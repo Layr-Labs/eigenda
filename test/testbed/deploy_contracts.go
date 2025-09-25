@@ -27,6 +27,40 @@ type PrivateKeyMaps struct {
 	BlsMap   map[string]KeyInfo
 }
 
+// OperatorInfo contains all the key information needed for an operator
+type OperatorInfo struct {
+	ECDSAPrivateKey string
+	ECDSAKeyFile    string
+	ECDSAPassword   string
+	BLSKeyPath      string
+	BLSPassword     string
+}
+
+// GenerateOperators creates a slice of OperatorInfo from PrivateKeyMaps
+func GenerateOperators(privateKeys *PrivateKeyMaps) []OperatorInfo {
+	// Count the number of operators
+	numOperators := 0
+	for key := range privateKeys.EcdsaMap {
+		if strings.HasPrefix(key, "opr") {
+			numOperators++
+		}
+	}
+
+	operators := make([]OperatorInfo, numOperators)
+	for i := 0; i < numOperators; i++ {
+		operatorKey := fmt.Sprintf("opr%d", i)
+		operators[i] = OperatorInfo{
+			ECDSAPrivateKey: privateKeys.EcdsaMap[operatorKey].PrivateKey,
+			ECDSAKeyFile:    privateKeys.EcdsaMap[operatorKey].KeyFile,
+			ECDSAPassword:   privateKeys.EcdsaMap[operatorKey].Password,
+			BLSKeyPath:      privateKeys.BlsMap[operatorKey].KeyFile,
+			BLSPassword:     privateKeys.BlsMap[operatorKey].Password,
+		}
+	}
+
+	return operators
+}
+
 // LoadPrivateKeysInput contains all the inputs needed to load private keys
 type LoadPrivateKeysInput struct {
 	NumOperators int

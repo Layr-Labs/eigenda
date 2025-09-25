@@ -27,3 +27,5 @@ icicle/*
 
 # OSX specific
 .DS_Store
+
+**/logs/**

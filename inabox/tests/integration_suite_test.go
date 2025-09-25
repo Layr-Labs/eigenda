@@ -4,9 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"log/slog"
 	"math/big"
 	"math/rand"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -21,25 +24,31 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	validatorclientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
-	"github.com/Layr-Labs/eigenda/core/eth"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
+	"google.golang.org/grpc"
 )
 
 /*
@@ -52,6 +61,8 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 var (
 	anvilContainer     *testbed.AnvilContainer
 	graphNodeContainer *testbed.GraphNodeContainer
+	churnerServer      *grpc.Server
+	churnerListener    net.Listener
 	// chainDockerNetwork is only used by anvil and graphNode
 	chainDockerNetwork *testcontainers.DockerNetwork
 
@@ -90,7 +101,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil-nograph.yaml", "Name of the config file (in `inabox/templates`)")
+	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
 	flag.BoolVar(&inMemoryBlobStore, "inMemoryBlobStore", false, "whether to use in-memory blob store")
 }
@@ -135,7 +146,7 @@ func setupSuite() error {
 		}
 	}
 
-	testConfig = deploy.NewTestConfig(testName, rootPath)
+	testConfig = deploy.ReadTestConfig(testName, rootPath)
 
 	if testConfig.Environment.IsLocal() {
 		// Create a shared Docker network for all containers
@@ -236,8 +247,15 @@ func setupSuite() error {
 			return fmt.Errorf("failed to mine block: %w", err)
 		}
 
+		logger.Info("Starting churner server")
+		err = startChurnerServer(testConfig)
+		if err != nil {
+			return fmt.Errorf("failed to start churner server: %w", err)
+		}
+		logger.Info("Churner server started", "port", "32002")
+
 		logger.Info("Starting binaries")
-		testConfig.StartBinaries()
+		testConfig.StartBinaries(true) // true = for tests, will skip churner
 
 		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
 		if err != nil {
@@ -421,13 +439,13 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 			log.Fatalln("could not start tcp listener", err)
 		}
 	}
-	tx, err := eth.NewWriter(
+	tx, err := coreeth.NewWriter(
 		logger, ethClient, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
 	if err != nil {
 		return err
 	}
 
-	cs := eth.NewChainState(tx, ethClient)
+	cs := coreeth.NewChainState(tx, ethClient)
 	agn := &core.StdAssignmentCoordinator{}
 	nodeClient := clients.NewNodeClient(20 * time.Second)
 	srsOrder, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_SRS_ORDER)
@@ -454,7 +472,7 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
-	chainReader, err = eth.NewReader(
+	chainReader, err = coreeth.NewReader(
 		logger,
 		ethClient,
 		testConfig.EigenDA.OperatorStateRetriever,
@@ -518,6 +536,126 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	return err
 }
 
+func startChurnerServer(testConfig *deploy.Config) error {
+	// Get deployer's private key
+	var privateKey string
+	deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
+	if ok && deployer.Name != "" {
+		privateKey = strings.TrimPrefix(testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey, "0x")
+	}
+
+	// Create churner config directly
+	// Create logs directory in the test directory
+	logsDir := fmt.Sprintf("testdata/%s/logs", testName)
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create logs directory: %w", err)
+	}
+
+	logFilePath := fmt.Sprintf("%s/churner.log", logsDir)
+	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open churner log file: %w", err)
+	}
+
+	churnerConfig := &churner.Config{
+		EthClientConfig: geth.EthClientConfig{
+			RPCURLs:          []string{"http://localhost:8545"},
+			PrivateKeyString: privateKey,
+		},
+		LoggerConfig: common.LoggerConfig{
+			Format:       common.TextLogFormat,
+			OutputWriter: io.MultiWriter(os.Stdout, logFile),
+			HandlerOpts: logging.SLoggerOptions{
+				Level:   slog.LevelDebug,
+				NoColor: true,
+			},
+		},
+		MetricsConfig: churner.MetricsConfig{
+			HTTPPort:      "9095",
+			EnableMetrics: true,
+		},
+		OperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetriever,
+		EigenDAServiceManagerAddr:  testConfig.EigenDA.ServiceManager,
+		EigenDADirectory:           testConfig.EigenDA.EigenDADirectory,
+		GRPCPort:                   "32002",
+		ChurnApprovalInterval:      15 * time.Minute,
+		PerPublicKeyRateLimit:      1 * time.Second,
+	}
+
+	// Set graph URL if graph node is enabled
+	if deployer.DeploySubgraphs && graphNodeContainer != nil {
+		churnerConfig.ChainStateConfig = thegraph.Config{
+			Endpoint: "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state",
+		}
+	}
+
+	// Create a logger from the churner config with file output
+	churnerLogger, err := common.NewLogger(&churnerConfig.LoggerConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create churner logger: %w", err)
+	}
+
+	// Create geth client
+	gethClient, err := geth.NewMultiHomingClient(churnerConfig.EthClientConfig, gethcommon.Address{}, churnerLogger)
+	if err != nil {
+		return fmt.Errorf("failed to create geth client: %w", err)
+	}
+
+	// Create writer
+	churnerTx, err := coreeth.NewWriter(
+		churnerLogger,
+		gethClient,
+		churnerConfig.OperatorStateRetrieverAddr,
+		churnerConfig.EigenDAServiceManagerAddr)
+	if err != nil {
+		return fmt.Errorf("failed to create writer: %w", err)
+	}
+
+	// Create indexer
+	chainState := coreeth.NewChainState(churnerTx, gethClient)
+	indexer := thegraph.MakeIndexedChainState(churnerConfig.ChainStateConfig, chainState, churnerLogger)
+
+	// Create churner
+	churnerMetrics := churner.NewMetrics(churnerConfig.MetricsConfig.HTTPPort, churnerLogger)
+	churnerInstance, err := churner.NewChurner(churnerConfig, indexer, churnerTx, churnerLogger, churnerMetrics)
+	if err != nil {
+		return fmt.Errorf("failed to create churner: %w", err)
+	}
+
+	// Create churner server
+	churnerSvr := churner.NewServer(churnerConfig, churnerInstance, churnerLogger, churnerMetrics)
+	err = churnerSvr.Start(churnerConfig.MetricsConfig)
+	if err != nil {
+		return fmt.Errorf("failed to start churner server metrics: %w", err)
+	}
+
+	// Create listener only after churner is successfully created
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", churnerConfig.GRPCPort))
+	if err != nil {
+		return fmt.Errorf("failed to listen on port %s: %w", churnerConfig.GRPCPort, err)
+	}
+	churnerListener = listener
+
+	// Create and start gRPC server
+	churnerServer = grpc.NewServer(grpc.MaxRecvMsgSize(1024 * 1024 * 300))
+	pb.RegisterChurnerServer(churnerServer, churnerSvr)
+	healthcheck.RegisterHealthServer(pb.Churner_ServiceDesc.ServiceName, churnerServer)
+
+	// Start serving in goroutine
+	go func() {
+		churnerLogger.Info("Starting churner gRPC server", "port", churnerConfig.GRPCPort)
+		if err := churnerServer.Serve(churnerListener); err != nil {
+			churnerLogger.Info("Churner gRPC server stopped", "error", err)
+		}
+	}()
+
+	// TODO: Replace with proper health check endpoint instead of fixed sleep
+	time.Sleep(100 * time.Millisecond)
+	churnerLogger.Info("Churner server started successfully", "port", churnerConfig.GRPCPort, "logFile", logFilePath)
+
+	return nil
+}
+
 func teardownSuite() {
 	logger.Info("Tearing down test environment")
 
@@ -534,6 +672,14 @@ func teardownSuite() {
 
 	logger.Info("Stopping binaries")
 	testConfig.StopBinaries()
+
+	if churnerServer != nil {
+		logger.Info("Stopping churner server")
+		churnerServer.GracefulStop()
+		if churnerListener != nil {
+			_ = churnerListener.Close()
+		}
+	}
 
 	logger.Info("Stopping anvil")
 	if anvilContainer != nil {
