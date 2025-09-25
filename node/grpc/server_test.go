@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/docker/go-units"
 	"github.com/gammazero/workerpool"
+	"github.com/stretchr/testify/require"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -348,8 +349,8 @@ func storeChunks(t *testing.T, server *grpc.Server, useGnarkBundleEncoding bool)
 func TestNodeInfoRequest(t *testing.T) {
 	server := newTestServer(t, true)
 	resp, err := server.NodeInfo(context.Background(), &pb.NodeInfoRequest{})
-	assert.True(t, resp.GetSemver() == ">=0.9.0-rc.1")
-	assert.True(t, err == nil)
+	require.NoError(t, err)
+	require.Equal(t, version.DefaultVersion().String(), resp.GetSemver())
 }
 
 func TestStoreChunksRequestValidation(t *testing.T) {
