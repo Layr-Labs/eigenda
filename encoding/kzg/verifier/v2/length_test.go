@@ -1,7 +1,6 @@
 package verifier_test
 
 import (
-	"fmt"
 	"strconv"
 	"testing"
 
@@ -40,10 +39,8 @@ func TestLengthProof(t *testing.T) {
 			require.Nil(t, err)
 			require.Equal(t, uint64(len(inputFr)), numSymbols)
 
-			_, lengthCommitment, lengthProof, _, _, err := enc.Encode(inputFr)
+			_, lengthCommitment, lengthProof, err := enc.GetCommitments(inputFr)
 			require.Nil(t, err)
-
-			fmt.Println("lengthCommitment", lengthCommitment, "lengthProof", lengthProof)
 
 			require.NoError(t, v.VerifyLengthProof(lengthCommitment, lengthProof, numSymbols),
 				"low degree verification failed\n")
