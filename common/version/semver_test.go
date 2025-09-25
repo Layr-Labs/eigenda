@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func verifySemver(t *testing.T, str string, major int, minor int, patch int, errata string) {
+func verifySemver(t *testing.T, str string, major uint64, minor uint64, patch uint64, errata string) {
 	semver, err := SemverFromString(str)
 	require.NoError(t, err)
 
