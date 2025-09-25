@@ -60,7 +60,7 @@ func setupTest(t *testing.T) (
 		require.NoError(t, err, "failed to create test directory")
 	}
 
-	testConfig := deploy.NewTestConfig(testName, rootPath)
+	testConfig := deploy.ReadTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = true
 
 	// Create a shared Docker network for all containers

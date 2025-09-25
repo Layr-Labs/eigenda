@@ -101,7 +101,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil-nograph.yaml", "Name of the config file (in `inabox/templates`)")
+	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
 	flag.BoolVar(&inMemoryBlobStore, "inMemoryBlobStore", false, "whether to use in-memory blob store")
 }
@@ -146,7 +146,7 @@ func setupSuite() error {
 		}
 	}
 
-	testConfig = deploy.NewTestConfig(testName, rootPath)
+	testConfig = deploy.ReadTestConfig(testName, rootPath)
 
 	if testConfig.Environment.IsLocal() {
 		// Create a shared Docker network for all containers
