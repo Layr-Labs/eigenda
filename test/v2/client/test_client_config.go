@@ -36,19 +36,6 @@ type TestClientConfig struct {
 	EthRPCUrlsVar string
 	// The contract address for the EigenDA address directory, where all contract addresses are stored
 	ContractDirectoryAddress string
-	// The contract address for the OperatorStateRetriever
-	// The contract address for the EigenDA cert verifier, which specifies required quorums 0 and 1
-	//
-	// If this value is not set, that tests utilizing it will be skipped
-	EigenDACertVerifierAddressQuorums0_1 string
-	// The contract address for the EigenDA cert verifier, which specifies required quorums 0, 1, and 2
-	//
-	// If this value is not set, that tests utilizing it will be skipped
-	EigenDACertVerifierAddressQuorums0_1_2 string
-	// The contract address for the EigenDA cert verifier, which specifies required quorum 2
-	//
-	// If this value is not set, that tests utilizing it will be skipped
-	EigenDACertVerifierAddressQuorums2 string
 	// The URL/IP of a subgraph to use for the chain state
 	SubgraphURL string
 	// The SRS order to use for the test

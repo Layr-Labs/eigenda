@@ -13,15 +13,11 @@ import (
 
 // Disperse an empty payload. Blob will not be empty, since payload encoding entails adding bytes
 func emptyPayloadProxyDispersalTest(t *testing.T, environment string) {
-	payload := []byte{}
-
-	config, err := client.GetConfig(environment)
-	require.NoError(t, err)
+	var payload []byte
 
 	c := client.GetTestClient(t, environment)
-	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = c.DisperseAndVerifyWithProxy(t.Context(), payload)
+	err := c.DisperseAndVerifyWithProxy(t.Context(), payload)
 	require.NoError(t, err)
 }
 
@@ -40,13 +36,9 @@ func TestEmptyPayloadProxyDispersal(t *testing.T) {
 func microscopicBlobProxyDispersalTest(t *testing.T, environment string) {
 	payload := []byte{1}
 
-	config, err := client.GetConfig(environment)
-	require.NoError(t, err)
-
 	c := client.GetTestClient(t, environment)
-	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = c.DisperseAndVerifyWithProxy(t.Context(), payload)
+	err := c.DisperseAndVerifyWithProxy(t.Context(), payload)
 	require.NoError(t, err)
 }
 
@@ -66,13 +58,9 @@ func smallBlobProxyDispersalTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
-	config, err := client.GetConfig(environment)
-	require.NoError(t, err)
-
 	c := client.GetTestClient(t, environment)
-	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = c.DisperseAndVerifyWithProxy(t.Context(), payload)
+	err := c.DisperseAndVerifyWithProxy(t.Context(), payload)
 	require.NoError(t, err)
 }
 
@@ -100,7 +88,6 @@ func maximumSizedBlobProxyDispersalTest(t *testing.T, environment string) {
 	payload := rand.Bytes(int(maxPermissibleDataLength))
 
 	c := client.GetTestClient(t, environment)
-	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
 	err = c.DisperseAndVerifyWithProxy(t.Context(), payload)
 	require.NoError(t, err)

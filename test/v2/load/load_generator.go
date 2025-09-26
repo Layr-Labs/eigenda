@@ -115,8 +115,6 @@ func NewLoadGenerator(
 		client.GetLogger().Info("Enabled pprof", "port", config.PprofHttpPort)
 	}
 
-	client.SetCertVerifierAddress(client.GetConfig().EigenDACertVerifierAddressQuorums0_1)
-
 	// Initialize a pool for random number generators
 	randPool := &sync.Pool{
 		New: func() interface{} {
