@@ -11,63 +11,89 @@ import (
 	"github.com/testcontainers/testcontainers-go/network"
 )
 
+// InfrastructureConfig contains the configuration for setting up the infrastructure
+type InfrastructureConfig struct {
+	TemplateName        string
+	TestName            string
+	InMemoryBlobStore   bool
+	Logger              logging.Logger
+	MetadataTableName   string
+	BucketTableName     string
+	MetadataTableNameV2 string
+}
+
 // SetupGlobalInfrastructure creates the shared infrastructure that persists across all tests.
 // This includes containers for Anvil, LocalStack, GraphNode, and the Churner server.
 // This should be called once in TestMain.
-func SetupGlobalInfrastructure(
-	templateName, testName string,
-	inMemoryBlobStore bool,
-	logger logging.Logger,
-) (*InfrastructureHarness, error) {
-	infra := &InfrastructureHarness{
-		TemplateName:        templateName,
-		TestName:            testName,
-		InMemoryBlobStore:   inMemoryBlobStore,
-		Logger:              logger,
-		MetadataTableName:   "test-BlobMetadata",
-		BucketTableName:     "test-BucketStore",
-		MetadataTableNameV2: "test-BlobMetadata-v2",
+func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, error) {
+	if config.MetadataTableName == "" {
+		config.MetadataTableName = "test-BlobMetadata"
+	}
+	if config.BucketTableName == "" {
+		config.BucketTableName = "test-BucketStore"
+	}
+	if config.MetadataTableNameV2 == "" {
+		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	infra.Cancel = cancel
-	defer func() {
-		// Don't cancel here - the context is needed for the lifetime of the infra
-		// It will be cancelled in TeardownGlobalInfrastructure
-	}()
+	defer cancel()
 
 	rootPath := "../../"
 
 	// Create test directory if needed
-	if infra.TestName == "" {
+	testName := config.TestName
+	if testName == "" {
 		var err error
-		infra.TestName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
+		testName, err = deploy.CreateNewTestDirectory(config.TemplateName, rootPath)
 		if err != nil {
-			cancel()
 			return nil, fmt.Errorf("failed to create test directory: %w", err)
 		}
 	}
 
-	infra.TestConfig = deploy.ReadTestConfig(infra.TestName, rootPath)
+	testConfig := deploy.ReadTestConfig(testName, rootPath)
 
-	if infra.TestConfig.Environment.IsLocal() {
-		if err := setupLocalInfrastructure(ctx, infra); err != nil {
-			cancel()
-			return nil, err
-		}
+	if testConfig.Environment.IsLocal() {
+		return setupLocalInfrastructure(ctx, config, testName, testConfig)
 	}
 
-	return infra, nil
+	// For non-local environments, just return a minimal harness
+	return &InfrastructureHarness{
+		TemplateName:        config.TemplateName,
+		TestName:            testName,
+		InMemoryBlobStore:   config.InMemoryBlobStore,
+		Logger:              config.Logger,
+		MetadataTableName:   config.MetadataTableName,
+		BucketTableName:     config.BucketTableName,
+		MetadataTableNameV2: config.MetadataTableNameV2,
+		TestConfig:          testConfig,
+	}, nil
 }
 
-func setupLocalInfrastructure(ctx context.Context, infra *InfrastructureHarness) error {
+func setupLocalInfrastructure(
+	ctx context.Context,
+	config *InfrastructureConfig,
+	testName string,
+	testConfig *deploy.Config,
+) (*InfrastructureHarness, error) {
+	infra := &InfrastructureHarness{
+		TemplateName:        config.TemplateName,
+		TestName:            testName,
+		InMemoryBlobStore:   config.InMemoryBlobStore,
+		Logger:              config.Logger,
+		MetadataTableName:   config.MetadataTableName,
+		BucketTableName:     config.BucketTableName,
+		MetadataTableNameV2: config.MetadataTableNameV2,
+		TestConfig:          testConfig,
+	}
+
 	// Create a shared Docker network for all containers
 	var err error
 	infra.ChainDockerNetwork, err = network.New(context.Background(),
 		network.WithDriver("bridge"),
 		network.WithAttachable())
 	if err != nil {
-		return fmt.Errorf("failed to create docker network: %w", err)
+		return nil, fmt.Errorf("failed to create docker network: %w", err)
 	}
 	infra.Logger.Info("Created Docker network", "name", infra.ChainDockerNetwork.Name)
 
@@ -82,7 +108,7 @@ func setupLocalInfrastructure(ctx context.Context, infra *InfrastructureHarness)
 			Network:        infra.ChainDockerNetwork,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to start localstack: %w", err)
+			return nil, fmt.Errorf("failed to start localstack: %w", err)
 		}
 
 		deployConfig := testbed.DeployResourcesConfig{
@@ -94,7 +120,7 @@ func setupLocalInfrastructure(ctx context.Context, infra *InfrastructureHarness)
 		}
 		err = testbed.DeployResources(ctx, deployConfig)
 		if err != nil {
-			return fmt.Errorf("failed to deploy resources: %w", err)
+			return nil, fmt.Errorf("failed to deploy resources: %w", err)
 		}
 	} else {
 		infra.Logger.Info("Using in-memory Blob Store")
@@ -109,7 +135,7 @@ func setupLocalInfrastructure(ctx context.Context, infra *InfrastructureHarness)
 		Network:        infra.ChainDockerNetwork,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start anvil: %w", err)
+		return nil, fmt.Errorf("failed to start anvil: %w", err)
 	}
 
 	// Setup Graph Node if needed
@@ -132,7 +158,7 @@ func setupLocalInfrastructure(ctx context.Context, infra *InfrastructureHarness)
 				Network:        infra.ChainDockerNetwork,
 			})
 		if err != nil {
-			return fmt.Errorf("failed to start graph node: %w", err)
+			return nil, fmt.Errorf("failed to start graph node: %w", err)
 		}
 	}
 
@@ -140,21 +166,21 @@ func setupLocalInfrastructure(ctx context.Context, infra *InfrastructureHarness)
 	infra.Logger.Info("Deploying experiment")
 	err = infra.TestConfig.DeployExperiment()
 	if err != nil {
-		return fmt.Errorf("failed to deploy experiment: %w", err)
+		return nil, fmt.Errorf("failed to deploy experiment: %w", err)
 	}
 
 	// Start churner server
 	infra.Logger.Info("Starting churner server")
 	err = StartChurnerForInfrastructure(infra)
 	if err != nil {
-		return fmt.Errorf("failed to start churner server: %w", err)
+		return nil, fmt.Errorf("failed to start churner server: %w", err)
 	}
 	infra.Logger.Info("Churner server started", "port", "32002")
 
 	infra.Logger.Info("Starting binaries")
 	infra.TestConfig.StartBinaries(true) // true = for tests, will skip churner
 
-	return nil
+	return infra, nil
 }
 
 // TeardownGlobalInfrastructure cleans up all global infrastructure
@@ -167,10 +193,6 @@ func TeardownGlobalInfrastructure(infra *InfrastructureHarness) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-
-	if infra.Cancel != nil {
-		infra.Cancel()
-	}
 
 	infra.Logger.Info("Stopping binaries")
 	infra.TestConfig.StopBinaries()

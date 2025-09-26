@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"math/big"
 	"net"
 
@@ -50,11 +49,8 @@ type InfrastructureHarness struct {
 	// Deployment configuration (shared)
 	TestConfig *deploy.Config
 
-	// Logger
+	// Logger for the infrastructure components
 	Logger logging.Logger
-
-	// Context management
-	Cancel context.CancelFunc
 }
 
 // TestHarness contains all the components that should be created fresh for each test

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // Global infrastructure that is shared across all tests
@@ -17,7 +18,6 @@ var (
 	templateName      string
 	testName          string
 	inMemoryBlobStore bool
-	logger            = test.GetLogger()
 )
 
 func init() {
@@ -29,15 +29,18 @@ func init() {
 func TestMain(m *testing.M) {
 	flag.Parse()
 
+	// Create logger used for setup and teardown operations
+	logger := test.GetLogger()
+
 	if testing.Short() {
 		logger.Info("Skipping inabox integration tests in short mode")
 		os.Exit(0)
 	}
 
 	// Run suite setup
-	if err := setupSuite(); err != nil {
+	if err := setupSuite(logger); err != nil {
 		logger.Error("Setup failed:", err)
-		teardownSuite()
+		teardownSuite(logger)
 		os.Exit(1)
 	}
 
@@ -45,18 +48,24 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 
 	// Run suite teardown
-	teardownSuite()
+	teardownSuite(logger)
 
 	// Exit with test result code
 	os.Exit(code)
 }
 
-func setupSuite() error {
+func setupSuite(logger logging.Logger) error {
 	logger.Info("bootstrapping test environment")
 
 	// Setup the global infrastructure
+	config := &InfrastructureConfig{
+		TemplateName:      templateName,
+		TestName:          testName,
+		InMemoryBlobStore: inMemoryBlobStore,
+		Logger:            logger,
+	}
 	var err error
-	globalInfra, err = SetupGlobalInfrastructure(templateName, testName, inMemoryBlobStore, logger)
+	globalInfra, err = SetupGlobalInfrastructure(config)
 	if err != nil {
 		return fmt.Errorf("failed to setup global infrastructure: %w", err)
 	}
@@ -64,7 +73,7 @@ func setupSuite() error {
 	return nil
 }
 
-func teardownSuite() {
+func teardownSuite(logger logging.Logger) {
 	logger.Info("Tearing down test environment")
 
 	// Teardown the global infrastructure
