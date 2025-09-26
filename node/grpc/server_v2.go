@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/replay"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -37,6 +38,9 @@ type ServerV2 struct {
 	chunkAuthenticator auth.RequestAuthenticator
 	blobAuthenticator  corev2.BlobRequestAuthenticator
 	replayGuardian     replay.ReplayGuardian
+
+	// The current software version.
+	softwareVersion *version.Semver
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -47,7 +51,8 @@ func NewServerV2(
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
 	registry *prometheus.Registry,
-	reader core.Reader) (*ServerV2, error) {
+	reader core.Reader,
+	softwareVersion *version.Semver) (*ServerV2, error) {
 
 	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
@@ -85,12 +90,13 @@ func NewServerV2(
 		chunkAuthenticator: chunkAuthenticator,
 		blobAuthenticator:  blobAuthenticator,
 		replayGuardian:     replayGuardian,
+		softwareVersion:    softwareVersion,
 	}, nil
 }
 
 func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (*pb.GetNodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
-		return &pb.GetNodeInfoReply{Semver: node.SemVer}, nil
+		return &pb.GetNodeInfoReply{Semver: s.softwareVersion.String()}, nil
 	}
 
 	memBytes := uint64(0)
@@ -100,7 +106,7 @@ func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (
 	}
 
 	return &pb.GetNodeInfoReply{
-		Semver:   node.SemVer,
+		Semver:   s.softwareVersion.String(),
 		Os:       runtime.GOOS,
 		Arch:     runtime.GOARCH,
 		NumCpu:   uint32(runtime.GOMAXPROCS(0)),

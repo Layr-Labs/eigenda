@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -131,6 +132,7 @@ func NewNode(
 	pubIPProvider pubip.Provider,
 	client *geth.InstrumentedEthClient,
 	logger logging.Logger,
+	softwareVersion *version.Semver,
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
@@ -192,7 +194,8 @@ func NewNode(
 	}
 
 	// Setup Node Api
-	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
+	nodeApi := nodeapi.NewNodeApi(
+		AppName, softwareVersion.String(), ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
 	metrics := NewMetrics(eigenMetrics, reg, logger, socketAddr, config.ID, config.OnchainMetricsInterval, tx, cst)
 
