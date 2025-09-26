@@ -134,6 +134,8 @@ func (a *Accountant) blobPaymentInfo(
 		}
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 		a.metrics.RecordCumulativePayment(a.cumulativePayment)
+
+		// make a copy so we don't randomly mutate this on someone later
 		return new(big.Int).Set(a.cumulativePayment), nil
 	}
 	return big.NewInt(0), fmt.Errorf(
