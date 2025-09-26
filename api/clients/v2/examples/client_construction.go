@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
@@ -472,7 +473,7 @@ func createReservationLedger(
 		*clientReservation,
 		minNumSymbols,
 		true,
-		reservation.OverfillOncePermitted,
+		ratelimit.OverfillOncePermitted,
 		time.Minute,
 	)
 	if err != nil {

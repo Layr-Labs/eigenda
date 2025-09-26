@@ -30,13 +30,3 @@ func (e *TimeOutOfRangeError) Error() string {
 		e.ReservationStartTime.Format(time.RFC3339),
 		e.ReservationEndTime.Format(time.RFC3339))
 }
-
-// TimeMovedBackwardError indicates a timestamp was observed that is before a previously observed timestamp.
-type TimeMovedBackwardError struct {
-	PreviousTime time.Time
-	CurrentTime  time.Time
-}
-
-func (e *TimeMovedBackwardError) Error() string {
-	return fmt.Sprintf("time moved backward: previous=%v, current=%v", e.PreviousTime, e.CurrentTime)
-}
