@@ -656,7 +656,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		blobKey,
 		eigenDAV3Cert.RelayKeys(),
 		payload,
-		blobLengthSymbols,
+		uint32(blobLengthSymbols),
 		0)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
@@ -880,7 +880,7 @@ func (c *TestClient) ReadBlobFromValidators(
 
 		blobLengthSymbols := header.BlobCommitments.Length
 		var blob *coretypes.Blob
-		blob, err = coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
+		blob, err = coretypes.DeserializeBlob(retrievedBlobBytes, uint32(blobLengthSymbols))
 		if err != nil {
 			return fmt.Errorf("failed to deserialize blob: %w", err)
 		}
