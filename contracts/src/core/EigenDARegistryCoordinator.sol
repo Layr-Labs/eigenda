@@ -147,7 +147,7 @@ contract EigenDARegistryCoordinator is
         }).numOperatorsPerQuorum;
 
         // For each quorum, validate that the new operator count does not exceed the maximum
-        // If it does, churns an operator via an exhaustive search through the operator set.
+        // If it does, churns the operator with the lowest stake via an exhaustive search through the operator set.
         for (uint256 i; i < quorumNumbers.length; i++) {
             uint8 quorumNumber = uint8(quorumNumbers[i]);
 
@@ -157,7 +157,8 @@ contract EigenDARegistryCoordinator is
         }
     }
 
-    /// @notice Deprecated function. Use `registerOperator` instead.
+    /// @notice Deprecated function. Use `registerOperator` instead, which implements churning without a churn approver.
+    ///         Kept for backwards compatibility purposes only.
     function registerOperatorWithChurn(
         bytes calldata quorumNumbers,
         string calldata socket,
@@ -805,6 +806,7 @@ contract EigenDARegistryCoordinator is
     }
 
     /// @notice Deprecated function.
+    /// @dev    Kept for backwards compatibility purposes, and will be deleted when the migration to the new churning process is completed.
     function calculateOperatorChurnApprovalDigestHash(address, bytes32, OperatorKickParam[] memory, bytes32, uint256)
         external
         pure
