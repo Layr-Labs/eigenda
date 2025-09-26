@@ -32,7 +32,7 @@ type LeakyBucket struct {
 	// Defines different ways that overfilling the bucket should be handled
 	overfillBehavior OverfillBehavior
 
-	// The total quantity of "water" that fit in the bucket
+	// The total quantity of "water" that fits in the bucket
 	bucketCapacity float64
 
 	// The quantity of "water" that leaks out of the bucket each second, as determined by the configuration.
@@ -47,7 +47,7 @@ type LeakyBucket struct {
 
 // Creates a new instance of the LeakyBucket algorithm
 func NewLeakyBucket(
-	// how fast "water" leaks out of the bucket per second
+	// how much "water" leaks out of the bucket per second
 	leakRate float64,
 	// bucketCapacityDuration * leakRate becomes the bucket capacity
 	bucketCapacityDuration time.Duration,
@@ -58,14 +58,14 @@ func NewLeakyBucket(
 	// the current time, when this is being constructed
 	now time.Time,
 ) (*LeakyBucket, error) {
-	if leakRate == 0 {
-		return nil, errors.New("leakRate must be > 0")
+	if leakRate <= 0 {
+		return nil, fmt.Errorf("leakRate must be > 0, got %f", leakRate)
 	}
 
 	bucketCapacity := leakRate * bucketCapacityDuration.Seconds()
 	if bucketCapacity <= 0 {
-		return nil, fmt.Errorf("bucket capacity must be > 0 (from leak rate %f * duration %s)",
-			leakRate, bucketCapacityDuration)
+		return nil, fmt.Errorf("bucket capacity must be > 0 (from leak rate %f * duration %s), got %f",
+			leakRate, bucketCapacityDuration, bucketCapacity)
 	}
 
 	currentFillLevel := float64(0)
@@ -97,7 +97,7 @@ func NewLeakyBucket(
 // failed fill doesn't count against the meter.
 func (lb *LeakyBucket) Fill(now time.Time, quantity float64) (bool, error) {
 	if quantity <= 0 {
-		return false, errors.New("quantity must be > 0")
+		return false, fmt.Errorf("quantity must be > 0, got %f", quantity)
 	}
 
 	err := lb.leak(now)
@@ -143,15 +143,11 @@ func (lb *LeakyBucket) CheckFillLevel(now time.Time) float64 {
 	return lb.currentFillLevel
 }
 
-// Overrides the current fill level of the bucket, setting it to the specified value.
+// Overrides the current fill level of the bucket, setting it to the specified value. This method requires a positive
+// fill level, but otherwise does not attempt to enforce any constraints on the maximum fill level.
 func (lb *LeakyBucket) SetFillLevel(now time.Time, fillLevel float64) error {
 	if fillLevel < 0 {
-		return errors.New("fill level must be >= 0")
-	}
-
-	if fillLevel > lb.bucketCapacity && lb.overfillBehavior == OverfillNotPermitted {
-		return fmt.Errorf("fill level %f exceeds bucket capacity %f, but overfilling is not permitted",
-			fillLevel, lb.bucketCapacity)
+		return errors.New("fill level must be >= 0, got " + fmt.Sprint(fillLevel))
 	}
 
 	lb.previousLeakTime = now
@@ -170,7 +166,7 @@ func (lb *LeakyBucket) SetFillLevel(now time.Time, fillLevel float64) error {
 // The input time should be the most up-to-date time, NOT the time of the original fill.
 func (lb *LeakyBucket) RevertFill(now time.Time, quantity float64) error {
 	if quantity <= 0 {
-		return errors.New("quantity must be > 0")
+		return errors.New("quantity must be > 0, got " + fmt.Sprint(quantity))
 	}
 
 	err := lb.leak(now)
