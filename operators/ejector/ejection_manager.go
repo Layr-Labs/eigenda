@@ -20,7 +20,7 @@ type EjectionManager interface {
 	// Begin ejection proceedings against a validator. May not take action if it is not appropriate to do so.
 	BeginEjection(
 		validatorAddress geth.Address,
-	// For each quorum the validator is a member of, the validator's stake in that quorum as a fraction of 1.0.
+		// For each quorum the validator is a member of, the validator's stake in that quorum as a fraction of 1.0.
 		stakes map[core.QuorumID]float64,
 	)
 
@@ -100,25 +100,25 @@ type ejectionManager struct {
 func NewEjectionManager(
 	ctx context.Context,
 	logger logging.Logger,
-// A source of time.
+	// A source of time.
 	timeSource func() time.Time,
-// Submits ejection transactions.
+	// Submits ejection transactions.
 	transactor EjectionTransactor,
-// the minimum time between starting an ejection and completing it
+	// the minimum time between starting an ejection and completing it
 	ejectionDelay time.Duration,
-// the minimum time between two consecutive ejection attempts for the same validator
+	// the minimum time between two consecutive ejection attempts for the same validator
 	retryDelay time.Duration,
-// the maximum number of consecutive failed ejection attempts before a validator is blacklisted
+	// the maximum number of consecutive failed ejection attempts before a validator is blacklisted
 	maxConsecutiveFailedEjectionAttempts uint32,
-// Configures throttle for maximum stake (as a fraction of 1.0) that can be ejected per second in each quorum.
+	// Configures throttle for maximum stake (as a fraction of 1.0) that can be ejected per second in each quorum.
 	maxEjectionRate float64,
-// Determines the bucket size for the rate limiter. The bucket is sized equal to the amount that can be drained
-// in this interval.
+	// Determines the bucket size for the rate limiter. The bucket is sized equal to the amount that can be drained
+	// in this interval.
 	throttleBucketInterval time.Duration,
-// If true, when starting up the leaky bucket used by the throttle will be full, meaning that we will need to
-// wait for some time before being able to eject. If false, the bucket starts empty and we can eject immediately.
+	// If true, when starting up the leaky bucket used by the throttle will be full, meaning that we will need to
+	// wait for some time before being able to eject. If false, the bucket starts empty and we can eject immediately.
 	startThrottleFull bool,
-// A set of validators that we will not attempt to eject. May be nil.
+	// A set of validators that we will not attempt to eject. May be nil.
 	ejectionBlacklist []geth.Address,
 ) (EjectionManager, error) {
 
