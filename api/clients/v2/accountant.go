@@ -134,7 +134,7 @@ func (a *Accountant) blobPaymentInfo(
 		}
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 		a.metrics.RecordCumulativePayment(a.cumulativePayment)
-		return a.cumulativePayment, nil
+		return new(big.Int).Set(a.cumulativePayment), nil
 	}
 	return big.NewInt(0), fmt.Errorf(
 		"invalid payments: no available bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
