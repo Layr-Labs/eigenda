@@ -11,6 +11,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
 	"github.com/docker/go-units"
@@ -203,6 +205,14 @@ type Config struct {
 	// setting the minimum version number goes rogue, honest validators may want to contest ejection regardless of the
 	// claimed minimum version number.
 	IgnoreVersionForEjectionDefense bool
+
+	// Whether the validator should perform payment validation.
+	//
+	// TODO(litt3): This is a temporary field, which will be removed once the new payments system is fully in place.
+	// Payment validation is currently optional to make implementation and testing possible before actually shipping
+	// the new payments system.
+	EnablePaymentValidation      bool
+	ReservationLedgerCacheConfig reservationvalidation.ReservationLedgerCacheConfig
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -378,6 +388,21 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		}
 	}
 
+	paymentValidationEnabled := ctx.GlobalBool(flags.EnablePaymentValidationFlag.Name)
+	var reservationLedgerCacheConfig reservationvalidation.ReservationLedgerCacheConfig
+	if paymentValidationEnabled {
+		reservationLedgerCacheConfig, err = reservationvalidation.NewReservationLedgerCacheConfig(
+			ctx.GlobalInt(flags.ReservationMaxLedgersFlag.Name),
+			ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
+			// this is hardcoded: it's a parameter just in case, but it's never expected to change
+			reservation.OverfillOncePermitted,
+			ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("new reservation ledger cache config: %w", err)
+		}
+	}
+
 	return &Config{
 		Hostname:                            ctx.GlobalString(flags.HostnameFlag.Name),
 		DispersalPort:                       dispersalPort,
@@ -457,5 +482,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EjectionSentinelPeriod:          ctx.GlobalDuration(flags.EjectionSentinelPeriodFlag.Name),
 		EjectionDefenseEnabled:          ctx.GlobalBool(flags.EjectionDefenseEnabledFlag.Name),
 		IgnoreVersionForEjectionDefense: ctx.GlobalBool(flags.IgnoreVersionForEjectionDefenseFlag.Name),
+		EnablePaymentValidation:         paymentValidationEnabled,
+		ReservationLedgerCacheConfig:    reservationLedgerCacheConfig,
 	}, nil
 }
