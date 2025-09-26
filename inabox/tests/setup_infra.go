@@ -44,7 +44,7 @@ func SetupGlobalInfrastructure(templateName, testName string, inMemoryBlobStore 
 		}
 	}
 
-	infra.TestConfig = deploy.NewTestConfig(infra.TestName, rootPath)
+	infra.TestConfig = deploy.ReadTestConfig(infra.TestName, rootPath)
 
 	if infra.TestConfig.Environment.IsLocal() {
 		if err := setupLocalInfrastructure(ctx, infra); err != nil {
