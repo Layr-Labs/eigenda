@@ -14,7 +14,11 @@ import (
 // SetupGlobalInfrastructure creates the shared infrastructure that persists across all tests.
 // This includes containers for Anvil, LocalStack, GraphNode, and the Churner server.
 // This should be called once in TestMain.
-func SetupGlobalInfrastructure(templateName, testName string, inMemoryBlobStore bool, logger logging.Logger) (*InfrastructureHarness, error) {
+func SetupGlobalInfrastructure(
+	templateName, testName string,
+	inMemoryBlobStore bool,
+	logger logging.Logger,
+) (*InfrastructureHarness, error) {
 	infra := &InfrastructureHarness{
 		TemplateName:        templateName,
 		TestName:            testName,

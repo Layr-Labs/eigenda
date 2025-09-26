@@ -173,7 +173,7 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 		infraHarness.TestConfig.EigenDA.OperatorStateRetriever,
 		infraHarness.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create writer: %w", err)
 	}
 
 	cs := coreeth.NewChainState(tx, testHarness.EthClient)
@@ -182,7 +182,7 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 
 	srsOrder, err := strconv.Atoi(infraHarness.TestConfig.Retriever.RETRIEVER_SRS_ORDER)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse SRS order: %w", err)
 	}
 
 	kzgConfig := &kzg.KzgConfig{
@@ -198,12 +198,13 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 
 	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create kzg verifier: %w", err)
 	}
 
-	testHarness.RetrievalClient, err = clients.NewRetrievalClient(infraHarness.Logger, cs, agn, nodeClient, kzgVerifier, 10)
+	testHarness.RetrievalClient, err = clients.NewRetrievalClient(
+		infraHarness.Logger, cs, agn, nodeClient, kzgVerifier, 10)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create retrieval client: %w", err)
 	}
 
 	testHarness.ChainReader, err = coreeth.NewReader(
@@ -213,7 +214,7 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 		infraHarness.TestConfig.EigenDA.ServiceManager,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
 	// Setup V2 retrieval clients
@@ -238,7 +239,7 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 		kzgVerifier.G1SRS,
 		metrics.NoopRetrievalMetrics)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create validator payload retriever: %w", err)
 	}
 
 	// Setup relay client
@@ -246,14 +247,15 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 		MaxGRPCMessageSize: 100 * 1024 * 1024, // 100 MB message size limit
 	}
 
-	relayUrlProvider, err := relay.NewRelayUrlProvider(testHarness.EthClient, testHarness.ChainReader.GetRelayRegistryAddress())
+	relayUrlProvider, err := relay.NewRelayUrlProvider(
+		testHarness.EthClient, testHarness.ChainReader.GetRelayRegistryAddress())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create relay URL provider: %w", err)
 	}
 
 	relayClient, err := relay.NewRelayClient(relayClientConfig, infraHarness.Logger, relayUrlProvider)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create relay client: %w", err)
 	}
 
 	relayPayloadRetrieverConfig := payloadretrieval.RelayPayloadRetrieverConfig{
@@ -268,22 +270,25 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 		relayClient,
 		kzgVerifier.G1SRS,
 		metrics.NoopRetrievalMetrics)
+	if err != nil {
+		return fmt.Errorf("failed to create relay payload retriever: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 func setupPayloadDisperserForContext(testHarness *TestHarness, infra *InfrastructureHarness) error {
 	// Set up the block monitor
 	blockMonitor, err := verification.NewBlockNumberMonitor(infra.Logger, testHarness.EthClient, time.Second*1)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create block number monitor: %w", err)
 	}
 
 	// Set up the PayloadDisperser
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create blob request signer: %w", err)
 	}
 
 	disperserClientConfig := &clientsv2.DisperserClientConfig{
@@ -316,7 +321,7 @@ func setupPayloadDisperserForContext(testHarness *TestHarness, infra *Infrastruc
 		metrics.NoopDispersalMetrics,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create disperser client: %w", err)
 	}
 
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
@@ -337,8 +342,11 @@ func setupPayloadDisperserForContext(testHarness *TestHarness, infra *Infrastruc
 		nil,
 		nil,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create payload disperser: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind.TransactOpts {
