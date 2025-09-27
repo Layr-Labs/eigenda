@@ -1,13 +1,21 @@
 dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
-.PHONY: run-e2e-test start-inabox stop-inabox new-testdata-dir clean start-infra stop-infra start-services stop-services
+.PHONY: run-e2e-tests start-inabox stop-inabox new-testdata-dir clean start-infra stop-infra start-services stop-services
 
 # Starts a short-lived inabox devnet, and runs integration/e2e tests against it.
 run-e2e-tests:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
 
 # Starts a long-lived inabox local devnet.
-start-inabox: start-infra start-services
-	@echo "If everything went well, inabox should now be running."
+# If you need to make configuration changes to inabox,
+# Then use the low-level commands below:
+# 1. `make new-testdata-dir`
+# 2. make modifications to `./testdata/_latest/config.yaml`
+# 3. `make start-infra`
+# 4. `make start-services`
+start-inabox: new-testdata-dir start-infra start-services
+	@echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	@echo "@                     INABOX IS RUNNING!                         @"
+	@echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 	@echo
 	@echo "export these variables:"
 	@echo "ETH_RPC_URL=http://localhost:8545"
