@@ -59,15 +59,13 @@ abstract contract EigenDARegistryCoordinatorStorage is IRegistryCoordinator {
     mapping(bytes32 => QuorumBitmapUpdate[]) internal _operatorBitmapHistory;
     /// @notice maps operator address => operator id and status
     mapping(address => OperatorInfo) internal _operatorInfo;
-    /// @notice whether the salt has been used for an operator churn approval
-    mapping(bytes32 => bool) public isChurnApproverSaltUsed;
+    mapping(bytes32 => bool) private _deprecated_0;
     /// @notice mapping from quorum number to the latest block that all quorums were updated all at once
     mapping(uint8 => uint256) public quorumUpdateBlockNumber;
 
     /// @notice the dynamic-length array of the registries this coordinator is coordinating
     address[] public registries;
-    /// @notice the address of the entity allowed to sign off on operators getting kicked out of the AVS during registration
-    address public churnApprover;
+    address private _deprecated_1;
     /// @notice the address of the entity allowed to eject operators from the AVS
     address public ejector;
 

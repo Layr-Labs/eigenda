@@ -219,9 +219,9 @@ func TestParsingBundle(t *testing.T) {
 		proof := g1.G1Affine
 		proofs[i] = proof
 	}
-	serializedProofs, err := rs.SerializeFrameProofs(proofs)
+	serializedProofs, err := encoding.SerializeFrameProofs(proofs)
 	require.NoError(t, err)
-	splitProofs, err := rs.SplitSerializedFrameProofs(serializedProofs)
+	splitProofs, err := encoding.SplitSerializedFrameProofs(serializedProofs)
 	require.NoError(t, err)
 	require.Equal(t, len(proofs), len(splitProofs))
 

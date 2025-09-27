@@ -22,7 +22,7 @@ func (g *ParametrizedEncoder) PadPolyEval(coeffs []fr.Element) ([]fr.Element, er
 	numEval := int(g.NumEvaluations())
 
 	if len(coeffs) > numEval {
-		return nil, fmt.Errorf("the provided encoding parameters are not sufficient for the size of the data input")
+		return nil, fmt.Errorf("encoding params (%d) < num field elements of input (%d)", numEval, len(coeffs))
 	}
 
 	pdCoeffs := make([]fr.Element, numEval)

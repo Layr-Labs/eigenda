@@ -168,7 +168,7 @@ func (c *StdAssignmentCoordinator) GetOperatorAssignment(state *OperatorState, h
 		return Assignment{}, AssignmentInfo{}, fmt.Errorf("invalid request: quorum ID %d not found in blob header", quorum)
 	}
 
-	assignments, info, err := c.GetAssignments(state, header.Length, quorumInfo)
+	assignments, info, err := c.GetAssignments(state, uint(header.Length), quorumInfo)
 	if err != nil {
 		return Assignment{}, AssignmentInfo{}, err
 	}

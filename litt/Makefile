@@ -1,13 +1,13 @@
 SHELL := /bin/bash
 
+
+# Build the litt CLI tool.
+build:
+	go build -o ./bin/litt ./cli
+
 # Remove the bin directory if it exists.
 clean:
 	rm -rf ./bin
-
-# Build the litt CLI tool.
-build: clean
-	go mod tidy
-	go build -o ./bin/litt ./cli
 
 # Build the litt CLI tool with debug flags.
 debug-build: clean

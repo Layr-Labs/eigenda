@@ -14,7 +14,6 @@ import (
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -155,7 +154,15 @@ func (env *Config) DeployExperiment() error {
 			return fmt.Errorf("error getting latest block number: %w", err)
 		}
 
-		err = env.deploySubgraphs(startBlock)
+		config := testbed.SubgraphDeploymentConfig{
+			RootPath:            env.rootPath,
+			RegistryCoordinator: env.EigenDA.RegistryCoordinator,
+			BlsApkRegistry:      env.EigenDA.BlsApkRegistry,
+			ServiceManager:      env.EigenDA.ServiceManager,
+			Logger:              logger,
+		}
+
+		err = testbed.DeploySubgraphs(config, startBlock)
 		if err != nil {
 			return fmt.Errorf("error deploying subgraphs: %w", err)
 		}
@@ -352,8 +359,9 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	}
 }
 
-// TODO: Supply the test path to the runner utility
-func (env *Config) StartBinaries() {
+// StartBinaries starts the EigenDA binaries
+// forTests: if true, skips churner (which runs as goroutine in tests)
+func (env *Config) StartBinaries(forTests bool) {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
 		logger.Fatal("Error changing directories", "error", err)
 	}
@@ -363,8 +371,16 @@ func (env *Config) StartBinaries() {
 		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	logger.Info("Starting binaries")
-	err := execCmd("./bin.sh", []string{"start-detached"}, []string{}, true)
+	var command string
+	if forTests {
+		logger.Info("Starting binaries for tests (without churner)")
+		command = "start-detached-for-tests"
+	} else {
+		logger.Info("Starting binaries for devnet")
+		command = "start-detached"
+	}
+
+	err := execCmd("./bin.sh", []string{command}, []string{}, true)
 	if err != nil {
 		logger.Fatal("Failed to start binaries, check testdata directory for more information", "error", err)
 	}
@@ -372,7 +388,7 @@ func (env *Config) StartBinaries() {
 	logger.Info("Binaries started successfully!")
 }
 
-// TODO: Supply the test path to the runner utility
+// StopBinaries stops all running binaries
 func (env *Config) StopBinaries() {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
 		logger.Fatal("Error changing directories", "error", err)
@@ -386,40 +402,5 @@ func (env *Config) StopBinaries() {
 	err := execCmd("./bin.sh", []string{"stop-detached"}, []string{}, true)
 	if err != nil {
 		logger.Fatal("Failed to stop binaries", "error", err)
-	}
-}
-
-func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) {
-	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
-		logger.Fatal("Error changing directories", "error", err)
-	}
-
-	// Log the current working directory (absolute path)
-	if cwd, err := os.Getwd(); err == nil {
-		logger.Info("Successfully changed to absolute path", "path", cwd)
-	}
-
-	socket := string(core.MakeOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT, operator.NODE_V2_DISPERSAL_PORT, operator.NODE_V2_RETRIEVAL_PORT))
-
-	envVars := []string{
-		"NODE_OPERATION=" + operation,
-		"NODE_ECDSA_KEY_FILE=" + operator.NODE_ECDSA_KEY_FILE,
-		"NODE_BLS_KEY_FILE=" + operator.NODE_BLS_KEY_FILE,
-		"NODE_ECDSA_KEY_PASSWORD=" + operator.NODE_ECDSA_KEY_PASSWORD,
-		"NODE_BLS_KEY_PASSWORD=" + operator.NODE_BLS_KEY_PASSWORD,
-		"NODE_SOCKET=" + socket,
-		"NODE_QUORUM_ID_LIST=" + operator.NODE_QUORUM_ID_LIST,
-		"NODE_CHAIN_RPC=" + operator.NODE_CHAIN_RPC,
-		"NODE_EIGENDA_DIRECTORY=" + operator.NODE_EIGENDA_DIRECTORY,
-		"NODE_BLS_OPERATOR_STATE_RETRIVER=" + operator.NODE_BLS_OPERATOR_STATE_RETRIVER,
-		"NODE_EIGENDA_SERVICE_MANAGER=" + operator.NODE_EIGENDA_SERVICE_MANAGER,
-		"NODE_CHURNER_URL=" + operator.NODE_CHURNER_URL,
-		"NODE_NUM_CONFIRMATIONS=0",
-	}
-
-	err := execCmd("./node-plugin.sh", []string{}, envVars, true)
-
-	if err != nil {
-		logger.Fatal("Failed to run node plugin", "error", err)
 	}
 }

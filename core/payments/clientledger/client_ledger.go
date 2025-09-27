@@ -204,8 +204,24 @@ func (cl *ClientLedger) debitOnDemandOnly(
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
 	cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
-	enforce.NilError(err, "on-demand debit failed. reservations aren't configured, and the ledger won't become "+
-		"aware of new on-chain deposits without a restart")
+	if err != nil {
+		var insufficientFundsErr *ondemand.InsufficientFundsError
+		if errors.As(err, &insufficientFundsErr) {
+			// Don't panic if insufficient funds occurs: new deposits will be observed by the client ledger, so it's
+			// possible to recover from this.
+			// nolint:wrapcheck // the returned error message is informative
+			return nil, err
+		}
+
+		var quorumNotSupportedErr *ondemand.QuorumNotSupportedError
+		if errors.As(err, &quorumNotSupportedErr) {
+			// This error is included here explicitly, for the sake of completeness (even though the behavior is the
+			// same as for a generic error)
+			panic(err.Error())
+		}
+
+		panic(err.Error())
+	}
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
 	enforce.NilError(err, "new payment metadata")

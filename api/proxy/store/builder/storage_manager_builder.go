@@ -108,13 +108,8 @@ func BuildManagers(
 		// kzgVerifier is only needed when validator retrieval is enabled
 		var kzgVerifier *kzgverifierv2.Verifier
 		if slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
-			// The verifier doesn't support loading trailing g2 points from a separate file. If LoadG2Points is true, and
-			// the user is using a slimmed down g2 SRS file, the verifier will encounter an error while trying to load g2
-			// points. Since the verifier doesn't actually need g2 points, it's safe to force LoadG2Points to false, to
-			// sidestep the issue entirely.
-			kzgConfig := config.KzgConfig
-			kzgConfig.LoadG2Points = false
-			kzgVerifier, err = kzgverifierv2.NewVerifier(&kzgConfig, nil)
+			kzgConfig := kzgverifierv2.KzgConfigFromV1Config(&config.KzgConfig)
+			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig, nil)
 			if err != nil {
 				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 			}
@@ -222,10 +217,10 @@ func buildEigenDAV2Backend(
 	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
 	// the underlying core library to be more flexible, but that is a larger change for another time. As a stopgap, we
 	// simply set this value to whatever it needs to be prior to using it.
-	kzgConfig := config.KzgConfig
+	kzgConfig := kzgproverv2.KzgConfigFromV1Config(&config.KzgConfig)
 	kzgConfig.LoadG2Points = true
 
-	kzgProver, err := kzgproverv2.NewProver(&kzgConfig, nil)
+	kzgProver, err := kzgproverv2.NewProver(kzgConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("new KZG prover: %w", err)
 	}
@@ -608,6 +603,8 @@ func buildPayloadDisperser(
 		return nil, fmt.Errorf("error getting account ID: %w", err)
 	}
 
+	log.Infof("Using account ID %s", accountId.Hex())
+
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
@@ -790,15 +787,18 @@ func buildOnDemandLedger(
 		return nil, fmt.Errorf("get payment state from disperser: %w", err)
 	}
 
+	var cumulativePayment *big.Int
 	if paymentState.GetCumulativePayment() == nil {
-		return nil, errors.New("received nil cumulative payment from disperser")
+		cumulativePayment = big.NewInt(0)
+	} else {
+		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
 	}
 
 	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
 		totalDeposits,
 		new(big.Int).SetUint64(pricePerSymbol),
 		minNumSymbols,
-		new(big.Int).SetBytes(paymentState.GetCumulativePayment()),
+		cumulativePayment,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new on-demand ledger: %w", err)

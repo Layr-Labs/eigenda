@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -84,22 +83,22 @@ func TestEncoder(t *testing.T) {
 
 	params := encoding.ParamsFromMins(5, 5)
 	commitments, chunks, err := p.EncodeAndProve(gettysburgAddressBytes, params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	indices := []encoding.ChunkNumber{
 		0, 1, 2, 3, 4, 5, 6, 7,
 	}
 	err = v.VerifyFrames(chunks, indices, commitments, params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = v.VerifyFrames(chunks, []encoding.ChunkNumber{
 		7, 6, 5, 4, 3, 2, 1, 0,
 	}, commitments, params)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	maxInputSize := uint64(len(gettysburgAddressBytes))
 	decoded, err := p.Decode(chunks, indices, params, maxInputSize)
-	assert.NoError(t, err)
-	assert.Equal(t, gettysburgAddressBytes, decoded)
+	require.NoError(t, err)
+	require.Equal(t, gettysburgAddressBytes, decoded)
 
 	// shuffle chunks
 	tmp := chunks[2]
@@ -110,11 +109,11 @@ func TestEncoder(t *testing.T) {
 	}
 
 	err = v.VerifyFrames(chunks, indices, commitments, params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	decoded, err = p.Decode(chunks, indices, params, maxInputSize)
-	assert.NoError(t, err)
-	assert.Equal(t, gettysburgAddressBytes, decoded)
+	require.NoError(t, err)
+	require.Equal(t, gettysburgAddressBytes, decoded)
 }
 
 // Ballpark number for 400KiB blob encoding
