@@ -183,7 +183,10 @@ func (g *ParametrizedEncoder) getInterpolationPolyEval(
 	}
 
 	err := g.Fs.InplaceFFT(shiftedInterpolationPoly, evals, false)
-	return evals, fmt.Errorf("fft on shifted interpolation poly: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("fft on shifted interpolation poly: %w", err)
+	}
+	return evals, nil
 }
 
 // Since both F W are invertible, c = W^-1 F^-1 d, convert it back. F W W^-1 F^-1 d = c

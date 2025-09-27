@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,16 +44,16 @@ func TestEncoder(t *testing.T) {
 		0, 1, 2, 3, 4, 5, 6, 7,
 	}
 	err = v.VerifyFrames(frames, indices, commitments, params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = v.VerifyFrames(frames, []encoding.ChunkNumber{
 		7, 6, 5, 4, 3, 2, 1, 0,
 	}, commitments, params)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	maxInputSize := uint64(len(harness.paddedGettysburgAddressBytes))
 	decoded, err := v.Decode(frames, indices, params, maxInputSize)
-	assert.NoError(t, err)
-	assert.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
+	require.NoError(t, err)
+	require.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 
 	// shuffle frames
 	tmp := frames[2]
@@ -65,11 +64,11 @@ func TestEncoder(t *testing.T) {
 	}
 
 	err = v.VerifyFrames(frames, indices, commitments, params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	decoded, err = v.Decode(frames, indices, params, maxInputSize)
-	assert.NoError(t, err)
-	assert.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
+	require.NoError(t, err)
+	require.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 }
 
 // Ballpark number for 400KiB blob encoding
@@ -126,7 +125,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		require.NoError(t, err)
 
 		for _, frame := range frames {
-			assert.NotEqual(t, len(frame.Coeffs), 0)
+			require.NotEqual(t, len(frame.Coeffs), 0)
 		}
 
 		if err != nil {
@@ -142,6 +141,6 @@ func FuzzOnlySystematic(f *testing.F) {
 		if err != nil {
 			t.Errorf("Error Decoding:\n Data:\n %q \n Err: %q", input, err)
 		}
-		assert.Equal(t, input, data, "Input data was not equal to the decoded data")
+		require.Equal(t, input, data, "Input data was not equal to the decoded data")
 	})
 }
