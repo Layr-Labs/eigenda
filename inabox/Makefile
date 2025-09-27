@@ -24,8 +24,8 @@ start-inabox: start-infra start-services
 	@echo "Run 'docker ps' to see and manage them."
 	@echo
 	@echo "EigenDA services (disperser, validators, etc) are ran as local processes."
-	@echo "Their config is available under `pwd`/testdata/latest/envs"
-	@echo "Their logs are available under `pwd`/testdata/latest/logs"
+	@echo "Their config is available under `pwd`/testdata/_latest/envs"
+	@echo "Their logs are available under `pwd`/testdata/_latest/logs"
 
 stop-inabox: stop-services stop-infra
 
@@ -39,7 +39,11 @@ stop-inabox: stop-services stop-infra
 new-testdata-dir:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil.yaml "testdata/$(dt)/config.yaml"
-	ln -fs $(shell pwd)/testdata/$(dt) testdata/latest
+# We use _latest so that it appears before the other directories under testdata/
+# because there are some hardcoded assumptions in the deploy process that read the "last"
+# directory alphabetically.
+# TODO(samlaf): we should probably move to using the _latest directory instead.
+	ln -sfn $(shell pwd)/testdata/$(dt) testdata/_latest
 
 clean:
 	rm -rf testdata/*
