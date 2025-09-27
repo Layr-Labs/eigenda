@@ -136,10 +136,10 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
 
    Storage
 
-   --storage.backends-to-enable value [ --storage.backends-to-enable value ]  Comma separated list of eigenDA backends to enable (e.g. V1,V2) (default: "V1") [$EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE]
+   --storage.backends-to-enable value [ --storage.backends-to-enable value ]  Comma separated list of eigenDA backends to enable (e.g. V1,V2) (default: "V2") [$EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE]
    --storage.cache-targets value [ --storage.cache-targets value ]            List of caching targets to use fast reads from EigenDA. [$EIGENDA_PROXY_STORAGE_CACHE_TARGETS]
    --storage.concurrent-write-routines value                                  Number of threads spun-up for async secondary storage insertions. (<=0) denotes single threaded insertions where (>0) indicates decoupled writes. (default: 0) [$EIGENDA_PROXY_STORAGE_CONCURRENT_WRITE_THREADS]
-   --storage.dispersal-backend value                                          Target EigenDA backend version for blob dispersal (e.g. V1 or V2). (default: "V1") [$EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND]
+   --storage.dispersal-backend value                                          Target EigenDA backend version for blob dispersal (e.g. V1 or V2). (default: "V2") [$EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND]
    --storage.fallback-targets value [ --storage.fallback-targets value ]      List of read fallback targets to rollover to if cert can't be read from EigenDA. [$EIGENDA_PROXY_STORAGE_FALLBACK_TARGETS]
    --storage.write-on-cache-miss                                              While doing a GET, write to the secondary storage if the cert/blob is not found in the cache but is found in EigenDA. (default: false) [$EIGENDA_PROXY_STORAGE_WRITE_ON_CACHE_MISS]
 
