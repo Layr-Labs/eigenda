@@ -13,8 +13,6 @@ import (
 
 func TestFrameCoeffsSliceSerialization(t *testing.T) {
 	rand := random.NewTestRandom()
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
 
 	payload := rand.Bytes(1024 + rand.Intn(1024))
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
@@ -41,8 +39,6 @@ func TestFrameCoeffsSliceSerialization(t *testing.T) {
 
 func TestSplitSerializedFrameCoeffs(t *testing.T) {
 	rand := random.NewTestRandom()
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
 
 	payload := rand.Bytes(1024 + rand.Intn(1024))
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)

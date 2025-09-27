@@ -32,8 +32,6 @@ func TestGetNumElement(t *testing.T) {
 }
 
 func TestToFrArrayAndToByteArray_AreInverses(t *testing.T) {
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
 
 	numEle := rs.GetNumElement(1000, encoding.BYTES_PER_SYMBOL)
 	assert.Equal(t, numEle, uint64(32))
