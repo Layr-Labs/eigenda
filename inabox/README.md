@@ -75,7 +75,19 @@ make start-services
 ```
 
 
-### Send traffic via grpcurl
+### Send V2 traffic via proxy
+
+Dispersing blobs to the V2 disperser requires authentication in the form of an ECDSA signature, so is harder to do using grpcurl only.
+See https://docs.eigencloud.xyz/products/eigenda/integrations-guides/quick-start/v2/ for more details. We will soon add a proxy instance to inabox that will make dispersing blobs to V2 easier. In the meantime, you can spin one up manually by running:
+```bash
+# This key contains a reservation (setup in contracts/script/SetUpEigenDA.s.sol)
+export EIGENDA_V2_DISPERSAL_SIGNER_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded
+
+../api/proxy/bin/eigenda-proxy --storage.dispersal-backend v2 --storage.backends-to-enable v2 --apis.enabled standard --eigenda.v2.cert-verifier-router-or-immutable-verifier-addr $EIGENDA_CERT_VERIFIER_ROUTER --eigenda.v2.eth-rpc $ETH_RPC_URL --eigenda.v2.signer-payment-key-hex $EIGENDA_V2_DISPERSAL_SIGNER_KEY --eigenda.v2.disperser-rpc $EIGENDA_DISPERSER_V2_URL --eigenda.v2.eigenda-directory $EIGENDA_DIRECTORY_ADDR --eigenda.v2.disable-tls --eigenda.g1-path ../resources/srs/g1.point --eigenda.g2-path ../resources/srs/g2.point --eigenda.g2-path-trailing ../resources/srs/g2.trailing.point
+```
+and then you can disperse to it using `curl -X POST -d my-eigenda-payload "http://localhost:3100/put?commitment_mode=standard"`.
+
+### Send V1 traffic via grpcurl
 
 Disperse a blob:
 ```
@@ -112,6 +124,6 @@ To check the status of that same blob (replace `$REQUEST_ID` with the request ID
 
 ```
 grpcurl -plaintext -d '{"request_id": "$REQUEST_ID"}' \
-  localhost:32005 disperser.Disperser/GetBlobStatus
+  localhost:32003 disperser.Disperser/GetBlobStatus
 ```
 
