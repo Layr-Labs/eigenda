@@ -116,7 +116,7 @@ func (g *ParametrizedEncoder) interpolyWorker(
 			results <- err
 			continue
 		}
-		coeffs, err := g.getInterpolationPolyCoeff(ys, uint32(j))
+		coeffs, err := g.getInterpolationPolyCoeff(ys, j)
 		if err != nil {
 			results <- err
 			continue
@@ -183,7 +183,7 @@ func (g *ParametrizedEncoder) getInterpolationPolyEval(
 	}
 
 	err := g.Fs.InplaceFFT(shiftedInterpolationPoly, evals, false)
-	return evals, err
+	return evals, fmt.Errorf("fft on shifted interpolation poly: %w", err)
 }
 
 // Since both F W are invertible, c = W^-1 F^-1 d, convert it back. F W W^-1 F^-1 d = c
@@ -192,7 +192,7 @@ func (g *ParametrizedEncoder) getInterpolationPolyCoeff(chunk []fr.Element, k ui
 	shiftedInterpolationPoly := make([]fr.Element, len(chunk))
 	err := g.Fs.InplaceFFT(chunk, shiftedInterpolationPoly, true)
 	if err != nil {
-		return coeffs, err
+		return coeffs, fmt.Errorf("ifft on shifted interpolation poly: %w", err)
 	}
 
 	mod := int32(len(g.Fs.ExpandedRootsOfUnity) - 1)

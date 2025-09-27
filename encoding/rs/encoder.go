@@ -73,7 +73,7 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 
 	polyEvals, err := encoder.RSEncoderComputer.ExtendPolyEval(pdCoeffs)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("reed-solomon extend poly evals, %w", err)
 	}
 	extensionDuration := time.Since(intermediate)
 
@@ -109,7 +109,9 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 // maxInputSize is the upper bound of the original data size. This is needed because
 // the Frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
-func (e *Encoder) Decode(frames []FrameCoeffs, indices []uint64, maxInputSize uint64, params encoding.EncodingParams) ([]byte, error) {
+func (e *Encoder) Decode(
+	frames []FrameCoeffs, indices []uint64, maxInputSize uint64, params encoding.EncodingParams,
+) ([]byte, error) {
 	// Get encoder
 	g, err := e.getRsEncoder(params)
 	if err != nil {
@@ -142,7 +144,7 @@ func (e *Encoder) Decode(frames []FrameCoeffs, indices []uint64, maxInputSize ui
 			return nil, err
 		}
 
-		evals, err := g.getInterpolationPolyEval(f, uint32(e))
+		evals, err := g.getInterpolationPolyEval(f, e)
 		if err != nil {
 			return nil, err
 		}
@@ -172,13 +174,13 @@ func (e *Encoder) Decode(frames []FrameCoeffs, indices []uint64, maxInputSize ui
 			g.Fs.ZeroPolyViaMultiplication,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("recover polynomial from samples: %w", err)
 		}
 	}
 
 	reconstructedPoly, err := g.Fs.FFT(reconstructedData, true)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("inverse fft on reconstructed data: %w", err)
 	}
 
 	data := ToByteArray(reconstructedPoly, maxInputSize)
