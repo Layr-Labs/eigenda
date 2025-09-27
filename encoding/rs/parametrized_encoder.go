@@ -9,6 +9,11 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
+// Proof device represents a device capable of computing reed-solomon operations.
+type EncoderDevice interface {
+	ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error)
+}
+
 type ParametrizedEncoder struct {
 	*encoding.Config
 	encoding.EncodingParams

@@ -20,11 +20,6 @@ type Encoder struct {
 	ParametrizedEncoder map[encoding.EncodingParams]*ParametrizedEncoder
 }
 
-// Proof device represents a device capable of computing reed-solomon operations.
-type EncoderDevice interface {
-	ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error)
-}
-
 // NewEncoder creates a new encoder with the given options
 func NewEncoder(config *encoding.Config) (*Encoder, error) {
 	if config == nil {
