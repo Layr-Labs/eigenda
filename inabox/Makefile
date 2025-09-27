@@ -17,11 +17,11 @@ start-inabox: new-testdata-dir start-infra start-services
 	@echo "@                     INABOX IS RUNNING!                         @"
 	@echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 	@echo
-	@echo "export these variables:"
-	@echo "ETH_RPC_URL=http://localhost:8545"
-	@echo "EIGENDA_DIRECTORY_ADDR=$(shell cat ../contracts/script/output/eigenda_deploy_output.json | jq -r .eigenDADirectory)"
-	@echo "EIGENDA_DISPERSER_V1_URL=localhost:32004"
-	@echo "EIGENDA_DISPERSER_V2_URL=localhost:32005"
+	@echo "Export these variables:"
+	@echo "export ETH_RPC_URL=http://localhost:8545"
+	@echo "export EIGENDA_DIRECTORY_ADDR=$(shell cat ../contracts/script/output/eigenda_deploy_output.json | jq -r .eigenDADirectory)"
+	@echo "export EIGENDA_DISPERSER_V1_URL=localhost:32004"
+	@echo "export EIGENDA_DISPERSER_V2_URL=localhost:32005"
 	@echo
 	@echo "You can query other contract addresses from the directory:"
 	@echo 'cast call $$EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER"'
