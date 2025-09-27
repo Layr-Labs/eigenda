@@ -43,7 +43,7 @@ Export these variables:
 export ETH_RPC_URL=http://localhost:8545
 export EIGENDA_DIRECTORY_ADDR=0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8
 export EIGENDA_CERT_VERIFIER_ROUTER=$(cast call $EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER")
-export EIGENDA_DISPERSER_V1_URL=localhost:32004
+export EIGENDA_DISPERSER_V1_URL=localhost:32003
 export EIGENDA_DISPERSER_V2_URL=localhost:32005
 
 You can query other contract addresses from the directory:
