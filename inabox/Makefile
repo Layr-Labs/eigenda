@@ -47,7 +47,7 @@ clean:
 # Start infra will start anvil, a graph node, and aws localstack services (s3 and dynamodb)
 # docker containers. It will also deploy the contracts and the subgraphs onto the graph node.
 # After this you can run `make start-services`.
-start-infra: new-testdata-dir
+start-infra:
 	go run ./deploy/cmd -localstack-port 4570
 
 # Using filter based on ancestor doesn't seem to work with grep expressions,
