@@ -5,7 +5,6 @@ package reverseBits
 import (
 	"errors"
 
-	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -97,7 +96,7 @@ func ReverseBitsLimited(length uint32, value uint32) uint32 {
 	return reverseBits(value) >> unusedBitLen
 }
 
-func ReverseBitOrder(length uint32, swap func(i, j uint32)) error {
+func reverseBitOrder(length uint32, swap func(i, j uint32)) error {
 	if length == 0 || (length&(length-1) != 0) {
 		return ErrRBOInvalidLength
 	}
@@ -121,36 +120,11 @@ func ReverseBitOrderFr(values []fr.Element) error {
 		return ErrFrRBOListTooLarge
 	}
 	var tmp fr.Element
-	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
+	err := reverseBitOrder(uint32(len(values)), func(i, j uint32) {
 		tmp.Set(&values[i])
 
 		values[i].Set(&values[j])
 
-		values[j].Set(&tmp)
-
-	})
-	return err
-}
-
-// rearrange Fr ptr elements in reverse bit order. Supports 2**31 max element count.
-func ReverseBitOrderFrPtr(values []*fr.Element) error {
-	if len(values) > (1 << 31) {
-		return ErrFrRBOListTooLarge
-	}
-	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
-		values[i], values[j] = values[j], values[i]
-	})
-	return err
-}
-
-func ReverseBitOrderG1Point(values []bn254.G1Affine) error {
-	if len(values) > (1 << 31) {
-		return ErrG1RBOListTooLarge
-	}
-	var tmp bn254.G1Affine
-	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
-		tmp.Set(&values[i])
-		values[i].Set(&values[j])
 		values[j].Set(&tmp)
 
 	})

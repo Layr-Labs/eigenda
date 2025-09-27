@@ -10,12 +10,10 @@ import (
 )
 
 type EncodingParams struct {
-	ChunkLength uint64 // ChunkSize is the length of the chunk in symbols
-	NumChunks   uint64
-}
-
-func (p EncodingParams) ChunkDegree() uint64 {
-	return p.ChunkLength - 1
+	// number of Fr symbols stored inside a chunk
+	ChunkLength uint64
+	// number of total chunks (always a power of 2)
+	NumChunks uint64
 }
 
 func (p EncodingParams) NumEvaluations() uint64 {

@@ -10,7 +10,9 @@ import (
 type BackendType string
 
 const (
+	// GnarkBackend is the default CPU backend, using the gnark-crypto library.
 	GnarkBackend  BackendType = "gnark"
+	// IcicleBackend is a GPU-accelerated backend using the icicle library.
 	IcicleBackend BackendType = "icicle"
 )
 
