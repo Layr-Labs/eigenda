@@ -302,6 +302,9 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 // and relays in RelayRegistry contract
 func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
+	if (dasmAddr == gcommon.Address{}) {
+		logger.Fatal("Service Manager address is nil")
+	}
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
 	if err != nil {
 		logger.Fatal("Error creating EigenDAServiceManager contract", "error", err)

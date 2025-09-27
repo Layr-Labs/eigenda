@@ -130,7 +130,7 @@ integration-tests:
 # either chain, subgraph, or localstack.
 integration-tests-inabox: build
 	go test -v ./core/thegraph
-	cd inabox && make run-e2e
+	cd inabox && make run-e2e-tests
 
 # These are e2e tests that run against live environments (preprod and holesky currently).
 live-tests:

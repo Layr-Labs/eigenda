@@ -85,7 +85,7 @@ func DeployAll(ctx *cli.Context) error {
 		return fmt.Errorf("deploy experiment: %w", err)
 	}
 
-	logger.Info("Deployment complete. You can now run `make run-e2e` to run the e2e tests.")
+	logger.Info("Deployment complete. You can now run `make start-services` to start the services.")
 	return nil
 }
 
