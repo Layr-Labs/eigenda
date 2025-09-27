@@ -14,10 +14,6 @@ type EncodingParams struct {
 	NumChunks   uint64
 }
 
-func (p EncodingParams) ChunkDegree() uint64 {
-	return p.ChunkLength - 1
-}
-
 func (p EncodingParams) NumEvaluations() uint64 {
 	return p.NumChunks * p.ChunkLength
 }

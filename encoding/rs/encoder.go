@@ -63,7 +63,7 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 		return nil, nil, err
 	}
 
-	pdCoeffs, err := encoder.PadPolyEval(inputFr)
+	pdCoeffs, err := encoder.padPolyEval(inputFr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -80,7 +80,7 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 	intermediate = time.Now()
 
 	// create Frames to group relevant info
-	frames, indices, err := encoder.MakeFrames(polyEvals)
+	frames, indices, err := encoder.makeFrames(polyEvals)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -90,8 +90,8 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 	// TODO(samlaf): use an injected logger instead.
 	slog.Info("RSEncode details",
 		"input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
-		"num_chunks", encoder.NumChunks,
-		"chunk_length", encoder.ChunkLength,
+		"num_chunks", encoder.Params.NumChunks,
+		"chunk_length", encoder.Params.ChunkLength,
 		"padding_duration", paddingDuration,
 		"extension_duration", extensionDuration,
 		"frames_duration", framesDuration,
@@ -129,33 +129,33 @@ func (e *Encoder) Decode(frames []FrameCoeffs, indices []uint64, maxInputSize ui
 		}
 	}
 
-	numSys := encoding.GetNumSys(maxInputSize, g.ChunkLength)
+	numSys := encoding.GetNumSys(maxInputSize, g.Params.ChunkLength)
 	if uint64(len(frameMap)) < numSys {
 		return nil, errors.New("number of frame must be sufficient")
 	}
 
-	samples := make([]*fr.Element, g.NumEvaluations())
+	samples := make([]*fr.Element, g.Params.NumEvaluations())
 	// copy evals based on frame coeffs into samples
 	for d, f := range frameMap {
-		e, err := GetLeadingCosetIndex(d, g.NumChunks)
+		e, err := GetLeadingCosetIndex(d, g.Params.NumChunks)
 		if err != nil {
 			return nil, err
 		}
 
-		evals, err := g.GetInterpolationPolyEval(f, uint32(e))
+		evals, err := g.getInterpolationPolyEval(f, uint32(e))
 		if err != nil {
 			return nil, err
 		}
 
 		// Some pattern i butterfly swap. Find the leading coset, then increment by number of coset
-		for j := uint64(0); j < g.ChunkLength; j++ {
-			p := j*g.NumChunks + uint64(e)
+		for j := uint64(0); j < g.Params.ChunkLength; j++ {
+			p := j*g.Params.NumChunks + uint64(e)
 			samples[p] = new(fr.Element)
 			samples[p].Set(&evals[j])
 		}
 	}
 
-	reconstructedData := make([]fr.Element, g.NumEvaluations())
+	reconstructedData := make([]fr.Element, g.Params.NumEvaluations())
 	missingIndices := false
 	for i, s := range samples {
 		if s == nil {
@@ -242,7 +242,7 @@ func (e *Encoder) createGnarkBackendEncoder(params encoding.EncodingParams, fs *
 
 	return &ParametrizedEncoder{
 		Config:            e.Config,
-		EncodingParams:    params,
+		Params:            params,
 		Fs:                fs,
 		RSEncoderComputer: &gnarkencoder.RsGnarkBackend{Fs: fs},
 	}, nil

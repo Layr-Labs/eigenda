@@ -16,15 +16,15 @@ type EncoderDevice interface {
 
 type ParametrizedEncoder struct {
 	*encoding.Config
-	encoding.EncodingParams
+	Params            encoding.EncodingParams
 	Fs                *fft.FFTSettings
 	RSEncoderComputer EncoderDevice
 }
 
-// PadPolyEval pads the input polynomial coefficients to match the number of evaluations
+// padPolyEval pads the input polynomial coefficients to match the number of evaluations
 // required by the encoder.
-func (g *ParametrizedEncoder) PadPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
-	numEval := int(g.NumEvaluations())
+func (g *ParametrizedEncoder) padPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
+	numEval := int(g.Params.NumEvaluations())
 
 	if len(coeffs) > numEval {
 		return nil, fmt.Errorf("encoding params (%d) < num field elements of input (%d)", numEval, len(coeffs))
@@ -41,9 +41,9 @@ func (g *ParametrizedEncoder) PadPolyEval(coeffs []fr.Element) ([]fr.Element, er
 	return pdCoeffs, nil
 }
 
-// MakeFrames function takes extended evaluation data and bundles relevant information into Frame.
+// makeFrames function takes extended evaluation data and bundles relevant information into Frame.
 // Every frame is verifiable to the commitment.
-func (g *ParametrizedEncoder) MakeFrames(
+func (g *ParametrizedEncoder) makeFrames(
 	polyEvals []fr.Element,
 ) ([]FrameCoeffs, []uint32, error) {
 	// reverse dataFr making easier to sample points
@@ -53,11 +53,11 @@ func (g *ParametrizedEncoder) MakeFrames(
 	}
 
 	indices := make([]uint32, 0)
-	frames := make([]FrameCoeffs, g.NumChunks)
+	frames := make([]FrameCoeffs, g.Params.NumChunks)
 
 	numWorker := uint64(g.NumWorker)
-	if numWorker > g.NumChunks {
-		numWorker = g.NumChunks
+	if numWorker > g.Params.NumChunks {
+		numWorker = g.Params.NumChunks
 	}
 
 	jobChan := make(chan JobRequest, numWorker)
@@ -72,8 +72,8 @@ func (g *ParametrizedEncoder) MakeFrames(
 		)
 	}
 
-	for i := uint64(0); i < g.NumChunks; i++ {
-		j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
+	for i := uint64(0); i < g.Params.NumChunks; i++ {
+		j := rb.ReverseBitsLimited(uint32(g.Params.NumChunks), uint32(i))
 		jr := JobRequest{
 			Index: i,
 		}
@@ -109,14 +109,14 @@ func (g *ParametrizedEncoder) interpolyWorker(
 
 	for jr := range jobChan {
 		i := jr.Index
-		j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
-		ys := polyEvals[g.ChunkLength*i : g.ChunkLength*(i+1)]
+		j := rb.ReverseBitsLimited(uint32(g.Params.NumChunks), uint32(i))
+		ys := polyEvals[g.Params.ChunkLength*i : g.Params.ChunkLength*(i+1)]
 		err := rb.ReverseBitOrderFr(ys)
 		if err != nil {
 			results <- err
 			continue
 		}
-		coeffs, err := g.GetInterpolationPolyCoeff(ys, uint32(j))
+		coeffs, err := g.getInterpolationPolyCoeff(ys, uint32(j))
 		if err != nil {
 			results <- err
 			continue
@@ -127,4 +127,81 @@ func (g *ParametrizedEncoder) interpolyWorker(
 
 	results <- nil
 
+}
+
+// Consider input data as the polynomial Coefficients, c
+// This functions computes the evaluations of the such the interpolation polynomial
+// Passing through input data, evaluated at series of root of unity.
+// Consider the following points (w, d[0]), (wφ, d[1]), (wφ^2, d[2]), (wφ^3, d[3])
+// Suppose F be the fft matrix, then the systamtic equation that going through those points is
+// d = W F c, where each row corresponds to equation being evaluated at [1, φ, φ^2, φ^3]
+// where W is a diagonal matrix with diagonal [1 w w^2 w^3] for shifting the evaluation points
+
+// The index is transformed using FFT, for example 001 => 100, 110 => 011
+// The reason behind is because Reed Solomon extension using FFT insert evaluation within original
+// Data. i.e. [o_1, o_2, o_3..] with coding ratio 0.5 becomes [o_1, p_1, o_2, p_2...]
+
+func (g *ParametrizedEncoder) getInterpolationPolyEval(
+	interpolationPoly []fr.Element,
+	j uint32,
+) ([]fr.Element, error) {
+	evals := make([]fr.Element, g.Params.ChunkLength)
+	w := g.Fs.ExpandedRootsOfUnity[uint64(j)]
+	shiftedInterpolationPoly := make([]fr.Element, len(interpolationPoly))
+
+	//multiply each term of the polynomial by x^i so the fourier transform results in the desired evaluations
+	//The fourier matrix looks like
+	// ___                    ___
+	// | 1  1   1    1  . . . . |
+	// | 1  φ   φ^2 φ^3         |
+	// | 1  φ^2 φ^4 φ^6         |
+	// | 1  φ^3 φ^6 φ^9         |  = F
+	// | .   .          .       |
+	// | .   .            .     |
+	// | .   .              .   |
+	// |__                    __|
+
+	//
+	// F * p = [p(1), p(φ), p(φ^2), ...]
+	//
+	// but we want
+	//
+	// [p(w), p(wφ), p(wφ^2), ...]
+	//
+	// we can do this by computing shiftedInterpolationPoly = q = p(wx) and then doing
+	//
+	// F * q = [p(w), p(wφ), p(wφ^2), ...]
+	//
+	// to get our desired evaluations
+	// cool idea protolambda :)
+	var wPow fr.Element
+	wPow.SetOne()
+	//var tmp, tmp2 fr.Element
+	for i := 0; i < len(interpolationPoly); i++ {
+		shiftedInterpolationPoly[i].Mul(&interpolationPoly[i], &wPow)
+		wPow.Mul(&wPow, &w)
+	}
+
+	err := g.Fs.InplaceFFT(shiftedInterpolationPoly, evals, false)
+	return evals, err
+}
+
+// Since both F W are invertible, c = W^-1 F^-1 d, convert it back. F W W^-1 F^-1 d = c
+func (g *ParametrizedEncoder) getInterpolationPolyCoeff(chunk []fr.Element, k uint32) ([]fr.Element, error) {
+	coeffs := make([]fr.Element, g.Params.ChunkLength)
+	shiftedInterpolationPoly := make([]fr.Element, len(chunk))
+	err := g.Fs.InplaceFFT(chunk, shiftedInterpolationPoly, true)
+	if err != nil {
+		return coeffs, err
+	}
+
+	mod := int32(len(g.Fs.ExpandedRootsOfUnity) - 1)
+
+	for i := 0; i < len(chunk); i++ {
+		// We can lookup the inverse power by counting RootOfUnity backward
+		j := (-int32(k)*int32(i))%mod + mod
+		coeffs[i].Mul(&shiftedInterpolationPoly[i], &g.Fs.ExpandedRootsOfUnity[j])
+	}
+
+	return coeffs, nil
 }
