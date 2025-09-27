@@ -2,7 +2,7 @@ dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
 .PHONY: run-e2e-test start-inabox stop-inabox new-testdata-dir clean start-infra stop-infra start-services stop-services
 
 # Starts a short-lived inabox devnet, and runs integration/e2e tests against it.
-run-e2e-test:
+run-e2e-tests:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
 
 # Starts a long-lived inabox local devnet.
