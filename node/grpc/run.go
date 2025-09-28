@@ -44,7 +44,9 @@ func (r *ServerRunner) Stop() {
 	r.logger.Info("All gRPC servers stopped")
 }
 
-func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logger logging.Logger) (*ServerRunner, error) {
+func RunServers(
+	serverV1 *Server, serverV2 *ServerV2, config *node.Config, logger logging.Logger,
+) (*ServerRunner, error) {
 	if config.EnableV1 && serverV1 == nil {
 		return nil, errors.New("node v1 server is not configured")
 	}
@@ -93,7 +95,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 
 			// Run server in background
 			go func() {
-				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+				if err := gs.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 					logger.Error("dispersal server failed", "err", err)
 				}
 			}()
@@ -136,7 +138,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 
 			// Run server in background
 			go func() {
-				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+				if err := gs.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 					logger.Error("dispersal v2 server failed", "err", err)
 				}
 			}()
@@ -178,7 +180,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 
 			// Run server in background
 			go func() {
-				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+				if err := gs.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 					logger.Error("retrieval server failed", "err", err)
 				}
 			}()
@@ -221,7 +223,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 
 			// Run server in background
 			go func() {
-				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+				if err := gs.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 					logger.Error("retrieval v2 server failed", "err", err)
 				}
 			}()

@@ -43,7 +43,9 @@ type OperatorInstance struct {
 
 // StartOperatorForInfrastructure starts an operator node server as part of the global infrastructure.
 // This should be called after Anvil and the Churner are started.
-func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex int, anvilRPC string, churnerRPC string) (*OperatorInstance, error) {
+func StartOperatorForInfrastructure(
+	infra *InfrastructureHarness, operatorIndex int, anvilRPC string, churnerRPC string,
+) (*OperatorInstance, error) {
 	// Get operator's private key
 	var privateKey string
 	operatorName := fmt.Sprintf("opr%d", operatorIndex)
@@ -85,7 +87,8 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 	nodeApiPort := fmt.Sprintf("3710%d", operatorIndex)
 	metricsPort := 3800 + operatorIndex
 
-	// TODO(dmanc): The node config is quite a beast. This is a configuration that passed the tests after a bunch of trial and error.
+	// TODO(dmanc): The node config is quite a beast. This is a configuration that
+	// passed the tests after a bunch of trial and error.
 	// We really need better validation on the node constructor.
 	operatorConfig := &node.Config{
 		Hostname:                       "localhost",
@@ -324,7 +327,8 @@ func StartOperatorsForInfrastructure(infra *InfrastructureHarness, anvilRPC stri
 			return fmt.Errorf("failed to start operator %d: %w", i, err)
 		}
 		infra.OperatorInstances = append(infra.OperatorInstances, instance)
-		infra.Logger.Info("Started operator", "index", i, "dispersalPort", instance.DispersalPort, "retrievalPort", instance.RetrievalPort)
+		infra.Logger.Info("Started operator", "index", i,
+			"dispersalPort", instance.DispersalPort, "retrievalPort", instance.RetrievalPort)
 	}
 
 	return nil

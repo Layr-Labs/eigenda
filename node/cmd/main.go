@@ -160,7 +160,7 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 	}
 	runner, err := nodegrpc.RunServers(server, serverV2, config, logger)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to run servers: %w", err)
 	}
 
 	// Set up signal handling for graceful shutdown
