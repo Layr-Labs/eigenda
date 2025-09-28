@@ -10,8 +10,6 @@ import (
 type EigenDANetwork string
 
 const (
-	HoleskyTestnetEigenDANetwork EigenDANetwork = "holesky_testnet"
-	HoleskyPreprodEigenDANetwork EigenDANetwork = "holesky_preprod"
 	SepoliaTestnetEigenDANetwork EigenDANetwork = "sepolia_testnet"
 	MainnetEigenDANetwork        EigenDANetwork = "mainnet"
 )
@@ -24,10 +22,6 @@ func (n EigenDANetwork) GetEigenDADirectory() string {
 	switch n {
 	case MainnetEigenDANetwork:
 		return "0x64AB2e9A86FA2E183CB6f01B2D4050c1c2dFAad4"
-	case HoleskyTestnetEigenDANetwork:
-		return "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE"
-	case HoleskyPreprodEigenDANetwork:
-		return "0xfB676e909f376efFDbDee7F17342aCF55f6Ec502"
 	case SepoliaTestnetEigenDANetwork:
 		return "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 	default:
@@ -44,10 +38,6 @@ func (n EigenDANetwork) GetDisperserAddress() string {
 	switch n {
 	case MainnetEigenDANetwork:
 		return "disperser.eigenda.xyz:443"
-	case HoleskyTestnetEigenDANetwork:
-		return "disperser-testnet-holesky.eigenda.xyz:443"
-	case HoleskyPreprodEigenDANetwork:
-		return "disperser-preprod-holesky.eigenda.xyz:443"
 	case SepoliaTestnetEigenDANetwork:
 		return "disperser-testnet-sepolia.eigenda.xyz:443"
 	default:
@@ -62,7 +52,6 @@ func (n EigenDANetwork) String() string {
 // chainIDToNetworkMap maps chain IDs to EigenDA networks
 var chainIDToNetworkMap = map[string][]EigenDANetwork{
 	"1":        {MainnetEigenDANetwork},
-	"17000":    {HoleskyTestnetEigenDANetwork, HoleskyPreprodEigenDANetwork},
 	"11155111": {SepoliaTestnetEigenDANetwork},
 }
 
@@ -83,13 +72,11 @@ func EigenDANetworkFromString(inputString string) (EigenDANetwork, error) {
 	network := EigenDANetwork(inputString)
 
 	switch network {
-	case HoleskyTestnetEigenDANetwork, HoleskyPreprodEigenDANetwork, SepoliaTestnetEigenDANetwork, MainnetEigenDANetwork:
+	case SepoliaTestnetEigenDANetwork, MainnetEigenDANetwork:
 		return network, nil
 	default:
 		allowedNetworks := []string{
 			MainnetEigenDANetwork.String(),
-			HoleskyTestnetEigenDANetwork.String(),
-			HoleskyPreprodEigenDANetwork.String(),
 			SepoliaTestnetEigenDANetwork.String(),
 		}
 		return "", fmt.Errorf("invalid network: %s. Must be one of: %s",

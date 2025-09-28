@@ -27,20 +27,12 @@ disperse-test-blob:
 test-unit:
 	gotestsum --format pkgname-and-test-fails -- -short -parallel 4 ./...
 
-# E2E tests using local memstore, leveraging op-e2e framework. Also tests the standard client against the proxy.
+# E2E tests using local memstore. Also tests the standard client against the proxy.
 test-e2e-local:
 	BACKEND=memstore gotestsum --format testname -- -v -timeout 10m ./test/e2e -parallel 8
 
-# E2E tests using holesky testnet backend, leveraging op-e2e framework. Also tests the standard client against the proxy.
-# If holesky tests are failing, consider checking https://dora.holesky.ethpandaops.io/epochs for block production status.
-test-e2e-testnet:
-	BACKEND=testnet gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
-
-## Equivalent to `test-e2e-testnet`, but against preprod instead of testnet
-test-e2e-preprod:
-	BACKEND=preprod gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
-
-## Equivalent to `test-e2e-testnet`, bug against sepolia network instead of holesky
+# E2E tests using sepolia testnet backend. Also tests the standard client against the proxy.
+# If sepolia tests are failing, consider checking https://dora.holesky.ethpandaops.io/epochs for block production status.
 test-e2e-sepolia:
 	BACKEND=sepolia gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 

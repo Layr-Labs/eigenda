@@ -278,9 +278,9 @@ $ PRIVATE_KEY=$(jq -r '.[0].private_key' keypair.json | tail -c +3)
 ## Run EigenDA Proxy with EigenDA V1 backend
 $ ./bin/eigenda-proxy \
     --port 3100 \
-    --eigenda.disperser-rpc disperser-holesky.eigenda.xyz:443 \
+    --eigenda.disperser-rpc disperser-testnet-sepolia.eigenda.xyz:443 \
     --eigenda.signer-private-key-hex $PRIVATE_KEY \
-    --eigenda.eth-rpc https://ethereum-holesky-rpc.publicnode.com \
+    --eigenda.eth-rpc https://ethereum-sepolia.rpc.subquery.network/public \
     --eigenda.svc-manager-addr 0xD4A7E1Bd8015057293f0D0A557088c286942e84b
 ```
 
@@ -369,7 +369,7 @@ Unit tests can be run with `make test-unit`.
 #### Integration / E2E
 
 Integration tests against op framework can be run with `make test-e2e`. These tests use the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch
-submission and state derivation. Tests are run both in a local environment, and in a holesky testnet environment.
+submission and state derivation. Tests are run both in a local environment, and in a sepolia testnet environment.
 
 These tests also assert E2E client <-> server interactions using simple/op clients.
 
