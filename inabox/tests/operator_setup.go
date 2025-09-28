@@ -85,16 +85,18 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 	nodeApiPort := fmt.Sprintf("3710%d", operatorIndex)
 	metricsPort := 3800 + operatorIndex
 
+	// TODO(dmanc): The node config is quite a beast. This is a configuration that passed the tests after a bunch of trial and error.
+	// We really need better validation on the node constructor.
 	operatorConfig := &node.Config{
 		Hostname:                       "localhost",
 		RetrievalPort:                  retrievalPort,
 		DispersalPort:                  dispersalPort,
 		V2RetrievalPort:                v2RetrievalPort,
 		V2DispersalPort:                v2DispersalPort,
-		InternalRetrievalPort:          retrievalPort,   // Use same as external for tests
-		InternalDispersalPort:          dispersalPort,   // Use same as external for tests
-		InternalV2RetrievalPort:        v2RetrievalPort, // Use same as external for tests
-		InternalV2DispersalPort:        v2DispersalPort, // Use same as external for tests
+		InternalRetrievalPort:          retrievalPort,
+		InternalDispersalPort:          dispersalPort,
+		InternalV2RetrievalPort:        v2RetrievalPort,
+		InternalV2DispersalPort:        v2DispersalPort,
 		EnableNodeApi:                  true,
 		NodeApiPort:                    nodeApiPort,
 		EnableMetrics:                  true,
@@ -109,9 +111,9 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		ChurnerUrl:                     churnerRPC,
 		EnableTestMode:                 true,
 		NumBatchValidators:             1,
-		QuorumIDList:                   []core.QuorumID{0, 1}, // Default to quorums 0 and 1
+		QuorumIDList:                   []core.QuorumID{0, 1},
 		EigenDADirectory:               infra.TestConfig.EigenDA.EigenDADirectory,
-		DisableDispersalAuthentication: true, // TODO: enable
+		DisableDispersalAuthentication: true, // TODO: set to false
 		EthClientConfig: geth.EthClientConfig{
 			RPCURLs:          []string{anvilRPC},
 			PrivateKeyString: privateKey,
@@ -145,12 +147,12 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		RelayMaxMessageSize:                 units.GiB,
 		EjectionSentinelPeriod:              5 * time.Minute,
 		StoreChunksBufferTimeout:            10 * time.Second,
-		StoreChunksBufferSizeBytes:          2 * units.GiB,              // 2GB buffer for storing chunks
-		GetChunksHotCacheReadLimitMB:        10 * units.GiB / units.MiB, // 10 GB/s for tests
-		GetChunksHotBurstLimitMB:            10 * units.GiB / units.MiB, // 10 GB burst
-		GetChunksColdCacheReadLimitMB:       1 * units.GiB / units.MiB,  // 1 GB/s for tests
-		GetChunksColdBurstLimitMB:           1 * units.GiB / units.MiB,  // 1 GB burst
-		GRPCMsgSizeLimitV2:                  1024 * 1024 * 300,          // 300 MiB, same as in the original code
+		StoreChunksBufferSizeBytes:          2 * units.GiB,
+		GetChunksHotCacheReadLimitMB:        10 * units.GiB / units.MiB,
+		GetChunksHotBurstLimitMB:            10 * units.GiB / units.MiB,
+		GetChunksColdCacheReadLimitMB:       1 * units.GiB / units.MiB,
+		GetChunksColdBurstLimitMB:           1 * units.GiB / units.MiB,
+		GRPCMsgSizeLimitV2:                  1024 * 1024 * 300,
 	}
 
 	// Create operator logger
@@ -198,9 +200,6 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 
 	// Create mock IP provider for testing (returns "localhost")
 	pubIPProvider := pubip.ProviderOrDefault(operatorLogger, "mockip")
-
-	// Use the context from the infrastructure harness
-	// This allows all operators to be cancelled when the infrastructure is torn down
 
 	// Create node instance
 	operatorNode, err := node.NewNode(
