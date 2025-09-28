@@ -12,21 +12,6 @@ RUN echo "${GOLANG_SHA256} /tmp/go.tar.gz" | sha256sum -c - && \
     rm /tmp/go.tar.gz
 ENV PATH="/usr/local/go/bin:${PATH}"
 
-# Set up the working directory
-WORKDIR /app
-
-# Copy go.mod and go.sum first to leverage Docker cache
-COPY go.mod go.sum ./
-
-# Copy api/proxy/clients for the replace directive
-COPY api/proxy/clients ./api/proxy/clients
-
-# Download dependencies
-RUN go mod download
-
-# Copy the rest of the source code
-COPY . .
-
 # Define Icicle versions and checksums
 ENV ICICLE_VERSION=3.4
 ENV ICICLE_BASE_SHA256=e3eec1d5fca0e4ba52e09630dc360eb5f1c1d54b3bb1834eeef1624c2f7f4c48
@@ -37,7 +22,9 @@ ENV ICICLE_CUDA_SHA256=090bdf255b1beab05efa7eb2e67d50481c0c6f57beda969356e71bd11
 ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}.0/icicle_${ICICLE_VERSION//./_}-ubuntu22.tar.gz /tmp/icicle.tar.gz
 ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}.0/icicle_${ICICLE_VERSION//./_}-ubuntu22-cuda122.tar.gz /tmp/icicle-cuda.tar.gz
 
-# Verify checksums and install Icicle
+
+# Verify checksums and install Icicle BEFORE copying source code
+# This ensures the Icicle installation layer is cached independently
 RUN echo "${ICICLE_BASE_SHA256} /tmp/icicle.tar.gz" | sha256sum -c - && \
     echo "${ICICLE_CUDA_SHA256} /tmp/icicle-cuda.tar.gz" | sha256sum -c - && \
     tar xzf /tmp/icicle.tar.gz && \
@@ -45,6 +32,26 @@ RUN echo "${ICICLE_BASE_SHA256} /tmp/icicle.tar.gz" | sha256sum -c - && \
     cp -r ./icicle/include/icicle/ /usr/local/include/ && \
     tar xzf /tmp/icicle-cuda.tar.gz -C /opt && \
     rm /tmp/icicle.tar.gz /tmp/icicle-cuda.tar.gz
+
+# Set up the working directory
+WORKDIR /app
+
+# Copy go.mod and go.sum first to leverage Docker cache
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy all necessary source code for building
+# This includes all internal packages required by the encoder
+COPY ./api ./api
+COPY ./common ./common
+COPY ./contracts ./contracts
+COPY ./core ./core
+COPY ./disperser ./disperser
+COPY ./encoding ./encoding
+COPY ./relay ./relay
+COPY ./resources ./resources
 
 # Build the server with icicle backend
 WORKDIR /app/disperser
