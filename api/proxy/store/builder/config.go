@@ -17,26 +17,33 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// Config ... Higher order config which bundles all configs for building
-// the proxy store manager with necessary client context
+// Config ... Higher order storage layer config which bundles
+// all subconfigs for building the proxy storage backends and their
+// respective clients
 type Config struct {
+	// main storage storage enablement config that dictates
+	// secondary backend policies and EigenDA backends
 	StoreConfig store.Config
 
-	// main storage configs
+	KzgConfig kzg.KzgConfig
+
 	ClientConfigV1   common.ClientConfigV1
 	VerifierConfigV1 verify.Config
-	KzgConfig        kzg.KzgConfig
-	ClientConfigV2   common.ClientConfigV2
+
+	ClientConfigV2 common.ClientConfigV2
 
 	MemstoreConfig  *memconfig.SafeConfig
 	MemstoreEnabled bool
 
-	// secondary storage cfgs
+	// secondary storage cfg
 	S3Config s3.Config
 }
 
 // ReadConfig ... parses the Config from the provided flags or environment variables.
+// client config ingestion is ignored if `memstore=true`
 func ReadConfig(ctx *cli.Context) (Config, error) {
+	useMemStore := ctx.Bool(memstore.EnabledFlagName)
+
 	storeConfig, err := store.ReadConfig(ctx)
 	if err != nil {
 		return Config{}, fmt.Errorf("read storage config: %w", err)
@@ -44,7 +51,7 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 
 	var clientConfigV1 common.ClientConfigV1
 	var verifierConfigV1 verify.Config
-	if slices.Contains(storeConfig.BackendsToEnable, common.V1EigenDABackend) {
+	if slices.Contains(storeConfig.BackendsToEnable, common.V1EigenDABackend) && !useMemStore {
 		clientConfigV1, err = eigendaflags.ReadClientConfigV1(ctx)
 		if err != nil {
 			return Config{}, fmt.Errorf("read client config v1: %w", err)
@@ -54,7 +61,7 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	var clientConfigV2 common.ClientConfigV2
-	if slices.Contains(storeConfig.BackendsToEnable, common.V2EigenDABackend) {
+	if slices.Contains(storeConfig.BackendsToEnable, common.V2EigenDABackend) && !useMemStore {
 		clientConfigV2, err = eigendaflags_v2.ReadClientConfigV2(ctx)
 		if err != nil {
 			return Config{}, fmt.Errorf("read client config v2: %w", err)
@@ -84,7 +91,7 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		KzgConfig:        verify.ReadKzgConfig(ctx, maxBlobSizeBytes),
 		ClientConfigV2:   clientConfigV2,
 		MemstoreConfig:   memstoreConfig,
-		MemstoreEnabled:  ctx.Bool(memstore.EnabledFlagName),
+		MemstoreEnabled:  useMemStore,
 		S3Config:         s3.ReadConfig(ctx),
 	}
 
