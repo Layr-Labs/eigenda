@@ -48,8 +48,8 @@ func (g *Encoder) EncodeBytes(inputBytes []byte, params encoding.EncodingParams)
 
 // Encode function takes input in unit of Fr Element and creates a list of FramesCoeffs,
 // which each contain a list of multireveal interpolating polynomial coefficients.
-// A slice of uint32 is also returned, which corresponds to which leading coset root of unity the frame is proving against.
-// This can be deduced from a frame's index.
+// A slice of uint32 is also returned, which corresponds to which leading coset
+// root of unity the frame is proving against. This can be deduced from a frame's index.
 func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) ([]FrameCoeffs, []uint32, error) {
 	start := time.Now()
 	intermediate := time.Now()
