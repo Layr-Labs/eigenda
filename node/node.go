@@ -769,28 +769,32 @@ func (n *Node) expireLoop() {
 	defer ticker.Stop()
 
 	for {
-		<-ticker.C
-
-		// We cap the time the deletion function can run, to make sure there is no overlapping
-		// between loops and the garbage collection doesn't take too much resource.
-		// The heuristic is to cap the GC time to a percentage of the poll interval, but at
-		// least have 1 second.
-		timeLimitSec := uint64(math.Max(float64(n.Config.ExpirationPollIntervalSec)*gcPercentageTime, 1.0))
-		numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err := n.Store.DeleteExpiredEntries(
-			time.Now().Unix(), timeLimitSec)
-		n.Logger.Info("Complete an expiration cycle to remove expired batches",
-			"num expired batches found and removed", numBatchesDeleted,
-			"num expired mappings found and removed", numMappingsDeleted,
-			"num expired blobs found and removed", numBlobsDeleted)
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				n.Logger.Error("Expiration cycle exited with ContextDeadlineExceed, meaning more expired "+
-					"batches need to be removed, which will continue in next cycle", "time limit (sec)",
-					timeLimitSec)
-			} else {
-				n.Logger.Error("Expiration cycle encountered error when removing expired batches, "+
-					"which will be retried in next cycle", "err", err)
+		select {
+		case <-ticker.C:
+			// We cap the time the deletion function can run, to make sure there is no overlapping
+			// between loops and the garbage collection doesn't take too much resource.
+			// The heuristic is to cap the GC time to a percentage of the poll interval, but at
+			// least have 1 second.
+			timeLimitSec := uint64(math.Max(float64(n.Config.ExpirationPollIntervalSec)*gcPercentageTime, 1.0))
+			numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err := n.Store.DeleteExpiredEntries(
+				time.Now().Unix(), timeLimitSec)
+			n.Logger.Info("Complete an expiration cycle to remove expired batches",
+				"num expired batches found and removed", numBatchesDeleted,
+				"num expired mappings found and removed", numMappingsDeleted,
+				"num expired blobs found and removed", numBlobsDeleted)
+			if err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					n.Logger.Error("Expiration cycle exited with ContextDeadlineExceed, meaning more expired "+
+						"batches need to be removed, which will continue in next cycle", "time limit (sec)",
+						timeLimitSec)
+				} else {
+					n.Logger.Error("Expiration cycle encountered error when removing expired batches, "+
+						"which will be retried in next cycle", "err", err)
+				}
 			}
+		case <-n.CTX.Done():
+			n.Logger.Info("Stopping expireLoop due to context cancellation")
+			return
 		}
 	}
 }
@@ -1137,59 +1141,63 @@ func (n *Node) checkNodeReachability(checkPath string) {
 	defer ticker.Stop()
 
 	for {
-		<-ticker.C
+		select {
+		case <-ticker.C:
+			n.Logger.Debug(fmt.Sprintf("Calling %s reachability check", version), "url", checkURL)
 
-		n.Logger.Debug(fmt.Sprintf("Calling %s reachability check", version), "url", checkURL)
-
-		resp, err := http.Get(checkURL)
-		if err != nil {
-			n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version), err)
-			continue
-		} else if resp.StatusCode == 404 {
-			body, _ := io.ReadAll(resp.Body)
-			if string(body) == "404 page not found" {
-				n.Logger.Error("Invalid reachability check url", "checkUrl", checkURL)
-			} else {
-				n.Logger.Warn("Reachability check operator id not found",
-					"status", resp.StatusCode,
-					"operator_id", n.Config.ID.Hex())
-			}
-			continue
-		} else if resp.StatusCode != 200 {
-			n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version),
-				"status", resp.StatusCode)
-			continue
-		}
-
-		data, err := io.ReadAll(resp.Body)
-		if err != nil {
-			n.Logger.Error(fmt.Sprintf("Failed to read %s reachability check response", version), err)
-			continue
-		}
-
-		if version == "v1" {
-			var responseObject OperatorReachabilityResponse
-			err = json.Unmarshal(data, &responseObject)
+			resp, err := http.Get(checkURL)
 			if err != nil {
-				n.Logger.Error("Reachability check failed to unmarshal json response", err)
+				n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version), err)
+				continue
+			} else if resp.StatusCode == 404 {
+				body, _ := io.ReadAll(resp.Body)
+				if string(body) == "404 page not found" {
+					n.Logger.Error("Invalid reachability check url", "checkUrl", checkURL)
+				} else {
+					n.Logger.Warn("Reachability check operator id not found",
+						"status", resp.StatusCode,
+						"operator_id", n.Config.ID.Hex())
+				}
+				continue
+			} else if resp.StatusCode != 200 {
+				n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version),
+					"status", resp.StatusCode)
 				continue
 			}
 
-			n.processReachabilityResponse(version, responseObject)
-		} else {
-			var v2ResponseObject OperatorV2ReachabilityResponse
-			err = json.Unmarshal(data, &v2ResponseObject)
+			data, err := io.ReadAll(resp.Body)
 			if err != nil {
-				n.Logger.Error("Reachability check v2 failed to unmarshal json response", err)
+				n.Logger.Error(fmt.Sprintf("Failed to read %s reachability check response", version), err)
 				continue
 			}
 
-			if len(v2ResponseObject.Operators) > 0 {
-				// Process the first operator from the array
-				n.processReachabilityResponse(version, v2ResponseObject.Operators[0])
+			if version == "v1" {
+				var responseObject OperatorReachabilityResponse
+				err = json.Unmarshal(data, &responseObject)
+				if err != nil {
+					n.Logger.Error("Reachability check failed to unmarshal json response", err)
+					continue
+				}
+
+				n.processReachabilityResponse(version, responseObject)
 			} else {
-				n.Logger.Error("Reachability check v2 returned empty operators array")
+				var v2ResponseObject OperatorV2ReachabilityResponse
+				err = json.Unmarshal(data, &v2ResponseObject)
+				if err != nil {
+					n.Logger.Error("Reachability check v2 failed to unmarshal json response", err)
+					continue
+				}
+
+				if len(v2ResponseObject.Operators) > 0 {
+					// Process the first operator from the array
+					n.processReachabilityResponse(version, v2ResponseObject.Operators[0])
+				} else {
+					n.Logger.Error("Reachability check v2 returned empty operators array")
+				}
 			}
+		case <-n.CTX.Done():
+			n.Logger.Info("Stopping checkNodeReachability due to context cancellation")
+			return
 		}
 	}
 }

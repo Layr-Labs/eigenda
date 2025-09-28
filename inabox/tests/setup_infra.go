@@ -138,6 +138,9 @@ func setupLocalInfrastructure(
 		return nil, fmt.Errorf("failed to start anvil: %w", err)
 	}
 
+	// Get Anvil RPC URL from the running container
+	anvilRPC := infra.AnvilContainer.RpcURL()
+
 	// Setup Graph Node if needed
 	deployer, ok := infra.TestConfig.GetDeployer(infra.TestConfig.EigenDA.Deployer)
 	if ok && deployer.DeploySubgraphs {
@@ -171,15 +174,15 @@ func setupLocalInfrastructure(
 
 	// Start churner server
 	infra.Logger.Info("Starting churner server")
-	err = StartChurnerForInfrastructure(infra)
+	churnerURL, err := StartChurnerForInfrastructure(infra, anvilRPC)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start churner server: %w", err)
 	}
-	infra.Logger.Info("Churner server started", "port", "32002")
+	infra.Logger.Info("Churner server started", "address", churnerURL)
 
 	// Start operator goroutines instead of binaries
 	infra.Logger.Info("Starting operator goroutines")
-	err = StartOperatorsForInfrastructure(infra)
+	err = StartOperatorsForInfrastructure(infra, anvilRPC, churnerURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start operator goroutines: %w", err)
 	}

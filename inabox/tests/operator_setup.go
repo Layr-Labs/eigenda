@@ -11,6 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/common/version"
@@ -39,11 +40,12 @@ type OperatorInstance struct {
 	V2DispersalPort string
 	V2RetrievalPort string
 	Logger          logging.Logger
+	Cancel          context.CancelFunc // Function to cancel the node's context
 }
 
 // StartOperatorForInfrastructure starts an operator node server as part of the global infrastructure.
-// This should be called after Anvil and other containers are started.
-func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex int) (*OperatorInstance, error) {
+// This should be called after Anvil and the Churner are started.
+func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex int, anvilRPC string, churnerRPC string) (*OperatorInstance, error) {
 	// Get operator's private key
 	var privateKey string
 	operatorName := fmt.Sprintf("opr%d", operatorIndex)
@@ -91,10 +93,10 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		DispersalPort:                  dispersalPort,
 		V2RetrievalPort:                v2RetrievalPort,
 		V2DispersalPort:                v2DispersalPort,
-		InternalRetrievalPort:          retrievalPort,     // Use same as external for tests
-		InternalDispersalPort:          dispersalPort,     // Use same as external for tests
-		InternalV2RetrievalPort:        v2RetrievalPort,   // Use same as external for tests
-		InternalV2DispersalPort:        v2DispersalPort,   // Use same as external for tests
+		InternalRetrievalPort:          retrievalPort,   // Use same as external for tests
+		InternalDispersalPort:          dispersalPort,   // Use same as external for tests
+		InternalV2RetrievalPort:        v2RetrievalPort, // Use same as external for tests
+		InternalV2DispersalPort:        v2DispersalPort, // Use same as external for tests
 		EnableNodeApi:                  true,
 		NodeApiPort:                    nodeApiPort,
 		EnableMetrics:                  true,
@@ -106,14 +108,14 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		EnableV2:                       true,
 		DbPath:                         fmt.Sprintf("testdata/%s/db/operator_%d", infra.TestName, operatorIndex),
 		LogPath:                        logFilePath,
-		ChurnerUrl:                     "localhost:32002",
+		ChurnerUrl:                     churnerRPC,
 		EnableTestMode:                 true,
 		NumBatchValidators:             1,
 		QuorumIDList:                   []core.QuorumID{0, 1}, // Default to quorums 0 and 1
 		EigenDADirectory:               infra.TestConfig.EigenDA.EigenDADirectory,
 		DisableDispersalAuthentication: true, // TODO: enable
 		EthClientConfig: geth.EthClientConfig{
-			RPCURLs:          []string{"http://localhost:8545"},
+			RPCURLs:          []string{anvilRPC},
 			PrivateKeyString: privateKey,
 		},
 		LoggerConfig: common.LoggerConfig{
@@ -145,7 +147,7 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		RelayMaxMessageSize:                 units.GiB,
 		EjectionSentinelPeriod:              5 * time.Minute,
 		StoreChunksBufferTimeout:            10 * time.Second,
-		StoreChunksBufferSizeBytes:          2 * units.GiB, // 2GB buffer for storing chunks
+		StoreChunksBufferSizeBytes:          2 * units.GiB,              // 2GB buffer for storing chunks
 		GetChunksHotCacheReadLimitMB:        10 * units.GiB / units.MiB, // 10 GB/s for tests
 		GetChunksHotBurstLimitMB:            10 * units.GiB / units.MiB, // 10 GB burst
 		GetChunksColdCacheReadLimitMB:       1 * units.GiB / units.MiB,  // 1 GB/s for tests
@@ -193,15 +195,18 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		return nil, fmt.Errorf("failed to create contract directory: %w", err)
 	}
 
-	// Create public IP provider
-	pubIPProvider := &mockPublicIPProvider{ip: "127.0.0.1"}
-
 	// Create version info
 	softwareVersion := &version.Semver{}
 
+	// Create mock IP provider for testing (returns "localhost")
+	pubIPProvider := pubip.ProviderOrDefault(operatorLogger, "mockip")
+
+	// Create a cancellable context for the node
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// Create node instance
 	operatorNode, err := node.NewNode(
-		context.Background(),
+		ctx,
 		reg,
 		operatorConfig,
 		contractDirectory,
@@ -211,6 +216,7 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		softwareVersion,
 	)
 	if err != nil {
+		cancel() // Clean up context if node creation fails
 		return nil, fmt.Errorf("failed to create operator node: %w", err)
 	}
 
@@ -246,12 +252,13 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 			operatorStateRetrieverAddress.Hex(),
 			eigenDAServiceManagerAddress.Hex())
 		if err != nil {
+			cancel() // Clean up context on error
 			return nil, fmt.Errorf("cannot create eth.Reader: %w", err)
 		}
 
 		// Create v2 server
 		serverV2, err = grpc.NewServerV2(
-			context.Background(),
+			ctx,
 			operatorConfig,
 			operatorNode,
 			operatorLogger,
@@ -260,6 +267,7 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 			reader,
 			softwareVersion)
 		if err != nil {
+			cancel() // Clean up context on error
 			return nil, fmt.Errorf("failed to create server v2: %w", err)
 		}
 	}
@@ -267,6 +275,7 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 	// Start all gRPC servers using the new RunServers function
 	runner, err := grpc.RunServers(operatorServer, serverV2, operatorConfig, operatorLogger)
 	if err != nil {
+		cancel() // Clean up context on error
 		return nil, fmt.Errorf("failed to start gRPC servers: %w", err)
 	}
 
@@ -290,11 +299,12 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		V2DispersalPort: v2DispersalPort,
 		V2RetrievalPort: v2RetrievalPort,
 		Logger:          operatorLogger,
+		Cancel:          cancel,
 	}, nil
 }
 
 // StartOperatorsForInfrastructure starts all operator nodes configured in the test config
-func StartOperatorsForInfrastructure(infra *InfrastructureHarness) error {
+func StartOperatorsForInfrastructure(infra *InfrastructureHarness, anvilRPC string, churnerRPC string) error {
 	// Count how many operator configs exist
 	operatorCount := 0
 	for {
@@ -313,7 +323,7 @@ func StartOperatorsForInfrastructure(infra *InfrastructureHarness) error {
 
 	// Start each operator
 	for i := 0; i < operatorCount; i++ {
-		instance, err := StartOperatorForInfrastructure(infra, i)
+		instance, err := StartOperatorForInfrastructure(infra, i, anvilRPC, churnerRPC)
 		if err != nil {
 			// Clean up any operators we started before failing
 			for _, inst := range infra.OperatorInstances {
@@ -336,6 +346,11 @@ func StopOperator(instance *OperatorInstance) {
 
 	instance.Logger.Info("Stopping operator")
 
+	// Cancel the context to signal all background goroutines to stop
+	if instance.Cancel != nil {
+		instance.Cancel()
+	}
+
 	// Use the ServerRunner to gracefully stop all servers
 	if instance.ServerRunner != nil {
 		instance.ServerRunner.Stop()
@@ -357,22 +372,3 @@ func StopAllOperators(infra *InfrastructureHarness) {
 	}
 	infra.OperatorInstances = nil
 }
-
-// mockPublicIPProvider is a simple mock implementation for testing
-type mockPublicIPProvider struct {
-	ip string
-}
-
-func (m *mockPublicIPProvider) PublicIPAddress(_ context.Context) (string, error) {
-	return m.ip, nil
-}
-
-func (m *mockPublicIPProvider) Name() string {
-	return "mock"
-}
-
-// Ensure mockPublicIPProvider implements pubip.Provider interface
-var _ interface {
-	PublicIPAddress(context.Context) (string, error)
-	Name() string
-} = (*mockPublicIPProvider)(nil)
