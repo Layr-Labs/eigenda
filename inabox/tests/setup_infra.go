@@ -177,8 +177,16 @@ func setupLocalInfrastructure(
 	}
 	infra.Logger.Info("Churner server started", "port", "32002")
 
-	infra.Logger.Info("Starting binaries")
-	infra.TestConfig.StartBinaries(true) // true = for tests, will skip churner
+	// Start operator goroutines instead of binaries
+	infra.Logger.Info("Starting operator goroutines")
+	err = StartOperatorsForInfrastructure(infra)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start operator goroutines: %w", err)
+	}
+
+	// Start remaining binaries (disperser, encoder, batcher, etc.)
+	infra.Logger.Info("Starting remaining binaries")
+	infra.TestConfig.StartBinaries(true) // true = for tests, will skip churner and operators
 
 	return infra, nil
 }
@@ -193,6 +201,12 @@ func TeardownGlobalInfrastructure(infra *InfrastructureHarness) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
+
+	// Stop operator goroutines
+	if len(infra.OperatorInstances) > 0 {
+		infra.Logger.Info("Stopping operator goroutines")
+		StopAllOperators(infra)
+	}
 
 	infra.Logger.Info("Stopping binaries")
 	infra.TestConfig.StopBinaries()

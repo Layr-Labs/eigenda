@@ -32,8 +32,9 @@ type InfrastructureHarness struct {
 
 	// EigenDA components
 	// TODO: Should EigenDA components be their own test harness?
-	ChurnerServer   *grpc.Server
-	ChurnerListener net.Listener
+	ChurnerServer    *grpc.Server
+	ChurnerListener  net.Listener
+	OperatorInstances []*OperatorInstance
 
 	// Global configuration
 	TemplateName      string
