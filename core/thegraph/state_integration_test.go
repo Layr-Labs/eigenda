@@ -3,7 +3,6 @@ package thegraph_test
 import (
 	"context"
 	"flag"
-	"fmt"
 	"testing"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	inaboxtests "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -25,14 +25,8 @@ var (
 	templateName string
 	testName     string
 	graphUrl     string
-
-	localstackPort      = "4570"
-	metadataTableName   = "test-BlobMetadata"
-	bucketTableName     = "test-BucketStore"
-	metadataTableNameV2 = "test-BlobMetadata-v2"
-	testQuorums         = []uint8{0, 1}
-
-	logger = test.GetLogger()
+	testQuorums  = []uint8{0, 1}
+	logger       = test.GetLogger()
 )
 
 func init() {
@@ -42,7 +36,7 @@ func init() {
 }
 
 func setupTest(t *testing.T) (
-	*testbed.AnvilContainer, *testbed.LocalStackContainer, *testbed.GraphNodeContainer, *deploy.Config,
+	*testbed.AnvilContainer, *testbed.GraphNodeContainer, *deploy.Config, []*inaboxtests.OperatorInstance,
 ) {
 	t.Helper()
 
@@ -69,25 +63,6 @@ func setupTest(t *testing.T) (
 		network.WithAttachable())
 	require.NoError(t, err, "failed to create Docker network")
 	logger.Info("Created Docker network", "name", nw.Name)
-
-	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
-		ExposeHostPort: true,
-		HostPort:       localstackPort,
-		Services:       []string{"s3", "dynamodb", "kms"},
-		Logger:         logger,
-		Network:        nw,
-	})
-	require.NoError(t, err, "failed to start localstack container")
-
-	deployConfig := testbed.DeployResourcesConfig{
-		LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
-		MetadataTableName:   metadataTableName,
-		BucketTableName:     bucketTableName,
-		V2MetadataTableName: metadataTableNameV2,
-		Logger:              logger,
-	}
-	err = testbed.DeployResources(ctx, deployConfig)
-	require.NoError(t, err, "failed to deploy resources")
 
 	anvilContainer, err := testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
 		ExposeHostPort: true,
@@ -123,33 +98,45 @@ func setupTest(t *testing.T) (
 	err = testConfig.DeployExperiment()
 	require.NoError(t, err, "failed to deploy experiment")
 
-	logger.Info("Starting binaries")
-	testConfig.StartBinaries(true)
+	// Create a minimal InfrastructureHarness
+	infraHarness := &inaboxtests.InfrastructureHarness{
+		TestName:   testName,
+		TestConfig: testConfig,
+		Logger:     logger,
+		Ctx:        ctx,
+	}
+
+	// For graph indexer test, we don't need churner functionality
+	churnerURL := ""
+
+	// Start operator nodes as goroutines using the inabox operator setup
+	logger.Info("Starting operator nodes as goroutines")
+	err = inaboxtests.StartOperatorsForInfrastructure(infraHarness, anvilContainerPort, churnerURL)
+	require.NoError(t, err, "failed to start operator nodes")
 
 	t.Cleanup(func() {
 		logger.Info("Stopping containers and services")
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		logger.Info("Stop binaries")
-		testConfig.StopBinaries()
+		logger.Info("Stop operator nodes")
+		inaboxtests.StopAllOperators(infraHarness)
 
 		logger.Info("Stop graph node")
 		_ = graphNodeContainer.Terminate(ctx)
 
 		_ = anvilContainer.Terminate(ctx)
-		_ = localstackContainer.Terminate(ctx)
 
 		logger.Info("Removing Docker network")
 		_ = nw.Remove(ctx)
 	})
 
-	return anvilContainer, localstackContainer, graphNodeContainer, testConfig
+	return anvilContainer, graphNodeContainer, testConfig, infraHarness.OperatorInstances
 }
 
 func TestIndexerIntegration(t *testing.T) {
 	ctx := t.Context()
-	_, _, _, testConfig := setupTest(t)
+	_, _, testConfig, _ := setupTest(t)
 
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 	tx, err := eth.NewWriter(
