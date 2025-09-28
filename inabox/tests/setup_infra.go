@@ -36,8 +36,9 @@ func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHar
 		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	// Create a timeout context for setup operations only
+	setupCtx, setupCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer setupCancel()
 
 	rootPath := "../../"
 
@@ -53,8 +54,11 @@ func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHar
 
 	testConfig := deploy.ReadTestConfig(testName, rootPath)
 
+	// Create a long-lived context for the infrastructure lifecycle
+	infraCtx, infraCancel := context.WithCancel(context.Background())
+
 	if testConfig.Environment.IsLocal() {
-		return setupLocalInfrastructure(ctx, config, testName, testConfig)
+		return setupLocalInfrastructure(setupCtx, infraCtx, infraCancel, config, testName, testConfig)
 	}
 
 	// For non-local environments, just return a minimal harness
@@ -67,11 +71,15 @@ func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHar
 		BucketTableName:     config.BucketTableName,
 		MetadataTableNameV2: config.MetadataTableNameV2,
 		TestConfig:          testConfig,
+		Ctx:                 infraCtx,
+		Cancel:              infraCancel,
 	}, nil
 }
 
 func setupLocalInfrastructure(
-	ctx context.Context,
+	setupCtx context.Context,
+	infraCtx context.Context,
+	infraCancel context.CancelFunc,
 	config *InfrastructureConfig,
 	testName string,
 	testConfig *deploy.Config,
@@ -85,11 +93,14 @@ func setupLocalInfrastructure(
 		BucketTableName:     config.BucketTableName,
 		MetadataTableNameV2: config.MetadataTableNameV2,
 		TestConfig:          testConfig,
+		Ctx:                 infraCtx,
+		Cancel:              infraCancel,
 	}
 
 	// Create a shared Docker network for all containers
 	var err error
-	infra.ChainDockerNetwork, err = network.New(context.Background(),
+	infra.ChainDockerNetwork, err = network.New(
+		setupCtx,
 		network.WithDriver("bridge"),
 		network.WithAttachable())
 	if err != nil {
@@ -101,12 +112,14 @@ func setupLocalInfrastructure(
 	if !infra.InMemoryBlobStore {
 		infra.Logger.Info("Using shared Blob Store")
 		infra.LocalStackPort = "4570"
-		infra.LocalstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
-			ExposeHostPort: true,
-			HostPort:       infra.LocalStackPort,
-			Logger:         infra.Logger,
-			Network:        infra.ChainDockerNetwork,
-		})
+		infra.LocalstackContainer, err = testbed.NewLocalStackContainerWithOptions(
+			setupCtx,
+			testbed.LocalStackOptions{
+				ExposeHostPort: true,
+				HostPort:       infra.LocalStackPort,
+				Logger:         infra.Logger,
+				Network:        infra.ChainDockerNetwork,
+			})
 		if err != nil {
 			return nil, fmt.Errorf("failed to start localstack: %w", err)
 		}
@@ -118,7 +131,7 @@ func setupLocalInfrastructure(
 			V2MetadataTableName: infra.MetadataTableNameV2,
 			Logger:              infra.Logger,
 		}
-		err = testbed.DeployResources(ctx, deployConfig)
+		err = testbed.DeployResources(setupCtx, deployConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to deploy resources: %w", err)
 		}
@@ -128,12 +141,14 @@ func setupLocalInfrastructure(
 
 	// Setup Anvil
 	infra.Logger.Info("Starting anvil")
-	infra.AnvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
-		ExposeHostPort: true,
-		HostPort:       "8545",
-		Logger:         infra.Logger,
-		Network:        infra.ChainDockerNetwork,
-	})
+	infra.AnvilContainer, err = testbed.NewAnvilContainerWithOptions(
+		setupCtx,
+		testbed.AnvilOptions{
+			ExposeHostPort: true,
+			HostPort:       "8545",
+			Logger:         infra.Logger,
+			Network:        infra.ChainDockerNetwork,
+		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start anvil: %w", err)
 	}
@@ -147,7 +162,8 @@ func setupLocalInfrastructure(
 		infra.Logger.Info("Starting graph node")
 		anvilInternalEndpoint := infra.AnvilContainer.InternalEndpoint()
 		infra.GraphNodeContainer, err = testbed.NewGraphNodeContainerWithOptions(
-			context.Background(), testbed.GraphNodeOptions{
+			setupCtx,
+			testbed.GraphNodeOptions{
 				PostgresDB:     "graph-node",
 				PostgresUser:   "graph-node",
 				PostgresPass:   "let-me-in",
@@ -172,7 +188,7 @@ func setupLocalInfrastructure(
 		return nil, fmt.Errorf("failed to deploy experiment: %w", err)
 	}
 
-	// Start churner server
+	// Start churner goroutine
 	infra.Logger.Info("Starting churner server")
 	churnerURL, err := StartChurnerForInfrastructure(infra, anvilRPC)
 	if err != nil {
@@ -180,7 +196,7 @@ func setupLocalInfrastructure(
 	}
 	infra.Logger.Info("Churner server started", "address", churnerURL)
 
-	// Start operator goroutines instead of binaries
+	// Start operator goroutines
 	infra.Logger.Info("Starting operator goroutines")
 	err = StartOperatorsForInfrastructure(infra, anvilRPC, churnerURL)
 	if err != nil {
@@ -196,14 +212,17 @@ func setupLocalInfrastructure(
 
 // TeardownGlobalInfrastructure cleans up all global infrastructure
 func TeardownGlobalInfrastructure(infra *InfrastructureHarness) {
-	if infra == nil || infra.TestConfig == nil || !infra.TestConfig.Environment.IsLocal() {
-		return
-	}
-
 	infra.Logger.Info("Tearing down global infrastructure")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	// Cancel the infrastructure context to signal all components to shut down
+	if infra.Cancel != nil {
+		infra.Logger.Info("Cancelling infrastructure context")
+		infra.Cancel()
+	}
+
+	// Create a separate timeout context for cleanup operations
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cleanupCancel()
 
 	// Stop operator goroutines
 	if len(infra.OperatorInstances) > 0 {
@@ -224,24 +243,24 @@ func TeardownGlobalInfrastructure(infra *InfrastructureHarness) {
 
 	if infra.AnvilContainer != nil {
 		infra.Logger.Info("Stopping anvil")
-		if err := infra.AnvilContainer.Terminate(ctx); err != nil {
+		if err := infra.AnvilContainer.Terminate(cleanupCtx); err != nil {
 			infra.Logger.Warn("Failed to terminate anvil container", "error", err)
 		}
 	}
 
 	if infra.GraphNodeContainer != nil {
 		infra.Logger.Info("Stopping graph node")
-		_ = infra.GraphNodeContainer.Terminate(context.Background())
+		_ = infra.GraphNodeContainer.Terminate(cleanupCtx)
 	}
 
 	if infra.ChainDockerNetwork != nil {
 		infra.Logger.Info("Removing Docker network")
-		_ = infra.ChainDockerNetwork.Remove(context.Background())
+		_ = infra.ChainDockerNetwork.Remove(cleanupCtx)
 	}
 
 	if infra.LocalstackContainer != nil {
 		infra.Logger.Info("Stopping localstack container")
-		if err := infra.LocalstackContainer.Terminate(ctx); err != nil {
+		if err := infra.LocalstackContainer.Terminate(cleanupCtx); err != nil {
 			infra.Logger.Warn("Failed to terminate localstack container", "error", err)
 		}
 	}

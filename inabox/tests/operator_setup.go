@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -40,7 +39,6 @@ type OperatorInstance struct {
 	V2DispersalPort string
 	V2RetrievalPort string
 	Logger          logging.Logger
-	Cancel          context.CancelFunc // Function to cancel the node's context
 }
 
 // StartOperatorForInfrastructure starts an operator node server as part of the global infrastructure.
@@ -187,7 +185,7 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 
 	// Create contract directory
 	contractDirectory, err := directory.NewContractDirectory(
-		context.Background(),
+		infra.Ctx,
 		operatorLogger,
 		gethClient,
 		gethcommon.HexToAddress(operatorConfig.EigenDADirectory))
@@ -201,12 +199,12 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 	// Create mock IP provider for testing (returns "localhost")
 	pubIPProvider := pubip.ProviderOrDefault(operatorLogger, "mockip")
 
-	// Create a cancellable context for the node
-	ctx, cancel := context.WithCancel(context.Background())
+	// Use the context from the infrastructure harness
+	// This allows all operators to be cancelled when the infrastructure is torn down
 
 	// Create node instance
 	operatorNode, err := node.NewNode(
-		ctx,
+		infra.Ctx,
 		reg,
 		operatorConfig,
 		contractDirectory,
@@ -216,7 +214,6 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		softwareVersion,
 	)
 	if err != nil {
-		cancel() // Clean up context if node creation fails
 		return nil, fmt.Errorf("failed to create operator node: %w", err)
 	}
 
@@ -234,13 +231,13 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 	if operatorConfig.EnableV2 {
 		// Get operator state retriever and service manager addresses
 		operatorStateRetrieverAddress, err := contractDirectory.GetContractAddress(
-			context.Background(), directory.OperatorStateRetriever)
+			infra.Ctx, directory.OperatorStateRetriever)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get OperatorStateRetriever address: %w", err)
 		}
 
 		eigenDAServiceManagerAddress, err := contractDirectory.GetContractAddress(
-			context.Background(), directory.ServiceManager)
+			infra.Ctx, directory.ServiceManager)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get ServiceManager address: %w", err)
 		}
@@ -252,13 +249,12 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 			operatorStateRetrieverAddress.Hex(),
 			eigenDAServiceManagerAddress.Hex())
 		if err != nil {
-			cancel() // Clean up context on error
 			return nil, fmt.Errorf("cannot create eth.Reader: %w", err)
 		}
 
 		// Create v2 server
 		serverV2, err = grpc.NewServerV2(
-			ctx,
+			infra.Ctx,
 			operatorConfig,
 			operatorNode,
 			operatorLogger,
@@ -267,7 +263,6 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 			reader,
 			softwareVersion)
 		if err != nil {
-			cancel() // Clean up context on error
 			return nil, fmt.Errorf("failed to create server v2: %w", err)
 		}
 	}
@@ -275,7 +270,6 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 	// Start all gRPC servers using the new RunServers function
 	runner, err := grpc.RunServers(operatorServer, serverV2, operatorConfig, operatorLogger)
 	if err != nil {
-		cancel() // Clean up context on error
 		return nil, fmt.Errorf("failed to start gRPC servers: %w", err)
 	}
 
@@ -299,7 +293,6 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		V2DispersalPort: v2DispersalPort,
 		V2RetrievalPort: v2RetrievalPort,
 		Logger:          operatorLogger,
-		Cancel:          cancel,
 	}, nil
 }
 
@@ -345,11 +338,6 @@ func StopOperator(instance *OperatorInstance) {
 	}
 
 	instance.Logger.Info("Stopping operator")
-
-	// Cancel the context to signal all background goroutines to stop
-	if instance.Cancel != nil {
-		instance.Cancel()
-	}
 
 	// Use the ServerRunner to gracefully stop all servers
 	if instance.ServerRunner != nil {
