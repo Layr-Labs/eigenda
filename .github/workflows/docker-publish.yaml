@@ -29,15 +29,7 @@ jobs:
         with:
           install: true
           driver-opts: >-
-            image=moby/buildkit:master
-
-      - name: Cache main image layers
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 #4.2.0
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
+            image=moby/buildkit:v0.24.0
 
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
@@ -49,11 +41,29 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Build And Push Images
-      - name: Build Docker images
-        run: docker buildx bake all
-      - name: Push Docker images
+      - name: Build all (except encoder-icicle)
+        run: |
+          BAKE_ARGS="--cache-from type=gha --cache-to type=gha,mode=max" \
+          make docker-build-except-icicle
+
+      - name: Push all images (except encoder-icicle)
         if: github.ref == 'refs/heads/master'
-        run: BUILD_TAG=master make docker-build-push
+        run: |
+          BUILD_TAG=master \
+          BAKE_ARGS="--cache-from type=gha --cache-to type=gha,mode=max" \
+          make docker-build-push-except-icicle
+
+      - name: Build encoder-icicle
+        run: |
+          BAKE_ARGS="--cache-from type=gha --cache-to type=gha,mode=max" \
+          make encoder-icicle-build
+
+      - name: Push encoder-icicle
+        if: github.ref == 'refs/heads/master'
+        run: |
+          BUILD_TAG=master \
+          BAKE_ARGS="--cache-from type=gha --cache-to type=gha,mode=max" \
+          make encoder-icicle-push
 
       - name: Send GitHub Action trigger data to Slack workflow
         if: ${{ failure() }}
