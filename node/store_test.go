@@ -425,8 +425,7 @@ func BenchmarkEncodeChunks(b *testing.B) {
 		sampleChunks[n] = chunks
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		_, _ = node.EncodeChunks(sampleChunks[i%numSamples])
 	}
 }
@@ -447,8 +446,7 @@ func BenchmarkDecocodeChunks(b *testing.B) {
 		sampleChunks[n] = encoded
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		_, _, _ = node.DecodeChunks(sampleChunks[i%numSamples])
 	}
 }
