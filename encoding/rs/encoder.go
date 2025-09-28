@@ -46,13 +46,10 @@ func (g *Encoder) EncodeBytes(inputBytes []byte, params encoding.EncodingParams)
 	return g.Encode(inputFr, params)
 }
 
-// Encode function takes input in unit of Fr Element, creates a kzg commit and a list of Frames
-// which contains a list of multireveal interpolating polynomial coefficients, a G1 proof and a
-// low degree proof corresponding to the interpolating polynomial. Each frame is an independent
-// group of data verifiable to the kzg commitment. The encoding functions ensures that in each
-// frame, the multireveal interpolating coefficients are identical to the part of input bytes
-// in the form of field element. The extra returned integer list corresponds to which leading
-// coset root of unity, the frame is proving against, which can be deduced from a frame's index
+// Encode function takes input in unit of Fr Element and creates a list of FramesCoeffs,
+// which each contain a list of multireveal interpolating polynomial coefficients.
+// A slice of uint32 is also returned, which corresponds to which leading coset root of unity the frame is proving against.
+// This can be deduced from a frame's index.
 func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) ([]FrameCoeffs, []uint32, error) {
 	start := time.Now()
 	intermediate := time.Now()
@@ -100,12 +97,15 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 	return frames, indices, nil
 }
 
-// Decode data when some chunks from systematic nodes are lost. It first uses FFT to recover
-// the whole polynomial. Then it extracts only the systematic chunks.
+// Decode data when some chunks from systematic nodes are lost. This function implements
+// https://ethresear.ch/t/reed-solomon-erasure-code-recovery-in-n-log-2-n-time-with-ffts/3039
+//
+// It first uses FFT to recover the whole polynomial. Then it extracts only the systematic chunks.
 // It takes a list of available frame, and return the original encoded data
 // storing the evaluation points, since it is where RS is applied. The input frame contains
 // the coefficient of the interpolating polynomina, hence interpolation is needed before
 // recovery.
+//
 // maxInputSize is the upper bound of the original data size. This is needed because
 // the Frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
