@@ -164,8 +164,12 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		fmt.Println("Operator: ", idStr)
 
 		fmt.Println("Starting server")
-		err = nodegrpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
+		runner, err := nodegrpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
 		require.NoError(t, err)
+		// Store the runner for potential cleanup in defer
+		t.Cleanup(func() {
+			runner.Stop()
+		})
 	}
 
 	blob := makeTestBlob()

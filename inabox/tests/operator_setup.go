@@ -5,16 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"os"
 	"strings"
 	"time"
 
-	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
-	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/common/version"
@@ -30,27 +26,19 @@ import (
 	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
-	grpclib "google.golang.org/grpc"
 )
 
 // OperatorInstance holds the state for a single operator
 type OperatorInstance struct {
-	Node                *node.Node
-	Server              *grpc.Server
-	ServerV2            *grpc.ServerV2
-	DispersalServer     *grpclib.Server
-	RetrievalServer     *grpclib.Server
-	V2DispersalServer   *grpclib.Server
-	V2RetrievalServer   *grpclib.Server
-	DispersalListener   net.Listener
-	RetrievalListener   net.Listener
-	V2DispersalListener net.Listener
-	V2RetrievalListener net.Listener
-	DispersalPort       string
-	RetrievalPort       string
-	V2DispersalPort     string
-	V2RetrievalPort     string
-	Logger              logging.Logger
+	Node            *node.Node
+	Server          *grpc.Server
+	ServerV2        *grpc.ServerV2
+	ServerRunner    *grpc.ServerRunner
+	DispersalPort   string
+	RetrievalPort   string
+	V2DispersalPort string
+	V2RetrievalPort string
+	Logger          logging.Logger
 }
 
 // StartOperatorForInfrastructure starts an operator node server as part of the global infrastructure.
@@ -103,6 +91,10 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		DispersalPort:                  dispersalPort,
 		V2RetrievalPort:                v2RetrievalPort,
 		V2DispersalPort:                v2DispersalPort,
+		InternalRetrievalPort:          retrievalPort,     // Use same as external for tests
+		InternalDispersalPort:          dispersalPort,     // Use same as external for tests
+		InternalV2RetrievalPort:        v2RetrievalPort,   // Use same as external for tests
+		InternalV2DispersalPort:        v2DispersalPort,   // Use same as external for tests
 		EnableNodeApi:                  true,
 		NodeApiPort:                    nodeApiPort,
 		EnableMetrics:                  true,
@@ -158,6 +150,7 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		GetChunksHotBurstLimitMB:            10 * units.GiB / units.MiB, // 10 GB burst
 		GetChunksColdCacheReadLimitMB:       1 * units.GiB / units.MiB,  // 1 GB/s for tests
 		GetChunksColdBurstLimitMB:           1 * units.GiB / units.MiB,  // 1 GB burst
+		GRPCMsgSizeLimitV2:                  1024 * 1024 * 300,          // 300 MiB, same as in the original code
 	}
 
 	// Create operator logger
@@ -271,88 +264,10 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		}
 	}
 
-	// Create and start dispersal server
-	var dispersalServer *grpclib.Server
-	var dispersalListener net.Listener
-	if operatorConfig.EnableV1 {
-		dispersalListener, err = net.Listen("tcp", fmt.Sprintf(":%s", dispersalPort))
-		if err != nil {
-			return nil, fmt.Errorf("failed to listen on dispersal port %s: %w", dispersalPort, err)
-		}
-
-		dispersalServer = grpclib.NewServer(grpclib.MaxRecvMsgSize(60 * 1024 * 1024 * 1024)) // 60 GiB
-		pb.RegisterDispersalServer(dispersalServer, operatorServer)
-		healthcheck.RegisterHealthServer("node.Dispersal", dispersalServer)
-
-		go func() {
-			operatorLogger.Info("Starting dispersal server", "port", dispersalPort)
-			if err := dispersalServer.Serve(dispersalListener); err != nil {
-				operatorLogger.Info("Dispersal server stopped", "error", err)
-			}
-		}()
-	}
-
-	// Create and start retrieval server
-	var retrievalServer *grpclib.Server
-	var retrievalListener net.Listener
-	if operatorConfig.EnableV1 {
-		retrievalListener, err = net.Listen("tcp", fmt.Sprintf(":%s", retrievalPort))
-		if err != nil {
-			return nil, fmt.Errorf("failed to listen on retrieval port %s: %w", retrievalPort, err)
-		}
-
-		retrievalServer = grpclib.NewServer(grpclib.MaxRecvMsgSize(1024 * 1024 * 300)) // 300 MiB
-		pb.RegisterRetrievalServer(retrievalServer, operatorServer)
-		healthcheck.RegisterHealthServer("node.Retrieval", retrievalServer)
-
-		go func() {
-			operatorLogger.Info("Starting retrieval server", "port", retrievalPort)
-			if err := retrievalServer.Serve(retrievalListener); err != nil {
-				operatorLogger.Info("Retrieval server stopped", "error", err)
-			}
-		}()
-	}
-
-	// Create and start V2 dispersal server
-	var v2DispersalServer *grpclib.Server
-	var v2DispersalListener net.Listener
-	if operatorConfig.EnableV2 {
-		v2DispersalListener, err = net.Listen("tcp", fmt.Sprintf(":%s", v2DispersalPort))
-		if err != nil {
-			return nil, fmt.Errorf("failed to listen on v2 dispersal port %s: %w", v2DispersalPort, err)
-		}
-
-		v2DispersalServer = grpclib.NewServer(grpclib.MaxRecvMsgSize(1024 * 1024 * 300)) // 300 MiB
-		validator.RegisterDispersalServer(v2DispersalServer, serverV2)
-		healthcheck.RegisterHealthServer("node.v2.Dispersal", v2DispersalServer)
-
-		go func() {
-			operatorLogger.Info("Starting v2 dispersal server", "port", v2DispersalPort)
-			if err := v2DispersalServer.Serve(v2DispersalListener); err != nil {
-				operatorLogger.Info("V2 Dispersal server stopped", "error", err)
-			}
-		}()
-	}
-
-	// Create and start V2 retrieval server
-	var v2RetrievalServer *grpclib.Server
-	var v2RetrievalListener net.Listener
-	if operatorConfig.EnableV2 {
-		v2RetrievalListener, err = net.Listen("tcp", fmt.Sprintf(":%s", v2RetrievalPort))
-		if err != nil {
-			return nil, fmt.Errorf("failed to listen on v2 retrieval port %s: %w", v2RetrievalPort, err)
-		}
-
-		v2RetrievalServer = grpclib.NewServer(grpclib.MaxRecvMsgSize(1024 * 1024 * 300)) // 300 MiB
-		validator.RegisterRetrievalServer(v2RetrievalServer, serverV2)
-		healthcheck.RegisterHealthServer("node.v2.Retrieval", v2RetrievalServer)
-
-		go func() {
-			operatorLogger.Info("Starting v2 retrieval server", "port", v2RetrievalPort)
-			if err := v2RetrievalServer.Serve(v2RetrievalListener); err != nil {
-				operatorLogger.Info("V2 Retrieval server stopped", "error", err)
-			}
-		}()
+	// Start all gRPC servers using the new RunServers function
+	runner, err := grpc.RunServers(operatorServer, serverV2, operatorConfig, operatorLogger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start gRPC servers: %w", err)
 	}
 
 	// Wait for servers to be ready
@@ -366,22 +281,15 @@ func StartOperatorForInfrastructure(infra *InfrastructureHarness, operatorIndex 
 		"logFile", logFilePath)
 
 	return &OperatorInstance{
-		Node:                operatorNode,
-		Server:              operatorServer,
-		ServerV2:            serverV2,
-		DispersalServer:     dispersalServer,
-		RetrievalServer:     retrievalServer,
-		V2DispersalServer:   v2DispersalServer,
-		V2RetrievalServer:   v2RetrievalServer,
-		DispersalListener:   dispersalListener,
-		RetrievalListener:   retrievalListener,
-		V2DispersalListener: v2DispersalListener,
-		V2RetrievalListener: v2RetrievalListener,
-		DispersalPort:       dispersalPort,
-		RetrievalPort:       retrievalPort,
-		V2DispersalPort:     v2DispersalPort,
-		V2RetrievalPort:     v2RetrievalPort,
-		Logger:              operatorLogger,
+		Node:            operatorNode,
+		Server:          operatorServer,
+		ServerV2:        serverV2,
+		ServerRunner:    runner,
+		DispersalPort:   dispersalPort,
+		RetrievalPort:   retrievalPort,
+		V2DispersalPort: v2DispersalPort,
+		V2RetrievalPort: v2RetrievalPort,
+		Logger:          operatorLogger,
 	}, nil
 }
 
@@ -428,48 +336,9 @@ func StopOperator(instance *OperatorInstance) {
 
 	instance.Logger.Info("Stopping operator")
 
-	// Stop the dispersal server
-	if instance.DispersalServer != nil {
-		instance.Logger.Info("Stopping dispersal server")
-		instance.DispersalServer.GracefulStop()
-	}
-
-	// Stop the retrieval server
-	if instance.RetrievalServer != nil {
-		instance.Logger.Info("Stopping retrieval server")
-		instance.RetrievalServer.GracefulStop()
-	}
-
-	// Stop the v2 dispersal server
-	if instance.V2DispersalServer != nil {
-		instance.Logger.Info("Stopping v2 dispersal server")
-		instance.V2DispersalServer.GracefulStop()
-	}
-
-	// Stop the v2 retrieval server
-	if instance.V2RetrievalServer != nil {
-		instance.Logger.Info("Stopping v2 retrieval server")
-		instance.V2RetrievalServer.GracefulStop()
-	}
-
-	// Close the dispersal listener
-	if instance.DispersalListener != nil {
-		_ = instance.DispersalListener.Close()
-	}
-
-	// Close the retrieval listener
-	if instance.RetrievalListener != nil {
-		_ = instance.RetrievalListener.Close()
-	}
-
-	// Close the v2 dispersal listener
-	if instance.V2DispersalListener != nil {
-		_ = instance.V2DispersalListener.Close()
-	}
-
-	// Close the v2 retrieval listener
-	if instance.V2RetrievalListener != nil {
-		_ = instance.V2RetrievalListener.Close()
+	// Use the ServerRunner to gracefully stop all servers
+	if instance.ServerRunner != nil {
+		instance.ServerRunner.Stop()
 	}
 
 	instance.Logger.Info("Operator stopped")
