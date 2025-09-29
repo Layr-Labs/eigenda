@@ -104,7 +104,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 				healthcheck.RegisterHealthServer("node.Dispersal", gs)
 
 				logger.Info("v1 dispersal enabled on port", config.InternalDispersalPort, "address", listener.Addr().String(), "GRPC Listening")
-				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+				if err := gs.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 					select {
 					case <-runner.ctx.Done():
 						logger.Info("v1 dispersal server stopping due to context cancellation")
@@ -153,7 +153,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 				healthcheck.RegisterHealthServer("node.v2.Dispersal", gs)
 
 				logger.Info("v2 dispersal enabled on port", config.InternalV2DispersalPort, "address", listener.Addr().String(), "GRPC Listening")
-				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+				if err := gs.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 					select {
 					case <-runner.ctx.Done():
 						logger.Info("v2 dispersal server stopping due to context cancellation")
@@ -201,7 +201,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 				healthcheck.RegisterHealthServer("node.Retrieval", gs)
 
 				logger.Info("v1 retrieval enabled on port", config.InternalRetrievalPort, "address", listener.Addr().String(), "GRPC Listening")
-				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+				if err := gs.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 					select {
 					case <-runner.ctx.Done():
 						logger.Info("v1 retrieval server stopping due to context cancellation")
@@ -249,7 +249,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 				healthcheck.RegisterHealthServer("node.v2.Retrieval", gs)
 
 				logger.Info("v2 retrieval enabled on port", config.InternalV2RetrievalPort, "address", listener.Addr().String(), "GRPC Listening")
-				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+				if err := gs.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 					select {
 					case <-runner.ctx.Done():
 						logger.Info("v2 retrieval server stopping due to context cancellation")
