@@ -53,8 +53,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("application failed: %v", err)
 	}
-
-	select {}
 }
 
 func NodeMain(cliCtx *cli.Context, softwareVersion *version.Semver) error {
@@ -116,9 +114,13 @@ func NodeMain(cliCtx *cli.Context, softwareVersion *version.Semver) error {
 		return fmt.Errorf("failed to get ServiceManager address: %w", err)
 	}
 
+	// Create a cancellable context for the node
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // Ensure context is always cleaned up
+
 	// Create and start the node.
 	node, err := node.NewNode(
-		context.Background(),
+		ctx,
 		reg,
 		config,
 		contractDirectory,
@@ -129,6 +131,7 @@ func NodeMain(cliCtx *cli.Context, softwareVersion *version.Semver) error {
 	if err != nil {
 		return err
 	}
+	defer node.Shutdown() // Ensure node is always properly shut down (idempotent)
 
 	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
 	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
@@ -159,11 +162,8 @@ func NodeMain(cliCtx *cli.Context, softwareVersion *version.Semver) error {
 		}
 	}
 
-	// Create the shutdown function for the node
-	nodeShutdown := func() {
-		logger.Info("Shutting down node...")
-		node.Shutdown()
-	}
+	// Create a channel to signal when shutdown is complete
+	shutdownComplete := make(chan struct{})
 
 	runner, err := nodegrpc.RunServers(server, serverV2, config, logger)
 	if err != nil {
@@ -177,12 +177,19 @@ func NodeMain(cliCtx *cli.Context, softwareVersion *version.Semver) error {
 	go func() {
 		sig := <-sigChan
 		logger.Infof("Received signal %v, initiating graceful shutdown", sig)
+
+		// Shutdown in correct order
 		runner.Stop()
-		nodeShutdown()
-		os.Exit(0)
+		node.Shutdown()
+
+		close(shutdownComplete)
 	}()
 
 	logger.Info("Node is running")
+
+	// Block until shutdown signal is received
+	<-shutdownComplete
+	logger.Info("Node shutdown complete")
 
 	return nil
 }

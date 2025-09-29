@@ -107,6 +107,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
 					select {
 					case <-runner.ctx.Done():
+						logger.Info("v1 dispersal server stopping due to context cancellation")
 						return
 					default:
 						logger.Error("dispersal server failed; restarting.", "err", err)
@@ -155,6 +156,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
 					select {
 					case <-runner.ctx.Done():
+						logger.Info("v2 dispersal server stopping due to context cancellation")
 						return
 					default:
 						logger.Error("dispersal v2 server failed; restarting.", "err", err)
@@ -202,6 +204,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
 					select {
 					case <-runner.ctx.Done():
+						logger.Info("v1 retrieval server stopping due to context cancellation")
 						return
 					default:
 						logger.Error("retrieval server failed; restarting.", "err", err)
@@ -249,6 +252,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 				if err := gs.Serve(listener); err != nil && err != grpc.ErrServerStopped {
 					select {
 					case <-runner.ctx.Done():
+						logger.Info("v2 retrieval server stopping due to context cancellation")
 						return
 					default:
 						logger.Error("retrieval v2 server failed; restarting.", "err", err)
