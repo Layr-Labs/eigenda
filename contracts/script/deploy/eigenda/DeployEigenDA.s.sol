@@ -38,7 +38,12 @@ import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol
 import {MockStakeRegistry} from "test/mock/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "test/mock/MockRegistryCoordinator.sol";
 
+import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
+
 import {InitParamsLib} from "script/deploy/eigenda/DeployEigenDAConfig.sol";
+
+import {EigenDADirectory} from "src/core/EigenDADirectory.sol";
+import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
 
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
@@ -67,9 +72,11 @@ contract DeployEigenDA is Script {
     string constant MOCK_STAKE_REGISTRY = "MOCK_STAKE_REGISTRY";
     string constant MOCK_REGISTRY_COORDINATOR = "MOCK_REGISTRY_COORDINATOR";
 
-    mapping(string => address) deployed; // Addresses of the deployed contracts, whether they be a proxy or not.
     mapping(string => address) impl; // Implementation addresses of the deployed contracts.
     mapping(string => bool) upgraded; // Whether the deployment of a contract is upgraded to its final implementation. Should beTrue if the contract is not a proxy
+
+    ProxyAdmin proxyAdmin;
+    EigenDADirectory directory;
 
     string cfg;
 
@@ -81,18 +88,27 @@ contract DeployEigenDA is Script {
         initConfig();
         vm.startBroadcast();
 
-        // DEPLOY PROXY ADMIN
-        deployed[PROXY_ADMIN] = address(new ProxyAdmin());
-        impl[PROXY_ADMIN] = deployed[PROXY_ADMIN];
-        upgraded[PROXY_ADMIN] = true;
+        proxyAdmin = new ProxyAdmin();
+
+        directory = EigenDADirectory(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new EigenDADirectory()),
+                    address(proxyAdmin),
+                    abi.encodeWithSelector(
+                        EigenDADirectory.initialize.selector, address(new EigenDAAccessControl(msg.sender))
+                    )
+                )
+            )
+        );
 
         // DEPLOY MOCK IMPLEMENTATION
         impl[EMPTY_CONTRACT] = address(new EmptyContract());
 
         // DEPLOY PAUSER
-        deployed[PAUSER_REGISTRY] = address(new PauserRegistry(cfg.pausers(), cfg.unpauser()));
-        impl[PAUSER_REGISTRY] = deployed[PAUSER_REGISTRY];
-        upgraded[PAUSER_REGISTRY] = true;
+        directory.addAddress(
+            AddressDirectoryConstants.PAUSER_REGISTRY_NAME, address(new PauserRegistry(cfg.pausers(), cfg.unpauser()))
+        );
 
         // Registry coordinator requires these contracts as constructor arguments for implementation deployment
         // However, these contracts also require knowing the registry coordinator address
@@ -102,71 +118,99 @@ contract DeployEigenDA is Script {
         // SOCKET REGISTRY
         // BLS APK REGISTRY
         // SERVICE MANAGER
-        deployed[INDEX_REGISTRY] =
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
-        deployed[SOCKET_REGISTRY] =
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
-        deployed[BLS_APK_REGISTRY] =
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
+        directory.addAddress(
+            AddressDirectoryConstants.INDEX_REGISTRY_NAME,
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+        );
+        directory.addAddress(
+            AddressDirectoryConstants.SOCKET_REGISTRY_NAME,
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+        );
+        directory.addAddress(
+            AddressDirectoryConstants.BLS_APK_REGISTRY_NAME,
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+        );
         impl[MOCK_STAKE_REGISTRY] = address(new MockStakeRegistry(IDelegationManager(cfg.delegationManager())));
         // The service manager implementation requires the stake registry to expose the delegation manager on construction.
-        deployed[STAKE_REGISTRY] =
-            address(new TransparentUpgradeableProxy(impl[MOCK_STAKE_REGISTRY], deployed[PROXY_ADMIN], ""));
+        directory.addAddress(
+            AddressDirectoryConstants.STAKE_REGISTRY_NAME,
+            address(new TransparentUpgradeableProxy(impl[MOCK_STAKE_REGISTRY], address(proxyAdmin), ""))
+        );
         // The service manager implementation requires the registry coordinator to expose the stake registry and bls APK registry on construction.
         // And this can only be done after the stake registry and bls APK registry proxies are known.
         impl[MOCK_REGISTRY_COORDINATOR] = address(
             new MockRegistryCoordinator(
-                IStakeRegistry(deployed[STAKE_REGISTRY]), IBLSApkRegistry(deployed[BLS_APK_REGISTRY])
+                IStakeRegistry(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
+                IBLSApkRegistry(directory.getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME))
             )
         );
-        deployed[REGISTRY_COORDINATOR] =
-            address(new TransparentUpgradeableProxy(impl[MOCK_REGISTRY_COORDINATOR], deployed[PROXY_ADMIN], ""));
-        deployed[THRESHOLD_REGISTRY] =
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
-        deployed[RELAY_REGISTRY] =
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
-        deployed[DISPERSER_REGISTRY] =
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
-        deployed[PAYMENT_VAULT] =
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
-        deployed[SERVICE_MANAGER] =
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
-        deployed[EJECTION_MANAGER] =
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
+        directory.addAddress(
+            AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME,
+            address(new TransparentUpgradeableProxy(impl[MOCK_REGISTRY_COORDINATOR], address(proxyAdmin), ""))
+        );
+        directory.addAddress(
+            AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME,
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+        );
+        directory.addAddress(
+            AddressDirectoryConstants.RELAY_REGISTRY_NAME,
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+        );
+        directory.addAddress(
+            AddressDirectoryConstants.DISPERSER_REGISTRY_NAME,
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+        );
+        directory.addAddress(
+            AddressDirectoryConstants.PAYMENT_VAULT_NAME,
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+        );
+        directory.addAddress(
+            AddressDirectoryConstants.SERVICE_MANAGER_NAME,
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+        );
+        directory.addAddress(
+            AddressDirectoryConstants.EJECTION_MANAGER_NAME,
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+        );
 
-        impl[INDEX_REGISTRY] = address(new IndexRegistry(IRegistryCoordinator(deployed[REGISTRY_COORDINATOR])));
+        impl[INDEX_REGISTRY] = address(
+            new IndexRegistry(
+                IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME))
+            )
+        );
         upgrade(INDEX_REGISTRY, "");
 
         impl[STAKE_REGISTRY] = address(
             new StakeRegistry(
-                IRegistryCoordinator(deployed[REGISTRY_COORDINATOR]), IDelegationManager(cfg.delegationManager())
+                IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME)),
+                IDelegationManager(cfg.delegationManager())
             )
         );
         upgrade(STAKE_REGISTRY, "");
 
-        impl[SOCKET_REGISTRY] = address(new SocketRegistry(IRegistryCoordinator(deployed[REGISTRY_COORDINATOR])));
-        upgrade(SOCKET_REGISTRY, "");
-
-        impl[BLS_APK_REGISTRY] = address(new BLSApkRegistry(IRegistryCoordinator(deployed[REGISTRY_COORDINATOR])));
-        upgrade(BLS_APK_REGISTRY, "");
-
-        impl[REGISTRY_COORDINATOR] = address(
-            new EigenDARegistryCoordinator(
-                IServiceManager(deployed[SERVICE_MANAGER]),
-                IStakeRegistry(deployed[STAKE_REGISTRY]),
-                IBLSApkRegistry(deployed[BLS_APK_REGISTRY]),
-                IIndexRegistry(deployed[INDEX_REGISTRY]),
-                ISocketRegistry(deployed[SOCKET_REGISTRY])
+        impl[SOCKET_REGISTRY] = address(
+            new SocketRegistry(
+                IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME))
             )
         );
+        upgrade(SOCKET_REGISTRY, "");
+
+        impl[BLS_APK_REGISTRY] = address(
+            new BLSApkRegistry(
+                IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME))
+            )
+        );
+        upgrade(BLS_APK_REGISTRY, "");
+
+        impl[REGISTRY_COORDINATOR] = address(new EigenDARegistryCoordinator(address(directory)));
         upgrade(
             REGISTRY_COORDINATOR,
             abi.encodeCall(
                 EigenDARegistryCoordinator.initialize,
                 (
                     cfg.initialOwner(),
-                    deployed[EJECTION_MANAGER],
-                    IPauserRegistry(deployed[PAUSER_REGISTRY]),
+                    directory.getAddress(AddressDirectoryConstants.EJECTION_MANAGER_NAME),
+                    IPauserRegistry(directory.getAddress(AddressDirectoryConstants.PAUSER_REGISTRY_NAME)),
                     cfg.initialPausedStatus(),
                     cfg.operatorSetParams(),
                     cfg.minimumStakes(),
@@ -179,12 +223,12 @@ contract DeployEigenDA is Script {
             new EigenDAServiceManager(
                 IAVSDirectory(cfg.avsDirectory()),
                 IRewardsCoordinator(cfg.rewardsCoordinator()),
-                IRegistryCoordinator(deployed[REGISTRY_COORDINATOR]),
-                IStakeRegistry(deployed[STAKE_REGISTRY]),
-                IEigenDAThresholdRegistry(deployed[THRESHOLD_REGISTRY]),
-                IEigenDARelayRegistry(deployed[RELAY_REGISTRY]),
-                IPaymentVault(deployed[PAYMENT_VAULT]),
-                IEigenDADisperserRegistry(deployed[DISPERSER_REGISTRY])
+                IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME)),
+                IStakeRegistry(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
+                IEigenDAThresholdRegistry(directory.getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME)),
+                IEigenDARelayRegistry(directory.getAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME)),
+                IPaymentVault(directory.getAddress(AddressDirectoryConstants.PAYMENT_VAULT_NAME)),
+                IEigenDADisperserRegistry(directory.getAddress(AddressDirectoryConstants.DISPERSER_REGISTRY_NAME))
             )
         );
         upgrade(
@@ -192,7 +236,7 @@ contract DeployEigenDA is Script {
             abi.encodeCall(
                 EigenDAServiceManager.initialize,
                 (
-                    IPauserRegistry(deployed[PAUSER_REGISTRY]),
+                    IPauserRegistry(directory.getAddress(AddressDirectoryConstants.PAUSER_REGISTRY_NAME)),
                     cfg.initialPausedStatus(),
                     cfg.initialOwner(),
                     cfg.batchConfirmers(),
@@ -203,7 +247,8 @@ contract DeployEigenDA is Script {
 
         impl[EJECTION_MANAGER] = address(
             new EjectionManager(
-                IRegistryCoordinator(deployed[REGISTRY_COORDINATOR]), IStakeRegistry(deployed[STAKE_REGISTRY])
+                IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME)),
+                IStakeRegistry(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME))
             )
         );
         upgrade(
@@ -249,55 +294,32 @@ contract DeployEigenDA is Script {
             )
         );
 
-        deployed[OPERATOR_STATE_RETRIEVER] = address(new OperatorStateRetriever());
-        impl[OPERATOR_STATE_RETRIEVER] = deployed[OPERATOR_STATE_RETRIEVER];
-        upgraded[OPERATOR_STATE_RETRIEVER] = true;
+        directory.addAddress(
+            AddressDirectoryConstants.OPERATOR_STATE_RETRIEVER_NAME, address(new OperatorStateRetriever())
+        );
 
-        deployed[CERT_VERIFIER] = address(
-            new EigenDACertVerifier(
-                IEigenDAThresholdRegistry(deployed[THRESHOLD_REGISTRY]),
-                IEigenDASignatureVerifier(deployed[STAKE_REGISTRY]),
-                cfg.certVerifierSecurityThresholds(),
-                cfg.certVerifierQuorumNumbersRequired()
+        directory.addAddress(
+            AddressDirectoryConstants.CERT_VERIFIER_NAME,
+            address(
+                new EigenDACertVerifier(
+                    IEigenDAThresholdRegistry(directory.getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME)),
+                    IEigenDASignatureVerifier(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
+                    cfg.certVerifierSecurityThresholds(),
+                    cfg.certVerifierQuorumNumbersRequired()
+                )
             )
         );
-        impl[CERT_VERIFIER] = deployed[CERT_VERIFIER];
-        upgraded[CERT_VERIFIER] = true;
 
-        ProxyAdmin(deployed[PROXY_ADMIN]).transferOwnership(cfg.initialOwner());
+        proxyAdmin.transferOwnership(cfg.initialOwner());
 
         vm.stopBroadcast();
-
-        _sanityTest(PROXY_ADMIN);
-        _sanityTest(INDEX_REGISTRY);
-        _sanityTest(STAKE_REGISTRY);
-        _sanityTest(SOCKET_REGISTRY);
-        _sanityTest(BLS_APK_REGISTRY);
-        _sanityTest(REGISTRY_COORDINATOR);
-        _sanityTest(THRESHOLD_REGISTRY);
-        _sanityTest(RELAY_REGISTRY);
-        _sanityTest(PAYMENT_VAULT);
-        _sanityTest(DISPERSER_REGISTRY);
-        _sanityTest(SERVICE_MANAGER);
-        _sanityTest(EJECTION_MANAGER);
-        _sanityTest(OPERATOR_STATE_RETRIEVER);
-        _sanityTest(CERT_VERIFIER);
-        _sanityTest(PAUSER_REGISTRY);
-    }
-
-    function _sanityTest(string memory contractName) internal view {
-        require(deployed[contractName] != address(0), string.concat("Contract not deployed: ", contractName));
-        require(impl[contractName] != address(0), string.concat("Implementation not set: ", contractName));
-        require(upgraded[contractName], string.concat("Contract not upgraded: ", contractName));
     }
 
     function upgrade(string memory contractName, bytes memory initData) internal {
         require(!upgraded[contractName], string.concat("Contract already upgraded: ", contractName));
-        require(deployed[contractName] != address(0), string.concat("Contract not deployed: ", contractName));
 
-        ProxyAdmin proxyAdmin = ProxyAdmin(deployed[PROXY_ADMIN]);
         address implementation = impl[contractName];
-        TransparentUpgradeableProxy proxy = TransparentUpgradeableProxy(payable(deployed[contractName]));
+        TransparentUpgradeableProxy proxy = TransparentUpgradeableProxy(payable(directory.getAddress(contractName)));
 
         proxyAdmin.upgrade(proxy, implementation);
         if (initData.length > 0) {
