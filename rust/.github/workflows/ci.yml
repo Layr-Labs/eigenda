@@ -64,6 +64,16 @@ jobs:
       - uses: taiki-e/install-action@cargo-machete
       - run: cargo machete
 
+  feature-combinations:
+    name: Feature Combinations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-hack
+      - run: cargo hack check --feature-powerset --no-dev-deps
+
   security:
     name: Security Audit
     runs-on: ubuntu-latest
