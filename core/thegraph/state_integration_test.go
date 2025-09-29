@@ -71,9 +71,8 @@ func setupTest(t *testing.T) (
 		Network:        nw,
 	})
 	require.NoError(t, err, "failed to start anvil container")
-	anvilContainerPort := anvilContainer.RpcURL()
 	anvilInternalEndpoint := anvilContainer.InternalEndpoint()
-	logger.Info("Anvil RPC URL", "url", anvilContainerPort, "internal", anvilInternalEndpoint)
+	logger.Info("Anvil RPC URL", "url", anvilContainer.RpcURL(), "internal", anvilInternalEndpoint)
 
 	logger.Info("Starting graph node")
 	graphNodeContainer, err := testbed.NewGraphNodeContainerWithOptions(ctx, testbed.GraphNodeOptions{
@@ -100,20 +99,19 @@ func setupTest(t *testing.T) (
 
 	// Create a minimal InfrastructureHarness
 	infraHarness := &inaboxtests.InfrastructureHarness{
-		TestName:   testName,
-		TestConfig: testConfig,
-		Logger:     logger,
-		Ctx:        ctx,
+		TestName:       testName,
+		TestConfig:     testConfig,
+		Logger:         logger,
+		Ctx:            ctx,
+		AnvilContainer: anvilContainer,
+		ChurnerURL:     "localhost:8000", // For graph indexer test, we don't need churner functionality. Set a random URL.
 	}
-
-	// For graph indexer test, we don't need churner functionality
-	churnerURL := ""
 
 	// Start operator nodes as goroutines using the inabox operator setup
 	// TODO(dmanc): We really don't need to spin up the operators as goroutines, we just
 	// need to register them onchain so confirm that the graph node is functional.
 	logger.Info("Starting operator nodes as goroutines")
-	err = inaboxtests.StartOperatorsForInfrastructure(infraHarness, anvilContainerPort, churnerURL)
+	err = inaboxtests.StartOperatorsForInfrastructure(infraHarness)
 	require.NoError(t, err, "failed to start operator nodes")
 
 	t.Cleanup(func() {

@@ -23,8 +23,16 @@ import (
 
 // StartChurnerForInfrastructure starts the churner server as part of the global infrastructure.
 // This should be called after Anvil and other containers are started.
-// Returns the churner RPC address that can be used by operators.
-func StartChurnerForInfrastructure(infra *InfrastructureHarness, anvilRPC string) (string, error) {
+// The churner URL is stored in infra.ChurnerURL.
+func StartChurnerForInfrastructure(infra *InfrastructureHarness) error {
+	// Check that AnvilContainer is available
+	if infra.AnvilContainer == nil {
+		return fmt.Errorf("AnvilContainer is not initialized")
+	}
+
+	// Get Anvil RPC URL from the container
+	anvilRPC := infra.AnvilContainer.RpcURL()
+
 	// Get deployer's private key
 	var privateKey string
 	deployer, ok := infra.TestConfig.GetDeployer(infra.TestConfig.EigenDA.Deployer)
@@ -35,13 +43,13 @@ func StartChurnerForInfrastructure(infra *InfrastructureHarness, anvilRPC string
 	// Create logs directory
 	logsDir := fmt.Sprintf("testdata/%s/logs", infra.TestName)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create logs directory: %w", err)
+		return fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
 	logFilePath := fmt.Sprintf("%s/churner.log", logsDir)
 	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return "", fmt.Errorf("failed to open churner log file: %w", err)
+		return fmt.Errorf("failed to open churner log file: %w", err)
 	}
 
 	// Create churner configuration
@@ -80,13 +88,13 @@ func StartChurnerForInfrastructure(infra *InfrastructureHarness, anvilRPC string
 	// Create churner logger
 	churnerLogger, err := common.NewLogger(&churnerConfig.LoggerConfig)
 	if err != nil {
-		return "", fmt.Errorf("failed to create churner logger: %w", err)
+		return fmt.Errorf("failed to create churner logger: %w", err)
 	}
 
 	// Create geth client
 	gethClient, err := geth.NewMultiHomingClient(churnerConfig.EthClientConfig, gethcommon.Address{}, churnerLogger)
 	if err != nil {
-		return "", fmt.Errorf("failed to create geth client: %w", err)
+		return fmt.Errorf("failed to create geth client: %w", err)
 	}
 
 	// Create writer
@@ -96,7 +104,7 @@ func StartChurnerForInfrastructure(infra *InfrastructureHarness, anvilRPC string
 		churnerConfig.OperatorStateRetrieverAddr,
 		churnerConfig.EigenDAServiceManagerAddr)
 	if err != nil {
-		return "", fmt.Errorf("failed to create writer: %w", err)
+		return fmt.Errorf("failed to create writer: %w", err)
 	}
 
 	// Create indexer
@@ -107,20 +115,20 @@ func StartChurnerForInfrastructure(infra *InfrastructureHarness, anvilRPC string
 	churnerMetrics := churner.NewMetrics(churnerConfig.MetricsConfig.HTTPPort, churnerLogger)
 	churnerInstance, err := churner.NewChurner(churnerConfig, indexer, churnerTx, churnerLogger, churnerMetrics)
 	if err != nil {
-		return "", fmt.Errorf("failed to create churner: %w", err)
+		return fmt.Errorf("failed to create churner: %w", err)
 	}
 
 	// Create churner server
 	churnerSvr := churner.NewServer(churnerConfig, churnerInstance, churnerLogger, churnerMetrics)
 	err = churnerSvr.Start(churnerConfig.MetricsConfig)
 	if err != nil {
-		return "", fmt.Errorf("failed to start churner server metrics: %w", err)
+		return fmt.Errorf("failed to start churner server metrics: %w", err)
 	}
 
 	// Create listener
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", churnerConfig.GRPCPort))
 	if err != nil {
-		return "", fmt.Errorf("failed to listen on port %s: %w", churnerConfig.GRPCPort, err)
+		return fmt.Errorf("failed to listen on port %s: %w", churnerConfig.GRPCPort, err)
 	}
 	infra.ChurnerListener = listener
 
@@ -141,6 +149,7 @@ func StartChurnerForInfrastructure(infra *InfrastructureHarness, anvilRPC string
 	time.Sleep(100 * time.Millisecond)
 	churnerLogger.Info("Churner server started successfully", "port", churnerConfig.GRPCPort, "logFile", logFilePath)
 
-	// Return the churner RPC address for operators to use
-	return fmt.Sprintf("localhost:%s", churnerConfig.GRPCPort), nil
+	// Store the churner RPC address in the infrastructure harness
+	infra.ChurnerURL = fmt.Sprintf("localhost:%s", churnerConfig.GRPCPort)
+	return nil
 }

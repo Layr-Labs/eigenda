@@ -43,8 +43,21 @@ type OperatorInstance struct {
 // StartOperatorForInfrastructure starts an operator node server as part of the global infrastructure.
 // This should be called after Anvil and the Churner are started.
 func StartOperatorForInfrastructure(
-	infra *InfrastructureHarness, operatorIndex int, anvilRPC string, churnerRPC string,
+	infra *InfrastructureHarness, operatorIndex int,
 ) (*OperatorInstance, error) {
+	// Check that AnvilContainer is available
+	if infra.AnvilContainer == nil {
+		return nil, fmt.Errorf("AnvilContainer is not initialized")
+	}
+
+	// Check that Churner has been started
+	if infra.ChurnerURL == "" {
+		return nil, fmt.Errorf("churner has not been started (ChurnerURL is empty)")
+	}
+
+	// Get Anvil RPC URL from the container
+	anvilRPC := infra.AnvilContainer.RpcURL()
+
 	// Get operator's private key
 	var privateKey string
 	operatorName := fmt.Sprintf("opr%d", operatorIndex)
@@ -110,7 +123,7 @@ func StartOperatorForInfrastructure(
 		EnableV2:                       true,
 		DbPath:                         fmt.Sprintf("testdata/%s/db/operator_%d", infra.TestName, operatorIndex),
 		LogPath:                        logFilePath,
-		ChurnerUrl:                     churnerRPC,
+		ChurnerUrl:                     infra.ChurnerURL,
 		EnableTestMode:                 true,
 		NumBatchValidators:             1,
 		QuorumIDList:                   []core.QuorumID{0, 1},
@@ -297,7 +310,17 @@ func StartOperatorForInfrastructure(
 }
 
 // StartOperatorsForInfrastructure starts all operator nodes configured in the test config
-func StartOperatorsForInfrastructure(infra *InfrastructureHarness, anvilRPC string, churnerRPC string) error {
+func StartOperatorsForInfrastructure(infra *InfrastructureHarness) error {
+	// Check that AnvilContainer is available
+	if infra.AnvilContainer == nil {
+		return fmt.Errorf("AnvilContainer is not initialized")
+	}
+
+	// Check that Churner has been started
+	if infra.ChurnerURL == "" {
+		return fmt.Errorf("churner has not been started (ChurnerURL is empty)")
+	}
+
 	// Count how many operator configs exist
 	operatorCount := 0
 	for {
@@ -316,7 +339,7 @@ func StartOperatorsForInfrastructure(infra *InfrastructureHarness, anvilRPC stri
 
 	// Start each operator
 	for i := 0; i < operatorCount; i++ {
-		instance, err := StartOperatorForInfrastructure(infra, i, anvilRPC, churnerRPC)
+		instance, err := StartOperatorForInfrastructure(infra, i)
 		if err != nil {
 			// Clean up any operators we started before failing
 			for _, inst := range infra.OperatorInstances {
