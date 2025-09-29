@@ -66,6 +66,11 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		if err != nil {
 			return Config{}, fmt.Errorf("read client config v2: %w", err)
 		}
+	} else if slices.Contains(storeConfig.BackendsToEnable, common.V2EigenDABackend) && useMemStore {
+		clientConfigV2, err = eigendaflags_v2.ReadClientConfigV2Memstore(ctx)
+		if err != nil {
+			return Config{}, fmt.Errorf("read client config v2: %w", err)
+		}
 	}
 
 	var maxBlobSizeBytes uint64

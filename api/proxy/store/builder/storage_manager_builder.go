@@ -226,6 +226,7 @@ func buildEigenDAV2Backend(
 	}
 
 	if config.MemstoreEnabled {
+		log.Info("Using memstore backend for EigenDA V2")
 		return memstore_v2.New(ctx, log, config.MemstoreConfig, kzgProver.Srs.G1)
 	}
 

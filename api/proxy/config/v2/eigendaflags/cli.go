@@ -237,6 +237,21 @@ This check is optional and will be skipped when set to 0.`,
 	}
 }
 
+func ReadClientConfigV2Memstore(ctx *cli.Context) (common.ClientConfigV2, error) {
+
+	maxBlobLengthFlagContents := ctx.String(MaxBlobLengthFlagName)
+	maxBlobLengthBytes, err := eigendaflags.ParseMaxBlobLength(maxBlobLengthFlagContents)
+	if err != nil {
+		return common.ClientConfigV2{}, fmt.Errorf(
+			"parse max blob length flag \"%v\": %w", maxBlobLengthFlagContents, err)
+	}
+
+	return common.ClientConfigV2{
+		PutTries:         ctx.Int(PutRetriesFlagName),
+		MaxBlobSizeBytes: maxBlobLengthBytes,
+	}, nil
+}
+
 func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 	disperserConfig, err := readDisperserCfg(ctx)
 	if err != nil {
