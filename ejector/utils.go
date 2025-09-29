@@ -38,12 +38,38 @@ func combineSigningRates(
 	}
 }
 
+// Combines two slices of ValidatorSigningRate reports. Reports in each slice are assumed to be unique by
+// ValidatorId, but the same ValidatorId may appear in both slices. The resulting slice will contain one
+// entry per unique ValidatorId, with rates combined using combineSigningRates.
+func combineSigningRateSlices(
+	ratesA []*validator.ValidatorSigningRate,
+	ratesB []*validator.ValidatorSigningRate,
+) []*validator.ValidatorSigningRate {
+
+	rateMap := make(map[string]*validator.ValidatorSigningRate)
+	for _, rate := range ratesA {
+		rateMap[string(rate.GetValidatorId())] = rate
+	}
+	for _, rate := range ratesB {
+		rateMap[string(rate.GetValidatorId())] =
+			combineSigningRates(
+				rateMap[string(rate.GetValidatorId())],
+				rate)
+	}
+
+	combinedRates := make([]*validator.ValidatorSigningRate, 0, len(rateMap))
+	for _, rate := range rateMap {
+		combinedRates = append(combinedRates, rate)
+	}
+
+	return combinedRates
+}
+
 // Sorts the given signing rates in place by unsigned bytes in descending order. The first entry will
 // have the highest number of unsigned bytes, the last entry the lowest. Breaks ties by ordering by
 // number of unsigned batches, also in descending order. Breaks further ties by ordering by validator ID
-// in lexicographical order.
+// in lexicographical order.d
 func sortByUnsignedBytesDescending(rates []*validator.ValidatorSigningRate) {
-
 	sort.Slice(rates, func(i, j int) bool {
 		// Primary sort: unsigned bytes (descending)
 		if rates[i].GetUnsignedBytes() != rates[j].GetUnsignedBytes() {
@@ -58,5 +84,4 @@ func sortByUnsignedBytesDescending(rates []*validator.ValidatorSigningRate) {
 		// Tie breaker 2: validator ID (lexicographical ascending)
 		return strings.Compare(string(rates[i].GetValidatorId()), string(rates[j].GetValidatorId())) < 0
 	})
-
 }

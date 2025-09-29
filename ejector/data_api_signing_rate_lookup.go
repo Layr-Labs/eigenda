@@ -92,7 +92,8 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 	// interval: lookback window in seconds
 	q.Set("interval", strconv.Itoa(int(timeSpan.Seconds())))
 	url.RawQuery = q.Encode()
-	srl.logger.Debug("making request to DataAPI", "url", url.String())
+	// Very verbose, enable for debugging if needed.
+	// srl.logger.Debug("making request to DataAPI", "url", url.String())
 
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
@@ -109,7 +110,8 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
-	srl.logger.Info("Received response", "responseBody", string(respBody))
+	// Very verbose, enable for debugging if needed.
+	// srl.logger.Info("Received response", "responseBody", string(respBody))
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp dataapi.ErrorResponse
@@ -194,7 +196,8 @@ func (srl *dynamoSigningRateLookup) getV2SigningRates(
 		q.Set("nonsigner_only", "true")
 	}
 	url.RawQuery = q.Encode()
-	srl.logger.Debug("making request to DataAPI", "url", url.String())
+	// Very verbose, enable for debugging if needed.
+	// srl.logger.Debug("making request to DataAPI", "url", url.String())
 
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
@@ -211,7 +214,8 @@ func (srl *dynamoSigningRateLookup) getV2SigningRates(
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
-	srl.logger.Info("Received response", "responseBody", string(respBody))
+	// Very verbose, enable for debugging if needed.
+	// srl.logger.Info("Received response", "responseBody", string(respBody))
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp dataapi.ErrorResponse
