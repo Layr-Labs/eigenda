@@ -45,6 +45,7 @@ func NewDynamoSigningRateLookup(
 
 func (srl *dynamoSigningRateLookup) GetSigningRates(
 	timeSpan time.Duration,
+	quorums []core.QuorumID,
 	version ProtocolVersion,
 	omitPerfectSigners bool,
 ) ([]*validator.ValidatorSigningRate, error) {
@@ -54,9 +55,9 @@ func (srl *dynamoSigningRateLookup) GetSigningRates(
 			srl.logger.Warn(
 				"omitPerfectSigners flag is ignored for ProtocolVersionV1, will never return perfect signers")
 		}
-		return srl.getV1SigningRates(timeSpan)
+		return srl.getV1SigningRates(timeSpan, quorums)
 	case ProtocolVersionV2:
-		return srl.getV2SigningRates(timeSpan, omitPerfectSigners)
+		return srl.getV2SigningRates(timeSpan, quorums, omitPerfectSigners)
 	default:
 		return nil, fmt.Errorf("unsupported protocol version: %d", version)
 	}
@@ -65,7 +66,13 @@ func (srl *dynamoSigningRateLookup) GetSigningRates(
 // Look up signing rates for v1.
 func (srl *dynamoSigningRateLookup) getV1SigningRates(
 	timeSpan time.Duration,
+	quorums []core.QuorumID,
 ) ([]*validator.ValidatorSigningRate, error) {
+
+	quorumSet := make(map[core.QuorumID]struct{})
+	for _, q := range quorums {
+		quorumSet[q] = struct{}{}
+	}
 
 	now := time.Now()
 
@@ -123,13 +130,32 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 		return nil, fmt.Errorf("error parsing response body: %w", err)
 	}
 
-	signingRates := make([]*validator.ValidatorSigningRate, 0, len(response.Data))
+	// Use a map to combine results from multiple quorums.
+	signingRateMap := make(map[core.OperatorID]*validator.ValidatorSigningRate)
+
 	for _, data := range response.Data {
+
+		if len(quorumSet) > 0 {
+			if _, ok := quorumSet[core.QuorumID(data.QuorumId)]; !ok {
+				// This quorum is not in the requested set, skip it.
+				continue
+			}
+		}
+
 		signingRate, err := translateV1ToProto(data)
 		if err != nil {
 			return nil, fmt.Errorf("error translating dataapi rate to proto: %w", err)
 		}
-		signingRates = append(signingRates, signingRate)
+
+		signingRateMap[core.OperatorID(signingRate.ValidatorId)] =
+			combineSigningRates(
+				signingRateMap[core.OperatorID(signingRate.ValidatorId)],
+				signingRate)
+	}
+
+	signingRates := make([]*validator.ValidatorSigningRate, 0, len(signingRateMap))
+	for _, rate := range signingRateMap {
+		signingRates = append(signingRates, rate)
 	}
 
 	return signingRates, nil
@@ -138,8 +164,14 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 // Look up signing rates for v2.
 func (srl *dynamoSigningRateLookup) getV2SigningRates(
 	timeSpan time.Duration,
+	quorums []core.QuorumID,
 	omitPerfectSigners bool,
 ) ([]*validator.ValidatorSigningRate, error) {
+
+	quorumSet := make(map[core.QuorumID]struct{})
+	for _, q := range quorums {
+		quorumSet[q] = struct{}{}
+	}
 
 	now := time.Now()
 
@@ -200,13 +232,31 @@ func (srl *dynamoSigningRateLookup) getV2SigningRates(
 		return nil, fmt.Errorf("error parsing response body: %w", err)
 	}
 
-	signingRates := make([]*validator.ValidatorSigningRate, 0, len(response.OperatorSigningInfo))
+	// Use a map to combine results from multiple quorums.
+	signingRateMap := make(map[core.OperatorID]*validator.ValidatorSigningRate)
+
 	for _, data := range response.OperatorSigningInfo {
+		if len(quorumSet) > 0 {
+			if _, ok := quorumSet[core.QuorumID(data.QuorumId)]; !ok {
+				// This quorum is not in the requested set, skip it.
+				continue
+			}
+		}
+
 		signingRate, err := translateV2ToProto(data)
 		if err != nil {
 			return nil, fmt.Errorf("error translating dataapi rate to proto: %w", err)
 		}
-		signingRates = append(signingRates, signingRate)
+
+		signingRateMap[core.OperatorID(signingRate.ValidatorId)] =
+			combineSigningRates(
+				signingRateMap[core.OperatorID(signingRate.ValidatorId)],
+				signingRate)
+	}
+
+	signingRates := make([]*validator.ValidatorSigningRate, 0, len(signingRateMap))
+	for _, rate := range signingRateMap {
+		signingRates = append(signingRates, rate)
 	}
 
 	return signingRates, nil
@@ -254,4 +304,35 @@ func translateV2ToProto(data *dataapiv2.OperatorSigningInfo) (*validator.Validat
 	}
 
 	return signingRate, nil
+}
+
+// Combines two ValidatorSigningRate reports. Signed/unsigned batches and bytes are summed. Latency is taken
+// as a weighed average (by batch count). If one of the rates is nil, the other is returned directly.
+func combineSigningRates(
+	rateA *validator.ValidatorSigningRate,
+	rateB *validator.ValidatorSigningRate,
+) *validator.ValidatorSigningRate {
+
+	if rateA == nil {
+		return rateB
+	}
+	if rateB == nil {
+		return rateA
+	}
+
+	totalSignedBatches := rateA.GetSignedBatches() + rateB.GetSignedBatches()
+	var latency uint64
+	if totalSignedBatches > 0 {
+		latency = (rateA.GetSigningLatency()*rateA.GetSignedBatches() +
+			rateB.GetSigningLatency()*rateB.GetSignedBatches()) / totalSignedBatches
+	}
+
+	return &validator.ValidatorSigningRate{
+		ValidatorId:     rateA.GetValidatorId(),
+		SignedBatches:   rateA.GetSignedBatches() + rateB.GetSignedBatches(),
+		UnsignedBatches: rateA.GetUnsignedBatches() + rateB.GetUnsignedBatches(),
+		SignedBytes:     rateA.GetSignedBytes() + rateB.GetSignedBytes(),
+		UnsignedBytes:   rateA.GetUnsignedBytes() + rateB.GetUnsignedBytes(),
+		SigningLatency:  latency,
+	}
 }

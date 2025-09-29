@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/core"
 )
 
 // Signals whether we are using protocol version v1 or v2.
@@ -20,6 +21,9 @@ type SigningRateLookup interface {
 	GetSigningRates(
 		// The time span in the past over which to calculate signing rates.
 		timeSpan time.Duration, 
+		// A list of quorums to include. If empty, all quorums are included. If more than one quorum is given,
+		// the results for each quorum is summed together.
+		quorums []core.QuorumID,
 		// Whether to collect signing rates for protocol version v1 or v2. Not all implementations may support both.
 		version ProtocolVersion,
 		// If true, omit validators with perfect signing rates (i.e. 100% signed). Some implementations

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/core"
 )
 
 var _ SigningRateLookup = (*controllerSigningRateLookup)(nil)
@@ -16,6 +17,7 @@ type controllerSigningRateLookup struct {
 
 func (srl *controllerSigningRateLookup) GetSigningRates(
 	timeSpan time.Duration,
+	quorums []core.QuorumID,
 	version ProtocolVersion,
 	omitPerfectSigners bool,
 ) ([]*validator.ValidatorSigningRate, error) {
