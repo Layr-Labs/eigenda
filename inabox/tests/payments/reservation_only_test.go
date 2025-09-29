@@ -18,30 +18,34 @@ func TestReservationOnly(t *testing.T) {
 		Logger:                          test.GetLogger(),
 		RootPath:                        "../../../",
 		UserReservationSymbolsPerSecond: 1024,
+		UserOnDemandDeposit:             0,
+		// choose a bin width value much lower than the default, so that we converge on the average faster
+		ReservationPeriodInterval: 10,
 	}
 
 	infra, err := integration_test.SetupGlobalInfrastructure(infraConfig)
-	require.NoError(t, err, "Failed to setup infrastructure")
+	require.NoError(t, err)
 
 	testHarness, err := integration_test.NewTestHarnessWithSetup(infra)
-	require.NoError(t, err, "Failed to create test harness")
+	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		testHarness.Cleanup()
 		integration_test.TeardownGlobalInfrastructure(infra)
 	})
 
-	t.Run("Within limits", func(t *testing.T) {
-		integration_test.MineAnvilBlocks(t, testHarness.RPCClient, 6)
+	integration_test.MineAnvilBlocks(t, testHarness.RPCClient, 6)
 
-		testDuration := 1 * time.Minute
-		blobsPerSecond := float32(0.25)
-		payloadSize := 1000
+	payloadSize := 1000
+	testDuration := 1 * time.Minute
+	t.Logf("Test Duration: %s", testDuration)
+	t.Logf("Payload size: %d bytes", payloadSize)
 
-		t.Logf("Starting payment exhaustion test")
-		t.Logf("Test Duration: %s", testDuration)
+	t.Run("Within reservation limits", func(t *testing.T) {
+		// the reservation of 1024 symbols/second can support up .25 min size dispersals per second.
+		// to account for non-determinism, disperse at half that rate, and assert no failures
+		blobsPerSecond := float32(0.125)
 		t.Logf("Blobs per second: %f", blobsPerSecond)
-		t.Logf("Payload size: %d bytes", payloadSize)
 
 		resultChan := SubmitPayloads(
 			t,
@@ -54,5 +58,36 @@ func TestReservationOnly(t *testing.T) {
 		for err := range resultChan {
 			require.NoError(t, err, "Payload submission failed")
 		}
+	})
+
+	t.Run("Over reservation limits", func(t *testing.T) {
+		// 2x the rate of the what's permitted by the reservation
+		blobsPerSecond := float32(0.5)
+		t.Logf("Blobs per second: %f", blobsPerSecond)
+
+		resultChan := SubmitPayloads(
+			t,
+			random.NewTestRandom(),
+			testHarness.PayloadDisperser,
+			blobsPerSecond,
+			payloadSize,
+			testDuration)
+
+		successCount := 0
+		failureCount := 0
+		for err := range resultChan {
+			if err != nil {
+				failureCount++
+			} else {
+				successCount++
+			}
+		}
+
+		quarter := (successCount + failureCount) / 4
+
+		// With 2x the reservation rate, expect roughly 50% success rate
+		// To account for non-determinism, weaken assertion to just >25% of each
+		require.GreaterOrEqual(t, successCount, quarter, "Expected >25%% of dispersals to succeed")
+		require.GreaterOrEqual(t, failureCount, quarter, "Expected >25%% of dispersals to fail")
 	})
 }

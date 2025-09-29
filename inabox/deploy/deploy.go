@@ -86,6 +86,8 @@ func (env *Config) deployEigenDAContracts() error {
 
 	envVars := make(map[string]string)
 	envVars["USER_RESERVATION_SYMBOLS_PER_SECOND"] = strconv.FormatUint(env.UserReservationSymbolsPerSecond, 10)
+	envVars["USER_ONDEMAND_DEPOSIT"] = strconv.FormatUint(env.UserOnDemandDeposit, 10)
+	envVars["RESERVATION_PERIOD_INTERVAL"] = strconv.FormatUint(env.ReservationPeriodInterval, 10)
 
 	// Create deployment config for testbed
 	deployConfig := testbed.DeploymentConfig{

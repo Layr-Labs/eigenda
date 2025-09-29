@@ -22,6 +22,8 @@ type InfrastructureConfig struct {
 	BucketTableName                 string
 	MetadataTableNameV2             string
 	UserReservationSymbolsPerSecond uint64
+	UserOnDemandDeposit             uint64
+	ReservationPeriodInterval       uint64
 }
 
 // SetupGlobalInfrastructure creates the shared infrastructure that persists across all tests.
@@ -53,6 +55,8 @@ func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHar
 
 	testConfig := deploy.ReadTestConfig(testName, config.RootPath)
 	testConfig.UserReservationSymbolsPerSecond = config.UserReservationSymbolsPerSecond
+	testConfig.UserOnDemandDeposit = config.UserOnDemandDeposit
+	testConfig.ReservationPeriodInterval = config.ReservationPeriodInterval
 
 	if testConfig.Environment.IsLocal() {
 		return setupLocalInfrastructure(ctx, config, testName, testConfig)
