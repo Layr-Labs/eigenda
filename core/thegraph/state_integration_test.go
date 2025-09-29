@@ -60,7 +60,7 @@ func setupTest(t *testing.T) (
 		require.NoError(t, err, "failed to create test directory")
 	}
 
-	testConfig := deploy.NewTestConfig(testName, rootPath)
+	testConfig := deploy.ReadTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = true
 
 	// Create a shared Docker network for all containers
@@ -124,7 +124,7 @@ func setupTest(t *testing.T) (
 	require.NoError(t, err, "failed to deploy experiment")
 
 	logger.Info("Starting binaries")
-	testConfig.StartBinaries()
+	testConfig.StartBinaries(true)
 
 	t.Cleanup(func() {
 		logger.Info("Stopping containers and services")

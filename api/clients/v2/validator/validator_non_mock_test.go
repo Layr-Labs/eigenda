@@ -211,6 +211,7 @@ func makeTestEncodingComponents() (*prover.Prover, *verifier.Verifier, error) {
 	config := &kzg.KzgConfig{
 		G1Path:          "../../../../resources/srs/g1.point",
 		G2Path:          "../../../../resources/srs/g2.point",
+		G2TrailingPath:  "../../../../resources/srs/g2.trailing.point",
 		CacheDir:        "../../../../resources/srs/SRSTables",
 		SRSOrder:        8192,
 		SRSNumberToLoad: 8192,
@@ -218,12 +219,12 @@ func makeTestEncodingComponents() (*prover.Prover, *verifier.Verifier, error) {
 		LoadG2Points:    true,
 	}
 
-	p, err := prover.NewProver(config, nil)
+	p, err := prover.NewProver(prover.KzgConfigFromV1Config(config), nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	v, err := verifier.NewVerifier(config, nil)
+	v, err := verifier.NewVerifier(verifier.KzgConfigFromV1Config(config), nil)
 	if err != nil {
 		return nil, nil, err
 	}

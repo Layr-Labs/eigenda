@@ -11,24 +11,18 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
+	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/urfave/cli/v2"
 )
 
 var (
-	testNameFlagName        = "testname"
-	rootPathFlagName        = "root-path"
-	localstackFlagName      = "localstack-port"
-	deployResourcesFlagName = "deploy-resources"
+	testNameFlagName       = "testname"
+	rootPathFlagName       = "root-path"
+	localstackPortFlagName = "localstack-port"
 
 	metadataTableName   = "test-BlobMetadata"
 	bucketTableName     = "test-BucketStore"
 	metadataTableNameV2 = "test-BlobMetadata-v2"
-
-	chainCmdName       = "chain"
-	localstackCmdName  = "localstack"
-	expCmdName         = "exp"
-	generateEnvCmdName = "env"
-	allCmdName         = "all"
 
 	logger = test.GetLogger()
 )
@@ -48,43 +42,13 @@ func main() {
 				Value: "../",
 			},
 			&cli.StringFlag{
-				Name:  localstackFlagName,
+				Name:  localstackPortFlagName,
 				Value: "",
 				Usage: "path to the config file",
 			},
-			&cli.StringFlag{
-				Name:  deployResourcesFlagName,
-				Value: "",
-				Usage: "whether to deploy localstack resources",
-			},
 		},
-		Commands: []*cli.Command{
-			{
-				Name:   chainCmdName,
-				Usage:  "deploy the chain infrastructure (anvil, graph) for the inabox test",
-				Action: getRunner(chainCmdName),
-			},
-			{
-				Name:   localstackCmdName,
-				Usage:  "deploy localstack and create the AWS resources needed for the inabox test",
-				Action: getRunner(localstackCmdName),
-			},
-			{
-				Name:   expCmdName,
-				Usage:  "deploy the contracts and create configurations for all EigenDA components",
-				Action: getRunner(expCmdName),
-			},
-			{
-				Name:   generateEnvCmdName,
-				Usage:  "generate the environment variables for the inabox test",
-				Action: getRunner(generateEnvCmdName),
-			},
-			{
-				Name:   allCmdName,
-				Usage:  "deploy all infra, resources, contracts",
-				Action: getRunner(allCmdName),
-			},
-		},
+		Action:      DeployAll,
+		Description: "Deploys all infra, resources, and contracts needed to spin up a local EigenDA inabox devnet.",
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -92,57 +56,76 @@ func main() {
 	}
 }
 
-func getRunner(command string) func(ctx *cli.Context) error {
-
-	return func(ctx *cli.Context) error {
-
-		var config *deploy.Config
-		if command != localstackCmdName {
-			rootPath, err := filepath.Abs(ctx.String(rootPathFlagName))
-			if err != nil {
-				return err
-			}
-			testname := ctx.String(testNameFlagName)
-			if testname == "" {
-				testname, err = deploy.GetLatestTestDirectory(rootPath)
-				if err != nil {
-					return err
-				}
-			}
-			config = deploy.NewTestConfig(testname, rootPath)
-		}
-
-		switch command {
-		case chainCmdName:
-			return chainInfra(ctx, config)
-		case localstackCmdName:
-			return localstack(ctx, config)
-		case expCmdName:
-			if err := config.DeployExperiment(); err != nil {
-				return fmt.Errorf("failed to deploy experiment: %w", err)
-			}
-		case generateEnvCmdName:
-			config.GenerateAllVariables()
-		case allCmdName:
-			return all(ctx, config)
-		}
-
-		return nil
-
+func DeployAll(ctx *cli.Context) error {
+	config, err := readTestConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("get test config: %w", err)
 	}
 
-}
-
-func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 	// Disable Ryuk since we likely want to run the test for a long time
+	// This will prevent testcontainer's GC container from starting,
+	// and will hence let the containers run indefinitely.
+	// They can be stopped manually using `make stop-infra`.
 	if err := os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true"); err != nil {
 		return fmt.Errorf("failed to set environment variable: %w", err)
 	}
 
-	_, err := testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+	err = startChainInfra(ctx, config)
+	if err != nil {
+		return fmt.Errorf("start chain infra: %w", err)
+	}
+
+	err = startLocalstack(ctx, config)
+	if err != nil {
+		return fmt.Errorf("start localstack: %w", err)
+	}
+
+	err = config.DeployExperiment()
+	if err != nil {
+		return fmt.Errorf("deploy experiment: %w", err)
+	}
+
+	logger.Info("Deployment complete. You can now run `make start-services` to start the services.")
+	return nil
+}
+
+func readTestConfig(ctx *cli.Context) (*deploy.Config, error) {
+	rootPath, err := filepath.Abs(ctx.String(rootPathFlagName))
+	if err != nil {
+		return nil, fmt.Errorf("get absolute root path: %w", err)
+	}
+	testname := ctx.String(testNameFlagName)
+	if testname == "" {
+		testname, err = deploy.GetLatestTestDirectory(rootPath)
+		if err != nil {
+			return nil, fmt.Errorf("get latest test directory: %w", err)
+		}
+	}
+	config := deploy.ReadTestConfig(testname, rootPath)
+	return config, nil
+}
+
+// Spins up an anvil chain and a graph node (if DeploySubgraphs=true)
+func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
+	// Create a shared Docker network for all containers
+	// TODO(samlaf): seems like there's no way with testcontainers-go@v0.38 to give this network a name...
+	// https://pkg.go.dev/github.com/testcontainers/testcontainers-go@v0.38.0/network#WithNetworkName
+	// only returns an option to be passed to container requests... so we would have to use it on the first container
+	// we create, which would require changing our testbed package.
+	dockerNetwork, err := network.New(ctx.Context,
+		network.WithDriver("bridge"),
+		network.WithAttachable(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create docker network: %w", err)
+	}
+	logger.Info("Created Docker network", "name", dockerNetwork.Name)
+
+	anvilC, err := testbed.NewAnvilContainerWithOptions(ctx.Context, testbed.AnvilOptions{
 		ExposeHostPort: true,
 		HostPort:       "8545",
 		Logger:         logger,
+		Network:        dockerNetwork,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to start anvil container: %w", err)
@@ -150,17 +133,19 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 
 	if deployer, ok := config.GetDeployer(config.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
 		fmt.Println("Starting graph node")
-		_, err := testbed.NewGraphNodeContainerWithOptions(context.Background(), testbed.GraphNodeOptions{
+		_, err := testbed.NewGraphNodeContainerWithOptions(ctx.Context, testbed.GraphNodeOptions{
 			PostgresDB:     "graph-node",
 			PostgresUser:   "graph-node",
 			PostgresPass:   "let-me-in",
-			EthereumRPC:    "http://localhost:8545",
 			ExposeHostPort: true,
 			HostHTTPPort:   "8000",
 			HostWSPort:     "8001",
 			HostAdminPort:  "8020",
 			HostIPFSPort:   "5001",
 			Logger:         logger,
+			Network:        dockerNetwork,
+			// internal endpoint will work because they are in the same dockerNetwork
+			EthereumRPC: anvilC.InternalEndpoint(),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to start graph node: %w", err)
@@ -171,18 +156,13 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 
 }
 
-func localstack(ctx *cli.Context, config *deploy.Config) error {
-	// Disable Ryuk since we likely want to run the test for a long time
-	if err := os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true"); err != nil {
-		return fmt.Errorf("failed to set environment variable: %w", err)
-	}
-
-	context, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+func startLocalstack(ctx *cli.Context, config *deploy.Config) error {
+	context, cancel := context.WithTimeout(ctx.Context, 30*time.Second)
 	defer cancel()
 
 	_, err := testbed.NewLocalStackContainerWithOptions(context, testbed.LocalStackOptions{
 		ExposeHostPort: true,
-		HostPort:       ctx.String(localstackFlagName),
+		HostPort:       ctx.String(localstackPortFlagName),
 		Services:       []string{"s3", "dynamodb", "kms"},
 		Logger:         logger,
 	})
@@ -190,35 +170,15 @@ func localstack(ctx *cli.Context, config *deploy.Config) error {
 		return fmt.Errorf("failed to start localstack container: %w", err)
 	}
 
-	if ctx.Bool(deployResourcesFlagName) {
-		deployConfig := testbed.DeployResourcesConfig{
-			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", ctx.String(localstackFlagName)),
-			MetadataTableName:   metadataTableName,
-			BucketTableName:     bucketTableName,
-			V2MetadataTableName: metadataTableNameV2,
-		}
-		if err := testbed.DeployResources(context, deployConfig); err != nil {
-			return fmt.Errorf("failed to deploy resources: %w", err)
-		}
+	deployConfig := testbed.DeployResourcesConfig{
+		LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", ctx.String(localstackPortFlagName)),
+		MetadataTableName:   metadataTableName,
+		BucketTableName:     bucketTableName,
+		V2MetadataTableName: metadataTableNameV2,
+	}
+	if err := testbed.DeployResources(context, deployConfig); err != nil {
+		return fmt.Errorf("failed to deploy resources: %w", err)
 	}
 
 	return nil
-}
-
-func all(ctx *cli.Context, config *deploy.Config) error {
-
-	err := chainInfra(ctx, config)
-	if err != nil {
-		return err
-	}
-
-	err = localstack(ctx, config)
-	if err != nil {
-		return err
-	}
-
-	config.DeployExperiment()
-
-	return nil
-
 }

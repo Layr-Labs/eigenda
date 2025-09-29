@@ -26,17 +26,7 @@ func TestGetLeadingCoset(t *testing.T) {
 	assert.Equal(t, a, uint32(0))
 }
 
-func TestGetNumElement(t *testing.T) {
-	numEle := rs.GetNumElement(1000, encoding.BYTES_PER_SYMBOL)
-	assert.Equal(t, numEle, uint64(32))
-}
-
 func TestToFrArrayAndToByteArray_AreInverses(t *testing.T) {
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
-
-	numEle := rs.GetNumElement(1000, encoding.BYTES_PER_SYMBOL)
-	assert.Equal(t, numEle, uint64(32))
 
 	cfg := encoding.DefaultConfig()
 	enc, err := rs.NewEncoder(cfg)
@@ -48,12 +38,4 @@ func TestToFrArrayAndToByteArray_AreInverses(t *testing.T) {
 	require.NotNil(t, dataFr)
 
 	assert.Equal(t, rs.ToByteArray(dataFr, uint64(len(GETTYSBURG_ADDRESS_BYTES))), GETTYSBURG_ADDRESS_BYTES)
-}
-
-func TestRoundUpDivision(t *testing.T) {
-	a := rs.RoundUpDivision(1, 5)
-	b := rs.RoundUpDivision(5, 1)
-
-	assert.Equal(t, a, uint64(1))
-	assert.Equal(t, b, uint64(5))
 }

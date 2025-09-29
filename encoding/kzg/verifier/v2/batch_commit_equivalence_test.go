@@ -14,20 +14,22 @@ import (
 )
 
 func TestBatchEquivalence(t *testing.T) {
-	group, err := prover.NewProver(kzgConfig, nil)
+	harness := getTestHarness()
+
+	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
-	v, err := verifier.NewVerifier(kzgConfig, nil)
+	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
 	require.NoError(t, err)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
+	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
 	require.NoError(t, err)
 
-	inputFr, err := rs.ToFrArray(gettysburgAddressBytes)
+	inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 	require.NoError(t, err)
 
-	commit, g2commit, _, _, _, err := enc.Encode(inputFr)
+	commit, g2commit, _, err := enc.GetCommitments(inputFr)
 	require.NoError(t, err)
 
 	numBlob := 5

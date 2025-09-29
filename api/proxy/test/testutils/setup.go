@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	enablement "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
@@ -26,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
@@ -298,7 +298,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			G2Path:          "../../resources/g2.point",
 			G2TrailingPath:  "../../resources/g2.trailing.point",
 			CacheDir:        "../../resources/SRSTables",
-			SRSOrder:        eigendaflags.SrsOrder,
+			SRSOrder:        encoding.SRSOrder,
 			SRSNumberToLoad: maxBlobLengthBytes / 32,
 			NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 			LoadG2Points:    true,
@@ -331,7 +331,8 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			EigenDACertVerifierOrRouterAddress: certVerifierAddress,
 			EigenDADirectory:                   eigenDADirectory,
 			RetrieversToEnable:                 testCfg.Retrievers,
-			ClientLedgerMode:                   clientledger.ClientLedgerModeLegacy,
+			ClientLedgerMode:                   testCfg.ClientLedgerMode,
+			VaultMonitorInterval:               testCfg.VaultMonitorInterval,
 		},
 	}
 	if useMemory {

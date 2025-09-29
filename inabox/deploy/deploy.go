@@ -302,6 +302,9 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 // and relays in RelayRegistry contract
 func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
+	if (dasmAddr == gcommon.Address{}) {
+		logger.Fatal("Service Manager address is nil")
+	}
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
 	if err != nil {
 		logger.Fatal("Error creating EigenDAServiceManager contract", "error", err)
@@ -359,8 +362,9 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	}
 }
 
-// TODO: Supply the test path to the runner utility
-func (env *Config) StartBinaries() {
+// StartBinaries starts the EigenDA binaries
+// forTests: if true, skips churner (which runs as goroutine in tests)
+func (env *Config) StartBinaries(forTests bool) {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
 		logger.Fatal("Error changing directories", "error", err)
 	}
@@ -370,8 +374,16 @@ func (env *Config) StartBinaries() {
 		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	logger.Info("Starting binaries")
-	err := execCmd("./bin.sh", []string{"start-detached"}, []string{}, true)
+	var command string
+	if forTests {
+		logger.Info("Starting binaries for tests (without churner)")
+		command = "start-detached-for-tests"
+	} else {
+		logger.Info("Starting binaries for devnet")
+		command = "start-detached"
+	}
+
+	err := execCmd("./bin.sh", []string{command}, []string{}, true)
 	if err != nil {
 		logger.Fatal("Failed to start binaries, check testdata directory for more information", "error", err)
 	}
@@ -379,7 +391,7 @@ func (env *Config) StartBinaries() {
 	logger.Info("Binaries started successfully!")
 }
 
-// TODO: Supply the test path to the runner utility
+// StopBinaries stops all running binaries
 func (env *Config) StopBinaries() {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
 		logger.Fatal("Error changing directories", "error", err)
