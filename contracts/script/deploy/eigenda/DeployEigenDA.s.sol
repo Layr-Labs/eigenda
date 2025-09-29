@@ -54,20 +54,6 @@ contract DeployEigenDA is Script {
     using InitParamsLib for string;
 
     string constant PROXY_ADMIN = "PROXY_ADMIN";
-    string constant INDEX_REGISTRY = "INDEX_REGISTRY";
-    string constant STAKE_REGISTRY = "STAKE_REGISTRY";
-    string constant SOCKET_REGISTRY = "SOCKET_REGISTRY";
-    string constant BLS_APK_REGISTRY = "BLS_APK_REGISTRY";
-    string constant REGISTRY_COORDINATOR = "REGISTRY_COORDINATOR";
-    string constant THRESHOLD_REGISTRY = "THRESHOLD_REGISTRY";
-    string constant RELAY_REGISTRY = "RELAY_REGISTRY";
-    string constant PAYMENT_VAULT = "PAYMENT_VAULT";
-    string constant DISPERSER_REGISTRY = "DISPERSER_REGISTRY";
-    string constant SERVICE_MANAGER = "SERVICE_MANAGER";
-    string constant EJECTION_MANAGER = "EJECTION_MANAGER";
-    string constant OPERATOR_STATE_RETRIEVER = "OPERATOR_STATE_RETRIEVER";
-    string constant CERT_VERIFIER = "CERT_VERIFIER";
-    string constant PAUSER_REGISTRY = "PAUSER_REGISTRY";
     string constant EMPTY_CONTRACT = "EMPTY_CONTRACT";
     string constant MOCK_STAKE_REGISTRY = "MOCK_STAKE_REGISTRY";
     string constant MOCK_REGISTRY_COORDINATOR = "MOCK_REGISTRY_COORDINATOR";
@@ -173,38 +159,39 @@ contract DeployEigenDA is Script {
             address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
         );
 
-        impl[INDEX_REGISTRY] = address(
+        impl[AddressDirectoryConstants.INDEX_REGISTRY_NAME] = address(
             new IndexRegistry(
                 IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME))
             )
         );
-        upgrade(INDEX_REGISTRY, "");
+        upgrade(AddressDirectoryConstants.INDEX_REGISTRY_NAME, "");
 
-        impl[STAKE_REGISTRY] = address(
+        impl[AddressDirectoryConstants.STAKE_REGISTRY_NAME] = address(
             new StakeRegistry(
                 IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME)),
                 IDelegationManager(cfg.delegationManager())
             )
         );
-        upgrade(STAKE_REGISTRY, "");
+        upgrade(AddressDirectoryConstants.STAKE_REGISTRY_NAME, "");
 
-        impl[SOCKET_REGISTRY] = address(
+        impl[AddressDirectoryConstants.SOCKET_REGISTRY_NAME] = address(
             new SocketRegistry(
                 IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME))
             )
         );
-        upgrade(SOCKET_REGISTRY, "");
+        upgrade(AddressDirectoryConstants.SOCKET_REGISTRY_NAME, "");
 
-        impl[BLS_APK_REGISTRY] = address(
+        impl[AddressDirectoryConstants.BLS_APK_REGISTRY_NAME] = address(
             new BLSApkRegistry(
                 IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME))
             )
         );
-        upgrade(BLS_APK_REGISTRY, "");
+        upgrade(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME, "");
 
-        impl[REGISTRY_COORDINATOR] = address(new EigenDARegistryCoordinator(address(directory)));
+        impl[AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME] =
+            address(new EigenDARegistryCoordinator(address(directory)));
         upgrade(
-            REGISTRY_COORDINATOR,
+            AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME,
             abi.encodeCall(
                 EigenDARegistryCoordinator.initialize,
                 (
@@ -219,7 +206,7 @@ contract DeployEigenDA is Script {
             )
         );
 
-        impl[SERVICE_MANAGER] = address(
+        impl[AddressDirectoryConstants.SERVICE_MANAGER_NAME] = address(
             new EigenDAServiceManager(
                 IAVSDirectory(cfg.avsDirectory()),
                 IRewardsCoordinator(cfg.rewardsCoordinator()),
@@ -232,7 +219,7 @@ contract DeployEigenDA is Script {
             )
         );
         upgrade(
-            SERVICE_MANAGER,
+            AddressDirectoryConstants.SERVICE_MANAGER_NAME,
             abi.encodeCall(
                 EigenDAServiceManager.initialize,
                 (
@@ -245,20 +232,20 @@ contract DeployEigenDA is Script {
             )
         );
 
-        impl[EJECTION_MANAGER] = address(
+        impl[AddressDirectoryConstants.EJECTION_MANAGER_NAME] = address(
             new EjectionManager(
                 IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME)),
                 IStakeRegistry(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME))
             )
         );
         upgrade(
-            EJECTION_MANAGER,
+            AddressDirectoryConstants.EJECTION_MANAGER_NAME,
             abi.encodeCall(EjectionManager.initialize, (cfg.initialOwner(), cfg.ejectors(), cfg.quorumEjectionParams()))
         );
 
-        impl[THRESHOLD_REGISTRY] = address(new EigenDAThresholdRegistry());
+        impl[AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME] = address(new EigenDAThresholdRegistry());
         upgrade(
-            THRESHOLD_REGISTRY,
+            AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME,
             abi.encodeCall(
                 EigenDAThresholdRegistry.initialize,
                 (
@@ -271,15 +258,21 @@ contract DeployEigenDA is Script {
             )
         );
 
-        impl[RELAY_REGISTRY] = address(new EigenDARelayRegistry());
-        upgrade(RELAY_REGISTRY, abi.encodeCall(EigenDARelayRegistry.initialize, (cfg.initialOwner())));
-
-        impl[DISPERSER_REGISTRY] = address(new EigenDADisperserRegistry());
-        upgrade(DISPERSER_REGISTRY, abi.encodeCall(EigenDADisperserRegistry.initialize, (cfg.initialOwner())));
-
-        impl[PAYMENT_VAULT] = address(new PaymentVault());
+        impl[AddressDirectoryConstants.RELAY_REGISTRY_NAME] = address(new EigenDARelayRegistry());
         upgrade(
-            PAYMENT_VAULT,
+            AddressDirectoryConstants.RELAY_REGISTRY_NAME,
+            abi.encodeCall(EigenDARelayRegistry.initialize, (cfg.initialOwner()))
+        );
+
+        impl[AddressDirectoryConstants.DISPERSER_REGISTRY_NAME] = address(new EigenDADisperserRegistry());
+        upgrade(
+            AddressDirectoryConstants.DISPERSER_REGISTRY_NAME,
+            abi.encodeCall(EigenDADisperserRegistry.initialize, (cfg.initialOwner()))
+        );
+
+        impl[AddressDirectoryConstants.PAYMENT_VAULT_NAME] = address(new PaymentVault());
+        upgrade(
+            AddressDirectoryConstants.PAYMENT_VAULT_NAME,
             abi.encodeCall(
                 PaymentVault.initialize,
                 (
