@@ -53,7 +53,6 @@ import {console2} from "forge-std/console2.sol";
 contract DeployEigenDA is Script {
     using InitParamsLib for string;
 
-    string constant PROXY_ADMIN = "PROXY_ADMIN";
     string constant EMPTY_CONTRACT = "EMPTY_CONTRACT";
     string constant MOCK_STAKE_REGISTRY = "MOCK_STAKE_REGISTRY";
     string constant MOCK_REGISTRY_COORDINATOR = "MOCK_REGISTRY_COORDINATOR";
