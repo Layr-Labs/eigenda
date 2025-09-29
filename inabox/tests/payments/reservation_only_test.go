@@ -1,6 +1,7 @@
 package payments
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -20,6 +21,12 @@ func TestReservationOnlyNewPayments(t *testing.T) {
 }
 
 func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedgerMode) {
+	// Save current working directory. The setup process in its current form changes working directory, which causes
+	// subsequent executions to fail, since the process relies on relative paths. This is a workaround for now: we just
+	// capture the original working directory, and switch back to it as a cleanup step.
+	originalDir, err := os.Getwd()
+	require.NoError(t, err)
+
 	infraConfig := &integration_test.InfrastructureConfig{
 		TemplateName:                    "testconfig-anvil.yaml",
 		TestName:                        "",
@@ -42,6 +49,10 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 	t.Cleanup(func() {
 		testHarness.Cleanup()
 		integration_test.TeardownGlobalInfrastructure(infra)
+
+		if err := os.Chdir(originalDir); err != nil {
+			t.Logf("Warning: Failed to restore working directory: %v", err)
+		}
 	})
 
 	integration_test.MineAnvilBlocks(t, testHarness.RPCClient, 6)
