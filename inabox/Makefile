@@ -89,5 +89,5 @@ stop-services:
 	./bin.sh stop-detached
 
 run-payment-test: stop-services stop-infra
-	go test ./tests/payments -v -run TestPaymentExhaustion
+	go test ./tests/payments -v -run TestReservationOnly
 
