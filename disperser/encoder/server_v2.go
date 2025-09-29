@@ -274,7 +274,9 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 		return blobKey, params, errors.New("number of chunks must be greater than zero")
 	}
 
-	if req.GetBlobSize() == 0 || uint64(encoding.GetBlobLength(uint(req.GetBlobSize()))) > req.GetEncodingParams().GetChunkLength()*req.GetEncodingParams().GetNumChunks() {
+	if req.GetBlobSize() == 0 ||
+		(uint64(encoding.GetBlobLength(uint32(req.GetBlobSize()))) >
+			req.GetEncodingParams().GetChunkLength()*req.GetEncodingParams().GetNumChunks()) {
 		return blobKey, params, errors.New("blob size is invalid")
 	}
 

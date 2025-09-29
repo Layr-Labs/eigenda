@@ -129,10 +129,10 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 				t.Fatal(err)
 			}
 
-			blobSize := uint(len(blob.Data))
+			blobSize := uint32(len(blob.Data))
 			blobLength := encoding.GetBlobLength(blobSize)
 
-			chunkLength, err := asn.CalculateChunkLength(state, blobLength, 0, securityParam)
+			chunkLength, err := asn.CalculateChunkLength(state, uint(blobLength), 0, securityParam)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -146,7 +146,7 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 				ChunkLength: chunkLength,
 			}
 
-			assignments, info, err := asn.GetAssignments(state, blobLength, quorumHeader)
+			assignments, info, err := asn.GetAssignments(state, uint(blobLength), quorumHeader)
 			if err != nil {
 				t.Fatal(err)
 			}

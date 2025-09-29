@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common/version"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/gammazero/workerpool"
@@ -126,7 +127,8 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		logger,
 		ratelimiter,
 		prometheus.NewRegistry(),
-		reader)
+		reader,
+		version.DefaultVersion())
 
 	require.NoError(t, err)
 	return &testComponents{
@@ -141,8 +143,8 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 func TestV2NodeInfoRequest(t *testing.T) {
 	c := newTestComponents(t, makeConfig(t))
 	resp, err := c.server.GetNodeInfo(context.Background(), &validator.GetNodeInfoRequest{})
-	assert.True(t, resp.GetSemver() == ">=0.9.0-rc.1")
-	assert.True(t, err == nil)
+	require.NoError(t, err)
+	require.Equal(t, resp.GetSemver(), version.DefaultVersion().String())
 }
 
 func TestV2ServerWithoutV2(t *testing.T) {

@@ -22,6 +22,7 @@ import (
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -264,8 +265,8 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	operatorState, err := cst.GetOperatorState(ctx, 0, []core.QuorumID{0})
 	require.NoError(t, err)
 
-	blobLength := encoding.GetBlobLength(uint(len(blob.Data)))
-	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, 0, blob.RequestHeader.SecurityParams[0])
+	blobLength := encoding.GetBlobLength(uint32(len(blob.Data)))
+	chunkLength, err := asn.CalculateChunkLength(operatorState, uint(blobLength), 0, blob.RequestHeader.SecurityParams[0])
 	require.NoError(t, err)
 
 	blobQuorumInfo := &core.BlobQuorumInfo{
@@ -277,7 +278,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		ChunkLength: chunkLength,
 	}
 
-	assignments, info, err := asn.GetAssignments(operatorState, blobLength, blobQuorumInfo)
+	assignments, info, err := asn.GetAssignments(operatorState, uint(blobLength), blobQuorumInfo)
 	require.NoError(t, err)
 
 	var indices []encoding.ChunkNumber
@@ -668,7 +669,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.Opera
 		reader := &coremock.MockWriter{}
 		reader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
-		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter)
+		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter, version.DefaultVersion())
 		serverV2, err := nodegrpc.NewServerV2(
 			ctx,
 			config,
@@ -676,7 +677,8 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.Opera
 			logger,
 			rateLimiter,
 			prometheus.NewRegistry(),
-			reader)
+			reader,
+			version.DefaultVersion())
 		require.NoError(t, err)
 
 		ops[id] = TestOperator{

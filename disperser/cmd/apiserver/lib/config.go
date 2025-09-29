@@ -46,7 +46,7 @@ type Config struct {
 	BucketStoreSize               int
 	EthClientConfig               geth.EthClientConfig
 	MaxBlobSize                   int
-	MaxNumSymbolsPerBlob          uint
+	MaxNumSymbolsPerBlob          uint32
 	OnchainStateRefreshInterval   time.Duration
 	ControllerAddress             string
 	UseControllerMediatedPayments bool
@@ -132,7 +132,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChainReadTimeout:              ctx.GlobalDuration(flags.ChainReadTimeout.Name),
 		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
 		MaxBlobSize:                   ctx.GlobalInt(flags.MaxBlobSize.Name),
-		MaxNumSymbolsPerBlob:          ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
+		MaxNumSymbolsPerBlob:          uint32(ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name)),
 		OnchainStateRefreshInterval:   ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
 		EigenDADirectory:                ctx.GlobalString(flags.EigenDADirectoryFlag.Name),

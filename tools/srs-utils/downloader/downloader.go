@@ -2,14 +2,10 @@ package downloader
 
 import (
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 
-	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/tools/srs-utils/internal/download"
 )
 
 const (
@@ -28,21 +24,21 @@ func DownloadSRSFiles(config DownloaderConfig) error {
 
 	fmt.Println("Checking server availability and file sizes...")
 
-	g1URL, err := constructURLPath(config.baseURL, g1FileName)
+	g1URL, err := download.ConstructURLPath(config.baseURL, g1FileName)
 	if err != nil {
 		return fmt.Errorf("construct g1.point URL: %w", err)
 	}
-	g1TotalSize, err := getRemoteFileSize(g1URL)
+	g1TotalSize, err := download.GetRemoteFileSize(g1URL)
 	if err != nil {
 		return fmt.Errorf("get remote file size: %w", err)
 	}
 	fmt.Printf("Total remote g1.point size: %d bytes\n", g1TotalSize)
 
-	g2URL, err := constructURLPath(config.baseURL, g2FileName)
+	g2URL, err := download.ConstructURLPath(config.baseURL, g2FileName)
 	if err != nil {
 		return fmt.Errorf("construct g2.point URL: %w", err)
 	}
-	g2TotalSize, err := getRemoteFileSize(g2URL)
+	g2TotalSize, err := download.GetRemoteFileSize(g2URL)
 	if err != nil {
 		return fmt.Errorf("get remote file size: %w", err)
 	}
@@ -66,7 +62,7 @@ func DownloadSRSFiles(config DownloaderConfig) error {
 
 	fmt.Printf("Downloading g1.point (%d bytes)...\n", g1BytesToRead)
 	g1FilePath := filepath.Join(config.outputDir, g1FileName)
-	if err := downloadFile(
+	if err := download.DownloadFile(
 		g1URL,
 		g1FilePath,
 		0,
@@ -76,7 +72,7 @@ func DownloadSRSFiles(config DownloaderConfig) error {
 	}
 
 	fmt.Printf("Downloading g2.point (%d bytes)...\n", g2BytesToRead)
-	if err := downloadFile(
+	if err := download.DownloadFile(
 		g2URL,
 		filepath.Join(config.outputDir, g2FileName),
 		0,
@@ -86,7 +82,7 @@ func DownloadSRSFiles(config DownloaderConfig) error {
 	}
 
 	fmt.Printf("Downloading g2.trailing.point (%d bytes from the end of g2.point)...\n", g2BytesToRead)
-	if err := downloadFile(
+	if err := download.DownloadFile(
 		g2URL,
 		filepath.Join(config.outputDir, g2TrailingFileName),
 		g2TotalSize-g2BytesToRead,
@@ -97,19 +93,19 @@ func DownloadSRSFiles(config DownloaderConfig) error {
 
 	// Download g2.point.powerOf2 if requested
 	if config.includePowerOf2 {
-		g2PowerOf2URL, err := constructURLPath(config.baseURL, g2PowerOf2FileName)
+		g2PowerOf2URL, err := download.ConstructURLPath(config.baseURL, g2PowerOf2FileName)
 		if err != nil {
 			return fmt.Errorf("construct g2.point.powerOf2 URL: %w", err)
 		}
 
-		g2PowerOf2TotalSize, err := getRemoteFileSize(g2PowerOf2URL)
+		g2PowerOf2TotalSize, err := download.GetRemoteFileSize(g2PowerOf2URL)
 		if err != nil {
 			return fmt.Errorf("get remote file size for g2.point.powerOf2: %w", err)
 		}
 		fmt.Printf("Total remote g2.point.powerOf2 size: %d bytes\n", g2PowerOf2TotalSize)
 
 		fmt.Printf("Downloading g2.point.powerOf2 (full file: %d bytes)...\n", g2PowerOf2TotalSize)
-		if err := downloadFile(
+		if err := download.DownloadFile(
 			g2PowerOf2URL,
 			filepath.Join(config.outputDir, g2PowerOf2FileName),
 			0,
@@ -129,75 +125,6 @@ func DownloadSRSFiles(config DownloaderConfig) error {
 	err = srsHashFile.save()
 	if err != nil {
 		return fmt.Errorf("save hash file: %w", err)
-	}
-
-	return nil
-}
-
-// constructURLPath creates a proper URL for SRS file downloading
-func constructURLPath(baseURL string, filename string) (string, error) {
-	u, err := url.Parse(baseURL)
-	if err != nil {
-		return "", fmt.Errorf("invalid base URL: %w", err)
-	}
-	u.Path = path.Join(u.Path, filename)
-	return u.String(), nil
-}
-
-// getRemoteFileSize retrieves the size of a file from the server via a HEAD request
-func getRemoteFileSize(url string) (uint64, error) {
-	resp, err := http.Head(url)
-	if err != nil {
-		return 0, fmt.Errorf("failed to access %s: %w", url, err)
-	}
-	defer core.CloseLogOnError(resp.Body, "downloader: close response body", nil)
-
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("server returned non-OK status: %s", resp.Status)
-	}
-
-	if resp.ContentLength < 0 {
-		return 0, fmt.Errorf("could not determine file size for %s", url)
-	}
-
-	return uint64(resp.ContentLength), nil
-}
-
-// downloadFile downloads a file from the given URL
-func downloadFile(url string, outputPath string, rangeStart uint64, rangeEnd uint64) error {
-	// Create parent directory if it doesn't exist
-	err := os.MkdirAll(filepath.Dir(outputPath), 0755)
-	if err != nil {
-		return fmt.Errorf("create directory: %w", err)
-	}
-
-	file, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("create file %s: %w", outputPath, err)
-	}
-	defer core.CloseLogOnError(file, file.Name(), nil)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return fmt.Errorf("create http request: %w", err)
-	}
-
-	req.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", rangeStart, rangeEnd))
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("download failed: %w", err)
-	}
-	defer core.CloseLogOnError(resp.Body, "downloader: close response body", nil)
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
-		return fmt.Errorf("server returned non-OK status: %s", resp.Status)
-	}
-
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
-		return fmt.Errorf("save downloaded data: %w", err)
 	}
 
 	return nil

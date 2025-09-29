@@ -23,7 +23,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil-nochurner.yaml", "Name of the config file (in `inabox/templates`)")
+	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
 	flag.StringVar(&headerStoreType, "headerStore", "leveldb",
 		"The header store implementation to be used (inmem, leveldb)")
@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	testConfig = deploy.NewTestConfig(testName, rootPath)
+	testConfig = deploy.ReadTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = false
 
 	if testConfig.Environment.IsLocal() {

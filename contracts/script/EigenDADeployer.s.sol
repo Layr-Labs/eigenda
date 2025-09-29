@@ -305,7 +305,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 abi.encodeWithSelector(
                     EigenDARegistryCoordinator.initialize.selector,
                     addressConfig.eigenDACommunityMultisig,
-                    addressConfig.churner,
                     addressConfig.ejector,
                     IPauserRegistry(address(eigenDAPauserReg)),
                     0, // initial paused status is nothing paused

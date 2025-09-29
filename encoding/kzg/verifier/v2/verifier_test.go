@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,10 +44,12 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 		}
 		blob := make([]byte, blobSize)
 		_, err = rand.Read(blob)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		commitments, chunks, err := p.EncodeAndProve(blob, params)
-		assert.NoError(t, err)
+		commitments, err := p.GetCommitmentsForPaddedLength(blob)
+		require.NoError(t, err)
+		frames, err := p.GetFrames(blob, params)
+		require.NoError(t, err)
 
 		indices := make([]encoding.ChunkNumber, params.NumChunks)
 		for i := range indices {
@@ -60,8 +61,8 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 			result := testing.Benchmark(func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					// control = profile.Start(profile.ProfilePath("."))
-					err := v.VerifyFrames(chunks[:numChunks], indices[:numChunks], commitments, params)
-					assert.NoError(t, err)
+					err := v.VerifyFrames(frames[:numChunks], indices[:numChunks], commitments, params)
+					require.NoError(t, err)
 					// control.Stop()
 				}
 			})
@@ -82,10 +83,6 @@ func BenchmarkVerifyBlob(b *testing.B) {
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
 	require.NoError(b, err)
 
-	params := encoding.EncodingParams{
-		ChunkLength: 256,
-		NumChunks:   8,
-	}
 	blobSize := 8 * 256
 	numSamples := 30
 	blobs := make([][]byte, numSamples)
@@ -95,14 +92,14 @@ func BenchmarkVerifyBlob(b *testing.B) {
 		blobs[i] = blob
 	}
 
-	commitments, _, err := p.EncodeAndProve(blobs[0], params)
-	assert.NoError(b, err)
+	commitments, err := p.GetCommitmentsForPaddedLength(blobs[0])
+	require.NoError(b, err)
 
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		err = v.VerifyBlobLength(commitments)
-		assert.NoError(b, err)
+		require.NoError(b, err)
 	}
 
 }
