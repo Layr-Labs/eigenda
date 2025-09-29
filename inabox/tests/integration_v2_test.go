@@ -36,7 +36,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	ctx := t.Context()
 	// mine finalization_delay # of blocks given sometimes registry coordinator updates can sometimes happen
 	// in-between the current_block_number - finalization_block_delay. This ensures consistent test execution.
-	mineAnvilBlocks(t, testHarness.RPCClient, 6)
+	MineAnvilBlocks(t, testHarness.RPCClient, 6)
 
 	payload1 := randomPayload(992)
 	payload2 := randomPayload(123)
@@ -122,7 +122,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 		gethcommon.HexToAddress("0x0"),
 	)
 	require.NoError(t, err)
-	mineAnvilBlocks(t, testHarness.RPCClient, 1)
+	MineAnvilBlocks(t, testHarness.RPCClient, 1)
 
 	// ensure that tx successfully executed
 	err = validateTxReceipt(ctx, testHarness, tx.Hash())
@@ -139,7 +139,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.Equal(t, globalInfra.TestConfig.EigenDA.CertVerifier, verifier.String())
 
 	// progress anvil chain 10 blocks
-	mineAnvilBlocks(t, testHarness.RPCClient, 10)
+	MineAnvilBlocks(t, testHarness.RPCClient, 10)
 
 	// disperse blob #3 to trigger the new cert verifier which should fail
 	// since the address is not a valid cert verifier and the GetQuorums call will fail
@@ -157,7 +157,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 		gethcommon.HexToAddress(globalInfra.TestConfig.EigenDA.CertVerifier),
 	)
 	require.NoError(t, err)
-	mineAnvilBlocks(t, testHarness.RPCClient, 10)
+	MineAnvilBlocks(t, testHarness.RPCClient, 10)
 
 	err = validateTxReceipt(ctx, testHarness, tx.Hash())
 	require.NoError(t, err)

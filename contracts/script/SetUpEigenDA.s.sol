@@ -157,8 +157,9 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         }
 
         // Register Reservations for client as the eigenDACommunityMultisig
+        uint64 symbolsPerSec = uint64(vm.envOr("USER_RESERVATION_SYMBOLS_PER_SECOND", uint256(452198)));
         IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 452198,
+            symbolsPerSecond: symbolsPerSec,
             startTimestamp: uint64(block.timestamp),
             endTimestamp: uint64(block.timestamp + 1000000000),
             quorumNumbers: hex"0001",

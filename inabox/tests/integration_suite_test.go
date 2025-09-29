@@ -63,6 +63,7 @@ func setupSuite(logger logging.Logger) error {
 		TestName:          testName,
 		InMemoryBlobStore: inMemoryBlobStore,
 		Logger:            logger,
+		RootPath:          "../../",
 	}
 	var err error
 	globalInfra, err = SetupGlobalInfrastructure(config)

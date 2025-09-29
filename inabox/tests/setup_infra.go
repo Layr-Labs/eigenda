@@ -13,13 +13,15 @@ import (
 
 // InfrastructureConfig contains the configuration for setting up the infrastructure
 type InfrastructureConfig struct {
-	TemplateName        string
-	TestName            string
-	InMemoryBlobStore   bool
-	Logger              logging.Logger
-	MetadataTableName   string
-	BucketTableName     string
-	MetadataTableNameV2 string
+	TemplateName                    string
+	TestName                        string
+	InMemoryBlobStore               bool
+	Logger                          logging.Logger
+	RootPath                        string
+	MetadataTableName               string
+	BucketTableName                 string
+	MetadataTableNameV2             string
+	UserReservationSymbolsPerSecond uint64
 }
 
 // SetupGlobalInfrastructure creates the shared infrastructure that persists across all tests.
@@ -39,19 +41,18 @@ func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHar
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	rootPath := "../../"
-
 	// Create test directory if needed
 	testName := config.TestName
 	if testName == "" {
 		var err error
-		testName, err = deploy.CreateNewTestDirectory(config.TemplateName, rootPath)
+		testName, err = deploy.CreateNewTestDirectory(config.TemplateName, config.RootPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create test directory: %w", err)
 		}
 	}
 
-	testConfig := deploy.ReadTestConfig(testName, rootPath)
+	testConfig := deploy.ReadTestConfig(testName, config.RootPath)
+	testConfig.UserReservationSymbolsPerSecond = config.UserReservationSymbolsPerSecond
 
 	if testConfig.Environment.IsLocal() {
 		return setupLocalInfrastructure(ctx, config, testName, testConfig)

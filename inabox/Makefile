@@ -1,5 +1,5 @@
 dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
-.PHONY: run-e2e-tests start-inabox stop-inabox new-testdata-dir clean start-infra stop-infra start-services stop-services
+.PHONY: run-e2e-tests start-inabox stop-inabox new-testdata-dir clean start-infra stop-infra start-services stop-services run-payment-test
 
 # Starts a short-lived inabox devnet, and runs integration/e2e tests against it.
 run-e2e-tests:
@@ -87,3 +87,7 @@ start-services:
 
 stop-services:
 	./bin.sh stop-detached
+
+run-payment-test: stop-services stop-infra
+	go test ./tests/payments -v -run TestPaymentExhaustion
+

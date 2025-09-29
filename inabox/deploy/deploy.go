@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -83,6 +84,9 @@ func (env *Config) deployEigenDAContracts() error {
 		}
 	}
 
+	envVars := make(map[string]string)
+	envVars["USER_RESERVATION_SYMBOLS_PER_SECOND"] = strconv.FormatUint(env.UserReservationSymbolsPerSecond, 10)
+
 	// Create deployment config for testbed
 	deployConfig := testbed.DeploymentConfig{
 		AnvilRPCURL:      deployer.RPC,
@@ -93,6 +97,7 @@ func (env *Config) deployEigenDAContracts() error {
 		MaxOperatorCount: env.Services.Counts.NumMaxOperatorCount,
 		PrivateKeys:      env.convertToTestbedPrivateKeys(),
 		Logger:           logger,
+		EnvVars:          envVars,
 	}
 
 	// Deploy contracts using testbed
