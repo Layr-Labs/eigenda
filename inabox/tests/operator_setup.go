@@ -33,7 +33,6 @@ type OperatorInstance struct {
 	Node            *node.Node
 	Server          *grpc.Server
 	ServerV2        *grpc.ServerV2
-	ServerRunner    *grpc.ServerRunner
 	DispersalPort   string
 	RetrievalPort   string
 	V2DispersalPort string
@@ -270,7 +269,7 @@ func StartOperatorForInfrastructure(
 	}
 
 	// Start all gRPC servers using the new RunServers function
-	runner, err := grpc.RunServers(operatorServer, serverV2, operatorConfig, operatorLogger)
+	err = grpc.RunServers(operatorServer, serverV2, operatorConfig, operatorLogger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start gRPC servers: %w", err)
 	}
@@ -289,7 +288,6 @@ func StartOperatorForInfrastructure(
 		Node:            operatorNode,
 		Server:          operatorServer,
 		ServerV2:        serverV2,
-		ServerRunner:    runner,
 		DispersalPort:   dispersalPort,
 		RetrievalPort:   retrievalPort,
 		V2DispersalPort: v2DispersalPort,
@@ -342,10 +340,7 @@ func StopOperator(instance *OperatorInstance) {
 
 	instance.Logger.Info("Stopping operator")
 
-	// Use the ServerRunner to gracefully stop all servers
-	if instance.ServerRunner != nil {
-		instance.ServerRunner.Stop()
-	}
+	// TODO: Add graceful shutdown of node once it's implemented
 
 	instance.Logger.Info("Operator stopped")
 }

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -158,23 +156,7 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 			return fmt.Errorf("failed to create server v2: %v", err)
 		}
 	}
-	runner, err := nodegrpc.RunServers(server, serverV2, config, logger)
-	if err != nil {
-		return fmt.Errorf("failed to run servers: %w", err)
-	}
+	err = nodegrpc.RunServers(server, serverV2, config, logger)
 
-	// Set up signal handling for graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		sig := <-sigChan
-		logger.Infof("Received signal %v, initiating graceful shutdown", sig)
-		runner.Stop()
-		os.Exit(0)
-	}()
-
-	logger.Info("Node is running.")
-
-	return nil
+	return err
 }

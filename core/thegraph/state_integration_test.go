@@ -110,6 +110,8 @@ func setupTest(t *testing.T) (
 	churnerURL := ""
 
 	// Start operator nodes as goroutines using the inabox operator setup
+	// TODO(dmanc): We really don't need to spin up the operators as goroutines, we just
+	// need to register them onchain so confirm that the graph node is functional.
 	logger.Info("Starting operator nodes as goroutines")
 	err = inaboxtests.StartOperatorsForInfrastructure(infraHarness, anvilContainerPort, churnerURL)
 	require.NoError(t, err, "failed to start operator nodes")
