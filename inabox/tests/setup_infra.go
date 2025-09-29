@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -24,6 +25,7 @@ type InfrastructureConfig struct {
 	UserReservationSymbolsPerSecond uint64
 	UserOnDemandDeposit             uint64
 	ReservationPeriodInterval       uint64
+	ClientLedgerMode                clientledger.ClientLedgerMode
 }
 
 // SetupGlobalInfrastructure creates the shared infrastructure that persists across all tests.
@@ -57,6 +59,7 @@ func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHar
 	testConfig.UserReservationSymbolsPerSecond = config.UserReservationSymbolsPerSecond
 	testConfig.UserOnDemandDeposit = config.UserOnDemandDeposit
 	testConfig.ReservationPeriodInterval = config.ReservationPeriodInterval
+	testConfig.ClientLedgerMode = config.ClientLedgerMode
 
 	if testConfig.Environment.IsLocal() {
 		return setupLocalInfrastructure(ctx, config, testName, testConfig)

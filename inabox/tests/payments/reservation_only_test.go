@@ -4,13 +4,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	integration_test "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
-func TestReservationOnly(t *testing.T) {
+func TestReservationOnlyLegacy(t *testing.T) {
+	testReservationOnly(t, clientledger.ClientLedgerModeLegacy)
+}
+
+func TestReservationOnlyNewPayments(t *testing.T) {
+	testReservationOnly(t, clientledger.ClientLedgerModeReservationOnly)
+}
+
+func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedgerMode) {
 	infraConfig := &integration_test.InfrastructureConfig{
 		TemplateName:                    "testconfig-anvil.yaml",
 		TestName:                        "",
@@ -21,6 +30,7 @@ func TestReservationOnly(t *testing.T) {
 		UserOnDemandDeposit:             0,
 		// choose a bin width value much lower than the default, so that we converge on the average faster
 		ReservationPeriodInterval: 10,
+		ClientLedgerMode:          clientLedgerMode,
 	}
 
 	infra, err := integration_test.SetupGlobalInfrastructure(infraConfig)

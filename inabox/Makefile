@@ -5,6 +5,10 @@ dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
 run-e2e-tests:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
 
+# Uses the inabox framework to run tests of the payment system
+run-payments-tests: stop-services stop-infra
+	go test ./tests/payments -v
+
 # Starts a long-lived inabox local devnet.
 # If you need to make configuration changes to inabox,
 # Then use the low-level commands below:
@@ -87,7 +91,3 @@ start-services:
 
 stop-services:
 	./bin.sh stop-detached
-
-run-payment-test: stop-services stop-infra
-	go test ./tests/payments -v -run TestReservationOnly
-

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"gopkg.in/yaml.v3"
 )
@@ -209,6 +210,7 @@ type Config struct {
 	UserReservationSymbolsPerSecond uint64
 	UserOnDemandDeposit             uint64
 	ReservationPeriodInterval       uint64
+	ClientLedgerMode                clientledger.ClientLedgerMode
 }
 
 func (env *Config) IsEigenDADeployed() bool {
