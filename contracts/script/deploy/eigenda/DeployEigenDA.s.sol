@@ -58,7 +58,6 @@ contract DeployEigenDA is Script {
     string constant MOCK_REGISTRY_COORDINATOR = "MOCK_REGISTRY_COORDINATOR";
 
     mapping(string => address) impl; // Implementation addresses of the deployed contracts.
-    mapping(string => bool) upgraded; // Whether the deployment of a contract is upgraded to its final implementation. Should beTrue if the contract is not a proxy
 
     ProxyAdmin proxyAdmin;
     EigenDADirectory directory;
@@ -315,8 +314,6 @@ contract DeployEigenDA is Script {
     }
 
     function upgrade(string memory contractName, bytes memory initData) internal {
-        require(!upgraded[contractName], string.concat("Contract already upgraded: ", contractName));
-
         address implementation = impl[contractName];
         TransparentUpgradeableProxy proxy = TransparentUpgradeableProxy(payable(directory.getAddress(contractName)));
 
@@ -324,6 +321,5 @@ contract DeployEigenDA is Script {
         if (initData.length > 0) {
             proxyAdmin.upgradeAndCall(proxy, implementation, initData);
         }
-        upgraded[contractName] = true;
     }
 }
