@@ -22,6 +22,8 @@ func TestDataApiLookup(t *testing.T) {
 	signingRates, err := lookup.GetSigningRates(1*time.Hour, []core.QuorumID{0, 1}, ProtocolVersionV2, false)
 	require.NoError(t, err)
 
+	sortByUnsignedBytesDescending(signingRates)
+
 	for i, rate := range signingRates {
 		validatorID := core.OperatorID(rate.ValidatorId)
 

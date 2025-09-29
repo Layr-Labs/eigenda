@@ -305,34 +305,3 @@ func translateV2ToProto(data *dataapiv2.OperatorSigningInfo) (*validator.Validat
 
 	return signingRate, nil
 }
-
-// Combines two ValidatorSigningRate reports. Signed/unsigned batches and bytes are summed. Latency is taken
-// as a weighed average (by batch count). If one of the rates is nil, the other is returned directly.
-func combineSigningRates(
-	rateA *validator.ValidatorSigningRate,
-	rateB *validator.ValidatorSigningRate,
-) *validator.ValidatorSigningRate {
-
-	if rateA == nil {
-		return rateB
-	}
-	if rateB == nil {
-		return rateA
-	}
-
-	totalSignedBatches := rateA.GetSignedBatches() + rateB.GetSignedBatches()
-	var latency uint64
-	if totalSignedBatches > 0 {
-		latency = (rateA.GetSigningLatency()*rateA.GetSignedBatches() +
-			rateB.GetSigningLatency()*rateB.GetSignedBatches()) / totalSignedBatches
-	}
-
-	return &validator.ValidatorSigningRate{
-		ValidatorId:     rateA.GetValidatorId(),
-		SignedBatches:   rateA.GetSignedBatches() + rateB.GetSignedBatches(),
-		UnsignedBatches: rateA.GetUnsignedBatches() + rateB.GetUnsignedBatches(),
-		SignedBytes:     rateA.GetSignedBytes() + rateB.GetSignedBytes(),
-		UnsignedBytes:   rateA.GetUnsignedBytes() + rateB.GetUnsignedBytes(),
-		SigningLatency:  latency,
-	}
-}

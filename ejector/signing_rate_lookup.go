@@ -17,10 +17,11 @@ const (
 
 // A tool for looking up signing rates for validators.
 type SigningRateLookup interface {
-	// GetSigningRates returns signing rate information for all validators over the given time span.
+	// GetSigningRates returns signing rate information for all validators over the given time span. This method
+	// is not required to return data in any particular order.
 	GetSigningRates(
 		// The time span in the past over which to calculate signing rates.
-		timeSpan time.Duration, 
+		timeSpan time.Duration,
 		// A list of quorums to include. If empty, all quorums are included. If more than one quorum is given,
 		// the results for each quorum is summed together.
 		quorums []core.QuorumID,
