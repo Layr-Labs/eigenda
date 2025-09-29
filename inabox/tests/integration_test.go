@@ -5,10 +5,12 @@ import (
 	"context"
 	"crypto/rand"
 	"math/big"
+	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
 	certTypes "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
@@ -16,154 +18,157 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 )
 
-func mineAnvilBlocks(numBlocks int) {
+func mineAnvilBlocks(t *testing.T, rpcClient common.RPCEthClient, numBlocks int) {
+	t.Helper()
 	for i := 0; i < numBlocks; i++ {
-		err := rpcClient.CallContext(context.Background(), nil, "evm_mine")
-		Expect(err).To(BeNil())
+		err := rpcClient.CallContext(t.Context(), nil, "evm_mine")
+		require.NoError(t, err)
 	}
 }
 
-var _ = Describe("Inabox Integration", func() {
-	It("test end to end scenario", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
-		defer cancel()
+func TestEndToEndScenario(t *testing.T) {
+	// Create a fresh test harness for this test
+	testHarness, err := NewTestHarnessWithSetup(globalInfra)
+	require.NoError(t, err, "Failed to create test context")
+	defer testHarness.Cleanup()
 
-		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second*15)
+	defer cancel()
 
-		disp, err := clients.NewDisperserClient(&clients.Config{
-			Hostname: "localhost",
-			Port:     "32003",
-			Timeout:  10 * time.Second,
-		}, signer)
-		Expect(err).To(BeNil())
-		Expect(disp).To(Not(BeNil()))
+	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
-		data := make([]byte, 1024)
-		_, err = rand.Read(data)
-		Expect(err).To(BeNil())
+	disp, err := clients.NewDisperserClient(&clients.Config{
+		Hostname: "localhost",
+		Port:     "32003",
+		Timeout:  10 * time.Second,
+	}, signer)
+	require.NoError(t, err)
+	require.NotNil(t, disp)
 
-		paddedData := codec.ConvertByPaddingEmptyByte(data)
+	data := make([]byte, 1024)
+	_, err = rand.Read(data)
+	require.NoError(t, err)
 
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, paddedData, []uint8{})
-		Expect(err).To(BeNil())
-		Expect(key1).To(Not(BeNil()))
-		Expect(blobStatus1).To(Not(BeNil()))
-		Expect(*blobStatus1).To(Equal(disperser.Processing))
+	paddedData := codec.ConvertByPaddingEmptyByte(data)
 
-		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, paddedData, []uint8{})
-		Expect(err).To(BeNil())
-		Expect(key2).To(Not(BeNil()))
-		Expect(blobStatus2).To(Not(BeNil()))
-		Expect(*blobStatus2).To(Equal(disperser.Processing))
+	blobStatus1, key1, err := disp.DisperseBlob(ctx, paddedData, []uint8{})
+	require.NoError(t, err)
+	require.NotNil(t, key1)
+	require.NotNil(t, blobStatus1)
+	require.Equal(t, disperser.Processing, *blobStatus1)
 
-		ticker := time.NewTicker(time.Second * 1)
-		defer ticker.Stop()
+	blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, paddedData, []uint8{})
+	require.NoError(t, err)
+	require.NotNil(t, key2)
+	require.NotNil(t, blobStatus2)
+	require.Equal(t, disperser.Processing, *blobStatus2)
 
-		var reply1 *disperserpb.BlobStatusReply
-		var reply2 *disperserpb.BlobStatusReply
+	ticker := time.NewTicker(time.Second * 1)
+	defer ticker.Stop()
 
-		for loop := true; loop; {
-			select {
-			case <-ctx.Done():
-				Fail("timed out")
-			case <-ticker.C:
-				reply1, err = disp.GetBlobStatus(context.Background(), key1)
-				Expect(err).To(BeNil())
-				Expect(reply1).To(Not(BeNil()))
-				blobStatus1, err = disperser.FromBlobStatusProto(reply1.GetStatus())
-				Expect(err).To(BeNil())
+	var reply1 *disperserpb.BlobStatusReply
+	var reply2 *disperserpb.BlobStatusReply
 
-				reply2, err = disp.GetBlobStatus(context.Background(), key2)
-				Expect(err).To(BeNil())
-				Expect(reply2).To(Not(BeNil()))
-				blobStatus2, err = disperser.FromBlobStatusProto(reply2.GetStatus())
-				Expect(err).To(BeNil())
+	for loop := true; loop; {
+		select {
+		case <-ctx.Done():
+			t.Fatal("timed out")
+		case <-ticker.C:
+			reply1, err = disp.GetBlobStatus(ctx, key1)
+			require.NoError(t, err)
+			require.NotNil(t, reply1)
+			blobStatus1, err = disperser.FromBlobStatusProto(reply1.GetStatus())
+			require.NoError(t, err)
 
-				if *blobStatus1 != disperser.Confirmed || *blobStatus2 != disperser.Confirmed {
-					mineAnvilBlocks(numConfirmations + 1)
-					continue
-				}
-				blobHeader := blobHeaderFromProto(reply1.GetInfo().GetBlobHeader())
-				verificationProof := blobVerificationProofFromProto(reply1.GetInfo().GetBlobVerificationProof())
-				err = eigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
-				Expect(err).To(BeNil())
-				mineAnvilBlocks(numConfirmations + 1)
+			reply2, err = disp.GetBlobStatus(ctx, key2)
+			require.NoError(t, err)
+			require.NotNil(t, reply2)
+			blobStatus2, err = disperser.FromBlobStatusProto(reply2.GetStatus())
+			require.NoError(t, err)
 
-				blobHeader = blobHeaderFromProto(reply2.GetInfo().GetBlobHeader())
-				verificationProof = blobVerificationProofFromProto(reply2.GetInfo().GetBlobVerificationProof())
-				err = eigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
-				Expect(err).To(BeNil())
-				loop = false
+			if *blobStatus1 != disperser.Confirmed || *blobStatus2 != disperser.Confirmed {
+				mineAnvilBlocks(t, testHarness.RPCClient, testHarness.NumConfirmations+1)
+				continue
 			}
+			blobHeader := blobHeaderFromProto(reply1.GetInfo().GetBlobHeader())
+			verificationProof := blobVerificationProofFromProto(reply1.GetInfo().GetBlobVerificationProof())
+			err = testHarness.EigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
+			require.NoError(t, err)
+			mineAnvilBlocks(t, testHarness.RPCClient, testHarness.NumConfirmations+1)
+
+			blobHeader = blobHeaderFromProto(reply2.GetInfo().GetBlobHeader())
+			verificationProof = blobVerificationProofFromProto(reply2.GetInfo().GetBlobVerificationProof())
+			err = testHarness.EigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
+			require.NoError(t, err)
+			loop = false
 		}
-		Expect(*blobStatus1).To(Equal(disperser.Confirmed))
-		Expect(*blobStatus2).To(Equal(disperser.Confirmed))
+	}
+	require.Equal(t, disperser.Confirmed, *blobStatus1)
+	require.Equal(t, disperser.Confirmed, *blobStatus2)
 
-		ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
-		defer cancel()
-		retrieved, err := retrievalClient.RetrieveBlob(ctx,
-			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			0, // retrieve blob 1 from quorum 0
-		)
-		Expect(err).To(BeNil())
+	ctx, cancel = context.WithTimeout(t.Context(), time.Second*5)
+	defer cancel()
+	retrieved, err := testHarness.RetrievalClient.RetrieveBlob(ctx,
+		[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+		reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+		uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+		[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+		0, // retrieve blob 1 from quorum 0
+	)
+	require.NoError(t, err)
 
-		restored := codec.RemoveEmptyByteFromPaddedBytes(retrieved)
-		Expect(bytes.TrimRight(restored, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+	restored := codec.RemoveEmptyByteFromPaddedBytes(retrieved)
+	require.Equal(t, bytes.TrimRight(data, "\x00"), bytes.TrimRight(restored, "\x00"))
 
-		_, err = retrievalClient.RetrieveBlob(ctx,
-			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			1, // retrieve blob 1 from quorum 1
-		)
-		Expect(err).To(BeNil())
+	_, err = testHarness.RetrievalClient.RetrieveBlob(ctx,
+		[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+		reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+		uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+		[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+		1, // retrieve blob 1 from quorum 1
+	)
+	require.NoError(t, err)
 
-		_, err = retrievalClient.RetrieveBlob(ctx,
-			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			2, // retrieve blob 1 from quorum 2
-		)
-		Expect(err).NotTo(BeNil())
+	_, err = testHarness.RetrievalClient.RetrieveBlob(ctx,
+		[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+		reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+		uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+		[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+		2, // retrieve blob 1 from quorum 2
+	)
+	require.Error(t, err)
 
-		retrieved, err = retrievalClient.RetrieveBlob(ctx,
-			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-			reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			0, // retrieve from quorum 0
-		)
-		Expect(err).To(BeNil())
-		restored = codec.RemoveEmptyByteFromPaddedBytes(retrieved)
-		Expect(bytes.TrimRight(restored, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
-		_, err = retrievalClient.RetrieveBlob(ctx,
-			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-			reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			1, // retrieve from quorum 1
-		)
-		Expect(err).To(BeNil())
-		_, err = retrievalClient.RetrieveBlob(ctx,
-			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-			reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			2, // retrieve from quorum 2
-		)
-		Expect(err).NotTo(BeNil())
-	})
-})
+	retrieved, err = testHarness.RetrievalClient.RetrieveBlob(ctx,
+		[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+		reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+		uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+		[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+		0, // retrieve from quorum 0
+	)
+	require.NoError(t, err)
+	restored = codec.RemoveEmptyByteFromPaddedBytes(retrieved)
+	require.Equal(t, bytes.TrimRight(data, "\x00"), bytes.TrimRight(restored, "\x00"))
+	_, err = testHarness.RetrievalClient.RetrieveBlob(ctx,
+		[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+		reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+		uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+		[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+		1, // retrieve from quorum 1
+	)
+	require.NoError(t, err)
+	_, err = testHarness.RetrievalClient.RetrieveBlob(ctx,
+		[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+		reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+		uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+		[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+		2, // retrieve from quorum 2
+	)
+	require.Error(t, err)
+}
 
 func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) certTypes.EigenDATypesV1BlobHeader {
 	quorums := make([]certTypes.EigenDATypesV1QuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))

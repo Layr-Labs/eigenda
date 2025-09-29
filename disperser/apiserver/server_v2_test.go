@@ -1,7 +1,6 @@
 package apiserver_test
 
 import (
-	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -15,8 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -28,6 +26,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,8 +46,9 @@ type testComponents struct {
 }
 
 func TestV2DisperseBlob(t *testing.T) {
+	ctx := t.Context()
 	c := newTestServerV2(t)
-	ctx := peer.NewContext(context.Background(), c.Peer)
+	ctx = peer.NewContext(ctx, c.Peer)
 	data := make([]byte, 50)
 	_, err := rand.Read(data)
 	require.NoError(t, err)
@@ -164,7 +165,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	sig, err = signer.SignBlobRequest(blobHeader)
 	require.NoError(t, err)
 
-	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  sig,
 		BlobHeader: ondemandReqProto,
@@ -173,6 +174,7 @@ func TestV2DisperseBlob(t *testing.T) {
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
+	ctx := t.Context()
 	c := newTestServerV2(t)
 	data := make([]byte, 50)
 	_, err := rand.Read(data)
@@ -194,7 +196,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
 		BlobHeader: invalidReqProto,
@@ -214,7 +216,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
 		BlobHeader: invalidReqProto,
@@ -232,7 +234,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
 		BlobHeader: invalidReqProto,
@@ -250,7 +252,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
 		BlobHeader: invalidReqProto,
@@ -268,7 +270,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		},
 	}
 	// request with invalid signature
-	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
 		BlobHeader: invalidReqProto,
@@ -290,8 +292,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	require.NoError(t, err)
 	sig, err := signer.SignBlobRequest(blobHeader)
 	require.NoError(t, err)
-
-	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  sig,
 		BlobHeader: invalidReqProto,
@@ -315,7 +316,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	require.NoError(t, err)
 	sig, err = signer.SignBlobRequest(blobHeader)
 	require.NoError(t, err)
-	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  sig,
 		BlobHeader: invalidReqProto,
@@ -345,7 +346,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	require.NoError(t, err)
 	sig, err = signer.SignBlobRequest(blobHeader)
 	require.NoError(t, err)
-	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  sig,
 		BlobHeader: validHeader,
@@ -355,8 +356,9 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 }
 
 func TestV2GetBlobStatus(t *testing.T) {
+	ctx := t.Context()
 	c := newTestServerV2(t)
-	ctx := peer.NewContext(context.Background(), c.Peer)
+	ctx = peer.NewContext(ctx, c.Peer)
 
 	blobHeader := &corev2.BlobHeader{
 		BlobVersion:     0,
@@ -442,7 +444,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 	err = c.BlobMetadataStore.PutAttestation(ctx, attestation)
 	require.NoError(t, err)
 
-	reply, err := c.DispersalServerV2.GetBlobStatus(context.Background(), &pbv2.BlobStatusRequest{
+	reply, err := c.DispersalServerV2.GetBlobStatus(ctx, &pbv2.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	})
 	require.NoError(t, err)
@@ -463,6 +465,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 }
 
 func TestV2GetBlobCommitment(t *testing.T) {
+	ctx := t.Context()
 	c := newTestServerV2(t)
 	data := make([]byte, 50)
 	_, err := rand.Read(data)
@@ -471,7 +474,7 @@ func TestV2GetBlobCommitment(t *testing.T) {
 	data = codec.ConvertByPaddingEmptyByte(data)
 	commit, err := prover.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
-	reply, err := c.DispersalServerV2.GetBlobCommitment(context.Background(), &pbv2.BlobCommitmentRequest{
+	reply, err := c.DispersalServerV2.GetBlobCommitment(ctx, &pbv2.BlobCommitmentRequest{
 		Blob: data,
 	})
 	require.NoError(t, err)
@@ -488,14 +491,17 @@ func TestV2GetBlobCommitment(t *testing.T) {
 }
 
 func newTestServerV2(t *testing.T) *testComponents {
-	logger := testutils.GetLogger()
+	t.Helper()
+
+	ctx := t.Context()
+	logger := test.GetLogger()
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
-	s3Client, err := s3.NewClient(context.Background(), awsConfig, logger)
+	s3Client, err := s3.NewClient(ctx, awsConfig, logger)
 	require.NoError(t, err)
 	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
 	require.NoError(t, err)
@@ -517,7 +523,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
 	mockState.On("GetOnDemandQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 
-	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
+	if err := mockState.RefreshOnchainPaymentState(ctx); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 	table_names := []string{"reservations_server_" + t.Name(), "ondemand_server_" + t.Name(), "global_server_" + t.Name()}
@@ -582,12 +588,13 @@ func newTestServerV2(t *testing.T) *testComponents {
 			HTTPPort:      "9094",
 			EnableMetrics: false,
 		},
-		// reserved only mode
-		false,
+		false, // enable both reservation and on-demand
+		false, // use old style payments
+		"",    // No controller client in tests
 	)
 	require.NoError(t, err)
 
-	err = s.RefreshOnchainState(context.Background())
+	err = s.RefreshOnchainState(ctx)
 	require.NoError(t, err)
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	require.NoError(t, err)
@@ -609,8 +616,9 @@ func newTestServerV2(t *testing.T) *testComponents {
 }
 
 func TestInvalidLength(t *testing.T) {
+	ctx := t.Context()
 	c := newTestServerV2(t)
-	ctx := peer.NewContext(context.Background(), c.Peer)
+	ctx = peer.NewContext(ctx, c.Peer)
 	data := make([]byte, 50)
 	_, err := rand.Read(data)
 	require.NoError(t, err)
@@ -620,7 +628,7 @@ func TestInvalidLength(t *testing.T) {
 	require.NoError(t, err)
 
 	// Length we are commiting to should be a power of 2.
-	require.Equal(t, commitments.Length, encoding.NextPowerOf2(commitments.Length))
+	require.Equal(t, uint64(commitments.Length), math.NextPowOf2u64(uint64(commitments.Length)))
 
 	// Changing the number of commitments should cause an error before a validity check of the commitments
 	commitments.Length += 1
@@ -657,10 +665,11 @@ func TestInvalidLength(t *testing.T) {
 }
 
 func TestTooShortCommitment(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	c := newTestServerV2(t)
-	ctx := peer.NewContext(context.Background(), c.Peer)
+	ctx = peer.NewContext(ctx, c.Peer)
 	data := rand.VariableBytes(2, 100)
 	_, err := rand.Read(data)
 	require.NoError(t, err)
@@ -670,7 +679,7 @@ func TestTooShortCommitment(t *testing.T) {
 	require.NoError(t, err)
 
 	// Length we are commiting to should be a power of 2.
-	require.Equal(t, commitments.Length, encoding.NextPowerOf2(commitments.Length))
+	require.Equal(t, uint64(commitments.Length), math.NextPowOf2u64(uint64(commitments.Length)))
 
 	// Choose a smaller commitment length than is legal. Make sure it's a power of 2 so that it doesn't
 	// fail prior to the commitment length check.

@@ -1,22 +1,23 @@
 package reservation
 
 import (
-	"context"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewReservationVaultMonitorInvalidInterval(t *testing.T) {
+	ctx := t.Context()
 	t.Run("zero interval", func(t *testing.T) {
 		monitor, err := NewReservationVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			0, // zero interval
 			1024,
@@ -29,8 +30,8 @@ func TestNewReservationVaultMonitorInvalidInterval(t *testing.T) {
 
 	t.Run("negative interval", func(t *testing.T) {
 		monitor, err := NewReservationVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			-time.Second, // negative interval
 			1024,
@@ -45,8 +46,7 @@ func TestNewReservationVaultMonitorInvalidInterval(t *testing.T) {
 func TestReservationVaultMonitor(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	updateInterval := time.Millisecond
 
 	accounts := []gethcommon.Address{
@@ -68,15 +68,18 @@ func TestReservationVaultMonitor(t *testing.T) {
 		})
 	}
 
+	var mu sync.Mutex
 	capturedUpdates := make(map[gethcommon.Address]*Reservation)
 	updateReservation := func(accountID gethcommon.Address, newReservation *Reservation) error {
+		mu.Lock()
+		defer mu.Unlock()
 		capturedUpdates[accountID] = newReservation
 		return nil
 	}
 
 	monitor, err := NewReservationVaultMonitor(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		testVault,
 		updateInterval,
 		2, // Small batch size to force multiple batches
@@ -86,15 +89,19 @@ func TestReservationVaultMonitor(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, monitor)
 
-	time.Sleep(updateInterval * 10)
-
-	require.Equal(t, len(accounts), len(capturedUpdates))
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(capturedUpdates)
+	}, time.Second)
+	mu.Lock()
 	for i, addr := range accounts {
 		reservation, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())
 		require.NotNil(t, reservation)
 		require.Equal(t, uint64(100+i*10), reservation.symbolsPerSecond)
 	}
+	mu.Unlock()
 
 	// update one of the reservations
 	testAccount := accounts[2]
@@ -106,22 +113,15 @@ func TestReservationVaultMonitor(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
-	// Clear captured updates to verify new updates
-	capturedUpdates = make(map[gethcommon.Address]*Reservation)
-
 	// Wait for the monitor to fetch the updated reservation
-	time.Sleep(updateInterval * 10)
-
-	// Verify all accounts were updated again
-	require.Equal(t, len(accounts), len(capturedUpdates))
-
-	// Check that the specific account was updated correctly
-	updatedReservation, ok := capturedUpdates[testAccount]
-	require.True(t, ok, "account %s should have been updated", testAccount.Hex())
-	require.NotNil(t, updatedReservation)
-	require.Equal(t, uint64(999), updatedReservation.symbolsPerSecond)
+	test.AssertEventuallyEquals(t, uint64(999), func() uint64 {
+		mu.Lock()
+		defer mu.Unlock()
+		return capturedUpdates[testAccount].symbolsPerSecond
+	}, time.Second)
 
 	// Other accounts should remain unchanged
+	mu.Lock()
 	for i, addr := range accounts {
 		if addr != testAccount {
 			reservation, ok := capturedUpdates[addr]
@@ -130,13 +130,13 @@ func TestReservationVaultMonitor(t *testing.T) {
 			require.Equal(t, uint64(100+i*10), reservation.symbolsPerSecond)
 		}
 	}
+	mu.Unlock()
 }
 
 func TestReservationVaultMonitorNoBatching(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	updateInterval := time.Millisecond
 
 	// Create multiple accounts to verify they're all fetched in a single batch
@@ -156,15 +156,18 @@ func TestReservationVaultMonitorNoBatching(t *testing.T) {
 		})
 	}
 
+	var mu sync.Mutex
 	capturedUpdates := make(map[gethcommon.Address]*Reservation)
 	updateReservation := func(accountID gethcommon.Address, newReservation *Reservation) error {
+		mu.Lock()
+		defer mu.Unlock()
 		capturedUpdates[accountID] = newReservation
 		return nil
 	}
 
 	monitor, err := NewReservationVaultMonitor(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		testVault,
 		updateInterval,
 		0, // Batch size 0 means no batching - all accounts in one call
@@ -175,14 +178,17 @@ func TestReservationVaultMonitorNoBatching(t *testing.T) {
 	require.NotNil(t, monitor)
 
 	// Wait for updates
-	time.Sleep(updateInterval * 10)
-
-	// Verify all accounts were updated correctly with no batching
-	require.Equal(t, len(accounts), len(capturedUpdates))
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(capturedUpdates)
+	}, time.Second)
+	mu.Lock()
 	for i, addr := range accounts {
 		reservation, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())
 		require.NotNil(t, reservation)
 		require.Equal(t, uint64(200+i*20), reservation.symbolsPerSecond)
 	}
+	mu.Unlock()
 }

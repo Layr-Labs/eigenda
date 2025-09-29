@@ -6,7 +6,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"

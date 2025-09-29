@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -18,8 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -129,15 +129,16 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("configured max blob size is invalid %v", config.MaxBlobSize)
 	}
 
-	if !encoding.IsPowerOfTwo(uint64(config.MaxBlobSize)) {
+	if !math.IsPowerOfTwo(uint64(config.MaxBlobSize)) {
 		return fmt.Errorf("configured max blob size must be power of 2 %v", config.MaxBlobSize)
 	}
 
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
 	if config.DisperserVersion == V2 {
-		config.EncodingConfig.LoadG2Points = true
-		prover, err := prover.NewProver(&config.EncodingConfig, nil)
+		// load G2 points because v2 apiserver exposes an rpc endpoint to compute kzg commitments
+		config.ProverKzgConfig.LoadG2Points = true
+		prover, err := proverv2.NewProver(&config.ProverKzgConfig, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
@@ -157,12 +158,14 @@ func RunDisperserServer(ctx *cli.Context) error {
 			meterer,
 			authv2.NewPaymentStateAuthenticator(config.AuthPmtStateRequestMaxPastAge, config.AuthPmtStateRequestMaxFutureAge),
 			prover,
-			uint64(config.MaxNumSymbolsPerBlob),
+			config.MaxNumSymbolsPerBlob,
 			config.OnchainStateRefreshInterval,
 			logger,
 			reg,
 			config.MetricsConfig,
 			config.ReservedOnly,
+			config.UseControllerMediatedPayments,
+			config.ControllerAddress,
 		)
 		if err != nil {
 			return err

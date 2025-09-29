@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/wealdtech/go-merkletree/v2"
 
@@ -56,7 +57,7 @@ type retrievalClient struct {
 	chainState            core.ChainState
 	assignmentCoordinator core.AssignmentCoordinator
 	nodeClient            NodeClient
-	verifier              encoding.Verifier
+	verifier              *verifier.Verifier
 	numConnections        int
 }
 
@@ -66,7 +67,7 @@ func NewRetrievalClient(
 	chainState core.ChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
-	verifier encoding.Verifier,
+	verifier *verifier.Verifier,
 	numConnections int) (RetrievalClient, error) {
 
 	return &retrievalClient{
@@ -173,7 +174,7 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 		return nil, err
 	}
 
-	assignments, info, err := r.assignmentCoordinator.GetAssignments(operatorState, blobHeader.Length, quorumHeader)
+	assignments, info, err := r.assignmentCoordinator.GetAssignments(operatorState, uint(blobHeader.Length), quorumHeader)
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
@@ -220,7 +221,7 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 		Chunks:           chunks,
 		Indices:          indices,
 		EncodingParams:   encodingParams,
-		BlobHeaderLength: blobHeader.Length,
+		BlobHeaderLength: uint(blobHeader.Length),
 		Assignments:      assignments,
 		AssignmentInfo:   info,
 	}, nil

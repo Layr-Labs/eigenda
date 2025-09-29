@@ -27,44 +27,14 @@
 package fft
 
 import (
+	"fmt"
+
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-
-	"math/bits"
 )
 
-// isPowerOfTwo returns true if the provided integer v is a power of 2.
-func isPowerOfTwo(v uint64) bool {
-	return (v&(v-1) == 0) && (v != 0)
-}
-
-// if not already a power of 2, return the next power of 2
-func nextPowOf2(v uint64) uint64 {
-	if v == 0 {
-		return 1
-	}
-	return uint64(1) << bits.Len64(v-1)
-}
-
-// Expands the power circle for a given root of unity to WIDTH+1 values.
-// The first entry will be 1, the last entry will also be 1,
-// for convenience when reversing the array (useful for inverses)
-func expandRootOfUnity(rootOfUnity *fr.Element) []fr.Element {
-	rootz := make([]fr.Element, 2)
-	rootz[0].SetOne() // some unused number in py code
-	rootz[1] = *rootOfUnity
-
-	for i := 1; !rootz[i].IsOne(); {
-		rootz = append(rootz, fr.Element{})
-		this := &rootz[i]
-		i++
-		rootz[i].Mul(this, rootOfUnity)
-		//bls.MulModFr(&rootz[i], this, rootOfUnity)
-	}
-	return rootz
-}
-
 type FFTSettings struct {
+	// Maximum number of points this FFTSettings can handle
 	MaxWidth uint64
 	// the generator used to get all roots of unity
 	RootOfUnity *fr.Element
@@ -74,10 +44,14 @@ type FFTSettings struct {
 	ReverseRootsOfUnity []fr.Element
 }
 
+// NewFFTSettings creates FFTSettings for a given maximum scale (log2 of max width).
+// Precomputes the roots of unity for all widths up to 2^maxScale.
+// Note that MaxWith is in units of Fr elements, so the actual byte size is 32 * MaxWidth.
+// In order to FFT a blob of size 16MiB, you thus need maxScale=19 (2^19 * 32 = 16MiB).
 func NewFFTSettings(maxScale uint8) *FFTSettings {
 	width := uint64(1) << maxScale
 	root := &encoding.Scale2RootOfUnity[maxScale]
-	rootz := expandRootOfUnity(&encoding.Scale2RootOfUnity[maxScale])
+	rootz := expandRootOfUnity(maxScale)
 
 	// reverse roots of unity
 	rootzReverse := make([]fr.Element, len(rootz))
@@ -92,4 +66,24 @@ func NewFFTSettings(maxScale uint8) *FFTSettings {
 		ExpandedRootsOfUnity: rootz,
 		ReverseRootsOfUnity:  rootzReverse,
 	}
+}
+
+// Expands the power circle for a given root of unity to WIDTH+1 values.
+// The first entry will be 1, the last entry will also be 1,
+// for convenience when reversing the array (useful for inverses)
+func expandRootOfUnity(maxScale uint8) []fr.Element {
+	rootOfUnity := encoding.Scale2RootOfUnity[maxScale]
+	// preallocate with capacity for all roots of unity
+	// There are 2^maxScale roots of unity, plus the duplicate 1 at the end.
+	rootz := make([]fr.Element, (1<<maxScale)+1)
+	rootz[0].SetOne()
+	rootz[1] = rootOfUnity
+
+	for i := 2; i < len(rootz); i++ {
+		rootz[i].Mul(&rootz[i-1], &rootOfUnity)
+	}
+	if rootz[len(rootz)-1].Cmp(new(fr.Element).SetOne()) != 0 {
+		panic(fmt.Sprintf("last root of unity is not 1, got %v", rootz[len(rootz)-1]))
+	}
+	return rootz
 }

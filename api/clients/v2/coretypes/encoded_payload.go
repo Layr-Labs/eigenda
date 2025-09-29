@@ -3,9 +3,10 @@ package coretypes
 import (
 	"encoding/binary"
 	"fmt"
-	"math"
+	gomath "math"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -164,7 +165,7 @@ func (ep *EncodedPayload) checkLenInvariant() error {
 	// the encoded payload as a polynomial, and is also more meaningful given
 	// that the length in [encoding.BlobCommitments.Length] is in field elements.
 	numFieldElements := len(ep.bytes) / encoding.BYTES_PER_SYMBOL
-	if !encoding.IsPowerOfTwo(numFieldElements) {
+	if !math.IsPowerOfTwo(numFieldElements) {
 		return fmt.Errorf("encoded payload must be a power of 2 field elements (32 bytes chunks), "+
 			"but got %d field elements", numFieldElements)
 	}
@@ -191,9 +192,9 @@ func evalToCoeffPoly(evalPoly []fr.Element) []fr.Element {
 // fftSettingsFromBlobLengthSymbols accepts a blob length, and returns a new instance of FFT settings.
 // blobLengthSymbols should be a power of 2, and the function will panic if it is not.
 func fftSettingsFromBlobLengthSymbols(blobLengthSymbols uint32) *fft.FFTSettings {
-	if !encoding.IsPowerOfTwo(blobLengthSymbols) {
+	if !math.IsPowerOfTwo(blobLengthSymbols) {
 		panic(fmt.Sprintf("blob length symbols %d is not a power of 2", blobLengthSymbols))
 	}
-	maxScale := uint8(math.Log2(float64(blobLengthSymbols)))
+	maxScale := uint8(gomath.Log2(float64(blobLengthSymbols)))
 	return fft.NewFFTSettings(maxScale)
 }

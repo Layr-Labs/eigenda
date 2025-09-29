@@ -1,20 +1,19 @@
 package batcher_test
 
 import (
-	"context"
 	"crypto/rand"
 	"errors"
 	"testing"
 	"time"
 
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/mock"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 	tmock "github.com/stretchr/testify/mock"
@@ -39,7 +38,9 @@ type components struct {
 }
 
 func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshold uint64, streamerConfig batcher.StreamerConfig) (*batcher.EncodingStreamer, *components) {
-	logger := testutils.GetLogger()
+	t.Helper()
+
+	logger := test.GetLogger()
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.MakeChainDataMock(map[uint8]int{
 		0: numOperators,
@@ -66,7 +67,8 @@ func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshol
 }
 
 func TestEncodingQueueLimit(t *testing.T) {
-	logger := testutils.GetLogger()
+	ctx := t.Context()
+	logger := test.GetLogger()
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.MakeChainDataMock(map[uint8]int{
 		0: numOperators,
@@ -104,12 +106,11 @@ func TestEncodingQueueLimit(t *testing.T) {
 	// assume that encoding queue is already full
 	pool.On("WaitingQueueSize").Return(streamerConfig.EncodingQueueLimit).Once()
 
-	ctx := context.Background()
 	key, err := blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
 	assert.Nil(t, err)
 	out := make(chan batcher.EncodingResultOrStatus, 1)
 	// This should return without making a request since encoding queue was already full
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
 
 	encoderClient.AssertNotCalled(t, "EncodeBlob")
@@ -122,7 +123,7 @@ func TestEncodingQueueLimit(t *testing.T) {
 	pool.On("WaitingQueueSize").Return(0).Once()
 
 	// retry
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
 
 	encoderClient.AssertNumberOfCalls(t, "EncodeBlob", 1)
@@ -133,8 +134,7 @@ func TestEncodingQueueLimit(t *testing.T) {
 	default:
 		t.Fatal("did not expect any encoding results")
 	}
-
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), encodingResult)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, encodingResult)
 	assert.Nil(t, err)
 	res, err := encodingStreamer.EncodedBlobstore.GetEncodingResult(key, 0)
 	assert.Nil(t, err)
@@ -142,6 +142,7 @@ func TestEncodingQueueLimit(t *testing.T) {
 }
 
 func TestBatchTrigger(t *testing.T) {
+	ctx := t.Context()
 	encodingStreamer, c := createEncodingStreamer(t, 10, 30_000, streamerConfig)
 
 	blob := makeTestBlob([]*core.SecurityParam{{
@@ -149,14 +150,13 @@ func TestBatchTrigger(t *testing.T) {
 		AdversaryThreshold:    80,
 		ConfirmationThreshold: 100,
 	}})
-	ctx := context.Background()
 	_, err := c.blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
 	assert.Nil(t, err)
 	out := make(chan batcher.EncodingResultOrStatus)
 	// Request encoding
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.Nil(t, err)
 	count, size := encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
@@ -164,9 +164,9 @@ func TestBatchTrigger(t *testing.T) {
 
 	// try encode the same blobs again at different block (this happens when the blob is retried)
 	encodingStreamer.ReferenceBlockNumber = 11
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.Nil(t, err)
 
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
@@ -183,9 +183,9 @@ func TestBatchTrigger(t *testing.T) {
 	// Request encoding once more
 	_, err = c.blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
 	assert.Nil(t, err)
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.Nil(t, err)
 
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
@@ -201,6 +201,8 @@ func TestBatchTrigger(t *testing.T) {
 }
 
 func TestStreamingEncoding(t *testing.T) {
+	ctx := t.Context()
+
 	encodingStreamer, c := createEncodingStreamer(t, 0, 1e12, streamerConfig)
 
 	blob := makeTestBlob([]*core.SecurityParam{{
@@ -208,7 +210,6 @@ func TestStreamingEncoding(t *testing.T) {
 		AdversaryThreshold:    80,
 		ConfirmationThreshold: 100,
 	}})
-	ctx := context.Background()
 	metadataKey, err := c.blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
 	assert.Nil(t, err)
 	metadata, err := c.blobStore.GetBlobMetadata(ctx, metadataKey)
@@ -218,7 +219,7 @@ func TestStreamingEncoding(t *testing.T) {
 	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10)+encodingStreamer.FinalizationBlockDelay, nil)
 
 	out := make(chan batcher.EncodingResultOrStatus)
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
 	isRequested := encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
@@ -226,7 +227,7 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.Equal(t, count, 0)
 	assert.Equal(t, size, uint64(0))
 
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.Nil(t, err)
 	encodedResult, err := encodingStreamer.EncodedBlobstore.GetEncodingResult(metadataKey, core.QuorumID(0))
 	assert.Nil(t, err)
@@ -244,7 +245,7 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.NotNil(t, encodedResult.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.LengthProof)
-	assert.Greater(t, encodedResult.Commitment.Length, uint(0))
+	assert.Greater(t, encodedResult.Commitment.Length, uint32(0))
 	assert.Len(t, encodedResult.Assignments, numOperators)
 	assert.Len(t, encodedResult.ChunksData.Chunks, 32)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
@@ -264,9 +265,9 @@ func TestStreamingEncoding(t *testing.T) {
 	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err = c.blobStore.StoreBlob(ctx, &blob, requestedAt)
 	assert.Nil(t, err)
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.Nil(t, err)
 	encodedResult, err = encodingStreamer.EncodedBlobstore.GetEncodingResult(metadataKey, core.QuorumID(0))
 	assert.Nil(t, err)
@@ -286,7 +287,7 @@ func TestStreamingEncoding(t *testing.T) {
 	// Request the same blob, which should be dedupped
 	_, err = c.blobStore.StoreBlob(ctx, &blob, requestedAt)
 	assert.Nil(t, err)
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
 	assert.Equal(t, len(out), 0)
 	// It should not have been added to the encoded blob store
@@ -296,7 +297,8 @@ func TestStreamingEncoding(t *testing.T) {
 }
 
 func TestEncodingFailure(t *testing.T) {
-	logger := testutils.GetLogger()
+	ctx := t.Context()
+	logger := test.GetLogger()
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.MakeChainDataMock(map[uint8]int{
 		0: numOperators,
@@ -319,8 +321,6 @@ func TestEncodingFailure(t *testing.T) {
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = 10
 
-	ctx := context.Background()
-
 	// put a blob in the blobstore
 	blob := makeTestBlob([]*core.SecurityParam{{
 		QuorumID:              0,
@@ -339,16 +339,16 @@ func TestEncodingFailure(t *testing.T) {
 	encoderClient.On("EncodeBlob", tmock.Anything, tmock.Anything, tmock.Anything).Return(nil, nil, errors.New("errrrr"))
 	// request encoding
 	out := make(chan batcher.EncodingResultOrStatus)
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
 	isRequested := encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(1), 10)
 	assert.True(t, isRequested)
 
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.NotNil(t, err)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.NotNil(t, err)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 9)
 	assert.False(t, isRequested)
@@ -361,13 +361,12 @@ func TestEncodingFailure(t *testing.T) {
 }
 
 func TestPartialBlob(t *testing.T) {
+	ctx := t.Context()
 	encodingStreamer, c := createEncodingStreamer(t, 10, 1e12, streamerConfig)
 
 	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10)+encodingStreamer.FinalizationBlockDelay, nil)
 
 	out := make(chan batcher.EncodingResultOrStatus)
-
-	ctx := context.Background()
 
 	// put in first blob and request encoding
 	blob1 := makeTestBlob([]*core.SecurityParam{{
@@ -382,12 +381,12 @@ func TestPartialBlob(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, disperser.Processing, metadata1.BlobStatus)
 
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
 
 	isRequested := encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey1, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.Nil(t, err)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey1, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
@@ -408,14 +407,14 @@ func TestPartialBlob(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, disperser.Processing, metadata2.BlobStatus)
 
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
 
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey2, core.QuorumID(1), 10)
 	assert.True(t, isRequested)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey2, core.QuorumID(2), 10)
 	assert.True(t, isRequested)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.Nil(t, err)
 
 	// The second quorum doesn't complete
@@ -429,7 +428,7 @@ func TestPartialBlob(t *testing.T) {
 
 	// get batch
 	assert.Equal(t, encodingStreamer.ReferenceBlockNumber, uint(10))
-	batch, err := encodingStreamer.CreateBatch(context.Background())
+	batch, err := encodingStreamer.CreateBatch(ctx)
 	assert.Nil(t, err)
 	assert.NotNil(t, batch)
 	assert.Equal(t, encodingStreamer.ReferenceBlockNumber, uint(0))
@@ -453,7 +452,7 @@ func TestPartialBlob(t *testing.T) {
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint32(48)) //nolint: staticcheck
 	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{
@@ -478,8 +477,7 @@ func TestPartialBlob(t *testing.T) {
 }
 
 func TestIncorrectParameters(t *testing.T) {
-
-	ctx := context.Background()
+	ctx := t.Context()
 
 	streamerConfig := batcher.StreamerConfig{
 		SRSOrder:                 3000,
@@ -515,7 +513,7 @@ func TestIncorrectParameters(t *testing.T) {
 
 	// request encoding
 	out := make(chan batcher.EncodingResultOrStatus)
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
 
 	isRequested := encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
@@ -530,13 +528,12 @@ func TestIncorrectParameters(t *testing.T) {
 }
 
 func TestInvalidQuorum(t *testing.T) {
+	ctx := t.Context()
 	encodingStreamer, c := createEncodingStreamer(t, 10, 1e12, streamerConfig)
 
 	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10)+encodingStreamer.FinalizationBlockDelay, nil)
 
 	out := make(chan batcher.EncodingResultOrStatus)
-
-	ctx := context.Background()
 
 	// this blob should not be encoded because the quorum does not exist
 	blob1 := makeTestBlob([]*core.SecurityParam{{
@@ -566,7 +563,7 @@ func TestInvalidQuorum(t *testing.T) {
 	assert.Nil(t, err)
 
 	// request encoding
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
 
 	isRequested := encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey1, core.QuorumID(0), 10)
@@ -586,7 +583,7 @@ func TestInvalidQuorum(t *testing.T) {
 
 func TestGetBatch(t *testing.T) {
 	encodingStreamer, c := createEncodingStreamer(t, 10, 1e12, streamerConfig)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// put 2 blobs in the blobstore
 	blob1 := makeTestBlob([]*core.SecurityParam{{
@@ -618,7 +615,7 @@ func TestGetBatch(t *testing.T) {
 
 	// request encoding
 	out := make(chan batcher.EncodingResultOrStatus)
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	err = encodingStreamer.RequestEncoding(ctx, out)
 	assert.Nil(t, err)
 	isRequested := encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey1, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
@@ -627,11 +624,11 @@ func TestGetBatch(t *testing.T) {
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey2, core.QuorumID(2), 10)
 	assert.True(t, isRequested)
 
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.Nil(t, err)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.Nil(t, err)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.Nil(t, err)
 	encodingStreamer.Pool.StopWait()
 
@@ -644,7 +641,7 @@ func TestGetBatch(t *testing.T) {
 
 	// get batch
 	assert.Equal(t, encodingStreamer.ReferenceBlockNumber, uint(10))
-	batch, err := encodingStreamer.CreateBatch(context.Background())
+	batch, err := encodingStreamer.CreateBatch(ctx)
 	assert.Nil(t, err)
 	assert.NotNil(t, batch)
 	assert.Equal(t, encodingStreamer.ReferenceBlockNumber, uint(0))
@@ -696,7 +693,7 @@ func TestGetBatch(t *testing.T) {
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint32(48)) //nolint: staticcheck
 	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 2)
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{
 		{
@@ -729,7 +726,7 @@ func TestGetBatch(t *testing.T) {
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint32(48)) //nolint: staticcheck
 	assert.Len(t, encodedBlob2.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob2.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{

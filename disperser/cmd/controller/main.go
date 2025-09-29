@@ -11,7 +11,14 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
+	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
+	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -22,15 +29,15 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gammazero/workerpool"
 	"github.com/urfave/cli"
 )
@@ -182,25 +189,7 @@ func RunController(ctx *cli.Context) error {
 		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
 		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 	} else {
-		logger.Info("Using built-in indexer")
-		rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
-		if err != nil {
-			return err
-		}
-		idx, err := indexer.CreateNewIndexer(
-			&config.IndexerConfig,
-			gethClient,
-			rpcClient,
-			serviceManagerAddress.Hex(),
-			logger,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create indexer: %w", err)
-		}
-		ics, err = indexer.NewIndexedChainState(chainState, idx)
-		if err != nil {
-			return fmt.Errorf("failed to create indexed chain state: %w", err)
-		}
+		return fmt.Errorf("built-in indexer is deprecated and will be removed soon, please use UseGraph=true")
 	}
 
 	var requestSigner clients.DispersalRequestSigner
@@ -275,6 +264,44 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
 
+	if config.ServerConfig.EnableServer {
+		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
+		if config.ServerConfig.EnablePaymentAuthentication {
+			paymentAuthorizationHandler, err = buildPaymentAuthorizationHandler(
+				c,
+				logger,
+				config.OnDemandConfig,
+				config.ReservationConfig,
+				contractDirectory,
+				gethClient,
+				dynamoClient.GetAwsClient(),
+				metricsRegistry,
+			)
+			if err != nil {
+				return fmt.Errorf("build payment authorization handler: %w", err)
+			}
+		}
+
+		grpcServer, err := server.NewServer(
+			c,
+			config.ServerConfig,
+			logger,
+			metricsRegistry,
+			paymentAuthorizationHandler)
+		if err != nil {
+			return fmt.Errorf("create gRPC server: %w", err)
+		}
+
+		go func() {
+			logger.Info("Starting controller gRPC server", "port", config.ServerConfig.GrpcPort)
+			if err := grpcServer.Start(); err != nil {
+				panic(fmt.Sprintf("gRPC server failed: %v", err))
+			}
+		}()
+	} else {
+		logger.Info("Controller gRPC server disabled")
+	}
+
 	go func() {
 		err := metricsServer.ListenAndServe()
 		if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
@@ -305,4 +332,94 @@ func RunController(ctx *cli.Context) error {
 	}()
 
 	return nil
+}
+
+func buildPaymentAuthorizationHandler(
+	ctx context.Context,
+	logger logging.Logger,
+	onDemandConfig ondemandvalidation.OnDemandLedgerCacheConfig,
+	reservationConfig reservationvalidation.ReservationLedgerCacheConfig,
+	contractDirectory *directory.ContractDirectory,
+	ethClient common.EthClient,
+	awsDynamoClient *awsdynamodb.Client,
+	metricsRegistry *prometheus.Registry,
+) (*controllerpayments.PaymentAuthorizationHandler, error) {
+	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddress)
+	if err != nil {
+		return nil, fmt.Errorf("create payment vault: %w", err)
+	}
+
+	globalSymbolsPerSecond, err := paymentVault.GetGlobalSymbolsPerSecond(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get global symbols per second: %w", err)
+	}
+
+	globalRatePeriodInterval, err := paymentVault.GetGlobalRatePeriodInterval(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get global rate period interval: %w", err)
+	}
+
+	onDemandMeterer := meterer.NewOnDemandMeterer(
+		globalSymbolsPerSecond,
+		globalRatePeriodInterval,
+		time.Now,
+		meterer.NewOnDemandMetererMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+	)
+
+	onDemandValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
+		ctx,
+		logger,
+		onDemandConfig,
+		paymentVault,
+		awsDynamoClient,
+		ondemandvalidation.NewOnDemandValidatorMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+		ondemandvalidation.NewOnDemandCacheMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create on-demand payment validator: %w", err)
+	}
+
+	reservationValidator, err := reservationvalidation.NewReservationPaymentValidator(
+		ctx,
+		logger,
+		reservationConfig,
+		paymentVault,
+		time.Now,
+		reservationvalidation.NewReservationValidatorMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+		reservationvalidation.NewReservationCacheMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create reservation payment validator: %w", err)
+	}
+
+	return controllerpayments.NewPaymentAuthorizationHandler(
+		onDemandMeterer,
+		onDemandValidator,
+		reservationValidator,
+	), nil
 }

@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -25,6 +24,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
@@ -32,6 +32,7 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -43,7 +44,7 @@ var (
 	mockPrometheusRespAvgThroughput string
 
 	expectedBlobCommitment *encoding.BlobCommitments
-	mockLogger             = testutils.GetLogger()
+	mockLogger             = test.GetLogger()
 	blobstore              = inmem.NewBlobStore()
 	mockPrometheusApi      = &prommock.MockPrometheusApi{}
 	prometheusClient       = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
@@ -76,7 +77,7 @@ var (
 	_                               = mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 	testDataApiServer, _            = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 	expectedRequestedAt             = uint64(5567830000000000000)
-	expectedDataLength              = 32
+	expectedDataLength              = uint32(32)
 	expectedBatchId                 = uint32(99)
 	expectedBatchRoot               = []byte("hello")
 	expectedReferenceBlockNumber    = uint32(132)
@@ -1491,18 +1492,22 @@ func setUpRouter() *gin.Engine {
 }
 
 func queueBlob(t *testing.T, blob *core.Blob, queue disperser.BlobStore) disperser.BlobKey {
-	key, err := queue.StoreBlob(context.Background(), blob, expectedRequestedAt)
-	assert.NoError(t, err)
+	t.Helper()
+	ctx := t.Context()
+	key, err := queue.StoreBlob(ctx, blob, expectedRequestedAt)
+	require.NoError(t, err)
 	return key
 }
 
 func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, blobIndex uint32, batchHeaderHash [32]byte, queue disperser.BlobStore) {
+	t.Helper()
+	ctx := t.Context()
 	// simulate blob confirmation
 	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = commitY.SetString("9207254729396071334325696286939045899948985698134704137261649190717970615186")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	commitment := &encoding.G1Commitment{
 		X: commitX,
 		Y: commitY,
@@ -1517,7 +1522,7 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, blo
 		BlobInclusionProof:   expectedInclusionProof,
 		BlobCommitment: &encoding.BlobCommitments{
 			Commitment: commitment,
-			Length:     uint(expectedDataLength),
+			Length:     expectedDataLength,
 		},
 		BatchID:                 expectedBatchId,
 		ConfirmationTxnHash:     gethcommon.HexToHash("0x123"),
@@ -1540,9 +1545,9 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, blo
 	}
 
 	expectedBlobCommitment = confirmationInfo.BlobCommitment
-	updated, err := queue.MarkBlobConfirmed(context.Background(), metadata, confirmationInfo)
-	assert.NoError(t, err)
-	assert.Equal(t, disperser.Confirmed, updated.BlobStatus)
+	updated, err := queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo)
+	require.NoError(t, err)
+	require.Equal(t, disperser.Confirmed, updated.BlobStatus)
 }
 
 func makeTestBlob(quorumID core.QuorumID, adversityThreshold uint8) core.Blob {

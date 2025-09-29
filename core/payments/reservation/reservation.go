@@ -108,3 +108,34 @@ func (r *Reservation) CheckTime(timeToCheck time.Time) error {
 
 	return nil
 }
+
+// Checks if two Reservation instances are equal
+func (r *Reservation) Equal(other *Reservation) bool {
+	if other == nil {
+		return false
+	}
+
+	if r.symbolsPerSecond != other.symbolsPerSecond {
+		return false
+	}
+
+	if !r.startTime.Equal(other.startTime) {
+		return false
+	}
+
+	if !r.endTime.Equal(other.endTime) {
+		return false
+	}
+
+	if len(r.permittedQuorumIDs) != len(other.permittedQuorumIDs) {
+		return false
+	}
+
+	for quorumID := range r.permittedQuorumIDs {
+		if _, exists := other.permittedQuorumIDs[quorumID]; !exists {
+			return false
+		}
+	}
+
+	return true
+}

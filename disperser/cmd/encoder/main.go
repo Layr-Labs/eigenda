@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -86,7 +87,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 		// We no longer load the G2 points in V2 because the KZG commitments are computed
 		// on the API server side.
 		config.EncoderConfig.LoadG2Points = false
-		prover, err := prover.NewProver(&config.EncoderConfig, encodingConfig)
+		prover, err := proverv2.NewProver(proverv2.KzgConfigFromV1Config(&config.EncoderConfig), encodingConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}

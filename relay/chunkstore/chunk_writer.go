@@ -56,7 +56,7 @@ func (c *chunkWriter) PutFrameProofs(ctx context.Context, blobKey corev2.BlobKey
 		return fmt.Errorf("no proofs to upload")
 	}
 
-	bytes, err := rs.SerializeFrameProofs(proofs)
+	bytes, err := encoding.SerializeFrameProofs(proofs)
 	if err != nil {
 		c.logger.Error("Failed to encode proofs", "err", err)
 		return fmt.Errorf("failed to encode proofs: %v", err)

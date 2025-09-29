@@ -13,8 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
@@ -31,42 +31,18 @@ type DisperserClientConfig struct {
 }
 
 // DisperserClient manages communication with the disperser server.
-type DisperserClient interface {
-	// Close closes the grpc connection to the disperser server.
-	Close() error
-	// DisperseBlob disperses a blob with the given data, blob version, and quorums.
-	DisperseBlob(
-		ctx context.Context,
-		data []byte,
-		blobVersion corev2.BlobVersion,
-		quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
-	// DisperseBlobWithProbe is similar to DisperseBlob, but also takes a SequenceProbe to capture metrics.
-	// If the probe is nil, no metrics are captured.
-	DisperseBlobWithProbe(
-		ctx context.Context,
-		data []byte,
-		blobVersion corev2.BlobVersion,
-		quorums []core.QuorumID,
-		probe *common.SequenceProbe) (*dispv2.BlobStatus, corev2.BlobKey, error)
-	// GetBlobStatus returns the status of a blob with the given blob key.
-	GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error)
-	// GetBlobCommitment returns the blob commitment for a given blob payload.
-	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
-}
-type disperserClient struct {
+type DisperserClient struct {
 	logger                  logging.Logger
 	config                  *DisperserClientConfig
 	signer                  corev2.BlobRequestSigner
 	clientPool              *common.GRPCClientPool[disperser_rpc.DisperserClient]
-	prover                  encoding.Prover
+	prover                  *prover.Prover
 	accountant              *Accountant
 	accountantLock          sync.Mutex
 	initOnceAccountant      sync.Once
 	initOnceAccountantError error
 	metrics                 metrics.DispersalMetricer
 }
-
-var _ DisperserClient = &disperserClient{}
 
 // DisperserClient maintains a single underlying grpc connection to the disperser server,
 // through which it sends requests to disperse blobs and get blob status.
@@ -92,10 +68,10 @@ func NewDisperserClient(
 	logger logging.Logger,
 	config *DisperserClientConfig,
 	signer corev2.BlobRequestSigner,
-	prover encoding.Prover,
+	prover *prover.Prover,
 	accountant *Accountant,
 	metrics metrics.DispersalMetricer,
-) (*disperserClient, error) {
+) (*DisperserClient, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config must be provided")
 	}
@@ -132,7 +108,7 @@ func NewDisperserClient(
 		return nil, fmt.Errorf("new grpc client pool: %w", err)
 	}
 
-	return &disperserClient{
+	return &DisperserClient{
 		logger:     logger,
 		config:     config,
 		signer:     signer,
@@ -144,7 +120,7 @@ func NewDisperserClient(
 }
 
 // PopulateAccountant populates the accountant with the payment state from the disperser.
-func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
+func (c *DisperserClient) PopulateAccountant(ctx context.Context) error {
 	if c.accountant == nil {
 		return fmt.Errorf("accountant is nil")
 	}
@@ -164,7 +140,7 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 
 // Close closes the grpc connection to the disperser server.
 // It is thread safe and can be called multiple times.
-func (c *disperserClient) Close() error {
+func (c *DisperserClient) Close() error {
 	if c.clientPool != nil {
 		err := c.clientPool.Close()
 		if err != nil {
@@ -174,69 +150,70 @@ func (c *disperserClient) Close() error {
 	return nil
 }
 
-func (c *disperserClient) DisperseBlob(
-	ctx context.Context,
-	data []byte,
-	blobVersion corev2.BlobVersion,
-	quorums []core.QuorumID,
-) (*dispv2.BlobStatus, corev2.BlobKey, error) {
-	return c.DisperseBlobWithProbe(ctx, data, blobVersion, quorums, nil)
-}
-
-// DisperseBlobWithProbe disperses a blob with the given data, blob version, and quorums. If sequenceProbe is not nil,
-// the probe is used to capture metrics during the dispersal process.
-func (c *disperserClient) DisperseBlobWithProbe(
+// Disperses a blob with the given data, blob version, and quorums.
+//
+// Returns the BlobHeader of the blob that was dispersed, and the DisperseBlobReply that was received from the
+// disperser, if the dispersal was successful. Otherwise returns an error
+func (c *DisperserClient) DisperseBlob(
 	ctx context.Context,
 	data []byte,
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
 	probe *common.SequenceProbe,
-) (*dispv2.BlobStatus, corev2.BlobKey, error) {
-
+	// if this is nil, that indicates we will use the legacy payment system to create the paymentMetadata
+	paymentMetadata *core.PaymentMetadata,
+) (*corev2.BlobHeader, *disperser_rpc.DisperseBlobReply, error) {
 	if len(quorums) == 0 {
-		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
+		//nolint:wrapcheck
+		return nil, nil, api.NewErrorInvalidArg("quorum numbers must be provided")
 	}
 	if c.signer == nil {
-		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
+		//nolint:wrapcheck
+		return nil, nil, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
 	}
 	for _, q := range quorums {
 		if q > corev2.MaxQuorumID {
-			return nil, [32]byte{}, api.NewErrorInvalidArg("quorum number must be less than 256")
+			//nolint:wrapcheck
+			return nil, nil, api.NewErrorInvalidArg("quorum number must be less than 256")
 		}
 	}
 
-	probe.SetStage("acquire_accountant_lock")
-	c.accountantLock.Lock()
+	symbolLength := encoding.GetBlobLengthPowerOf2(uint32(len(data)))
 
-	probe.SetStage("accountant")
+	if paymentMetadata == nil {
+		// we are using the legacy payment system
+		probe.SetStage("acquire_accountant_lock")
+		c.accountantLock.Lock()
 
-	err := c.initOncePopulateAccountant(ctx)
-	if err != nil {
-		c.accountantLock.Unlock()
-		return nil, [32]byte{}, fmt.Errorf("error initializing accountant: %w", err)
-	}
+		probe.SetStage("accountant")
 
-	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
-	if err != nil {
-		c.accountantLock.Unlock()
-		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
-	}
+		err := c.initOncePopulateAccountant(ctx)
+		if err != nil {
+			c.accountantLock.Unlock()
+			return nil, nil, fmt.Errorf("error initializing accountant: %w", err)
+		}
 
-	if payment.CumulativePayment == nil || payment.CumulativePayment.Sign() == 0 {
-		// This request is using reserved bandwidth, no need to prevent parallel dispersal.
-		c.accountantLock.Unlock()
-	} else {
-		// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
-		defer c.accountantLock.Unlock()
+		paymentMetadata, err = c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
+		if err != nil {
+			c.accountantLock.Unlock()
+			return nil, nil, fmt.Errorf("error accounting blob: %w", err)
+		}
+
+		if paymentMetadata.CumulativePayment == nil || paymentMetadata.CumulativePayment.Sign() == 0 {
+			// This request is using reserved bandwidth, no need to prevent parallel dispersal.
+			c.accountantLock.Unlock()
+		} else {
+			// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
+			defer c.accountantLock.Unlock()
+		}
 	}
 
 	probe.SetStage("verify_field_element")
 
 	// check every 32 bytes of data are within the valid range for a bn254 field element
-	_, err = rs.ToFrArray(data)
+	_, err := rs.ToFrArray(data)
 	if err != nil {
-		return nil, [32]byte{}, fmt.Errorf(
+		return nil, nil, fmt.Errorf(
 			"encountered an error to convert a 32-bytes into a valid field element, "+
 				"please use the correct format where every 32bytes(big-endian) is less than "+
 				"21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
@@ -250,11 +227,11 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		commitments, err := c.GetBlobCommitment(ctx, data)
 		if err != nil {
 			// Failover worthy error because it means the disperser is not responsive.
-			return nil, [32]byte{}, api.NewErrorFailover(fmt.Errorf("GetBlobCommitment rpc: %w", err))
+			return nil, nil, api.NewErrorFailover(fmt.Errorf("GetBlobCommitment rpc: %w", err))
 		}
 		deserialized, err := encoding.BlobCommitmentsFromProtobuf(commitments.GetBlobCommitment())
 		if err != nil {
-			return nil, [32]byte{}, fmt.Errorf("error deserializing blob commitments: %w", err)
+			return nil, nil, fmt.Errorf("error deserializing blob commitments: %w", err)
 		}
 		blobCommitments = *deserialized
 
@@ -265,7 +242,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		// fail, if the length claimed in the encoded payload header is larger than the blob length in the commitment.
 		lengthFromCommitment := commitments.GetBlobCommitment().GetLength()
 		if lengthFromCommitment != uint32(symbolLength) {
-			return nil, [32]byte{}, fmt.Errorf(
+			return nil, nil, fmt.Errorf(
 				"blob commitment length (%d) from disperser doesn't match expected length (%d): %w",
 				lengthFromCommitment, symbolLength, err)
 		}
@@ -273,7 +250,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		// if prover is configured, get commitments from prover
 		blobCommitments, err = c.prover.GetCommitmentsForPaddedLength(data)
 		if err != nil {
-			return nil, [32]byte{}, fmt.Errorf("error getting blob commitments: %w", err)
+			return nil, nil, fmt.Errorf("error getting blob commitments: %w", err)
 		}
 	}
 
@@ -281,18 +258,18 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		BlobVersion:     blobVersion,
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
-		PaymentMetadata: *payment,
+		PaymentMetadata: *paymentMetadata,
 	}
 
 	probe.SetStage("sign_blob_request")
 
 	sig, err := c.signer.SignBlobRequest(blobHeader)
 	if err != nil {
-		return nil, [32]byte{}, fmt.Errorf("error signing blob request: %w", err)
+		return nil, nil, fmt.Errorf("error signing blob request: %w", err)
 	}
 	blobHeaderProto, err := blobHeader.ToProtobuf()
 	if err != nil {
-		return nil, [32]byte{}, fmt.Errorf("error converting blob header to protobuf: %w", err)
+		return nil, nil, fmt.Errorf("error converting blob header to protobuf: %w", err)
 	}
 	request := &disperser_rpc.DisperseBlobRequest{
 		Blob:       data,
@@ -304,61 +281,19 @@ func (c *disperserClient) DisperseBlobWithProbe(
 
 	reply, err := c.clientPool.GetClient().DisperseBlob(ctx, request)
 	if err != nil {
-		return nil, [32]byte{}, api.NewErrorFailover(fmt.Errorf("DisperseBlob rpc: %w", err))
-	}
-
-	blobStatus, err := dispv2.BlobStatusFromProtobuf(reply.GetResult())
-	if err != nil {
-		return nil, [32]byte{}, err
-	}
-
-	probe.SetStage("verify_blob_key")
-
-	if verifyReceivedBlobKey(blobHeader, reply) != nil {
-		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
+		return nil, nil, api.NewErrorFailover(fmt.Errorf("DisperseBlob rpc: %w", err))
 	}
 
 	c.metrics.RecordBlobSizeBytes(len(data))
 
-	return &blobStatus, corev2.BlobKey(reply.GetBlobKey()), nil
-}
-
-// verifyReceivedBlobKey computes the BlobKey from the BlobHeader which was sent to the disperser, and compares it with
-// the BlobKey which was returned by the disperser in the DisperseBlobReply
-//
-// A successful verification guarantees that the disperser didn't make any modifications to the BlobHeader that it
-// received from this client.
-//
-// This function returns nil if the verification succeeds, and otherwise returns an error describing the failure
-func verifyReceivedBlobKey(
-	// the blob header which was constructed locally and sent to the disperser
-	blobHeader *corev2.BlobHeader,
-	// the reply received back from the disperser
-	disperserReply *disperser_rpc.DisperseBlobReply,
-) error {
-
-	actualBlobKey, err := blobHeader.BlobKey()
-	if err != nil {
-		// this shouldn't be possible, since the blob key has already been used when signing dispersal
-		return fmt.Errorf("computing blob key: %w", err)
-	}
-
-	blobKeyFromDisperser, err := corev2.BytesToBlobKey(disperserReply.GetBlobKey())
-	if err != nil {
-		return fmt.Errorf("converting returned bytes to blob key: %w", err)
-	}
-
-	if actualBlobKey != blobKeyFromDisperser {
-		return fmt.Errorf(
-			"blob key returned by disperser (%v) doesn't match blob which was dispersed (%v)",
-			blobKeyFromDisperser, actualBlobKey)
-	}
-
-	return nil
+	return blobHeader, reply, nil
 }
 
 // GetBlobStatus returns the status of a blob with the given blob key.
-func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error) {
+func (c *DisperserClient) GetBlobStatus(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+) (*disperser_rpc.BlobStatusReply, error) {
 	request := &disperser_rpc.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	}
@@ -370,7 +305,7 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 }
 
 // GetPaymentState returns the payment state of the disperser client
-func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+func (c *DisperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
 	accountID, err := c.signer.GetAccountID()
 	if err != nil {
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
@@ -399,7 +334,10 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 // While the blob commitment can be calculated by anyone, it requires SRS points to
 // be loaded. For service that does not have access to SRS points, this method can be
 // used to calculate the blob commitment in blob header, which is required for dispersal.
-func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error) {
+func (c *DisperserClient) GetBlobCommitment(
+	ctx context.Context,
+	data []byte,
+) (*disperser_rpc.BlobCommitmentReply, error) {
 	request := &disperser_rpc.BlobCommitmentRequest{
 		Blob: data,
 	}
@@ -412,7 +350,7 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*
 
 // initOncePopulateAccountant initializes the accountant if it is not already initialized.
 // If initialization fails, it caches the error and will return it on every subsequent call.
-func (c *disperserClient) initOncePopulateAccountant(ctx context.Context) error {
+func (c *DisperserClient) initOncePopulateAccountant(ctx context.Context) error {
 	c.initOnceAccountant.Do(func() {
 		err := c.PopulateAccountant(ctx)
 		if err != nil {

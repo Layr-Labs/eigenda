@@ -3,6 +3,7 @@ package codec
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 )
 
@@ -156,7 +157,7 @@ func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 // The blob size is the size used for determining payments and throttling by EigenDA. Two payloads of
 // differing length that have the same blob size cost the same and use the same amount of bandwidth.
 func PayloadSizeToBlobSize(payloadSize uint32) uint32 {
-	return encoding.NextPowerOf2(GetPaddedDataLength(payloadSize) + EncodedPayloadHeaderLenBytes)
+	return math.NextPowOf2u32(GetPaddedDataLength(payloadSize) + EncodedPayloadHeaderLenBytes)
 }
 
 // FindLegalBlobSizes finds a list of blob sizes that are legal for EigenDA. A legal blob size is
@@ -165,10 +166,10 @@ func FindLegalBlobSizes(minBlobSize uint32, maxBlobSize uint32) ([]uint32, error
 	if minBlobSize > maxBlobSize {
 		return nil, fmt.Errorf("min blob size %d is greater than max blob size %d", minBlobSize, maxBlobSize)
 	}
-	if !encoding.IsPowerOfTwo(minBlobSize) {
+	if !math.IsPowerOfTwo(minBlobSize) {
 		return nil, fmt.Errorf("min blob size %d is not a power of 2", minBlobSize)
 	}
-	if !encoding.IsPowerOfTwo(maxBlobSize) {
+	if !math.IsPowerOfTwo(maxBlobSize) {
 		return nil, fmt.Errorf("max blob size %d is not a power of 2", maxBlobSize)
 	}
 
@@ -226,7 +227,7 @@ func BlobSymbolsToMaxPayloadSize(blobLengthSymbols uint32) (uint32, error) {
 		return 0, fmt.Errorf("blobLengthSymbols %d is less than PayloadHeaderSizeSymbols %d",
 			blobLengthSymbols, EncodedPayloadHeaderLenSymbols)
 	}
-	if !encoding.IsPowerOfTwo(uint64(blobLengthSymbols)) {
+	if !math.IsPowerOfTwo(uint64(blobLengthSymbols)) {
 		return 0, fmt.Errorf("blobLengthSymbols %d is not a power of two", blobLengthSymbols)
 	}
 
@@ -269,7 +270,7 @@ func FindMaxPayloadSizes(minBlobSize uint32, maxBlobSize uint32) ([]uint32, erro
 // BlobSizeToMinPayloadSize takes a given a blob size and determines the minimum payload size
 // that yields that blob size.
 func BlobSizeToMinPayloadSize(blobSize uint32) (uint32, error) {
-	if !encoding.IsPowerOfTwo(blobSize) {
+	if !math.IsPowerOfTwo(blobSize) {
 		return 0, fmt.Errorf("blob size %d is not a power of 2", blobSize)
 	}
 

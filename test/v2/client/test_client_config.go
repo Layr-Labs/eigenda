@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/docker/go-units"
 )
@@ -35,19 +36,6 @@ type TestClientConfig struct {
 	EthRPCUrlsVar string
 	// The contract address for the EigenDA address directory, where all contract addresses are stored
 	ContractDirectoryAddress string
-	// The contract address for the OperatorStateRetriever
-	// The contract address for the EigenDA cert verifier, which specifies required quorums 0 and 1
-	//
-	// If this value is not set, that tests utilizing it will be skipped
-	EigenDACertVerifierAddressQuorums0_1 string
-	// The contract address for the EigenDA cert verifier, which specifies required quorums 0, 1, and 2
-	//
-	// If this value is not set, that tests utilizing it will be skipped
-	EigenDACertVerifierAddressQuorums0_1_2 string
-	// The contract address for the EigenDA cert verifier, which specifies required quorum 2
-	//
-	// If this value is not set, that tests utilizing it will be skipped
-	EigenDACertVerifierAddressQuorums2 string
 	// The URL/IP of a subgraph to use for the chain state
 	SubgraphURL string
 	// The SRS order to use for the test
@@ -70,6 +58,8 @@ type TestClientConfig struct {
 	DisperserConnectionCount uint
 	// The port to use for the proxy.
 	ProxyPort int
+	// Client ledger mode used for payments.
+	ClientLedgerPaymentMode string
 }
 
 // DefaultTestClientConfig returns a default configuration for the test client. Sets default values for fields
@@ -85,6 +75,7 @@ func DefaultTestClientConfig() *TestClientConfig {
 		ProxyPort:                       1234,
 		RelayConnectionCount:            8,
 		DisperserConnectionCount:        8,
+		ClientLedgerPaymentMode:         string(clientledger.ClientLedgerModeOnDemandOnly),
 	}
 }
 

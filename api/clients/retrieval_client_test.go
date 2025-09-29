@@ -2,13 +2,11 @@ package clients_test
 
 import (
 	"bytes"
-	"context"
 	"runtime"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -18,38 +16,16 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/wealdtech/go-merkletree/v2"
 	"github.com/wealdtech/go-merkletree/v2/keccak256"
 )
 
 const numOperators = 10
-
-func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
-	config := &kzg.KzgConfig{
-		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
-		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 3000,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
-	}
-
-	p, err := prover.NewProver(config, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	v, err := verifier.NewVerifier(config, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return p, v, nil
-}
 
 var (
 	indexedChainState core.IndexedChainState
@@ -67,10 +43,13 @@ var (
 	batchHeaderHash        [32]byte
 	batchRoot              [32]byte
 	gettysburgAddressBytes = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
+	logger                 = test.GetLogger()
 )
 
 func setup(t *testing.T) {
+	t.Helper()
 
+	ctx := t.Context()
 	var err error
 	chainState, err = coremock.MakeChainDataMock(map[uint8]int{
 		0: numOperators,
@@ -92,11 +71,7 @@ func setup(t *testing.T) {
 
 	nodeClient = clientsmock.NewNodeClient()
 	coordinator = &core.StdAssignmentCoordinator{}
-	p, v, err := makeTestComponents()
-	if err != nil {
-		t.Fatal(err)
-	}
-	logger := testutils.GetLogger()
+	p, v := mustMakeTestComponents(t)
 	indexer = &indexermock.MockIndexer{}
 	indexer.On("Index").Return(nil).Once()
 
@@ -104,7 +79,7 @@ func setup(t *testing.T) {
 	if err != nil {
 		panic("failed to create a new retrieval client")
 	}
-	err = indexer.Index(context.Background())
+	err = indexer.Index(ctx)
 	if err != nil {
 		panic("failed to start indexing")
 	}
@@ -127,15 +102,15 @@ func setup(t *testing.T) {
 		},
 		Data: codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes),
 	}
-	operatorState, err = indexedChainState.GetOperatorState(context.Background(), (0), []core.QuorumID{quorumID})
+	operatorState, err = indexedChainState.GetOperatorState(ctx, (0), []core.QuorumID{quorumID})
 	if err != nil {
 		t.Fatalf("failed to get operator state: %s", err)
 	}
 
-	blobSize := uint(len(blob.Data))
-	blobLength := encoding.GetBlobLength(uint(blobSize))
+	blobSize := uint32(len(blob.Data))
+	blobLength := encoding.GetBlobLength(blobSize)
 
-	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
+	chunkLength, err := coordinator.CalculateChunkLength(operatorState, uint(blobLength), 0, securityParams[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +124,7 @@ func setup(t *testing.T) {
 		ChunkLength: chunkLength,
 	}
 
-	assignments, info, err := coordinator.GetAssignments(operatorState, blobLength, quorumHeader)
+	assignments, info, err := coordinator.GetAssignments(operatorState, uint(blobLength), quorumHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +178,33 @@ func setup(t *testing.T) {
 
 }
 
+// TODO: Good candidate to be extracted into test package as a utility
+func mustMakeTestComponents(t *testing.T) (*prover.Prover, *verifier.Verifier) {
+	t.Helper()
+
+	config := &kzg.KzgConfig{
+		G1Path:          "../../resources/srs/g1.point",
+		G2Path:          "../../resources/srs/g2.point",
+		CacheDir:        "../../resources/srs/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
+	}
+
+	p, err := prover.NewProver(config, nil)
+	require.NoError(nil, err)
+
+	v, err := verifier.NewVerifier(config, nil)
+	require.NoError(nil, err)
+
+	return p, v
+}
+
+// TODO: Good candidate to be extracted into test package as a utility
 func mustMakeOpertatorPubKeysPair(t *testing.T) *coreindexer.OperatorPubKeys {
+	t.Helper()
+
 	operators := make(map[core.OperatorID]coreindexer.OperatorPubKeysPair, len(operatorState.Operators))
 	for operatorId := range operatorState.Operators[0] {
 		keyPair, err := core.GenRandomBlsKeys()
@@ -227,7 +228,10 @@ func mustMakeOpertatorPubKeysPair(t *testing.T) *coreindexer.OperatorPubKeys {
 	}
 }
 
+// TODO: Good candidate to be extracted into test package as a utility
 func musMakeOperatorSocket(t *testing.T) coreindexer.OperatorSockets {
+	t.Helper()
+
 	operatorSocket := make(coreindexer.OperatorSockets, len(operatorState.Operators))
 	for operatorId := range operatorState.Operators[0] {
 		operatorSocket[operatorId] = "test"
@@ -236,6 +240,7 @@ func musMakeOperatorSocket(t *testing.T) coreindexer.OperatorSockets {
 }
 
 func TestInvalidBlobHeader(t *testing.T) {
+	ctx := t.Context()
 
 	setup(t)
 
@@ -251,12 +256,13 @@ func TestInvalidBlobHeader(t *testing.T) {
 	indexer.On("GetObject", mock.Anything, 0).Return(operatorPubKeys, nil).Once()
 	indexer.On("GetObject", mock.Anything, 1).Return(operatorSocket, nil).Once()
 
-	_, err := retrievalClient.RetrieveBlob(context.Background(), batchHeaderHash, 0, 0, batchRoot, 0)
+	_, err := retrievalClient.RetrieveBlob(ctx, batchHeaderHash, 0, 0, batchRoot, 0)
 	assert.ErrorContains(t, err, "failed to get blob header from all operators")
 
 }
 
 func TestValidBlobHeader(t *testing.T) {
+	ctx := t.Context()
 
 	setup(t)
 
@@ -272,7 +278,7 @@ func TestValidBlobHeader(t *testing.T) {
 	indexer.On("GetObject", mock.Anything, 0).Return(operatorPubKeys, nil).Once()
 	indexer.On("GetObject", mock.Anything, 1).Return(operatorSocket, nil).Once()
 
-	data, err := retrievalClient.RetrieveBlob(context.Background(), batchHeaderHash, 0, 0, batchRoot, 0)
+	data, err := retrievalClient.RetrieveBlob(ctx, batchHeaderHash, 0, 0, batchRoot, 0)
 	assert.NoError(t, err)
 
 	restored := codec.RemoveEmptyByteFromPaddedBytes(data)

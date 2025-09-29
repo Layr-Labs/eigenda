@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
+	"github.com/Layr-Labs/eigenda/common/version"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
@@ -32,14 +33,20 @@ var (
 )
 
 func main() {
+	softwareVersion := node.GetSoftwareVersion()
+	log.Printf("Starting EigenDA Validator, version %s", softwareVersion)
+
 	app := cli.NewApp()
 	app.Flags = flags.Flags
-	app.Version = fmt.Sprintf("%s-%s-%s", node.SemVer, node.GitCommit, node.GitDate)
+
+	app.Version = softwareVersion.String()
 	app.Name = node.AppName
 	app.Usage = "EigenDA Node"
 	app.Description = "Service for receiving and storing encoded blobs from disperser"
 
-	app.Action = NodeMain
+	app.Action = func(ctx *cli.Context) error {
+		return NodeMain(ctx, softwareVersion)
+	}
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatalf("application failed: %v", err)
@@ -48,7 +55,7 @@ func main() {
 	select {}
 }
 
-func NodeMain(ctx *cli.Context) error {
+func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 
 	// TODO (cody.littley): pull all business logic in this function into the NewNode() constructor.
 
@@ -107,21 +114,23 @@ func NodeMain(ctx *cli.Context) error {
 		return fmt.Errorf("failed to get ServiceManager address: %w", err)
 	}
 
-	// Create the node.
-	node, err := node.NewNode(context.Background(), reg, config, contractDirectory, pubIPProvider, client, logger)
+	// Create and start the node.
+	node, err := node.NewNode(
+		context.Background(),
+		reg,
+		config,
+		contractDirectory,
+		pubIPProvider,
+		client,
+		logger,
+		softwareVersion)
 	if err != nil {
-		return err
-	}
-
-	err = node.Start(context.Background())
-	if err != nil {
-		node.Logger.Error("could not start node", "error", err)
 		return err
 	}
 
 	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
 	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
-	server := nodegrpc.NewServer(config, node, logger, ratelimiter)
+	server := nodegrpc.NewServer(config, node, logger, ratelimiter, softwareVersion)
 
 	reader, err := coreeth.NewReader(
 		logger,
@@ -134,7 +143,15 @@ func NodeMain(ctx *cli.Context) error {
 
 	var serverV2 *nodegrpc.ServerV2
 	if config.EnableV2 {
-		serverV2, err = nodegrpc.NewServerV2(context.Background(), config, node, logger, ratelimiter, reg, reader)
+		serverV2, err = nodegrpc.NewServerV2(
+			context.Background(),
+			config,
+			node,
+			logger,
+			ratelimiter,
+			reg,
+			reader,
+			softwareVersion)
 		if err != nil {
 			return fmt.Errorf("failed to create server v2: %v", err)
 		}

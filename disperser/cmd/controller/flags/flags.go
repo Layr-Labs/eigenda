@@ -233,6 +233,89 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_METRICS_THRESHOLDS"),
 		Value:    &defaultSigningThresholds,
 	}
+	GrpcServerEnableFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-server-enable"),
+		Usage:    "enable the controller gRPC server. default: false",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_SERVER_ENABLE"),
+	}
+	GrpcPaymentAuthenticationFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-payment-authentication"),
+		Usage:    "If true, use the new payment authentication system running on the controller; if false, payment authentication is disabled and request validation will always fail. Defaults to disabled.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PAYMENT_AUTHENTICATION"),
+	}
+	GrpcPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
+		Usage:    "the port for the controller gRPC server",
+		Required: false,
+		Value:    "32001",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PORT"),
+	}
+	GrpcMaxMessageSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-max-message-size"),
+		Usage:    "maximum size of a gRPC message (in bytes). default: 1MB",
+		Required: false,
+		Value:    1024 * 1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_MAX_MESSAGE_SIZE"),
+	}
+	GrpcMaxIdleConnectionAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-max-idle-connection-age"),
+		Usage:    "maximum time a connection can be idle before it is closed",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_MAX_IDLE_CONNECTION_AGE"),
+	}
+	GrpcAuthorizationRequestMaxPastAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-authorization-request-max-past-age"),
+		Usage:    "the maximum age of an authorization request in the past that the server will accept",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_AUTHORIZATION_REQUEST_MAX_PAST_AGE"),
+	}
+	GrpcAuthorizationRequestMaxFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-authorization-request-max-future-age"),
+		Usage:    "the maximum age of an authorization request in the future that the server will accept",
+		Required: false,
+		Value:    3 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_AUTHORIZATION_REQUEST_MAX_FUTURE_AGE"),
+	}
+	OnDemandPaymentsTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "on-demand-payments-table-name"),
+		Usage:    "Name of the DynamoDB table for storing on-demand payment state",
+		Required: false,
+		Value:    "on_demand",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ON_DEMAND_PAYMENTS_TABLE_NAME"),
+	}
+	OnDemandPaymentsLedgerCacheSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ondemand-payments-ledger-cache-size"),
+		Usage:    "Maximum number of on-demand ledgers to keep in the LRU cache",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONDEMAND_PAYMENTS_LEDGER_CACHE_SIZE"),
+	}
+	ReservationPaymentsLedgerCacheSizeFlag = cli.IntFlag{
+		Name: common.PrefixFlag(FlagPrefix, "reservation-payments-ledger-cache-size"),
+		Usage: "Initial number of reservation ledgers to keep in the LRU cache. May increase " +
+			"dynamically if premature evictions are detected, up to 65,536.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVATION_PAYMENTS_LEDGER_CACHE_SIZE"),
+	}
+	ReservationBucketCapacityPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "reservation-bucket-capacity-period"),
+		Usage:    "Duration used to calculate bucket capacity for reservations",
+		Required: false,
+		Value:    60 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVATION_BUCKET_CAPACITY_PERIOD"),
+	}
+	PaymentVaultUpdateIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "payment-vault-update-interval"),
+		Usage:    "Interval for checking payment vault updates",
+		Required: false,
+		Value:    30 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -271,6 +354,18 @@ var optionalFlags = []cli.Flag{
 	SignificantSigningMetricsThresholdsFlag,
 	EigenDAContractDirectoryAddressFlag,
 	BatchMetadataUpdatePeriodFlag,
+	GrpcServerEnableFlag,
+	GrpcPaymentAuthenticationFlag,
+	GrpcPortFlag,
+	GrpcMaxMessageSizeFlag,
+	GrpcMaxIdleConnectionAgeFlag,
+	GrpcAuthorizationRequestMaxPastAgeFlag,
+	GrpcAuthorizationRequestMaxFutureAgeFlag,
+	OnDemandPaymentsTableNameFlag,
+	OnDemandPaymentsLedgerCacheSizeFlag,
+	ReservationPaymentsLedgerCacheSizeFlag,
+	ReservationBucketCapacityPeriodFlag,
+	PaymentVaultUpdateIntervalFlag,
 }
 
 var Flags []cli.Flag

@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -29,14 +30,14 @@ type BlobShard struct {
 
 // shardValidator implements the validation logic that a DA node should apply to its received data
 type shardValidator struct {
-	verifier   encoding.Verifier
+	verifier   *verifier.Verifier
 	operatorID core.OperatorID
 	logger     logging.Logger
 }
 
 var _ ShardValidator = (*shardValidator)(nil)
 
-func NewShardValidator(v encoding.Verifier, operatorID core.OperatorID, logger logging.Logger) *shardValidator {
+func NewShardValidator(v *verifier.Verifier, operatorID core.OperatorID, logger logging.Logger) *shardValidator {
 	return &shardValidator{
 		verifier:   v,
 		operatorID: operatorID,

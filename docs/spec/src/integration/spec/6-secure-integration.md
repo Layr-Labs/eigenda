@@ -147,9 +147,35 @@ In the diagram, the top row shows L1 blocks every 12 s; the smaller squares are 
 
 ### 2. Cert Validation
 
-Cert validation is done inside the EigenDACertVerifier contract, which EigenDA deploys as-is, but is also available for rollups to modify and deploy on their own. Specifically, [checkDACert](https://github.com/Layr-Labs/eigenda/blob/2414ed6f11bd28bc631eab4da3d6b576645801b0/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) is the entry point for validation. This could either be called during a normal eth transaction (either for pessimistic “bridging” like EigenDA V1 used to do, or when uploading a Blob Field Element to a one-step-proof’s [preimage contract](https://specs.optimism.io/fault-proof/index.html#pre-image-oracle)), or be zk proven using a library like [Steel](https://docs.beboundless.xyz/developers/steel/what-is-steel) and [Sp1CC](https://succinctlabs.github.io/sp1-contract-call/).
+Cert validation is done inside the `EigenDACertVerifier` contract, which EigenDA deploys as-is, but is also available for rollups to modify and deploy on their own. Specifically, [checkDACert](https://github.com/Layr-Labs/eigenda/blob/2414ed6f11bd28bc631eab4da3d6b576645801b0/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) is the entry point for validation. This could either be called during a normal eth transaction (either for pessimistic “bridging” like EigenDA V1 used to do, or when uploading a Blob Field Element to a one-step-proof’s [preimage contract](https://specs.optimism.io/fault-proof/index.html#pre-image-oracle)), or be zk proven using a library like [Steel](https://docs.beboundless.xyz/developers/steel/what-is-steel) and [Sp1CC](https://succinctlabs.github.io/sp1-contract-call/).
 
 The `checkDACert` function accepts an ABI-encoded `[]byte` certificate input. This design allows the underlying DACert structure to evolve across versions, enabling seamless upgrades without requiring changes to the `EigenDACertVerifierRouter` interface.
+
+The `checkDACert` function is implemented using a **non-revertable pattern**.  
+This is done to ensure both liveness and safety for a rollup's proof generation/verification flow; ie:
+- Steel proofs for `eth_call` simulations that revert result in a stark execution proof failing to generate
+- Optimistic fraud proofs like Arbitrum BoLD's proving system expect that an invalid DA Cert can be **provably invalid**. A one step proof tx reverting could result in an challenger forced to forfeit their bond.
+Rather than allowing Solidity reverts or EVM exceptions to propagate, all error conditions are captured and mapped into explicit **status codes**.  
+
+### Status Codes
+
+The `EigenDACertVerifier` contract maintains three status codes that define rollup posting and derivation behavior:
+
+- **`SUCCESS`**  
+  Indicates that the DA Certificate fulfills all correctness guarantees.  
+  Rollup batch posting and derivation may proceed safely.
+
+- **`INTERNAL_ERROR`**  
+  Represents Solidity compiler-level or EVM exception errors, including but not limited to:
+  - Arithmetic overflow or underflow.  
+  - Out-of-gas or invalid opcode execution.  
+  - Any Solidity compiler-injected runtime error.  
+
+- **`INVALID_CERT`**  
+  Indicates that the DA Certificate violates critical invariants.  
+  This implies an **invalid or insecure** certificate, and rollup posting must not proceed and derivation must treat the associated     Rollup Payload as an empty batch.
+
+
 
 The [cert verification](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/libraries/EigenDACertVerificationLib.sol#L92-L152) logic consists of:
 

@@ -144,10 +144,14 @@ library EigenDACertVerificationLib {
 
     /**
      * @notice Checks the security parameters for a blob cert
+     * @dev Verifies that the security condition
+     *      (confirmationThreshold - adversaryThreshold > reconstructionThreshold)
+     *      holds, by checking the invariant
+     *      `numChunks * (1 - 100/gamma/codingRate) >= maxNumOperators`
+     *      If the inequality fails, the blob is considered insecure.
      * @param eigenDAThresholdRegistry The threshold registry contract
      * @param blobVersion The blob version to verify
      * @param securityThresholds The security thresholds to verify against
-     * @dev Checks the invariant `numChunks * (1 - 100/gamma/codingRate) >= maxNumOperators`
      */
     function checkSecurityParams(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,

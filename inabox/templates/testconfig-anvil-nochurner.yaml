@@ -1,3 +1,5 @@
+# This template file is only used for thegraph integration tests,
+# where we don't spin up a churner. Therefore, we only specify 3 operators.
 environment:
   name: "staging"
   type: "local"

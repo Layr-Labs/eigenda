@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -35,55 +36,63 @@ import (
 // REST status code signals (i.e, "drop cert", "failover") into arbitrum specific
 // errors
 type Config struct {
-	Enable bool
-	Host   string
-	Port   int
+	Host string
+	Port int
 }
 
 type Server struct {
-	cfg  *Config
-	svr  *http.Server
-	addr string
+	cfg      *Config
+	svr      *http.Server
+	listener net.Listener
 }
 
 // NewServer constructs the RPC server
-func NewServer(ctx context.Context, cfg *Config) (*Server, error) {
-	rpcServer := rpc.NewServer()
-	if err := rpcServer.RegisterName("daprovider", &Handlers{}); err != nil {
-		return nil, fmt.Errorf("failed to register daprovider: %w", err)
-	}
-
-	svr := &http.Server{
-		Handler: rpcServer,
-	}
-
-	return &Server{
-		cfg: cfg,
-		svr: svr,
-	}, nil
-
-}
-
-func (s *Server) Addr() string {
-	return s.addr
-}
-
-// Start creates a tcp listener and serves it on an independent go routine
-func (s *Server) Start() error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port))
+func NewServer(ctx context.Context, cfg *Config, h *Handlers) (*Server, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port))
 	if err != nil {
-		return fmt.Errorf("new arbitrum altda server: %w", err)
+		return nil, fmt.Errorf("failed to listen on tcp: %w", err)
+	}
+
+	rpcServer := rpc.NewServer()
+	if err := rpcServer.RegisterName("daprovider", h); err != nil {
+		return nil, fmt.Errorf("failed to register daprovider: %w", err)
 	}
 
 	addr, ok := listener.Addr().(*net.TCPAddr)
 	if !ok {
-		return errors.New("failed getting provider server address from listener")
+		return nil, errors.New("failed getting provider server address from listener")
 	}
 
-	s.addr = addr.String()
+	svr := &http.Server{
+		Addr:    "http://" + addr.String(),
+		Handler: rpcServer,
+	}
 
+	return &Server{
+		cfg:      cfg,
+		svr:      svr,
+		listener: listener,
+	}, nil
+
+}
+
+// Port returns the port that the server is listening on.
+// Useful in case Config.Port was set to 0 to let the OS assign a random port.
+func (svr *Server) Port() int {
+	// read from listener
+	_, portStr, _ := net.SplitHostPort(svr.listener.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+	return port
+}
+
+func (s *Server) Addr() string {
+	return s.svr.Addr
+}
+
+// Start serves a tcp listener on an independent go routine
+func (s *Server) Start() error {
 	go func() {
-		if err := s.svr.Serve(listener); err != nil &&
+		if err := s.svr.Serve(s.listener); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
 			println(fmt.Sprintf("provider server's Serve method returned a non http.ErrServerClosed error: %s", err.Error()))
 		}
