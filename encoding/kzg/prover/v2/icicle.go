@@ -61,11 +61,11 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 	}
 
 	return &ParametrizedProver{
-		srsNumberToLoad:    p.KzgConfig.SRSNumberToLoad,
-		encodingParams:        params,
-		encoder:               p.encoder,
+		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
+		encodingParams:             params,
+		encoder:                    p.encoder,
 		computeMultiproofNumWorker: p.KzgConfig.NumWorker,
-		kzgMultiProofBackend:  multiproofBackend,
-		kzgCommitmentsBackend: commitmentsBackend,
+		kzgMultiProofBackend:       multiproofBackend,
+		kzgCommitmentsBackend:      commitmentsBackend,
 	}, nil
 }

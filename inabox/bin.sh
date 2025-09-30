@@ -223,6 +223,138 @@ function start_detached {
         waiters="$waiters $!"
     done
 
+    for FILE in $(ls $testpath/envs/proxy*.env); do
+        set -a
+        source $FILE
+        set +a
+        ../api/proxy/bin/eigenda-proxy > $testpath/logs/proxy.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+    done
+
+    echo $pids > $pid_file
+
+    for waiter in $waiters; do
+        wait $waiter
+    done
+}
+
+# Start binaries for tests (without churner which runs as a goroutine)
+function start_detached_for_tests {
+
+    pids=""
+    waiters=""
+    pid_file="$testpath/pids"
+
+    if [[ -f "$pid_file" ]]; then
+        echo "Processes still running. Run ./bin.sh stop"
+        return
+    fi
+
+    mkdir -p $testpath/logs
+
+    echo "Skipping churner startup (running as goroutine in tests)"
+
+    for FILE in $(ls $testpath/envs/dis*.env); do
+        set -a
+        source $FILE
+        set +a
+        id=$(basename $FILE | tr -d -c 0-9)
+        ../disperser/bin/server > $testpath/logs/dis${id}.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+
+        ./wait-for 0.0.0.0:${DISPERSER_SERVER_GRPC_PORT} -- echo "Disperser up" &
+        waiters="$waiters $!"
+    done
+
+    for FILE in $(ls $testpath/envs/enc*.env); do
+        set -a
+        source $FILE
+        set +a
+        id=$(basename $FILE | tr -d -c 0-9)
+        ../disperser/bin/encoder > $testpath/logs/enc${id}.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+
+        ./wait-for 0.0.0.0:${DISPERSER_ENCODER_GRPC_PORT} -- echo "Encoder up" &
+        waiters="$waiters $!"
+    done
+
+    for FILE in $(ls $testpath/envs/batcher*.env); do
+        set -a
+        source $FILE
+        set +a
+        id=$(basename $FILE | tr -d -c 0-9)
+        ../disperser/bin/batcher > $testpath/logs/batcher${id}.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+    done
+
+    for FILE in $(ls $testpath/envs/retriever*.env); do
+        set -a
+        source $FILE
+        set +a
+        ../retriever/bin/server > $testpath/logs/retriever.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+    done
+
+    for FILE in $(ls $testpath/envs/controller*.env); do
+        set -a
+        source $FILE
+        set +a
+        ../disperser/bin/controller > $testpath/logs/controller.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+    done
+
+    files=($(ls $testpath/envs/relay*.env))
+    last_index=$(( ${#files[@]} - 1 ))
+    for i in "${!files[@]}"; do
+        FILE=${files[$i]}
+        set -a
+        source $FILE
+        set +a
+        id=$(basename $FILE | tr -d -c 0-9)
+        ../relay/bin/relay > $testpath/logs/relay${id}.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+
+        ./wait-for 0.0.0.0:${RELAY_GRPC_PORT} -- echo "Relay up" &
+        waiters="$waiters $!"
+    done
+
+    files=($(ls $testpath/envs/opr*.env))
+    last_index=$(( ${#files[@]} - 1 ))
+
+    for i in "${!files[@]}"; do
+        if [ $i -eq $last_index ]; then
+            sleep 10  # Sleep for 10 seconds before the last loop iteration
+        fi
+        FILE=${files[$i]}
+        set -a
+        source $FILE
+        set +a
+        id=$(basename $FILE | tr -d -c 0-9)
+        ../node/bin/node > $testpath/logs/opr${id}.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+
+        ./wait-for 0.0.0.0:${NODE_DISPERSAL_PORT} -- echo "Node up" &
+        waiters="$waiters $!"
+    done
+
+    # We don't spin up a proxy here because they are not needed for tests currently.
+
     echo $pids > $pid_file
 
     for waiter in $waiters; do
@@ -263,13 +395,14 @@ function force_stop {
 }
 
 help() {
-    echo "Usage: $0 {start|start-detached|stop-detached|force-stop}"
+    echo "Usage: $0 {start|start-detached|start-detached-for-tests|stop-detached|force-stop}"
     echo ""
     echo "Commands:"
-    echo "  start              Start all services in the foreground with trap on SIGINT"
-    echo "  start-detached     Start all services in the background and log output to files"
-    echo "  stop-detached      Stop all background services started with start-detached"
-    echo "  force-stop         Force kill all EigenDA related processes"
+    echo "  start                      Start all services in the foreground with trap on SIGINT"
+    echo "  start-detached             Start all services in the background and log output to files"
+    echo "  start-detached-for-tests   Start services for tests (no churner, runs as goroutine)"
+    echo "  stop-detached              Stop all background services started with start-detached"
+    echo "  force-stop                 Force kill all EigenDA related processes"
     echo ""
     echo "Logs are stored in $testpath/logs/"
     echo "PIDs of detached processes are stored in $testpath/pids"
@@ -280,6 +413,8 @@ case "$1" in
         start_trap ${@:2} ;;
     start-detached)
         start_detached ${@:2} ;;
+    start-detached-for-tests)
+        start_detached_for_tests ${@:2} ;;
     stop-detached)
         stop_detached ${@:2} ;;
     force-stop)
