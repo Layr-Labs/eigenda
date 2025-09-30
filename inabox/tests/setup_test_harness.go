@@ -22,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
+	paymentvaultbindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
@@ -127,6 +128,10 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 	// Setup payload disperser
 	if err := setupPayloadDisperserForContext(ctx, testCtx, infra); err != nil {
 		return nil, fmt.Errorf("failed to setup payload disperser: %w", err)
+	}
+
+	if err := setupPaymentVaultTransactor(ctx, testCtx, infra); err != nil {
+		return nil, fmt.Errorf("setup payment vault transactor: %w", err)
 	}
 
 	return testCtx, nil
@@ -312,6 +317,7 @@ func setupPayloadDisperserForContext(
 	if err != nil {
 		return fmt.Errorf("error getting account ID: %w", err)
 	}
+	testHarness.TestAccountID = accountId
 
 	accountant := clientsv2.NewAccountant(
 		accountId,
@@ -442,7 +448,7 @@ func buildClientLedger(
 		onDemandLedger,
 		time.Now,
 		paymentVault,
-		5*time.Second, // update interval for vault monitoring
+		1*time.Second, // update interval for vault monitoring
 	)
 
 	return ledger, nil
@@ -545,4 +551,31 @@ func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind
 	}
 
 	return opts
+}
+
+func setupPaymentVaultTransactor(
+	ctx context.Context,
+	testHarness *TestHarness,
+	infra *InfrastructureHarness,
+) error {
+	eigenDADirectoryAddr := gethcommon.HexToAddress(infra.TestConfig.EigenDA.EigenDADirectory)
+	contractDirectory, err := directory.NewContractDirectory(
+		ctx, infra.Logger, testHarness.EthClient, eigenDADirectoryAddr)
+	if err != nil {
+		return fmt.Errorf("new contract directory: %w", err)
+	}
+
+	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	transactor, err := paymentvaultbindings.NewContractPaymentVaultTransactor(paymentVaultAddr, testHarness.EthClient)
+	if err != nil {
+		return fmt.Errorf("new PaymentVault transactor: %w", err)
+	}
+
+	testHarness.PaymentVaultTransactor = transactor
+
+	return nil
 }

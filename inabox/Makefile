@@ -6,8 +6,24 @@ run-e2e-tests:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
 
 # Uses the inabox framework to run tests of the payment system
-run-payments-tests: stop-services stop-infra
-	go test ./tests/payments -v
+# Runs each test individually with cleanup between them to avoid teardown issues. This is an ugly workaround, and should
+# be removed as soon as we figure out why in-test teardown isn't always succeeding.
+run-payments-tests:
+	@for test in \
+		TestReservationOnly_LegacyClient_LegacyController \
+		TestReservationOnly_LegacyClient_NewController \
+		TestReservationOnly_NewClient_LegacyController \
+		TestReservationOnly_NewClient_NewController; do \
+		echo "Running $$test..."; \
+		if ! go test ./tests/payments -v -run "^$$test$$"; then \
+			echo "❌ TEST FAILED: $$test"; \
+			$(MAKE) -s stop-services stop-infra; \
+			exit 1; \
+		fi; \
+		$(MAKE) -s stop-services stop-infra; \
+	done; \
+	echo "========================================="; \
+	echo "✅ ALL PAYMENT TESTS PASSED"
 
 # Starts a long-lived inabox local devnet.
 # If you need to make configuration changes to inabox,

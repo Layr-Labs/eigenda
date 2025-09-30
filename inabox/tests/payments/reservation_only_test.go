@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// NOTE: Currently, it doesn't work to run these tests in sequence. Each test must be run as a separate command.
+// The problem is that the cleanup logic sometimes randomly fails to free docker ports, so subsequent setups fail.
+// Once we figure out why resources aren't being freed, then these tests will be runnable the "normal" way.
+
 func TestReservationOnly_LegacyClient_LegacyController(t *testing.T) {
 	testReservationOnly(t, clientledger.ClientLedgerModeLegacy, false)
 }
@@ -60,7 +64,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		integration_test.TeardownGlobalInfrastructure(infra)
 
 		if err := os.Chdir(originalDir); err != nil {
-			t.Logf("Warning: Failed to restore working directory: %v", err)
+			t.Logf("Failed to restore working directory: %v", err)
 		}
 	})
 
@@ -72,6 +76,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 	t.Logf("Payload size: %d bytes", payloadSize)
 
 	t.Run("Within reservation limits", func(t *testing.T) {
+		testRandom := random.NewTestRandom()
 		// the reservation of 1024 symbols/second can support up .25 min size dispersals per second.
 		// to account for non-determinism, disperse at half that rate, and assert no failures
 		blobsPerSecond := float32(0.125)
@@ -79,7 +84,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 
 		resultChan := SubmitPayloads(
 			t,
-			random.NewTestRandom(),
+			testRandom,
 			testHarness.PayloadDisperser,
 			blobsPerSecond,
 			payloadSize,
@@ -88,16 +93,63 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		for err := range resultChan {
 			require.NoError(t, err, "Payload submission failed")
 		}
+
+		// The next part of the test decreases the reservation size, and asserts the the same dispersal conditions now
+		// yield errors. The legacy client ledger mode doesn't observe payment vault updates, so skip this next
+		// part if that's the current configuration
+		if clientLedgerMode == clientledger.ClientLedgerModeLegacy {
+			return
+		}
+
+		newReservation, err := reservation.NewReservation(
+			256, // this rate will not support the 0.125 dispersals/second rate
+			time.Now().Add(-1*time.Hour),
+			time.Now().Add(24*time.Hour),
+			[]core.QuorumID{0, 1},
+		)
+		require.NoError(t, err)
+		err = testHarness.UpdateReservation(t.Context(), t, newReservation)
+		require.NoError(t, err)
+
+		// the vault monitor checks every 1 second, so this should be plenty of time
+		time.Sleep(3 * time.Second)
+
+		t.Log("Dispersing with decreased reservation limits")
+		resultChan = SubmitPayloads(
+			t,
+			testRandom,
+			testHarness.PayloadDisperser,
+			blobsPerSecond,
+			payloadSize,
+			testDuration)
+
+		successCount := 0
+		failureCount := 0
+		for err := range resultChan {
+			if err != nil {
+				failureCount++
+			} else {
+				successCount++
+			}
+		}
+
+		quarter := (successCount + failureCount) / 4
+
+		// With reduced reservation rate, expect roughly 50% success rate
+		// To account for non-determinism, weaken assertion to just >25% of each
+		require.GreaterOrEqual(t, successCount, quarter, "Expected >25%% of dispersals to succeed")
+		require.GreaterOrEqual(t, failureCount, quarter, "Expected >25%% of dispersals to fail")
 	})
 
 	t.Run("Over reservation limits", func(t *testing.T) {
+		testRandom := random.NewTestRandom()
 		// 2x the rate of the what's permitted by the reservation
 		blobsPerSecond := float32(0.5)
 		t.Logf("Blobs per second: %f", blobsPerSecond)
 
 		resultChan := SubmitPayloads(
 			t,
-			random.NewTestRandom(),
+			testRandom,
 			testHarness.PayloadDisperser,
 			blobsPerSecond,
 			payloadSize,
@@ -119,5 +171,39 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		// To account for non-determinism, weaken assertion to just >25% of each
 		require.GreaterOrEqual(t, successCount, quarter, "Expected >25%% of dispersals to succeed")
 		require.GreaterOrEqual(t, failureCount, quarter, "Expected >25%% of dispersals to fail")
+
+		// The next part of the test increases the reservation size, and asserts the the same dispersal conditions no
+		// longer yield errors. The legacy client ledger mode doesn't observe payment vault updates, so skip this next
+		// part if that's the current configuration
+		if clientLedgerMode == clientledger.ClientLedgerModeLegacy {
+			return
+		}
+
+		newReservation, err := reservation.NewReservation(
+			4096, // this rate will easily support the 0.5 dispersals/second rate
+			time.Now().Add(-1*time.Hour),
+			time.Now().Add(24*time.Hour),
+			[]core.QuorumID{0, 1},
+		)
+		require.NoError(t, err)
+		err = testHarness.UpdateReservation(t.Context(), t, newReservation)
+		require.NoError(t, err)
+
+		// the vault monitor checks every 1 second, so this should be plenty of time
+		time.Sleep(3 * time.Second)
+
+		t.Log("Testing with increased reservation limits")
+		resultChan = SubmitPayloads(
+			t,
+			testRandom,
+			testHarness.PayloadDisperser,
+			blobsPerSecond,
+			payloadSize,
+			testDuration)
+
+		// with the updated reservation, we should expect no failures at all
+		for err := range resultChan {
+			require.NoError(t, err, "Payload submission failed")
+		}
 	})
 }

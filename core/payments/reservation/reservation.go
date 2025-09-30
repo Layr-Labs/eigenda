@@ -139,3 +139,23 @@ func (r *Reservation) Equal(other *Reservation) bool {
 
 	return true
 }
+
+func (r *Reservation) GetSymbolsPerSecond() uint64 {
+	return r.symbolsPerSecond
+}
+
+func (r *Reservation) GetStartTime() time.Time {
+	return r.startTime
+}
+
+func (r *Reservation) GetEndTime() time.Time {
+	return r.endTime
+}
+
+func (r *Reservation) GetQuorumNumbers() []core.QuorumID {
+	quorumNumbers := make([]byte, 0, len(r.permittedQuorumIDs))
+	for quorumID := range r.permittedQuorumIDs {
+		quorumNumbers = append(quorumNumbers, quorumID)
+	}
+	return quorumNumbers
+}

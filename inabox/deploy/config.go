@@ -227,7 +227,8 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		// so it calls the grpc GetBlobCommitment to generate commitments.
 		// DisperserV2 uses the V2 prover which always uses SRSOrder=2^28.
 		// So it needs the trailing g2 points to generate correct length commitments.
-		DISPERSER_SERVER_G2_TRAILING_PATH: "../resources/srs/g2.trailing.point",
+		DISPERSER_SERVER_G2_TRAILING_PATH:               "../resources/srs/g2.trailing.point",
+		DISPERSER_SERVER_ONCHAIN_STATE_REFRESH_INTERVAL: "1s",
 	}
 
 	if env.UseControllerMediatedPayments {
@@ -368,11 +369,10 @@ func (env *Config) generateControllerVars(
 		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "true"
 		v.CONTROLLER_GRPC_PORT = "30000"
 		v.CONTROLLER_ON_DEMAND_PAYMENTS_TABLE_NAME = "e2e_v2_ondemand"
+		v.CONTROLLER_PAYMENT_VAULT_UPDATE_INTERVAL = "1s"
 	} else {
 		v.CONTROLLER_GRPC_SERVER_ENABLE = "false"
 		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "false"
-		v.CONTROLLER_GRPC_PORT = ""
-		v.CONTROLLER_ON_DEMAND_PAYMENTS_TABLE_NAME = ""
 	}
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
