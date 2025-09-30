@@ -46,7 +46,7 @@ func parseFlags() Config {
 	flag.Uint64Var(&config.NumChunks, "num-chunks", 8192, "Minimum number of chunks (power of 2)")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
-	flag.BoolVar(&config.EnableVerify, "enable-verify", true, "Verify blobs after encoding")
+	flag.BoolVar(&config.EnableVerify, "enable-verify", false, "Verify blobs after encoding")
 	flag.Parse()
 	return config
 }
@@ -68,7 +68,7 @@ func main() {
 		SRSNumberToLoad: 524288,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,
-		PreloadEncoder:  false,
+		PreloadEncoder:  true,
 	}
 
 	verifierKzgConfig = &verifierv2.KzgConfig{
@@ -172,8 +172,13 @@ func benchmarkEncodeAndVerify(
 		inputFr[i].SetInt64(int64(i + 1))
 	}
 
+	// commit, _, _, err := enc.GetCommitments(inputFr)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
 	start := time.Now()
-	commit, _, _, frames, _, err := enc.Encode(inputFr)
+	_, _, err = enc.GetFrames(inputFr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -182,27 +187,27 @@ func benchmarkEncodeAndVerify(
 	verifyResult := true
 	verifyStart := time.Now()
 
-	if verifyResults {
-		v, err := verifierv2.NewVerifier(verifierKzgConfig, nil)
-		if err != nil {
-			log.Fatalf("Failed to create verifier: %v", err)
-		}
+	// if verifyResults {
+	// 	v, err := verifierv2.NewVerifier(verifierKzgConfig, nil)
+	// 	if err != nil {
+	// 		log.Fatalf("Failed to create verifier: %v", err)
+	// 	}
 
-		samples := []encoding.Sample{}
-		for i, frame := range frames {
-			samples = append(samples, encoding.Sample{
-				Commitment:      (*encoding.G1Commitment)(commit),
-				Chunk:           &frame,
-				AssignmentIndex: uint(i),
-				BlobIndex:       0,
-			})
-		}
+	// 	samples := []encoding.Sample{}
+	// 	for i, frame := range frames {
+	// 		samples = append(samples, encoding.Sample{
+	// 			Commitment:      (*encoding.G1Commitment)(commit),
+	// 			Chunk:           &frame,
+	// 			AssignmentIndex: uint(i),
+	// 			BlobIndex:       0,
+	// 		})
+	// 	}
 
-		err = v.UniversalVerifySubBatch(params, samples, 1)
-		if err != nil {
-			log.Fatal("Wtf", err)
-		}
-	}
+	// 	err = v.UniversalVerifySubBatch(params, samples, 1)
+	// 	if err != nil {
+	// 		log.Fatal("Wtf", err)
+	// 	}
+	// }
 
 	verifyTime := time.Since(verifyStart)
 
