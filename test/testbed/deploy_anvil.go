@@ -3,6 +3,7 @@ package testbed
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -136,6 +137,39 @@ func (ac *AnvilContainer) RpcURL() string {
 // InternalEndpoint returns the Anvil endpoint URL for internal Docker network communication
 func (ac *AnvilContainer) InternalEndpoint() string {
 	return "http://anvil:8545"
+}
+
+// SetIntervalMining enables auto-mining with the specified interval in seconds
+func (ac *AnvilContainer) SetIntervalMining(ctx context.Context, intervalSeconds int) error {
+	if ac == nil {
+		return fmt.Errorf("anvil container is nil")
+	}
+	ac.logger.Info("Setting interval mining", "interval", intervalSeconds)
+
+	// Execute cast rpc evm_setIntervalMining command
+	exitCode, outputReader, err := ac.container.Exec(ctx, []string{
+		"cast", "rpc", "evm_setIntervalMining", fmt.Sprintf("%d", intervalSeconds),
+		"--rpc-url", "http://127.0.0.1:8545",
+	})
+	if err != nil {
+		ac.logger.Error("Failed to execute cast command", "error", err)
+		return fmt.Errorf("failed to execute cast command: %w", err)
+	}
+
+	// Read the output
+	output, err := io.ReadAll(outputReader)
+	if err != nil {
+		ac.logger.Error("Failed to read command output", "error", err)
+		return fmt.Errorf("failed to read command output: %w", err)
+	}
+
+	if exitCode != 0 {
+		ac.logger.Error("Cast command failed", "exitCode", exitCode, "output", string(output))
+		return fmt.Errorf("cast command failed with exit code %d: %s", exitCode, string(output))
+	}
+
+	ac.logger.Debug("Interval mining set successfully", "output", string(output))
+	return nil
 }
 
 // Terminate stops and removes the container

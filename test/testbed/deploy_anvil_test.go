@@ -15,16 +15,18 @@ func TestAnvilBlockNumberReachesFive(t *testing.T) {
 	ctx := t.Context()
 	logger := test.GetLogger()
 
-	// Start Anvil container with 1 second block time
+	// Start Anvil container
 	anvil, err := testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
-		ExposeHostPort: true,
-		Logger:         logger,
-		BlockTime:      1, // 1 second block intervals
+		Logger: logger,
 	})
 	require.NoError(t, err)
 	defer func() {
 		_ = anvil.Terminate(ctx)
 	}()
+
+	// Set interval mining to 1 second
+	err = anvil.SetIntervalMining(ctx, 1)
+	require.NoError(t, err)
 
 	// Connect to Anvil RPC
 	client, err := ethclient.Dial(anvil.RpcURL())
