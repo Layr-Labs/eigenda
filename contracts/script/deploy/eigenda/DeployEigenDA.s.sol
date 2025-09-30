@@ -39,8 +39,6 @@ import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACer
 import {MockStakeRegistry} from "test/mock/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "test/mock/MockRegistryCoordinator.sol";
 
-import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
-
 import {InitParamsLib} from "script/deploy/eigenda/DeployEigenDAConfig.sol";
 
 import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
@@ -189,17 +187,6 @@ contract DeployEigenDA is Script {
                 IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME))
             )
         );
-        upgrade(AddressDirectoryConstants.SOCKET_REGISTRY_NAME, "");
-
-        impl[AddressDirectoryConstants.BLS_APK_REGISTRY_NAME] = address(
-            new BLSApkRegistry(
-                IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME))
-            )
-        );
-        upgrade(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME, "");
-
-        impl[AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME] =
-            address(new EigenDARegistryCoordinator(address(directory)));
         upgrade(AddressDirectoryConstants.SOCKET_REGISTRY_NAME, "");
 
         impl[AddressDirectoryConstants.BLS_APK_REGISTRY_NAME] = address(

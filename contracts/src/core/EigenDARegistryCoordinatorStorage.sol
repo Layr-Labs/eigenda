@@ -55,7 +55,7 @@ abstract contract EigenDARegistryCoordinatorStorage is IRegistryCoordinator {
     /// @notice mapping from quorum number to the latest block that all quorums were updated all at once
     mapping(uint8 => uint256) public quorumUpdateBlockNumber;
 
-    address[] private deprecated_2;
+    address[] private _deprecated_2;
     address private _deprecated_1;
     /// @notice the address of the entity allowed to eject operators from the AVS
     address public ejector;
