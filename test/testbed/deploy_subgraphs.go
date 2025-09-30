@@ -166,6 +166,16 @@ func deploySubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, pa
 
 	config.Logger.Info("Deploying Subgraph", "path", path, "startBlock", startBlock)
 
+	// Save the current directory so we can restore it later
+	originalDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+	// Ensure we restore the directory when we're done
+	defer func() {
+		_ = os.Chdir(originalDir)
+	}()
+
 	subgraphPath := filepath.Join(config.RootPath, "subgraphs", path)
 	if err := os.Chdir(subgraphPath); err != nil {
 		return fmt.Errorf("error changing directories: %w", err)
