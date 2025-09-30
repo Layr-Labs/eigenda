@@ -117,7 +117,8 @@ func setupDisperserKeypairAndRegistrations(config DisperserHarnessConfig) error 
 	return nil
 }
 
-// SetupDisperserHarness creates and initializes the disperser infrastructure (LocalStack, DynamoDB tables, S3 buckets, relays)
+// SetupDisperserHarness creates and initializes the disperser infrastructure
+// (LocalStack, DynamoDB tables, S3 buckets, relays)
 func SetupDisperserHarness(ctx context.Context, config DisperserHarnessConfig) (*DisperserHarness, error) {
 	harness := &DisperserHarness{
 		RelayInstances: make([]*RelayInstance, 0),
@@ -226,7 +227,12 @@ func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) 
 }
 
 // startRelay starts a single relay with the given index and URL
-func startRelay(relayIndex int, relayURL string, harness *DisperserHarness, config DisperserHarnessConfig) (*RelayInstance, error) {
+func startRelay(
+	relayIndex int,
+	relayURL string,
+	harness *DisperserHarness,
+	config DisperserHarnessConfig,
+) (*RelayInstance, error) {
 	// Parse port from relayURL (format: "localhost:32035")
 	parts := strings.Split(relayURL, ":")
 	if len(parts) != 2 {
@@ -361,13 +367,13 @@ func startRelay(relayIndex int, relayURL string, harness *DisperserHarness, conf
 			InternalGetCoefficientsTimeout: 20 * time.Second,
 		},
 		OnchainStateRefreshInterval: 10 * time.Second,
-		MetricsPort:                  9100 + relayIndex,
-		EnableMetrics:                true,
-		EnablePprof:                  false,
-		PprofHttpPort:                0,
-		MaxConnectionAge:             0,
-		MaxConnectionAgeGrace:        5 * time.Second,
-		MaxIdleConnectionAge:         30 * time.Second,
+		MetricsPort:                 9100 + relayIndex,
+		EnableMetrics:               true,
+		EnablePprof:                 false,
+		PprofHttpPort:               0,
+		MaxConnectionAge:            0,
+		MaxConnectionAgeGrace:       5 * time.Second,
+		MaxIdleConnectionAge:        30 * time.Second,
 	}
 
 	// Create relay server

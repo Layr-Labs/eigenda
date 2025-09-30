@@ -25,7 +25,7 @@ type DeployResourcesConfig struct {
 	LocalStackEndpoint  string
 	MetadataTableName   string
 	BucketTableName     string
-	BucketName          string         // Optional: S3 bucket name, defaults to "test-eigenda-blobstore"
+	BucketName          string // Optional: S3 bucket name, defaults to "test-eigenda-blobstore"
 	V2MetadataTableName string
 	V2PaymentPrefix     string         // Optional: prefix for v2 payment tables, defaults to "e2e_v2_"
 	Region              string         // Optional: AWS region, defaults to "us-east-1"
