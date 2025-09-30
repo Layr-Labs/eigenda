@@ -41,6 +41,7 @@ type ChainHarness struct {
 		Listener net.Listener
 		URL      string
 	}
+	EthClient *geth.MultiHomingClient
 }
 
 // SetupChainHarness creates and initializes the chain infrastructure (Anvil, Graph Node, contracts, and Churner)
@@ -61,6 +62,18 @@ func SetupChainHarness(ctx context.Context, config *ChainHarnessConfig) (*ChainH
 		return nil, fmt.Errorf("failed to start anvil: %w", err)
 	}
 	harness.Anvil = anvilContainer
+
+	// Create eth client for contract interactions (after Anvil is running)
+	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{config.TestConfig.Deployers[0].RPC},
+		PrivateKeyString: config.TestConfig.Pks.EcdsaMap[config.TestConfig.EigenDA.Deployer].PrivateKey[2:],
+		NumConfirmations: 0,
+		NumRetries:       3,
+	}, gethcommon.Address{}, config.Logger)
+	if err != nil {
+		return nil, fmt.Errorf("could not create eth client for registration: %w", err)
+	}
+	harness.EthClient = ethClient
 
 	// Step 2: Setup Graph Node if needed
 	deployer, ok := config.TestConfig.GetDeployer(config.TestConfig.EigenDA.Deployer)
@@ -95,19 +108,8 @@ func SetupChainHarness(ctx context.Context, config *ChainHarnessConfig) (*ChainH
 		return nil, fmt.Errorf("failed to deploy experiment: %w", err)
 	}
 
-	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{config.TestConfig.Deployers[0].RPC},
-		PrivateKeyString: config.TestConfig.Pks.EcdsaMap[config.TestConfig.EigenDA.Deployer].PrivateKey[2:],
-		NumConfirmations: 0,
-		NumRetries:       3,
-	}, gethcommon.Address{}, config.Logger)
-	if err != nil {
-		config.Logger.Errorf("could not create eth client for registration: %v", err)
-		return nil, fmt.Errorf("could not create eth client for registration: %w", err)
-	}
-
 	// Register blob versions
-	config.TestConfig.RegisterBlobVersions(ethClient)
+	config.TestConfig.RegisterBlobVersions(harness.EthClient)
 
 	// Register relay URLs
 	relayURLs := []string{
@@ -116,7 +118,7 @@ func SetupChainHarness(ctx context.Context, config *ChainHarnessConfig) (*ChainH
 		"localhost:32039",
 		"localhost:32041",
 	}
-	config.TestConfig.RegisterRelays(ethClient, relayURLs, ethClient.GetAccountAddress())
+	config.TestConfig.RegisterRelays(harness.EthClient, relayURLs, harness.EthClient.GetAccountAddress())
 
 	// Step 4: Start Churner (requires deployed contracts)
 	config.Logger.Info("Starting churner server")

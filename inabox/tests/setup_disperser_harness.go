@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -20,6 +21,7 @@ type DisperserHarnessConfig struct {
 	MetadataTableName   string
 	BucketTableName     string
 	MetadataTableNameV2 string
+	EthClient           common.EthClient
 }
 
 // TODO: Add encoder, api server, relay, controller, batcher
@@ -81,7 +83,7 @@ func setupDisperserKeypairAndRegistrations(config *DisperserHarnessConfig) error
 
 	// Register blob versions, relays, and disperser keypair
 	if config.TestConfig.EigenDA.Deployer != "" && config.TestConfig.IsEigenDADeployed() {
-		config.TestConfig.PerformDisperserRegistrations()
+		config.TestConfig.PerformDisperserRegistrations(config.EthClient)
 	}
 
 	return nil

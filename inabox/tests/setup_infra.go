@@ -129,6 +129,7 @@ func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, 
 		MetadataTableName:   config.MetadataTableName,
 		BucketTableName:     config.BucketTableName,
 		MetadataTableNameV2: config.MetadataTableNameV2,
+		EthClient:           infra.ChainHarness.EthClient,
 	}
 
 	disperserHarness, err := SetupDisperserHarness(setupCtx, disperserHarnessConfig)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -177,31 +176,6 @@ func (env *Config) DeployExperiment() error {
 	return nil
 }
 
-// performRegistrations handles blob version, relay, and disperser keypair registrations.
-func (env *Config) PerformDisperserRegistrations() {
-	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{env.Deployers[0].RPC},
-		PrivateKeyString: env.Pks.EcdsaMap[env.EigenDA.Deployer].PrivateKey[2:],
-		NumConfirmations: 0,
-		NumRetries:       3,
-	}, gcommon.Address{}, logger)
-	if err != nil {
-		logger.Errorf("could not create eth client for registration: %v", err)
-		return
-	}
-
-	// Only register disperser keypair if we have a valid address (i.e., localstack was available)
-	if env.DisperserAddress != (gcommon.Address{}) {
-		logger.Info("Registering disperser keypair")
-		err = env.RegisterDisperserKeypair(ethClient)
-		if err != nil {
-			logger.Errorf("could not register disperser keypair: %v", err)
-		}
-	} else {
-		logger.Info("Skipping disperser keypair registration (localstack not available)")
-	}
-}
-
 // GenerateDisperserKeypair generates a disperser keypair using AWS KMS.
 func (env *Config) GenerateDisperserKeypair() error {
 	// Skip if we already have a disperser key
@@ -245,8 +219,22 @@ func (env *Config) GenerateDisperserKeypair() error {
 	return nil
 }
 
+// PerformDisperserRegistrations registers the disperser keypair onchain.
+func (env *Config) PerformDisperserRegistrations(ethClient common.EthClient) {
+	// Only register disperser keypair if we have a valid address
+	if env.DisperserAddress != (gcommon.Address{}) {
+		logger.Info("Registering disperser keypair")
+		err := env.registerDisperserKeypair(ethClient)
+		if err != nil {
+			logger.Errorf("could not register disperser keypair: %v", err)
+		}
+	} else {
+		logger.Info("Skipping disperser keypair registration")
+	}
+}
+
 // RegisterDisperserKeypair registers the disperser's public key on-chain.
-func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
+func (env *Config) registerDisperserKeypair(ethClient common.EthClient) error {
 	// Write the disperser's public key to on-chain storage
 	writer, err := eth.NewWriter(
 		logger,
@@ -358,32 +346,6 @@ func (env *Config) RegisterRelays(ethClient common.EthClient, relayURLs []string
 			logger.Fatal("Error sending relay transaction", "error", err)
 		}
 	}
-}
-
-// RegisterBlobVersionAndRelays initializes blob versions in ThresholdRegistry contract
-// and relays in RelayRegistry contract
-func (env *Config) RegisterBlobVersionAndRelays() {
-	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{env.Deployers[0].RPC},
-		PrivateKeyString: env.Pks.EcdsaMap[env.EigenDA.Deployer].PrivateKey[2:],
-		NumConfirmations: 0,
-		NumRetries:       3,
-	}, gcommon.Address{}, logger)
-	if err != nil {
-		logger.Errorf("could not create eth client for registration: %v", err)
-		return
-	}
-
-	env.RegisterBlobVersions(ethClient)
-
-	// Prepare relay URLs from env.Relays
-	relayURLs := make([]string, 0, len(env.Relays))
-	for _, relayVars := range env.Relays {
-		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
-		relayURLs = append(relayURLs, url)
-	}
-
-	env.RegisterRelays(ethClient, relayURLs, ethClient.GetAccountAddress())
 }
 
 // StartBinaries starts the EigenDA binaries
