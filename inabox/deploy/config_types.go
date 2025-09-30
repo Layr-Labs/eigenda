@@ -211,6 +211,7 @@ type Config struct {
 	UserOnDemandDeposit             uint64
 	ReservationPeriodInterval       uint64
 	ClientLedgerMode                clientledger.ClientLedgerMode
+	UseControllerMediatedPayments   bool
 }
 
 func (env *Config) IsEigenDADeployed() bool {

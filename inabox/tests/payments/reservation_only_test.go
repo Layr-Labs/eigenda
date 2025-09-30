@@ -12,15 +12,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReservationOnlyLegacy(t *testing.T) {
-	testReservationOnly(t, clientledger.ClientLedgerModeLegacy)
+func TestReservationOnly_LegacyClient_LegacyController(t *testing.T) {
+	testReservationOnly(t, clientledger.ClientLedgerModeLegacy, false)
 }
 
-func TestReservationOnlyNewPayments(t *testing.T) {
-	testReservationOnly(t, clientledger.ClientLedgerModeReservationOnly)
+func TestReservationOnly_LegacyClient_NewController(t *testing.T) {
+	testReservationOnly(t, clientledger.ClientLedgerModeLegacy, true)
 }
 
-func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedgerMode) {
+func TestReservationOnly_NewClient_LegacyController(t *testing.T) {
+	testReservationOnly(t, clientledger.ClientLedgerModeReservationOnly, false)
+}
+
+func TestReservationOnly_NewClient_NewController(t *testing.T) {
+	testReservationOnly(t, clientledger.ClientLedgerModeReservationOnly, true)
+}
+
+func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedgerMode, controllerUseNewPayments bool) {
 	// Save current working directory. The setup process in its current form changes working directory, which causes
 	// subsequent executions to fail, since the process relies on relative paths. This is a workaround for now: we just
 	// capture the original working directory, and switch back to it as a cleanup step.
@@ -38,6 +46,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		// choose a bin width value much lower than the default, so that we converge on the average faster
 		ReservationPeriodInterval: 10,
 		ClientLedgerMode:          clientLedgerMode,
+		ControllerUseNewPayments:  controllerUseNewPayments,
 	}
 
 	infra, err := integration_test.SetupGlobalInfrastructure(infraConfig)

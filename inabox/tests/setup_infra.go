@@ -26,6 +26,7 @@ type InfrastructureConfig struct {
 	UserOnDemandDeposit             uint64
 	ReservationPeriodInterval       uint64
 	ClientLedgerMode                clientledger.ClientLedgerMode
+	ControllerUseNewPayments        bool
 }
 
 // SetupGlobalInfrastructure creates the shared infrastructure that persists across all tests.
@@ -60,6 +61,7 @@ func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHar
 	testConfig.UserOnDemandDeposit = config.UserOnDemandDeposit
 	testConfig.ReservationPeriodInterval = config.ReservationPeriodInterval
 	testConfig.ClientLedgerMode = config.ClientLedgerMode
+	testConfig.UseControllerMediatedPayments = config.ControllerUseNewPayments
 
 	if testConfig.Environment.IsLocal() {
 		return setupLocalInfrastructure(ctx, config, testName, testConfig)
