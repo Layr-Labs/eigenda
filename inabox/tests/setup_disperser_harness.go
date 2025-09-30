@@ -22,6 +22,7 @@ type DisperserHarnessConfig struct {
 	BucketTableName     string
 	MetadataTableNameV2 string
 	EthClient           common.EthClient
+	RelayURLs           []string // URLs to register for relays
 }
 
 // TODO: Add encoder, api server, relay, controller, batcher
@@ -81,9 +82,15 @@ func setupDisperserKeypairAndRegistrations(config *DisperserHarnessConfig) error
 		return fmt.Errorf("failed to generate disperser keypair: %w", err)
 	}
 
-	// Register blob versions, relays, and disperser keypair
+	// Register disperser keypair and relays
 	if config.TestConfig.EigenDA.Deployer != "" && config.TestConfig.IsEigenDADeployed() {
 		config.TestConfig.PerformDisperserRegistrations(config.EthClient)
+
+		// Register relay URLs if provided
+		if len(config.RelayURLs) > 0 {
+			config.Logger.Info("Registering relay URLs", "count", len(config.RelayURLs))
+			config.TestConfig.RegisterRelays(config.EthClient, config.RelayURLs, config.EthClient.GetAccountAddress())
+		}
 	}
 
 	return nil

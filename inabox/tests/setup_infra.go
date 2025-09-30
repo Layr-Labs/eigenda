@@ -19,6 +19,7 @@ type InfrastructureConfig struct {
 	MetadataTableName   string
 	BucketTableName     string
 	MetadataTableNameV2 string
+	RelayURLs           []string
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
@@ -104,7 +105,28 @@ func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, 
 	}
 	infra.ChainHarness = *chainHarness
 
-	// Setup Operator Harness second (requires chain to be ready)
+	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relay registration)
+	disperserHarnessConfig := &DisperserHarnessConfig{
+		Logger:              logger,
+		Network:             sharedDockerNetwork,
+		TestConfig:          testConfig,
+		InMemoryBlobStore:   config.InMemoryBlobStore,
+		LocalStackPort:      infra.LocalStackPort,
+		MetadataTableName:   config.MetadataTableName,
+		BucketTableName:     config.BucketTableName,
+		MetadataTableNameV2: config.MetadataTableNameV2,
+		EthClient:           infra.ChainHarness.EthClient,
+		RelayURLs:           config.RelayURLs,
+	}
+
+	disperserHarness, err := SetupDisperserHarness(setupCtx, disperserHarnessConfig)
+	if err != nil {
+		setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
+		return nil, setupErr
+	}
+	infra.DisperserHarness = *disperserHarness
+
+	// Setup Operator Harness third (requires chain and disperser to be ready)
 	operatorHarnessConfig := &OperatorHarnessConfig{
 		TestConfig:   testConfig,
 		TestName:     testName,
@@ -118,26 +140,6 @@ func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, 
 		return nil, setupErr
 	}
 	infra.OperatorHarness = *operatorHarness
-
-	// Setup Disperser Harness third (LocalStack, DynamoDB tables, S3 buckets)
-	disperserHarnessConfig := &DisperserHarnessConfig{
-		Logger:              logger,
-		Network:             sharedDockerNetwork,
-		TestConfig:          testConfig,
-		InMemoryBlobStore:   config.InMemoryBlobStore,
-		LocalStackPort:      infra.LocalStackPort,
-		MetadataTableName:   config.MetadataTableName,
-		BucketTableName:     config.BucketTableName,
-		MetadataTableNameV2: config.MetadataTableNameV2,
-		EthClient:           infra.ChainHarness.EthClient,
-	}
-
-	disperserHarness, err := SetupDisperserHarness(setupCtx, disperserHarnessConfig)
-	if err != nil {
-		setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
-		return nil, setupErr
-	}
-	infra.DisperserHarness = *disperserHarness
 
 	return infra, nil
 }

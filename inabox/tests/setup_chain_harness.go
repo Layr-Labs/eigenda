@@ -111,15 +111,6 @@ func SetupChainHarness(ctx context.Context, config *ChainHarnessConfig) (*ChainH
 	// Register blob versions
 	config.TestConfig.RegisterBlobVersions(harness.EthClient)
 
-	// Register relay URLs
-	relayURLs := []string{
-		"localhost:32035",
-		"localhost:32037",
-		"localhost:32039",
-		"localhost:32041",
-	}
-	config.TestConfig.RegisterRelays(harness.EthClient, relayURLs, harness.EthClient.GetAccountAddress())
-
 	// Step 4: Start Churner (requires deployed contracts)
 	config.Logger.Info("Starting churner server")
 	err = startChurner(harness, config)
