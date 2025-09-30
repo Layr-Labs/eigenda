@@ -70,7 +70,7 @@ func DeployAll(ctx *cli.Context) error {
 		return fmt.Errorf("failed to set environment variable: %w", err)
 	}
 
-	err = startChainInfra(ctx, config)
+	_, err = startChainInfra(ctx, config)
 	if err != nil {
 		return fmt.Errorf("start chain infra: %w", err)
 	}
@@ -106,7 +106,7 @@ func readTestConfig(ctx *cli.Context) (*deploy.Config, error) {
 }
 
 // Spins up an anvil chain and a graph node (if DeploySubgraphs=true)
-func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
+func startChainInfra(ctx *cli.Context, config *deploy.Config) (*testbed.AnvilContainer, error) {
 	// Create a shared Docker network for all containers
 	// TODO(samlaf): seems like there's no way with testcontainers-go@v0.38 to give this network a name...
 	// https://pkg.go.dev/github.com/testcontainers/testcontainers-go@v0.38.0/network#WithNetworkName
@@ -117,7 +117,7 @@ func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
 		network.WithAttachable(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create docker network: %w", err)
+		return nil, fmt.Errorf("failed to create docker network: %w", err)
 	}
 	logger.Info("Created Docker network", "name", dockerNetwork.Name)
 
@@ -126,9 +126,10 @@ func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
 		HostPort:       "8545",
 		Logger:         logger,
 		Network:        dockerNetwork,
+		BlockTime:      1,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start anvil container: %w", err)
+		return nil, fmt.Errorf("failed to start anvil container: %w", err)
 	}
 
 	if deployer, ok := config.GetDeployer(config.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
@@ -148,11 +149,11 @@ func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
 			EthereumRPC: anvilC.InternalEndpoint(),
 		})
 		if err != nil {
-			return fmt.Errorf("failed to start graph node: %w", err)
+			return nil, fmt.Errorf("failed to start graph node: %w", err)
 		}
 	}
 
-	return nil
+	return anvilC, nil
 
 }
 
