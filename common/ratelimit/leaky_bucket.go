@@ -217,7 +217,7 @@ func (lb *LeakyBucket) GetCapacity() float64 {
 	return lb.bucketCapacity
 }
 
-// Reconfigure bucket parameters. Preservers fill level. If the new bucket capacity is smaller than the current
+// Reconfigure bucket parameters. Preserves fill level. If the new bucket capacity is smaller than the current
 // fill level, the bucket will be overfilled (even if overfill is otherwise disallowed).
 func (lb *LeakyBucket) Reconfigure(
 	// how much "water" leaks out of the bucket per second
