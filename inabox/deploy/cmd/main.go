@@ -85,6 +85,26 @@ func DeployAll(ctx *cli.Context) error {
 		return fmt.Errorf("deploy experiment: %w", err)
 	}
 
+	logger.Info("Generating disperser keypair")
+	err = config.GenerateDisperserKeypair()
+	if err != nil {
+		logger.Errorf("could not generate disperser keypair: %v", err)
+		panic(err)
+	}
+
+	logger.Info("Registering blob version and relays")
+	config.RegisterBlobVersionAndRelays()
+
+	logger.Info("Registering disperser keypair on-chain")
+	config.PerformDisperserRegistrations()
+
+	logger.Info("Generating variables")
+	err = config.GenerateAllVariables()
+	if err != nil {
+		logger.Errorf("could not generate environment variables: %v", err)
+		panic(err)
+	}
+
 	logger.Info("Deployment complete. You can now run `make start-services` to start the services.")
 	return nil
 }

@@ -1,10 +1,13 @@
-package integration_test
+package integration
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -18,6 +21,7 @@ import (
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -40,41 +44,148 @@ type OperatorInstance struct {
 	Logger          logging.Logger
 }
 
-// StartOperatorForInfrastructure starts an operator node server as part of the global infrastructure.
-// This should be called after Anvil and the Churner are started.
-func StartOperatorForInfrastructure(
-	infra *InfrastructureHarness, operatorIndex int,
-) (*OperatorInstance, error) {
-	// Check that AnvilContainer is available
-	if infra.AnvilContainer == nil {
-		return nil, fmt.Errorf("AnvilContainer is not initialized")
+// OperatorHarnessConfig contains the configuration for setting up the operator harness
+type OperatorHarnessConfig struct {
+	TestConfig   *deploy.Config
+	TestName     string
+	Logger       logging.Logger
+	ChainHarness *ChainHarness // Access to chain infrastructure
+	Ctx          context.Context
+}
+
+// SetupOperatorHarness creates and initializes the operator harness
+func SetupOperatorHarness(ctx context.Context, config *OperatorHarnessConfig) (*OperatorHarness, error) {
+	harness := &OperatorHarness{
+		OperatorInstances: make([]*OperatorInstance, 0),
 	}
 
-	// Check that Churner has been started
-	if infra.ChurnerURL == "" {
-		return nil, fmt.Errorf("churner has not been started (ChurnerURL is empty)")
+	// Store references we'll need
+	harness.testConfig = config.TestConfig
+	harness.testName = config.TestName
+	harness.logger = config.Logger
+	harness.chainHarness = config.ChainHarness
+	harness.ctx = config.Ctx
+
+	// Start all operators
+	if err := harness.StartOperators(); err != nil {
+		return nil, err
 	}
 
-	// Get Anvil RPC URL from the container
-	anvilRPC := infra.AnvilContainer.RpcURL()
+	return harness, nil
+}
 
+// Add fields to OperatorHarness to support the methods
+type OperatorHarness struct {
+	OperatorInstances []*OperatorInstance
+
+	// Internal fields for operator management
+	testConfig   *deploy.Config
+	testName     string
+	logger       logging.Logger
+	chainHarness *ChainHarness
+	ctx          context.Context
+	srsG1Path    string
+	srsG2Path    string
+}
+
+// getSRSPaths returns the correct paths to SRS files based on the source file location.
+// This uses runtime.Caller to determine where this file is located and calculates
+// the relative path to the resources/srs directory from there.
+func getSRSPaths() (g1Path, g2Path string, err error) {
+	// Get the path of this source file
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", "", fmt.Errorf("failed to get caller information")
+	}
+
+	// We need to go up 2 directories from tests/ to get to inabox/, then up one more to get to the project root
+	// From project root, resources/srs is the target
+	testDir := filepath.Dir(filename)
+	inaboxDir := filepath.Dir(testDir)
+	projectRoot := filepath.Dir(inaboxDir)
+
+	g1Path = filepath.Join(projectRoot, "resources", "srs", "g1.point")
+	g2Path = filepath.Join(projectRoot, "resources", "srs", "g2.point")
+
+	return g1Path, g2Path, nil
+}
+
+// StartOperators starts all operator nodes configured in the test config
+func (oh *OperatorHarness) StartOperators() error {
+	// Get SRS paths first - fail early if we can't find them
+	g1Path, g2Path, err := getSRSPaths()
+	if err != nil {
+		return fmt.Errorf("failed to determine SRS file paths: %w", err)
+	}
+
+	// Store them in the harness for use by startOperator
+	oh.srsG1Path = g1Path
+	oh.srsG2Path = g2Path
+
+	// Check that chain dependencies are available
+	if oh.chainHarness == nil || oh.chainHarness.Anvil == nil {
+		return fmt.Errorf("AnvilContainer is not initialized")
+	}
+
+	if oh.chainHarness.Churner.URL == "" {
+		return fmt.Errorf("churner has not been started (ChurnerURL is empty)")
+	}
+
+	// Count how many operator configs exist
+	operatorCount := 0
+	for {
+		operatorName := fmt.Sprintf("opr%d", operatorCount)
+		if _, ok := oh.testConfig.Pks.EcdsaMap[operatorName]; !ok {
+			break
+		}
+		operatorCount++
+	}
+
+	if operatorCount == 0 {
+		return fmt.Errorf("no operators found in config")
+	}
+
+	oh.logger.Info("Starting operator goroutines", "count", operatorCount)
+
+	// Start each operator
+	for i := 0; i < operatorCount; i++ {
+		instance, err := oh.startOperator(i)
+		if err != nil {
+			// Clean up any operators we started before failing
+			oh.Cleanup(context.Background(), oh.logger)
+			return fmt.Errorf("failed to start operator %d: %w", i, err)
+		}
+		oh.OperatorInstances = append(oh.OperatorInstances, instance)
+		oh.logger.Info("Started operator", "index", i,
+			"dispersalPort", instance.DispersalPort, "retrievalPort", instance.RetrievalPort)
+	}
+
+	return nil
+}
+
+// startOperator starts a single operator with the given index
+func (oh *OperatorHarness) startOperator(operatorIndex int) (*OperatorInstance, error) {
 	// Get operator's private key
-	var privateKey string
 	operatorName := fmt.Sprintf("opr%d", operatorIndex)
 
 	// Check if operator exists in test config
-	if infra.TestConfig.Pks == nil || infra.TestConfig.Pks.EcdsaMap == nil {
+	if oh.testConfig.Pks == nil || oh.testConfig.Pks.EcdsaMap == nil {
 		return nil, fmt.Errorf("no private keys configured")
 	}
 
-	operatorKey, ok := infra.TestConfig.Pks.EcdsaMap[operatorName]
+	operatorKey, ok := oh.testConfig.Pks.EcdsaMap[operatorName]
 	if !ok {
 		return nil, fmt.Errorf("operator %s not found in config", operatorName)
 	}
-	privateKey = strings.TrimPrefix(operatorKey.PrivateKey, "0x")
+
+	// Get BLS key configuration
+	blsKey, blsOk := oh.testConfig.Pks.BlsMap[operatorName]
+	if !blsOk {
+		return nil, fmt.Errorf("BLS key for %s not found in config", operatorName)
+	}
 
 	// Create logs directory
-	logsDir := fmt.Sprintf("testdata/%s/logs", infra.TestName)
+	logsDir := fmt.Sprintf("testdata/%s/logs", oh.testName)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create logs directory: %w", err)
 	}
@@ -83,12 +194,6 @@ func StartOperatorForInfrastructure(
 	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open operator log file: %w", err)
-	}
-
-	// Get BLS key configuration - use the same operator name as for ECDSA key
-	blsKey, blsOk := infra.TestConfig.Pks.BlsMap[operatorName]
-	if !blsOk {
-		return nil, fmt.Errorf("BLS key for %s not found in config", operatorName)
 	}
 
 	// Create operator configuration
@@ -102,7 +207,7 @@ func StartOperatorForInfrastructure(
 	// TODO(dmanc): The node config is quite a beast. This is a configuration that
 	// passed the tests after a bunch of trial and error.
 	// We really need better validation on the node constructor.
-	operatorConfig := &node.Config{
+	nodeConfig := &node.Config{
 		Hostname:                       "localhost",
 		RetrievalPort:                  retrievalPort,
 		DispersalPort:                  dispersalPort,
@@ -121,17 +226,17 @@ func StartOperatorForInfrastructure(
 		ExpirationPollIntervalSec:      10,
 		EnableV1:                       true,
 		EnableV2:                       true,
-		DbPath:                         fmt.Sprintf("testdata/%s/db/operator_%d", infra.TestName, operatorIndex),
+		DbPath:                         fmt.Sprintf("testdata/%s/db/operator_%d", oh.testName, operatorIndex),
 		LogPath:                        logFilePath,
-		ChurnerUrl:                     infra.ChurnerURL,
+		ChurnerUrl:                     oh.chainHarness.Churner.URL,
 		EnableTestMode:                 true,
 		NumBatchValidators:             1,
 		QuorumIDList:                   []core.QuorumID{0, 1},
-		EigenDADirectory:               infra.TestConfig.EigenDA.EigenDADirectory,
+		EigenDADirectory:               oh.testConfig.EigenDA.EigenDADirectory,
 		DisableDispersalAuthentication: true, // TODO: set to false
 		EthClientConfig: geth.EthClientConfig{
-			RPCURLs:          []string{anvilRPC},
-			PrivateKeyString: privateKey,
+			RPCURLs:          []string{oh.chainHarness.GetAnvilRPCUrl()},
+			PrivateKeyString: strings.TrimPrefix(operatorKey.PrivateKey, "0x"),
 		},
 		LoggerConfig: common.LoggerConfig{
 			Format:       common.TextLogFormat,
@@ -146,9 +251,9 @@ func StartOperatorForInfrastructure(
 			PrivateKey: strings.TrimPrefix(blsKey.PrivateKey, "0x"),
 		},
 		EncoderConfig: kzg.KzgConfig{
-			G1Path:          "../resources/srs/g1.point",
-			G2Path:          "../resources/srs/g2.point",
-			CacheDir:        fmt.Sprintf("testdata/%s/cache/operator_%d", infra.TestName, operatorIndex),
+			G1Path:          oh.srsG1Path,
+			G2Path:          oh.srsG2Path,
+			CacheDir:        fmt.Sprintf("testdata/%s/cache/operator_%d", oh.testName, operatorIndex),
 			SRSOrder:        10000,
 			SRSNumberToLoad: 10000,
 			NumWorker:       4,
@@ -171,7 +276,7 @@ func StartOperatorForInfrastructure(
 	}
 
 	// Create operator logger
-	operatorLogger, err := common.NewLogger(&operatorConfig.LoggerConfig)
+	operatorLogger, err := common.NewLogger(&nodeConfig.LoggerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create operator logger: %w", err)
 	}
@@ -195,17 +300,17 @@ func StartOperatorForInfrastructure(
 	rpcCallsCollector := rpccalls.NewCollector(node.AppName, reg)
 
 	// Create geth client
-	gethClient, err := geth.NewInstrumentedEthClient(operatorConfig.EthClientConfig, rpcCallsCollector, operatorLogger)
+	gethClient, err := geth.NewInstrumentedEthClient(nodeConfig.EthClientConfig, rpcCallsCollector, operatorLogger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create geth client: %w", err)
 	}
 
 	// Create contract directory
 	contractDirectory, err := directory.NewContractDirectory(
-		infra.Ctx,
+		oh.ctx,
 		operatorLogger,
 		gethClient,
-		gethcommon.HexToAddress(operatorConfig.EigenDADirectory))
+		gethcommon.HexToAddress(nodeConfig.EigenDADirectory))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create contract directory: %w", err)
 	}
@@ -218,9 +323,9 @@ func StartOperatorForInfrastructure(
 
 	// Create node instance
 	operatorNode, err := node.NewNode(
-		infra.Ctx,
+		oh.ctx,
 		reg,
-		operatorConfig,
+		nodeConfig,
 		contractDirectory,
 		pubIPProvider,
 		gethClient,
@@ -233,7 +338,7 @@ func StartOperatorForInfrastructure(
 
 	// Create operator gRPC server
 	operatorServer := grpc.NewServer(
-		operatorConfig,
+		nodeConfig,
 		operatorNode,
 		operatorLogger,
 		ratelimiter,
@@ -242,16 +347,16 @@ func StartOperatorForInfrastructure(
 
 	// Create v2 server if enabled
 	var serverV2 *grpc.ServerV2
-	if operatorConfig.EnableV2 {
+	if nodeConfig.EnableV2 {
 		// Get operator state retriever and service manager addresses
 		operatorStateRetrieverAddress, err := contractDirectory.GetContractAddress(
-			infra.Ctx, directory.OperatorStateRetriever)
+			oh.ctx, directory.OperatorStateRetriever)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get OperatorStateRetriever address: %w", err)
 		}
 
 		eigenDAServiceManagerAddress, err := contractDirectory.GetContractAddress(
-			infra.Ctx, directory.ServiceManager)
+			oh.ctx, directory.ServiceManager)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get ServiceManager address: %w", err)
 		}
@@ -268,8 +373,8 @@ func StartOperatorForInfrastructure(
 
 		// Create v2 server
 		serverV2, err = grpc.NewServerV2(
-			infra.Ctx,
-			operatorConfig,
+			oh.ctx,
+			nodeConfig,
 			operatorNode,
 			operatorLogger,
 			ratelimiter,
@@ -282,7 +387,7 @@ func StartOperatorForInfrastructure(
 	}
 
 	// Start all gRPC servers using the new RunServers function
-	err = grpc.RunServers(operatorServer, serverV2, operatorConfig, operatorLogger)
+	err = grpc.RunServers(operatorServer, serverV2, nodeConfig, operatorLogger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start gRPC servers: %w", err)
 	}
@@ -309,50 +414,20 @@ func StartOperatorForInfrastructure(
 	}, nil
 }
 
-// StartOperatorsForInfrastructure starts all operator nodes configured in the test config
-func StartOperatorsForInfrastructure(infra *InfrastructureHarness) error {
-	// Check that AnvilContainer is available
-	if infra.AnvilContainer == nil {
-		return fmt.Errorf("AnvilContainer is not initialized")
+// Cleanup releases resources held by the OperatorHarness
+func (oh *OperatorHarness) Cleanup(ctx context.Context, logger logging.Logger) {
+	if len(oh.OperatorInstances) == 0 {
+		return
 	}
-
-	// Check that Churner has been started
-	if infra.ChurnerURL == "" {
-		return fmt.Errorf("churner has not been started (ChurnerURL is empty)")
-	}
-
-	// Count how many operator configs exist
-	operatorCount := 0
-	for {
-		operatorName := fmt.Sprintf("opr%d", operatorCount)
-		if _, ok := infra.TestConfig.Pks.EcdsaMap[operatorName]; !ok {
-			break
+	logger.Info("Stopping all operator goroutines")
+	for i, instance := range oh.OperatorInstances {
+		if instance == nil {
+			continue
 		}
-		operatorCount++
+		logger.Info("Stopping operator", "index", i)
+		StopOperator(instance)
 	}
-
-	if operatorCount == 0 {
-		return fmt.Errorf("no operators found in config")
-	}
-
-	infra.Logger.Info("Starting operator goroutines", "count", operatorCount)
-
-	// Start each operator
-	for i := 0; i < operatorCount; i++ {
-		instance, err := StartOperatorForInfrastructure(infra, i)
-		if err != nil {
-			// Clean up any operators we started before failing
-			for _, inst := range infra.OperatorInstances {
-				StopOperator(inst)
-			}
-			return fmt.Errorf("failed to start operator %d: %w", i, err)
-		}
-		infra.OperatorInstances = append(infra.OperatorInstances, instance)
-		infra.Logger.Info("Started operator", "index", i,
-			"dispersalPort", instance.DispersalPort, "retrievalPort", instance.RetrievalPort)
-	}
-
-	return nil
+	oh.OperatorInstances = nil
 }
 
 // StopOperator gracefully stops an operator instance
@@ -368,16 +443,37 @@ func StopOperator(instance *OperatorInstance) {
 	instance.Logger.Info("Operator stopped")
 }
 
-// StopAllOperators stops all operator instances in the infrastructure
-func StopAllOperators(infra *InfrastructureHarness) {
-	if infra == nil || len(infra.OperatorInstances) == 0 {
-		return
+// StartOperatorForInfrastructure is a compatibility wrapper for existing code.
+// It creates a temporary OperatorHarness and starts a single operator.
+// New code should use OperatorHarness.startOperator directly.
+func StartOperatorForInfrastructure(
+	infra *InfrastructureHarness, operatorIndex int,
+) (*OperatorInstance, error) {
+	// Create a temporary harness with the infrastructure references
+	harness := &OperatorHarness{
+		testConfig:   infra.TestConfig,
+		testName:     infra.TestName,
+		logger:       infra.Logger,
+		chainHarness: &infra.ChainHarness,
+		ctx:          infra.Ctx,
 	}
 
-	infra.Logger.Info("Stopping all operator goroutines")
-	for i, instance := range infra.OperatorInstances {
-		infra.Logger.Info("Stopping operator", "index", i)
-		StopOperator(instance)
+	return harness.startOperator(operatorIndex)
+}
+
+// StartOperatorsForInfrastructure is a compatibility wrapper for existing code.
+// It updates the infrastructure's OperatorHarness with all started operators.
+// New code should use SetupOperatorHarness and OperatorHarness.StartOperators directly.
+func StartOperatorsForInfrastructure(infra *InfrastructureHarness) error {
+	// Set up the operator harness with references from infrastructure
+	infra.OperatorHarness = OperatorHarness{
+		testConfig:   infra.TestConfig,
+		testName:     infra.TestName,
+		logger:       infra.Logger,
+		chainHarness: &infra.ChainHarness,
+		ctx:          infra.Ctx,
 	}
-	infra.OperatorInstances = nil
+
+	// Start all operators
+	return infra.OperatorHarness.StartOperators()
 }

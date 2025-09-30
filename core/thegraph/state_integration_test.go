@@ -52,17 +52,17 @@ func setupTest(t *testing.T) *inaboxtests.InfrastructureHarness {
 	// Start all the necessary infrastructure like anvil, graph node, and eigenda components
 	// TODO(dmanc): We really only need to register operators on chain, maybe add some sort of
 	// configuration to allow that mode.
-	infraHarness, err := inaboxtests.SetupGlobalInfrastructure(config)
+	infraHarness, err := inaboxtests.SetupInfrastructure(config)
 	require.NoError(t, err, "failed to setup global infrastructure")
 
 	// Update the graph URL to use the container from infrastructure
-	if infraHarness.GraphNodeContainer != nil {
-		graphUrl = infraHarness.GraphNodeContainer.HTTPURL() + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
+	if infraHarness.ChainHarness.GraphNode != nil {
+		graphUrl = infraHarness.ChainHarness.GraphNode.HTTPURL() + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
 	}
 
 	t.Cleanup(func() {
 		logger.Info("Tearing down test infrastructure")
-		inaboxtests.TeardownGlobalInfrastructure(infraHarness)
+		inaboxtests.TeardownInfrastructure(infraHarness)
 	})
 
 	return infraHarness
