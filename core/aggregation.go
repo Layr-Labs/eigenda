@@ -110,7 +110,7 @@ func NewStdSignatureAggregator(logger logging.Logger, transactor Reader) (*StdSi
 	}
 
 	return &StdSignatureAggregator{
-		Logger: logger.With("component", "SignatureAggregator"),
+		Logger:            logger.With("component", "SignatureAggregator"),
 		Transactor:        transactor,
 		OperatorAddresses: operatorAddrs,
 	}, nil

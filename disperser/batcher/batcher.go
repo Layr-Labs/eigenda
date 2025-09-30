@@ -589,8 +589,8 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	indexedOperatorState, err := b.ChainState.GetIndexedOperatorState(
-		ctx, 
-		batch.BatchHeader.ReferenceBlockNumber, 
+		ctx,
+		batch.BatchHeader.ReferenceBlockNumber,
 		nonEmptyQuorums)
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
