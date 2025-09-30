@@ -81,14 +81,14 @@ func TestEndToEndScenario(t *testing.T) {
 			require.NoError(t, err)
 
 			if *blobStatus1 != disperser.Confirmed || *blobStatus2 != disperser.Confirmed {
-				MineAnvilBlocks(t, testHarness.RPCClient, testHarness.NumConfirmations+1)
+				integration.MineAnvilBlocks(t, testHarness.RPCClient, testHarness.NumConfirmations+1)
 				continue
 			}
 			blobHeader := blobHeaderFromProto(reply1.GetInfo().GetBlobHeader())
 			verificationProof := blobVerificationProofFromProto(reply1.GetInfo().GetBlobVerificationProof())
 			err = testHarness.EigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
 			require.NoError(t, err)
-			MineAnvilBlocks(t, testHarness.RPCClient, testHarness.NumConfirmations+1)
+			integration.MineAnvilBlocks(t, testHarness.RPCClient, testHarness.NumConfirmations+1)
 
 			blobHeader = blobHeaderFromProto(reply2.GetInfo().GetBlobHeader())
 			verificationProof = blobVerificationProofFromProto(reply2.GetInfo().GetBlobVerificationProof())

@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
-	integration_test "github.com/Layr-Labs/eigenda/inabox/tests"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	integration "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
@@ -39,7 +41,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 	originalDir, err := os.Getwd()
 	require.NoError(t, err)
 
-	infraConfig := &integration_test.InfrastructureConfig{
+	infraConfig := &integration.InfrastructureConfig{
 		TemplateName:                    "testconfig-anvil.yaml",
 		TestName:                        "",
 		InMemoryBlobStore:               false,
@@ -53,22 +55,22 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		ControllerUseNewPayments:  controllerUseNewPayments,
 	}
 
-	infra, err := integration_test.SetupGlobalInfrastructure(infraConfig)
+	infra, err := integration.SetupInfrastructure(infraConfig)
 	require.NoError(t, err)
 
-	testHarness, err := integration_test.NewTestHarnessWithSetup(infra)
+	testHarness, err := integration.NewTestHarnessWithSetup(infra)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		testHarness.Cleanup()
-		integration_test.TeardownGlobalInfrastructure(infra)
+		integration.TeardownInfrastructure(infra)
 
 		if err := os.Chdir(originalDir); err != nil {
 			t.Logf("Failed to restore working directory: %v", err)
 		}
 	})
 
-	integration_test.MineAnvilBlocks(t, testHarness.RPCClient, 6)
+	integration.MineAnvilBlocks(t, testHarness.RPCClient, 6)
 
 	payloadSize := 1000
 	testDuration := 1 * time.Minute
