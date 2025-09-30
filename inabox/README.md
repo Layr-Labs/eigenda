@@ -42,12 +42,13 @@ This will start the devnet and print this log output:
 Export these variables:
 export ETH_RPC_URL=http://localhost:8545
 export EIGENDA_DIRECTORY_ADDR=0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8
-export EIGENDA_CERT_VERIFIER_ROUTER=$(cast call $EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER")
+export EIGENDA_CERT_VERIFIER_ROUTER_ADDR=$(cast call $EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER")
 export EIGENDA_DISPERSER_V1_URL=localhost:32003
 export EIGENDA_DISPERSER_V2_URL=localhost:32005
+export EIGENDA_PROXY_URL=http://localhost:3100
 
 You can query other contract addresses from the directory:
-cast call $EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER"
+cast call $EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "SERVICE_MANAGER"
 You can query the disperser v2 by using:
 grpcurl -plaintext $EIGENDA_DISPERSER_V2_URL list
 
@@ -57,6 +58,9 @@ Run 'docker ps' to see and manage them.
 EigenDA services (disperser, validators, etc) are ran as local processes.
 Their config is available under /Users/samlaf/devel/eigenda/inabox/testdata/_latest/envs
 Their logs are available under /Users/samlaf/devel/eigenda/inabox/testdata/_latest/logs
+
+To disperse a blob via the proxy, run:
+curl -X POST -d my-eigenda-payload "$EIGENDA_PROXY_URL/put?commitment_mode=standard"
 ```
 
 It can also be stopped by running:
@@ -78,14 +82,9 @@ make start-services
 ### Send V2 traffic via proxy
 
 Dispersing blobs to the V2 disperser requires authentication in the form of an ECDSA signature, so is harder to do using grpcurl only.
-See https://docs.eigencloud.xyz/products/eigenda/integrations-guides/quick-start/v2/ for more details. We will soon add a proxy instance to inabox that will make dispersing blobs to V2 easier. In the meantime, you can spin one up manually by running:
-```bash
-# This key contains a reservation (setup in contracts/script/SetUpEigenDA.s.sol)
-export EIGENDA_V2_DISPERSAL_SIGNER_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded
+See https://docs.eigencloud.xyz/products/eigenda/integrations-guides/quick-start/v2/ for details on how to do this using our golang clients. 
 
-../api/proxy/bin/eigenda-proxy --storage.dispersal-backend v2 --storage.backends-to-enable v2 --apis.enabled standard --eigenda.v2.cert-verifier-router-or-immutable-verifier-addr $EIGENDA_CERT_VERIFIER_ROUTER --eigenda.v2.eth-rpc $ETH_RPC_URL --eigenda.v2.signer-payment-key-hex $EIGENDA_V2_DISPERSAL_SIGNER_KEY --eigenda.v2.disperser-rpc $EIGENDA_DISPERSER_V2_URL --eigenda.v2.eigenda-directory $EIGENDA_DIRECTORY_ADDR --eigenda.v2.disable-tls --eigenda.g1-path ../resources/srs/g1.point --eigenda.g2-path ../resources/srs/g2.point --eigenda.g2-path-trailing ../resources/srs/g2.trailing.point
-```
-and then you can disperse to it using `curl -X POST -d my-eigenda-payload "http://localhost:3100/put?commitment_mode=standard"`.
+Inabox does spin up a proxy which you can use to disperse payloads (that proxy encodes into blobs):  `curl -X POST -d my-eigenda-payload "http://localhost:3100/put?commitment_mode=standard"`.
 
 ### Send V1 traffic via grpcurl
 

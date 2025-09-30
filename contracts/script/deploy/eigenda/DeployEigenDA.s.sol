@@ -34,6 +34,7 @@ import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IService
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
+import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
 
 import {MockStakeRegistry} from "test/mock/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "test/mock/MockRegistryCoordinator.sol";
@@ -42,8 +43,10 @@ import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
 
 import {InitParamsLib} from "script/deploy/eigenda/DeployEigenDAConfig.sol";
 
-import {EigenDADirectory} from "src/core/EigenDADirectory.sol";
 import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
+import {AccessControlConstants} from "src/core/libraries/v3/access-control/AccessControlConstants.sol";
+import {EigenDADirectory} from "src/core/EigenDADirectory.sol";
+import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
 
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
@@ -53,17 +56,17 @@ import {console2} from "forge-std/console2.sol";
 contract DeployEigenDA is Script {
     using InitParamsLib for string;
 
-    string constant EMPTY_CONTRACT = "EMPTY_CONTRACT";
-    string constant MOCK_STAKE_REGISTRY = "MOCK_STAKE_REGISTRY";
-    string constant MOCK_REGISTRY_COORDINATOR = "MOCK_REGISTRY_COORDINATOR";
+    EigenDADirectory directory;
+    address proxyAdmin;
 
     mapping(string => address) impl; // Implementation addresses of the deployed contracts.
     mapping(string => bool) upgraded; // Whether the deployment of a contract is upgraded to its final implementation. Should beTrue if the contract is not a proxy
 
-    ProxyAdmin proxyAdmin;
-    EigenDADirectory directory;
-
     string cfg;
+
+    string constant EMPTY_CONTRACT = "EMPTY_CONTRACT";
+    string constant MOCK_STAKE_REGISTRY = "MOCK_STAKE_REGISTRY";
+    string constant MOCK_REGISTRY_COORDINATOR = "MOCK_REGISTRY_COORDINATOR";
 
     function initConfig() internal virtual {
         cfg = vm.readFile(vm.envString("DEPLOY_CONFIG_PATH"));
@@ -73,19 +76,25 @@ contract DeployEigenDA is Script {
         initConfig();
         vm.startBroadcast();
 
-        proxyAdmin = new ProxyAdmin();
+        // DEPLOY PROXY ADMIN
+        proxyAdmin = address(new ProxyAdmin());
+
+        /// These steps are done after the main deployment because not all eigenDA contracts use these contracts yet.
+        /// So these contracts can be considered to live somewhere in the "periphery" of the eigenDA system for now.
+
+        /// DEPLOY EIGENDA DIRECTORY AND ACCESS CONTROL
 
         directory = EigenDADirectory(
             address(
                 new TransparentUpgradeableProxy(
                     address(new EigenDADirectory()),
-                    address(proxyAdmin),
-                    abi.encodeWithSelector(
-                        EigenDADirectory.initialize.selector, address(new EigenDAAccessControl(msg.sender))
-                    )
+                    proxyAdmin,
+                    abi.encodeCall(EigenDADirectory.initialize, (address(new EigenDAAccessControl(msg.sender))))
                 )
             )
         );
+
+        console2.log("DIRECTORY:", address(directory));
 
         // DEPLOY MOCK IMPLEMENTATION
         impl[EMPTY_CONTRACT] = address(new EmptyContract());
@@ -105,21 +114,23 @@ contract DeployEigenDA is Script {
         // SERVICE MANAGER
         directory.addAddress(
             AddressDirectoryConstants.INDEX_REGISTRY_NAME,
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], proxyAdmin, ""))
         );
+
         directory.addAddress(
             AddressDirectoryConstants.SOCKET_REGISTRY_NAME,
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], proxyAdmin, ""))
         );
+
         directory.addAddress(
             AddressDirectoryConstants.BLS_APK_REGISTRY_NAME,
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], proxyAdmin, ""))
         );
         impl[MOCK_STAKE_REGISTRY] = address(new MockStakeRegistry(IDelegationManager(cfg.delegationManager())));
         // The service manager implementation requires the stake registry to expose the delegation manager on construction.
         directory.addAddress(
             AddressDirectoryConstants.STAKE_REGISTRY_NAME,
-            address(new TransparentUpgradeableProxy(impl[MOCK_STAKE_REGISTRY], address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(impl[MOCK_STAKE_REGISTRY], proxyAdmin, ""))
         );
         // The service manager implementation requires the registry coordinator to expose the stake registry and bls APK registry on construction.
         // And this can only be done after the stake registry and bls APK registry proxies are known.
@@ -131,31 +142,31 @@ contract DeployEigenDA is Script {
         );
         directory.addAddress(
             AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME,
-            address(new TransparentUpgradeableProxy(impl[MOCK_REGISTRY_COORDINATOR], address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(impl[MOCK_REGISTRY_COORDINATOR], proxyAdmin, ""))
         );
         directory.addAddress(
             AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME,
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], proxyAdmin, ""))
         );
         directory.addAddress(
             AddressDirectoryConstants.RELAY_REGISTRY_NAME,
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], proxyAdmin, ""))
         );
         directory.addAddress(
             AddressDirectoryConstants.DISPERSER_REGISTRY_NAME,
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
-        );
-        directory.addAddress(
-            AddressDirectoryConstants.PAYMENT_VAULT_NAME,
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], proxyAdmin, ""))
         );
         directory.addAddress(
             AddressDirectoryConstants.SERVICE_MANAGER_NAME,
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], proxyAdmin, ""))
+        );
+        directory.addAddress(
+            AddressDirectoryConstants.PAYMENT_VAULT_NAME,
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], proxyAdmin, ""))
         );
         directory.addAddress(
             AddressDirectoryConstants.EJECTION_MANAGER_NAME,
-            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], proxyAdmin, ""))
         );
 
         impl[AddressDirectoryConstants.INDEX_REGISTRY_NAME] = address(
@@ -176,6 +187,20 @@ contract DeployEigenDA is Script {
         impl[AddressDirectoryConstants.SOCKET_REGISTRY_NAME] = address(
             new SocketRegistry(
                 IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME))
+            )
+        );
+        upgrade(AddressDirectoryConstants.SOCKET_REGISTRY_NAME, "");
+
+        impl[AddressDirectoryConstants.BLS_APK_REGISTRY_NAME] = address(
+            new BLSApkRegistry(
+                IRegistryCoordinator(directory.getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME))
+            )
+        );
+        upgrade(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME, "");
+
+        impl[AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME] = address(
+            new EigenDARegistryCoordinator(
+                address(directory)
             )
         );
         upgrade(AddressDirectoryConstants.SOCKET_REGISTRY_NAME, "");
@@ -259,14 +284,13 @@ contract DeployEigenDA is Script {
 
         impl[AddressDirectoryConstants.RELAY_REGISTRY_NAME] = address(new EigenDARelayRegistry());
         upgrade(
-            AddressDirectoryConstants.RELAY_REGISTRY_NAME,
-            abi.encodeCall(EigenDARelayRegistry.initialize, (cfg.initialOwner()))
+            AddressDirectoryConstants.RELAY_REGISTRY_NAME, abi.encodeCall(EigenDARelayRegistry.initialize, (msg.sender))
         );
 
         impl[AddressDirectoryConstants.DISPERSER_REGISTRY_NAME] = address(new EigenDADisperserRegistry());
         upgrade(
             AddressDirectoryConstants.DISPERSER_REGISTRY_NAME,
-            abi.encodeCall(EigenDADisperserRegistry.initialize, (cfg.initialOwner()))
+            abi.encodeCall(EigenDADisperserRegistry.initialize, (msg.sender))
         );
 
         impl[AddressDirectoryConstants.PAYMENT_VAULT_NAME] = address(new PaymentVault());
@@ -285,7 +309,6 @@ contract DeployEigenDA is Script {
                 )
             )
         );
-
         directory.addAddress(
             AddressDirectoryConstants.OPERATOR_STATE_RETRIEVER_NAME, address(new OperatorStateRetriever())
         );
@@ -302,20 +325,64 @@ contract DeployEigenDA is Script {
             )
         );
 
-        proxyAdmin.transferOwnership(cfg.initialOwner());
+        address routerImpl = address(new EigenDACertVerifierRouter());
+        address[] memory certVerifiers = new address[](1);
+
+        certVerifiers[0] = directory.getAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME);
+
+        directory.addAddress(
+            AddressDirectoryConstants.CERT_VERIFIER_ROUTER_NAME,
+            address(
+                new TransparentUpgradeableProxy(
+                    routerImpl,
+                    proxyAdmin,
+                    abi.encodeWithSelector(
+                        EigenDACertVerifierRouter.initialize.selector,
+                        cfg.initialOwner(),
+                        new uint32[](1), // equivalent to [0]
+                        certVerifiers
+                    )
+                )
+            )
+        );
+
+        ProxyAdmin(proxyAdmin).transferOwnership(cfg.initialOwner());
+        EigenDAAccessControl accessControl =
+            EigenDAAccessControl(directory.getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME));
+
+        for (uint256 i; i < cfg.dispersers().length; i++) {
+            IEigenDADisperserRegistry(directory.getAddress(AddressDirectoryConstants.DISPERSER_REGISTRY_NAME))
+                .setDisperserInfo(uint32(i), DATypesV2.DisperserInfo(cfg.dispersers()[i]));
+        }
+
+        for (uint256 i; i < cfg.relayInfos().length; i++) {
+            IEigenDARelayRegistry(directory.getAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME)).addRelayInfo(
+                cfg.relayInfos()[i]
+            );
+        }
+
+        if (msg.sender != cfg.initialOwner()) {
+            accessControl.grantRole(accessControl.DEFAULT_ADMIN_ROLE(), cfg.initialOwner());
+            accessControl.grantRole(AccessControlConstants.OWNER_ROLE, cfg.initialOwner());
+            accessControl.revokeRole(AccessControlConstants.OWNER_ROLE, msg.sender);
+            accessControl.revokeRole(accessControl.DEFAULT_ADMIN_ROLE(), msg.sender);
+            EigenDADisperserRegistry(directory.getAddress(AddressDirectoryConstants.DISPERSER_REGISTRY_NAME))
+                .transferOwnership(cfg.initialOwner());
+            EigenDARelayRegistry(directory.getAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME)).transferOwnership(
+                cfg.initialOwner()
+            );
+        }
 
         vm.stopBroadcast();
     }
 
     function upgrade(string memory contractName, bytes memory initData) internal {
-        require(!upgraded[contractName], string.concat("Contract already upgraded: ", contractName));
-
         address implementation = impl[contractName];
         TransparentUpgradeableProxy proxy = TransparentUpgradeableProxy(payable(directory.getAddress(contractName)));
 
-        proxyAdmin.upgrade(proxy, implementation);
+        ProxyAdmin(proxyAdmin).upgrade(proxy, implementation);
         if (initData.length > 0) {
-            proxyAdmin.upgradeAndCall(proxy, implementation, initData);
+            ProxyAdmin(proxyAdmin).upgradeAndCall(proxy, implementation, initData);
         }
         upgraded[contractName] = true;
     }

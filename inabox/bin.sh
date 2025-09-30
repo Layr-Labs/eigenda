@@ -223,6 +223,16 @@ function start_detached {
         waiters="$waiters $!"
     done
 
+    for FILE in $(ls $testpath/envs/proxy*.env); do
+        set -a
+        source $FILE
+        set +a
+        ../api/proxy/bin/eigenda-proxy > $testpath/logs/proxy.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+    done
+
     echo $pids > $pid_file
 
     for waiter in $waiters; do
@@ -342,6 +352,8 @@ function start_detached_for_tests {
         ./wait-for 0.0.0.0:${NODE_DISPERSAL_PORT} -- echo "Node up" &
         waiters="$waiters $!"
     done
+
+    # We don't spin up a proxy here because they are not needed for tests currently.
 
     echo $pids > $pid_file
 

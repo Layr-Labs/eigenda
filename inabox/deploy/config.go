@@ -360,6 +360,32 @@ func (env *Config) generateControllerVars(
 	return v
 }
 
+func (env *Config) generateProxyVars(ind int) ProxyVars {
+	v := ProxyVars{
+		EIGENDA_PROXY_APIS_TO_ENABLE:             "op-generic,standard,metrics",
+		EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE: "V2", // we only enable V2
+		EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND:  "V2",
+		// V2 Variables
+		// TODO(samlaf): this private key should be read from the output config file instead of hardcoded.
+		EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded",
+		// TODO(samlaf): this should not be hardcoded
+		EIGENDA_PROXY_EIGENDA_V2_ETH_RPC:                                         "http://localhost:8545",
+		EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH:                                 "16MiB",
+		EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR: env.EigenDA.CertVerifierRouter,
+		EIGENDA_PROXY_EIGENDA_V2_RBN_RECENCY_WINDOW_SIZE:                         "0",
+		// TODO(samlaf): this should not be hardcoded
+		EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC:     "localhost:32005",
+		EIGENDA_PROXY_EIGENDA_V2_EIGENDA_DIRECTORY: env.EigenDA.EigenDADirectory,
+		EIGENDA_PROXY_EIGENDA_V2_GRPC_DISABLE_TLS:  "true",
+		// SRS paths
+		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH:          "../resources/srs/g1.point",
+		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH:          "../resources/srs/g2.point",
+		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH: "../resources/srs/g2.trailing.point",
+	}
+	env.applyDefaults(&v, "EIGENDA_PROXY", "proxy", ind)
+	return v
+}
+
 func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVars {
 	v := RelayVars{
 		RELAY_LOG_FORMAT:                            "text",
@@ -792,6 +818,15 @@ func (env *Config) GenerateAllVariables() error {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Controller = controllerConfig
+
+	// Proxy
+	name = "proxy0"
+	_, _, _, envFile = env.getPaths(name)
+	proxyConfig := env.generateProxyVars(0)
+	if err := writeEnv(proxyConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
+	env.Proxy = proxyConfig
 
 	if env.Environment.IsLocal() {
 

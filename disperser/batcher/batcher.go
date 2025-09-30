@@ -588,11 +588,18 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		nonEmptyQuorums = append(nonEmptyQuorums, quorumID)
 	}
 
+	indexedOperatorState, err := b.ChainState.GetIndexedOperatorState(
+		ctx,
+		batch.BatchHeader.ReferenceBlockNumber,
+		nonEmptyQuorums)
+	if err != nil {
+		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
+		return fmt.Errorf("HandleSingleBatch: error getting indexed operator state: %w", err)
+	}
+
 	// Aggregate the signatures across only the non-empty quorums. Excluding empty quorums reduces the gas cost.
 	aggSig, err := b.Aggregator.AggregateSignatures(
-		ctx,
-		b.ChainState,
-		batch.BatchHeader.ReferenceBlockNumber,
+		indexedOperatorState,
 		quorumAttestation,
 		nonEmptyQuorums)
 	if err != nil {
