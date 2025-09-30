@@ -194,10 +194,10 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 				}
 			}
 
-			idexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorumIDs)
+			indexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorumIDs)
 			require.NoError(t, err)
 
-			sigAgg, err := agg.AggregateSignatures(idexedOperatorState, aq, quorumIDs)
+			sigAgg, err := agg.AggregateSignatures(indexedOperatorState, aq, quorumIDs)
 			assert.NoError(t, err)
 
 			for i, quorum := range tt.quorums {
