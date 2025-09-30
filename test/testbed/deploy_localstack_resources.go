@@ -25,6 +25,7 @@ type DeployResourcesConfig struct {
 	LocalStackEndpoint  string
 	MetadataTableName   string
 	BucketTableName     string
+	BucketName          string         // Optional: S3 bucket name, defaults to "test-eigenda-blobstore"
 	V2MetadataTableName string
 	V2PaymentPrefix     string         // Optional: prefix for v2 payment tables, defaults to "e2e_v2_"
 	Region              string         // Optional: AWS region, defaults to "us-east-1"
@@ -65,6 +66,9 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 	if config.V2PaymentPrefix == "" {
 		config.V2PaymentPrefix = "e2e_v2_"
 	}
+	if config.BucketName == "" {
+		config.BucketName = "test-eigenda-blobstore"
+	}
 
 	// Create AWS client config
 	cfg := aws.ClientConfig{
@@ -75,7 +79,7 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 	}
 
 	// Create S3 bucket
-	if err := createS3Bucket(ctx, cfg, logger); err != nil {
+	if err := createS3Bucket(ctx, cfg, config.BucketName, logger); err != nil {
 		return fmt.Errorf("failed to create S3 bucket: %w", err)
 	}
 
@@ -121,8 +125,7 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 }
 
 // createS3Bucket creates the S3 bucket using the AWS SDK
-func createS3Bucket(ctx context.Context, cfg aws.ClientConfig, logger logging.Logger) error {
-	bucketName := "test-eigenda-blobstore"
+func createS3Bucket(ctx context.Context, cfg aws.ClientConfig, bucketName string, logger logging.Logger) error {
 
 	// Create AWS SDK config with custom endpoint resolver
 	customResolver := awssdk.EndpointResolverWithOptionsFunc(

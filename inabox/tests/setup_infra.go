@@ -18,6 +18,7 @@ type InfrastructureConfig struct {
 	Logger              logging.Logger
 	MetadataTableName   string
 	BucketTableName     string
+	S3BucketName        string
 	MetadataTableNameV2 string
 	RelayURLs           []string
 }
@@ -105,21 +106,24 @@ func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, 
 	}
 	infra.ChainHarness = *chainHarness
 
-	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relay registration)
+	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
 	disperserHarnessConfig := &DisperserHarnessConfig{
 		Logger:              logger,
 		Network:             sharedDockerNetwork,
 		TestConfig:          testConfig,
+		TestName:            testName,
 		InMemoryBlobStore:   config.InMemoryBlobStore,
 		LocalStackPort:      infra.LocalStackPort,
 		MetadataTableName:   config.MetadataTableName,
 		BucketTableName:     config.BucketTableName,
+		S3BucketName:        config.S3BucketName,
 		MetadataTableNameV2: config.MetadataTableNameV2,
 		EthClient:           infra.ChainHarness.EthClient,
 		RelayURLs:           config.RelayURLs,
+		infraCtx:            infraCtx,
 	}
 
-	disperserHarness, err := SetupDisperserHarness(setupCtx, disperserHarnessConfig)
+	disperserHarness, err := SetupDisperserHarness(setupCtx, *disperserHarnessConfig)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
 		return nil, setupErr
