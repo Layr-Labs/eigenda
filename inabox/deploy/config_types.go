@@ -197,6 +197,7 @@ type Config struct {
 	Retriever  RetrieverVars
 	Controller ControllerVars
 	Relays     []RelayVars
+	Proxy      ProxyVars
 
 	localstackEndpoint string
 	localstackRegion   string

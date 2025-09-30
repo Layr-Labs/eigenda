@@ -27,6 +27,7 @@ start-inabox: new-testdata-dir start-infra start-services
 	@echo 'export EIGENDA_CERT_VERIFIER_ROUTER_ADDR=$$(cast call $$EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER")'
 	@echo "export EIGENDA_DISPERSER_V1_URL=localhost:32003"
 	@echo "export EIGENDA_DISPERSER_V2_URL=localhost:32005"
+	@echo "export EIGENDA_PROXY_URL=http://localhost:3100"
 	@echo
 	@echo "You can query other contract addresses from the directory:"
 	@echo 'cast call $$EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "SERVICE_MANAGER"'
@@ -39,6 +40,9 @@ start-inabox: new-testdata-dir start-infra start-services
 	@echo "EigenDA services (disperser, validators, etc) are ran as local processes."
 	@echo "Their config is available under `pwd`/testdata/_latest/envs"
 	@echo "Their logs are available under `pwd`/testdata/_latest/logs"
+	@echo
+	@echo "To disperse a blob via the proxy, run:"
+	@echo 'curl -X POST -d my-eigenda-payload "$$EIGENDA_PROXY_URL/put?commitment_mode=standard"'
 
 stop-inabox: stop-services stop-infra
 
@@ -91,3 +95,10 @@ start-services:
 
 stop-services:
 	./bin.sh stop-detached
+
+############################################################################
+#                               Tools                                      #
+############################################################################
+
+gen:
+	cd ./deploy/codegen && ./gen.sh
