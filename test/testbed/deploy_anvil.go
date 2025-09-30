@@ -51,7 +51,7 @@ func NewAnvilContainerWithOptions(ctx context.Context, opts AnvilOptions) (*Anvi
 	// Note: foundry image uses ENTRYPOINT ["/bin/sh", "-c"], so we need a single shell command string
 	cmd := "anvil"
 	if opts.BlockTime > 0 {
-		cmd = fmt.Sprintf("anvil --block-time %d", opts.BlockTime)
+		cmd = fmt.Sprintf("anvil --block-time %d --mixed-mining", opts.BlockTime)
 	}
 
 	req := testcontainers.ContainerRequest{

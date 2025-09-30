@@ -70,7 +70,7 @@ func DeployAll(ctx *cli.Context) error {
 		return fmt.Errorf("failed to set environment variable: %w", err)
 	}
 
-	anvilC, err := startChainInfra(ctx, config)
+	_, err = startChainInfra(ctx, config)
 	if err != nil {
 		return fmt.Errorf("start chain infra: %w", err)
 	}
@@ -83,15 +83,6 @@ func DeployAll(ctx *cli.Context) error {
 	err = config.DeployExperiment()
 	if err != nil {
 		return fmt.Errorf("deploy experiment: %w", err)
-	}
-
-	// Enable interval mining after contract deployment
-	// This gives us instant mining during deployment (for speed),
-	// but regular block intervals after deployment (for testing)
-	logger.Info("Setting interval mining to 1 second")
-	err = anvilC.SetIntervalMining(ctx.Context, 1)
-	if err != nil {
-		return fmt.Errorf("set interval mining: %w", err)
 	}
 
 	logger.Info("Deployment complete. You can now run `make start-services` to start the services.")
@@ -135,6 +126,7 @@ func startChainInfra(ctx *cli.Context, config *deploy.Config) (*testbed.AnvilCon
 		HostPort:       "8545",
 		Logger:         logger,
 		Network:        dockerNetwork,
+		BlockTime:      1,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start anvil container: %w", err)
