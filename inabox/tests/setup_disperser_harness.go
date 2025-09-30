@@ -257,8 +257,9 @@ func startRelay(
 		Format:       common.TextLogFormat,
 		OutputWriter: io.MultiWriter(os.Stdout, logFile),
 		HandlerOpts: logging.SLoggerOptions{
-			Level:   slog.LevelDebug,
-			NoColor: true,
+			Level:     slog.LevelDebug,
+			NoColor:   true,
+			AddSource: true,
 		},
 	}
 
