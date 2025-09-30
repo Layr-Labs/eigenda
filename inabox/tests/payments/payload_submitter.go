@@ -27,7 +27,8 @@ func SubmitPayloads(
 		defer cancel()
 		startTime := time.Now()
 
-		ticker := time.NewTicker(time.Duration(1000/blobsPerSecond) * time.Millisecond)
+		secondsPerBlob := time.Duration(1.0 / blobsPerSecond * float32(time.Second))
+		ticker := time.NewTicker(secondsPerBlob)
 		defer ticker.Stop()
 
 		var wg sync.WaitGroup
