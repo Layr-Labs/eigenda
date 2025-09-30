@@ -1,10 +1,9 @@
-package integration_test
+package integration
 
 import (
 	"context"
 	"fmt"
 	"math/big"
-	"net"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -19,44 +18,43 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/testcontainers/testcontainers-go"
-	"google.golang.org/grpc"
 )
 
 // InfrastructureHarness contains the shared infrastructure components
 // that are global across all tests (external dependencies)
 type InfrastructureHarness struct {
-	// Infrastructure containers - truly global
-	AnvilContainer      *testbed.AnvilContainer
-	GraphNodeContainer  *testbed.GraphNodeContainer
-	LocalstackContainer *testbed.LocalStackContainer
-	ChainDockerNetwork  *testcontainers.DockerNetwork
+	// Shared docker network
+	SharedNetwork *testcontainers.DockerNetwork
+
+	// Chain related components
+	ChainHarness ChainHarness
+
+	// Operator related components
+	OperatorHarness OperatorHarness
 
 	// EigenDA components
-	// TODO: Should EigenDA components be their own test harness?
-	ChurnerServer   *grpc.Server
-	ChurnerListener net.Listener
+	DisperserHarness DisperserHarness
 
-	// Global configuration
+	// Proxy
+	// TODO: Add harness when we need it
+
+	// Legacy deployment configuration
+	TestConfig        *deploy.Config
 	TemplateName      string
 	TestName          string
 	InMemoryBlobStore bool
 	LocalStackPort    string
 
-	// DynamoDB table names (global for the test suite)
-	MetadataTableName   string
-	BucketTableName     string
-	MetadataTableNameV2 string
-
-	// Deployment configuration (shared)
-	TestConfig *deploy.Config
-
 	// Logger for the infrastructure components
 	Logger logging.Logger
+
+	// Context for managing infrastructure lifecycle
+	Ctx    context.Context
+	Cancel context.CancelFunc
 }
 
 // TestHarness contains all the components that should be created fresh for each test

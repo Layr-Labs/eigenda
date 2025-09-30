@@ -1,4 +1,4 @@
-package integration_test
+package integration
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/testcontainers/testcontainers-go/network"
 )
@@ -29,10 +28,9 @@ type InfrastructureConfig struct {
 	ControllerUseNewPayments        bool
 }
 
-// SetupGlobalInfrastructure creates the shared infrastructure that persists across all tests.
+// SetupInfrastructure creates the shared infrastructure that persists across all tests.
 // This includes containers for Anvil, LocalStack, GraphNode, and the Churner server.
-// This should be called once in TestMain.
-func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, error) {
+func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, error) {
 	if config.MetadataTableName == "" {
 		config.MetadataTableName = "test-BlobMetadata"
 	}
@@ -43,8 +41,11 @@ func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHar
 		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	logger := config.Logger
+
+	// Create a timeout context for setup operations only
+	setupCtx, setupCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer setupCancel()
 
 	// Create test directory if needed
 	testName := config.TestName
@@ -63,180 +64,125 @@ func SetupGlobalInfrastructure(config *InfrastructureConfig) (*InfrastructureHar
 	testConfig.ClientLedgerMode = config.ClientLedgerMode
 	testConfig.UseControllerMediatedPayments = config.ControllerUseNewPayments
 
-	if testConfig.Environment.IsLocal() {
-		return setupLocalInfrastructure(ctx, config, testName, testConfig)
-	}
+	// Create a long-lived context for the infrastructure lifecycle
+	infraCtx, infraCancel := context.WithCancel(context.Background())
 
-	// For non-local environments, just return a minimal harness
-	return &InfrastructureHarness{
-		TemplateName:        config.TemplateName,
-		TestName:            testName,
-		InMemoryBlobStore:   config.InMemoryBlobStore,
-		Logger:              config.Logger,
-		MetadataTableName:   config.MetadataTableName,
-		BucketTableName:     config.BucketTableName,
-		MetadataTableNameV2: config.MetadataTableNameV2,
-		TestConfig:          testConfig,
-	}, nil
-}
-
-func setupLocalInfrastructure(
-	ctx context.Context,
-	config *InfrastructureConfig,
-	testName string,
-	testConfig *deploy.Config,
-) (*InfrastructureHarness, error) {
-	infra := &InfrastructureHarness{
-		TemplateName:        config.TemplateName,
-		TestName:            testName,
-		InMemoryBlobStore:   config.InMemoryBlobStore,
-		Logger:              config.Logger,
-		MetadataTableName:   config.MetadataTableName,
-		BucketTableName:     config.BucketTableName,
-		MetadataTableNameV2: config.MetadataTableNameV2,
-		TestConfig:          testConfig,
-	}
+	// Ensure we cancel the context if we return an error
+	var setupErr error
+	defer func() {
+		if setupErr != nil && infraCancel != nil {
+			infraCancel()
+		}
+	}()
 
 	// Create a shared Docker network for all containers
-	var err error
-	infra.ChainDockerNetwork, err = network.New(context.Background(),
+	sharedDockerNetwork, err := network.New(
+		setupCtx,
 		network.WithDriver("bridge"),
 		network.WithAttachable())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create docker network: %w", err)
+		setupErr = fmt.Errorf("failed to create docker network: %w", err)
+		return nil, setupErr
 	}
-	infra.Logger.Info("Created Docker network", "name", infra.ChainDockerNetwork.Name)
+	logger.Info("Created Docker network", "name", sharedDockerNetwork.Name)
 
-	// Setup blob store
-	if !infra.InMemoryBlobStore {
-		infra.Logger.Info("Using shared Blob Store")
-		infra.LocalStackPort = "4570"
-		infra.LocalstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
-			ExposeHostPort: true,
-			HostPort:       infra.LocalStackPort,
-			Logger:         infra.Logger,
-			Network:        infra.ChainDockerNetwork,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to start localstack: %w", err)
-		}
-
-		deployConfig := testbed.DeployResourcesConfig{
-			LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", infra.LocalStackPort),
-			MetadataTableName:   infra.MetadataTableName,
-			BucketTableName:     infra.BucketTableName,
-			V2MetadataTableName: infra.MetadataTableNameV2,
-			Logger:              infra.Logger,
-		}
-		err = testbed.DeployResources(ctx, deployConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to deploy resources: %w", err)
-		}
-	} else {
-		infra.Logger.Info("Using in-memory Blob Store")
+	// Create infrastructure harness early so we can populate it incrementally
+	infra := &InfrastructureHarness{
+		SharedNetwork:     sharedDockerNetwork,
+		TestConfig:        testConfig,
+		TemplateName:      config.TemplateName,
+		TestName:          testName,
+		InMemoryBlobStore: config.InMemoryBlobStore,
+		LocalStackPort:    "4570",
+		Logger:            config.Logger,
+		Ctx:               infraCtx,
+		Cancel:            infraCancel,
 	}
 
-	// Setup Anvil
-	infra.Logger.Info("Starting anvil")
-	infra.AnvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
-		ExposeHostPort: true,
-		HostPort:       "8545",
-		Logger:         infra.Logger,
-		Network:        infra.ChainDockerNetwork,
-	})
+	// Setup Chain Harness first (Anvil, Graph Node, contracts, Churner)
+	chainHarnessConfig := &ChainHarnessConfig{
+		TestConfig: testConfig,
+		TestName:   testName,
+		Logger:     logger,
+		Network:    sharedDockerNetwork,
+	}
+
+	chainHarness, err := SetupChainHarness(setupCtx, chainHarnessConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start anvil: %w", err)
+		setupErr = fmt.Errorf("failed to setup chain harness: %w", err)
+		return nil, setupErr
 	}
+	infra.ChainHarness = *chainHarness
 
-	// Setup Graph Node if needed
-	deployer, ok := infra.TestConfig.GetDeployer(infra.TestConfig.EigenDA.Deployer)
-	if ok && deployer.DeploySubgraphs {
-		infra.Logger.Info("Starting graph node")
-		anvilInternalEndpoint := infra.AnvilContainer.InternalEndpoint()
-		infra.GraphNodeContainer, err = testbed.NewGraphNodeContainerWithOptions(
-			context.Background(), testbed.GraphNodeOptions{
-				PostgresDB:     "graph-node",
-				PostgresUser:   "graph-node",
-				PostgresPass:   "let-me-in",
-				EthereumRPC:    anvilInternalEndpoint,
-				ExposeHostPort: true,
-				HostHTTPPort:   "8000",
-				HostWSPort:     "8001",
-				HostAdminPort:  "8020",
-				HostIPFSPort:   "5001",
-				Logger:         infra.Logger,
-				Network:        infra.ChainDockerNetwork,
-			})
-		if err != nil {
-			return nil, fmt.Errorf("failed to start graph node: %w", err)
-		}
+	// Setup Operator Harness second (requires chain to be ready)
+	operatorHarnessConfig := &OperatorHarnessConfig{
+		TestConfig:   testConfig,
+		TestName:     testName,
+		Logger:       logger,
+		ChainHarness: &infra.ChainHarness,
+		Ctx:          infraCtx,
 	}
-
-	// Deploy contracts
-	infra.Logger.Info("Deploying experiment")
-	err = infra.TestConfig.DeployExperiment()
+	operatorHarness, err := SetupOperatorHarness(setupCtx, operatorHarnessConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to deploy experiment: %w", err)
+		setupErr = fmt.Errorf("failed to setup operator harness: %w", err)
+		return nil, setupErr
+	}
+	infra.OperatorHarness = *operatorHarness
+
+	// Setup Disperser Harness third (LocalStack, DynamoDB tables, S3 buckets)
+	disperserHarnessConfig := &DisperserHarnessConfig{
+		Logger:              logger,
+		Network:             sharedDockerNetwork,
+		TestConfig:          testConfig,
+		InMemoryBlobStore:   config.InMemoryBlobStore,
+		LocalStackPort:      infra.LocalStackPort,
+		MetadataTableName:   config.MetadataTableName,
+		BucketTableName:     config.BucketTableName,
+		MetadataTableNameV2: config.MetadataTableNameV2,
+		EthClient:           infra.ChainHarness.EthClient,
 	}
 
-	// Start churner server
-	infra.Logger.Info("Starting churner server")
-	err = StartChurnerForInfrastructure(infra)
+	disperserHarness, err := SetupDisperserHarness(setupCtx, disperserHarnessConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start churner server: %w", err)
+		setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
+		return nil, setupErr
 	}
-	infra.Logger.Info("Churner server started", "port", "32002")
-
-	infra.Logger.Info("Starting binaries")
-	infra.TestConfig.StartBinaries(true) // true = for tests, will skip churner
+	infra.DisperserHarness = *disperserHarness
 
 	return infra, nil
 }
 
 // TeardownGlobalInfrastructure cleans up all global infrastructure
-func TeardownGlobalInfrastructure(infra *InfrastructureHarness) {
-	if infra == nil || infra.TestConfig == nil || !infra.TestConfig.Environment.IsLocal() {
-		return
-	}
-
+func TeardownInfrastructure(infra *InfrastructureHarness) {
 	infra.Logger.Info("Tearing down global infrastructure")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	// Cancel the infrastructure context to signal all components to shut down
+	if infra.Cancel != nil {
+		infra.Logger.Info("Cancelling infrastructure context")
+		infra.Cancel()
+	}
 
+	// Create a separate timeout context for cleanup operations
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cleanupCancel()
+
+	// Stop operator goroutines using the harness cleanup
+	infra.OperatorHarness.Cleanup(cleanupCtx, infra.Logger)
+
+	// Stop test binaries
 	infra.Logger.Info("Stopping binaries")
 	infra.TestConfig.StopBinaries()
 
-	if infra.ChurnerServer != nil {
-		infra.Logger.Info("Stopping churner server")
-		infra.ChurnerServer.GracefulStop()
-		if infra.ChurnerListener != nil {
-			_ = infra.ChurnerListener.Close()
-		}
-	}
+	// Clean up disperser harness (graph node and localstack)
+	infra.DisperserHarness.Cleanup(cleanupCtx, infra.Logger)
 
-	if infra.AnvilContainer != nil {
-		infra.Logger.Info("Stopping anvil")
-		if err := infra.AnvilContainer.Terminate(ctx); err != nil {
-			infra.Logger.Warn("Failed to terminate anvil container", "error", err)
-		}
-	}
+	// Clean up chain harness (churner and anvil)
+	infra.ChainHarness.Cleanup(cleanupCtx, infra.Logger)
 
-	if infra.GraphNodeContainer != nil {
-		infra.Logger.Info("Stopping graph node")
-		_ = infra.GraphNodeContainer.Terminate(context.Background())
-	}
-
-	if infra.ChainDockerNetwork != nil {
-		infra.Logger.Info("Removing Docker network")
-		_ = infra.ChainDockerNetwork.Remove(context.Background())
-	}
-
-	if infra.LocalstackContainer != nil {
-		infra.Logger.Info("Stopping localstack container")
-		if err := infra.LocalstackContainer.Terminate(ctx); err != nil {
-			infra.Logger.Warn("Failed to terminate localstack container", "error", err)
-		}
+	// Clean up the shared Docker network last since multiple harnesses use it
+	if infra.SharedNetwork != nil {
+		infra.Logger.Info("Removing shared Docker network")
+		_ = infra.SharedNetwork.Remove(cleanupCtx)
 	}
 
 	infra.Logger.Info("Teardown completed")

@@ -3,6 +3,7 @@ package testbed
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -32,6 +33,7 @@ type AnvilOptions struct {
 	HostPort       string                        // Custom host port to bind to (defaults to "8545" if empty and ExposeHostPort is true)
 	Logger         logging.Logger                // Logger for container operations (required)
 	Network        *testcontainers.DockerNetwork // Docker network to use (optional)
+	BlockTime      int                           // Block time in seconds (optional, 0 means instant mining which is the default)
 }
 
 // NewAnvilContainerWithOptions creates and starts a new Anvil container with custom options
@@ -45,8 +47,15 @@ func NewAnvilContainerWithOptions(ctx context.Context, opts AnvilOptions) (*Anvi
 	// Generate a unique container name using timestamp to avoid conflicts in parallel tests
 	uniqueName := fmt.Sprintf("anvil-%d", time.Now().UnixNano())
 
+	// Build command with optional block time
+	// Note: foundry image uses ENTRYPOINT ["/bin/sh", "-c"], so we need a single shell command string
+	cmd := "anvil"
+	if opts.BlockTime > 0 {
+		cmd = fmt.Sprintf("anvil --block-time %d --mixed-mining", opts.BlockTime)
+	}
+
 	req := testcontainers.ContainerRequest{
-		Cmd:          []string{"anvil"},
+		Cmd:          []string{cmd},
 		ExposedPorts: []string{AnvilPort},
 		Env:          map[string]string{"ANVIL_IP_ADDR": "0.0.0.0"},
 		Image:        AnvilImage,
@@ -128,6 +137,39 @@ func (ac *AnvilContainer) RpcURL() string {
 // InternalEndpoint returns the Anvil endpoint URL for internal Docker network communication
 func (ac *AnvilContainer) InternalEndpoint() string {
 	return "http://anvil:8545"
+}
+
+// SetIntervalMining enables auto-mining with the specified interval in seconds
+func (ac *AnvilContainer) SetIntervalMining(ctx context.Context, intervalSeconds int) error {
+	if ac == nil {
+		return fmt.Errorf("anvil container is nil")
+	}
+	ac.logger.Info("Setting interval mining", "interval", intervalSeconds)
+
+	// Execute cast rpc evm_setIntervalMining command
+	exitCode, outputReader, err := ac.container.Exec(ctx, []string{
+		"cast", "rpc", "evm_setIntervalMining", fmt.Sprintf("%d", intervalSeconds),
+		"--rpc-url", "http://127.0.0.1:8545",
+	})
+	if err != nil {
+		ac.logger.Error("Failed to execute cast command", "error", err)
+		return fmt.Errorf("failed to execute cast command: %w", err)
+	}
+
+	// Read the output
+	output, err := io.ReadAll(outputReader)
+	if err != nil {
+		ac.logger.Error("Failed to read command output", "error", err)
+		return fmt.Errorf("failed to read command output: %w", err)
+	}
+
+	if exitCode != 0 {
+		ac.logger.Error("Cast command failed", "exitCode", exitCode, "output", string(output))
+		return fmt.Errorf("cast command failed with exit code %d: %s", exitCode, string(output))
+	}
+
+	ac.logger.Debug("Interval mining set successfully", "output", string(output))
+	return nil
 }
 
 // Terminate stops and removes the container
