@@ -134,9 +134,9 @@ func (v *Verifier) VerifyLengthProof(
 // The function verify low degree proof against a poly commitment
 // We wish to show x^shift poly = shiftedPoly, with
 // With shift = SRSOrder - length and
-// proof = commit(shiftedPoly) on G1
+// proof = commit(shiftedPoly) on G2
 // so we can verify by checking
-// e( commit_1, [x^shift]_2) = e( proof_1, G_2 )
+// e( s^shift * G1, p(s)G2 ) = e( G1, p(s^shift)G2 )
 func verifyLengthProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) error {
 	return pairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
 }

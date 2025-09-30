@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 )
@@ -19,9 +20,12 @@ func TestVerify(t *testing.T) {
 	proverGroup, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.Nil(t, err)
 
+	committer, err := committer.NewFromConfig(*harness.committerConfig)
+	require.Nil(t, err)
+
 	frames, err := proverGroup.GetFrames(harness.paddedGettysburgAddressBytes, params)
 	require.Nil(t, err)
-	commitments, err := proverGroup.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
+	commitments, err := committer.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
 	require.Nil(t, err)
 
 	verifierGroup, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)

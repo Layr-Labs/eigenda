@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,9 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 
 	p, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
+
+	committer, err := committer.NewFromConfig(*harness.committerConfig)
+	require.Nil(t, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
 	require.NoError(t, err)
@@ -46,7 +50,7 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 		_, err = rand.Read(blob)
 		require.NoError(t, err)
 
-		commitments, err := p.GetCommitmentsForPaddedLength(blob)
+		commitments, err := committer.GetCommitmentsForPaddedLength(blob)
 		require.NoError(t, err)
 		frames, err := p.GetFrames(blob, params)
 		require.NoError(t, err)
@@ -77,7 +81,7 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 func BenchmarkVerifyBlob(b *testing.B) {
 	harness := getTestHarness()
 
-	p, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	committer, err := committer.NewFromConfig(*harness.committerConfig)
 	require.NoError(b, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
@@ -92,7 +96,7 @@ func BenchmarkVerifyBlob(b *testing.B) {
 		blobs[i] = blob
 	}
 
-	commitments, err := p.GetCommitmentsForPaddedLength(blobs[0])
+	commitments, err := committer.GetCommitmentsForPaddedLength(blobs[0])
 	require.NoError(b, err)
 
 	b.ResetTimer()

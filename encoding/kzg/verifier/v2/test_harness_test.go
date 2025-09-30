@@ -4,6 +4,7 @@ import (
 	"runtime"
 
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -11,6 +12,7 @@ import (
 
 type testHarness struct {
 	verifierV2KzgConfig          *verifier.KzgConfig
+	committerConfig              *committer.Config
 	proverV2KzgConfig            *prover.KzgConfig
 	numNode                      uint64
 	numSys                       uint64
@@ -29,6 +31,12 @@ func getTestHarness() *testHarness {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,
 	}
+	committerConfig := &committer.Config{
+		SRSNumberToLoad:   2900,
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
+	}
 	numNode := uint64(4)
 	numSys := uint64(3)
 	numPar := numNode - numSys
@@ -36,6 +44,7 @@ func getTestHarness() *testHarness {
 	return &testHarness{
 		verifierV2KzgConfig:          verifier.KzgConfigFromV1Config(kzgConfig),
 		proverV2KzgConfig:            prover.KzgConfigFromV1Config(kzgConfig),
+		committerConfig:              committerConfig,
 		numNode:                      numNode,
 		numSys:                       numSys,
 		numPar:                       numPar,

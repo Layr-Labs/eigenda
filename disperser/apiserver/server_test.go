@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"runtime"
 	"testing"
 	"time"
 
@@ -29,7 +28,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	kzgcommitter "github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
@@ -57,10 +56,10 @@ var (
 	bucketTableName     = fmt.Sprintf("test-BucketStore-%v", UUID)
 	s3BucketName        = "test-eigenda-blobstore"
 	v2MetadataTableName = fmt.Sprintf("test-BlobMetadata-%v-v2", UUID)
-	// This prover is only used in server_v2_test.go, but is instantiated here
+	// committer is only used in server_v2_test.go, but is instantiated here
 	// as part of the setup() function which sets up both v1 and v2 tests...
 	// TODO(samlaf): we need to move away from these global variables
-	prover        *proverv2.Prover
+	committer     *kzgcommitter.Committer
 	privateKeyHex = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	deployLocalStack bool
@@ -668,20 +667,15 @@ func setup() {
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
-	config := &proverv2.KzgConfig{
-		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
-		G2TrailingPath:  "../../resources/srs/g2.trailing.point",
-		CacheDir:        "../../resources/srs/SRSTables",
-		SRSNumberToLoad: 8192,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
-	}
-
-	prover, err = proverv2.NewProver(config, nil)
+	committer, err = kzgcommitter.NewFromConfig(kzgcommitter.Config{
+		SRSNumberToLoad:   8192,
+		G1SRSPath:         "../../resources/srs/g1.point",
+		G2SRSPath:         "../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../resources/srs/g2.trailing.point",
+	})
 	if err != nil {
 		teardown()
-		logger.Fatal("Failed to initialize KZG prover:", err)
+		logger.Fatal("Failed to initialize KZG committer:", err)
 	}
 
 	dispersalServer = newTestServer(ctx, transactor, "setup")
