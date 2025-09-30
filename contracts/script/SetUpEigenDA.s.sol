@@ -199,10 +199,6 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         vm.serializeAddress(output, "eigenDACertVerifier", address(eigenDACertVerifier));
         vm.serializeAddress(output, "eigenDACertVerifierRouter", address(eigenDACertVerifierRouter));
         vm.serializeAddress(output, "eigenDAEjectionManager", address(eigenDAEjectionManager));
-        vm.serializeAddress(output, "clientAddress", address(clientAddress));
-        vm.serializeString(
-            output, "clientPrivateKey", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-        );
 
         string memory finalJson = vm.serializeString(output, "object", output);
 
