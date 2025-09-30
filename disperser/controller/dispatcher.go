@@ -464,12 +464,17 @@ func (d *Dispatcher) HandleSignatures(
 		}
 		req := &corev2.DispersalRequest{
 			OperatorID:      opID,
-			OperatorAddress: gethcommon.Address{},
+			OperatorAddress: batchData.OperatorState.IndexedOperators[opID].Address,
 			Socket:          batchData.OperatorState.IndexedOperators[opID].Socket,
 			DispersedAt:     uint64(time.Now().UnixNano()),
 			BatchHeader:     *batchData.Batch.BatchHeader,
 		}
-		_ = d.blobMetadataStore.PutDispersalRequest(ctx, req)
+		if err := d.blobMetadataStore.PutDispersalRequest(ctx, req); err != nil {
+			if !errors.Is(err, blobstore.ErrAlreadyExists) {
+				d.logger.Error("failed to store missed dispersal request", "err", err, "operator", opID.Hex())
+				continue
+			}
+		}
 		if err := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
 			DispersalRequest: req,
 			RespondedAt:      uint64(time.Now().UnixNano()),
