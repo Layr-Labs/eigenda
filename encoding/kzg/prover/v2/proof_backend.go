@@ -20,7 +20,7 @@ type KzgCommitmentsBackendV2 interface {
 	ComputeCommitmentV2(coeffs []fr.Element) (*bn254.G1Affine, error)
 	ComputeLengthCommitmentV2(coeffs []fr.Element) (*bn254.G2Affine, error)
 	ComputeLengthProofV2(coeffs []fr.Element) (*bn254.G2Affine, error)
-	ComputeLengthProofForLengthV2(blobFr []fr.Element, length uint64) (*bn254.G2Affine, error)
+	ComputeLengthProofForLengthV2(blobFr []fr.Element, length uint32) (*bn254.G2Affine, error)
 }
 
 var _ KzgCommitmentsBackendV2 = &gnark.KzgCommitmentsGnarkBackend{}

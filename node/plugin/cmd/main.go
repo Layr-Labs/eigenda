@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
@@ -33,8 +34,6 @@ func main() {
 		plugin.QuorumIDListFlag,
 		plugin.ChainRpcUrlFlag,
 		plugin.EigenDADirectoryFlag,
-		plugin.OperatorStateRetrieverFlag,
-		plugin.EigenDAServiceManagerFlag,
 		plugin.ChurnerUrlFlag,
 		plugin.NumConfirmationsFlag,
 		plugin.PubIPProviderFlag,
@@ -42,6 +41,9 @@ func main() {
 		plugin.BLSPublicKeyHexFlag,
 		plugin.BLSSignerCertFileFlag,
 		plugin.BLSSignerAPIKeyFlag,
+		// Deprecated flags
+		plugin.DeprecatedOperatorStateRetrieverFlag,
+		plugin.DeprecatedEigenDAServiceManagerFlag,
 	}
 	app.Name = "eigenda-node-plugin"
 	app.Usage = "EigenDA Node Plugin"
@@ -130,7 +132,27 @@ func pluginOps(ctx *cli.Context) {
 	}
 	log.Printf("Info: ethclient created for url: %s", config.ChainRpcUrl)
 
-	tx, err := eth.NewWriter(logger, client, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	contractDirectory, err := directory.NewContractDirectory(context.Background(), logger, client,
+		gethcommon.HexToAddress(config.EigenDADirectory))
+	if err != nil {
+		log.Printf("Error: failed to create contract directory: %v", err)
+		return
+	}
+	eigenDAServiceManagerAddr, err := contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
+	if err != nil {
+		log.Printf("Error: failed to get EigenDAServiceManager address from directory: %v", err)
+		return
+	}
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(
+		context.Background(), directory.OperatorStateRetriever)
+	if err != nil {
+		log.Printf("Error: failed to get OperatorStateRetriever address from directory: %v", err)
+		return
+	}
+	log.Printf("Info: got EigenDAServiceManager address: %s, OperatorStateRetriever address: %s from directory contract: %s",
+		eigenDAServiceManagerAddr.Hex(), operatorStateRetrieverAddr.Hex(), config.EigenDADirectory)
+
+	tx, err := eth.NewWriter(logger, client, operatorStateRetrieverAddr.Hex(), eigenDAServiceManagerAddr.Hex())
 	if err != nil {
 		log.Printf("Error: failed to create EigenDA transactor: %v", err)
 		return

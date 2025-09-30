@@ -211,7 +211,6 @@ contract DeployEigenDA is Script {
                 EigenDARegistryCoordinator.initialize,
                 (
                     cfg.initialOwner(),
-                    cfg.churnApprover(),
                     directory.getAddress(AddressDirectoryConstants.EJECTION_MANAGER_NAME),
                     IPauserRegistry(directory.getAddress(AddressDirectoryConstants.PAUSER_REGISTRY_NAME)),
                     cfg.initialPausedStatus(),

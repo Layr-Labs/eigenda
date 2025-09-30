@@ -1,9 +1,14 @@
+# Fuzz examplars are written to disk after fuzzing in these paths.
+**/testdata
+
 inabox/testdata/*
 inabox/anvil.pid
 
 test/v1/testdata/*
-encoding/kzgrs/prover/data/SRSTable/*
 resources/srs/SRSTables/*
+# resources/srs/SRSTables should be the main place where they are written to,
+# but when running tests locally from other dirs they might write them locally.
+**/SRSTable
 
 **/bin/*
 coverage.*
@@ -22,3 +27,5 @@ icicle/*
 
 # OSX specific
 .DS_Store
+
+**/logs/**

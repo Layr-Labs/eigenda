@@ -3,6 +3,7 @@ package verifier_test
 import (
 	"testing"
 
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/require"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -11,22 +12,23 @@ import (
 )
 
 func TestVerify(t *testing.T) {
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
+	harness := getTestHarness()
 
-	proverGroup, err := prover.NewProver(kzgConfig, nil)
-	require.Nil(t, err)
-	encoder, err := proverGroup.GetKzgEncoder(params)
+	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
+
+	proverGroup, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.Nil(t, err)
 
-	verifierGroup, err := verifier.NewVerifier(kzgConfig, nil)
+	frames, err := proverGroup.GetFrames(harness.paddedGettysburgAddressBytes, params)
+	require.Nil(t, err)
+	commitments, err := proverGroup.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
+	require.Nil(t, err)
+
+	verifierGroup, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
 	require.Nil(t, err)
 	verifier, err := verifierGroup.GetKzgVerifier(params)
 	require.Nil(t, err)
 
-	commit, _, _, frames, _, err := encoder.EncodeBytes(gettysburgAddressBytes)
-	require.Nil(t, err)
-	require.NotNil(t, commit)
-
-	err = verifier.VerifyFrame(&frames[0], 0, commit, params.NumChunks)
+	err = verifier.VerifyFrame(frames[0], 0, (*bn254.G1Affine)(commitments.Commitment), params.NumChunks)
 	require.Nil(t, err)
 }

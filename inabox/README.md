@@ -1,157 +1,93 @@
-# Inabox Tests
+# Inabox Devnet + E2E Tests
 
-Notice: The scripts for setting up a local geth chain are currently broken. The instructions below use anvil instead
+Inabox is a local eigenda devnet, that can be used in 2 modes:
+1. short-running devnet for [e2e-tests](#run-e2e-tests-against-inabox)
+2. long-running devnet for [local interactions](#run-long-lived-local-inabox-devnet)
 
-## First time setup
-- Go path is in system path. [Instructions for installing go](https://go.dev/doc/install).
+Make sure to look at the Makefile, which is well documented.
+
+## Dependencies
 - Ensure all submodules are initialized and checked out
     ```
     $ git submodule update --init --recursive
     ```
 - Docker is installed. [Instructions for installing docker](https://www.docker.com/products/docker-desktop/).
-- Ensure foundry is installed (comes with `anvil` which we use as a test chain and `forge` which we use for deployment scripting):
-    ```
-    $ curl -L https://foundry.paradigm.xyz | bash
-    $ foundryup
-    ```
-- `brew` is installed, see instructions [here](https://brew.sh/).
-- Localstack CLI is installed (simulates AWS stack on local machine; we also provide instructions for running localstack from docker without the CLI):
-    ```
-    $ brew install localstack/tap/localstack-cli
-    ```
-- `grpcurl` is installed:
-    ```
-    $ brew install grpcurl
-    ```
-- `aws` is installed, follow instructions [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
-- `npm` is installed
-   ```
-   $ brew install node
-   ```
-- `yarn` is installed
-   ```
-   $ npm install --global yarn
-   ```
-- Install contracts
+- We use mise as a dependency manager. Most dependencies are defined in our [mise.toml](../mise.toml) file. [Install mise](https://mise.jdx.dev/getting-started.html) and run `mise install` to install them.
+- Two dependencies are not available via mise, so need to be installed independently: 
+  - Localstack CLI is installed (simulates AWS stack on local machine; we also provide instructions for running localstack from docker without the CLI):
+      ```
+      $ brew install localstack/tap/localstack-cli
+      ```
+  - `aws` CLI  (install instructions [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html))
 
-  Follow the installation instructions under [`contracts/README.md`](../contracts/README.md)
+## Run E2E tests against inabox
 
-- The Graph is installed
-   ```
-   $ npm install -g @graphprotocol/graph-cli@latest
-   ```
-
-## Run a complete end-to-end test
-
-You can run a complete end-to-end test by running the following command:
+You can run the end-to-end test suite by running the following command:
 ```
-cd inabox
-make run-e2e
+make run-e2e-tests
 ```
 
-## Manually deploy the experiment and interact with the services
+## Run long-lived local inabox devnet
 
-### Preliminary setup steps
-
-Ensure that all submodules (e.g. EigenLayer smart contracts) are checked out to the correct branch, and then build the binaries.
+You can run a long-lived local inabox devnet by running the following command:
 ```
-$ git submodule update --init --recursive
-$ make build
+make start-inabox
 ```
-
-Create a new configuration file:
+This will start the devnet and print this log output:
 ```
-cd inabox
-make new-anvil
-```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@                     INABOX IS RUNNING!                         @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-This will create a new file, e.g. `./testdata/12D-07M-2023Y-14H-41M-19S/config.yaml`. Please feel free to inspect the file and make any desired configuration changes at this point. After you have deployed the experiment, changes will not go into effect. 
+Export these variables:
+export ETH_RPC_URL=http://localhost:8545
+export EIGENDA_DIRECTORY_ADDR=0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8
+export EIGENDA_CERT_VERIFIER_ROUTER=$(cast call $EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER")
+export EIGENDA_DISPERSER_V1_URL=localhost:32003
+export EIGENDA_DISPERSER_V2_URL=localhost:32005
 
+You can query other contract addresses from the directory:
+cast call $EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER"
+You can query the disperser v2 by using:
+grpcurl -plaintext $EIGENDA_DISPERSER_V2_URL list
 
-### Provision the test infrastructure, deploy contracts, and configure services
+Infra components (anvil, graph, aws localstack) are managed by docker.
+Run 'docker ps' to see and manage them.
 
-#### Option 1 (simplest): 
-
-Run the following command (from inabox directory)
-```
-make deploy-all
-```
-
-This will
-- Start all test infrastructure (localstack, graph node, anvil chain)
-- Create the necessary AWS resources on localstack
-- Deploy the smart contracts to anvil
-- Deploy subgraphs to the graph node
-- Create configurations for the eigenda services (located in `inabox/testdata/DATETIME/envs`)
-
-To view the logs generated by the graph node, run the following command
-
-```
-cd thegraph
-docker compose logs -f
+EigenDA services (disperser, validators, etc) are ran as local processes.
+Their config is available under /Users/samlaf/devel/eigenda/inabox/testdata/_latest/envs
+Their logs are available under /Users/samlaf/devel/eigenda/inabox/testdata/_latest/logs
 ```
 
-The localstack logs can also be viewed by finding the localstack container and running the appropriate docker logs command. Option 1 does not allow for easy viewing of the chain (anvil logs). If you wish to be able to view the chain logs, please use [Option 2](#option-2) instead.
-
-#### Option 2:
-
-NOTE!!: If you already completed Option 1, don't follow the steps in Option 2; skip to the next section.
-
-This option allows you to manually set up the test infrastructure and deployment steps for troubleshooting purposes. 
-
-Terminal 1: Start anvil
+It can also be stopped by running:
 ```
-anvil --host 0.0.0.0
+make stop-inabox
 ```
 
-Terminal 2: Start the graph node
+### Custom inabox devnet
+
+If you need to make modifications to the template config file used by inabox, then instead run:
 ```
-cd inabox/thegraph 
-docker compose up
+make new-testdata-dir
+# make modifications to `./testdata/_latest/config.yaml`
+make start-infra
+make start-services
 ```
 
-Terminal 3: Start localstack
-```
-GATEWAY_LISTEN=0.0.0.0:4570 LOCALSTACK_HOST=localhost.localstack.cloud:4570 localstack start
-```
 
-The `make infra` command provides an alternative which runs all test infra in the background. This command has no dependence on the localstack cli. 
+### Send V2 traffic via proxy
 
-Terminal 4: Create the AWS resources on localstack
-```
-cd inabox 
-make resources
-```
+Dispersing blobs to the V2 disperser requires authentication in the form of an ECDSA signature, so is harder to do using grpcurl only.
+See https://docs.eigencloud.xyz/products/eigenda/integrations-guides/quick-start/v2/ for more details. We will soon add a proxy instance to inabox that will make dispersing blobs to V2 easier. In the meantime, you can spin one up manually by running:
+```bash
+# This key contains a reservation (setup in contracts/script/SetUpEigenDA.s.sol)
+export EIGENDA_V2_DISPERSAL_SIGNER_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded
 
-Terminal 4: Deploy the contracts and create test configurations
+../api/proxy/bin/eigenda-proxy --storage.dispersal-backend v2 --storage.backends-to-enable v2 --apis.enabled standard --eigenda.v2.cert-verifier-router-or-immutable-verifier-addr $EIGENDA_CERT_VERIFIER_ROUTER --eigenda.v2.eth-rpc $ETH_RPC_URL --eigenda.v2.signer-payment-key-hex $EIGENDA_V2_DISPERSAL_SIGNER_KEY --eigenda.v2.disperser-rpc $EIGENDA_DISPERSER_V2_URL --eigenda.v2.eigenda-directory $EIGENDA_DIRECTORY_ADDR --eigenda.v2.disable-tls --eigenda.g1-path ../resources/srs/g1.point --eigenda.g2-path ../resources/srs/g2.point --eigenda.g2-path-trailing ../resources/srs/g2.trailing.point
 ```
-$ make exp
-```
+and then you can disperse to it using `curl -X POST -d my-eigenda-payload "http://localhost:3100/put?commitment_mode=standard"`.
 
-You should see the following output:
-```
-./setup.sh deploy
-Running experiment in ./testdata/12D-07M-2023Y-14H-41M-19S/
-2023/07/12 14:41:24 Deploying experiment...
-Deploying EigenDA
-Generating variables
-Test environment has successfully deployed!
-```
-
-If there are any deployment errors, look at `inabox/testdata/DATETIME/deploy.log` for a detailed log. 
-
-To view the configurations created for the EigenDA service components, look in `inabox/testdata/DATETIME/envs`
-
-### Run the binaries and send traffic
-
-Run the binaries:
-```
-cd inabox
-./bin.sh start
-```
-This will print all logs from the EigenDA services to the screen; `Ctrl+C` will stop all services. Inspect the logs to make sure all binaries started without any errors. 
-
-Alternatively, you can start and stop the EigenDA services in detached mode by running `./bin.sh start-detached` and `./bin.sh stop-detached`, respectively. In this case, the logs are saved to `inabox/testdata/DATETIME/logs`.
+### Send V1 traffic via grpcurl
 
 Disperse a blob:
 ```
@@ -190,15 +126,4 @@ To check the status of that same blob (replace `$REQUEST_ID` with the request ID
 grpcurl -plaintext -d '{"request_id": "$REQUEST_ID"}' \
   localhost:32003 disperser.Disperser/GetBlobStatus
 ```
-
-### Cleanup
-
-If you followed [Option 1](#option-1-simplest) above, you can run the following command in order to clean up the test infra:
-```
-cd inabox
-make stop-infra
-```
-
-If you followed [Option 2](#option-2), you can stop the infra services by `Ctrl-C`'ing in each terminal. For the graph, it's also important to run `docker compose down -v` from within the `inabox/thegraph` directory to make sure that the containers are fully removed. 
-
 

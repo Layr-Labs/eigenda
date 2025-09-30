@@ -38,7 +38,7 @@ func NewSRSTable(tableDir string, s1 []bn254.G1Affine, numWorker uint64) (*SRSTa
 
 	err := os.MkdirAll(tableDir, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("create table dir: %w", err)
+		return nil, fmt.Errorf("create table dir %s: %w", tableDir, err)
 	}
 
 	files, err := os.ReadDir(tableDir)

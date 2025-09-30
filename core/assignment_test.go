@@ -27,9 +27,9 @@ func TestOperatorAssignments(t *testing.T) {
 		ChunkLength: 10,
 	}
 
-	blobLength := uint(100)
+	blobLength := uint32(100)
 
-	assignments, info, err := coordinator.GetAssignments(operatorState, blobLength, quorumInfo)
+	assignments, info, err := coordinator.GetAssignments(operatorState, uint(blobLength), quorumInfo)
 	assert.NoError(t, err)
 	expectedAssignments := map[core.OperatorID]core.Assignment{
 		mock.MakeOperatorId(0): {

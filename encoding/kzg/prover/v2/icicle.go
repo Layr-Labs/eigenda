@@ -22,7 +22,7 @@ const (
 )
 
 func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedProver, error) {
-	_, fftPointsT, err := p.SetupFFTPoints(params)
+	_, fftPointsT, err := p.setupFFTPoints(params)
 	if err != nil {
 		return nil, err
 	}
@@ -49,23 +49,23 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 		Srs:            p.Srs,
 		NttCfg:         icicleDevice.NttCfg,
 		MsmCfg:         icicleDevice.MsmCfg,
-		KzgConfig:      p.KzgConfig,
 		Device:         icicleDevice.Device,
 		GpuLock:        sync.Mutex{},
+		NumWorker:      p.KzgConfig.NumWorker,
 	}
 
 	// Set up gnark commitments backend
 	commitmentsBackend := &gnarkprover.KzgCommitmentsGnarkBackend{
 		Srs:        p.Srs,
 		G2Trailing: p.G2Trailing,
-		KzgConfig:  p.KzgConfig,
 	}
 
 	return &ParametrizedProver{
-		EncodingParams:        params,
-		Encoder:               p.encoder,
-		KzgConfig:             p.KzgConfig,
-		KzgMultiProofBackend:  multiproofBackend,
-		KzgCommitmentsBackend: commitmentsBackend,
+		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
+		encodingParams:             params,
+		encoder:                    p.encoder,
+		computeMultiproofNumWorker: p.KzgConfig.NumWorker,
+		kzgMultiProofBackend:       multiproofBackend,
+		kzgCommitmentsBackend:      commitmentsBackend,
 	}, nil
 }

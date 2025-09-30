@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -39,6 +40,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -115,6 +118,9 @@ type Node struct {
 
 	// A handle for sending Ethereum RPC requests.
 	client *geth.InstrumentedEthClient
+
+	// Validates reservation payments for blob dispersals
+	reservationPaymentValidator *reservationvalidation.ReservationPaymentValidator
 }
 
 // NewNode creates a new Node with the provided config.
@@ -126,6 +132,7 @@ func NewNode(
 	pubIPProvider pubip.Provider,
 	client *geth.InstrumentedEthClient,
 	logger logging.Logger,
+	softwareVersion *version.Semver,
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
@@ -187,7 +194,8 @@ func NewNode(
 	}
 
 	// Setup Node Api
-	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
+	nodeApi := nodeapi.NewNodeApi(
+		AppName, softwareVersion.String(), ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
 	metrics := NewMetrics(eigenMetrics, reg, logger, socketAddr, config.ID, config.OnchainMetricsInterval, tx, cst)
 
@@ -200,7 +208,8 @@ func NewNode(
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
 
-	verifierV2, err := verifierv2.NewVerifier(&config.EncoderConfig, nil)
+	verifierV2Config := verifierv2.KzgConfigFromV1Config(&config.EncoderConfig)
+	verifierV2, err := verifierv2.NewVerifier(verifierV2Config, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create verifier: %w", err)
 	}
@@ -289,27 +298,57 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create operator state cache: %w", err)
 	}
 
+	var reservationPaymentValidator *reservationvalidation.ReservationPaymentValidator
+	if config.EnablePaymentValidation {
+		paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+		if err != nil {
+			return nil, fmt.Errorf("get PaymentVault address: %w", err)
+		}
+
+		paymentVault, err := vault.NewPaymentVault(logger, client, paymentVaultAddress)
+		if err != nil {
+			return nil, fmt.Errorf("create payment vault: %w", err)
+		}
+
+		reservationPaymentValidator, err = reservationvalidation.NewReservationPaymentValidator(
+			ctx,
+			logger,
+			config.ReservationLedgerCacheConfig,
+			paymentVault,
+			time.Now,
+			reservationvalidation.NewReservationValidatorMetrics(reg, Namespace, PaymentsSubsystem),
+			reservationvalidation.NewReservationCacheMetrics(reg, Namespace, PaymentsSubsystem),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("create reservation payment validator: %w", err)
+		}
+		logger.Debug("Reservation payment validation ENABLED")
+	} else {
+		logger.Debug("Reservation payment validation DISABLED")
+	}
+
 	n := &Node{
-		CTX:                     ctx,
-		Config:                  config,
-		Logger:                  nodeLogger,
-		Metrics:                 metrics,
-		NodeApi:                 nodeApi,
-		Store:                   store,
-		ChainState:              cst,
-		Transactor:              tx,
-		Validator:               validator,
-		ValidatorV2:             validatorV2,
-		PubIPProvider:           pubIPProvider,
-		OperatorSocketsFilterer: socketsFilterer,
-		ChainID:                 chainID,
-		BLSSigner:               blsSigner,
-		DownloadPool:            downloadPool,
-		ValidationPool:          validationPool,
-		StoreChunksSemaphore:    storeChunksSemaphore,
-		OperatorStateCache:      operatorStateCache,
-		contractDirectory:       contractDirectory,
-		client:                  client,
+		CTX:                         ctx,
+		Config:                      config,
+		Logger:                      nodeLogger,
+		Metrics:                     metrics,
+		NodeApi:                     nodeApi,
+		Store:                       store,
+		ChainState:                  cst,
+		Transactor:                  tx,
+		Validator:                   validator,
+		ValidatorV2:                 validatorV2,
+		PubIPProvider:               pubIPProvider,
+		OperatorSocketsFilterer:     socketsFilterer,
+		ChainID:                     chainID,
+		BLSSigner:                   blsSigner,
+		DownloadPool:                downloadPool,
+		ValidationPool:              validationPool,
+		StoreChunksSemaphore:        storeChunksSemaphore,
+		OperatorStateCache:          operatorStateCache,
+		contractDirectory:           contractDirectory,
+		client:                      client,
+		reservationPaymentValidator: reservationPaymentValidator,
 	}
 
 	if config.EnableV2 {
@@ -386,6 +425,52 @@ func NewNode(
 	n.startNodeIPUpdater()
 
 	return n, nil
+}
+
+// Validates reservation payments for all blobs in a batch.
+//
+// Returns nil if validation passes or if payment validation is disabled.
+//
+// TODO(litt3): With the current multi-blob batch implementation, the logic in this method suffers from the "batch
+// poison pill" problem: if a single payment fails within a batch, then the entire batch is invalid. Therefore, payment
+// validation shouldn't be enabled until the single-blob-batch effort has been completed. Then, poisoning a batch will
+// only affect the malicious user.
+//
+// This method is goroutine safe
+func (n *Node) ValidateReservationPayment(ctx context.Context, batch *corev2.Batch, probe *common.SequenceProbe) error {
+	// TODO(litt3): remove this case once payment validation is no longer optional
+	if n.reservationPaymentValidator == nil {
+		return nil
+	}
+
+	probe.SetStage("payment_validation")
+	for _, blobCert := range batch.BlobCertificates {
+		if blobCert.BlobHeader.PaymentMetadata.IsOnDemand() {
+			// Validators don't check on-demand payments. The EigenDA disperser is the source of truth for on-demand,
+			// and will only forward dispersals to validators if on-demand payment was successful.
+			continue
+		}
+
+		success, err := n.reservationPaymentValidator.Debit(
+			ctx,
+			blobCert.BlobHeader.PaymentMetadata.AccountID,
+			blobCert.BlobHeader.BlobCommitments.Length,
+			blobCert.BlobHeader.QuorumNumbers,
+			time.Unix(0, blobCert.BlobHeader.PaymentMetadata.Timestamp),
+		)
+
+		if err != nil {
+			return fmt.Errorf("debit: %w", err)
+		}
+
+		if !success {
+			return fmt.Errorf(
+				"debit for account %s: insufficient bandwidth for %d symbols",
+				blobCert.BlobHeader.PaymentMetadata.AccountID.Hex(), blobCert.BlobHeader.BlobCommitments.Length)
+		}
+	}
+
+	return nil
 }
 
 // Start the ejection sentinel, which is responsible for preventing this validator from being improperly ejected.

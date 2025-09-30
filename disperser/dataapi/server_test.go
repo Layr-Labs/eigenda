@@ -77,7 +77,7 @@ var (
 	_                               = mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 	testDataApiServer, _            = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 	expectedRequestedAt             = uint64(5567830000000000000)
-	expectedDataLength              = 32
+	expectedDataLength              = uint32(32)
 	expectedBatchId                 = uint32(99)
 	expectedBatchRoot               = []byte("hello")
 	expectedReferenceBlockNumber    = uint32(132)
@@ -1522,7 +1522,7 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, blo
 		BlobInclusionProof:   expectedInclusionProof,
 		BlobCommitment: &encoding.BlobCommitments{
 			Commitment: commitment,
-			Length:     uint(expectedDataLength),
+			Length:     expectedDataLength,
 		},
 		BatchID:                 expectedBatchId,
 		ConfirmationTxnHash:     gethcommon.HexToHash("0x123"),
