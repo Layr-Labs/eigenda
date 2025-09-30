@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
+	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/urfave/cli/v2"
 )
@@ -83,6 +85,47 @@ func DeployAll(ctx *cli.Context) error {
 	err = config.DeployExperiment()
 	if err != nil {
 		return fmt.Errorf("deploy experiment: %w", err)
+	}
+
+	logger.Info("Generating disperser keypair")
+	err = config.GenerateDisperserKeypair()
+	if err != nil {
+		logger.Errorf("could not generate disperser keypair: %v", err)
+		panic(err)
+	}
+
+	// Create eth client
+	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{config.Deployers[0].RPC},
+		PrivateKeyString: config.Pks.EcdsaMap[config.EigenDA.Deployer].PrivateKey[2:],
+		NumConfirmations: 0,
+		NumRetries:       3,
+	}, gcommon.Address{}, logger)
+	if err != nil {
+		logger.Errorf("could not create eth client for registration: %v", err)
+		panic(err)
+	}
+
+	logger.Info("Registering disperser keypair on-chain")
+	config.PerformDisperserRegistrations(ethClient)
+
+	// Register blob versions
+	config.RegisterBlobVersions(ethClient)
+
+	// Register relay URLs
+	relayURLs := []string{
+		"localhost:32035",
+		"localhost:32037",
+		"localhost:32039",
+		"localhost:32041",
+	}
+	config.RegisterRelays(ethClient, relayURLs, ethClient.GetAccountAddress())
+
+	logger.Info("Generating variables")
+	err = config.GenerateAllVariables()
+	if err != nil {
+		logger.Errorf("could not generate environment variables: %v", err)
+		panic(err)
 	}
 
 	logger.Info("Deployment complete. You can now run `make start-services` to start the services.")

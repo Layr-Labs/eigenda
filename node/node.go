@@ -293,7 +293,7 @@ func NewNode(
 		client,
 		cst,
 		registryCoordinatorAddress,
-		config.operatorStateCacheSize)
+		config.OperatorStateCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create operator state cache: %w", err)
 	}
