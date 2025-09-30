@@ -10,7 +10,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -173,55 +172,17 @@ func (env *Config) DeployExperiment() error {
 	env.localstackEndpoint = "http://localhost:4570"
 	env.localstackRegion = "us-east-1"
 
-	logger.Info("Generating disperser keypair")
-	err = env.GenerateDisperserKeypair()
-	if err != nil {
-		logger.Errorf("could not generate disperser keypair: %v", err)
-		panic(err)
-	}
-
-	logger.Info("Generating variables")
-	env.GenerateAllVariables()
-
-	// Register blob versions, relays, and disperser keypair
-	if env.EigenDA.Deployer != "" && env.IsEigenDADeployed() {
-		env.performRegistrations()
-	}
-
 	logger.Info("Test environment has successfully deployed!")
 	return nil
 }
 
-// performRegistrations handles blob version, relay, and disperser keypair registrations.
-func (env *Config) performRegistrations() {
-	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{env.Deployers[0].RPC},
-		PrivateKeyString: env.Pks.EcdsaMap[env.EigenDA.Deployer].PrivateKey[2:],
-		NumConfirmations: 0,
-		NumRetries:       3,
-	}, gcommon.Address{}, logger)
-	if err != nil {
-		logger.Errorf("could not create eth client for registration: %v", err)
-		return
-	}
-
-	logger.Info("Registering blob versions and relays")
-	env.RegisterBlobVersionAndRelays(ethClient)
-
-	// Only register disperser keypair if we have a valid address (i.e., localstack was available)
-	if env.DisperserAddress != (gcommon.Address{}) {
-		logger.Info("Registering disperser keypair")
-		err = env.RegisterDisperserKeypair(ethClient)
-		if err != nil {
-			logger.Errorf("could not register disperser keypair: %v", err)
-		}
-	} else {
-		logger.Info("Skipping disperser keypair registration (localstack not available)")
-	}
-}
-
 // GenerateDisperserKeypair generates a disperser keypair using AWS KMS.
 func (env *Config) GenerateDisperserKeypair() error {
+	// Skip if we already have a disperser key
+	if env.DisperserKMSKeyID != "" {
+		logger.Info("Disperser keypair already exists, skipping generation")
+		return nil
+	}
 
 	// Generate a keypair in AWS KMS
 
@@ -258,8 +219,22 @@ func (env *Config) GenerateDisperserKeypair() error {
 	return nil
 }
 
+// PerformDisperserRegistrations registers the disperser keypair onchain.
+func (env *Config) PerformDisperserRegistrations(ethClient common.EthClient) {
+	// Only register disperser keypair if we have a valid address
+	if env.DisperserAddress != (gcommon.Address{}) {
+		logger.Info("Registering disperser keypair")
+		err := env.registerDisperserKeypair(ethClient)
+		if err != nil {
+			logger.Errorf("could not register disperser keypair: %v", err)
+		}
+	} else {
+		logger.Info("Skipping disperser keypair registration")
+	}
+}
+
 // RegisterDisperserKeypair registers the disperser's public key on-chain.
-func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
+func (env *Config) registerDisperserKeypair(ethClient common.EthClient) error {
 	// Write the disperser's public key to on-chain storage
 	writer, err := eth.NewWriter(
 		logger,
@@ -298,9 +273,8 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	return fmt.Errorf("timed out waiting for disperser address to be set")
 }
 
-// RegisterBlobVersionAndRelays initializes blob versions in ThresholdRegistry contract
-// and relays in RelayRegistry contract
-func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
+// RegisterBlobVersions initializes blob versions in ThresholdRegistry contract
+func (env *Config) RegisterBlobVersions(ethClient common.EthClient) {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
 	if (dasmAddr == gcommon.Address{}) {
 		logger.Fatal("Service Manager address is nil")
@@ -335,7 +309,18 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 			logger.Fatal("Error sending blob version transaction", "error", err)
 		}
 	}
+}
 
+// RegisterRelays initializes relays in RelayRegistry contract
+func (env *Config) RegisterRelays(ethClient common.EthClient, relayURLs []string, relayAddress gcommon.Address) {
+	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
+	if (dasmAddr == gcommon.Address{}) {
+		logger.Fatal("Service Manager address is nil")
+	}
+	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
+	if err != nil {
+		logger.Fatal("Error creating EigenDAServiceManager contract", "error", err)
+	}
 	relayAddr, err := contractEigenDAServiceManager.EigenDARelayRegistry(&bind.CallOpts{})
 	if err != nil {
 		logger.Fatal("Error getting relay registry address", "error", err)
@@ -344,12 +329,13 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	if err != nil {
 		logger.Fatal("Error creating relay registry contract", "error", err)
 	}
-
-	ethAddr := ethClient.GetAccountAddress()
-	for _, relayVars := range env.Relays {
-		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
+	opts, err := ethClient.GetNoSendTransactOpts()
+	if err != nil {
+		logger.Fatal("Error getting transaction opts", "error", err)
+	}
+	for _, url := range relayURLs {
 		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.EigenDATypesV2RelayInfo{
-			RelayAddress: ethAddr,
+			RelayAddress: relayAddress,
 			RelayURL:     url,
 		})
 		if err != nil {

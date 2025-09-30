@@ -11,13 +11,12 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-
 	certTypes "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
-
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	integration "github.com/Layr-Labs/eigenda/inabox/tests"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,7 +30,7 @@ func mineAnvilBlocks(t *testing.T, rpcClient common.RPCEthClient, numBlocks int)
 
 func TestEndToEndScenario(t *testing.T) {
 	// Create a fresh test harness for this test
-	testHarness, err := NewTestHarnessWithSetup(globalInfra)
+	testHarness, err := integration.NewTestHarnessWithSetup(globalInfra)
 	require.NoError(t, err, "Failed to create test context")
 	defer testHarness.Cleanup()
 

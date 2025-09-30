@@ -198,11 +198,8 @@ contract DeployEigenDA is Script {
         );
         upgrade(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME, "");
 
-        impl[AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME] = address(
-            new EigenDARegistryCoordinator(
-                address(directory)
-            )
-        );
+        impl[AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME] =
+            address(new EigenDARegistryCoordinator(address(directory)));
         upgrade(AddressDirectoryConstants.SOCKET_REGISTRY_NAME, "");
 
         impl[AddressDirectoryConstants.BLS_APK_REGISTRY_NAME] = address(
