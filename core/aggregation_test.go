@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -193,7 +194,10 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 				}
 			}
 
-			sigAgg, err := agg.AggregateSignatures(ctx, dat, 0, aq, quorumIDs)
+			idexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorumIDs)
+			require.NoError(t, err)
+
+			sigAgg, err := agg.AggregateSignatures(idexedOperatorState, aq, quorumIDs)
 			assert.NoError(t, err)
 
 			for i, quorum := range tt.quorums {
@@ -227,7 +231,11 @@ func TestSortNonsigners(t *testing.T) {
 		message,
 		update)
 	assert.NoError(t, err)
-	sigAgg, err := agg.AggregateSignatures(ctx, dat, 0, aq, quorums)
+
+	indexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorums)
+	require.NoError(t, err)
+
+	sigAgg, err := agg.AggregateSignatures(indexedOperatorState, aq, quorums)
 	assert.NoError(t, err)
 
 	for i := range sigAgg.NonSigners {
@@ -291,7 +299,11 @@ func TestFilterQuorums(t *testing.T) {
 
 	// Only consider quorum 0
 	quorums := []core.QuorumID{0}
-	sigAgg, err := agg.AggregateSignatures(ctx, dat, 0, aq, quorums)
+
+	indexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorums)
+	require.NoError(t, err)
+
+	sigAgg, err := agg.AggregateSignatures(indexedOperatorState, aq, quorums)
 	assert.NoError(t, err)
 	assert.Len(t, sigAgg.NonSigners, 4)
 	assert.ElementsMatch(t, sigAgg.NonSigners, []*core.G1Point{
@@ -321,7 +333,11 @@ func TestFilterQuorums(t *testing.T) {
 
 	// Only consider quorum 1
 	quorums = []core.QuorumID{1}
-	sigAgg, err = agg.AggregateSignatures(ctx, dat, 0, aq, quorums)
+
+	indexedOperatorState, err = dat.GetIndexedOperatorState(ctx, 0, quorums)
+	require.NoError(t, err)
+
+	sigAgg, err = agg.AggregateSignatures(indexedOperatorState, aq, quorums)
 	assert.NoError(t, err)
 	assert.Len(t, sigAgg.NonSigners, 1)
 	assert.ElementsMatch(t, sigAgg.NonSigners, []*core.G1Point{

@@ -90,9 +90,7 @@ type SignatureAggregator interface {
 	// AggregateSignatures takes attestation result by quorum and aggregates the signatures across them.
 	// If the aggregated signature is invalid, an error is returned.
 	AggregateSignatures(
-		ctx context.Context,
-		ics IndexedChainState,
-		referenceBlockNumber uint,
+		indexedOperatorState *IndexedOperatorState,
 		quorumAttestation *QuorumAttestation,
 		quorumIDs []QuorumID,
 	) (*SignatureAggregation, error)
@@ -112,8 +110,7 @@ func NewStdSignatureAggregator(logger logging.Logger, transactor Reader) (*StdSi
 	}
 
 	return &StdSignatureAggregator{
-		Logger: logger.With(
-			"component", "SignatureAggregator"),
+		Logger: logger.With("component", "SignatureAggregator"),
 		Transactor:        transactor,
 		OperatorAddresses: operatorAddrs,
 	}, nil
@@ -338,9 +335,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 }
 
 func (a *StdSignatureAggregator) AggregateSignatures(
-	ctx context.Context,
-	ics IndexedChainState,
-	referenceBlockNumber uint,
+	indexedOperatorState *IndexedOperatorState,
 	quorumAttestation *QuorumAttestation,
 	quorumIDs []QuorumID,
 ) (*SignatureAggregation, error) {
@@ -377,10 +372,6 @@ func (a *StdSignatureAggregator) AggregateSignatures(
 	}
 
 	nonSignerKeys := make([]*G1Point, 0)
-	indexedOperatorState, err := ics.GetIndexedOperatorState(ctx, referenceBlockNumber, quorumIDs)
-	if err != nil {
-		return nil, err
-	}
 	for id, op := range indexedOperatorState.IndexedOperators {
 		_, found := quorumAttestation.SignerMap[id]
 		if !found {
