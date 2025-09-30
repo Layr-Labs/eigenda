@@ -126,6 +126,7 @@ func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
 		HostPort:       "8545",
 		Logger:         logger,
 		Network:        dockerNetwork,
+		BlockTime:      1, // 1 second block times
 	})
 	if err != nil {
 		return fmt.Errorf("failed to start anvil container: %w", err)

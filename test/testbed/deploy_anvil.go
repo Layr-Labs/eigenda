@@ -32,6 +32,7 @@ type AnvilOptions struct {
 	HostPort       string                        // Custom host port to bind to (defaults to "8545" if empty and ExposeHostPort is true)
 	Logger         logging.Logger                // Logger for container operations (required)
 	Network        *testcontainers.DockerNetwork // Docker network to use (optional)
+	BlockTime      int                           // Block time in seconds (optional, 0 means instant mining which is the default)
 }
 
 // NewAnvilContainerWithOptions creates and starts a new Anvil container with custom options
@@ -45,8 +46,15 @@ func NewAnvilContainerWithOptions(ctx context.Context, opts AnvilOptions) (*Anvi
 	// Generate a unique container name using timestamp to avoid conflicts in parallel tests
 	uniqueName := fmt.Sprintf("anvil-%d", time.Now().UnixNano())
 
+	// Build command with optional block time
+	// Note: foundry image uses ENTRYPOINT ["/bin/sh", "-c"], so we need a single shell command string
+	cmd := "anvil"
+	if opts.BlockTime > 0 {
+		cmd = fmt.Sprintf("anvil --block-time %d", opts.BlockTime)
+	}
+
 	req := testcontainers.ContainerRequest{
-		Cmd:          []string{"anvil"},
+		Cmd:          []string{cmd},
 		ExposedPorts: []string{AnvilPort},
 		Env:          map[string]string{"ANVIL_IP_ADDR": "0.0.0.0"},
 		Image:        AnvilImage,
