@@ -20,7 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
@@ -54,7 +54,7 @@ type DispersalServerV2 struct {
 
 	chainReader              core.Reader
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator
-	prover                   *prover.Prover
+	committer                *committer.Committer
 	logger                   logging.Logger
 
 	// state
@@ -88,7 +88,7 @@ func NewDispersalServerV2(
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
-	prover *prover.Prover,
+	committer *committer.Committer,
 	maxNumSymbolsPerBlob uint32,
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,
@@ -114,8 +114,8 @@ func NewDispersalServerV2(
 	if blobRequestAuthenticator == nil {
 		return nil, errors.New("blobRequestAuthenticator is required")
 	}
-	if prover == nil {
-		return nil, errors.New("prover is required")
+	if committer == nil {
+		return nil, errors.New("committer is required")
 	}
 	if maxNumSymbolsPerBlob == 0 {
 		return nil, errors.New("maxNumSymbolsPerBlob is required")
@@ -156,7 +156,7 @@ func NewDispersalServerV2(
 		chainReader:              chainReader,
 		blobRequestAuthenticator: blobRequestAuthenticator,
 		meterer:                  meterer,
-		prover:                   prover,
+		committer:                committer,
 		logger:                   logger,
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
@@ -256,8 +256,8 @@ func (s *DispersalServerV2) getBlobCommitment(
 		s.metrics.reportGetBlobCommitmentLatency(time.Since(start))
 	}()
 
-	if s.prover == nil {
-		return nil, status.New(codes.Internal, "prover is not configured")
+	if s.committer == nil {
+		return nil, status.New(codes.Internal, "committer is not configured")
 	}
 	blobSize := uint32(len(req.GetBlob()))
 	if blobSize == 0 {
@@ -267,7 +267,7 @@ func (s *DispersalServerV2) getBlobCommitment(
 		return nil, status.Newf(codes.InvalidArgument, "blob size cannot exceed %v bytes",
 			s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL)
 	}
-	c, err := s.prover.GetCommitmentsForPaddedLength(req.GetBlob())
+	c, err := s.committer.GetCommitmentsForPaddedLength(req.GetBlob())
 	if err != nil {
 		return nil, status.New(codes.Internal, "failed to compute commitments")
 	}

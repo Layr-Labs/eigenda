@@ -159,6 +159,7 @@ func NewServer(
 		authenticator:    authenticator,
 		replayGuardian:   replayGuardian,
 		metrics:          relayMetrics,
+		chainReader:      chainReader,
 	}, nil
 }
 

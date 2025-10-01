@@ -44,7 +44,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
-	kzgproverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -214,20 +214,18 @@ func buildEigenDAV2Backend(
 	kzgVerifier *kzgverifierv2.Verifier,
 	registry *prometheus.Registry,
 ) (common.EigenDAV2Store, error) {
-	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
-	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
-	// the underlying core library to be more flexible, but that is a larger change for another time. As a stopgap, we
-	// simply set this value to whatever it needs to be prior to using it.
-	kzgConfig := kzgproverv2.KzgConfigFromV1Config(&config.KzgConfig)
-	kzgConfig.LoadG2Points = true
-
-	kzgProver, err := kzgproverv2.NewProver(kzgConfig, nil)
+	kzgCommitter, err := committer.NewFromConfig(committer.Config{
+		G1SRSPath:         config.KzgConfig.G1Path,
+		G2SRSPath:         config.KzgConfig.G2Path,
+		G2TrailingSRSPath: config.KzgConfig.G2TrailingPath,
+		SRSNumberToLoad:   config.KzgConfig.SRSNumberToLoad,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("new KZG prover: %w", err)
+		return nil, fmt.Errorf("new kzg committer: %w", err)
 	}
 
 	if config.MemstoreEnabled {
-		return memstore_v2.New(ctx, log, config.MemstoreConfig, kzgProver.Srs.G1)
+		return memstore_v2.New(ctx, log, config.MemstoreConfig, kzgVerifier.G1SRS), nil
 	}
 
 	ethClient, err := buildEthClient(ctx, log, secrets, config.ClientConfigV2.EigenDANetwork)
@@ -336,7 +334,7 @@ func buildEigenDAV2Backend(
 				return nil, fmt.Errorf("get relay registry address: %w", err)
 			}
 			relayPayloadRetriever, err := buildRelayPayloadRetriever(
-				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, relayRegistryAddr, retrievalMetrics)
+				log, config.ClientConfigV2, ethClient, kzgVerifier.G1SRS, relayRegistryAddr, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
@@ -346,7 +344,7 @@ func buildEigenDAV2Backend(
 			validatorPayloadRetriever, err := buildValidatorPayloadRetriever(
 				log, config.ClientConfigV2, ethClient,
 				operatorStateRetrieverAddr, eigenDAServiceManagerAddr,
-				kzgVerifier, kzgProver.Srs.G1, retrievalMetrics)
+				kzgVerifier, kzgVerifier.G1SRS, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build validator payload retriever: %w", err)
 			}
@@ -367,7 +365,7 @@ func buildEigenDAV2Backend(
 		config.ClientConfigV2,
 		secrets,
 		ethClient,
-		kzgProver,
+		kzgCommitter,
 		contractDirectory,
 		certVerifier,
 		operatorStateRetrieverAddr,
@@ -587,7 +585,7 @@ func buildPayloadDisperser(
 	clientConfigV2 common.ClientConfigV2,
 	secrets common.SecretConfigV2,
 	ethClient common_eigenda.EthClient,
-	kzgProver *kzgproverv2.Prover,
+	kzgCommitter *committer.Committer,
 	contractDirectory *directory.ContractDirectory,
 	certVerifier *verification.CertVerifier,
 	operatorStateRetrieverAddr geth_common.Address,
@@ -625,7 +623,7 @@ func buildPayloadDisperser(
 		log,
 		&clientConfigV2.DisperserClientCfg,
 		signer,
-		kzgProver,
+		kzgCommitter,
 		accountant,
 		dispersalMetrics,
 	)

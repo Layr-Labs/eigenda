@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -18,9 +19,17 @@ func TestProveAllCosetThreads(t *testing.T) {
 	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
+	c, err := committer.NewFromConfig(committer.Config{
+		SRSNumberToLoad:   harness.proverV2KzgConfig.SRSNumberToLoad,
+		G1SRSPath:         harness.proverV2KzgConfig.G1Path,
+		G2SRSPath:         harness.proverV2KzgConfig.G2Path,
+		G2TrailingSRSPath: harness.proverV2KzgConfig.G2TrailingPath,
+	})
+	require.NoError(t, err)
+
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
 
-	commitments, err := group.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
+	commitments, err := c.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
 	require.Nil(t, err)
 	frames, err := group.GetFrames(harness.paddedGettysburgAddressBytes, params)
 	require.Nil(t, err)
