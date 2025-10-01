@@ -44,6 +44,11 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 	// capture the original working directory, and switch back to it as a cleanup step.
 	originalDir, err := os.Getwd()
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Logf("Failed to restore working directory: %v", err)
+		}
+	})
 
 	infraConfig := &integration.InfrastructureConfig{
 		TemplateName:                    "testconfig-anvil.yaml",
@@ -57,19 +62,20 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 	}
 
 	infra, err := integration.SetupInfrastructure(infraConfig)
+	if infra != nil {
+		t.Cleanup(func() {
+			integration.TeardownInfrastructure(infra)
+		})
+	}
 	require.NoError(t, err)
 
 	testHarness, err := integration.NewTestHarnessWithSetup(infra)
+	if testHarness != nil {
+		t.Cleanup(func() {
+			testHarness.Cleanup()
+		})
+	}
 	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		testHarness.Cleanup()
-		integration.TeardownInfrastructure(infra)
-
-		if err := os.Chdir(originalDir); err != nil {
-			t.Logf("Failed to restore working directory: %v", err)
-		}
-	})
 
 	integration.MineAnvilBlocks(t, testHarness.RPCClient, 6)
 
