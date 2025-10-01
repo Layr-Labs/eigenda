@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	paymentvaultbindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
@@ -482,7 +483,7 @@ func buildReservationLedger(
 		*clientReservation,
 		minNumSymbols,
 		true,
-		reservation.OverfillOncePermitted,
+		ratelimit.OverfillOncePermitted,
 		10*time.Second,
 	)
 	if err != nil {
