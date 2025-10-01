@@ -229,7 +229,7 @@ func (c *Committer) computeLengthProofV2(coeffs []fr.Element) (*bn254.G2Affine, 
 	start := uint32(len(c.g2TrailingSRS)) - blobLen
 	shiftedSecret := c.g2TrailingSRS[start : start+uint32(len(coeffs))]
 
-	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
+	// The proof of low degree is commitment of the polynomial shifted to the largest srs degree
 	var lengthProof bn254.G2Affine
 	_, err := lengthProof.MultiExp(shiftedSecret, coeffs, ecc.MultiExpConfig{})
 	if err != nil {
