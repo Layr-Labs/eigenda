@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -170,42 +169,6 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	return chunks, nil
 }
 
-// GetCommitmentsForPaddedLength takes in a byte slice representing a list of bn254
-// field elements (32 bytes each, except potentially the last element),
-// pads the (potentially incomplete) last element with zeroes, and returns the commitments for the padded list.
-func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommitments, error) {
-	symbols, err := rs.ToFrArray(data)
-	if err != nil {
-		return encoding.BlobCommitments{}, fmt.Errorf("ToFrArray: %w", err)
-	}
-
-	// TODO(samlaf): why do we hardcode these params here?
-	// Would we ever need/want to change them?
-	params := encoding.EncodingParams{
-		NumChunks:   2,
-		ChunkLength: 2,
-	}
-
-	enc, err := e.GetKzgEncoder(params)
-	if err != nil {
-		return encoding.BlobCommitments{}, fmt.Errorf("get kzg encoder: %w", err)
-	}
-
-	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols)
-	if err != nil {
-		return encoding.BlobCommitments{}, fmt.Errorf("get commitments: %w", err)
-	}
-
-	commitments := encoding.BlobCommitments{
-		Commitment:       (*encoding.G1Commitment)(commit),
-		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
-		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           math.NextPowOf2u32(uint32(len(symbols))),
-	}
-
-	return commitments, nil
-}
-
 func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedProver, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -269,19 +232,12 @@ func (p *Prover) createGnarkBackendProver(
 		SFs:        sfs,
 	}
 
-	// Set KZG Commitments gnark backend
-	commitmentsBackend := &gnarkprover.KzgCommitmentsGnarkBackend{
-		Srs:        p.Srs,
-		G2Trailing: p.G2Trailing,
-	}
-
 	return &ParametrizedProver{
 		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
 		encoder:                    p.encoder,
 		encodingParams:             params,
 		computeMultiproofNumWorker: p.KzgConfig.NumWorker,
 		kzgMultiProofBackend:       multiproofBackend,
-		kzgCommitmentsBackend:      commitmentsBackend,
 	}, nil
 }
 

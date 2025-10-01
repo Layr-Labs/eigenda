@@ -294,7 +294,7 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
-	commitments, err := s.prover.GetCommitmentsForPaddedLength(blob)
+	commitments, err := s.committer.GetCommitmentsForPaddedLength(blob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commitments: %w", err)
 	}
