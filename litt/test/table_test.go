@@ -8,10 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/cache"
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	tablecache "github.com/Layr-Labs/eigenda/litt/cache"
 	"github.com/Layr-Labs/eigenda/litt/disktable"
@@ -19,6 +16,8 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/memtable"
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
@@ -117,10 +116,7 @@ func buildMemKeyDiskTable(
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
+	logger := test.GetLogger()
 
 	keymapPath := filepath.Join(path, name, keymap.KeymapDirectoryName)
 	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.MemKeymapType)
@@ -167,10 +163,7 @@ func buildLevelDBKeyDiskTable(
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
+	logger := test.GetLogger()
 
 	keymapPath := filepath.Join(path, name, keymap.KeymapDirectoryName)
 	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.MemKeymapType)
@@ -480,7 +473,7 @@ func garbageCollectionTest(t *testing.T, tableBuilder *tableBuilder) {
 
 			// Check the values that are expected to have been removed from the table
 			// Garbage collection happens asynchronously, so we may need to wait for it to complete.
-			testutils.AssertEventuallyTrue(t, func() bool {
+			test.AssertEventuallyTrue(t, func() bool {
 				// keep a running sum of the unexpired data size. Some data may be unable to expire
 				// due to sharing a file with data that is not yet ready to expire, so it's hard
 				// to predict the exact quantity of unexpired data.

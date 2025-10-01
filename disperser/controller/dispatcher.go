@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -488,9 +488,7 @@ func (d *Dispatcher) updateAttestation(
 
 	aggregationStartTime := time.Now()
 	signatureAggregation, err := d.aggregator.AggregateSignatures(
-		ctx,
-		d.chainState,
-		uint(batchData.Batch.BatchHeader.ReferenceBlockNumber),
+		batchData.OperatorState,
 		quorumAttestation,
 		sortedNonZeroQuorums)
 	d.metrics.reportAggregateSignaturesLatency(time.Since(aggregationStartTime))

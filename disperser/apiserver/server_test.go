@@ -14,23 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core/auth"
-	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/disperser/apiserver"
-	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/testbed"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/google/uuid"
-	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/urfave/cli"
-
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -38,18 +21,33 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/apiserver"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/google/uuid"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
+	"github.com/prometheus/client_golang/prometheus"
 	tmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli"
 	"google.golang.org/grpc/peer"
 )
 
 var (
-	logger          = testutils.GetLogger()
+	logger          = test.GetLogger()
 	queue           disperser.BlobStore
 	dispersalServer *apiserver.DispersalServer
 
@@ -59,8 +57,11 @@ var (
 	bucketTableName     = fmt.Sprintf("test-BucketStore-%v", UUID)
 	s3BucketName        = "test-eigenda-blobstore"
 	v2MetadataTableName = fmt.Sprintf("test-BlobMetadata-%v-v2", UUID)
-	prover              encoding.Prover
-	privateKeyHex       = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	// This prover is only used in server_v2_test.go, but is instantiated here
+	// as part of the setup() function which sets up both v1 and v2 tests...
+	// TODO(samlaf): we need to move away from these global variables
+	prover        *proverv2.Prover
+	privateKeyHex = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	deployLocalStack bool
 	localstackPort   = "4576"
@@ -92,7 +93,6 @@ func TestDisperseBlob(t *testing.T) {
 }
 
 func TestDisperseBlobAuth(t *testing.T) {
-
 	data1KiB := make([]byte, 1024)
 	_, err := rand.Read(data1KiB)
 	require.NoError(t, err)
@@ -114,7 +114,6 @@ func TestDisperseBlobAuth(t *testing.T) {
 }
 
 func TestDisperseBlobAuthTimeout(t *testing.T) {
-
 	data1KiB := make([]byte, 1024)
 	_, err := rand.Read(data1KiB)
 	require.NoError(t, err)
@@ -141,6 +140,7 @@ func TestDisperseBlobAuthTimeout(t *testing.T) {
 }
 
 func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
+	ctx := t.Context()
 
 	transactor := &mock.MockWriter{}
 	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
@@ -151,7 +151,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 
-	dispersalServer := newTestServer(transactor, t.Name())
+	dispersalServer := newTestServer(ctx, transactor, t.Name())
 
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
@@ -165,7 +165,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 			Port: 51001,
 		},
 	}
-	ctx := peer.NewContext(t.Context(), p)
+	ctx = peer.NewContext(ctx, p)
 
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil).Twice()
 
@@ -207,7 +207,6 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 }
 
 func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
-
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	require.NoError(t, err)
@@ -669,23 +668,23 @@ func setup() {
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
-	config := &kzg.KzgConfig{
+	config := &proverv2.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
+		G2TrailingPath:  "../../resources/srs/g2.trailing.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        8192,
 		SRSNumberToLoad: 8192,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,
 	}
 
-	prover, err = p.NewProver(config, nil)
+	prover, err = proverv2.NewProver(config, nil)
 	if err != nil {
 		teardown()
 		logger.Fatal("Failed to initialize KZG prover:", err)
 	}
 
-	dispersalServer = newTestServer(transactor, "setup")
+	dispersalServer = newTestServer(ctx, transactor, "setup")
 
 	var X1, Y1 fp.Element
 	X1 = *X1.SetBigInt(big.NewInt(1))
@@ -744,8 +743,7 @@ func teardown() {
 	}
 }
 
-func newTestServer(transactor core.Writer, testName string) *apiserver.DispersalServer {
-	ctx := context.Background()
+func newTestServer(ctx context.Context, transactor core.Writer, testName string) *apiserver.DispersalServer {
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
@@ -956,7 +954,6 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 		X: commitX,
 		Y: commitY,
 	}
-	dataLength := 32
 	batchID := uint32(99)
 	batchRoot := []byte("hello")
 	referenceBlockNumber := uint32(132)
@@ -986,7 +983,7 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 		BlobInclusionProof:   inclusionProof,
 		BlobCommitment: &encoding.BlobCommitments{
 			Commitment: commitment,
-			Length:     uint(dataLength),
+			Length:     32,
 		},
 		BatchID:                 batchID,
 		ConfirmationTxnHash:     gethcommon.HexToHash("0x123"),

@@ -9,12 +9,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"gopkg.in/yaml.v3"
 )
 
-var logger = testutils.GetLogger()
+var logger = test.GetLogger()
 
 func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
 	for _, deployer := range env.Deployers {
@@ -221,6 +221,12 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e_v2_reservation",
 		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e_v2_ondemand",
 		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
+
+		// V2 inabox test is setup with a client that doesn't setup a client for some reason,
+		// so it calls the grpc GetBlobCommitment to generate commitments.
+		// DisperserV2 uses the V2 prover which always uses SRSOrder=2^28.
+		// So it needs the trailing g2 points to generate correct length commitments.
+		DISPERSER_SERVER_G2_TRAILING_PATH: "../resources/srs/g2.trailing.point",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -354,6 +360,32 @@ func (env *Config) generateControllerVars(
 	return v
 }
 
+func (env *Config) generateProxyVars(ind int) ProxyVars {
+	v := ProxyVars{
+		EIGENDA_PROXY_APIS_TO_ENABLE:             "op-generic,standard,metrics",
+		EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE: "V2", // we only enable V2
+		EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND:  "V2",
+		// V2 Variables
+		// TODO(samlaf): this private key should be read from the output config file instead of hardcoded.
+		EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded",
+		// TODO(samlaf): this should not be hardcoded
+		EIGENDA_PROXY_EIGENDA_V2_ETH_RPC:                                         "http://localhost:8545",
+		EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH:                                 "16MiB",
+		EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR: env.EigenDA.CertVerifierRouter,
+		EIGENDA_PROXY_EIGENDA_V2_RBN_RECENCY_WINDOW_SIZE:                         "0",
+		// TODO(samlaf): this should not be hardcoded
+		EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC:     "localhost:32005",
+		EIGENDA_PROXY_EIGENDA_V2_EIGENDA_DIRECTORY: env.EigenDA.EigenDADirectory,
+		EIGENDA_PROXY_EIGENDA_V2_GRPC_DISABLE_TLS:  "true",
+		// SRS paths
+		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH:          "../resources/srs/g1.point",
+		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH:          "../resources/srs/g2.point",
+		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH: "../resources/srs/g2.trailing.point",
+	}
+	env.applyDefaults(&v, "EIGENDA_PROXY", "proxy", ind)
+	return v
+}
+
 func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVars {
 	v := RelayVars{
 		RELAY_LOG_FORMAT:                            "text",
@@ -421,8 +453,6 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_BLS_KEY_PASSWORD:                 blsPassword,
 		NODE_ECDSA_KEY_PASSWORD:               ecdsaPassword,
 		NODE_EIGENDA_DIRECTORY:                env.EigenDA.EigenDADirectory,
-		NODE_BLS_OPERATOR_STATE_RETRIVER:      env.EigenDA.OperatorStateRetriever,
-		NODE_EIGENDA_SERVICE_MANAGER:          env.EigenDA.ServiceManager,
 		NODE_REGISTER_AT_NODE_START:           "true",
 		NODE_CHURNER_URL:                      churnerUrl,
 		NODE_CHURNER_USE_SECURE_GRPC:          "false",
@@ -788,6 +818,15 @@ func (env *Config) GenerateAllVariables() error {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Controller = controllerConfig
+
+	// Proxy
+	name = "proxy0"
+	_, _, _, envFile = env.getPaths(name)
+	proxyConfig := env.generateProxyVars(0)
+	if err := writeEnv(proxyConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
+	env.Proxy = proxyConfig
 
 	if env.Environment.IsLocal() {
 

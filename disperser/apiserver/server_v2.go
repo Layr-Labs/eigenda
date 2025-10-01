@@ -20,13 +20,16 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 type OnchainState struct {
@@ -51,12 +54,12 @@ type DispersalServerV2 struct {
 
 	chainReader              core.Reader
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator
-	prover                   encoding.Prover
+	prover                   *prover.Prover
 	logger                   logging.Logger
 
 	// state
 	onchainState                atomic.Pointer[OnchainState]
-	maxNumSymbolsPerBlob        uint64
+	maxNumSymbolsPerBlob        uint32
 	onchainStateRefreshInterval time.Duration
 
 	metricsConfig disperser.MetricsConfig
@@ -85,8 +88,8 @@ func NewDispersalServerV2(
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
-	prover encoding.Prover,
-	maxNumSymbolsPerBlob uint64,
+	prover *prover.Prover,
+	maxNumSymbolsPerBlob uint32,
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
@@ -232,38 +235,53 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobCommitmentRequest) (*pb.BlobCommitmentReply, error) {
+func (s *DispersalServerV2) GetBlobCommitment(
+	ctx context.Context,
+	req *pb.BlobCommitmentRequest,
+) (*pb.BlobCommitmentReply, error) {
+	reply, st := s.getBlobCommitment(req)
+	api.LogResponseStatus(s.logger, st)
+	if st != nil {
+		// nolint:wrapcheck
+		return reply, st.Err()
+	}
+	return reply, nil
+}
+
+func (s *DispersalServerV2) getBlobCommitment(
+	req *pb.BlobCommitmentRequest,
+) (*pb.BlobCommitmentReply, *status.Status) {
 	start := time.Now()
 	defer func() {
 		s.metrics.reportGetBlobCommitmentLatency(time.Since(start))
 	}()
 
 	if s.prover == nil {
-		return nil, api.NewErrorUnimplemented()
+		return nil, status.New(codes.Internal, "prover is not configured")
 	}
-	blobSize := uint(len(req.GetBlob()))
+	blobSize := uint32(len(req.GetBlob()))
 	if blobSize == 0 {
-		return nil, api.NewErrorInvalidArg("data is empty")
+		return nil, status.New(codes.InvalidArgument, "blob cannot be empty")
 	}
-	if uint64(encoding.GetBlobLengthPowerOf2(blobSize)) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes",
-			s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
+	if encoding.GetBlobLengthPowerOf2(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
+		return nil, status.Newf(codes.InvalidArgument, "blob size cannot exceed %v bytes",
+			s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL)
 	}
 	c, err := s.prover.GetCommitmentsForPaddedLength(req.GetBlob())
 	if err != nil {
-		return nil, api.NewErrorInternal("failed to get commitments")
+		return nil, status.New(codes.Internal, "failed to compute commitments")
 	}
 	commitment, err := c.Commitment.Serialize()
 	if err != nil {
-		return nil, api.NewErrorInternal("failed to serialize commitment")
+		return nil, status.New(codes.Internal, "failed to serialize commitment")
 	}
 	lengthCommitment, err := c.LengthCommitment.Serialize()
 	if err != nil {
-		return nil, api.NewErrorInternal("failed to serialize length commitment")
+		return nil, status.New(codes.Internal, "failed to serialize length commitment")
 	}
 	lengthProof, err := c.LengthProof.Serialize()
 	if err != nil {
-		return nil, api.NewErrorInternal("failed to serialize length proof")
+		return nil, status.New(codes.Internal, "failed to serialize length proof")
 	}
 
 	return &pb.BlobCommitmentReply{
@@ -272,7 +290,7 @@ func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobC
 			LengthCommitment: lengthCommitment,
 			LengthProof:      lengthProof,
 			Length:           uint32(c.Length),
-		}}, nil
+		}}, status.New(codes.OK, "")
 }
 
 // refreshOnchainState refreshes the onchain quorum state.
@@ -319,9 +337,25 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	return nil
 }
 
-func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
+func (s *DispersalServerV2) GetPaymentState(
+	ctx context.Context,
+	req *pb.GetPaymentStateRequest,
+) (*pb.GetPaymentStateReply, error) {
+	reply, st := s.getPaymentState(ctx, req)
+	api.LogResponseStatus(s.logger, st)
+	if st != nil {
+		// nolint:wrapcheck
+		return reply, st.Err()
+	}
+	return reply, nil
+}
+
+func (s *DispersalServerV2) getPaymentState(
+	ctx context.Context,
+	req *pb.GetPaymentStateRequest,
+) (*pb.GetPaymentStateReply, *status.Status) {
 	if s.meterer == nil {
-		return nil, errors.New("payment meterer is not enabled")
+		return nil, status.New(codes.Internal, "meterer is not configured")
 	}
 	start := time.Now()
 	defer func() {
@@ -329,7 +363,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	}()
 
 	if !gethcommon.IsHexAddress(req.GetAccountId()) {
-		return nil, api.NewErrorInvalidArg("invalid account ID")
+		return nil, status.New(codes.InvalidArgument, "invalid account ID")
 	}
 
 	accountID := gethcommon.HexToAddress(req.GetAccountId())
@@ -337,7 +371,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// validate the signature
 	if err := s.blobRequestAuthenticator.AuthenticatePaymentStateRequest(accountID, req); err != nil {
 		s.logger.Debug("failed to validate signature", "err", err, "accountID", accountID)
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
+		return nil, status.Newf(codes.Unauthenticated, "failed to validate signature: %s", err.Error())
 	}
 	// on-chain global payment parameters
 	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
@@ -407,7 +441,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		CumulativePayment:        largestCumulativePaymentBytes,
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
-	return reply, nil
+	return reply, status.New(codes.OK, "")
 }
 
 // Gracefully shuts down the server and closes any open connections

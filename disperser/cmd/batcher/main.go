@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -207,22 +206,7 @@ func RunBatcher(ctx *cli.Context) error {
 		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
 		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 	} else {
-		logger.Info("Using built-in indexer")
-
-		indexer, err := coreindexer.CreateNewIndexer(
-			&config.IndexerConfig,
-			client,
-			rpcClient,
-			config.EigenDADirectory,
-			logger,
-		)
-		if err != nil {
-			return err
-		}
-		ics, err = coreindexer.NewIndexedChainState(cs, indexer)
-		if err != nil {
-			return err
-		}
+		return fmt.Errorf("built-in indexer is deprecated and will be removed soon, please use UseGraph=true")
 	}
 
 	if len(config.BatcherConfig.EncoderSocket) == 0 {

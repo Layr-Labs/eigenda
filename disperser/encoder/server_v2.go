@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -34,7 +35,7 @@ type EncoderServerV2 struct {
 	blobStore   *blobstore.BlobStore
 	chunkWriter chunkstore.ChunkWriter
 	logger      logging.Logger
-	prover      encoding.Prover
+	prover      *prover.Prover
 	metrics     *Metrics
 	grpcMetrics *grpcprom.ServerMetrics
 	close       func()
@@ -57,7 +58,7 @@ func NewEncoderServerV2(
 	blobStore *blobstore.BlobStore,
 	chunkWriter chunkstore.ChunkWriter,
 	logger logging.Logger,
-	prover encoding.Prover,
+	prover *prover.Prover,
 	metrics *Metrics,
 	grpcMetrics *grpcprom.ServerMetrics,
 ) *EncoderServerV2 {
@@ -273,7 +274,9 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 		return blobKey, params, errors.New("number of chunks must be greater than zero")
 	}
 
-	if req.GetBlobSize() == 0 || uint64(encoding.GetBlobLength(uint(req.GetBlobSize()))) > req.GetEncodingParams().GetChunkLength()*req.GetEncodingParams().GetNumChunks() {
+	if req.GetBlobSize() == 0 ||
+		(uint64(encoding.GetBlobLength(uint32(req.GetBlobSize()))) >
+			req.GetEncodingParams().GetChunkLength()*req.GetEncodingParams().GetNumChunks()) {
 		return blobKey, params, errors.New("blob size is invalid")
 	}
 
@@ -288,7 +291,7 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 		NumChunks:   req.GetEncodingParams().GetNumChunks(),
 	}
 
-	err = encoding.ValidateEncodingParams(params, s.prover.GetSRSOrder())
+	err = encoding.ValidateEncodingParams(params, encoding.SRSOrder)
 	if err != nil {
 		return blobKey, params, fmt.Errorf("invalid encoding parameters: %v", err)
 	}

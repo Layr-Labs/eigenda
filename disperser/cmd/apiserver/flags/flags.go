@@ -242,6 +242,12 @@ var kzgFlags = []cli.Flag{
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G2_PATH"),
 	},
 	cli.StringFlag{
+		Name:     kzg.G2TrailingPathFlagName,
+		Usage:    "Path to trailing G2 SRS file. Its intended purpose is to allow local generation the blob length proof. If you already downloaded the entire G2 SRS file which contains 268435456 G2 points with total size 16GiB, this flag is not needed. With this G2TrailingPathFlag, user can use a smaller file that contains only the trailing end of the whole G2 SRS file. Ignoring this flag, the program assumes the entire G2 SRS file is provided. With this flag, the size of the provided file must be at least SRSLoadingNumberFlagName * 64 Bytes.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G2_TRAILING_PATH"),
+	},
+	cli.StringFlag{
 		Name:     kzg.CachePathFlagName,
 		Usage:    "Path to SRS Table directory",
 		Required: false,

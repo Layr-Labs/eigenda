@@ -15,5 +15,5 @@ type KzgCommitmentsBackend interface {
 	ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, error)
 	ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Affine, error)
 	ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error)
-	ComputeLengthProofForLength(blobFr []fr.Element, length uint64) (*bn254.G2Affine, error)
+	ComputeLengthProofForLength(blobFr []fr.Element, length uint32) (*bn254.G2Affine, error)
 }

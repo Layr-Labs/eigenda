@@ -1,16 +1,17 @@
 package limiter
 
 import (
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/rand"
 	"math"
 	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/test/random"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 )
 
 func TestConcurrentGetChunksOperations(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	concurrencyLimit := 1 + rand.Intn(10)
 
@@ -20,7 +21,7 @@ func TestConcurrentGetChunksOperations(t *testing.T) {
 	config.GetChunkOpsBurstiness = math.MaxInt32
 	config.GetChunkOpsBurstinessClient = math.MaxInt32
 
-	userID := tu.RandomString(64)
+	userID := random.RandomString(64)
 
 	limiter := NewChunkRateLimiter(config, nil)
 
@@ -46,7 +47,7 @@ func TestConcurrentGetChunksOperations(t *testing.T) {
 }
 
 func TestGetChunksRateLimit(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	config := defaultConfig()
 	config.MaxGetChunkOpsPerSecond = float64(2 + rand.Intn(10))
@@ -54,7 +55,7 @@ func TestGetChunksRateLimit(t *testing.T) {
 	config.GetChunkOpsBurstinessClient = math.MaxInt32
 	config.MaxConcurrentGetChunkOps = 1
 
-	userID := tu.RandomString(64)
+	userID := random.RandomString(64)
 
 	limiter := NewChunkRateLimiter(config, nil)
 
@@ -111,14 +112,14 @@ func TestGetChunksRateLimit(t *testing.T) {
 }
 
 func TestGetChunksBandwidthLimit(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	config := defaultConfig()
 	config.MaxGetChunkBytesPerSecond = float64(1024 + rand.Intn(1024*1024))
 	config.GetChunkBytesBurstiness = int(config.MaxGetBlobBytesPerSecond) + rand.Intn(1024*1024)
 	config.GetChunkBytesBurstinessClient = math.MaxInt32
 
-	userID := tu.RandomString(64)
+	userID := random.RandomString(64)
 
 	limiter := NewChunkRateLimiter(config, nil)
 
@@ -159,7 +160,7 @@ func TestGetChunksBandwidthLimit(t *testing.T) {
 }
 
 func TestPerClientConcurrencyLimit(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	config := defaultConfig()
 	config.MaxConcurrentGetChunkOpsClient = 1 + rand.Intn(10)
@@ -167,8 +168,8 @@ func TestPerClientConcurrencyLimit(t *testing.T) {
 	config.GetChunkOpsBurstinessClient = math.MaxInt32
 	config.GetChunkOpsBurstiness = math.MaxInt32
 
-	userID1 := tu.RandomString(64)
-	userID2 := tu.RandomString(64)
+	userID1 := random.RandomString(64)
+	userID2 := random.RandomString(64)
 
 	limiter := NewChunkRateLimiter(config, nil)
 
@@ -208,15 +209,15 @@ func TestPerClientConcurrencyLimit(t *testing.T) {
 }
 
 func TestOpLimitPerClient(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	config := defaultConfig()
 	config.MaxGetChunkOpsPerSecondClient = float64(2 + rand.Intn(10))
 	config.GetChunkOpsBurstinessClient = int(config.MaxGetChunkOpsPerSecondClient) + rand.Intn(10)
 	config.GetChunkOpsBurstiness = math.MaxInt32
 
-	userID1 := tu.RandomString(64)
-	userID2 := tu.RandomString(64)
+	userID1 := random.RandomString(64)
+	userID2 := random.RandomString(64)
 
 	limiter := NewChunkRateLimiter(config, nil)
 
@@ -264,7 +265,7 @@ func TestOpLimitPerClient(t *testing.T) {
 }
 
 func TestBandwidthLimitPerClient(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	config := defaultConfig()
 	config.MaxGetChunkBytesPerSecondClient = float64(1024 + rand.Intn(1024*1024))
@@ -273,8 +274,8 @@ func TestBandwidthLimitPerClient(t *testing.T) {
 	config.GetChunkOpsBurstiness = math.MaxInt32
 	config.GetChunkOpsBurstinessClient = math.MaxInt32
 
-	userID1 := tu.RandomString(64)
-	userID2 := tu.RandomString(64)
+	userID1 := random.RandomString(64)
+	userID2 := random.RandomString(64)
 
 	limiter := NewChunkRateLimiter(config, nil)
 
