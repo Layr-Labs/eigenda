@@ -199,7 +199,7 @@ func startRelays(ctx context.Context, harness *DisperserHarness, config Disperse
 	actualURLs := make([]string, config.RelayCount)
 
 	for i := range config.RelayCount {
-		listener, err := net.Listen("tcp", "localhost:0")
+		listener, err := net.Listen("tcp", "0.0.0.0:0")
 		if err != nil {
 			// Clean up any listeners we created before failing
 			for j := range i {
@@ -214,7 +214,7 @@ func startRelays(ctx context.Context, harness *DisperserHarness, config Disperse
 
 		// Extract the actual port assigned by the OS
 		actualPort := listener.Addr().(*net.TCPAddr).Port
-		actualURLs[i] = fmt.Sprintf("localhost:%d", actualPort)
+		actualURLs[i] = fmt.Sprintf("0.0.0.0:%d", actualPort)
 
 		config.Logger.Info("Created listener for relay", "index", i, "assigned_port", actualPort)
 	}

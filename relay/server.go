@@ -64,11 +64,11 @@ type Server struct {
 	// replayGuardian is used to guard against replay attacks.
 	replayGuardian replay.ReplayGuardian
 
-	// metrics encapsulates the metrics for the relay server.
-	metrics *metrics.RelayMetrics
-
 	// chainReader is the core.Reader used to fetch blob parameters.
 	chainReader core.Reader
+
+	// metrics encapsulates the metrics for the relay server.
+	metrics *metrics.RelayMetrics
 }
 
 // NewServer creates a new relay Server.
