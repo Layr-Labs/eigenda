@@ -61,7 +61,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		ControllerUseNewPayments:        controllerUseNewPayments,
 	}
 
-	infra, err := integration.SetupInfrastructure(infraConfig)
+	infra, err := integration.SetupInfrastructure(t.Context(), infraConfig)
 	if infra != nil {
 		t.Cleanup(func() {
 			integration.TeardownInfrastructure(infra)

@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -65,11 +66,12 @@ func setupSuite(logger logging.Logger) error {
 		TestName:          testName,
 		InMemoryBlobStore: inMemoryBlobStore,
 		Logger:            logger,
+		RelayCount:        4,
 		RootPath:          "../../",
 		ClientLedgerMode:  clientledger.ClientLedgerModeLegacy,
 	}
 	var err error
-	globalInfra, err = integration.SetupInfrastructure(config)
+	globalInfra, err = integration.SetupInfrastructure(context.Background(), config)
 	if err != nil {
 		return fmt.Errorf("failed to setup global infrastructure: %w", err)
 	}
