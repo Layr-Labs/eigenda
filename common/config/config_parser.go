@@ -14,25 +14,33 @@ import (
 // ParseConfigFromCLI parses configuration, pulling config paths from command line arguments. Assumes that any command
 // line argument, if present, is a config path. The resulting config is written into target. If there should be default
 // values in the config, target should be initialized with those default values before calling this function.
-func ParseConfigFromCLI[T VerifiableConfig](target *T, envPrefix string) error {
+func ParseConfigFromCLI[T VerifiableConfig](constructor func() T, envPrefix string) (T, error) {
 	configPaths := make([]string, 0)
 	configPaths = append(configPaths, os.Args...)
 
-	err := ParseConfig(*target, envPrefix, configPaths...)
+	cfg, err := ParseConfig(constructor, envPrefix, configPaths...)
 	if err != nil {
-		return fmt.Errorf("failed to parse config from CLI: %w", err)
+		var zero T
+		return zero, fmt.Errorf("failed to parse config from CLI: %w", err)
 	}
 
-	return nil
+	return cfg, nil
 }
 
-// ParseConfig parses the configuration from the given paths and environment variables into the target
-// configuration struct. Configuration files are loaded in order, with later files overriding earlier ones.
-// Environment variables are loaded last, and overrid values from all configuration files. If there are default
-// values in the config, target should be initialized with those default values before calling this function.
+// ParseConfig parses the configuration from the given paths and environment variables. Configuration files are
+// loaded in order, with later files overriding earlier ones. Environment variables are loaded last, and overrid values
+// from all configuration files. If there are default values in the config, target should be initialized with those
+// default values before calling this function.
 //
-// The envPrefix is used to prefix environment variables. TODO document this
-func ParseConfig[T VerifiableConfig](target T, envPrefix string, configPaths ...string) error {
+// The envPrefix is used to prefix environment variables. May not be empty. Environment variables with this prefix
+// are required to be bound to a configuration field, otherwise an error is returned. TODO expand docs
+func ParseConfig[T VerifiableConfig](constructor func() T, envPrefix string, configPaths ...string) (T, error) {
+	if envPrefix == "" {
+		var zero T
+		return zero, fmt.Errorf("envPrefix may not be empty")
+	}
+
+	target := constructor()
 
 	// Configure viper.
 	viperInstance := viper.New()
@@ -44,43 +52,50 @@ func ParseConfig[T VerifiableConfig](target T, envPrefix string, configPaths ...
 	for i, path := range configPaths {
 		err := loadConfigFile(viperInstance, path, i == 0)
 		if err != nil {
-			return fmt.Errorf("failed to load config file %q: %w", path, err)
+			var zero T
+			return zero, fmt.Errorf("failed to load config file %q: %w", path, err)
 		}
 	}
 
 	// Walk the struct and figure out what environment variables to bind to it.
 	boundVars, err := bindEnvs(viperInstance, envPrefix, target)
 	if err != nil {
-		return fmt.Errorf("failed to bind environment variables: %w", err)
+		var zero T
+		return zero, fmt.Errorf("failed to bind environment variables: %w", err)
 	}
 
 	// Make sure there aren't any invalid environment variables set.
 	err = checkForInvalidEnvVars(boundVars, envPrefix)
 	if err != nil {
-		return fmt.Errorf("invalid environment variables: %w", err)
+		var zero T
+		return zero, fmt.Errorf("invalid environment variables: %w", err)
 	}
 
 	// Use viper to unmarshal environment variables into the target struct.
 	decoderConfig := &mapstructure.DecoderConfig{
-		ErrorUnused: true,
-		Result:      target,
-		TagName:     "mapstructure",
+		ErrorUnused:      true,
+		WeaklyTypedInput: true, // Allow automatic type conversion from strings (e.g., env vars)
+		Result:           target,
+		TagName:          "mapstructure",
 	}
 	decoder, err := mapstructure.NewDecoder(decoderConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create decoder: %w", err)
+		var zero T
+		return zero, fmt.Errorf("failed to create decoder: %w", err)
 	}
 	if err := decoder.Decode(viperInstance.AllSettings()); err != nil {
-		return fmt.Errorf("failed to decode settings: %w", err)
+		var zero T
+		return zero, fmt.Errorf("failed to decode settings: %w", err)
 	}
 
 	// Verify configuration invariants.
 	err = target.Verify()
 	if err != nil {
-		return fmt.Errorf("invalid configuration: %w", err)
+		var zero T
+		return zero, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	return nil
+	return target, nil
 }
 
 func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
@@ -112,8 +127,6 @@ func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
 
 	return nil
 }
-
-// TODO handle no prefix case
 
 // Walks a struct tree and automatically binds each field to an environment variable based on the given prefix
 // and the field's path in the struct tree. For example, given a struct like:
@@ -180,7 +193,6 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 			} else {
 				// Pointer to non-struct type, bind as regular field
 				env := prefix + "_" + strings.ToUpper(strings.ReplaceAll(strings.Join(keyPath, "_"), ".", "_"))
-				fmt.Printf("binding %s\n", env) // TODO
 				boundVars[env] = struct{}{}
 				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
 					return nil, err
@@ -188,7 +200,6 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 			}
 		default:
 			env := prefix + "_" + strings.ToUpper(strings.ReplaceAll(strings.Join(keyPath, "_"), ".", "_"))
-			fmt.Printf("binding %s\n", env) // TODO
 			boundVars[env] = struct{}{}
 			if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
 				return nil, err
@@ -225,6 +236,5 @@ func checkForInvalidEnvVars(boundVars map[string]struct{}, envPrefix string) err
 		}
 	}
 
-	// TODO
 	return nil
 }

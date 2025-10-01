@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -26,7 +27,15 @@ type Foo struct {
 	Baz     *Baz
 }
 
+func DefaultFoo() *Foo {
+	return &Foo{}
+}
+
 func (f *Foo) Verify() error {
+	if f.String == "invalid" {
+		return fmt.Errorf("String may not be 'invalid'")
+	}
+
 	return nil
 }
 
@@ -55,8 +64,7 @@ func TestTOMLParsing(t *testing.T) {
 
 	configFile := "testdata/config.toml"
 
-	var foo Foo
-	err := ParseConfig(&foo, "FOO", configFile)
+	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -96,8 +104,7 @@ func TestJSONParsing(t *testing.T) {
 
 	configFile := "testdata/config.json"
 
-	var foo Foo
-	err := ParseConfig(&foo, "FOO", configFile)
+	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -138,8 +145,7 @@ func TestYAMLParsing(t *testing.T) {
 
 	configFile := "testdata/config.yml"
 
-	var foo Foo
-	err := ParseConfig(&foo, "FOO", configFile)
+	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -181,8 +187,7 @@ func TestTOMLConfigOverride(t *testing.T) {
 	configFile := "testdata/config.toml"
 	overrideFile := "testdata/config_override.toml"
 
-	var foo Foo
-	err := ParseConfig(&foo, "FOO", configFile, overrideFile)
+	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -218,8 +223,7 @@ func TestJSONConfigOverride(t *testing.T) {
 	configFile := "testdata/config.json"
 	overrideFile := "testdata/config_override.json"
 
-	var foo Foo
-	err := ParseConfig(&foo, "FOO", configFile, overrideFile)
+	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -261,8 +265,7 @@ func TestYAMLConfigOverride(t *testing.T) {
 	configFile := "testdata/config.yml"
 	overrideFile := "testdata/config_override.yml"
 
-	var foo Foo
-	err := ParseConfig(&foo, "FOO", configFile, overrideFile)
+	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -302,8 +305,7 @@ func TestYAMLConfigOverride(t *testing.T) {
 func TestInvalidTOML(t *testing.T) {
 	configFile := "testdata/invalid_config.toml"
 
-	var foo Foo
-	err := ParseConfig(&foo, "FOO", configFile)
+	_, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.Error(t, err)
 }
 
@@ -311,63 +313,68 @@ func TestDefaultValues(t *testing.T) {
 
 	configFile := "testdata/config_override.toml"
 
-	defaultValue := &Foo{
-		String:  "default string",
-		Int:     42,
-		Float64: 3.14,
-		Bar: Bar{
-			A: "default bar A",
-			B: 84,
-			C: true,
-			Baz: &Baz{
-				X: "default baz X",
-				Y: 168,
-				Z: false,
+	constructor := func() *Foo {
+		return &Foo{
+			String:  "default string",
+			Int:     42,
+			Float64: 3.14,
+			Bar: Bar{
+				A: "default bar A",
+				B: 84,
+				C: true,
+				Baz: &Baz{
+					X: "default baz X",
+					Y: 168,
+					Z: false,
+				},
 			},
-		},
-		Baz: &Baz{
-			X: "default top-level baz X",
-			Y: 336,
-			Z: true,
-		},
+			Baz: &Baz{
+				X: "default top-level baz X",
+				Y: 336,
+				Z: true,
+			},
+		}
 	}
 
-	err := ParseConfig(defaultValue, "FOO", configFile)
+	foo, err := ParseConfig(constructor, "FOO", configFile)
 	require.NoError(t, err)
 
 	// Fields that are overridden by config_override.toml
-	require.Equal(t, -1, defaultValue.Int)                 // overridden
-	require.Equal(t, int32(-3), defaultValue.Int32)        // overridden
-	require.Equal(t, int8(-5), defaultValue.Int8)          // overridden
-	require.Equal(t, uint64(10007), defaultValue.Uint64)   // overridden
-	require.Equal(t, uint16(10009), defaultValue.Uint16)   // overridden
-	require.Equal(t, -11.11, defaultValue.Float64)         // overridden
-	require.Equal(t, true, defaultValue.Bool)              // overridden
+	require.Equal(t, -1, foo.Int)               // overridden
+	require.Equal(t, int32(-3), foo.Int32)      // overridden
+	require.Equal(t, int8(-5), foo.Int8)        // overridden
+	require.Equal(t, uint64(10007), foo.Uint64) // overridden
+	require.Equal(t, uint16(10009), foo.Uint16) // overridden
+	require.Equal(t, -11.11, foo.Float64)       // overridden
+	require.Equal(t, true, foo.Bool)            // overridden
 
 	// Fields that keep default values (not in override file)
-	require.Equal(t, "default string", defaultValue.String) // default
-	require.Equal(t, int64(0), defaultValue.Int64)          // default (zero value since not in override or default)
-	require.Equal(t, int16(0), defaultValue.Int16)          // default (zero value)
-	require.Equal(t, uint(0), defaultValue.Uint)            // default (zero value)
-	require.Equal(t, uint32(0), defaultValue.Uint32)        // default (zero value)
-	require.Equal(t, uint8(0), defaultValue.Uint8)          // default (zero value)
-	require.Equal(t, float32(0), defaultValue.Float32)      // default (zero value)
+	require.Equal(t, "default string", foo.String) // default
+	require.Equal(t, int64(0), foo.Int64)          // default (zero value since not in override or default)
+	require.Equal(t, int16(0), foo.Int16)          // default (zero value)
+	require.Equal(t, uint(0), foo.Uint)            // default (zero value)
+	require.Equal(t, uint32(0), foo.Uint32)        // default (zero value)
+	require.Equal(t, uint8(0), foo.Uint8)          // default (zero value)
+	require.Equal(t, float32(0), foo.Float32)      // default (zero value)
 
 	// Bar field
-	require.Equal(t, "default bar A", defaultValue.Bar.A) // default
-	require.Equal(t, -25, defaultValue.Bar.B)             // overridden
-	require.Equal(t, true, defaultValue.Bar.C)            // default
-	require.NotNil(t, defaultValue.Bar.Baz)               // default (nested struct)
-	require.Equal(t, "default baz X", defaultValue.Bar.Baz.X)
-	require.Equal(t, 168, defaultValue.Bar.Baz.Y)
-	require.Equal(t, false, defaultValue.Bar.Baz.Z)
+	require.Equal(t, "default bar A", foo.Bar.A) // default
+	require.Equal(t, -25, foo.Bar.B)             // overridden
+	require.Equal(t, true, foo.Bar.C)            // default
+	require.NotNil(t, foo.Bar.Baz)               // default (nested struct)
+	require.Equal(t, "default baz X", foo.Bar.Baz.X)
+	require.Equal(t, 168, foo.Bar.Baz.Y)
+	require.Equal(t, false, foo.Bar.Baz.Z)
 
 	// Baz field - mix of override and default
-	require.NotNil(t, defaultValue.Baz)
-	require.Equal(t, "toml baz partial X", defaultValue.Baz.X) // overridden
-	require.Equal(t, 336, defaultValue.Baz.Y)                  // default
-	require.Equal(t, false, defaultValue.Baz.Z)                // overridden
+	require.NotNil(t, foo.Baz)
+	require.Equal(t, "toml baz partial X", foo.Baz.X) // overridden
+	require.Equal(t, 336, foo.Baz.Y)                  // default
+	require.Equal(t, false, foo.Baz.Z)                // overridden
 }
+
+// TODO claude: when parsing from environment variables, it can't convert strings into the appropriate types.
+// Can you fix that? The test below fails due to this problem. Run it before you attempt to fix.
 
 func TestEnvironmentVariables(t *testing.T) {
 
@@ -380,30 +387,29 @@ func TestEnvironmentVariables(t *testing.T) {
 	os.Setenv("PREFIX_BAR_BAZ_X", "env var bar baz X")
 	os.Setenv("PREFIX_BAR_BAZ_Y", "444")
 	os.Setenv("PREFIX_BAR_BAZ_Z", "false")
-	os.Setenv("PREFIX_INT64", "0")    // zero value
-	os.Setenv("PREFIX_INT32", "0")    // zero value
+	os.Setenv("PREFIX_INT64", "0") // zero value
+	os.Setenv("PREFIX_INT32", "0") // zero value
 
-	foo := &Foo{
+	os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored")
 
-	}
-	err := ParseConfig(foo, "PREFIX", configFile)
+	foo, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
 	require.NoError(t, err)
 
 	// Verify that environment variables have overridden the config file values.
-	require.Equal(t, "value from env var", foo.String)    // from env
-	require.Equal(t, -999, foo.Int)                       // from env
-	require.Equal(t, int64(0), foo.Int64)                 // from env (zero value)
-	require.Equal(t, int32(0), foo.Int32)                 // from env (zero value)
-	require.Equal(t, int16(4), foo.Int16)                 // from config
-	require.Equal(t, int8(5), foo.Int8)                   // from config
-	require.Equal(t, uint(6), foo.Uint)                   // from config
-	require.Equal(t, uint64(7), foo.Uint64)               // from config
-	require.Equal(t, uint32(8), foo.Uint32)               // from config
-	require.Equal(t, uint16(9), foo.Uint16)               // from config
-	require.Equal(t, uint8(10), foo.Uint8)                // from config
-	require.Equal(t, 11.11, foo.Float64)                  // from config
-	require.Equal(t, float32(12.12), foo.Float32)         // from config
-	require.Equal(t, false, foo.Bool)                     // from config
+	require.Equal(t, "value from env var", foo.String) // from env
+	require.Equal(t, -999, foo.Int)                    // from env
+	require.Equal(t, int64(0), foo.Int64)              // from env (zero value)
+	require.Equal(t, int32(0), foo.Int32)              // from env (zero value)
+	require.Equal(t, int16(4), foo.Int16)              // from config
+	require.Equal(t, int8(5), foo.Int8)                // from config
+	require.Equal(t, uint(6), foo.Uint)                // from config
+	require.Equal(t, uint64(7), foo.Uint64)            // from config
+	require.Equal(t, uint32(8), foo.Uint32)            // from config
+	require.Equal(t, uint16(9), foo.Uint16)            // from config
+	require.Equal(t, uint8(10), foo.Uint8)             // from config
+	require.Equal(t, 11.11, foo.Float64)               // from config
+	require.Equal(t, float32(12.12), foo.Float32)      // from config
+	require.Equal(t, false, foo.Bool)                  // from config
 
 	// Bar field
 	require.Equal(t, "bar A", foo.Bar.A) // from config
@@ -422,4 +428,28 @@ func TestEnvironmentVariables(t *testing.T) {
 	require.Equal(t, "baz X", foo.Baz.X) // from config
 	require.Equal(t, 27, foo.Baz.Y)      // from config
 	require.Equal(t, true, foo.Baz.Z)    // from config
+}
+
+func TestInvalidEnvironmentVariable(t *testing.T) {
+	configFile := "testdata/config.toml"
+
+	// Set environment variables to override some config values.
+	os.Setenv("PREFIX_STRING", "value from env var")
+	os.Setenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED", "should not be ignored")
+
+	_, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
+	require.Error(t, err)
+
+	os.Unsetenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED")
+}
+
+func TestVerificaitonFailure(t *testing.T) {
+	configFile := "testdata/config.toml"
+
+	// Set environment variables to override some config values.
+	os.Setenv("PREFIX_STRING", "invalid") // will cause verification to fail
+
+	_, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "String may not be 'invalid'")
 }
