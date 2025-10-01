@@ -16,7 +16,7 @@ func TestLengthProof(t *testing.T) {
 	harness := getTestHarness()
 	testRand := random.NewTestRandom(134)
 	maxNumSymbols := uint64(1 << 19) // our stored G1 and G2 files only contain this many pts
-	harness.proverV2KzgConfig.SRSNumberToLoad = maxNumSymbols
+	harness.committerConfig.SRSNumberToLoad = maxNumSymbols
 
 	committer, err := committer.NewFromConfig(*harness.committerConfig)
 	require.Nil(t, err)
