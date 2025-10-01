@@ -49,9 +49,9 @@ services:
       G2_PATH: ../resources/srs/g2.point
       G2_POWER_OF_2_PATH: ../resources/srs/g2.point.powerOf2
       CACHE_PATH: ../resources/srs/SRSTables
-      SRS_ORDER: 10000
-      SRS_LOAD: 10000
-      CHALLENGE_ORDER: 10000
+      SRS_ORDER: 8192
+      SRS_LOAD: 8192
+      CHALLENGE_ORDER: 8192
       LOG_LEVEL: "debug"
       VERBOSE: true
       NUM_CONNECTIONS: 50
