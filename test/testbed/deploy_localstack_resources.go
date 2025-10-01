@@ -48,6 +48,7 @@ type DeployResourcesConfig struct {
 }
 
 // DeployResources creates AWS resources (S3 buckets and DynamoDB tables) on LocalStack
+// TODO(dmanc): This function should be split between v1 and v2 resources.
 func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 	// Set defaults
 	if config.V2PaymentPrefix == "" {

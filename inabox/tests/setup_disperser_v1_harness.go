@@ -58,7 +58,9 @@ type EncoderV1Instance struct {
 
 // SetupDisperserV1Harness creates and initializes the v1 disperser infrastructure
 // (LocalStack, DynamoDB tables, S3 buckets, encoder v1 goroutine).
-func SetupDisperserV1Harness(ctx context.Context, localstack *testbed.LocalStackContainer, config DisperserV1HarnessConfig) (*DisperserV1Harness, error) {
+func SetupDisperserV1Harness(
+	ctx context.Context, localstack *testbed.LocalStackContainer, config DisperserV1HarnessConfig,
+) (*DisperserV1Harness, error) {
 	// Check if localstack resources are empty
 	if config.V1MetadataTableName == "" || config.BucketTableName == "" || config.BlobStoreBucketName == "" {
 		return nil, fmt.Errorf("missing name for localstack resources")

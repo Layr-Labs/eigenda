@@ -166,7 +166,10 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	// TODO(dmanc): Once all of these components are migrated to goroutines, we can remove this.
 	if testConfig != nil {
 		config.Logger.Info("Starting remaining binaries")
-		err := testConfig.GenerateAllVariables(disperserV1Harness.EncoderV1Instance.URL, disperserHarness.EncoderV2Instance.URL)
+		err := testConfig.GenerateAllVariables(
+			disperserV1Harness.EncoderV1Instance.URL,
+			disperserHarness.EncoderV2Instance.URL,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate environment variables: %w", err)
 		}

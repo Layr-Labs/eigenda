@@ -101,7 +101,9 @@ func setupDisperserKeypairAndRegistrations(config DisperserHarnessConfig) error 
 
 // SetupDisperserHarness creates and initializes the disperser infrastructure
 // (LocalStack, DynamoDB tables, S3 buckets, relays)
-func SetupDisperserHarness(ctx context.Context, localstack *testbed.LocalStackContainer, config DisperserHarnessConfig) (*DisperserHarness, error) {
+func SetupDisperserHarness(
+	ctx context.Context, localstack *testbed.LocalStackContainer, config DisperserHarnessConfig,
+) (*DisperserHarness, error) {
 	// Check if localstack resources are empty
 	if config.V2MetadataTableName == "" || config.BlobStoreBucketName == "" {
 		return nil, fmt.Errorf("missing name for localstack resources")

@@ -125,7 +125,10 @@ func (s *EncoderServer) Start() error {
 	}
 
 	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
-	return gs.Serve(listener)
+	if err := gs.Serve(listener); err != nil {
+		return fmt.Errorf("failed to serve grpc: %w", err)
+	}
+	return nil
 }
 
 // StartWithListener starts the server using the provided listener. This method will block until the server is stopped.
@@ -153,7 +156,10 @@ func (s *EncoderServer) StartWithListener(listener net.Listener) error {
 	}
 
 	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
-	return gs.Serve(listener)
+	if err := gs.Serve(listener); err != nil {
+		return fmt.Errorf("failed to serve grpc: %w", err)
+	}
+	return nil
 }
 
 func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
