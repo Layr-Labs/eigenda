@@ -19,19 +19,15 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/testcontainers/testcontainers-go"
 )
 
 // DisperserV1HarnessConfig contains the configuration for setting up the v1 disperser harness
 type DisperserV1HarnessConfig struct {
-	Logger              logging.Logger
-	Network             *testcontainers.DockerNetwork
 	TestConfig          *deploy.Config
 	TestName            string
 	BucketTableName     string
 	V1MetadataTableName string
 	BlobStoreBucketName string
-	EthClient           common.EthClient
 }
 
 // DisperserV1Harness is a simpler harness that only uses v1 encoder (no v2, no relays)
@@ -58,7 +54,10 @@ type EncoderV1Instance struct {
 // SetupDisperserV1Harness creates and initializes the v1 disperser infrastructure
 // (LocalStack, DynamoDB tables, S3 buckets, encoder v1 goroutine).
 func SetupDisperserV1Harness(
-	ctx context.Context, localstack *testbed.LocalStackContainer, config DisperserV1HarnessConfig,
+	ctx context.Context,
+	logger logging.Logger,
+	localstack *testbed.LocalStackContainer,
+	config DisperserV1HarnessConfig,
 ) (*DisperserV1Harness, error) {
 	// Check if localstack resources are empty
 	if config.V1MetadataTableName == "" || config.BucketTableName == "" || config.BlobStoreBucketName == "" {
@@ -73,26 +72,15 @@ func SetupDisperserV1Harness(
 
 	// Setup LocalStack if not using in-memory blob store
 	// Setup LocalStack resources (reuse the same function from main harness)
-	harnessConfig := DisperserV1HarnessConfig{
-		Logger:              config.Logger,
-		Network:             config.Network,
-		TestConfig:          config.TestConfig,
-		TestName:            config.TestName,
-		V1MetadataTableName: config.V1MetadataTableName,
-		BucketTableName:     config.BucketTableName,
-		BlobStoreBucketName: config.BlobStoreBucketName,
-		EthClient:           config.EthClient,
-	}
-
-	localstack, err := setupV1LocalStackResources(ctx, localstack, harnessConfig)
+	localstack, err := setupV1LocalStackResources(ctx, logger, localstack, config)
 	if err != nil {
 		return nil, err
 	}
 	harness.LocalStack = localstack
 
 	// Start encoder v1 instance as a goroutine
-	config.Logger.Info("Starting encoder v1 instance")
-	encoderInstance, err := startEncoderV1(ctx, harness, config)
+	logger.Info("Starting encoder v1 instance")
+	encoderInstance, err := startEncoderV1(logger, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start encoder v1: %w", err)
 	}
@@ -103,33 +91,35 @@ func SetupDisperserV1Harness(
 
 // setupLocalStackResources initializes LocalStack and deploys AWS resources
 func setupV1LocalStackResources(
-	ctx context.Context, localstack *testbed.LocalStackContainer, config DisperserV1HarnessConfig,
+	ctx context.Context,
+	logger logging.Logger,
+	localstack *testbed.LocalStackContainer,
+	config DisperserV1HarnessConfig,
 ) (*testbed.LocalStackContainer, error) {
 	// Deploy AWS resources (DynamoDB tables and S3 buckets)
-	config.Logger.Info("Deploying AWS resources in LocalStack")
+	logger.Info("Deploying AWS resources in LocalStack")
 	deployConfig := testbed.DeployResourcesConfig{
 		LocalStackEndpoint:  localstack.Endpoint(),
 		V1MetadataTableName: config.V1MetadataTableName,
 		BucketTableName:     config.BucketTableName,
 		BlobStoreBucketName: config.BlobStoreBucketName,
 		AWSConfig:           localstack.GetAWSClientConfig(),
-		Logger:              config.Logger,
+		Logger:              logger,
 	}
 	if err := testbed.DeployResources(ctx, deployConfig); err != nil {
 		return nil, fmt.Errorf("failed to deploy resources: %w", err)
 	}
-	config.Logger.Info("AWS resources deployed successfully")
+	logger.Info("AWS resources deployed successfully")
 
 	return localstack, nil
 }
 
 // startEncoderV1 starts a single encoder v1 instance
 func startEncoderV1(
-	ctx context.Context,
-	harness *DisperserV1Harness,
+	logger logging.Logger,
 	config DisperserV1HarnessConfig,
 ) (*EncoderV1Instance, error) {
-	config.Logger.Info("Starting encoder v1 instance")
+	logger.Info("Starting encoder v1 instance")
 
 	// Get SRS paths using the same function as operator setup
 	g1Path, g2Path, err := getSRSPaths()
@@ -148,7 +138,7 @@ func startEncoderV1(
 	encoderURL := fmt.Sprintf("0.0.0.0:%d", actualPort)
 	port := fmt.Sprintf("%d", actualPort)
 
-	config.Logger.Info("Created listener for encoder v1", "assigned_port", actualPort)
+	logger.Info("Created listener for encoder v1", "assigned_port", actualPort)
 
 	// Create logs directory
 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)

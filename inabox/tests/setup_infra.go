@@ -122,8 +122,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 
 	// Setup Disperser Harness (V1) (DynamoDB tables, S3 buckets, encoders)
 	disperserV1HarnessConfig := &DisperserV1HarnessConfig{
-		Logger:     logger,
-		Network:    sharedDockerNetwork,
 		TestConfig: testConfig,
 		TestName:   testName,
 
@@ -132,7 +130,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		BucketTableName:     config.BucketTableName,
 		BlobStoreBucketName: config.BlobStoreBucketName,
 	}
-	disperserV1Harness, err := SetupDisperserV1Harness(infraCtx, sharedLocalStack, *disperserV1HarnessConfig)
+	disperserV1Harness, err := SetupDisperserV1Harness(infraCtx, logger, sharedLocalStack, *disperserV1HarnessConfig)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup disperser v1 harness: %w", err)
 		return nil, setupErr
@@ -141,18 +139,21 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 
 	// Setup Disperser Harness (V2) (DynamoDB tables, S3 buckets, relays, encoders)
 	disperserHarnessConfig := &DisperserHarnessConfig{
-		Logger:     logger,
-		Network:    sharedDockerNetwork,
 		TestConfig: testConfig,
 		TestName:   testName,
-		EthClient:  infra.ChainHarness.EthClient,
 		RelayCount: config.RelayCount,
 
 		// LocalStack resources
 		BlobStoreBucketName: config.BlobStoreBucketName,
 		V2MetadataTableName: config.V2MetadataTableName,
 	}
-	disperserHarness, err := SetupDisperserHarness(infraCtx, sharedLocalStack, *disperserHarnessConfig)
+	disperserHarness, err := SetupDisperserHarness(
+		infraCtx,
+		logger,
+		infra.ChainHarness.EthClient,
+		sharedLocalStack,
+		*disperserHarnessConfig,
+	)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
 		return nil, setupErr

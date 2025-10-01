@@ -27,19 +27,15 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/testcontainers/testcontainers-go"
 )
 
 // DisperserHarnessConfig contains the configuration for setting up the disperser harness
 type DisperserHarnessConfig struct {
-	Logger              logging.Logger
-	Network             *testcontainers.DockerNetwork
 	TestConfig          *deploy.Config
 	TestName            string
 	LocalStackPort      string
 	V2MetadataTableName string
 	BlobStoreBucketName string // S3 bucket name for blob storage
-	EthClient           common.EthClient
 
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
@@ -60,39 +56,46 @@ type DisperserHarness struct {
 
 // setupLocalStackResources initializes LocalStack and deploys AWS resources
 func setupV2LocalStackResources(
-	ctx context.Context, localstack *testbed.LocalStackContainer, config DisperserHarnessConfig,
+	ctx context.Context,
+	logger logging.Logger,
+	localstack *testbed.LocalStackContainer,
+	config DisperserHarnessConfig,
 ) (*testbed.LocalStackContainer, error) {
 	// Deploy AWS resources (DynamoDB tables and S3 buckets)
-	config.Logger.Info("Deploying AWS resources in LocalStack")
+	logger.Info("Deploying AWS resources in LocalStack")
 	deployConfig := testbed.DeployResourcesConfig{
 		LocalStackEndpoint:  localstack.Endpoint(),
 		V2MetadataTableName: config.V2MetadataTableName,
 		BlobStoreBucketName: config.BlobStoreBucketName,
 		AWSConfig:           localstack.GetAWSClientConfig(),
-		Logger:              config.Logger,
+		Logger:              logger,
 	}
 	if err := testbed.DeployResources(ctx, deployConfig); err != nil {
 		return nil, fmt.Errorf("failed to deploy resources: %w", err)
 	}
-	config.Logger.Info("AWS resources deployed successfully")
+	logger.Info("AWS resources deployed successfully")
 
 	return localstack, nil
 }
 
 // setupDisperserKeypairAndRegistrations generates disperser keypair and performs registrations
-func setupDisperserKeypairAndRegistrations(config DisperserHarnessConfig) error {
+func setupDisperserKeypairAndRegistrations(
+	logger logging.Logger,
+	ethClient common.EthClient,
+	config DisperserHarnessConfig,
+) error {
 	if config.TestConfig == nil {
 		return nil
 	}
 
-	config.Logger.Info("Attempting to generate disperser keypair with LocalStack running")
+	logger.Info("Attempting to generate disperser keypair with LocalStack running")
 	if err := config.TestConfig.GenerateDisperserKeypair(); err != nil {
 		return fmt.Errorf("failed to generate disperser keypair: %w", err)
 	}
 
 	// Register disperser keypair on chain
 	if config.TestConfig.EigenDA.Deployer != "" && config.TestConfig.IsEigenDADeployed() {
-		config.TestConfig.PerformDisperserRegistrations(config.EthClient)
+		config.TestConfig.PerformDisperserRegistrations(ethClient)
 	}
 
 	return nil
@@ -101,7 +104,11 @@ func setupDisperserKeypairAndRegistrations(config DisperserHarnessConfig) error 
 // SetupDisperserHarness creates and initializes the disperser infrastructure
 // (LocalStack, DynamoDB tables, S3 buckets, relays)
 func SetupDisperserHarness(
-	ctx context.Context, localstack *testbed.LocalStackContainer, config DisperserHarnessConfig,
+	ctx context.Context,
+	logger logging.Logger,
+	ethClient common.EthClient,
+	localstack *testbed.LocalStackContainer,
+	config DisperserHarnessConfig,
 ) (*DisperserHarness, error) {
 	// Check if localstack resources are empty
 	if config.V2MetadataTableName == "" || config.BlobStoreBucketName == "" {
@@ -117,29 +124,29 @@ func SetupDisperserHarness(
 	harness.S3Buckets.BlobStore = config.BlobStoreBucketName
 
 	// Setup LocalStack if not using in-memory blob store
-	localstack, err := setupV2LocalStackResources(ctx, localstack, config)
+	localstack, err := setupV2LocalStackResources(ctx, logger, localstack, config)
 	if err != nil {
 		return nil, err
 	}
 	harness.LocalStack = localstack
 
 	// Generate disperser keypair and perform registrations
-	if err := setupDisperserKeypairAndRegistrations(config); err != nil {
+	if err := setupDisperserKeypairAndRegistrations(logger, ethClient, config); err != nil {
 		return nil, err
 	}
 
 	// Start relay goroutines if relay count is specified
 	if config.RelayCount > 0 {
-		if err := startRelays(ctx, harness, config); err != nil {
+		if err := startRelays(ctx, logger, ethClient, harness, config); err != nil {
 			return nil, fmt.Errorf("failed to start relays: %w", err)
 		}
 	} else {
-		config.Logger.Warn("Relay count is not specified, skipping relay setup")
+		logger.Warn("Relay count is not specified, skipping relay setup")
 	}
 
 	// Start encoder v2 instance
-	config.Logger.Info("Starting encoder v2 instance")
-	encoderInstance, err := startEncoderV2(ctx, harness, config)
+	logger.Info("Starting encoder v2 instance")
+	encoderInstance, err := startEncoderV2(ctx, logger, harness, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start encoder v2: %w", err)
 	}
@@ -168,8 +175,14 @@ type EncoderV2Instance struct {
 }
 
 // startRelays starts all relay goroutines
-func startRelays(ctx context.Context, harness *DisperserHarness, config DisperserHarnessConfig) error {
-	config.Logger.Info("Pre-creating listeners for relay goroutines", "count", config.RelayCount)
+func startRelays(
+	ctx context.Context,
+	logger logging.Logger,
+	ethClient common.EthClient,
+	harness *DisperserHarness,
+	config DisperserHarnessConfig,
+) error {
+	logger.Info("Pre-creating listeners for relay goroutines", "count", config.RelayCount)
 
 	// Pre-create all listeners with port 0 (OS assigns ports)
 	listeners := make([]net.Listener, config.RelayCount)
@@ -182,7 +195,7 @@ func startRelays(ctx context.Context, harness *DisperserHarness, config Disperse
 			for j := range i {
 				err := listeners[j].Close()
 				if err != nil {
-					config.Logger.Warn("Failed to close listener for relay", "index", j, "error", err)
+					logger.Warn("Failed to close listener for relay", "index", j, "error", err)
 				}
 			}
 			return fmt.Errorf("failed to create listener for relay %d: %w", i, err)
@@ -193,31 +206,31 @@ func startRelays(ctx context.Context, harness *DisperserHarness, config Disperse
 		actualPort := listener.Addr().(*net.TCPAddr).Port
 		actualURLs[i] = fmt.Sprintf("0.0.0.0:%d", actualPort)
 
-		config.Logger.Info("Created listener for relay", "index", i, "assigned_port", actualPort)
+		logger.Info("Created listener for relay", "index", i, "assigned_port", actualPort)
 	}
 
 	// Now that we have all the actual URLs, register them on-chain
 	if config.TestConfig != nil && config.TestConfig.EigenDA.Deployer != "" && config.TestConfig.IsEigenDADeployed() {
-		config.Logger.Info("Registering relay URLs with actual ports", "urls", actualURLs)
-		config.TestConfig.RegisterRelays(config.EthClient, actualURLs, config.EthClient.GetAccountAddress())
+		logger.Info("Registering relay URLs with actual ports", "urls", actualURLs)
+		config.TestConfig.RegisterRelays(ethClient, actualURLs, ethClient.GetAccountAddress())
 	}
 
 	// Now start each relay with its pre-created listener
 	for i, listener := range listeners {
-		instance, err := startRelayWithListener(ctx, i, actualURLs[i], listener, harness, config)
+		instance, err := startRelayWithListener(ctx, logger, ethClient, i, actualURLs[i], listener, harness, config)
 		if err != nil {
 			// Clean up any relays we started and all remaining listeners
-			stopAllRelays(harness.RelayInstances, config.Logger)
+			stopAllRelays(harness.RelayInstances, logger)
 			for j := i; j < len(listeners); j++ {
 				err := listeners[j].Close()
 				if err != nil {
-					config.Logger.Warn("Failed to close listener for relay", "index", j, "error", err)
+					logger.Warn("Failed to close listener for relay", "index", j, "error", err)
 				}
 			}
 			return fmt.Errorf("failed to start relay %d (%s): %w", i, actualURLs[i], err)
 		}
 		harness.RelayInstances = append(harness.RelayInstances, instance)
-		config.Logger.Info("Started relay", "index", i, "url", actualURLs[i])
+		logger.Info("Started relay", "index", i, "url", actualURLs[i])
 	}
 
 	return nil
@@ -242,6 +255,8 @@ func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) 
 // startRelayWithListener starts a single relay with the given index, URL, and pre-created listener
 func startRelayWithListener(
 	ctx context.Context,
+	logger logging.Logger,
+	ethClient common.EthClient,
 	relayIndex int,
 	relayURL string,
 	listener net.Listener,
@@ -310,14 +325,14 @@ func startRelayWithListener(
 	// Create eth writer and chain state
 	tx, err := coreeth.NewWriter(
 		relayLogger,
-		config.EthClient,
+		ethClient,
 		config.TestConfig.EigenDA.OperatorStateRetriever,
 		config.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create eth writer: %w", err)
 	}
 
-	cs := coreeth.NewChainState(tx, config.EthClient)
+	cs := coreeth.NewChainState(tx, ethClient)
 	ics := thegraph.MakeIndexedChainState(thegraph.Config{}, cs, relayLogger)
 
 	// Create relay configuration
@@ -426,10 +441,11 @@ func stopAllRelays(instances []*RelayInstance, logger logging.Logger) {
 // startEncoderV2 starts a single encoder v2 instance
 func startEncoderV2(
 	ctx context.Context,
+	logger logging.Logger,
 	harness *DisperserHarness,
 	config DisperserHarnessConfig,
 ) (*EncoderV2Instance, error) {
-	config.Logger.Info("Starting encoder v2 instance")
+	logger.Info("Starting encoder v2 instance")
 
 	// Get SRS paths using the same function as operator setup
 	g1Path, _, err := getSRSPaths()
@@ -448,7 +464,7 @@ func startEncoderV2(
 	encoderURL := fmt.Sprintf("0.0.0.0:%d", actualPort)
 	port := fmt.Sprintf("%d", actualPort)
 
-	config.Logger.Info("Created listener for encoder v2", "assigned_port", actualPort)
+	logger.Info("Created listener for encoder v2", "assigned_port", actualPort)
 
 	// Create logs directory
 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
