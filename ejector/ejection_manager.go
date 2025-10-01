@@ -71,10 +71,10 @@ type ejectionManager struct {
 	transactor EjectionTransactor
 
 	// The minimum time between starting an ejection and completing it.
-	ejectionDelay time.Duration
+	ejectionFinalizationDelay time.Duration
 
 	// The minimum time between two consecutive ejection attempts for the same validator.
-	retryDelay time.Duration
+	ejectionRetryDelay time.Duration
 
 	// The maximum number of consecutive failed ejection attempts before a validator is blacklisted.
 	maxConsecutiveFailedEjectionAttempts uint32
@@ -105,9 +105,9 @@ func NewEjectionManager(
 	// Submits ejection transactions.
 	transactor EjectionTransactor,
 	// the minimum time between starting an ejection and completing it
-	ejectionDelay time.Duration,
+	ejectionFinalizationDelay time.Duration,
 	// the minimum time between two consecutive ejection attempts for the same validator
-	retryDelay time.Duration,
+	ejectionRetryDelay time.Duration,
 	// the maximum number of consecutive failed ejection attempts before a validator is blacklisted
 	maxConsecutiveFailedEjectionAttempts uint32,
 	// Configures throttle for maximum stake (as a fraction of 1.0) that can be ejected per second in each quorum.
@@ -131,8 +131,8 @@ func NewEjectionManager(
 		ejectionsInProgress:                  make(map[geth.Address]*inProgressEjection),
 		failedEjectionAttempts:               make(map[geth.Address]uint32),
 		transactor:                           transactor,
-		ejectionDelay:                        ejectionDelay,
-		retryDelay:                           retryDelay,
+		ejectionFinalizationDelay:            ejectionFinalizationDelay,
+		ejectionRetryDelay:                   ejectionRetryDelay,
 		maxConsecutiveFailedEjectionAttempts: maxConsecutiveFailedEjectionAttempts,
 		quorumRateLimits:                     make(map[core.QuorumID]*ratelimit.LeakyBucket),
 		maxEjectionRate:                      maxEjectionRate,
@@ -220,7 +220,7 @@ func (em *ejectionManager) BeginEjection(
 
 	em.recentEjectionTimes[validatorAddress] = em.timeSource()
 	em.ejectionsInProgress[validatorAddress] = &inProgressEjection{
-		ejectionFinalizationTime: em.timeSource().Add(em.ejectionDelay),
+		ejectionFinalizationTime: em.timeSource().Add(em.ejectionFinalizationDelay),
 		stake:                    stakes,
 	}
 }
@@ -348,7 +348,7 @@ func (em *ejectionManager) cleanRecentEjections() {
 	// Another possible optimization if this code ever becomes a hotspot is to execute eth transactions on
 	// background goroutines, so that this loop is not blocked on network calls. Premature at current scale.
 
-	cutoff := em.timeSource().Add(-em.retryDelay)
+	cutoff := em.timeSource().Add(-em.ejectionRetryDelay)
 	for addr, ts := range em.recentEjectionTimes {
 		if ts.Before(cutoff) {
 			delete(em.recentEjectionTimes, addr)
