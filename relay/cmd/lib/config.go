@@ -32,7 +32,7 @@ type Config struct {
 	// RelayConfig is the configuration for the relay.
 	RelayConfig relay.Config
 
-	// Configuration for the graph indexer.
+	// Configuration for the graph.
 	EthClientConfig            geth.EthClientConfig
 	EigenDADirectory           string
 	OperatorStateRetrieverAddr string
