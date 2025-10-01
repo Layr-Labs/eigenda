@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	integration "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 		TODO: Decompose this test into smaller tests that cover each of the above steps individually.
 	*/
 	// Create a fresh test harness for this test
-	testHarness, err := NewTestHarnessWithSetup(globalInfra)
+	testHarness, err := integration.NewTestHarnessWithSetup(globalInfra)
 	require.NoError(t, err, "Failed to create test harness")
 	defer testHarness.Cleanup()
 
@@ -198,7 +199,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
 }
 
-func validateTxReceipt(ctx context.Context, testHarness *TestHarness, txHash gethcommon.Hash) error {
+func validateTxReceipt(ctx context.Context, testHarness *integration.TestHarness, txHash gethcommon.Hash) error {
 	receipt, err := testHarness.EthClient.TransactionReceipt(ctx, txHash)
 	if err != nil {
 		return err

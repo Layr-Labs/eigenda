@@ -161,15 +161,18 @@ func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation, now 
 	}
 
 	// Create new config with the updated reservation
-	newConfig := ReservationLedgerConfig{
-		reservation:            *newReservation,
-		startFull:              rl.config.startFull,
-		overfillBehavior:       rl.config.overfillBehavior,
-		bucketCapacityDuration: rl.config.bucketCapacityDuration,
+	newConfig, err := NewReservationLedgerConfig(
+		*newReservation,
+		rl.config.minNumSymbols,
+		rl.config.startFull,
+		rl.config.overfillBehavior,
+		rl.config.bucketCapacityDuration)
+	if err != nil {
+		return fmt.Errorf("new reservation ledger config: %w", err)
 	}
-	rl.config = newConfig
+	rl.config = *newConfig
 
-	err := rl.leakyBucket.Reconfigure(
+	err = rl.leakyBucket.Reconfigure(
 		float64(newConfig.reservation.symbolsPerSecond),
 		newConfig.bucketCapacityDuration,
 		newConfig.overfillBehavior,
