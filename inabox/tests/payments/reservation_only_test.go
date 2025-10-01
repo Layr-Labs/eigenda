@@ -98,7 +98,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		blobsPerSecond := float32(0.125)
 		t.Logf("Blobs per second: %f", blobsPerSecond)
 
-		resultChan := SubmitPayloads(
+		resultChan := submitPayloads(
 			t,
 			testRandom,
 			testHarness.PayloadDisperser,
@@ -131,7 +131,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		time.Sleep(3 * time.Second)
 
 		t.Log("Dispersing with decreased reservation limits")
-		resultChan = SubmitPayloads(
+		resultChan = submitPayloads(
 			t,
 			testRandom,
 			testHarness.PayloadDisperser,
@@ -176,7 +176,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		blobsPerSecond := float32(0.5)
 		t.Logf("Blobs per second: %f", blobsPerSecond)
 
-		resultChan := SubmitPayloads(
+		resultChan := submitPayloads(
 			t,
 			testRandom,
 			testHarness.PayloadDisperser,
@@ -222,7 +222,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		time.Sleep(3 * time.Second)
 
 		t.Log("Testing with increased reservation limits")
-		resultChan = SubmitPayloads(
+		resultChan = submitPayloads(
 			t,
 			testRandom,
 			testHarness.PayloadDisperser,
