@@ -8,9 +8,9 @@ import (
 )
 
 func main() {
-	// Loads config from environment variables. 
+	// Loads config from environment variables.
 	// If there are CLI arguments, they are treated as config file paths and loaded.
-	cfg, err := config.ParseConfigFromCLI(ejector.DefaultEjectorConfig, "EJECTOR")
+	cfg, err := config.ParseConfigFromCLI(ejector.DefaultEjectorConfig, ejector.EjectorConfigEnvPrefix)
 	if err != nil {
 		panic(err)
 	}

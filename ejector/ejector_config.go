@@ -7,17 +7,39 @@ import (
 	"github.com/Layr-Labs/eigenda/common/config"
 )
 
+// The environment variable prefix to use for the ejector configuration.
+const EjectorConfigEnvPrefix = "EJECTOR"
+
 var _ config.VerifiableConfig = (*EjectorConfig)(nil)
 
+// Configuration for the ejector.
 type EjectorConfig struct {
+
+	////////////////////////
+	// Required arguments //
+	////////////////////////
+
+	// The address of the contract directory contract.
+	contractDirectoryAddress string
+
+	// The Ethereum RPC URL to use for connecting to the blockchain.
+	ethRPCURL string
+
+	// The private key to use for signing ejection transactions.
+	privateKey string
+
+	// The URL of the Eigenda Data API to use for looking up signing rates.
+	dataApiUrl string
+
+	////////////////////////
+	// Optional arguments //
+	////////////////////////
+
 	// The period with which to evaluate validators for ejection.
 	ejectionPeriod time.Duration
 
 	// The time window over which to evaluate signing metrics when deciding whether to eject a validator.
 	ejectionCriteriaTimeWindow time.Duration
-
-	// The address of the contract directory contract.
-	contractDirectoryAddress string
 
 	// The time between starting an ejection and when the ejection can be finalized.
 	ejectionFinalizationDelay time.Duration
@@ -38,15 +60,6 @@ type EjectorConfig struct {
 	// If true, then the ejection manager will immediately be able to eject ejectionRateLimit fraction of stake when it
 	// starts up. If false, then the ejection manager will need to wait before it has this capacity.
 	startEjectionThrottleFull bool
-
-	// The Ethereum RPC URL to use for connecting to the blockchain.
-	ethRPCURL string
-
-	// The private key to use for signing ejection transactions.
-	privateKey string
-
-	// The URL of the Eigenda Data API to use for looking up signing rates.
-	dataAPIURL string
 }
 
 // DefaultEjectorConfig returns a default configuration for the ejector.
@@ -103,8 +116,8 @@ func (c *EjectorConfig) Verify() error {
 	if c.privateKey == "" {
 		return fmt.Errorf("invalid private key")
 	}
-	if c.dataAPIURL == "" {
-		return fmt.Errorf("invalid data API URL: %s", c.dataAPIURL)
+	if c.dataApiUrl == "" {
+		return fmt.Errorf("invalid data API URL: %s", c.dataApiUrl)
 	}
 
 	return nil
