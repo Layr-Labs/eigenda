@@ -196,15 +196,8 @@ contract DeployEigenDA is Script {
         );
         upgrade(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME, "");
 
-        impl[AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME] = address(
-            new EigenDARegistryCoordinator(
-                IServiceManager(directory.getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME)),
-                IStakeRegistry(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
-                IBLSApkRegistry(directory.getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME)),
-                IIndexRegistry(directory.getAddress(AddressDirectoryConstants.INDEX_REGISTRY_NAME)),
-                ISocketRegistry(directory.getAddress(AddressDirectoryConstants.SOCKET_REGISTRY_NAME))
-            )
-        );
+        impl[AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME] =
+            address(new EigenDARegistryCoordinator(address(directory)));
         upgrade(
             AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME,
             abi.encodeCall(
