@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
 	"github.com/urfave/cli/v2"
 )
 
@@ -28,7 +29,7 @@ func withEnvPrefix(envPrefix, s string) []string {
 // CLIFlags ... used for storage configuration
 // category is used to group the flags in the help output (see https://cli.urfave.org/v2/examples/flags/#grouping)
 func CLIFlags(envPrefix, category string) []cli.Flag {
-	return []cli.Flag{
+	flags := []cli.Flag{
 		&cli.StringSliceFlag{
 			Name:     BackendsToEnableFlagName,
 			Usage:    "Comma separated list of eigenDA backends to enable (e.g. V1,V2)",
@@ -74,6 +75,11 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 		},
 	}
+
+	// Append secondary storage flags
+	flags = append(flags, secondary.CLIFlags(envPrefix, category)...)
+
+	return flags
 }
 
 func ReadConfig(ctx *cli.Context) (Config, error) {
@@ -117,12 +123,15 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		}
 	}
 
+	secondaryCfg := secondary.ReadConfig(ctx)
+
 	return Config{
-		BackendsToEnable: backends,
-		DispersalBackend: dispersalBackend,
-		AsyncPutWorkers:  ctx.Int(ConcurrentWriteThreads),
-		FallbackTargets:  filteredFallbackTargets,
-		CacheTargets:     filteredCacheTargets,
-		WriteOnCacheMiss: ctx.Bool(WriteOnCacheMissFlagName),
+		BackendsToEnable:              backends,
+		DispersalBackend:              dispersalBackend,
+		AsyncPutWorkers:               ctx.Int(ConcurrentWriteThreads),
+		FallbackTargets:               filteredFallbackTargets,
+		CacheTargets:                  filteredCacheTargets,
+		WriteOnCacheMiss:              ctx.Bool(WriteOnCacheMissFlagName),
+		ErrorOnSecondaryInsertFailure: secondaryCfg.ErrorOnSecondaryInsertFailure,
 	}, nil
 }
