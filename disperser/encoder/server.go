@@ -128,6 +128,34 @@ func (s *EncoderServer) Start() error {
 	return gs.Serve(listener)
 }
 
+// StartWithListener starts the server using the provided listener. This method will block until the server is stopped.
+func (s *EncoderServer) StartWithListener(listener net.Listener) error {
+	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
+	gs := grpc.NewServer(opt,
+		grpc.UnaryInterceptor(
+			s.grpcMetrics.UnaryServerInterceptor(),
+		),
+	)
+	reflection.Register(gs)
+	pb.RegisterEncoderServer(gs, s)
+	s.grpcMetrics.InitializeMetrics(gs)
+
+	// Register Server for Health Checks
+	name := pb.Encoder_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
+
+	s.close = func() {
+		err := listener.Close()
+		if err != nil {
+			log.Printf("failed to close listener: %v", err)
+		}
+		gs.GracefulStop()
+	}
+
+	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	return gs.Serve(listener)
+}
+
 func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	startTime := time.Now()
 	blobSize := len(req.GetData())

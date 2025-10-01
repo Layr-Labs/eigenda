@@ -28,16 +28,16 @@ type DeployResourcesConfig struct {
 	// Required: AWS client config
 	AWSConfig aws.ClientConfig
 
-	// Optional: Metadata table name, defaults to "test-eigenda-blobmetadata"
-	MetadataTableName string
-
-	// Optional: Bucket table name, defaults to "test-eigenda-bucket"
+	// Optional: Bucket table name
 	BucketTableName string
 
-	// Optional: V2 metadata table name, defaults to "test-eigenda-blobmetadata-v2"
+	// Optional: V1 blob metadata table name
+	V1MetadataTableName string
+
+	// Optional: V2 blob metadata table name
 	V2MetadataTableName string
 
-	// Optional: Blobstore S3 bucket name, defaults to "test-eigenda-blobstore"
+	// Optional: Blobstore S3 bucket name
 	BlobStoreBucketName string
 
 	// Optional: prefix for v2 payment tables, defaults to "e2e_v2_"
@@ -49,6 +49,12 @@ type DeployResourcesConfig struct {
 
 // DeployResources creates AWS resources (S3 buckets and DynamoDB tables) on LocalStack
 func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
+	// Set defaults
+	if config.V2PaymentPrefix == "" {
+		// TODO(dmanc): This is a hardcoded assumption in inabox/deploy/config.go
+		config.V2PaymentPrefix = "e2e_v2_"
+	}
+
 	// Use a default logger if none provided
 	logger := config.Logger
 	if logger == nil {
@@ -66,23 +72,6 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 	// Add component to logger
 	logger = logger.With("component", "DeployResources")
 
-	// Set defaults
-	if config.V2PaymentPrefix == "" {
-		config.V2PaymentPrefix = "e2e_v2_"
-	}
-	if config.MetadataTableName == "" {
-		config.MetadataTableName = "test-eigenda-blobmetadata"
-	}
-	if config.BucketTableName == "" {
-		config.BucketTableName = "test-eigenda-bucket"
-	}
-	if config.V2MetadataTableName == "" {
-		config.V2MetadataTableName = "test-eigenda-blobmetadata-v2"
-	}
-	if config.BlobStoreBucketName == "" {
-		config.BlobStoreBucketName = "test-eigenda-blobstore"
-	}
-
 	// Set endpoint URL from LocalStackEndpoint
 	config.AWSConfig.EndpointURL = config.LocalStackEndpoint
 
@@ -90,18 +79,20 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 	cfg := config.AWSConfig
 
 	// Create S3 bucket
-	if err := createS3Bucket(ctx, cfg, config.BlobStoreBucketName, logger); err != nil {
-		return fmt.Errorf("failed to create S3 bucket: %w", err)
+	if config.BlobStoreBucketName != "" {
+		if err := createS3Bucket(ctx, cfg, config.BlobStoreBucketName, logger); err != nil {
+			return fmt.Errorf("failed to create blobstore s3 bucket: %w", err)
+		}
 	}
 
 	// Create metadata table
-	if config.MetadataTableName != "" {
-		_, err := test_utils.CreateTable(ctx, cfg, config.MetadataTableName,
-			blobstore.GenerateTableSchema(config.MetadataTableName, 10, 10))
+	if config.V1MetadataTableName != "" {
+		_, err := test_utils.CreateTable(ctx, cfg, config.V1MetadataTableName,
+			blobstore.GenerateTableSchema(config.V1MetadataTableName, 10, 10))
 		if err != nil {
-			return fmt.Errorf("failed to create metadata table %s: %w", config.MetadataTableName, err)
+			return fmt.Errorf("failed to create metadata table %s: %w", config.V1MetadataTableName, err)
 		}
-		logger.Info("Created metadata table", "table", config.MetadataTableName)
+		logger.Info("Created metadata table", "table", config.V1MetadataTableName)
 	}
 
 	// Create bucket table

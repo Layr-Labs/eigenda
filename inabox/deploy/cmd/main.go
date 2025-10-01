@@ -122,7 +122,7 @@ func DeployAll(ctx *cli.Context) error {
 	config.RegisterRelays(ethClient, relayURLs, ethClient.GetAccountAddress())
 
 	logger.Info("Generating variables")
-	err = config.GenerateAllVariables("0.0.0.0:34001")
+	err = config.GenerateAllVariables("0.0.0.0:34000", "0.0.0.0:34001")
 	if err != nil {
 		logger.Errorf("could not generate environment variables: %v", err)
 		panic(err)

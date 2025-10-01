@@ -235,7 +235,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 }
 
 // Generates batcher .env
-func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) BatcherVars {
+func (env *Config) generateBatcherVars(ind int, key, graphUrl, encoderAddress string) BatcherVars {
 	v := BatcherVars{
 		BATCHER_LOG_FORMAT:                    "text",
 		BATCHER_S3_BUCKET_NAME:                "test-eigenda-blobstore",
@@ -243,6 +243,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_ENABLE_METRICS:                "true",
 		BATCHER_METRICS_HTTP_PORT:             "9094",
 		BATCHER_PULL_INTERVAL:                 "5s",
+		BATCHER_ENCODER_ADDRESS:               encoderAddress,
 		BATCHER_EIGENDA_DIRECTORY:             env.EigenDA.EigenDADirectory,
 		BATCHER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetriever,
 		BATCHER_EIGENDA_SERVICE_MANAGER:       env.EigenDA.ServiceManager,
@@ -613,7 +614,7 @@ func (env *Config) getKey(name string) (key, address string, err error) {
 // GenerateAllVariables all of the config for the test environment.
 // Returns an object that corresponds to the participants of the
 // current experiment.
-func (env *Config) GenerateAllVariables(encoderV2Address string) error {
+func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string) error {
 	// hardcode graphurl for now
 	graphUrl := "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
 
@@ -731,7 +732,7 @@ func (env *Config) GenerateAllVariables(encoderV2Address string) error {
 		return fmt.Errorf("failed to get key for %s: %w", name, err)
 	}
 
-	batcherConfig := env.generateBatcherVars(0, key, graphUrl, logPath)
+	batcherConfig := env.generateBatcherVars(0, key, graphUrl, encoderAddress)
 	if err := writeEnv(batcherConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}

@@ -14,6 +14,7 @@ import (
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/testcontainers/testcontainers-go"
@@ -28,10 +29,17 @@ type InfrastructureHarness struct {
 	// Chain related components
 	ChainHarness ChainHarness
 
+	// Shared localstack container
+	SharedLocalStack *testbed.LocalStackContainer
+
 	// Operator related components
 	OperatorHarness OperatorHarness
 
-	// EigenDA components (includes relays)
+	// EigenDA V1 disperser related components
+	// Note: Once V1 is deprecated, we can remove this component
+	DisperserV1Harness DisperserV1Harness
+
+	// EigenDA V2 disperser components (includes relays)
 	DisperserHarness DisperserHarness
 
 	// Proxy

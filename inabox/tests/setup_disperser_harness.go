@@ -38,10 +38,8 @@ type DisperserHarnessConfig struct {
 	TestName            string
 	InMemoryBlobStore   bool
 	LocalStackPort      string
-	MetadataTableName   string
-	BucketTableName     string
-	S3BucketName        string // S3 bucket name for blob storage
-	MetadataTableNameV2 string
+	V2MetadataTableName string
+	BlobStoreBucketName string // S3 bucket name for blob storage
 	EthClient           common.EthClient
 
 	// Number of relay instances to start, if not specified, no relays will be started.
@@ -52,8 +50,7 @@ type DisperserHarnessConfig struct {
 type DisperserHarness struct {
 	LocalStack     *testbed.LocalStackContainer
 	DynamoDBTables struct {
-		BlobMetadataV1 string
-		BlobMetaV2     string
+		BlobMetaV2 string
 	}
 	S3Buckets struct {
 		BlobStore string
@@ -63,31 +60,16 @@ type DisperserHarness struct {
 }
 
 // setupLocalStackResources initializes LocalStack and deploys AWS resources
-func setupLocalStackResources(
-	ctx context.Context, config DisperserHarnessConfig,
+func setupV2LocalStackResources(
+	ctx context.Context, localstack *testbed.LocalStackContainer, config DisperserHarnessConfig,
 ) (*testbed.LocalStackContainer, error) {
-	config.Logger.Info("Setting up LocalStack for blob store")
-	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(
-		ctx,
-		testbed.LocalStackOptions{
-			ExposeHostPort: true,
-			HostPort:       config.LocalStackPort,
-			Logger:         config.Logger,
-			Network:        config.Network,
-		})
-	if err != nil {
-		return nil, fmt.Errorf("failed to start localstack: %w", err)
-	}
-
 	// Deploy AWS resources (DynamoDB tables and S3 buckets)
 	config.Logger.Info("Deploying AWS resources in LocalStack")
 	deployConfig := testbed.DeployResourcesConfig{
-		LocalStackEndpoint:  localstackContainer.Endpoint(),
-		MetadataTableName:   config.MetadataTableName,
-		BucketTableName:     config.BucketTableName,
-		BlobStoreBucketName: config.S3BucketName,
-		V2MetadataTableName: config.MetadataTableNameV2,
-		AWSConfig:           localstackContainer.GetAWSClientConfig(),
+		LocalStackEndpoint:  localstack.Endpoint(),
+		V2MetadataTableName: config.V2MetadataTableName,
+		BlobStoreBucketName: config.BlobStoreBucketName,
+		AWSConfig:           localstack.GetAWSClientConfig(),
 		Logger:              config.Logger,
 	}
 	if err := testbed.DeployResources(ctx, deployConfig); err != nil {
@@ -95,7 +77,7 @@ func setupLocalStackResources(
 	}
 	config.Logger.Info("AWS resources deployed successfully")
 
-	return localstackContainer, nil
+	return localstack, nil
 }
 
 // setupDisperserKeypairAndRegistrations generates disperser keypair and performs registrations
@@ -119,36 +101,23 @@ func setupDisperserKeypairAndRegistrations(config DisperserHarnessConfig) error 
 
 // SetupDisperserHarness creates and initializes the disperser infrastructure
 // (LocalStack, DynamoDB tables, S3 buckets, relays)
-func SetupDisperserHarness(ctx context.Context, config DisperserHarnessConfig) (*DisperserHarness, error) {
+func SetupDisperserHarness(ctx context.Context, localstack *testbed.LocalStackContainer, config DisperserHarnessConfig) (*DisperserHarness, error) {
+	// Check if localstack resources are empty
+	if config.V2MetadataTableName == "" || config.BlobStoreBucketName == "" {
+		return nil, fmt.Errorf("missing name for localstack resources")
+	}
+
 	harness := &DisperserHarness{
 		RelayInstances: make([]*RelayInstance, 0),
 	}
 
-	// Set default values if not provided
-	if config.LocalStackPort == "" {
-		config.LocalStackPort = "4570"
-	}
-	if config.MetadataTableName == "" {
-		config.MetadataTableName = "test-BlobMetadata"
-	}
-	if config.BucketTableName == "" {
-		config.BucketTableName = "test-BucketStore"
-	}
-	if config.S3BucketName == "" {
-		config.S3BucketName = "test-eigenda-blobstore"
-	}
-	if config.MetadataTableNameV2 == "" {
-		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
-	}
-
 	// Populate the harness tables and buckets metadata
-	harness.DynamoDBTables.BlobMetadataV1 = config.MetadataTableName
-	harness.DynamoDBTables.BlobMetaV2 = config.MetadataTableNameV2
-	harness.S3Buckets.BlobStore = config.S3BucketName
+	harness.DynamoDBTables.BlobMetaV2 = config.V2MetadataTableName
+	harness.S3Buckets.BlobStore = config.BlobStoreBucketName
 
 	// Setup LocalStack if not using in-memory blob store
 	if !config.InMemoryBlobStore {
-		localstack, err := setupLocalStackResources(ctx, config)
+		localstack, err := setupV2LocalStackResources(ctx, localstack, config)
 		if err != nil {
 			return nil, err
 		}
@@ -178,17 +147,6 @@ func SetupDisperserHarness(ctx context.Context, config DisperserHarnessConfig) (
 	} else {
 		// TODO(dmanc): Do the relays even work when not using S3 as the blob store?
 		config.Logger.Info("Using in-memory blob store, skipping LocalStack setup")
-	}
-
-	// Start remaining binaries (disperser, encoder, batcher, etc.)
-	if config.TestConfig != nil {
-		config.Logger.Info("Starting remaining binaries")
-		encoderV2Address := harness.EncoderV2Instance.URL
-		err := config.TestConfig.GenerateAllVariables(encoderV2Address)
-		if err != nil {
-			return nil, fmt.Errorf("could not generate environment variables: %w", err)
-		}
-		config.TestConfig.StartBinaries(true) // true = for tests, will skip churner and operators
 	}
 
 	return harness, nil
@@ -283,13 +241,6 @@ func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) 
 		dh.EncoderV2Instance.Logger.Info("Stopping encoder v2")
 		dh.EncoderV2Instance.Server.Close()
 	}
-
-	if dh.LocalStack != nil {
-		logger.Info("Stopping localstack container")
-		if err := dh.LocalStack.Terminate(ctx); err != nil {
-			logger.Warn("Failed to terminate localstack container", "error", err)
-		}
-	}
 }
 
 // startRelayWithListener starts a single relay with the given index, URL, and pre-created listener
@@ -349,7 +300,7 @@ func startRelayWithListener(
 	metricsRegistry := prometheus.NewRegistry()
 
 	// Create metadata store
-	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, relayLogger, config.MetadataTableNameV2)
+	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, relayLogger, config.V2MetadataTableName)
 	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
 		ServiceName: "relay",
 		Registry:    metricsRegistry,
