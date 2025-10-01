@@ -209,8 +209,6 @@ type Config struct {
 	DisperserKMSKeyID string
 
 	UserReservationSymbolsPerSecond uint64
-	UserOnDemandDeposit             uint64
-	ReservationPeriodInterval       uint64
 	ClientLedgerMode                clientledger.ClientLedgerMode
 	UseControllerMediatedPayments   bool
 }

@@ -167,7 +167,6 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
         vm.startBroadcast(msg.sender);
         paymentVault.setReservation(clientAddress, reservation);
-        paymentVault.depositOnDemand{value: vm.envOr("USER_ONDEMAND_DEPOSIT", uint256(0.1 ether))}(clientAddress);
         vm.stopBroadcast();
 
         // Deposit stakers into EigenLayer and delegate to operators

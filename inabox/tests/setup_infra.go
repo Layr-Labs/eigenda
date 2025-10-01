@@ -22,8 +22,6 @@ type InfrastructureConfig struct {
 	BucketTableName                 string
 	MetadataTableNameV2             string
 	UserReservationSymbolsPerSecond uint64
-	UserOnDemandDeposit             uint64
-	ReservationPeriodInterval       uint64
 	ClientLedgerMode                clientledger.ClientLedgerMode
 	ControllerUseNewPayments        bool
 }
@@ -59,8 +57,6 @@ func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, 
 
 	testConfig := deploy.ReadTestConfig(testName, config.RootPath)
 	testConfig.UserReservationSymbolsPerSecond = config.UserReservationSymbolsPerSecond
-	testConfig.UserOnDemandDeposit = config.UserOnDemandDeposit
-	testConfig.ReservationPeriodInterval = config.ReservationPeriodInterval
 	testConfig.ClientLedgerMode = config.ClientLedgerMode
 	testConfig.UseControllerMediatedPayments = config.ControllerUseNewPayments
 

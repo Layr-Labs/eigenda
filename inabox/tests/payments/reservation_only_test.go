@@ -48,11 +48,8 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		Logger:                          test.GetLogger(),
 		RootPath:                        "../../../",
 		UserReservationSymbolsPerSecond: 1024,
-		UserOnDemandDeposit:             0,
-		// choose a bin width value much lower than the default, so that we converge on the average faster
-		ReservationPeriodInterval: 10,
-		ClientLedgerMode:          clientLedgerMode,
-		ControllerUseNewPayments:  controllerUseNewPayments,
+		ClientLedgerMode:                clientLedgerMode,
+		ControllerUseNewPayments:        controllerUseNewPayments,
 	}
 
 	infra, err := integration.SetupInfrastructure(infraConfig)
@@ -78,6 +75,19 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 	t.Logf("Payload size: %d bytes", payloadSize)
 
 	t.Run("Within reservation limits", func(t *testing.T) {
+		initialReservation, err := reservation.NewReservation(
+			1024,
+			time.Now().Add(-1*time.Hour),
+			time.Now().Add(24*time.Hour),
+			[]core.QuorumID{0, 1},
+		)
+		require.NoError(t, err)
+		err = testHarness.UpdateReservation(t.Context(), t, initialReservation)
+		require.NoError(t, err)
+
+		// Wait for vault monitor to pick up changes
+		time.Sleep(3 * time.Second)
+
 		testRandom := random.NewTestRandom()
 		// the reservation of 1024 symbols/second can support up .25 min size dispersals per second.
 		// to account for non-determinism, disperse at half that rate, and assert no failures
@@ -144,6 +154,19 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 	})
 
 	t.Run("Over reservation limits", func(t *testing.T) {
+		initialReservation, err := reservation.NewReservation(
+			1024,
+			time.Now().Add(-1*time.Hour),
+			time.Now().Add(24*time.Hour),
+			[]core.QuorumID{0, 1},
+		)
+		require.NoError(t, err)
+		err = testHarness.UpdateReservation(t.Context(), t, initialReservation)
+		require.NoError(t, err)
+
+		// Wait for vault monitor to pick up changes
+		time.Sleep(3 * time.Second)
+
 		testRandom := random.NewTestRandom()
 		// 2x the rate of the what's permitted by the reservation
 		blobsPerSecond := float32(0.5)
