@@ -326,7 +326,8 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 
 func (env *Config) generateControllerVars(
 	ind int,
-	graphUrl string) ControllerVars {
+	graphUrl string,
+	encoderV2Address string) ControllerVars {
 
 	v := ControllerVars{
 		CONTROLLER_LOG_FORMAT:                         "text",
@@ -347,7 +348,7 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_AWS_ACCESS_KEY_ID:                  "",
 		CONTROLLER_AWS_SECRET_ACCESS_KEY:              "",
 		CONTROLLER_AWS_ENDPOINT_URL:                   "",
-		CONTROLLER_ENCODER_ADDRESS:                    "0.0.0.0:34001",
+		CONTROLLER_ENCODER_ADDRESS:                    encoderV2Address,
 		CONTROLLER_BATCH_METADATA_UPDATE_PERIOD:       "100ms",
 		// set to 5 to ensure payload disperser checkDACert calls pass in integration_v2 test since
 		// disperser chooses rbn = latest_block_number - finalization_block_delay
@@ -612,7 +613,7 @@ func (env *Config) getKey(name string) (key, address string, err error) {
 // GenerateAllVariables all of the config for the test environment.
 // Returns an object that corresponds to the participants of the
 // current experiment.
-func (env *Config) GenerateAllVariables() error {
+func (env *Config) GenerateAllVariables(encoderV2Address string) error {
 	// hardcode graphurl for now
 	graphUrl := "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
 
@@ -813,7 +814,7 @@ func (env *Config) GenerateAllVariables() error {
 	// Controller
 	name = "controller0"
 	_, _, _, envFile = env.getPaths(name)
-	controllerConfig := env.generateControllerVars(0, graphUrl)
+	controllerConfig := env.generateControllerVars(0, graphUrl, encoderV2Address)
 	if err := writeEnv(controllerConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}

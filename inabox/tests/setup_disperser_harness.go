@@ -16,12 +16,16 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigenda/encoding"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -44,7 +48,7 @@ type DisperserHarnessConfig struct {
 	RelayCount int
 }
 
-// TODO: Add encoder, api server, controller, batcher
+// TODO: Add api server, controller, batcher
 type DisperserHarness struct {
 	LocalStack     *testbed.LocalStackContainer
 	DynamoDBTables struct {
@@ -54,7 +58,8 @@ type DisperserHarness struct {
 	S3Buckets struct {
 		BlobStore string
 	}
-	RelayInstances []*RelayInstance
+	RelayInstances    []*RelayInstance
+	EncoderV2Instance *EncoderV2Instance
 }
 
 // setupLocalStackResources initializes LocalStack and deploys AWS resources
@@ -162,6 +167,14 @@ func SetupDisperserHarness(ctx context.Context, config DisperserHarnessConfig) (
 		} else {
 			config.Logger.Warn("Relay count is not specified, skipping relay setup")
 		}
+
+		// Start encoder v2 instance
+		config.Logger.Info("Starting encoder v2 instance")
+		encoderInstance, err := startEncoderV2(ctx, harness, config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to start encoder v2: %w", err)
+		}
+		harness.EncoderV2Instance = encoderInstance
 	} else {
 		// TODO(dmanc): Do the relays even work when not using S3 as the blob store?
 		config.Logger.Info("Using in-memory blob store, skipping LocalStack setup")
@@ -170,7 +183,8 @@ func SetupDisperserHarness(ctx context.Context, config DisperserHarnessConfig) (
 	// Start remaining binaries (disperser, encoder, batcher, etc.)
 	if config.TestConfig != nil {
 		config.Logger.Info("Starting remaining binaries")
-		err := config.TestConfig.GenerateAllVariables()
+		encoderV2Address := harness.EncoderV2Instance.URL
+		err := config.TestConfig.GenerateAllVariables(encoderV2Address)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate environment variables: %w", err)
 		}
@@ -184,6 +198,15 @@ func SetupDisperserHarness(ctx context.Context, config DisperserHarnessConfig) (
 // TODO(dmanc): This (or something similar) should live in the relay package instead of here.
 type RelayInstance struct {
 	Server   *relay.Server
+	Listener net.Listener
+	Port     string
+	URL      string
+	Logger   logging.Logger
+}
+
+// EncoderV2Instance holds the state for a single encoder v2
+type EncoderV2Instance struct {
+	Server   *encoder.EncoderServerV2
 	Listener net.Listener
 	Port     string
 	URL      string
@@ -252,6 +275,13 @@ func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) 
 	if len(dh.RelayInstances) > 0 {
 		logger.Info("Stopping relay goroutines")
 		stopAllRelays(dh.RelayInstances, logger)
+	}
+
+	// Stop encoder v2 instance
+	if dh.EncoderV2Instance != nil {
+		logger.Info("Stopping encoder v2 instance")
+		dh.EncoderV2Instance.Logger.Info("Stopping encoder v2")
+		dh.EncoderV2Instance.Server.Close()
 	}
 
 	if dh.LocalStack != nil {
@@ -444,6 +474,147 @@ func stopAllRelays(instances []*RelayInstance, logger logging.Logger) {
 		// TODO: Add graceful shutdown of relay server once it's implemented
 		// For now, the context cancellation in TeardownInfrastructure will stop the server
 	}
+}
+
+// startEncoderV2 starts a single encoder v2 instance
+func startEncoderV2(
+	ctx context.Context,
+	harness *DisperserHarness,
+	config DisperserHarnessConfig,
+) (*EncoderV2Instance, error) {
+	config.Logger.Info("Starting encoder v2 instance")
+
+	// Get SRS paths using the same function as operator setup
+	g1Path, _, err := getSRSPaths()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine SRS file paths: %w", err)
+	}
+
+	// Pre-create listener with port 0 (OS assigns port)
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create listener for encoder v2: %w", err)
+	}
+
+	// Extract the actual port assigned by the OS
+	actualPort := listener.Addr().(*net.TCPAddr).Port
+	encoderURL := fmt.Sprintf("0.0.0.0:%d", actualPort)
+	port := fmt.Sprintf("%d", actualPort)
+
+	config.Logger.Info("Created listener for encoder v2", "assigned_port", actualPort)
+
+	// Create logs directory
+	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		_ = listener.Close()
+		return nil, fmt.Errorf("failed to create logs directory: %w", err)
+	}
+
+	logFilePath := fmt.Sprintf("%s/encoder_v2.log", logsDir)
+	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		_ = listener.Close()
+		return nil, fmt.Errorf("failed to open encoder v2 log file: %w", err)
+	}
+
+	// Create encoder logger
+	loggerConfig := common.LoggerConfig{
+		Format:       common.TextLogFormat,
+		OutputWriter: io.MultiWriter(os.Stdout, logFile),
+		HandlerOpts: logging.SLoggerOptions{
+			Level:     slog.LevelDebug,
+			NoColor:   true,
+			AddSource: true,
+		},
+	}
+
+	encoderLogger, err := common.NewLogger(&loggerConfig)
+	if err != nil {
+		_ = listener.Close()
+		return nil, fmt.Errorf("failed to create encoder v2 logger: %w", err)
+	}
+
+	// Create AWS clients using LocalStack container's configuration
+	awsConfig := harness.LocalStack.GetAWSClientConfig()
+	s3Client, err := s3.NewClient(ctx, awsConfig, encoderLogger)
+	if err != nil {
+		_ = listener.Close()
+		return nil, fmt.Errorf("failed to create s3 client: %w", err)
+	}
+
+	// Create blob store and chunk writer
+	blobStore := blobstore.NewBlobStore(harness.S3Buckets.BlobStore, s3Client, encoderLogger)
+	chunkWriter := chunkstore.NewChunkWriter(encoderLogger, s3Client, harness.S3Buckets.BlobStore, 4*1024*1024)
+
+	// Create prover with dynamically determined paths
+	// TODO(dmanc): Make these configurable
+	kzgConfig := &proverv2.KzgConfig{
+		SRSNumberToLoad: 10000,
+		G1Path:          g1Path,
+		LoadG2Points:    false, // Encoder doesn't need G2 points
+		PreloadEncoder:  false,
+		CacheDir:        fmt.Sprintf("testdata/%s/cache/encoder", config.TestName),
+		NumWorker:       1,
+		Verbose:         false,
+	}
+	encodingConfig := &encoding.Config{
+		BackendType: encoding.GnarkBackend,
+		GPUEnable:   false,
+		NumWorker:   1,
+	}
+
+	prover, err := proverv2.NewProver(kzgConfig, encodingConfig)
+	if err != nil {
+		_ = listener.Close()
+		return nil, fmt.Errorf("failed to create prover: %w", err)
+	}
+
+	// Create metrics registry
+	metricsRegistry := prometheus.NewRegistry()
+	metrics := encoder.NewMetrics(metricsRegistry, "9200", encoderLogger)
+	grpcMetrics := grpcprom.NewServerMetrics()
+	metricsRegistry.MustRegister(grpcMetrics)
+
+	// Create encoder server configuration
+	serverConfig := encoder.ServerConfig{
+		GrpcPort:              port,
+		MaxConcurrentRequests: 32,
+		RequestQueueSize:      100,
+		PreventReencoding:     false,
+		Backend:               "gnark",
+		GPUEnable:             false,
+	}
+
+	// Create encoder server
+	server := encoder.NewEncoderServerV2(
+		serverConfig,
+		blobStore,
+		chunkWriter,
+		encoderLogger,
+		prover,
+		metrics,
+		grpcMetrics,
+	)
+
+	// Start the encoder server in a goroutine using the pre-created listener
+	go func() {
+		encoderLogger.Info("Starting encoder v2 server with listener", "port", port)
+		if err := server.StartWithListener(listener); err != nil {
+			encoderLogger.Error("Encoder v2 server failed", "error", err)
+		}
+	}()
+
+	// Wait for server to be ready
+	time.Sleep(100 * time.Millisecond)
+	encoderLogger.Info("Encoder v2 server started successfully", "port", port, "logFile", logFilePath)
+
+	return &EncoderV2Instance{
+		Server:   server,
+		Listener: listener,
+		Port:     port,
+		URL:      encoderURL,
+		Logger:   encoderLogger,
+	}, nil
 }
 
 // mustParsePort parses a port string to an int, panicking on error
