@@ -36,7 +36,6 @@ type DisperserHarnessConfig struct {
 	Network             *testcontainers.DockerNetwork
 	TestConfig          *deploy.Config
 	TestName            string
-	InMemoryBlobStore   bool
 	LocalStackPort      string
 	V2MetadataTableName string
 	BlobStoreBucketName string // S3 bucket name for blob storage
@@ -118,38 +117,33 @@ func SetupDisperserHarness(
 	harness.S3Buckets.BlobStore = config.BlobStoreBucketName
 
 	// Setup LocalStack if not using in-memory blob store
-	if !config.InMemoryBlobStore {
-		localstack, err := setupV2LocalStackResources(ctx, localstack, config)
-		if err != nil {
-			return nil, err
-		}
-		harness.LocalStack = localstack
-
-		// Generate disperser keypair and perform registrations
-		if err := setupDisperserKeypairAndRegistrations(config); err != nil {
-			return nil, err
-		}
-
-		// Start relay goroutines if relay count is specified
-		if config.RelayCount > 0 {
-			if err := startRelays(ctx, harness, config); err != nil {
-				return nil, fmt.Errorf("failed to start relays: %w", err)
-			}
-		} else {
-			config.Logger.Warn("Relay count is not specified, skipping relay setup")
-		}
-
-		// Start encoder v2 instance
-		config.Logger.Info("Starting encoder v2 instance")
-		encoderInstance, err := startEncoderV2(ctx, harness, config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to start encoder v2: %w", err)
-		}
-		harness.EncoderV2Instance = encoderInstance
-	} else {
-		// TODO(dmanc): Do the relays even work when not using S3 as the blob store?
-		config.Logger.Info("Using in-memory blob store, skipping LocalStack setup")
+	localstack, err := setupV2LocalStackResources(ctx, localstack, config)
+	if err != nil {
+		return nil, err
 	}
+	harness.LocalStack = localstack
+
+	// Generate disperser keypair and perform registrations
+	if err := setupDisperserKeypairAndRegistrations(config); err != nil {
+		return nil, err
+	}
+
+	// Start relay goroutines if relay count is specified
+	if config.RelayCount > 0 {
+		if err := startRelays(ctx, harness, config); err != nil {
+			return nil, fmt.Errorf("failed to start relays: %w", err)
+		}
+	} else {
+		config.Logger.Warn("Relay count is not specified, skipping relay setup")
+	}
+
+	// Start encoder v2 instance
+	config.Logger.Info("Starting encoder v2 instance")
+	encoderInstance, err := startEncoderV2(ctx, harness, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start encoder v2: %w", err)
+	}
+	harness.EncoderV2Instance = encoderInstance
 
 	return harness, nil
 }

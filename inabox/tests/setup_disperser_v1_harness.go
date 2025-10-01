@@ -28,7 +28,6 @@ type DisperserV1HarnessConfig struct {
 	Network             *testcontainers.DockerNetwork
 	TestConfig          *deploy.Config
 	TestName            string
-	InMemoryBlobStore   bool
 	BucketTableName     string
 	V1MetadataTableName string
 	BlobStoreBucketName string
@@ -73,35 +72,31 @@ func SetupDisperserV1Harness(
 	harness.S3Buckets.BlobStore = config.BlobStoreBucketName
 
 	// Setup LocalStack if not using in-memory blob store
-	if !config.InMemoryBlobStore {
-		// Setup LocalStack resources (reuse the same function from main harness)
-		harnessConfig := DisperserV1HarnessConfig{
-			Logger:              config.Logger,
-			Network:             config.Network,
-			TestConfig:          config.TestConfig,
-			TestName:            config.TestName,
-			V1MetadataTableName: config.V1MetadataTableName,
-			BucketTableName:     config.BucketTableName,
-			BlobStoreBucketName: config.BlobStoreBucketName,
-			EthClient:           config.EthClient,
-		}
-
-		localstack, err := setupV1LocalStackResources(ctx, localstack, harnessConfig)
-		if err != nil {
-			return nil, err
-		}
-		harness.LocalStack = localstack
-
-		// Start encoder v1 instance as a goroutine
-		config.Logger.Info("Starting encoder v1 instance")
-		encoderInstance, err := startEncoderV1(ctx, harness, config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to start encoder v1: %w", err)
-		}
-		harness.EncoderV1Instance = encoderInstance
-	} else {
-		config.Logger.Info("Using in-memory blob store, skipping LocalStack setup")
+	// Setup LocalStack resources (reuse the same function from main harness)
+	harnessConfig := DisperserV1HarnessConfig{
+		Logger:              config.Logger,
+		Network:             config.Network,
+		TestConfig:          config.TestConfig,
+		TestName:            config.TestName,
+		V1MetadataTableName: config.V1MetadataTableName,
+		BucketTableName:     config.BucketTableName,
+		BlobStoreBucketName: config.BlobStoreBucketName,
+		EthClient:           config.EthClient,
 	}
+
+	localstack, err := setupV1LocalStackResources(ctx, localstack, harnessConfig)
+	if err != nil {
+		return nil, err
+	}
+	harness.LocalStack = localstack
+
+	// Start encoder v1 instance as a goroutine
+	config.Logger.Info("Starting encoder v1 instance")
+	encoderInstance, err := startEncoderV1(ctx, harness, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start encoder v1: %w", err)
+	}
+	harness.EncoderV1Instance = encoderInstance
 
 	return harness, nil
 }

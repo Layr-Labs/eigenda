@@ -13,10 +13,9 @@ import (
 
 // InfrastructureConfig contains the configuration for setting up the infrastructure
 type InfrastructureConfig struct {
-	TemplateName      string
-	TestName          string
-	InMemoryBlobStore bool
-	Logger            logging.Logger
+	TemplateName string
+	TestName     string
+	Logger       logging.Logger
 
 	// V1 disperser related configuration
 	V1MetadataTableName string
@@ -86,13 +85,12 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 
 	// Create infrastructure harness early so we can populate it incrementally
 	infra := &InfrastructureHarness{
-		SharedNetwork:     sharedDockerNetwork,
-		TestConfig:        testConfig,
-		TemplateName:      config.TemplateName,
-		TestName:          testName,
-		InMemoryBlobStore: config.InMemoryBlobStore,
-		Logger:            config.Logger,
-		Cancel:            infraCancel,
+		SharedNetwork: sharedDockerNetwork,
+		TestConfig:    testConfig,
+		TemplateName:  config.TemplateName,
+		TestName:      testName,
+		Logger:        config.Logger,
+		Cancel:        infraCancel,
 	}
 
 	// Setup Chain Harness first (Anvil, Graph Node, Contracts, Churner)
@@ -143,13 +141,12 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 
 	// Setup Disperser Harness (V2) (DynamoDB tables, S3 buckets, relays, encoders)
 	disperserHarnessConfig := &DisperserHarnessConfig{
-		Logger:            logger,
-		Network:           sharedDockerNetwork,
-		TestConfig:        testConfig,
-		TestName:          testName,
-		InMemoryBlobStore: config.InMemoryBlobStore,
-		EthClient:         infra.ChainHarness.EthClient,
-		RelayCount:        config.RelayCount,
+		Logger:     logger,
+		Network:    sharedDockerNetwork,
+		TestConfig: testConfig,
+		TestName:   testName,
+		EthClient:  infra.ChainHarness.EthClient,
+		RelayCount: config.RelayCount,
 
 		// LocalStack resources
 		BlobStoreBucketName: config.BlobStoreBucketName,
@@ -166,9 +163,19 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	// TODO(dmanc): Once all of these components are migrated to goroutines, we can remove this.
 	if testConfig != nil {
 		config.Logger.Info("Starting remaining binaries")
+		// Get encoder addresses, using empty string if instances are nil
+		// TODO(dmanc): This is a hack to get the tests to pass when using in-memory blob store, we should refactor this.
+		encoderV1Address := ""
+		if disperserV1Harness.EncoderV1Instance != nil {
+			encoderV1Address = disperserV1Harness.EncoderV1Instance.URL
+		}
+		encoderV2Address := ""
+		if disperserHarness.EncoderV2Instance != nil {
+			encoderV2Address = disperserHarness.EncoderV2Instance.URL
+		}
 		err := testConfig.GenerateAllVariables(
-			disperserV1Harness.EncoderV1Instance.URL,
-			disperserHarness.EncoderV2Instance.URL,
+			encoderV1Address,
+			encoderV2Address,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate environment variables: %w", err)
