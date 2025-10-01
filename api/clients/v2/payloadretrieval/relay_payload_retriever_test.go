@@ -115,7 +115,7 @@ func buildCertFromBlobBytes(
 		G1SRSPath:         "../../../../resources/srs/g1.point",
 		G2SRSPath:         "../../../../resources/srs/g2.point",
 		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
-		SRSNumberToLoad:   3000,
+		SRSNumberToLoad:   4096,
 	}
 
 	committer, err := committer.NewFromConfig(committerConfig)
