@@ -5,9 +5,7 @@ package committer
 
 import (
 	"fmt"
-	"log/slog"
 	"runtime"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -16,7 +14,6 @@ import (
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/hashicorp/go-multierror"
 )
 
 // Committer is responsible for computing [encoding.BlobCommitments],
@@ -24,8 +21,9 @@ import (
 type Committer struct {
 	// G1 SRS points are used for computing Blob commitments.
 	g1SRS []bn254.G1Affine
-	// G2 SRS points are used for computing Blob length commitments+proofs.
-	g2SRS         []bn254.G2Affine
+	// G2 SRS points are used for computing Blob length commitments.
+	g2SRS []bn254.G2Affine
+	// G2 trailing SRS points are used for computing Blob length proofs.
 	g2TrailingSRS []bn254.G2Affine
 }
 
@@ -139,72 +137,29 @@ func (c *Committer) GetCommitments(
 			len(inputFr), len(c.g1SRS))
 	}
 
-	encodeStart := time.Now()
-
-	lengthCommitmentChan := make(chan lengthCommitmentResult, 1)
-	lengthProofChan := make(chan lengthProofResult, 1)
-	commitmentChan := make(chan commitmentResult, 1)
-
-	// compute commit for the full poly
-	go func() {
-		start := time.Now()
-		commit, err := c.computeCommitmentV2(inputFr)
-		commitmentChan <- commitmentResult{
-			Commitment: commit,
-			Err:        err,
-			Duration:   time.Since(start),
-		}
-	}()
-
-	go func() {
-		start := time.Now()
-		lengthCommitment, err := c.computeLengthCommitmentV2(inputFr)
-		lengthCommitmentChan <- lengthCommitmentResult{
-			LengthCommitment: lengthCommitment,
-			Err:              err,
-			Duration:         time.Since(start),
-		}
-	}()
-
-	go func() {
-		start := time.Now()
-		lengthProof, err := c.computeLengthProofV2(inputFr)
-		lengthProofChan <- lengthProofResult{
-			LengthProof: lengthProof,
-			Err:         err,
-			Duration:    time.Since(start),
-		}
-	}()
-
-	lengthProofResult := <-lengthProofChan
-	lengthCommitmentResult := <-lengthCommitmentChan
-	commitmentResult := <-commitmentChan
-
-	if lengthProofResult.Err != nil || lengthCommitmentResult.Err != nil ||
-		commitmentResult.Err != nil {
-		return nil, nil, nil, multierror.Append(lengthProofResult.Err, lengthCommitmentResult.Err, commitmentResult.Err)
+	// We compute all 3 commitments sequentially, since each individual computation
+	// already saturates all cores by default.
+	commit, err := c.computeCommitmentV2(inputFr)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("compute commitment: %w", err)
 	}
-	totalProcessingTime := time.Since(encodeStart)
 
-	slog.Info("Commitment process details",
-		"Input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
-		"Total_duration", totalProcessingTime,
-		"Committing_duration", commitmentResult.Duration,
-		"LengthCommit_duration", lengthCommitmentResult.Duration,
-		"lengthProof_duration", lengthProofResult.Duration,
-		"SRSOrder", encoding.SRSOrder,
-		// TODO(samlaf): should we take NextPowerOf2(len(inputFr)) instead?
-		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
-	)
+	lengthCommitment, err := c.computeLengthCommitmentV2(inputFr)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("compute length commitment: %w", err)
+	}
 
-	return commitmentResult.Commitment, lengthCommitmentResult.LengthCommitment, lengthProofResult.LengthProof, nil
+	lenProof, err := c.computeLengthProofV2(inputFr)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("compute length proof: %w", err)
+	}
+
+	return commit, lengthCommitment, lenProof, nil
 }
 
 func (c *Committer) computeCommitmentV2(coeffs []fr.Element) (*bn254.G1Affine, error) {
-	// compute commit for the full poly
-	config := ecc.MultiExpConfig{}
 	var commitment bn254.G1Affine
-	_, err := commitment.MultiExp(c.g1SRS[:len(coeffs)], coeffs, config)
+	_, err := commitment.MultiExp(c.g1SRS[:len(coeffs)], coeffs, ecc.MultiExpConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("multi exp: %w", err)
 	}
@@ -237,22 +192,4 @@ func (c *Committer) computeLengthProofV2(coeffs []fr.Element) (*bn254.G2Affine, 
 	}
 
 	return &lengthProof, nil
-}
-
-type lengthCommitmentResult struct {
-	LengthCommitment *bn254.G2Affine
-	Duration         time.Duration
-	Err              error
-}
-
-type lengthProofResult struct {
-	LengthProof *bn254.G2Affine
-	Duration    time.Duration
-	Err         error
-}
-
-type commitmentResult struct {
-	Commitment *bn254.G1Affine
-	Duration   time.Duration
-	Err        error
 }
