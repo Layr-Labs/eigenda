@@ -3,6 +3,7 @@ package validator
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"math"
 	"runtime"
 	"sync"
@@ -227,17 +228,17 @@ func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifi
 		G2TrailingSRSPath: config.G2TrailingPath,
 	})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("new committer from config: %w", err)
 	}
 
 	p, err := prover.NewProver(prover.KzgConfigFromV1Config(config), nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}
 
 	v, err := verifier.NewVerifier(verifier.KzgConfigFromV1Config(config), nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("new verifier: %w", err)
 	}
 
 	return p, c, v, nil

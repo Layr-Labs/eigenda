@@ -99,7 +99,8 @@ func NewFromConfig(config Config) (*Committer, error) {
 			"which is < kzgConfig.SRSNumberToLoad=%v",
 			config.G2TrailingSRSPath, numG2point, config.SRSNumberToLoad)
 	}
-	g2TrailingSRS, err := kzg.ReadG2PointSection(config.G2TrailingSRSPath, numG2point-config.SRSNumberToLoad, numG2point, numWorkers)
+	g2TrailingSRS, err := kzg.ReadG2PointSection(
+		config.G2TrailingSRSPath, numG2point-config.SRSNumberToLoad, numG2point, numWorkers)
 	if err != nil {
 		return nil, fmt.Errorf("read G2 trailing points from %s: %w", config.G2TrailingSRSPath, err)
 	}

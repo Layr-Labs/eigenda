@@ -52,7 +52,7 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 
 	kzgCommitter, err := createKzgCommitter()
 	if err != nil {
-		return nil, fmt.Errorf("create kzg committer: %v", err)
+		return nil, fmt.Errorf("create kzg committer: %w", err)
 	}
 
 	disperserClient, err := createDisperserClient(logger, privateKeyHex, kzgCommitter)
