@@ -31,9 +31,9 @@ Recursive.Bool = true
 Bar.A = "bar A"
 Bar.B = 25
 Bar.C = true
-BarD.Baz.X = "barD baz X"
-BarD.Baz.Y = 26
-BarD.Baz.Z = false
+Bar.Baz.X = "barD baz X"
+Bar.Baz.Y = 26
+Bar.Baz.Z = false
 
 Baz.X = "baz X"
 Baz.Y = 27

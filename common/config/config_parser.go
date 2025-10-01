@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 )
 
@@ -15,9 +16,7 @@ import (
 // values in the config, target should be initialized with those default values before calling this function.
 func ParseConfigFromCLI[T VerifiableConfig](target *T, envPrefix string) error {
 	configPaths := make([]string, 0)
-	for _, arg := range os.Args {
-		configPaths = append(configPaths, arg)
-	}
+	configPaths = append(configPaths, os.Args...)
 
 	err := ParseConfig(*target, envPrefix, configPaths...)
 	if err != nil {
@@ -62,9 +61,17 @@ func ParseConfig[T VerifiableConfig](target T, envPrefix string, configPaths ...
 	}
 
 	// Use viper to unmarshal environment variables into the target struct.
-	err = viperInstance.Unmarshal(target)
+	decoderConfig := &mapstructure.DecoderConfig{
+		ErrorUnused: true,
+		Result:      target,
+		TagName:     "mapstructure",
+	}
+	decoder, err := mapstructure.NewDecoder(decoderConfig)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal configuration: %w", err)
+		return fmt.Errorf("failed to create decoder: %w", err)
+	}
+	if err := decoder.Decode(viperInstance.AllSettings()); err != nil {
+		return fmt.Errorf("failed to decode settings: %w", err)
 	}
 
 	// Verify configuration invariants.
