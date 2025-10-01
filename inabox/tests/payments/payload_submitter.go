@@ -15,7 +15,7 @@ import (
 // Submits payloads at a certain rate for a duration.
 //
 // Returns dispersal errors on a channel.
-func SubmitPayloads(
+func submitPayloads(
 	t *testing.T,
 	testRandom *random.TestRandom,
 	payloadDisperser *payloaddispersal.PayloadDisperser,
