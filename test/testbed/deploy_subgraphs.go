@@ -217,7 +217,12 @@ func deploySubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, pa
 	return nil
 }
 
-func updateSubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, startBlock int, subgraphPath string) error {
+func updateSubgraph(
+	config SubgraphDeploymentConfig,
+	updater SubgraphUpdater,
+	startBlock int,
+	subgraphPath string,
+) error {
 	const (
 		networkFile  = "networks.json"
 		subgraphFile = "subgraph.yaml"

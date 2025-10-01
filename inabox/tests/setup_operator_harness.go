@@ -46,15 +46,17 @@ type OperatorInstance struct {
 
 // OperatorHarnessConfig contains the configuration for setting up the operator harness
 type OperatorHarnessConfig struct {
-	TestConfig   *deploy.Config
-	TestName     string
-	Logger       logging.Logger
-	ChainHarness *ChainHarness // Access to chain infrastructure
-	Ctx          context.Context
+	TestConfig *deploy.Config
+	TestName   string
+	Logger     logging.Logger
 }
 
 // SetupOperatorHarness creates and initializes the operator harness
-func SetupOperatorHarness(ctx context.Context, config *OperatorHarnessConfig) (*OperatorHarness, error) {
+func SetupOperatorHarness(
+	ctx context.Context,
+	config *OperatorHarnessConfig,
+	chainHarness *ChainHarness,
+) (*OperatorHarness, error) {
 	harness := &OperatorHarness{
 		OperatorInstances: make([]*OperatorInstance, 0),
 	}
@@ -63,11 +65,10 @@ func SetupOperatorHarness(ctx context.Context, config *OperatorHarnessConfig) (*
 	harness.testConfig = config.TestConfig
 	harness.testName = config.TestName
 	harness.logger = config.Logger
-	harness.chainHarness = config.ChainHarness
-	harness.ctx = config.Ctx
+	harness.chainHarness = chainHarness
 
 	// Start all operators
-	if err := harness.StartOperators(); err != nil {
+	if err := harness.StartOperators(ctx); err != nil {
 		return nil, err
 	}
 
@@ -83,7 +84,6 @@ type OperatorHarness struct {
 	testName     string
 	logger       logging.Logger
 	chainHarness *ChainHarness
-	ctx          context.Context
 	srsG1Path    string
 	srsG2Path    string
 }
@@ -111,7 +111,7 @@ func getSRSPaths() (g1Path, g2Path string, err error) {
 }
 
 // StartOperators starts all operator nodes configured in the test config
-func (oh *OperatorHarness) StartOperators() error {
+func (oh *OperatorHarness) StartOperators(ctx context.Context) error {
 	// Get SRS paths first - fail early if we can't find them
 	g1Path, g2Path, err := getSRSPaths()
 	if err != nil {
@@ -149,7 +149,7 @@ func (oh *OperatorHarness) StartOperators() error {
 
 	// Start each operator
 	for i := 0; i < operatorCount; i++ {
-		instance, err := oh.startOperator(i)
+		instance, err := oh.startOperator(ctx, i)
 		if err != nil {
 			// Clean up any operators we started before failing
 			oh.Cleanup(context.Background(), oh.logger)
@@ -164,7 +164,7 @@ func (oh *OperatorHarness) StartOperators() error {
 }
 
 // startOperator starts a single operator with the given index
-func (oh *OperatorHarness) startOperator(operatorIndex int) (*OperatorInstance, error) {
+func (oh *OperatorHarness) startOperator(ctx context.Context, operatorIndex int) (*OperatorInstance, error) {
 	// Get operator's private key
 	operatorName := fmt.Sprintf("opr%d", operatorIndex)
 
@@ -308,7 +308,7 @@ func (oh *OperatorHarness) startOperator(operatorIndex int) (*OperatorInstance, 
 
 	// Create contract directory
 	contractDirectory, err := directory.NewContractDirectory(
-		oh.ctx,
+		ctx,
 		operatorLogger,
 		gethClient,
 		gethcommon.HexToAddress(nodeConfig.EigenDADirectory))
@@ -324,7 +324,7 @@ func (oh *OperatorHarness) startOperator(operatorIndex int) (*OperatorInstance, 
 
 	// Create node instance
 	operatorNode, err := node.NewNode(
-		oh.ctx,
+		ctx,
 		reg,
 		nodeConfig,
 		contractDirectory,
@@ -351,13 +351,13 @@ func (oh *OperatorHarness) startOperator(operatorIndex int) (*OperatorInstance, 
 	if nodeConfig.EnableV2 {
 		// Get operator state retriever and service manager addresses
 		operatorStateRetrieverAddress, err := contractDirectory.GetContractAddress(
-			oh.ctx, directory.OperatorStateRetriever)
+			ctx, directory.OperatorStateRetriever)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get OperatorStateRetriever address: %w", err)
 		}
 
 		eigenDAServiceManagerAddress, err := contractDirectory.GetContractAddress(
-			oh.ctx, directory.ServiceManager)
+			ctx, directory.ServiceManager)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get ServiceManager address: %w", err)
 		}
@@ -374,7 +374,7 @@ func (oh *OperatorHarness) startOperator(operatorIndex int) (*OperatorInstance, 
 
 		// Create v2 server
 		serverV2, err = grpc.NewServerV2(
-			oh.ctx,
+			ctx,
 			nodeConfig,
 			operatorNode,
 			operatorLogger,
@@ -442,39 +442,4 @@ func StopOperator(instance *OperatorInstance) {
 	// TODO: Add graceful shutdown of node once it's implemented
 
 	instance.Logger.Info("Operator stopped")
-}
-
-// StartOperatorForInfrastructure is a compatibility wrapper for existing code.
-// It creates a temporary OperatorHarness and starts a single operator.
-// New code should use OperatorHarness.startOperator directly.
-func StartOperatorForInfrastructure(
-	infra *InfrastructureHarness, operatorIndex int,
-) (*OperatorInstance, error) {
-	// Create a temporary harness with the infrastructure references
-	harness := &OperatorHarness{
-		testConfig:   infra.TestConfig,
-		testName:     infra.TestName,
-		logger:       infra.Logger,
-		chainHarness: &infra.ChainHarness,
-		ctx:          infra.Ctx,
-	}
-
-	return harness.startOperator(operatorIndex)
-}
-
-// StartOperatorsForInfrastructure is a compatibility wrapper for existing code.
-// It updates the infrastructure's OperatorHarness with all started operators.
-// New code should use SetupOperatorHarness and OperatorHarness.StartOperators directly.
-func StartOperatorsForInfrastructure(infra *InfrastructureHarness) error {
-	// Set up the operator harness with references from infrastructure
-	infra.OperatorHarness = OperatorHarness{
-		testConfig:   infra.TestConfig,
-		testName:     infra.TestName,
-		logger:       infra.Logger,
-		chainHarness: &infra.ChainHarness,
-		ctx:          infra.Ctx,
-	}
-
-	// Start all operators
-	return infra.OperatorHarness.StartOperators()
 }

@@ -41,7 +41,6 @@ type DisperserHarnessConfig struct {
 	MetadataTableNameV2 string
 	EthClient           common.EthClient
 	RelayURLs           []string // URLs to register for relays
-	infraCtx            context.Context
 }
 
 // TODO: Add encoder, api server, controller, batcher
@@ -162,7 +161,7 @@ func SetupDisperserHarness(ctx context.Context, config DisperserHarnessConfig) (
 
 		// Start relay goroutines if relay URLs are provided
 		if len(config.RelayURLs) > 0 {
-			if err := startRelays(harness, config); err != nil {
+			if err := startRelays(ctx, harness, config); err != nil {
 				return nil, fmt.Errorf("failed to start relays: %w", err)
 			}
 		}
@@ -194,11 +193,11 @@ type RelayInstance struct {
 }
 
 // startRelays starts all relay goroutines
-func startRelays(harness *DisperserHarness, config DisperserHarnessConfig) error {
+func startRelays(ctx context.Context, harness *DisperserHarness, config DisperserHarnessConfig) error {
 	config.Logger.Info("Starting relay goroutines", "count", len(config.RelayURLs))
 
 	for i, relayURL := range config.RelayURLs {
-		instance, err := startRelay(i, relayURL, harness, config)
+		instance, err := startRelay(ctx, i, relayURL, harness, config)
 		if err != nil {
 			// Clean up any relays we started before failing
 			stopAllRelays(harness.RelayInstances, config.Logger)
@@ -229,6 +228,7 @@ func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) 
 
 // startRelay starts a single relay with the given index and URL
 func startRelay(
+	ctx context.Context,
 	relayIndex int,
 	relayURL string,
 	harness *DisperserHarness,
@@ -276,28 +276,10 @@ func startRelay(
 		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
-	// Test DynamoDB connection with a reasonable timeout
-	relayLogger.Info("Testing DynamoDB connection", "table", config.MetadataTableNameV2)
-	testCtx, testCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer testCancel()
-	if err := dynamoClient.TableExists(testCtx, config.MetadataTableNameV2); err != nil {
-		return nil, fmt.Errorf("failed to verify DynamoDB table exists (this may indicate LocalStack is not ready or credentials are invalid): %w", err)
-	}
-	relayLogger.Info("DynamoDB connection verified", "table", config.MetadataTableNameV2)
-
-	s3Client, err := s3.NewClient(config.infraCtx, awsConfig, relayLogger)
+	s3Client, err := s3.NewClient(ctx, awsConfig, relayLogger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
-
-	// Test S3 connection by listing objects (works even if bucket is empty)
-	relayLogger.Info("Testing S3 connection", "bucket", harness.S3Buckets.BlobStore)
-	testCtx2, testCancel2 := context.WithTimeout(context.Background(), 30*time.Second)
-	defer testCancel2()
-	if _, err := s3Client.ListObjects(testCtx2, harness.S3Buckets.BlobStore, ""); err != nil {
-		return nil, fmt.Errorf("failed to verify S3 bucket exists (this may indicate LocalStack is not ready): %w", err)
-	}
-	relayLogger.Info("S3 connection verified", "bucket", harness.S3Buckets.BlobStore)
 
 	// Create metrics registry
 	metricsRegistry := prometheus.NewRegistry()
@@ -380,7 +362,7 @@ func startRelay(
 
 	// Create relay server
 	server, err := relay.NewServer(
-		config.infraCtx,
+		ctx,
 		metricsRegistry,
 		relayLogger,
 		relayConfig,
@@ -397,7 +379,7 @@ func startRelay(
 	// Start the relay server in a goroutine
 	go func() {
 		relayLogger.Info("Starting relay server", "port", port)
-		if err := server.Start(config.infraCtx); err != nil {
+		if err := server.Start(ctx); err != nil {
 			relayLogger.Error("Relay server failed", "error", err)
 		}
 	}()
