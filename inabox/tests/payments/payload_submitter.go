@@ -12,6 +12,9 @@ import (
 	"github.com/Layr-Labs/eigenda/test/random"
 )
 
+// Submits payloads at a certain rate for a duration.
+//
+// Returns dispersal errors on a channel.
 func SubmitPayloads(
 	t *testing.T,
 	testRandom *random.TestRandom,
