@@ -209,7 +209,9 @@ func (oh *OperatorHarness) startOperator(ctx context.Context, operatorIndex int)
 	// TODO(dmanc): The node config is quite a beast. This is a configuration that
 	// passed the tests after a bunch of trial and error.
 	// We really need better validation on the node constructor.
-	// TODO(dmanc): In addition to loggers, we should have a centralized place for creating configuration and injecting it into the harness config.
+
+	// TODO(dmanc): In addition to loggers, we should have a centralized place for creating
+	// configuration and injecting it into the harness config.
 	nodeConfig := &node.Config{
 		Hostname:                       "localhost",
 		RetrievalPort:                  retrievalPort,

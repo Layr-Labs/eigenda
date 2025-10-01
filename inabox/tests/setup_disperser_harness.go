@@ -344,7 +344,8 @@ func startRelayWithListener(
 	ics := thegraph.MakeIndexedChainState(thegraph.Config{}, cs, relayLogger)
 
 	// Create relay configuration
-	// TODO(dmanc): In addition to loggers, we should have a centralized place for setting up configuration and injecting it into the harness config.
+	// TODO(dmanc): In addition to loggers, we should have a centralized place for
+	// setting up configuration and injecting it into the harness config.
 	relayConfig := &relay.Config{
 		RelayKeys:                  []v2.RelayKey{v2.RelayKey(relayIndex)}, // Serve data for any shard
 		GRPCPort:                   mustParsePort(port),

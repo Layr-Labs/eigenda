@@ -37,6 +37,7 @@ func defaultConfig() *Config {
 		AuthenticationDisabled:       false,
 		GetChunksRequestMaxPastAge:   5 * time.Minute,
 		GetChunksRequestMaxFutureAge: 5 * time.Minute,
+		OnchainStateRefreshInterval:  1 * time.Minute,
 		RateLimits: limiter.Config{
 			MaxGetBlobOpsPerSecond:          1024,
 			GetBlobOpsBurstiness:            1024,
