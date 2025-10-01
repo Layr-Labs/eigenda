@@ -831,22 +831,27 @@ contract EigenDARegistryCoordinator is
         return OwnableUpgradeable.owner();
     }
 
+    /// @dev Deprecated, but kept for backwards compatibility purposes. Use the address directory instead.
     function serviceManager() public view returns (IServiceManager) {
         return IServiceManager(directory.getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME.getKey()));
     }
 
+    /// @dev Deprecated, but kept for backwards compatibility purposes. Use the address directory instead.
     function blsApkRegistry() public view returns (IBLSApkRegistry) {
         return IBLSApkRegistry(directory.getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME.getKey()));
     }
 
+    /// @dev Deprecated, but kept for backwards compatibility purposes. Use the address directory instead.
     function stakeRegistry() public view returns (IStakeRegistry) {
         return IStakeRegistry(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME.getKey()));
     }
 
+    /// @dev Deprecated, but kept for backwards compatibility purposes. Use the address directory instead.
     function indexRegistry() public view returns (IIndexRegistry) {
         return IIndexRegistry(directory.getAddress(AddressDirectoryConstants.INDEX_REGISTRY_NAME.getKey()));
     }
 
+    /// @dev Deprecated, but kept for backwards compatibility purposes. Use the address directory instead.
     function socketRegistry() public view returns (ISocketRegistry) {
         return ISocketRegistry(directory.getAddress(AddressDirectoryConstants.SOCKET_REGISTRY_NAME.getKey()));
     }
