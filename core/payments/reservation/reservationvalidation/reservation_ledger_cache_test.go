@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -20,7 +20,7 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 		config, err := NewReservationLedgerCacheConfig(
 			10,
 			10*time.Second,
-			reservation.OverfillOncePermitted,
+			ratelimit.OverfillOncePermitted,
 			time.Second,
 		)
 		require.NoError(t, err)
@@ -40,7 +40,7 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 		config, err := NewReservationLedgerCacheConfig(
 			10,
 			10*time.Second,
-			reservation.OverfillOncePermitted,
+			ratelimit.OverfillOncePermitted,
 			time.Second,
 		)
 		require.NoError(t, err)
@@ -93,7 +93,7 @@ func TestLRUCacheNormalEviction(t *testing.T) {
 	config, err := NewReservationLedgerCacheConfig(
 		2, // Small cache size to force eviction
 		time.Second,
-		reservation.OverfillOncePermitted,
+		ratelimit.OverfillOncePermitted,
 		time.Millisecond,
 	)
 	require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 	config, err := NewReservationLedgerCacheConfig(
 		2, // Small cache size to force eviction
 		time.Second,
-		reservation.OverfillOncePermitted,
+		ratelimit.OverfillOncePermitted,
 		time.Millisecond,
 	)
 	require.NoError(t, err)
