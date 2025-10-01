@@ -152,10 +152,10 @@ export function handleReservationUpdated(event: ReservationUpdatedEvent): void {
 
   // Create or update the Reservation entity for this account
   let reservation = Reservation.load(event.params.account)
-  if (reservation == null) {
+  if (!reservation) {
     reservation = new Reservation(event.params.account)
   }
-  
+
   reservation.account = event.params.account
   reservation.symbolsPerSecond = event.params.reservation.symbolsPerSecond
   reservation.startTimestamp = event.params.reservation.startTimestamp
@@ -165,6 +165,6 @@ export function handleReservationUpdated(event: ReservationUpdatedEvent): void {
   reservation.lastUpdatedBlock = event.block.number
   reservation.lastUpdatedTimestamp = event.block.timestamp
   reservation.lastUpdatedTransactionHash = event.transaction.hash
-  
+
   reservation.save()
 }

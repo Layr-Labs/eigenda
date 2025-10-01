@@ -3,7 +3,7 @@ import {
     BLSApkRegistry,
     OperatorAddedToQuorums as OperatorAddedToQuorumsEvent,
     OperatorRemovedFromQuorums as OperatorRemovedFromQuorumsEvent
-  } from "../generated/BLSApkRegistry_QuorumApkUpdates/BLSApkRegistry"
+} from "../generated/BLSApkRegistry_QuorumApkUpdates/BLSApkRegistry"
 import {
     QuorumApk
 } from "../generated/schema"

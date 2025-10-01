@@ -1,15 +1,13 @@
-import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
+import { BigInt, log } from "@graphprotocol/graph-ts"
 import {
   OperatorRegistered as OperatorRegisteredEvent,
   OperatorDeregistered as OperatorDeregisteredEvent
 } from "../generated/RegistryCoordinator_Operator/RegistryCoordinator"
-import { NewPubkeyRegistration as NewPubkeyRegistrationEvent } from "../generated/BLSApkRegistry/BLSApkRegistry"
 import { Operator } from "../generated/schema"
-import { BLSApkRegistry } from "../generated/BLSApkRegistry/BLSApkRegistry"
 
-export function handleOperatorDeregistered(event: OperatorDeregisteredEvent) : void {
+export function handleOperatorDeregistered(event: OperatorDeregisteredEvent): void {
   let entity = Operator.load(event.params.operatorId)
-  if (entity == null) {
+  if (!entity) {
     log.error("Operator {} not found", [event.params.operatorId.toString()])
     return
   }
@@ -19,9 +17,9 @@ export function handleOperatorDeregistered(event: OperatorDeregisteredEvent) : v
   entity.save()
 }
 
-export function handleOperatorRegistered(event: OperatorRegisteredEvent) : void {
+export function handleOperatorRegistered(event: OperatorRegisteredEvent): void {
   let entity = Operator.load(event.params.operatorId)
-  if (entity == null) {
+  if (!entity) {
     log.error("Operator {} not found", [event.params.operatorId.toString()])
     return
   }
