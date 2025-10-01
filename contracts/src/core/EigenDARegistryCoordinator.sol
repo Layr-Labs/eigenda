@@ -21,6 +21,10 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/draft-EIP712.so
 import {Pausable} from "eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
 import {EigenDARegistryCoordinatorStorage} from "src/core/EigenDARegistryCoordinatorStorage.sol";
 
+import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
+import {AddressDirectoryLib} from "src/core/libraries/v3/address-directory/AddressDirectoryLib.sol";
+import {IEigenDAAddressDirectory} from "src/core/interfaces/IEigenDADirectory.sol";
+
 /**
  * @title A `RegistryCoordinator` that has three registries:
  *      1) a `StakeRegistry` that keeps track of operators' stakes
@@ -39,6 +43,7 @@ contract EigenDARegistryCoordinator is
 {
     using BitmapUtils for *;
     using BN254 for BN254.G1Point;
+    using AddressDirectoryLib for string;
 
     modifier onlyEjector() {
         _checkEjector();
@@ -52,14 +57,8 @@ contract EigenDARegistryCoordinator is
         _;
     }
 
-    constructor(
-        IServiceManager _serviceManager,
-        IStakeRegistry _stakeRegistry,
-        IBLSApkRegistry _blsApkRegistry,
-        IIndexRegistry _indexRegistry,
-        ISocketRegistry _socketRegistry
-    )
-        EigenDARegistryCoordinatorStorage(_serviceManager, _stakeRegistry, _blsApkRegistry, _indexRegistry, _socketRegistry)
+    constructor(address _directory)
+        EigenDARegistryCoordinatorStorage(_directory)
         EIP712("AVSRegistryCoordinator", "v0.0.1")
     {
         _disableInitializers();
@@ -93,11 +92,6 @@ contract EigenDARegistryCoordinator is
         _transferOwnership(_initialOwner);
         _initializePauser(_pauserRegistry, _initialPausedStatus);
         _setEjector(_ejector);
-
-        // Add registry contracts to the registries array
-        registries.push(address(stakeRegistry));
-        registries.push(address(blsApkRegistry));
-        registries.push(address(indexRegistry));
 
         // Create quorums
         for (uint256 i = 0; i < _operatorSetParams.length; i++) {
@@ -171,14 +165,14 @@ contract EigenDARegistryCoordinator is
     }
 
     function _churnOperator(uint8 quorumNumber) internal {
-        bytes32[] memory operatorList = indexRegistry.getOperatorListAtBlockNumber(quorumNumber, uint32(block.number));
+        bytes32[] memory operatorList = indexRegistry().getOperatorListAtBlockNumber(quorumNumber, uint32(block.number));
         require(operatorList.length > 0, "RegCoord._churnOperator: no operators to churn");
 
         // Find the operator with the lowest stake
         bytes32 operatorToChurn;
         uint96 lowestStake = type(uint96).max;
         for (uint256 i; i < operatorList.length; i++) {
-            uint96 operatorStake = stakeRegistry.getCurrentStake(operatorList[i], quorumNumber);
+            uint96 operatorStake = stakeRegistry().getCurrentStake(operatorList[i], quorumNumber);
             if (operatorStake < lowestStake) {
                 lowestStake = operatorStake;
                 operatorToChurn = operatorList[i];
@@ -189,7 +183,7 @@ contract EigenDARegistryCoordinator is
         bytes memory quorumNumbers = new bytes(1);
         quorumNumbers[0] = bytes1(uint8(quorumNumber));
         _deregisterOperator({
-            operator: blsApkRegistry.pubkeyHashToOperator(operatorToChurn),
+            operator: blsApkRegistry().pubkeyHashToOperator(operatorToChurn),
             quorumNumbers: quorumNumbers
         });
     }
@@ -256,7 +250,7 @@ contract EigenDARegistryCoordinator is
             // Ensure we've passed in the correct number of operators for this quorum
             address[] calldata currQuorumOperators = operatorsPerQuorum[i];
             require(
-                currQuorumOperators.length == indexRegistry.totalOperatorsForQuorum(quorumNumber),
+                currQuorumOperators.length == indexRegistry().totalOperatorsForQuorum(quorumNumber),
                 "RegCoord.updateOperatorsForQuorum: number of updated operators does not match quorum total"
             );
 
@@ -447,7 +441,7 @@ contract EigenDARegistryCoordinator is
             _operatorInfo[operator] = OperatorInfo({operatorId: operatorId, status: OperatorStatus.REGISTERED});
 
             // Register the operator with the EigenLayer core contracts via this AVS's ServiceManager
-            serviceManager.registerOperatorToAVS(operator, operatorSignature);
+            serviceManager().registerOperatorToAVS(operator, operatorSignature);
 
             _setOperatorSocket(operatorId, socket);
 
@@ -455,10 +449,10 @@ contract EigenDARegistryCoordinator is
         }
 
         // Register the operator with the BLSApkRegistry, StakeRegistry, and IndexRegistry
-        blsApkRegistry.registerOperator(operator, quorumNumbers);
+        blsApkRegistry().registerOperator(operator, quorumNumbers);
         (results.operatorStakes, results.totalStakes) =
-            stakeRegistry.registerOperator(operator, operatorId, quorumNumbers);
-        results.numOperatorsPerQuorum = indexRegistry.registerOperator(operatorId, quorumNumbers);
+            stakeRegistry().registerOperator(operator, operatorId, quorumNumbers);
+        results.numOperatorsPerQuorum = indexRegistry().registerOperator(operatorId, quorumNumbers);
 
         return results;
     }
@@ -492,9 +486,11 @@ contract EigenDARegistryCoordinator is
         internal
         returns (bytes32 operatorId)
     {
-        operatorId = blsApkRegistry.getOperatorId(operator);
+        IBLSApkRegistry blsApkRegistryMem = blsApkRegistry();
+        operatorId = blsApkRegistryMem.getOperatorId(operator);
         if (operatorId == 0) {
-            operatorId = blsApkRegistry.registerBLSPublicKey(operator, params, pubkeyRegistrationMessageHash(operator));
+            operatorId =
+                blsApkRegistryMem.registerBLSPublicKey(operator, params, pubkeyRegistrationMessageHash(operator));
         }
         return operatorId;
     }
@@ -535,14 +531,14 @@ contract EigenDARegistryCoordinator is
         // them from the AVS via the EigenLayer core contracts
         if (newBitmap.isEmpty()) {
             operatorInfo.status = OperatorStatus.DEREGISTERED;
-            serviceManager.deregisterOperatorFromAVS(operator);
+            serviceManager().deregisterOperatorFromAVS(operator);
             emit OperatorDeregistered(operator, operatorId);
         }
 
         // Deregister operator with each of the registry contracts
-        blsApkRegistry.deregisterOperator(operator, quorumNumbers);
-        stakeRegistry.deregisterOperator(operatorId, quorumNumbers);
-        indexRegistry.deregisterOperator(operatorId, quorumNumbers);
+        blsApkRegistry().deregisterOperator(operator, quorumNumbers);
+        stakeRegistry().deregisterOperator(operatorId, quorumNumbers);
+        indexRegistry().deregisterOperator(operatorId, quorumNumbers);
     }
 
     /**
@@ -558,7 +554,7 @@ contract EigenDARegistryCoordinator is
             return;
         }
         bytes32 operatorId = operatorInfo.operatorId;
-        uint192 quorumsToRemove = stakeRegistry.updateOperatorStake(operator, operatorId, quorumsToUpdate);
+        uint192 quorumsToRemove = stakeRegistry().updateOperatorStake(operator, operatorId, quorumsToUpdate);
 
         if (!quorumsToRemove.isEmpty()) {
             _deregisterOperator({operator: operator, quorumNumbers: BitmapUtils.bitmapToBytesArray(quorumsToRemove)});
@@ -608,9 +604,9 @@ contract EigenDARegistryCoordinator is
 
         // Initialize the quorum here and in each registry
         _setOperatorSetParams(quorumNumber, operatorSetParams);
-        stakeRegistry.initializeQuorum(quorumNumber, minimumStake, strategyParams);
-        indexRegistry.initializeQuorum(quorumNumber);
-        blsApkRegistry.initializeQuorum(quorumNumber);
+        stakeRegistry().initializeQuorum(quorumNumber, minimumStake, strategyParams);
+        indexRegistry().initializeQuorum(quorumNumber);
+        blsApkRegistry().initializeQuorum(quorumNumber);
     }
 
     /**
@@ -699,7 +695,7 @@ contract EigenDARegistryCoordinator is
     }
 
     function _setOperatorSocket(bytes32 operatorId, string memory socket) internal {
-        socketRegistry.setOperatorSocket(operatorId, socket);
+        socketRegistry().setOperatorSocket(operatorId, socket);
         emit OperatorSocketUpdate(operatorId, socket);
     }
 
@@ -726,7 +722,7 @@ contract EigenDARegistryCoordinator is
 
     /// @notice Returns the operator address for the given `operatorId`
     function getOperatorFromId(bytes32 operatorId) external view returns (address) {
-        return blsApkRegistry.getOperatorFromPubkeyHash(operatorId);
+        return blsApkRegistry().getOperatorFromPubkeyHash(operatorId);
     }
 
     /// @notice Returns the status for the given `operator`
@@ -800,9 +796,16 @@ contract EigenDARegistryCoordinator is
         return _operatorBitmapHistory[operatorId].length;
     }
 
+    /// @notice Returns the list of registries this coordinator is coordinating
+    /// @dev DEPRECATED. Use the address directory instead.
+    function registries(uint256) external pure returns (address) {
+        return address(0);
+    }
+
     /// @notice Returns the number of registries
-    function numRegistries() external view returns (uint256) {
-        return registries.length;
+    /// @dev DEPRECATED. Use the address directory instead.
+    function numRegistries() external pure returns (uint256) {
+        return 0;
     }
 
     /// @notice Deprecated function.
@@ -826,5 +829,30 @@ contract EigenDARegistryCoordinator is
     /// @dev need to override function here since its defined in both these contracts
     function owner() public view override(OwnableUpgradeable, IRegistryCoordinator) returns (address) {
         return OwnableUpgradeable.owner();
+    }
+
+    /// @dev Deprecated, but kept for backwards compatibility purposes. Use the address directory instead.
+    function serviceManager() public view returns (IServiceManager) {
+        return IServiceManager(directory.getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME.getKey()));
+    }
+
+    /// @dev Deprecated, but kept for backwards compatibility purposes. Use the address directory instead.
+    function blsApkRegistry() public view returns (IBLSApkRegistry) {
+        return IBLSApkRegistry(directory.getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME.getKey()));
+    }
+
+    /// @dev Deprecated, but kept for backwards compatibility purposes. Use the address directory instead.
+    function stakeRegistry() public view returns (IStakeRegistry) {
+        return IStakeRegistry(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME.getKey()));
+    }
+
+    /// @dev Deprecated, but kept for backwards compatibility purposes. Use the address directory instead.
+    function indexRegistry() public view returns (IIndexRegistry) {
+        return IIndexRegistry(directory.getAddress(AddressDirectoryConstants.INDEX_REGISTRY_NAME.getKey()));
+    }
+
+    /// @dev Deprecated, but kept for backwards compatibility purposes. Use the address directory instead.
+    function socketRegistry() public view returns (ISocketRegistry) {
+        return ISocketRegistry(directory.getAddress(AddressDirectoryConstants.SOCKET_REGISTRY_NAME.getKey()));
     }
 }
