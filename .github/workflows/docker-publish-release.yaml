@@ -16,8 +16,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  CACHE-FROM: /tmp/.buildx-cache
-  CACHE-TO: /tmp/.buildx-cache-new
 
 jobs:
   build-and-push:
@@ -49,16 +47,7 @@ jobs:
       uses: docker/setup-buildx-action@v1
       with:
         install: true
-        driver-opts: image=moby/buildkit:master
-
-    - name: Cache docker layers
-      uses: actions/cache@v4
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildx-
-      if: ${{ success() }}
+        driver-opts: image=moby/buildkit:v0.24.0
 
     - name: Log into registry ${{ env.REGISTRY }}
       uses: docker/login-action@v2
@@ -76,4 +65,4 @@ jobs:
 
     - name: Build (and potentially push) docker image release
       # The PUSH_FLAG is ingested by the Makefile and passed to docker buildx bake command.
-      run: PUSH_FLAG=$PUSH_FLAG make docker-release-build
+      run: PUSH_FLAG=$PUSH_FLAG BAKE_ARGS="--set '*.cache-from=type=gha' --set '*.cache-to=type=gha,mode=max'" make docker-release-build

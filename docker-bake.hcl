@@ -55,6 +55,24 @@ group "all" {
   ]
 }
 
+group "all-except-icicle" {
+  targets = [
+    "node-group",
+    "batcher",
+    "disperser",
+    "encoder",
+    "retriever",
+    "churner",
+    "dataapi",
+    "traffic-generator",
+    "traffic-generator-v2",
+    "controller",
+    "relay",
+    "blobapi",
+    "proxy",
+  ]
+}
+
 group "node-group" {
   targets = ["node", "nodeplugin"]
 }

@@ -86,23 +86,47 @@ fmt-check:
 		exit 1; \
 	fi
 
+# Let CI pass extra flags to bake/build without hardcoding them here.
+BAKE_ARGS ?=
+BUILD_ARGS ?=
+# Default values for registry and repo, matching docker-bake.hcl defaults
+REGISTRY ?= ghcr.io
+REPO ?= layr-labs/eigenda
+BUILD_TAG ?= dev
+
 # builds all services and loads them into dockerd (such that they are available via `docker images`).
 # The images will be tagged with :dev, which is the default BUILD_TAG in docker-bake.hcl.
 # This can be changed by running for example `BUILD_TAG=master make docker-build`.
 docker-build:
-	docker buildx bake all --load
+	docker buildx bake all --load $(BAKE_ARGS)
 
 # builds all services and pushes them to the configured registry (ghcr by default).
 docker-build-push:
-	docker buildx bake all --push
+	docker buildx bake all --push $(BAKE_ARGS)
+
+# Build everything EXCEPT encoder-icicle (useful for CI to avoid long icicle builds)
+docker-build-except-icicle:
+	docker buildx bake all-except-icicle --load $(BAKE_ARGS)
+
+# Push everything EXCEPT encoder-icicle
+docker-build-push-except-icicle:
+	docker buildx bake all-except-icicle --push $(BAKE_ARGS)
+
+# Build encoder-icicle only
+encoder-icicle-build:
+	docker buildx bake encoder-icicle --load $(BAKE_ARGS)
+
+# Push encoder-icicle only
+encoder-icicle-push:
+	docker buildx bake encoder-icicle --push $(BAKE_ARGS)
 
 # Should only ever be used by the docker-publish-release CI workflow.
 # We keep the node-group and proxy targets separate since we might want to release them separately in the future.
 docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake node-group-release ${PUSH_FLAG}
+	docker buildx bake node-group-release ${PUSH_FLAG} $(BAKE_ARGS)
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake proxy-release ${PUSH_FLAG}
+	docker buildx bake proxy-release ${PUSH_FLAG} $(BAKE_ARGS)
 
 # Run all tests that don't have their own panel.
 unit-tests:
