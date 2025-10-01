@@ -47,6 +47,7 @@ func setupTest(t *testing.T) *inaboxtests.InfrastructureHarness {
 		TestName:          testName,
 		InMemoryBlobStore: true, // Graph indexer test doesn't need blob store
 		Logger:            logger,
+		RootPath:          "../../",
 	}
 
 	// Start all the necessary infrastructure like anvil, graph node, and eigenda components
