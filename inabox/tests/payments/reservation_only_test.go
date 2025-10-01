@@ -19,18 +19,22 @@ import (
 // Once we figure out why resources aren't being freed, then these tests will be runnable the "normal" way.
 
 func TestReservationOnly_LegacyClient_LegacyController(t *testing.T) {
+	t.Skip("Manual test for now")
 	testReservationOnly(t, clientledger.ClientLedgerModeLegacy, false)
 }
 
 func TestReservationOnly_LegacyClient_NewController(t *testing.T) {
+	t.Skip("Manual test for now")
 	testReservationOnly(t, clientledger.ClientLedgerModeLegacy, true)
 }
 
 func TestReservationOnly_NewClient_LegacyController(t *testing.T) {
+	t.Skip("Manual test for now")
 	testReservationOnly(t, clientledger.ClientLedgerModeReservationOnly, false)
 }
 
 func TestReservationOnly_NewClient_NewController(t *testing.T) {
+	t.Skip("Manual test for now")
 	testReservationOnly(t, clientledger.ClientLedgerModeReservationOnly, true)
 }
 
