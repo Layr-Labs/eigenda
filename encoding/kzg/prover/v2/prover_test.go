@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -31,11 +32,19 @@ func TestEncoder(t *testing.T) {
 	p, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
+	c, err := committer.NewFromConfig(committer.Config{
+		SRSNumberToLoad:   harness.proverV2KzgConfig.SRSNumberToLoad,
+		G1SRSPath:         harness.proverV2KzgConfig.G1Path,
+		G2SRSPath:         harness.proverV2KzgConfig.G2Path,
+		G2TrailingSRSPath: harness.proverV2KzgConfig.G2TrailingPath,
+	})
+	require.NoError(t, err)
+
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromMins(5, 5)
-	commitments, err := p.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
+	commitments, err := c.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
 	require.NoError(t, err)
 	frames, err := p.GetFrames(harness.paddedGettysburgAddressBytes, params)
 	require.NoError(t, err)

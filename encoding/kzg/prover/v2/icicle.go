@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
-	gnarkprover "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2/gnark"
 	icicleprover "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2/icicle"
 )
 
@@ -54,18 +53,11 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 		NumWorker:      p.KzgConfig.NumWorker,
 	}
 
-	// Set up gnark commitments backend
-	commitmentsBackend := &gnarkprover.KzgCommitmentsGnarkBackend{
-		Srs:        p.Srs,
-		G2Trailing: p.G2Trailing,
-	}
-
 	return &ParametrizedProver{
 		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
 		encodingParams:             params,
 		encoder:                    p.encoder,
 		computeMultiproofNumWorker: p.KzgConfig.NumWorker,
 		kzgMultiProofBackend:       multiproofBackend,
-		kzgCommitmentsBackend:      commitmentsBackend,
 	}, nil
 }

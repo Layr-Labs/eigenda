@@ -35,14 +35,12 @@ func TestGetSet(t *testing.T) {
 
 	require.NoError(t, err)
 
-	msV2, err := New(
+	msV2 := New(
 		t.Context(),
 		testLogger,
 		getDefaultMemStoreTestConfig(),
 		g1Srs,
 	)
-
-	require.NoError(t, err)
 
 	expected := []byte(testPreimage)
 	key, err := msV2.Put(t.Context(), expected)

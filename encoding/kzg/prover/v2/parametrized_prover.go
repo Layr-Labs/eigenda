@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/hashicorp/go-multierror"
 
@@ -26,7 +25,6 @@ type ParametrizedProver struct {
 
 	computeMultiproofNumWorker uint64
 	kzgMultiProofBackend       KzgMultiProofsBackendV2
-	kzgCommitmentsBackend      KzgCommitmentsBackendV2
 }
 
 type rsEncodeResult struct {
@@ -36,100 +34,10 @@ type rsEncodeResult struct {
 	Err      error
 }
 
-type lengthCommitmentResult struct {
-	LengthCommitment *bn254.G2Affine
-	Duration         time.Duration
-	Err              error
-}
-
-type lengthProofResult struct {
-	LengthProof *bn254.G2Affine
-	Duration    time.Duration
-	Err         error
-}
-
-type commitmentResult struct {
-	Commitment *bn254.G1Affine
-	Duration   time.Duration
-	Err        error
-}
-
 type proofsResult struct {
 	Proofs   []bn254.G1Affine
 	Duration time.Duration
 	Err      error
-}
-
-func (g *ParametrizedProver) GetCommitments(
-	inputFr []fr.Element,
-) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, error) {
-	if err := g.validateInput(inputFr); err != nil {
-		return nil, nil, nil, err
-	}
-
-	encodeStart := time.Now()
-
-	lengthCommitmentChan := make(chan lengthCommitmentResult, 1)
-	lengthProofChan := make(chan lengthProofResult, 1)
-	commitmentChan := make(chan commitmentResult, 1)
-
-	// compute commit for the full poly
-	go func() {
-		start := time.Now()
-		commit, err := g.kzgCommitmentsBackend.ComputeCommitmentV2(inputFr)
-		commitmentChan <- commitmentResult{
-			Commitment: commit,
-			Err:        err,
-			Duration:   time.Since(start),
-		}
-	}()
-
-	go func() {
-		start := time.Now()
-		lengthCommitment, err := g.kzgCommitmentsBackend.ComputeLengthCommitmentV2(inputFr)
-		lengthCommitmentChan <- lengthCommitmentResult{
-			LengthCommitment: lengthCommitment,
-			Err:              err,
-			Duration:         time.Since(start),
-		}
-	}()
-
-	go func() {
-		start := time.Now()
-		// blobLen must always be a power of 2 in V2
-		// inputFr is not modified because padding with 0s doesn't change the commitment,
-		// but we need to pretend like it was actually padded with 0s to get the correct length proof.
-		blobLen := math.NextPowOf2u32(uint32(len(inputFr)))
-		lengthProof, err := g.kzgCommitmentsBackend.ComputeLengthProofForLengthV2(inputFr, blobLen)
-		lengthProofChan <- lengthProofResult{
-			LengthProof: lengthProof,
-			Err:         err,
-			Duration:    time.Since(start),
-		}
-	}()
-
-	lengthProofResult := <-lengthProofChan
-	lengthCommitmentResult := <-lengthCommitmentChan
-	commitmentResult := <-commitmentChan
-
-	if lengthProofResult.Err != nil || lengthCommitmentResult.Err != nil ||
-		commitmentResult.Err != nil {
-		return nil, nil, nil, multierror.Append(lengthProofResult.Err, lengthCommitmentResult.Err, commitmentResult.Err)
-	}
-	totalProcessingTime := time.Since(encodeStart)
-
-	slog.Info("Commitment process details",
-		"Input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
-		"Total_duration", totalProcessingTime,
-		"Committing_duration", commitmentResult.Duration,
-		"LengthCommit_duration", lengthCommitmentResult.Duration,
-		"lengthProof_duration", lengthProofResult.Duration,
-		"SRSOrder", encoding.SRSOrder,
-		// TODO(samlaf): should we take NextPowerOf2(len(inputFr)) instead?
-		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
-	)
-
-	return commitmentResult.Commitment, lengthCommitmentResult.LengthCommitment, lengthProofResult.LengthProof, nil
 }
 
 func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, []uint32, error) {
