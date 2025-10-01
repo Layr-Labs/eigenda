@@ -77,11 +77,12 @@ func setupLocalStackResources(
 	// Deploy AWS resources (DynamoDB tables and S3 buckets)
 	config.Logger.Info("Deploying AWS resources in LocalStack")
 	deployConfig := testbed.DeployResourcesConfig{
-		LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", config.LocalStackPort),
+		LocalStackEndpoint:  localstackContainer.Endpoint(),
 		MetadataTableName:   config.MetadataTableName,
 		BucketTableName:     config.BucketTableName,
-		BucketName:          config.S3BucketName,
+		BlobStoreBucketName: config.S3BucketName,
 		V2MetadataTableName: config.MetadataTableNameV2,
+		AWSConfig:           localstackContainer.GetAWSClientConfig(),
 		Logger:              config.Logger,
 	}
 	if err := testbed.DeployResources(ctx, deployConfig); err != nil {

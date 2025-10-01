@@ -22,16 +22,29 @@ import (
 
 // DeployResourcesConfig holds configuration for deploying AWS resources
 type DeployResourcesConfig struct {
-	LocalStackEndpoint  string
-	MetadataTableName   string
-	BucketTableName     string
-	BucketName          string // Optional: S3 bucket name, defaults to "test-eigenda-blobstore"
+	// Required: LocalStack endpoint URL to deploy resources to
+	LocalStackEndpoint string
+
+	// Required: AWS client config
+	AWSConfig aws.ClientConfig
+
+	// Optional: Metadata table name, defaults to "test-eigenda-blobmetadata"
+	MetadataTableName string
+
+	// Optional: Bucket table name, defaults to "test-eigenda-bucket"
+	BucketTableName string
+
+	// Optional: V2 metadata table name, defaults to "test-eigenda-blobmetadata-v2"
 	V2MetadataTableName string
-	V2PaymentPrefix     string         // Optional: prefix for v2 payment tables, defaults to "e2e_v2_"
-	Region              string         // Optional: AWS region, defaults to "us-east-1"
-	AccessKey           string         // Optional: AWS access key, defaults to "localstack"
-	SecretAccessKey     string         // Optional: AWS secret key, defaults to "localstack"
-	Logger              logging.Logger // Optional: logger for output messages
+
+	// Optional: Blobstore S3 bucket name, defaults to "test-eigenda-blobstore"
+	BlobStoreBucketName string
+
+	// Optional: prefix for v2 payment tables, defaults to "e2e_v2_"
+	V2PaymentPrefix string
+
+	// Optional: Logger for output messages
+	Logger logging.Logger
 }
 
 // DeployResources creates AWS resources (S3 buckets and DynamoDB tables) on LocalStack
@@ -54,32 +67,30 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 	logger = logger.With("component", "DeployResources")
 
 	// Set defaults
-	if config.Region == "" {
-		config.Region = "us-east-1"
-	}
-	if config.AccessKey == "" {
-		config.AccessKey = "localstack"
-	}
-	if config.SecretAccessKey == "" {
-		config.SecretAccessKey = "localstack"
-	}
 	if config.V2PaymentPrefix == "" {
 		config.V2PaymentPrefix = "e2e_v2_"
 	}
-	if config.BucketName == "" {
-		config.BucketName = "test-eigenda-blobstore"
+	if config.MetadataTableName == "" {
+		config.MetadataTableName = "test-eigenda-blobmetadata"
+	}
+	if config.BucketTableName == "" {
+		config.BucketTableName = "test-eigenda-bucket"
+	}
+	if config.V2MetadataTableName == "" {
+		config.V2MetadataTableName = "test-eigenda-blobmetadata-v2"
+	}
+	if config.BlobStoreBucketName == "" {
+		config.BlobStoreBucketName = "test-eigenda-blobstore"
 	}
 
-	// Create AWS client config
-	cfg := aws.ClientConfig{
-		Region:          config.Region,
-		AccessKey:       config.AccessKey,
-		SecretAccessKey: config.SecretAccessKey,
-		EndpointURL:     config.LocalStackEndpoint,
-	}
+	// Set endpoint URL from LocalStackEndpoint
+	config.AWSConfig.EndpointURL = config.LocalStackEndpoint
+
+	// Use the AWS config
+	cfg := config.AWSConfig
 
 	// Create S3 bucket
-	if err := createS3Bucket(ctx, cfg, config.BucketName, logger); err != nil {
+	if err := createS3Bucket(ctx, cfg, config.BlobStoreBucketName, logger); err != nil {
 		return fmt.Errorf("failed to create S3 bucket: %w", err)
 	}
 
@@ -210,12 +221,4 @@ func createPaymentTables(cfg aws.ClientConfig, prefix string, logger logging.Log
 	logger.Info("Created global reservation table", "table", prefix+"global_reservation")
 
 	return nil
-}
-
-// DeployResourcesWithContainer is a convenience function that uses a LocalStackContainer
-func DeployResourcesWithContainer(ctx context.Context,
-	container *LocalStackContainer, config DeployResourcesConfig) error {
-	// Override the endpoint with the container's endpoint
-	config.LocalStackEndpoint = container.Endpoint()
-	return DeployResources(ctx, config)
 }
