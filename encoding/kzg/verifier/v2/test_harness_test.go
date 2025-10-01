@@ -26,13 +26,13 @@ func getTestHarness() *testHarness {
 		G2Path:          "../../../../resources/srs/g2.point",
 		G2TrailingPath:  "../../../../resources/srs/g2.trailing.point",
 		CacheDir:        "../../../../resources/srs/SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 2900,
+		SRSOrder:        4096,
+		SRSNumberToLoad: 4096,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,
 	}
 	committerConfig := &committer.Config{
-		SRSNumberToLoad:   2900,
+		SRSNumberToLoad:   4096,
 		G1SRSPath:         "../../../../resources/srs/g1.point",
 		G2SRSPath:         "../../../../resources/srs/g2.point",
 		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
