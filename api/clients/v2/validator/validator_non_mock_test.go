@@ -3,6 +3,7 @@ package validator
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"math"
 	"runtime"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -36,8 +38,8 @@ var (
 func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	ctx := t.Context()
 
-	// Set up KZG components (prover and verifier)
-	p, v, err := makeTestEncodingComponents()
+	// Set up KZG components (prover, committer and verifier)
+	p, c, v, err := makeTestEncodingComponents()
 	require.NoError(t, err)
 
 	// Set up test environment
@@ -62,7 +64,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// Create blob and get commitments
 	blobVersion := v2.BlobVersion(0)
-	blobHeader, data := makeTestBlob(t, p, blobVersion, 2, quorumNumbers)
+	blobHeader, data := makeTestBlob(t, c, blobVersion, 2, quorumNumbers)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
 
@@ -206,8 +208,8 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	require.GreaterOrEqual(t, maxToVerify, framesSentToDecodingCount.Load())
 }
 
-// makeTestEncodingComponents makes a prover and verifier for KZG
-func makeTestEncodingComponents() (*prover.Prover, *verifier.Verifier, error) {
+// makeTestEncodingComponents makes a KZG prover, committer and verifier
+func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
 	config := &kzg.KzgConfig{
 		G1Path:          "../../../../resources/srs/g1.point",
 		G2Path:          "../../../../resources/srs/g2.point",
@@ -219,22 +221,32 @@ func makeTestEncodingComponents() (*prover.Prover, *verifier.Verifier, error) {
 		LoadG2Points:    true,
 	}
 
+	c, err := committer.NewFromConfig(committer.Config{
+		SRSNumberToLoad:   config.SRSNumberToLoad,
+		G1SRSPath:         config.G1Path,
+		G2SRSPath:         config.G2Path,
+		G2TrailingSRSPath: config.G2TrailingPath,
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("new committer from config: %w", err)
+	}
+
 	p, err := prover.NewProver(prover.KzgConfigFromV1Config(config), nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}
 
 	v, err := verifier.NewVerifier(verifier.KzgConfigFromV1Config(config), nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, fmt.Errorf("new verifier: %w", err)
 	}
 
-	return p, v, nil
+	return p, c, v, nil
 }
 
 // makeTestBlob creates a test blob with valid commitments
 func makeTestBlob(
-	t *testing.T, p *prover.Prover, version v2.BlobVersion, length int, quorums []core.QuorumID,
+	t *testing.T, c *committer.Committer, version v2.BlobVersion, length int, quorums []core.QuorumID,
 ) (*v2.BlobHeaderWithHashedPayment, []byte) {
 	data := make([]byte, length*31)
 	_, err := rand.Read(data)
@@ -244,7 +256,7 @@ func makeTestBlob(
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -63,7 +63,8 @@ func defaultConfig() *Config {
 			InternalGetProofsTimeout:       10 * time.Second,
 			InternalGetCoefficientsTimeout: 10 * time.Second,
 		},
-		MetricsPort: 9101,
+		MetricsPort:                 9101,
+		OnchainStateRefreshInterval: 1 * time.Minute,
 	}
 }
 

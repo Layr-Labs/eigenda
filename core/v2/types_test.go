@@ -15,7 +15,7 @@ import (
 
 func TestConvertBatchToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 
 	bh0 := &v2.BlobHeader{
@@ -69,7 +69,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 
 func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 
 	bh := &v2.BlobHeader{
@@ -94,7 +94,7 @@ func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 
 func TestConvertBlobCertToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 
 	bh := &v2.BlobHeader{
