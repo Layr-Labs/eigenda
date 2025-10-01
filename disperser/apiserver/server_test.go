@@ -643,10 +643,11 @@ func setup() {
 
 		// Deploy resources using the testbed DeployResources function
 		deployConfig := testbed.DeployResourcesConfig{
-			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", localstackPort),
+			LocalStackEndpoint:  localstackContainer.Endpoint(),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
 			V2MetadataTableName: v2MetadataTableName,
+			AWSConfig:           localstackContainer.GetAWSClientConfig(),
 			Logger:              logger,
 		}
 

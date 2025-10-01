@@ -18,12 +18,16 @@ type InfrastructureConfig struct {
 	Logger              logging.Logger
 	MetadataTableName   string
 	BucketTableName     string
+	S3BucketName        string
 	MetadataTableNameV2 string
+
+	// Number of relay instances to start, if not specified, no relays will be started.
+	RelayCount int
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
 // This includes containers for Anvil, LocalStack, GraphNode, and the Churner server.
-func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, error) {
+func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*InfrastructureHarness, error) {
 	if config.MetadataTableName == "" {
 		config.MetadataTableName = "test-BlobMetadata"
 	}
@@ -35,10 +39,6 @@ func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, 
 	}
 
 	logger := config.Logger
-
-	// Create a timeout context for setup operations only
-	setupCtx, setupCancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer setupCancel()
 
 	rootPath := "../../"
 
@@ -55,7 +55,7 @@ func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, 
 	testConfig := deploy.ReadTestConfig(testName, rootPath)
 
 	// Create a long-lived context for the infrastructure lifecycle
-	infraCtx, infraCancel := context.WithCancel(context.Background())
+	infraCtx, infraCancel := context.WithCancel(ctx)
 
 	// Ensure we cancel the context if we return an error
 	var setupErr error
@@ -65,9 +65,9 @@ func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, 
 		}
 	}()
 
-	// Create a shared Docker network for all containers
+	// Create shared Docker network, primarily for Anvil and Graph Node
 	sharedDockerNetwork, err := network.New(
-		setupCtx,
+		infraCtx,
 		network.WithDriver("bridge"),
 		network.WithAttachable())
 	if err != nil {
@@ -85,59 +85,57 @@ func SetupInfrastructure(config *InfrastructureConfig) (*InfrastructureHarness, 
 		InMemoryBlobStore: config.InMemoryBlobStore,
 		LocalStackPort:    "4570",
 		Logger:            config.Logger,
-		Ctx:               infraCtx,
 		Cancel:            infraCancel,
 	}
 
-	// Setup Chain Harness first (Anvil, Graph Node, contracts, Churner)
+	// Setup Chain Harness first (Anvil, Graph Node, Contracts, Churner)
 	chainHarnessConfig := &ChainHarnessConfig{
 		TestConfig: testConfig,
 		TestName:   testName,
 		Logger:     logger,
 		Network:    sharedDockerNetwork,
 	}
-
-	chainHarness, err := SetupChainHarness(setupCtx, chainHarnessConfig)
+	chainHarness, err := SetupChainHarness(infraCtx, chainHarnessConfig)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup chain harness: %w", err)
 		return nil, setupErr
 	}
 	infra.ChainHarness = *chainHarness
 
-	// Setup Operator Harness second (requires chain to be ready)
-	operatorHarnessConfig := &OperatorHarnessConfig{
-		TestConfig:   testConfig,
-		TestName:     testName,
-		Logger:       logger,
-		ChainHarness: &infra.ChainHarness,
-		Ctx:          infraCtx,
-	}
-	operatorHarness, err := SetupOperatorHarness(setupCtx, operatorHarnessConfig)
-	if err != nil {
-		setupErr = fmt.Errorf("failed to setup operator harness: %w", err)
-		return nil, setupErr
-	}
-	infra.OperatorHarness = *operatorHarness
-
-	// Setup Disperser Harness third (LocalStack, DynamoDB tables, S3 buckets)
+	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
 	disperserHarnessConfig := &DisperserHarnessConfig{
 		Logger:              logger,
 		Network:             sharedDockerNetwork,
 		TestConfig:          testConfig,
+		TestName:            testName,
 		InMemoryBlobStore:   config.InMemoryBlobStore,
 		LocalStackPort:      infra.LocalStackPort,
 		MetadataTableName:   config.MetadataTableName,
 		BucketTableName:     config.BucketTableName,
+		S3BucketName:        config.S3BucketName,
 		MetadataTableNameV2: config.MetadataTableNameV2,
 		EthClient:           infra.ChainHarness.EthClient,
+		RelayCount:          config.RelayCount,
 	}
-
-	disperserHarness, err := SetupDisperserHarness(setupCtx, disperserHarnessConfig)
+	disperserHarness, err := SetupDisperserHarness(infraCtx, *disperserHarnessConfig)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
 		return nil, setupErr
 	}
 	infra.DisperserHarness = *disperserHarness
+
+	// Setup Operator Harness third (requires chain and disperser to be ready)
+	operatorHarnessConfig := &OperatorHarnessConfig{
+		TestConfig: testConfig,
+		TestName:   testName,
+		Logger:     logger,
+	}
+	operatorHarness, err := SetupOperatorHarness(infraCtx, operatorHarnessConfig, &infra.ChainHarness)
+	if err != nil {
+		setupErr = fmt.Errorf("failed to setup operator harness: %w", err)
+		return nil, setupErr
+	}
+	infra.OperatorHarness = *operatorHarness
 
 	return infra, nil
 }

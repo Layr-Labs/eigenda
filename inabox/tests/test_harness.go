@@ -22,7 +22,7 @@ import (
 // InfrastructureHarness contains the shared infrastructure components
 // that are global across all tests (external dependencies)
 type InfrastructureHarness struct {
-	// Shared docker network
+	// Shared docker network. Currently the only users of this network are the anvil chain and the graph node.
 	SharedNetwork *testcontainers.DockerNetwork
 
 	// Chain related components
@@ -31,7 +31,7 @@ type InfrastructureHarness struct {
 	// Operator related components
 	OperatorHarness OperatorHarness
 
-	// EigenDA components
+	// EigenDA components (includes relays)
 	DisperserHarness DisperserHarness
 
 	// Proxy
