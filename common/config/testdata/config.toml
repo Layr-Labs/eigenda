@@ -13,21 +13,6 @@ Float64 = 11.11
 Float32 = 12.12
 Bool = false
 
-Recursive.String = "this value also came from config.toml"
-Recursive.Int = 13
-Recursive.Int64 = 14
-Recursive.Int32 = 15
-Recursive.Int16 = 16
-Recursive.Int8 = 17
-Recursive.Uint = 18
-Recursive.Uint64 = 19
-Recursive.Uint32 = 20
-Recursive.Uint16 = 21
-Recursive.Uint8 = 22
-Recursive.Float64 = 23.23
-Recursive.Float32 = 24.24
-Recursive.Bool = true
-
 Bar.A = "bar A"
 Bar.B = 25
 Bar.C = true

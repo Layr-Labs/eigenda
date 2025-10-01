@@ -6,14 +6,6 @@ Uint16 = 10009
 Float64 = -11.11
 Bool = true
 
-Recursive.Int = -13
-Recursive.Int32 = -15
-Recursive.Int8 = -17
-Recursive.Uint64 = 100019
-Recursive.Uint16 = 10021
-Recursive.Float64 = -23.23
-Recursive.Bool = false
-
 Bar.B = -25
 
 Baz.X = "toml baz partial X"

@@ -155,6 +155,7 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 		keyPath := append(path, name)
 
 		switch field.Type.Kind() {
+
 		case reflect.Struct:
 			// Recurse for nested structs
 			tmp := reflect.New(field.Type).Elem().Interface()
@@ -165,8 +166,29 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 			for k := range nestedBoundVars {
 				boundVars[k] = struct{}{}
 			}
+		case reflect.Ptr:
+			// Handle pointer to struct
+			if field.Type.Elem().Kind() == reflect.Struct {
+				tmp := reflect.New(field.Type.Elem()).Interface()
+				nestedBoundVars, err := bindEnvs(v, prefix, tmp, keyPath...)
+				if err != nil {
+					return nil, fmt.Errorf("failed to bind envs for field %s: %w", field.Name, err)
+				}
+				for k := range nestedBoundVars {
+					boundVars[k] = struct{}{}
+				}
+			} else {
+				// Pointer to non-struct type, bind as regular field
+				env := prefix + "_" + strings.ToUpper(strings.ReplaceAll(strings.Join(keyPath, "_"), ".", "_"))
+				fmt.Printf("binding %s\n", env) // TODO
+				boundVars[env] = struct{}{}
+				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
+					return nil, err
+				}
+			}
 		default:
 			env := prefix + "_" + strings.ToUpper(strings.ReplaceAll(strings.Join(keyPath, "_"), ".", "_"))
+			fmt.Printf("binding %s\n", env) // TODO
 			boundVars[env] = struct{}{}
 			if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
 				return nil, err

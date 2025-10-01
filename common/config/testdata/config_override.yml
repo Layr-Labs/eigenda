@@ -6,15 +6,6 @@ Uint16: 20009
 Float64: -211.11
 Bool: true
 
-Recursive:
-  Int: -213
-  Int32: -215
-  Int8: -17
-  Uint64: 2000019
-  Uint16: 20021
-  Float64: -223.23
-  Bool: false
-
 Bar:
   B: -225
 

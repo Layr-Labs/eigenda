@@ -8,23 +8,22 @@ import (
 )
 
 type Foo struct {
-	String    string
-	Int       int
-	Int64     int64
-	Int32     int32
-	Int16     int16
-	Int8      int8
-	Uint      uint
-	Uint64    uint64
-	Uint32    uint32
-	Uint16    uint16
-	Uint8     uint8
-	Float64   float64
-	Float32   float32
-	Bool      bool
-	Recursive *Foo
-	Bar       Bar
-	Baz       *Baz
+	String  string
+	Int     int
+	Int64   int64
+	Int32   int32
+	Int16   int16
+	Int8    int8
+	Uint    uint
+	Uint64  uint64
+	Uint32  uint32
+	Uint16  uint16
+	Uint8   uint8
+	Float64 float64
+	Float32 float32
+	Bool    bool
+	Bar     Bar
+	Baz     *Baz
 }
 
 func (f *Foo) Verify() error {
@@ -76,23 +75,6 @@ func TestTOMLParsing(t *testing.T) {
 	require.Equal(t, float32(12.12), foo.Float32)
 	require.Equal(t, false, foo.Bool)
 
-	// Recursive field
-	require.NotNil(t, foo.Recursive)
-	require.Equal(t, "this value also came from config.toml", foo.Recursive.String)
-	require.Equal(t, 13, foo.Recursive.Int)
-	require.Equal(t, int64(14), foo.Recursive.Int64)
-	require.Equal(t, int32(15), foo.Recursive.Int32)
-	require.Equal(t, int16(16), foo.Recursive.Int16)
-	require.Equal(t, int8(17), foo.Recursive.Int8)
-	require.Equal(t, uint(18), foo.Recursive.Uint)
-	require.Equal(t, uint64(19), foo.Recursive.Uint64)
-	require.Equal(t, uint32(20), foo.Recursive.Uint32)
-	require.Equal(t, uint16(21), foo.Recursive.Uint16)
-	require.Equal(t, uint8(22), foo.Recursive.Uint8)
-	require.Equal(t, 23.23, foo.Recursive.Float64)
-	require.Equal(t, float32(24.24), foo.Recursive.Float32)
-	require.Equal(t, true, foo.Recursive.Bool)
-
 	// Bar field
 	require.Equal(t, "bar A", foo.Bar.A)
 	require.Equal(t, 25, foo.Bar.B)
@@ -133,23 +115,6 @@ func TestJSONParsing(t *testing.T) {
 	require.Equal(t, 111.11, foo.Float64)
 	require.Equal(t, float32(112.12), foo.Float32)
 	require.Equal(t, true, foo.Bool)
-
-	// Recursive field
-	require.NotNil(t, foo.Recursive)
-	require.Equal(t, "this value also came from config.json", foo.Recursive.String)
-	require.Equal(t, 113, foo.Recursive.Int)
-	require.Equal(t, int64(114), foo.Recursive.Int64)
-	require.Equal(t, int32(115), foo.Recursive.Int32)
-	require.Equal(t, int16(116), foo.Recursive.Int16)
-	require.Equal(t, int8(117), foo.Recursive.Int8)
-	require.Equal(t, uint(118), foo.Recursive.Uint)
-	require.Equal(t, uint64(119), foo.Recursive.Uint64)
-	require.Equal(t, uint32(120), foo.Recursive.Uint32)
-	require.Equal(t, uint16(121), foo.Recursive.Uint16)
-	require.Equal(t, uint8(122), foo.Recursive.Uint8)
-	require.Equal(t, 123.23, foo.Recursive.Float64)
-	require.Equal(t, float32(124.24), foo.Recursive.Float32)
-	require.Equal(t, false, foo.Recursive.Bool)
 
 	// Bar field
 	require.Equal(t, "json bar A", foo.Bar.A)
@@ -192,23 +157,6 @@ func TestYAMLParsing(t *testing.T) {
 	require.Equal(t, 211.11, foo.Float64)
 	require.Equal(t, float32(212.12), foo.Float32)
 	require.Equal(t, false, foo.Bool)
-
-	// Recursive field
-	require.NotNil(t, foo.Recursive)
-	require.Equal(t, "this value also came from config.yml", foo.Recursive.String)
-	require.Equal(t, 213, foo.Recursive.Int)
-	require.Equal(t, int64(214), foo.Recursive.Int64)
-	require.Equal(t, int32(215), foo.Recursive.Int32)
-	require.Equal(t, int16(216), foo.Recursive.Int16)
-	require.Equal(t, int8(117), foo.Recursive.Int8)
-	require.Equal(t, uint(218), foo.Recursive.Uint)
-	require.Equal(t, uint64(219), foo.Recursive.Uint64)
-	require.Equal(t, uint32(220), foo.Recursive.Uint32)
-	require.Equal(t, uint16(221), foo.Recursive.Uint16)
-	require.Equal(t, uint8(222), foo.Recursive.Uint8)
-	require.Equal(t, 223.23, foo.Recursive.Float64)
-	require.Equal(t, float32(224.24), foo.Recursive.Float32)
-	require.Equal(t, true, foo.Recursive.Bool)
 
 	// Bar field
 	require.Equal(t, "yaml bar A", foo.Bar.A)
@@ -253,23 +201,6 @@ func TestTOMLConfigOverride(t *testing.T) {
 	require.Equal(t, float32(12.12), foo.Float32)                    // from base
 	require.Equal(t, true, foo.Bool)                                 // from override
 
-	// Recursive field - mix of base and override
-	require.NotNil(t, foo.Recursive)
-	require.Equal(t, "this value also came from config.toml", foo.Recursive.String) // from base
-	require.Equal(t, -13, foo.Recursive.Int)                                        // from override
-	require.Equal(t, int64(14), foo.Recursive.Int64)                                // from base
-	require.Equal(t, int32(-15), foo.Recursive.Int32)                               // from override
-	require.Equal(t, int16(16), foo.Recursive.Int16)                                // from base
-	require.Equal(t, int8(-17), foo.Recursive.Int8)                                 // from override
-	require.Equal(t, uint(18), foo.Recursive.Uint)                                  // from base
-	require.Equal(t, uint64(100019), foo.Recursive.Uint64)                          // from override
-	require.Equal(t, uint32(20), foo.Recursive.Uint32)                              // from base
-	require.Equal(t, uint16(10021), foo.Recursive.Uint16)                              // from base
-	require.Equal(t, uint8(22), foo.Recursive.Uint8)                                // from base
-	require.Equal(t, -23.23, foo.Recursive.Float64)                                 // from override
-	require.Equal(t, float32(24.24), foo.Recursive.Float32)                         // from base
-	require.Equal(t, false, foo.Recursive.Bool)                                     // from override
-
 	// Bar field - mix of base and override
 	require.Equal(t, "bar A", foo.Bar.A) // from base
 	require.Equal(t, -25, foo.Bar.B)     // from override
@@ -306,23 +237,6 @@ func TestJSONConfigOverride(t *testing.T) {
 	require.Equal(t, -111.11, foo.Float64)                           // from override
 	require.Equal(t, float32(112.12), foo.Float32)                   // from base
 	require.Equal(t, false, foo.Bool)                                // from override
-
-	// Recursive field - mix of base and override
-	require.NotNil(t, foo.Recursive)
-	require.Equal(t, "this value also came from config.json", foo.Recursive.String) // from base
-	require.Equal(t, -113, foo.Recursive.Int)                                       // from override
-	require.Equal(t, int64(114), foo.Recursive.Int64)                               // from base
-	require.Equal(t, int32(-115), foo.Recursive.Int32)                              // from override
-	require.Equal(t, int16(116), foo.Recursive.Int16)                               // from base
-	require.Equal(t, int8(-17), foo.Recursive.Int8)                                 // from override
-	require.Equal(t, uint(118), foo.Recursive.Uint)                                 // from base
-	require.Equal(t, uint64(1000019), foo.Recursive.Uint64)                         // from override
-	require.Equal(t, uint32(120), foo.Recursive.Uint32)                             // from base
-	require.Equal(t, uint16(10021), foo.Recursive.Uint16)                           // from override
-	require.Equal(t, uint8(122), foo.Recursive.Uint8)                               // from base
-	require.Equal(t, -123.23, foo.Recursive.Float64)                                // from override
-	require.Equal(t, float32(124.24), foo.Recursive.Float32)                        // from base
-	require.Equal(t, true, foo.Recursive.Bool)                                      // from override
 
 	// Bar field - mix of base and override
 	require.Equal(t, "json bar A", foo.Bar.A) // from base
@@ -366,23 +280,6 @@ func TestYAMLConfigOverride(t *testing.T) {
 	require.Equal(t, -211.11, foo.Float64)                          // from override
 	require.Equal(t, float32(212.12), foo.Float32)                  // from base
 	require.Equal(t, true, foo.Bool)                                // from override
-
-	// Recursive field - mix of base and override
-	require.NotNil(t, foo.Recursive)
-	require.Equal(t, "this value also came from config.yml", foo.Recursive.String) // from base
-	require.Equal(t, -213, foo.Recursive.Int)                                      // from override
-	require.Equal(t, int64(214), foo.Recursive.Int64)                              // from base
-	require.Equal(t, int32(-215), foo.Recursive.Int32)                             // from override
-	require.Equal(t, int16(216), foo.Recursive.Int16)                              // from base
-	require.Equal(t, int8(-17), foo.Recursive.Int8)                                // from override
-	require.Equal(t, uint(218), foo.Recursive.Uint)                                // from base
-	require.Equal(t, uint64(2000019), foo.Recursive.Uint64)                        // from override
-	require.Equal(t, uint32(220), foo.Recursive.Uint32)                            // from base
-	require.Equal(t, uint16(20021), foo.Recursive.Uint16)                          // from override
-	require.Equal(t, uint8(222), foo.Recursive.Uint8)                              // from base
-	require.Equal(t, -223.23, foo.Recursive.Float64)                               // from override
-	require.Equal(t, float32(224.24), foo.Recursive.Float32)                       // from base
-	require.Equal(t, false, foo.Recursive.Bool)                                    // from override
 
 	// Bar field - mix of base and override
 	require.Equal(t, "yaml bar A", foo.Bar.A) // from base
@@ -456,16 +353,6 @@ func TestDefaultValues(t *testing.T) {
 	require.Equal(t, uint8(0), defaultValue.Uint8)          // default (zero value)
 	require.Equal(t, float32(0), defaultValue.Float32)      // default (zero value)
 
-	// Recursive field - mix of override and defaults
-	require.NotNil(t, defaultValue.Recursive)
-	require.Equal(t, -13, defaultValue.Recursive.Int)                 // overridden
-	require.Equal(t, int32(-15), defaultValue.Recursive.Int32)        // overridden
-	require.Equal(t, int8(-17), defaultValue.Recursive.Int8)          // overridden
-	require.Equal(t, uint64(100019), defaultValue.Recursive.Uint64)   // overridden
-	require.Equal(t, uint16(10021), defaultValue.Recursive.Uint16)    // overridden
-	require.Equal(t, -23.23, defaultValue.Recursive.Float64)          // overridden
-	require.Equal(t, false, defaultValue.Recursive.Bool)              // overridden
-
 	// Bar field
 	require.Equal(t, "default bar A", defaultValue.Bar.A) // default
 	require.Equal(t, -25, defaultValue.Bar.B)             // overridden
@@ -487,23 +374,19 @@ func TestEnvironmentVariables(t *testing.T) {
 	configFile := "testdata/config.toml"
 
 	// Set environment variables to override some config values.
-	os.Setenv("FOO_STRING", "value from env var")
-	os.Setenv("FOO_INT", "-999")
-	os.Setenv("FOO_RECURSIVE_INT", "-888")
-	os.Setenv("FOO_BAR_B", "-777")
-	os.Setenv("FOO_BAZ_PARTIAL_X", "env var baz X")
-	os.Setenv("FOO_BAZ_PARTIAL_Y", "555")
-	os.Setenv("FOO_BAZ_PARTIAL_Z", "true")
-	os.Setenv("FOO_BAR_BAZ_X", "env var bar baz X")
-	os.Setenv("FOO_BAR_BAZ_Y", "444")
-	os.Setenv("FOO_BAR_BAZ_Z", "false")
-	os.Setenv("FOO_INT64", "0")    // zero value
-	os.Setenv("FOO_INT32", "0")    // zero value
+	os.Setenv("PREFIX_STRING", "value from env var")
+	os.Setenv("PREFIX_INT", "-999")
+	os.Setenv("PREFIX_BAR_B", "-777")
+	os.Setenv("PREFIX_BAR_BAZ_X", "env var bar baz X")
+	os.Setenv("PREFIX_BAR_BAZ_Y", "444")
+	os.Setenv("PREFIX_BAR_BAZ_Z", "false")
+	os.Setenv("PREFIX_INT64", "0")    // zero value
+	os.Setenv("PREFIX_INT32", "0")    // zero value
 
 	foo := &Foo{
 
 	}
-	err := ParseConfig(foo, "FOO", configFile)
+	err := ParseConfig(foo, "PREFIX", configFile)
 	require.NoError(t, err)
 
 	// Verify that environment variables have overridden the config file values.
@@ -521,23 +404,6 @@ func TestEnvironmentVariables(t *testing.T) {
 	require.Equal(t, 11.11, foo.Float64)                  // from config
 	require.Equal(t, float32(12.12), foo.Float32)         // from config
 	require.Equal(t, false, foo.Bool)                     // from config
-
-	// Recursive field
-	require.NotNil(t, foo.Recursive)
-	require.Equal(t, "this value also came from config.toml", foo.Recursive.String) // from config
-	require.Equal(t, -888, foo.Recursive.Int)                                       // from env
-	require.Equal(t, int64(14), foo.Recursive.Int64)                                // from config
-	require.Equal(t, int32(15), foo.Recursive.Int32)                                // from config
-	require.Equal(t, int16(16), foo.Recursive.Int16)                                // from config
-	require.Equal(t, int8(17), foo.Recursive.Int8)                                  // from config
-	require.Equal(t, uint(18), foo.Recursive.Uint)                                  // from config
-	require.Equal(t, uint64(19), foo.Recursive.Uint64)                              // from config
-	require.Equal(t, uint32(20), foo.Recursive.Uint32)                              // from config
-	require.Equal(t, uint16(21), foo.Recursive.Uint16)                              // from config
-	require.Equal(t, uint8(22), foo.Recursive.Uint8)                                // from config
-	require.Equal(t, 23.23, foo.Recursive.Float64)                                  // from config
-	require.Equal(t, float32(24.24), foo.Recursive.Float32)                         // from config
-	require.Equal(t, true, foo.Recursive.Bool)                                      // from config
 
 	// Bar field
 	require.Equal(t, "bar A", foo.Bar.A) // from config

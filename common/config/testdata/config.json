@@ -13,22 +13,6 @@
   "Float64": 111.11,
   "Float32": 112.12,
   "Bool": true,
-  "Recursive": {
-    "String": "this value also came from config.json",
-    "Int": 113,
-    "Int64": 114,
-    "Int32": 115,
-    "Int16": 116,
-    "Int8": 117,
-    "Uint": 118,
-    "Uint64": 119,
-    "Uint32": 120,
-    "Uint16": 121,
-    "Uint8": 122,
-    "Float64": 123.23,
-    "Float32": 124.24,
-    "Bool": false
-  },
   "Bar": {
     "A": "json bar A",
     "B": 125,

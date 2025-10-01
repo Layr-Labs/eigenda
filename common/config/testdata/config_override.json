@@ -6,15 +6,6 @@
   "Uint16": 10009,
   "Float64": -111.11,
   "Bool": false,
-  "Recursive": {
-    "Int": -113,
-    "Int32": -115,
-    "Int8": -17,
-    "Uint64": 1000019,
-    "Uint16": 10021,
-    "Float64": -123.23,
-    "Bool": true
-  },
   "Bar": {
     "B": -125
   },
