@@ -17,10 +17,10 @@ run-payments-tests:
 		echo "Running $$test..."; \
 		if ! go test ./tests/payments -v -run "^$$test$$"; then \
 			echo "❌ TEST FAILED: $$test"; \
-			$(MAKE) -s stop-services stop-infra; \
+			$(MAKE) -s stop-inabox; \
 			exit 1; \
 		fi; \
-		$(MAKE) -s stop-services stop-infra; \
+		$(MAKE) -s stop-inabox; \
 	done; \
 	echo "========================================="; \
 	echo "✅ ALL PAYMENT TESTS PASSED"
