@@ -56,6 +56,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 		InMemoryBlobStore:               false,
 		Logger:                          test.GetLogger(),
 		RootPath:                        "../../../",
+		RelayCount:                      4,
 		UserReservationSymbolsPerSecond: 1024,
 		ClientLedgerMode:                clientLedgerMode,
 		ControllerUseNewPayments:        controllerUseNewPayments,
