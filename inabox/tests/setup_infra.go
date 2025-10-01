@@ -20,7 +20,9 @@ type InfrastructureConfig struct {
 	BucketTableName     string
 	S3BucketName        string
 	MetadataTableNameV2 string
-	RelayURLs           []string
+
+	// Number of relay instances to start, if not specified, no relays will be started.
+	RelayCount int
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
@@ -113,7 +115,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		S3BucketName:        config.S3BucketName,
 		MetadataTableNameV2: config.MetadataTableNameV2,
 		EthClient:           infra.ChainHarness.EthClient,
-		RelayURLs:           config.RelayURLs,
+		RelayCount:          config.RelayCount,
 	}
 	disperserHarness, err := SetupDisperserHarness(infraCtx, *disperserHarnessConfig)
 	if err != nil {

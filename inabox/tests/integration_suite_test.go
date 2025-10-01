@@ -65,12 +65,7 @@ func setupSuite(logger logging.Logger) error {
 		TestName:          testName,
 		InMemoryBlobStore: inMemoryBlobStore,
 		Logger:            logger,
-		RelayURLs: []string{
-			"localhost:32035",
-			"localhost:32037",
-			"localhost:32039",
-			"localhost:32041",
-		},
+		RelayCount:        4,
 	}
 	var err error
 	globalInfra, err = integration.SetupInfrastructure(context.Background(), config)

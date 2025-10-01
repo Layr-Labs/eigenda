@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -40,7 +39,9 @@ type DisperserHarnessConfig struct {
 	S3BucketName        string // S3 bucket name for blob storage
 	MetadataTableNameV2 string
 	EthClient           common.EthClient
-	RelayURLs           []string // URLs to register for relays
+
+	// Number of relay instances to start, if not specified, no relays will be started.
+	RelayCount int
 }
 
 // TODO: Add encoder, api server, controller, batcher
@@ -103,15 +104,9 @@ func setupDisperserKeypairAndRegistrations(config DisperserHarnessConfig) error 
 		return fmt.Errorf("failed to generate disperser keypair: %w", err)
 	}
 
-	// Register disperser keypair and relays
+	// Register disperser keypair on chain
 	if config.TestConfig.EigenDA.Deployer != "" && config.TestConfig.IsEigenDADeployed() {
 		config.TestConfig.PerformDisperserRegistrations(config.EthClient)
-
-		// Register relay URLs if provided
-		if len(config.RelayURLs) > 0 {
-			config.Logger.Info("Registering relay URLs", "count", len(config.RelayURLs))
-			config.TestConfig.RegisterRelays(config.EthClient, config.RelayURLs, config.EthClient.GetAccountAddress())
-		}
 	}
 
 	return nil
@@ -159,11 +154,13 @@ func SetupDisperserHarness(ctx context.Context, config DisperserHarnessConfig) (
 			return nil, err
 		}
 
-		// Start relay goroutines if relay URLs are provided
-		if len(config.RelayURLs) > 0 {
+		// Start relay goroutines if relay count is specified
+		if config.RelayCount > 0 {
 			if err := startRelays(ctx, harness, config); err != nil {
 				return nil, fmt.Errorf("failed to start relays: %w", err)
 			}
+		} else {
+			config.Logger.Warn("Relay count is not specified, skipping relay setup")
 		}
 	} else {
 		// TODO(dmanc): Do the relays even work when not using S3 as the blob store?
@@ -194,17 +191,55 @@ type RelayInstance struct {
 
 // startRelays starts all relay goroutines
 func startRelays(ctx context.Context, harness *DisperserHarness, config DisperserHarnessConfig) error {
-	config.Logger.Info("Starting relay goroutines", "count", len(config.RelayURLs))
+	config.Logger.Info("Pre-creating listeners for relay goroutines", "count", config.RelayCount)
 
-	for i, relayURL := range config.RelayURLs {
-		instance, err := startRelay(ctx, i, relayURL, harness, config)
+	// Pre-create all listeners with port 0 (OS assigns ports)
+	listeners := make([]net.Listener, config.RelayCount)
+	actualURLs := make([]string, config.RelayCount)
+
+	for i := range config.RelayCount {
+		listener, err := net.Listen("tcp", "localhost:0")
 		if err != nil {
-			// Clean up any relays we started before failing
+			// Clean up any listeners we created before failing
+			for j := range i {
+				err := listeners[j].Close()
+				if err != nil {
+					config.Logger.Warn("Failed to close listener for relay", "index", j, "error", err)
+				}
+			}
+			return fmt.Errorf("failed to create listener for relay %d: %w", i, err)
+		}
+		listeners[i] = listener
+
+		// Extract the actual port assigned by the OS
+		actualPort := listener.Addr().(*net.TCPAddr).Port
+		actualURLs[i] = fmt.Sprintf("localhost:%d", actualPort)
+
+		config.Logger.Info("Created listener for relay", "index", i, "assigned_port", actualPort)
+	}
+
+	// Now that we have all the actual URLs, register them on-chain
+	if config.TestConfig != nil && config.TestConfig.EigenDA.Deployer != "" && config.TestConfig.IsEigenDADeployed() {
+		config.Logger.Info("Registering relay URLs with actual ports", "urls", actualURLs)
+		config.TestConfig.RegisterRelays(config.EthClient, actualURLs, config.EthClient.GetAccountAddress())
+	}
+
+	// Now start each relay with its pre-created listener
+	for i, listener := range listeners {
+		instance, err := startRelayWithListener(ctx, i, actualURLs[i], listener, harness, config)
+		if err != nil {
+			// Clean up any relays we started and all remaining listeners
 			stopAllRelays(harness.RelayInstances, config.Logger)
-			return fmt.Errorf("failed to start relay %d (%s): %w", i, relayURL, err)
+			for j := i; j < len(listeners); j++ {
+				err := listeners[j].Close()
+				if err != nil {
+					config.Logger.Warn("Failed to close listener for relay", "index", j, "error", err)
+				}
+			}
+			return fmt.Errorf("failed to start relay %d (%s): %w", i, actualURLs[i], err)
 		}
 		harness.RelayInstances = append(harness.RelayInstances, instance)
-		config.Logger.Info("Started relay", "index", i, "url", relayURL, "port", instance.Port)
+		config.Logger.Info("Started relay", "index", i, "url", actualURLs[i])
 	}
 
 	return nil
@@ -226,20 +261,17 @@ func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) 
 	}
 }
 
-// startRelay starts a single relay with the given index and URL
-func startRelay(
+// startRelayWithListener starts a single relay with the given index, URL, and pre-created listener
+func startRelayWithListener(
 	ctx context.Context,
 	relayIndex int,
 	relayURL string,
+	listener net.Listener,
 	harness *DisperserHarness,
 	config DisperserHarnessConfig,
 ) (*RelayInstance, error) {
-	// Parse port from relayURL (format: "localhost:32035")
-	parts := strings.Split(relayURL, ":")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid relay URL format: %s", relayURL)
-	}
-	port := parts[1]
+	// Extract port from the listener's address
+	port := fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
 
 	// Create logs directory
 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
@@ -376,10 +408,10 @@ func startRelay(
 		return nil, fmt.Errorf("failed to create relay server: %w", err)
 	}
 
-	// Start the relay server in a goroutine
+	// Start the relay server in a goroutine using the pre-created listener
 	go func() {
-		relayLogger.Info("Starting relay server", "port", port)
-		if err := server.Start(ctx); err != nil {
+		relayLogger.Info("Starting relay server with listener", "port", port)
+		if err := server.StartWithListener(ctx, listener); err != nil {
 			relayLogger.Error("Relay server failed", "error", err)
 		}
 	}()
@@ -389,10 +421,11 @@ func startRelay(
 	relayLogger.Info("Relay server started successfully", "port", port, "logFile", logFilePath)
 
 	return &RelayInstance{
-		Server: server,
-		Port:   port,
-		URL:    relayURL,
-		Logger: relayLogger,
+		Server:   server,
+		Listener: listener,
+		Port:     port,
+		URL:      relayURL,
+		Logger:   relayLogger,
 	}, nil
 }
 
