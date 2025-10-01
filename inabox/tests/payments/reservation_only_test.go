@@ -92,7 +92,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 			[]core.QuorumID{0, 1},
 		)
 		require.NoError(t, err)
-		err = testHarness.UpdateReservation(t.Context(), t, initialReservation)
+		err = testHarness.UpdateReservationOnChain(t.Context(), t, initialReservation)
 		require.NoError(t, err)
 
 		// Wait for vault monitor to pick up changes
@@ -130,7 +130,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 			[]core.QuorumID{0, 1},
 		)
 		require.NoError(t, err)
-		err = testHarness.UpdateReservation(t.Context(), t, newReservation)
+		err = testHarness.UpdateReservationOnChain(t.Context(), t, newReservation)
 		require.NoError(t, err)
 
 		// the vault monitor checks every 1 second, so this should be plenty of time
@@ -171,7 +171,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 			[]core.QuorumID{0, 1},
 		)
 		require.NoError(t, err)
-		err = testHarness.UpdateReservation(t.Context(), t, initialReservation)
+		err = testHarness.UpdateReservationOnChain(t.Context(), t, initialReservation)
 		require.NoError(t, err)
 
 		// Wait for vault monitor to pick up changes
@@ -221,7 +221,7 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 			[]core.QuorumID{0, 1},
 		)
 		require.NoError(t, err)
-		err = testHarness.UpdateReservation(t.Context(), t, newReservation)
+		err = testHarness.UpdateReservationOnChain(t.Context(), t, newReservation)
 		require.NoError(t, err)
 
 		// the vault monitor checks every 1 second, so this should be plenty of time

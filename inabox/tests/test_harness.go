@@ -104,7 +104,7 @@ func (tc *TestHarness) Cleanup() {
 }
 
 // Updates the reservation for the test account on the PaymentVault contract
-func (tc *TestHarness) UpdateReservation(ctx context.Context, t *testing.T, r *reservation.Reservation) error {
+func (tc *TestHarness) UpdateReservationOnChain(ctx context.Context, t *testing.T, r *reservation.Reservation) error {
 	quorumNumbers := r.GetQuorumNumbers()
 	quorumSplits := calculateQuorumSplits(len(quorumNumbers))
 
