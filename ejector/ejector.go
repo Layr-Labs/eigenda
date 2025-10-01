@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -29,9 +30,11 @@ type Ejector struct {
 	// The freqeuency with which to evaluate validators for ejection.
 	period time.Duration
 
-	// The time window over which to evaluate signing rates. Validators that have not signed any batches
-	// in this time window are considered eligible for ejection.
-	ejectionTimeWindow time.Duration
+	// Defines the time window over which to evaluate signing metrics when deciding whether to eject a validator.
+	ejectionCriteriaTimeWindow time.Duration
+
+	// Used to convert validator IDs to validator addresses.
+	validatorIDToAddressCache *eth.ValidatorIDToAddressCache
 }
 
 // NewEjector creates a new Ejector.
@@ -42,14 +45,18 @@ func NewEjector(
 	signingRateLookupV1 SigningRateLookup,
 	signingRateLookupV2 SigningRateLookup,
 	period time.Duration,
-	ejectionTimeWindow time.Duration,
+	ejectionCriteriaTimeWindow time.Duration,
+	validatorIDToAddressCache *eth.ValidatorIDToAddressCache,
 ) *Ejector {
 	e := &Ejector{
-		ctx:                 ctx,
-		logger:              logger,
-		ejectionManager:     ejectionManager,
-		signingRateLookupV1: signingRateLookupV1,
-		signingRateLookupV2: signingRateLookupV2,
+		ctx:                        ctx,
+		logger:                     logger,
+		ejectionManager:            ejectionManager,
+		signingRateLookupV1:        signingRateLookupV1,
+		signingRateLookupV2:        signingRateLookupV2,
+		period:                     period,
+		ejectionCriteriaTimeWindow: ejectionCriteriaTimeWindow,
+		validatorIDToAddressCache:  validatorIDToAddressCache,
 	}
 
 	go e.mainLoop()
@@ -77,7 +84,7 @@ func (e *Ejector) mainLoop() {
 func (e *Ejector) evaluateValidators() {
 
 	v1SigningRates, err := e.signingRateLookupV1.GetSigningRates(
-		e.ejectionTimeWindow,
+		e.ejectionCriteriaTimeWindow,
 		nil, // all quorums
 		ProtocolVersionV1,
 		true, // omit perfect signers if possible
@@ -88,7 +95,7 @@ func (e *Ejector) evaluateValidators() {
 	}
 
 	v2SigningRates, err := e.signingRateLookupV2.GetSigningRates(
-		e.ejectionTimeWindow,
+		e.ejectionCriteriaTimeWindow,
 		nil, // all quorums
 		ProtocolVersionV2,
 		true, // omit perfect signers if possible
@@ -109,18 +116,27 @@ func (e *Ejector) evaluateValidators() {
 
 // evaluateValidator evaluates a single validator's signing rate and decides whether to eject it.
 func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate) {
-	ejectable := IsEjectable(signingRate)
-	if !ejectable {
+	if !IsEjectable(signingRate) {
 		return
 	}
 
-	validatorAddress, err := eth.ValidatorIDToAddress()
-
-	// TODO we need to get the mapping from validator ID to operator ID
-	// TODO log signing rates
+	validatorID := core.OperatorID(signingRate.GetValidatorId()[:])
+	validatorAddress, err := e.validatorIDToAddressCache.GetValidatorAddress(e.ctx, validatorID)
+	if err != nil {
+		e.logger.Error("error looking up validator address", "validatorID", signingRate.GetValidatorId(), "error", err)
+		return
+	}
 
 	e.logger.Info("Validator is eligible for ejection",
-		"validatorID", signingRate.GetValidatorId())
+		"validatorID", signingRate.GetValidatorId(),
+		"validatorAddress", validatorAddress.Hex(),
+		"signedBatches", signingRate.GetSignedBatches(),
+		"unsignedBatches", signingRate.GetUnsignedBatches(),
+		"signedBytes", signingRate.GetSignedBytes(),
+		"unsignedBytes", signingRate.GetUnsignedBytes(),
+	)
 
-	// e.ejectionManager.EjectValidator(core.OperatorID(signingRate.GetValidatorId()))
+	// The ejection manager is responsible for deduplicating ejection requests, and deciding if
+	// there are other factors that may prevent ejection (e.g. too many ejection attempts, etc.).
+	e.ejectionManager.EjectValidator(validatorAddress)
 }

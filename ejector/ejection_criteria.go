@@ -2,7 +2,6 @@ package ejector
 
 import (
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // Checks to see if a validator is eligible for ejection. A validator is considered to be eligible for ejection if
