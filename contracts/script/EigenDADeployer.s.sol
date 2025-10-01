@@ -272,9 +272,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             TransparentUpgradeableProxy(payable(address(socketRegistry))), address(socketRegistryImplementation)
         );
 
-        registryCoordinatorImplementation = new EigenDARegistryCoordinator(
-            IServiceManager(address(eigenDAServiceManager)), stakeRegistry, apkRegistry, indexRegistry, socketRegistry
-        );
+        registryCoordinatorImplementation = new EigenDARegistryCoordinator(address(eigenDADirectory));
 
         {
             IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams =

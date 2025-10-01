@@ -6,8 +6,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -106,7 +106,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ctx.GlobalInt(flags.ReservationPaymentsLedgerCacheSizeFlag.Name),
 		ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
 		// this doesn't need to be configurable. there are no plans to ever use a different value
-		reservation.OverfillOncePermitted,
+		ratelimit.OverfillOncePermitted,
 		paymentVaultUpdateInterval,
 	)
 	if err != nil {
