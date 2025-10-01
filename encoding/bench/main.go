@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -35,17 +36,19 @@ type Config struct {
 	NumRuns       uint64
 	CPUProfile    string
 	MemProfile    string
+	TraceFile     string
 	EnableVerify  bool
 }
 
 func parseFlags() Config {
 	config := Config{}
 	flag.StringVar(&config.OutputFile, "output", "benchmark_results.json", "Output file for results")
-	flag.Uint64Var(&config.MinBlobLength, "min-blob-length", 4096, "Minimum blob length (power of 2)")
+	flag.Uint64Var(&config.MinBlobLength, "min-blob-length", 524288, "Minimum blob length (power of 2)")
 	flag.Uint64Var(&config.MaxBlobLength, "max-blob-length", 524288, "Maximum blob length (power of 2)")
 	flag.Uint64Var(&config.NumChunks, "num-chunks", 8192, "Minimum number of chunks (power of 2)")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
+	flag.StringVar(&config.TraceFile, "trace", "trace.out", "Write execution trace to file")
 	flag.BoolVar(&config.EnableVerify, "enable-verify", false, "Verify blobs after encoding")
 	flag.Parse()
 	return config
@@ -100,6 +103,18 @@ func main() {
 			log.Fatal("could not start CPU profile: ", err)
 		}
 		defer pprof.StopCPUProfile()
+	}
+
+	if config.TraceFile != "" {
+		f, err := os.Create(config.TraceFile)
+		if err != nil {
+			log.Fatal("could not create trace file: ", err)
+		}
+		defer core.CloseLogOnError(f, f.Name(), nil)
+		if err := trace.Start(f); err != nil {
+			log.Fatal("could not start trace: ", err)
+		}
+		defer trace.Stop()
 	}
 
 	results := runBenchmark(p, &config)
