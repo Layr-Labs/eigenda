@@ -65,9 +65,6 @@ type Config struct {
 }
 
 func NewFromConfig(config Config) (*Committer, error) {
-	if !math.IsPowerOfTwo(config.SRSNumberToLoad) {
-		return nil, fmt.Errorf("SRSNumberToLoad must be a power of 2")
-	}
 	if config.G1SRSPath == "" {
 		return nil, fmt.Errorf("G1SRSPath is empty")
 	}
