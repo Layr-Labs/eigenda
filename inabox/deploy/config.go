@@ -14,6 +14,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	controllerGrpcPort = uint16(30000)
+)
+
 var logger = test.GetLogger()
 
 func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
@@ -221,7 +225,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e_v2_reservation",
 		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e_v2_ondemand",
 		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
-		DISPERSER_SERVER_CONTROLLER_ADDRESS:      "localhost:30000",
+		DISPERSER_SERVER_CONTROLLER_ADDRESS:      fmt.Sprintf("localhost:%d", controllerGrpcPort),
 
 		// V2 inabox test is setup with a client that doesn't setup a client for some reason,
 		// so it calls the grpc GetBlobCommitment to generate commitments.
@@ -367,7 +371,7 @@ func (env *Config) generateControllerVars(
 	if env.UseControllerMediatedPayments {
 		v.CONTROLLER_GRPC_SERVER_ENABLE = "true"
 		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "true"
-		v.CONTROLLER_GRPC_PORT = "30000"
+		v.CONTROLLER_GRPC_PORT = fmt.Sprintf("%d", controllerGrpcPort)
 		v.CONTROLLER_ON_DEMAND_PAYMENTS_TABLE_NAME = "e2e_v2_ondemand"
 		v.CONTROLLER_PAYMENT_VAULT_UPDATE_INTERVAL = "1s"
 	} else {
