@@ -19,10 +19,12 @@ func TestProveAllCosetThreads(t *testing.T) {
 	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
-	// TODO(samlaf): committer should have its own builder for loading SRS
-	// Or we should be loading SRS points completely separately and injecting
-	// them into the prover/committer/verifier.
-	c, err := committer.New(group.Srs.G1, group.Srs.G2, group.G2Trailing)
+	c, err := committer.NewFromConfig(committer.Config{
+		SRSNumberToLoad:   harness.proverV2KzgConfig.SRSNumberToLoad,
+		G1SRSPath:         harness.proverV2KzgConfig.G1Path,
+		G2SRSPath:         harness.proverV2KzgConfig.G2Path,
+		G2TrailingSRSPath: harness.proverV2KzgConfig.G2TrailingPath,
+	})
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))

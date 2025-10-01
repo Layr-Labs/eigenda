@@ -32,10 +32,12 @@ func TestEncoder(t *testing.T) {
 	p, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
-	// TODO(samlaf): committer should have its own builder for loading SRS
-	// Or we should be loading SRS points completely separately and injecting
-	// them into the prover/committer/verifier.
-	c, err := committer.New(p.Srs.G1, p.Srs.G2, p.G2Trailing)
+	c, err := committer.NewFromConfig(committer.Config{
+		SRSNumberToLoad:   harness.proverV2KzgConfig.SRSNumberToLoad,
+		G1SRSPath:         harness.proverV2KzgConfig.G1Path,
+		G2SRSPath:         harness.proverV2KzgConfig.G2Path,
+		G2TrailingSRSPath: harness.proverV2KzgConfig.G2TrailingPath,
+	})
 	require.NoError(t, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
