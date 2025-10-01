@@ -181,6 +181,7 @@ func SetupDisperserHarness(ctx context.Context, config DisperserHarnessConfig) (
 }
 
 // RelayInstance holds the state for a single relay
+// TODO(dmanc): This (or something similar) should live in the relay package instead of here.
 type RelayInstance struct {
 	Server   *relay.Server
 	Listener net.Listener
@@ -274,6 +275,7 @@ func startRelayWithListener(
 	port := fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
 
 	// Create logs directory
+	// TODO(dmanc): If possible we should have a centralized place for creating loggers and injecting them into the config.
 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create logs directory: %w", err)
@@ -342,6 +344,7 @@ func startRelayWithListener(
 	ics := thegraph.MakeIndexedChainState(thegraph.Config{}, cs, relayLogger)
 
 	// Create relay configuration
+	// TODO(dmanc): In addition to loggers, we should have a centralized place for setting up configuration and injecting it into the harness config.
 	relayConfig := &relay.Config{
 		RelayKeys:                  []v2.RelayKey{v2.RelayKey(relayIndex)}, // Serve data for any shard
 		GRPCPort:                   mustParsePort(port),

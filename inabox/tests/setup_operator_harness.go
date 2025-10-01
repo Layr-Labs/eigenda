@@ -33,6 +33,7 @@ import (
 )
 
 // OperatorInstance holds the state for a single operator
+// TODO(dmanc): This (or something similar)should live in the operator package instead of here.
 type OperatorInstance struct {
 	Node            *node.Node
 	Server          *grpc.Server
@@ -185,6 +186,7 @@ func (oh *OperatorHarness) startOperator(ctx context.Context, operatorIndex int)
 	}
 
 	// Create logs directory
+	// TODO(dmanc): If possible we should have a centralized place for creating loggers and injecting them into the config.
 	logsDir := fmt.Sprintf("testdata/%s/logs", oh.testName)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create logs directory: %w", err)
@@ -207,6 +209,7 @@ func (oh *OperatorHarness) startOperator(ctx context.Context, operatorIndex int)
 	// TODO(dmanc): The node config is quite a beast. This is a configuration that
 	// passed the tests after a bunch of trial and error.
 	// We really need better validation on the node constructor.
+	// TODO(dmanc): In addition to loggers, we should have a centralized place for creating configuration and injecting it into the harness config.
 	nodeConfig := &node.Config{
 		Hostname:                       "localhost",
 		RetrievalPort:                  retrievalPort,
