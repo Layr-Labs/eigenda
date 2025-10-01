@@ -3,6 +3,7 @@ package secondary
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -35,6 +36,7 @@ type ISecondary interface {
 	) ([]byte, error)
 	WriteSubscriptionLoop(ctx context.Context)
 	WriteOnCacheMissEnabled() bool
+	ErrorOnInsertFailure() bool
 }
 
 // PutNotify ... notification received by primary manager to perform insertion across
@@ -52,10 +54,11 @@ type SecondaryManager struct {
 	caches    []common.SecondaryStore
 	fallbacks []common.SecondaryStore
 
-	verifyLock       sync.RWMutex
-	topic            chan PutNotify
-	concurrentWrites bool
-	writeOnCacheMiss bool
+	verifyLock           sync.RWMutex
+	topic                chan PutNotify
+	concurrentWrites     bool
+	writeOnCacheMiss     bool
+	errorOnInsertFailure bool
 }
 
 // NewSecondaryManager ... creates a new secondary storage manager
@@ -65,17 +68,19 @@ func NewSecondaryManager(
 	caches []common.SecondaryStore,
 	fallbacks []common.SecondaryStore,
 	writeOnCacheMiss bool,
+	errorOnInsertFailure bool,
 ) ISecondary {
 	return &SecondaryManager{
 		topic: make(
 			chan PutNotify,
 		), // channel is un-buffered which dispersing consumption across routines helps alleviate
-		log:              log,
-		m:                m,
-		caches:           caches,
-		fallbacks:        fallbacks,
-		verifyLock:       sync.RWMutex{},
-		writeOnCacheMiss: writeOnCacheMiss,
+		log:                  log,
+		m:                    m,
+		caches:               caches,
+		fallbacks:            fallbacks,
+		verifyLock:           sync.RWMutex{},
+		writeOnCacheMiss:     writeOnCacheMiss,
+		errorOnInsertFailure: errorOnInsertFailure,
 	}
 }
 
@@ -100,14 +105,23 @@ func (sm *SecondaryManager) WriteOnCacheMissEnabled() bool {
 	return sm.CachingEnabled() && sm.writeOnCacheMiss
 }
 
+// ErrorOnInsertFailure returns whether secondary insertion failures should be returned as errors
+// to the client, rather than being silently logged.
+func (sm *SecondaryManager) ErrorOnInsertFailure() bool {
+	return sm.errorOnInsertFailure
+}
+
 // HandleRedundantWrites ... writes to both sets of backends (i.e, fallback, cache)
-// and returns an error if NONE of them succeed
+// and returns an error based on the errorOnInsertFailure configuration:
+//   - If errorOnInsertFailure is false (default): returns error only if ALL writes fail
+//   - If errorOnInsertFailure is true: returns error if ANY write fails
 func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitment []byte, value []byte) error {
 	sources := sm.caches
 	sources = append(sources, sm.fallbacks...)
 
 	key := crypto.Keccak256(commitment)
 	successes := 0
+	var errs []error
 
 	for _, src := range sources {
 		sm.log.Debug("Attempting to write to secondary storage", "backend", src.BackendType())
@@ -125,14 +139,22 @@ func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitmen
 		if err != nil {
 			sm.log.Warn("Failed to write to redundant target", "backend", src.BackendType(), "err", err)
 			cb(Failed)
+			errs = append(errs, fmt.Errorf("write to %s failed: %w", src.BackendType(), err))
 		} else {
 			successes++
 			cb(Success)
 		}
 	}
 
+	// If no writes succeeded at all, always return error
 	if successes == 0 {
-		return errors.New("failed to write blob to any redundant targets")
+		return fmt.Errorf("failed to write blob to any redundant targets: %w", errors.Join(errs...))
+	}
+
+	// If errorOnInsertFailure is enabled and any writes failed (partial success), return error
+	if sm.errorOnInsertFailure && len(errs) > 0 {
+		return fmt.Errorf("failed to write to %d of %d secondary targets (strict mode enabled): %w",
+			len(errs), len(sources), errors.Join(errs...))
 	}
 
 	return nil
