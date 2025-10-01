@@ -84,7 +84,13 @@ func (env *Config) deployEigenDAContracts() error {
 	}
 
 	envVars := make(map[string]string)
-	envVars["USER_RESERVATION_SYMBOLS_PER_SECOND"] = strconv.FormatUint(env.UserReservationSymbolsPerSecond, 10)
+
+	// If UserReservationSymbolsPerSecond is 0, then the setup script uses the absence of the env var to know that a
+	// default value should be used. This is done for backwards compatibility with preexisting tests that rely on
+	// the default value in the setup script.
+	if env.UserReservationSymbolsPerSecond > 0 {
+		envVars["USER_RESERVATION_SYMBOLS_PER_SECOND"] = strconv.FormatUint(env.UserReservationSymbolsPerSecond, 10)
+	}
 
 	// Create deployment config for testbed
 	deployConfig := testbed.DeploymentConfig{
