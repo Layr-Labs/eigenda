@@ -26,7 +26,7 @@ import (
 type Store struct {
 	log logging.Logger
 
-	// Dispersal related fields. disperser is is optional, and PUT routes will return 500s if not set.
+	// Dispersal related fields. disperser is optional, and PUT routes will return 500s if not set.
 	disperser *payloaddispersal.PayloadDisperser
 	// Number of times to try blob dispersals:
 	// - If > 0: Try N times total
