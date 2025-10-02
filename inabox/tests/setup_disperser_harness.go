@@ -10,28 +10,39 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay"
+	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/testcontainers/testcontainers-go"
 )
 
 // DisperserHarnessConfig contains the configuration for setting up the disperser harness
 type DisperserHarnessConfig struct {
-	Logger              logging.Logger
-	Network             *testcontainers.DockerNetwork
-	TestConfig          *deploy.Config
-	TestName            string
-	InMemoryBlobStore   bool
-	LocalStackPort      string
+	Network           *testcontainers.DockerNetwork
+	TestConfig        *deploy.Config
+	TestName          string
+	InMemoryBlobStore bool
+	LocalStackPort    string
+
+	// LocalStack resources for blobstore and metadata store
 	MetadataTableName   string
 	BucketTableName     string
 	S3BucketName        string // S3 bucket name for blob storage
 	MetadataTableNameV2 string
-	EthClient           common.EthClient
+
+	// Inject logger and eth client
+	Logger    logging.Logger
+	EthClient common.EthClient
 
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
@@ -47,7 +58,7 @@ type DisperserHarness struct {
 	S3Buckets struct {
 		BlobStore string
 	}
-	RelayInstances []*relay.Instance
+	RelayServers []*relay.Server
 }
 
 // setupLocalStackResources initializes LocalStack and deploys AWS resources
@@ -109,7 +120,7 @@ func setupDisperserKeypairAndRegistrations(config DisperserHarnessConfig) error 
 // (LocalStack, DynamoDB tables, S3 buckets, relays)
 func SetupDisperserHarness(ctx context.Context, config DisperserHarnessConfig) (*DisperserHarness, error) {
 	harness := &DisperserHarness{
-		RelayInstances: make([]*relay.Instance, 0),
+		RelayServers: make([]*relay.Server, 0),
 	}
 
 	// Set default values if not provided
@@ -213,7 +224,7 @@ func startRelays(ctx context.Context, harness *DisperserHarness, config Disperse
 		instance, err := startRelayWithListener(ctx, i, listener, harness, config)
 		if err != nil {
 			// Clean up any relays we started and all remaining listeners
-			stopAllRelays(harness.RelayInstances, config.Logger)
+			stopAllRelays(harness.RelayServers, config.Logger)
 			for j := i; j < len(listeners); j++ {
 				err := listeners[j].Close()
 				if err != nil {
@@ -222,7 +233,7 @@ func startRelays(ctx context.Context, harness *DisperserHarness, config Disperse
 			}
 			return fmt.Errorf("failed to start relay %d (%s): %w", i, actualURLs[i], err)
 		}
-		harness.RelayInstances = append(harness.RelayInstances, instance)
+		harness.RelayServers = append(harness.RelayServers, instance)
 		config.Logger.Info("Started relay", "index", i, "url", actualURLs[i])
 	}
 
@@ -232,9 +243,9 @@ func startRelays(ctx context.Context, harness *DisperserHarness, config Disperse
 // Cleanup releases resources held by the DisperserHarness (excluding shared network)
 func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) {
 	// Stop relay goroutines
-	if len(dh.RelayInstances) > 0 {
+	if len(dh.RelayServers) > 0 {
 		logger.Info("Stopping relay goroutines")
-		stopAllRelays(dh.RelayInstances, logger)
+		stopAllRelays(dh.RelayServers, logger)
 	}
 
 	if dh.LocalStack != nil {
@@ -252,7 +263,7 @@ func startRelayWithListener(
 	listener net.Listener,
 	harness *DisperserHarness,
 	config DisperserHarnessConfig,
-) (*relay.Instance, error) {
+) (*relay.Server, error) {
 	// Extract port from the listener's address
 	port := fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
 
@@ -283,57 +294,113 @@ func startRelayWithListener(
 	// Create AWS clients using LocalStack container's configuration
 	awsConfig := harness.LocalStack.GetAWSClientConfig()
 
-	// Create eth client config with RPC URL from deployer
+	// Create logger
+	logger, err := common.NewLogger(&loggerConfig)
+	if err != nil {
+		_ = logFile.Close()
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	// Create eth client config and client
 	ethClientConfig := geth.EthClientConfig{
 		RPCURLs:    []string{config.TestConfig.Deployers[0].RPC},
 		NumRetries: 2,
 	}
+	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
+	if err != nil {
+		_ = logFile.Close()
+		return nil, fmt.Errorf("failed to create eth client: %w", err)
+	}
 
-	// Create relay server dependencies
-	deps, err := relay.NewServerDependencies(
+	// Create DynamoDB client
+	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
+	if err != nil {
+		_ = logFile.Close()
+		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
+	}
+
+	// Create S3 client
+	s3Client, err := s3.NewClient(ctx, awsConfig, logger)
+	if err != nil {
+		_ = logFile.Close()
+		return nil, fmt.Errorf("failed to create s3 client: %w", err)
+	}
+
+	// Create metrics registry
+	metricsRegistry := prometheus.NewRegistry()
+
+	// Create metadata store
+	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.MetadataTableNameV2)
+	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+		ServiceName: "relay",
+		Registry:    metricsRegistry,
+		Backend:     blobstore.BackendDynamoDB,
+	})
+
+	// Create blob store and chunk reader
+	blobStore := blobstore.NewBlobStore(config.S3BucketName, s3Client, logger)
+	chunkReader := chunkstore.NewChunkReader(logger, s3Client, config.S3BucketName)
+
+	// Create eth writer
+	tx, err := eth.NewWriter(
+		logger,
+		ethClient,
+		config.TestConfig.EigenDA.OperatorStateRetriever,
+		config.TestConfig.EigenDA.ServiceManager)
+	if err != nil {
+		_ = logFile.Close()
+		return nil, fmt.Errorf("failed to create eth writer: %w", err)
+	}
+
+	// Create chain state
+	cs := eth.NewChainState(tx, ethClient)
+	ics := thegraph.MakeIndexedChainState(thegraph.Config{}, cs, logger)
+
+	// Create relay test configuration
+	relayConfig := relay.NewTestConfig(relayIndex)
+
+	// Create server
+	server, err := relay.NewServer(
 		ctx,
-		relay.ServerDependenciesConfig{
-			AWSConfig:                  awsConfig,
-			MetadataTableName:          config.MetadataTableNameV2,
-			BucketName:                 config.S3BucketName,
-			OperatorStateRetrieverAddr: config.TestConfig.EigenDA.OperatorStateRetriever,
-			ServiceManagerAddr:         config.TestConfig.EigenDA.ServiceManager,
-			ChainStateConfig:           thegraph.Config{},
-			EthClientConfig:            ethClientConfig,
-			LoggerConfig:               loggerConfig,
-		},
+		metricsRegistry,
+		logger,
+		relayConfig,
+		metadataStore,
+		blobStore,
+		chunkReader,
+		tx,
+		ics,
+		listener,
 	)
 	if err != nil {
 		_ = logFile.Close()
-		return nil, fmt.Errorf("failed to create relay server dependencies: %w", err)
+		return nil, fmt.Errorf("failed to create relay server: %w", err)
 	}
 
-	// Create relay test configuration (GRPCPort is ignored since listener is pre-created)
-	relayConfig := relay.NewTestConfig(relayIndex)
-
-	// Create and start the relay instance using the helper
-	instance, err := relay.NewInstanceWithDependencies(ctx, relayConfig, deps, listener)
-	if err != nil {
-		_ = logFile.Close()
-		return nil, fmt.Errorf("failed to create relay instance: %w", err)
-	}
+	// Start server in background
+	go func() {
+		logger.Info("Starting relay server", "address", listener.Addr().String(), "logFile", logFilePath)
+		if err := server.Start(ctx); err != nil {
+			logger.Error("Relay server failed", "error", err)
+		}
+	}()
 
 	// Wait for server to be ready
 	time.Sleep(100 * time.Millisecond)
-	deps.Logger.Info("Relay server started successfully", "port", port, "logFile", logFilePath)
+	logger.Info("Relay server started successfully", "port", port, "logFile", logFilePath)
 
-	return instance, nil
+	return server, nil
 }
 
-// stopAllRelays stops all relay instances
-func stopAllRelays(instances []*relay.Instance, logger logging.Logger) {
-	for i, instance := range instances {
-		if instance == nil {
+// stopAllRelays stops all relay servers
+func stopAllRelays(servers []*relay.Server, logger logging.Logger) {
+	for i, server := range servers {
+		if server == nil {
 			continue
 		}
-		logger.Info("Stopping relay", "index", i, "url", instance.URL)
-		if err := instance.Stop(); err != nil {
-			logger.Warn("Error stopping relay instance", "index", i, "error", err)
+		logger.Info("Stopping relay", "index", i)
+		if err := server.Stop(); err != nil {
+			logger.Warn("Error stopping relay server", "index", i, "error", err)
 		}
 	}
 }

@@ -70,8 +70,7 @@ func (m *MultiHomingClient) GetRPCInstance() (int, dacommon.EthClient) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if len(m.RPCs) == 0 {
-		m.Logger.Error("[MultiHomingClient] No RPC clients available - please check EthClientConfig.RPCURLs configuration")
-		panic("no RPC clients available")
+		m.Logger.Fatal("[MultiHomingClient] No RPC clients available - please check EthClientConfig.RPCURLs configuration")
 	}
 
 	index := m.GetTotalNumberRpcFault() % uint64(len(m.RPCs))

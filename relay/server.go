@@ -55,6 +55,9 @@ type Server struct {
 	// chunkRateLimiter enforces rate limits on GetChunk operations.
 	chunkRateLimiter *limiter.ChunkRateLimiter
 
+	// listener is the network listener for the gRPC server.
+	listener net.Listener
+
 	// grpcServer is the gRPC server.
 	grpcServer *grpc.Server
 
@@ -82,7 +85,11 @@ func NewServer(
 	chunkReader chunkstore.ChunkReader,
 	chainReader core.Reader,
 	ics core.IndexedChainState,
+	listener net.Listener,
 ) (*Server, error) {
+	if listener == nil {
+		return nil, errors.New("listener is required")
+	}
 	if chainReader == nil {
 		return nil, errors.New("chainReader is required")
 	}
@@ -147,7 +154,7 @@ func NewServer(
 		config.GetChunksRequestMaxPastAge,
 		config.GetChunksRequestMaxPastAge)
 
-	return &Server{
+	server := &Server{
 		config:           config,
 		logger:           logger.With("component", "RelayServer"),
 		metadataProvider: mp,
@@ -159,46 +166,26 @@ func NewServer(
 		replayGuardian:   replayGuardian,
 		metrics:          relayMetrics,
 		chainReader:      chainReader,
-	}, nil
-}
-
-// NewInstanceWithDependencies creates and starts a relay server instance with the given dependencies.
-// This is a convenience function that combines NewServer + StartAsInstanceWithListener.
-// The listener must be pre-created by the caller before calling this function.
-func NewInstanceWithDependencies(
-	ctx context.Context,
-	config *Config,
-	deps *ServerDependencies,
-	listener net.Listener,
-) (*Instance, error) {
-	if listener == nil {
-		return nil, errors.New("listener is required")
+		listener:         listener,
 	}
 
-	// Create the server
-	server, err := NewServer(
-		ctx,
-		deps.MetricsRegistry,
-		deps.Logger,
-		config,
-		deps.MetadataStore,
-		deps.BlobStore,
-		deps.ChunkReader,
-		deps.ChainReader,
-		deps.ChainState,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create relay server: %w", err)
-	}
+	// Setup gRPC server
+	opt := grpc.MaxRecvMsgSize(config.MaxGRPCMessageSize)
+	keepAliveConfig := grpc.KeepaliveParams(keepalive.ServerParameters{
+		MaxConnectionIdle:     config.MaxIdleConnectionAge,
+		MaxConnectionAge:      config.MaxConnectionAge,
+		MaxConnectionAgeGrace: config.MaxConnectionAgeGrace,
+	})
 
-	// Start the server with the listener
-	instance, err := server.StartAsInstanceWithListener(ctx, listener)
-	if err != nil {
-		_ = listener.Close()
-		return nil, fmt.Errorf("failed to start relay server: %w", err)
-	}
+	server.grpcServer = grpc.NewServer(opt, relayMetrics.GetGRPCServerOption(), keepAliveConfig)
+	reflection.Register(server.grpcServer)
+	pb.RegisterRelayServer(server.grpcServer, server)
 
-	return instance, nil
+	// Register Server for Health Checks
+	name := pb.Relay_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, server.grpcServer)
+
+	return server, nil
 }
 
 // GetBlob retrieves a blob stored by the relay.
@@ -578,8 +565,9 @@ func buildInsufficientGetChunksBandwidthError(
 		blobCount, chunkCount, requiredBandwidth, originalError))
 }
 
-// StartWithListener starts the server using the provided listener. This method will block until the server is stopped.
-func (s *Server) StartWithListener(ctx context.Context, listener net.Listener) error {
+// Start starts the server using the listener provided in the constructor.
+// This method will block until the server is stopped.
+func (s *Server) Start(ctx context.Context) error {
 	// Start metrics server if enabled
 	if s.config.EnableMetrics {
 		s.metrics.Start()
@@ -600,67 +588,12 @@ func (s *Server) StartWithListener(ctx context.Context, listener net.Listener) e
 	}
 
 	// Serve grpc requests
-	opt := grpc.MaxRecvMsgSize(s.config.MaxGRPCMessageSize)
-
-	keepAliveConfig := grpc.KeepaliveParams(keepalive.ServerParameters{
-		MaxConnectionIdle:     s.config.MaxIdleConnectionAge,
-		MaxConnectionAge:      s.config.MaxConnectionAge,
-		MaxConnectionAgeGrace: s.config.MaxConnectionAgeGrace,
-	})
-
-	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption(), keepAliveConfig)
-	reflection.Register(s.grpcServer)
-	pb.RegisterRelayServer(s.grpcServer, s)
-
-	// Register Server for Health Checks
-	name := pb.Relay_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, s.grpcServer)
-
-	s.logger.Info("GRPC Listening", "address", listener.Addr().String())
-	if err := s.grpcServer.Serve(listener); err != nil {
+	s.logger.Info("GRPC Listening", "address", s.listener.Addr().String())
+	if err := s.grpcServer.Serve(s.listener); err != nil {
 		return errors.New("could not start GRPC server")
 	}
 
 	return nil
-}
-
-// StartAsInstance creates a listener, starts the server in a goroutine, and returns an Instance
-// that can be used to manage the server lifecycle.
-func (s *Server) StartAsInstance(ctx context.Context) (*Instance, error) {
-	addr := fmt.Sprintf("0.0.0.0:%d", s.config.GRPCPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return nil, fmt.Errorf("could not start tcp listener on %s: %w", addr, err)
-	}
-
-	return s.StartAsInstanceWithListener(ctx, listener)
-}
-
-// StartAsInstanceWithListener starts the server with a pre-created listener in a goroutine,
-// and returns an Instance that can be used to manage the server lifecycle.
-func (s *Server) StartAsInstanceWithListener(ctx context.Context, listener net.Listener) (*Instance, error) {
-	// Extract the actual port from the listener
-	tcpAddr := listener.Addr().(*net.TCPAddr)
-	port := fmt.Sprintf("%d", tcpAddr.Port)
-	url := fmt.Sprintf("0.0.0.0:%s", port)
-
-	// Start the server in a goroutine
-	go func() {
-		s.logger.Info("Starting relay server", "url", url)
-		if err := s.StartWithListener(ctx, listener); err != nil {
-			s.logger.Error("Relay server failed", "error", err)
-		}
-	}()
-
-	instance := &Instance{
-		Server:   s,
-		Listener: listener,
-		Port:     port,
-		URL:      url,
-		Logger:   s.logger,
-	}
-
-	return instance, nil
 }
 
 func (s *Server) RefreshOnchainState(ctx context.Context) error {

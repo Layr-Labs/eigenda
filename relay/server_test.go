@@ -2,6 +2,8 @@ package relay
 
 import (
 	"encoding/binary"
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -139,6 +141,11 @@ func TestReadWriteBlobs(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	server, err := NewServer(
 		ctx,
 		prometheus.NewRegistry(),
@@ -148,13 +155,19 @@ func TestReadWriteBlobs(t *testing.T) {
 		blobStore,
 		nil, /* not used in this test*/
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 
-	instance, err := server.StartAsInstance(ctx)
-	require.NoError(t, err)
+	go func() {
+		_ = server.Start(ctx)
+	}()
+	time.Sleep(100 * time.Millisecond) // Give server time to start
+
 	defer func() {
-		err = instance.Stop()
+		err = server.Stop()
+		require.NoError(t, err)
+		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -224,6 +237,11 @@ func TestReadNonExistentBlob(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -234,13 +252,19 @@ func TestReadNonExistentBlob(t *testing.T) {
 		blobStore,
 		nil, /* not used in this test */
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 
-	instance, err := server.StartAsInstance(ctx)
-	require.NoError(t, err)
+	go func() {
+		_ = server.Start(ctx)
+	}()
+	time.Sleep(100 * time.Millisecond) // Give server time to start
+
 	defer func() {
-		err = instance.Stop()
+		err = server.Stop()
+		require.NoError(t, err)
+		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -286,6 +310,11 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayKeys = shardList
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -296,13 +325,19 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		blobStore,
 		nil, /* not used in this test*/
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 
-	instance, err := server.StartAsInstance(ctx)
-	require.NoError(t, err)
+	go func() {
+		_ = server.Start(ctx)
+	}()
+	time.Sleep(100 * time.Millisecond) // Give server time to start
+
 	defer func() {
-		err = instance.Stop()
+		err = server.Stop()
+		require.NoError(t, err)
+		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -426,6 +461,11 @@ func TestReadWriteChunks(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -436,13 +476,19 @@ func TestReadWriteChunks(t *testing.T) {
 		nil, /* not used in this test*/
 		chunkReader,
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 
-	instance, err := server.StartAsInstance(ctx)
-	require.NoError(t, err)
+	go func() {
+		_ = server.Start(ctx)
+	}()
+	time.Sleep(100 * time.Millisecond) // Give server time to start
+
 	defer func() {
-		err = instance.Stop()
+		err = server.Stop()
+		require.NoError(t, err)
+		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -648,6 +694,11 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -658,14 +709,20 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		nil, /* not used in this test */
 		chunkReader,
 		chainReader,
-		ics)
+		ics,
+		listener)
 	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 	require.NoError(t, err)
 
-	instance, err := server.StartAsInstance(ctx)
-	require.NoError(t, err)
+	go func() {
+		_ = server.Start(ctx)
+	}()
+	time.Sleep(100 * time.Millisecond) // Give server time to start
+
 	defer func() {
-		err = instance.Stop()
+		err = server.Stop()
+		require.NoError(t, err)
+		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -800,6 +857,11 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -810,13 +872,19 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		nil, /* not used in this test*/
 		chunkReader,
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 
-	instance, err := server.StartAsInstance(ctx)
-	require.NoError(t, err)
+	go func() {
+		_ = server.Start(ctx)
+	}()
+	time.Sleep(100 * time.Millisecond) // Give server time to start
+
 	defer func() {
-		err = instance.Stop()
+		err = server.Stop()
+		require.NoError(t, err)
+		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -1102,6 +1170,11 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -1112,14 +1185,20 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		nil, /* not used in this test */
 		chunkReader,
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 
-	instance, err := server.StartAsInstance(ctx)
-	require.NoError(t, err)
+	go func() {
+		_ = server.Start(ctx)
+	}()
+	time.Sleep(100 * time.Millisecond) // Give server time to start
+
 	defer func() {
-		err = instance.Stop()
+		err = server.Stop()
+		require.NoError(t, err)
+		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
