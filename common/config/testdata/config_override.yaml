@@ -4,6 +4,7 @@ Int8: -15
 Uint64: 200007
 Uint16: 20009
 Float64: -211.11
+Duration: 33m
 Bool: true
 
 Bar:

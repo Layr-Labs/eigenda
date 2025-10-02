@@ -12,7 +12,7 @@
   "Uint8": 110,
   "Float64": 111.11,
   "Float32": 112.12,
-  "Duration": "5s",
+  "Duration": "1h",
   "Bool": true,
   "Bar": {
     "A": "json bar A",

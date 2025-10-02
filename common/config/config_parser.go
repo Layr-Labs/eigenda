@@ -77,6 +77,9 @@ func ParseConfig[T VerifiableConfig](constructor func() T, envPrefix string, con
 		WeaklyTypedInput: true, // Allow automatic type conversion from strings (e.g., env vars)
 		Result:           target,
 		TagName:          "mapstructure",
+		DecodeHook: mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(), // Support time.Duration parsing from strings
+		),
 	}
 	decoder, err := mapstructure.NewDecoder(decoderConfig)
 	if err != nil {
@@ -216,7 +219,6 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 //
 // This function returns an error if any invalid environment variables are found.
 func checkForInvalidEnvVars(boundVars map[string]struct{}, envPrefix string) error {
-
 	if envPrefix == "" {
 		// Nothing we can do if there is no prefix.
 		return nil

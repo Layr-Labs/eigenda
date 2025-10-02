@@ -1,4 +1,4 @@
-String: "this value came from config.yml"
+String: "this value came from config.yaml"
 Int: 200
 Int64: 201
 Int32: 203
@@ -11,7 +11,7 @@ Uint16: 209
 Uint8: 210
 Float64: 211.11
 Float32: 212.12
-Duration: 213s
+Duration: 33m
 Bool: false
 
 Bar:

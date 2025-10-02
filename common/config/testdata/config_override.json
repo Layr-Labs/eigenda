@@ -5,6 +5,7 @@
   "Uint64": 100007,
   "Uint16": 10009,
   "Float64": -111.11,
+  "Duration": "1h",
   "Bool": false,
   "Bar": {
     "B": -125

@@ -15,7 +15,7 @@ Float32: 212.12
 Bool: false
 
 Recursive:
-  String: "this value also came from config.yml"
+  String: "this value also came from config.yaml"
   Int: 213
   Int64: 214
   Int32: 215

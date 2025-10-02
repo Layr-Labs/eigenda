@@ -15,8 +15,8 @@ requirements:
 
 1. All variables must be exported.
 2. Variables must all be "simple" types.
-    a. any primitive (int, float, string, etc.)
-    b. time.Duration
+    a. any primitive (`int`, `float`, `string`, etc.)
+    b. `time.Duration`
     b. nested structs that themselves only contain simple types (recursive type nested not permitted)
     c. pointers to any of the above
 3. The struct must implement the `config.VerifiableConfig` interface (see below).

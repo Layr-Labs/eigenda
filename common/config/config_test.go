@@ -83,6 +83,7 @@ func TestTOMLParsing(t *testing.T) {
 	require.Equal(t, uint8(10), foo.Uint8)
 	require.Equal(t, 11.11, foo.Float64)
 	require.Equal(t, float32(12.12), foo.Float32)
+	require.Equal(t, 5*time.Second, foo.Duration)
 	require.Equal(t, false, foo.Bool)
 
 	// Bar field
@@ -123,6 +124,7 @@ func TestJSONParsing(t *testing.T) {
 	require.Equal(t, uint8(110), foo.Uint8)
 	require.Equal(t, 111.11, foo.Float64)
 	require.Equal(t, float32(112.12), foo.Float32)
+	require.Equal(t, 1*time.Hour, foo.Duration)
 	require.Equal(t, true, foo.Bool)
 
 	// Bar field
@@ -164,6 +166,7 @@ func TestYAMLParsing(t *testing.T) {
 	require.Equal(t, uint8(210), foo.Uint8)
 	require.Equal(t, 211.11, foo.Float64)
 	require.Equal(t, float32(212.12), foo.Float32)
+	require.Equal(t, 33*time.Minute, foo.Duration)
 	require.Equal(t, false, foo.Bool)
 
 	// Bar field
@@ -205,6 +208,7 @@ func TestTOMLConfigOverride(t *testing.T) {
 	require.Equal(t, uint16(10009), foo.Uint16)                      // from override
 	require.Equal(t, uint8(10), foo.Uint8)                           // from base
 	require.Equal(t, -11.11, foo.Float64)                            // from override
+	require.Equal(t, 5*time.Second, foo.Duration)                    // from base
 	require.Equal(t, float32(12.12), foo.Float32)                    // from base
 	require.Equal(t, true, foo.Bool)                                 // from override
 
@@ -242,6 +246,7 @@ func TestJSONConfigOverride(t *testing.T) {
 	require.Equal(t, uint8(110), foo.Uint8)                          // from base
 	require.Equal(t, -111.11, foo.Float64)                           // from override
 	require.Equal(t, float32(112.12), foo.Float32)                   // from base
+	require.Equal(t, 1*time.Hour, foo.Duration)                      // from base
 	require.Equal(t, false, foo.Bool)                                // from override
 
 	// Bar field - mix of base and override
@@ -272,19 +277,20 @@ func TestYAMLConfigOverride(t *testing.T) {
 
 	// Top-level fields - mix of base and override
 	require.Equal(t, "this value came from config.yaml", foo.String) // from base
-	require.Equal(t, -200, foo.Int)                                 // from override
-	require.Equal(t, int64(201), foo.Int64)                         // from base
-	require.Equal(t, int32(-203), foo.Int32)                        // from override
-	require.Equal(t, int16(204), foo.Int16)                         // from base
-	require.Equal(t, int8(-15), foo.Int8)                           // from override
-	require.Equal(t, uint(206), foo.Uint)                           // from base
-	require.Equal(t, uint64(200007), foo.Uint64)                    // from override
-	require.Equal(t, uint32(208), foo.Uint32)                       // from base
-	require.Equal(t, uint16(20009), foo.Uint16)                     // from override
-	require.Equal(t, uint8(210), foo.Uint8)                         // from base
-	require.Equal(t, -211.11, foo.Float64)                          // from override
-	require.Equal(t, float32(212.12), foo.Float32)                  // from base
-	require.Equal(t, true, foo.Bool)                                // from override
+	require.Equal(t, -200, foo.Int)                                  // from override
+	require.Equal(t, int64(201), foo.Int64)                          // from base
+	require.Equal(t, int32(-203), foo.Int32)                         // from override
+	require.Equal(t, int16(204), foo.Int16)                          // from base
+	require.Equal(t, int8(-15), foo.Int8)                            // from override
+	require.Equal(t, uint(206), foo.Uint)                            // from base
+	require.Equal(t, uint64(200007), foo.Uint64)                     // from override
+	require.Equal(t, uint32(208), foo.Uint32)                        // from base
+	require.Equal(t, uint16(20009), foo.Uint16)                      // from override
+	require.Equal(t, uint8(210), foo.Uint8)                          // from base
+	require.Equal(t, -211.11, foo.Float64)                           // from override
+	require.Equal(t, float32(212.12), foo.Float32)                   // from base
+	require.Equal(t, 33*time.Minute, foo.Duration)                   // from base
+	require.Equal(t, true, foo.Bool)                                 // from override
 
 	// Bar field - mix of base and override
 	require.Equal(t, "yaml bar A", foo.Bar.A) // from base
@@ -408,6 +414,7 @@ func TestEnvironmentVariables(t *testing.T) {
 	require.Equal(t, uint8(10), foo.Uint8)             // from config
 	require.Equal(t, 11.11, foo.Float64)               // from config
 	require.Equal(t, float32(12.12), foo.Float32)      // from config
+	require.Equal(t, 5*time.Second, foo.Duration)      // from config
 	require.Equal(t, false, foo.Bool)                  // from config
 
 	// Bar field
