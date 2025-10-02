@@ -69,6 +69,11 @@ func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Addre
 func (m *MultiHomingClient) GetRPCInstance() (int, dacommon.EthClient) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if len(m.RPCs) == 0 {
+		m.Logger.Error("[MultiHomingClient] No RPC clients available - please check EthClientConfig.RPCURLs configuration")
+		panic("no RPC clients available")
+	}
+
 	index := m.GetTotalNumberRpcFault() % uint64(len(m.RPCs))
 	if index != m.lastRPCIndex {
 		m.Logger.Info("[MultiHomingClient] Switch RPC", "new index", index, "old index", m.lastRPCIndex)

@@ -151,12 +151,10 @@ func TestReadWriteBlobs(t *testing.T) {
 		ics)
 	require.NoError(t, err)
 
-	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
-	}()
+	instance, err := server.StartAsInstance(ctx)
+	require.NoError(t, err)
 	defer func() {
-		err = server.Stop()
+		err = instance.Stop()
 		require.NoError(t, err)
 	}()
 
@@ -239,12 +237,10 @@ func TestReadNonExistentBlob(t *testing.T) {
 		ics)
 	require.NoError(t, err)
 
-	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
-	}()
+	instance, err := server.StartAsInstance(ctx)
+	require.NoError(t, err)
 	defer func() {
-		err = server.Stop()
+		err = instance.Stop()
 		require.NoError(t, err)
 	}()
 
@@ -303,12 +299,10 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		ics)
 	require.NoError(t, err)
 
-	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
-	}()
+	instance, err := server.StartAsInstance(ctx)
+	require.NoError(t, err)
 	defer func() {
-		err = server.Stop()
+		err = instance.Stop()
 		require.NoError(t, err)
 	}()
 
@@ -445,12 +439,10 @@ func TestReadWriteChunks(t *testing.T) {
 		ics)
 	require.NoError(t, err)
 
-	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
-	}()
+	instance, err := server.StartAsInstance(ctx)
+	require.NoError(t, err)
 	defer func() {
-		err = server.Stop()
+		err = instance.Stop()
 		require.NoError(t, err)
 	}()
 
@@ -670,12 +662,10 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 	require.NoError(t, err)
 
-	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
-	}()
+	instance, err := server.StartAsInstance(ctx)
+	require.NoError(t, err)
 	defer func() {
-		err = server.Stop()
+		err = instance.Stop()
 		require.NoError(t, err)
 	}()
 
@@ -823,12 +813,10 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		ics)
 	require.NoError(t, err)
 
-	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
-	}()
+	instance, err := server.StartAsInstance(ctx)
+	require.NoError(t, err)
 	defer func() {
-		err = server.Stop()
+		err = instance.Stop()
 		require.NoError(t, err)
 	}()
 
@@ -1128,12 +1116,10 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	require.NoError(t, err)
 	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 
-	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
-	}()
+	instance, err := server.StartAsInstance(ctx)
+	require.NoError(t, err)
 	defer func() {
-		err = server.Stop()
+		err = instance.Stop()
 		require.NoError(t, err)
 	}()
 

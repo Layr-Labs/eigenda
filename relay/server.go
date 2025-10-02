@@ -83,7 +83,6 @@ func NewServer(
 	chainReader core.Reader,
 	ics core.IndexedChainState,
 ) (*Server, error) {
-
 	if chainReader == nil {
 		return nil, errors.New("chainReader is required")
 	}
@@ -161,6 +160,45 @@ func NewServer(
 		metrics:          relayMetrics,
 		chainReader:      chainReader,
 	}, nil
+}
+
+// NewInstanceWithDependencies creates and starts a relay server instance with the given dependencies.
+// This is a convenience function that combines NewServer + StartAsInstanceWithListener.
+// The listener must be pre-created by the caller before calling this function.
+func NewInstanceWithDependencies(
+	ctx context.Context,
+	config *Config,
+	deps *ServerDependencies,
+	listener net.Listener,
+) (*Instance, error) {
+	if listener == nil {
+		return nil, errors.New("listener is required")
+	}
+
+	// Create the server
+	server, err := NewServer(
+		ctx,
+		deps.MetricsRegistry,
+		deps.Logger,
+		config,
+		deps.MetadataStore,
+		deps.BlobStore,
+		deps.ChunkReader,
+		deps.ChainReader,
+		deps.ChainState,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create relay server: %w", err)
+	}
+
+	// Start the server with the listener
+	instance, err := server.StartAsInstanceWithListener(ctx, listener)
+	if err != nil {
+		_ = listener.Close()
+		return nil, fmt.Errorf("failed to start relay server: %w", err)
+	}
+
+	return instance, nil
 }
 
 // GetBlob retrieves a blob stored by the relay.
@@ -586,15 +624,43 @@ func (s *Server) StartWithListener(ctx context.Context, listener net.Listener) e
 	return nil
 }
 
-// Start starts the server listening for requests. This method will block until the server is stopped.
-func (s *Server) Start(ctx context.Context) error {
+// StartAsInstance creates a listener, starts the server in a goroutine, and returns an Instance
+// that can be used to manage the server lifecycle.
+func (s *Server) StartAsInstance(ctx context.Context) (*Instance, error) {
 	addr := fmt.Sprintf("0.0.0.0:%d", s.config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("could not start tcp listener on %s: %w", addr, err)
+		return nil, fmt.Errorf("could not start tcp listener on %s: %w", addr, err)
 	}
 
-	return s.StartWithListener(ctx, listener)
+	return s.StartAsInstanceWithListener(ctx, listener)
+}
+
+// StartAsInstanceWithListener starts the server with a pre-created listener in a goroutine,
+// and returns an Instance that can be used to manage the server lifecycle.
+func (s *Server) StartAsInstanceWithListener(ctx context.Context, listener net.Listener) (*Instance, error) {
+	// Extract the actual port from the listener
+	tcpAddr := listener.Addr().(*net.TCPAddr)
+	port := fmt.Sprintf("%d", tcpAddr.Port)
+	url := fmt.Sprintf("0.0.0.0:%s", port)
+
+	// Start the server in a goroutine
+	go func() {
+		s.logger.Info("Starting relay server", "url", url)
+		if err := s.StartWithListener(ctx, listener); err != nil {
+			s.logger.Error("Relay server failed", "error", err)
+		}
+	}()
+
+	instance := &Instance{
+		Server:   s,
+		Listener: listener,
+		Port:     port,
+		URL:      url,
+		Logger:   s.logger,
+	}
+
+	return instance, nil
 }
 
 func (s *Server) RefreshOnchainState(ctx context.Context) error {
