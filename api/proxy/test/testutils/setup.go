@@ -146,9 +146,10 @@ type TestConfig struct {
 	WriteThreadCount int
 	WriteOnCacheMiss bool
 	// at most one of the below options should be true
-	UseKeccak256ModeS3 bool
-	UseS3Caching       bool
-	UseS3Fallback      bool
+	UseKeccak256ModeS3          bool
+	UseS3Caching                bool
+	UseS3Fallback               bool
+	ErrorOnSecondaryInsertFailure bool
 
 	ClientLedgerMode     clientledger.ClientLedgerMode
 	VaultMonitorInterval time.Duration
@@ -176,18 +177,19 @@ func NewTestConfig(
 			OpKeccakCommitment:  true,
 			StandardCommitment:  true,
 		},
-		BackendsToEnable:     backendsToEnable,
-		DispersalBackend:     dispersalBackend,
-		Backend:              backend,
-		Retrievers:           []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
-		Expiration:           14 * 24 * time.Hour,
-		UseKeccak256ModeS3:   false,
-		UseS3Caching:         false,
-		UseS3Fallback:        false,
-		WriteThreadCount:     0,
-		WriteOnCacheMiss:     false,
-		ClientLedgerMode:     clientledger.ClientLedgerModeLegacy,
-		VaultMonitorInterval: 30 * time.Second,
+		BackendsToEnable:              backendsToEnable,
+		DispersalBackend:              dispersalBackend,
+		Backend:                       backend,
+		Retrievers:                    []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
+		Expiration:                    14 * 24 * time.Hour,
+		UseKeccak256ModeS3:            false,
+		UseS3Caching:                  false,
+		UseS3Fallback:                 false,
+		WriteThreadCount:              0,
+		WriteOnCacheMiss:              false,
+		ErrorOnSecondaryInsertFailure: false,
+		ClientLedgerMode:              clientledger.ClientLedgerModeLegacy,
+		VaultMonitorInterval:          30 * time.Second,
 	}
 }
 
@@ -267,10 +269,11 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	}
 	builderConfig := builder.Config{
 		StoreConfig: store.Config{
-			AsyncPutWorkers:  testCfg.WriteThreadCount,
-			BackendsToEnable: testCfg.BackendsToEnable,
-			DispersalBackend: testCfg.DispersalBackend,
-			WriteOnCacheMiss: testCfg.WriteOnCacheMiss,
+			AsyncPutWorkers:               testCfg.WriteThreadCount,
+			BackendsToEnable:              testCfg.BackendsToEnable,
+			DispersalBackend:              testCfg.DispersalBackend,
+			WriteOnCacheMiss:              testCfg.WriteOnCacheMiss,
+			ErrorOnSecondaryInsertFailure: testCfg.ErrorOnSecondaryInsertFailure,
 		},
 		ClientConfigV1: common.ClientConfigV1{
 			EdaClientCfg: clients.EigenDAClientConfig{

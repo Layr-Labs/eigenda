@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -344,6 +346,197 @@ func testProxyWriteCacheOnMiss(t *testing.T, dispersalBackend common.EigenDABack
 	exists, err = testutils.ExistsBlobInfotInBucket(tsConfig.StoreBuilderConfig.S3Config.Bucket, blobInfo)
 	require.NoError(t, err)
 	require.True(t, exists)
+}
+
+// TestErrorOnSecondaryInsertFailureFlagOffV1 verifies that when the flag is OFF (default),
+// secondary storage write failures are logged but don't cause the PUT to fail.
+func TestErrorOnSecondaryInsertFailureFlagOffV1(t *testing.T) {
+	testErrorOnSecondaryInsertFailureFlagOff(t, common.V1EigenDABackend)
+}
+
+func TestErrorOnSecondaryInsertFailureFlagOffV2(t *testing.T) {
+	testErrorOnSecondaryInsertFailureFlagOff(t, common.V2EigenDABackend)
+}
+
+func testErrorOnSecondaryInsertFailureFlagOff(t *testing.T, dispersalBackend common.EigenDABackend) {
+	t.Parallel()
+
+	if testutils.GetBackend() != testutils.MemstoreBackend {
+		t.Skip("test only runs with memstore backend")
+	}
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
+	// Use S3 as fallback with invalid credentials to simulate S3 failure
+	testCfg.UseS3Fallback = true
+	testCfg.ErrorOnSecondaryInsertFailure = false // default: OFF
+
+	// Create a test suite with invalid S3 config to force secondary write failures
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	// Override S3 config with invalid credentials to force write failures
+	tsConfig.StoreBuilderConfig.S3Config = s3.Config{
+		Bucket:          "invalid-bucket-name",
+		Endpoint:        "invalid-endpoint:9000",
+		AccessKeyID:     "invalid-key",
+		AccessKeySecret: "invalid-secret",
+		EnableTLS:       false,
+		CredentialType:  s3.CredentialTypeStatic,
+	}
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	testBlob := testutils.RandBytes(100)
+
+	cfg := &standard_client.Config{
+		URL: ts.RestAddress(),
+	}
+	daClient := standard_client.New(cfg)
+
+	// PUT should succeed even though S3 write fails (flag is OFF)
+	t.Log("Setting data - should succeed despite S3 failure")
+	blobInfo, err := daClient.SetData(ts.Ctx, testBlob)
+	require.NoError(t, err, "PUT should succeed when error-on-secondary-insert-failure=false")
+
+	// GET should still work (primary storage succeeded)
+	t.Log("Getting data back from primary storage")
+	retrievedBlob, err := daClient.GetData(ts.Ctx, blobInfo)
+	require.NoError(t, err)
+	require.Equal(t, testBlob, retrievedBlob)
+}
+
+// TestErrorOnSecondaryInsertFailureFlagOnV1 verifies that when the flag is ON,
+// secondary storage write failures cause the PUT to return HTTP 500.
+func TestErrorOnSecondaryInsertFailureFlagOnV1(t *testing.T) {
+	testErrorOnSecondaryInsertFailureFlagOn(t, common.V1EigenDABackend)
+}
+
+func TestErrorOnSecondaryInsertFailureFlagOnV2(t *testing.T) {
+	testErrorOnSecondaryInsertFailureFlagOn(t, common.V2EigenDABackend)
+}
+
+func testErrorOnSecondaryInsertFailureFlagOn(t *testing.T, dispersalBackend common.EigenDABackend) {
+	t.Parallel()
+
+	if testutils.GetBackend() != testutils.MemstoreBackend {
+		t.Skip("test only runs with memstore backend")
+	}
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
+	// Use S3 as fallback with invalid credentials to simulate S3 failure
+	testCfg.UseS3Fallback = true
+	testCfg.ErrorOnSecondaryInsertFailure = true // Enable flag
+
+	// Ensure async writes are disabled (required for flag to work)
+	testCfg.WriteThreadCount = 0
+
+	// Create a test suite with invalid S3 config to force secondary write failures
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	// Override S3 config with invalid credentials to force write failures
+	tsConfig.StoreBuilderConfig.S3Config = s3.Config{
+		Bucket:          "invalid-bucket-name",
+		Endpoint:        "invalid-endpoint:9000",
+		AccessKeyID:     "invalid-key",
+		AccessKeySecret: "invalid-secret",
+		EnableTLS:       false,
+		CredentialType:  s3.CredentialTypeStatic,
+	}
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	testBlob := testutils.RandBytes(100)
+
+	cfg := &standard_client.Config{
+		URL: ts.RestAddress(),
+	}
+	daClient := standard_client.New(cfg)
+
+	// PUT should fail because S3 write fails and flag is ON
+	t.Log("Setting data - should fail due to S3 failure with flag enabled")
+	_, err := daClient.SetData(ts.Ctx, testBlob)
+	require.Error(t, err, "PUT should fail when error-on-secondary-insert-failure=true and S3 fails")
+
+	// Error should indicate it's a server error (5xx)
+	require.Contains(t, err.Error(), "500", "Expected HTTP 500 error")
+}
+
+// TestErrorOnSecondaryInsertFailureSuccessV1 verifies that when the flag is ON
+// and all secondary writes succeed, the PUT succeeds normally.
+func TestErrorOnSecondaryInsertFailureSuccessV1(t *testing.T) {
+	testErrorOnSecondaryInsertFailureSuccess(t, common.V1EigenDABackend)
+}
+
+func TestErrorOnSecondaryInsertFailureSuccessV2(t *testing.T) {
+	testErrorOnSecondaryInsertFailureSuccess(t, common.V2EigenDABackend)
+}
+
+func testErrorOnSecondaryInsertFailureSuccess(t *testing.T, dispersalBackend common.EigenDABackend) {
+	t.Parallel()
+
+	if testutils.GetBackend() != testutils.MemstoreBackend {
+		t.Skip("test only runs with memstore backend")
+	}
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
+	// Use S3 with VALID credentials
+	testCfg.UseS3Fallback = true
+	testCfg.ErrorOnSecondaryInsertFailure = true // Enable flag
+
+	// Ensure async writes are disabled (required for flag to work)
+	testCfg.WriteThreadCount = 0
+
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	testBlob := testutils.RandBytes(100)
+
+	cfg := &standard_client.Config{
+		URL: ts.RestAddress(),
+	}
+	daClient := standard_client.New(cfg)
+
+	// PUT should succeed because both primary and S3 succeed
+	t.Log("Setting data - should succeed with valid S3 config")
+	blobInfo, err := daClient.SetData(ts.Ctx, testBlob)
+	require.NoError(t, err, "PUT should succeed when all storage backends work")
+
+	// GET should work
+	t.Log("Getting data back")
+	retrievedBlob, err := daClient.GetData(ts.Ctx, blobInfo)
+	require.NoError(t, err)
+	require.Equal(t, testBlob, retrievedBlob)
+}
+
+// TestErrorOnSecondaryInsertFailureWithAsyncWritesInvalid verifies that
+// attempting to enable the flag with async writes causes configuration validation error.
+func TestErrorOnSecondaryInsertFailureWithAsyncWritesInvalid(t *testing.T) {
+	backend := testutils.GetBackend()
+	if backend != testutils.MemstoreBackend {
+		t.Skip("test only runs with memstore backend")
+	}
+
+	testCfg := testutils.NewTestConfig(backend, common.V2EigenDABackend, nil)
+	testCfg.UseS3Fallback = true
+	testCfg.ErrorOnSecondaryInsertFailure = true // Enable flag
+	testCfg.WriteThreadCount = 5                 // Enable async writes (INVALID)
+
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+
+	// Creating test suite should fail due to config validation
+	defer func() {
+		if r := recover(); r != nil {
+			errMsg := fmt.Sprintf("%v", r)
+			require.Contains(t, errMsg, "requires synchronous writes",
+				"Expected config validation error about synchronous writes requirement")
+			t.Log("Config validation correctly rejected invalid configuration")
+		} else {
+			t.Fatal("Expected panic due to invalid config, but test suite was created successfully")
+		}
+	}()
+
+	_, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
 }
 
 func TestProxyMemConfigClientCanGetAndPatchV1(t *testing.T) {
