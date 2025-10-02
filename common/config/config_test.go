@@ -386,16 +386,16 @@ func TestEnvironmentVariables(t *testing.T) {
 	configFile := "testdata/config.toml"
 
 	// Set environment variables to override some config values.
-	os.Setenv("PREFIX_STRING", "value from env var")
-	os.Setenv("PREFIX_INT", "-999")
-	os.Setenv("PREFIX_BAR_B", "-777")
-	os.Setenv("PREFIX_BAR_BAZ_X", "env var bar baz X")
-	os.Setenv("PREFIX_BAR_BAZ_Y", "444")
-	os.Setenv("PREFIX_BAR_BAZ_Z", "false")
-	os.Setenv("PREFIX_INT64", "0") // zero value
-	os.Setenv("PREFIX_INT32", "0") // zero value
+	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
+	require.NoError(t, os.Setenv("PREFIX_INT", "-999"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_B", "-777"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_BAZ_X", "env var bar baz X"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_BAZ_Y", "444"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_BAZ_Z", "false"))
+	require.NoError(t, os.Setenv("PREFIX_INT64", "0")) // zero value
+	require.NoError(t, os.Setenv("PREFIX_INT32", "0")) // zero value
 
-	os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored")
+	require.NoError(t, os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored"))
 
 	foo, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
 	require.NoError(t, err)
@@ -440,20 +440,20 @@ func TestInvalidEnvironmentVariable(t *testing.T) {
 	configFile := "testdata/config.toml"
 
 	// Set environment variables to override some config values.
-	os.Setenv("PREFIX_STRING", "value from env var")
-	os.Setenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED", "should not be ignored")
+	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
+	require.NoError(t, os.Setenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED", "should not be ignored"))
 
 	_, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
 	require.Error(t, err)
 
-	os.Unsetenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED")
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED"))
 }
 
 func TestVerificaitonFailure(t *testing.T) {
 	configFile := "testdata/config.toml"
 
 	// Set environment variables to override some config values.
-	os.Setenv("PREFIX_STRING", "invalid") // will cause verification to fail
+	require.NoError(t, os.Setenv("PREFIX_STRING", "invalid")) // will cause verification to fail
 
 	_, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
 	require.Error(t, err)

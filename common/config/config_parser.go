@@ -170,7 +170,7 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 		name := strings.ToLower(field.Name)
 		keyPath := append(path, name)
 
-		switch field.Type.Kind() {
+		switch field.Type.Kind() { //nolint:exhaustive // only handling struct and pointer types
 
 		case reflect.Struct:
 			// Recurse for nested structs
@@ -198,14 +198,14 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 				env := prefix + "_" + strings.ToUpper(strings.ReplaceAll(strings.Join(keyPath, "_"), ".", "_"))
 				boundVars[env] = struct{}{}
 				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
 				}
 			}
 		default:
 			env := prefix + "_" + strings.ToUpper(strings.ReplaceAll(strings.Join(keyPath, "_"), ".", "_"))
 			boundVars[env] = struct{}{}
 			if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
 			}
 		}
 	}
