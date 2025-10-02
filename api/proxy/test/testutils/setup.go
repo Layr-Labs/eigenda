@@ -146,9 +146,9 @@ type TestConfig struct {
 	WriteThreadCount int
 	WriteOnCacheMiss bool
 	// at most one of the below options should be true
-	UseKeccak256ModeS3          bool
-	UseS3Caching                bool
-	UseS3Fallback               bool
+	UseKeccak256ModeS3            bool
+	UseS3Caching                  bool
+	UseS3Fallback                 bool
 	ErrorOnSecondaryInsertFailure bool
 
 	ClientLedgerMode     clientledger.ClientLedgerMode
