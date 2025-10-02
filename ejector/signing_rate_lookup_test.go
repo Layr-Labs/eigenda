@@ -25,13 +25,13 @@ func TestDataApiLookup(t *testing.T) {
 	sortByUnsignedBytesDescending(signingRates)
 
 	for i, rate := range signingRates {
-		validatorID := core.OperatorID(rate.ValidatorId)
+		validatorID := core.OperatorID(rate.GetValidatorId())
 
 		fmt.Printf("%d: %s\n", i, validatorID.Hex())
-		fmt.Printf("        SignedBatches: %d\n", rate.SignedBatches)
-		fmt.Printf("        UnsignedBatches: %d\n", rate.UnsignedBatches)
-		fmt.Printf("        SignedBytes: %d\n", rate.SignedBytes)
-		fmt.Printf("        UnsignedBytes: %d\n", rate.UnsignedBytes)
-		fmt.Printf("        SigningLatency: %d\n", rate.SigningLatency)
+		fmt.Printf("        SignedBatches: %d\n", rate.GetSignedBatches())
+		fmt.Printf("        UnsignedBatches: %d\n", rate.GetUnsignedBatches())
+		fmt.Printf("        SignedBytes: %d\n", rate.GetSignedBytes())
+		fmt.Printf("        UnsignedBytes: %d\n", rate.GetUnsignedBytes())
+		fmt.Printf("        SigningLatency: %d\n", rate.GetSigningLatency())
 	}
 }

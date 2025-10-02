@@ -138,5 +138,5 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 
 	// The ejection manager is responsible for deduplicating ejection requests, and deciding if
 	// there are other factors that may prevent ejection (e.g. too many ejection attempts, etc.).
-	e.ejectionManager.EjectValidator(validatorAddress)
+	_ = e.ejectionManager.EjectValidator(validatorAddress)
 }

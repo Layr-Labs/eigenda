@@ -104,7 +104,9 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 	if err != nil {
 		return nil, fmt.Errorf("error sending HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -138,7 +140,7 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 	for _, data := range response.Data {
 
 		if len(quorumSet) > 0 {
-			if _, ok := quorumSet[core.QuorumID(data.QuorumId)]; !ok {
+			if _, ok := quorumSet[data.QuorumId]; !ok {
 				// This quorum is not in the requested set, skip it.
 				continue
 			}
@@ -149,9 +151,9 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 			return nil, fmt.Errorf("error translating dataapi rate to proto: %w", err)
 		}
 
-		signingRateMap[core.OperatorID(signingRate.ValidatorId)] =
+		signingRateMap[core.OperatorID(signingRate.GetValidatorId())] =
 			combineSigningRates(
-				signingRateMap[core.OperatorID(signingRate.ValidatorId)],
+				signingRateMap[core.OperatorID(signingRate.GetValidatorId())],
 				signingRate)
 	}
 
@@ -208,7 +210,9 @@ func (srl *dynamoSigningRateLookup) getV2SigningRates(
 	if err != nil {
 		return nil, fmt.Errorf("error sending HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -241,7 +245,7 @@ func (srl *dynamoSigningRateLookup) getV2SigningRates(
 
 	for _, data := range response.OperatorSigningInfo {
 		if len(quorumSet) > 0 {
-			if _, ok := quorumSet[core.QuorumID(data.QuorumId)]; !ok {
+			if _, ok := quorumSet[data.QuorumId]; !ok {
 				// This quorum is not in the requested set, skip it.
 				continue
 			}
@@ -252,9 +256,9 @@ func (srl *dynamoSigningRateLookup) getV2SigningRates(
 			return nil, fmt.Errorf("error translating dataapi rate to proto: %w", err)
 		}
 
-		signingRateMap[core.OperatorID(signingRate.ValidatorId)] =
+		signingRateMap[core.OperatorID(signingRate.GetValidatorId())] =
 			combineSigningRates(
-				signingRateMap[core.OperatorID(signingRate.ValidatorId)],
+				signingRateMap[core.OperatorID(signingRate.GetValidatorId())],
 				signingRate)
 	}
 
