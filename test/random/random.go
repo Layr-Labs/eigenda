@@ -250,3 +250,13 @@ func (r *TestRandom) Float64Range(min, max float64) float64 {
 func (r *TestRandom) DurationRange(min time.Duration, max time.Duration) time.Duration {
 	return time.Duration(r.Int63n(int64(max-min))) + min
 }
+
+// FrElements generates a slice of num random field elements.
+func (r *TestRandom) FrElements(num uint64) []fr.Element {
+	elements := make([]fr.Element, num)
+	for i := range num {
+		b := r.Bytes(fr.Bytes)
+		_ = elements[i].SetBytes(b)
+	}
+	return elements
+}
