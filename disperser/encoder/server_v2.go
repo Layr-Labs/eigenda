@@ -86,6 +86,11 @@ func (s *EncoderServerV2) Start() error {
 		log.Fatalf("Could not start tcp listener: %v", err)
 	}
 
+	return s.StartWithListener(listener)
+}
+
+// StartWithListener starts the server using the provided listener. This method will block until the server is stopped.
+func (s *EncoderServerV2) StartWithListener(listener net.Listener) error {
 	gs := grpc.NewServer(
 		grpc.UnaryInterceptor(
 			s.grpcMetrics.UnaryServerInterceptor(),

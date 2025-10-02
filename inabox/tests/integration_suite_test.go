@@ -61,11 +61,10 @@ func setupSuite(logger logging.Logger) error {
 
 	// Setup the global infrastructure
 	config := &integration.InfrastructureConfig{
-		TemplateName:      templateName,
-		TestName:          testName,
-		InMemoryBlobStore: inMemoryBlobStore,
-		Logger:            logger,
-		RelayCount:        4,
+		TemplateName: templateName,
+		TestName:     testName,
+		Logger:       logger,
+		RelayCount:   4,
 	}
 	var err error
 	globalInfra, err = integration.SetupInfrastructure(context.Background(), config)
