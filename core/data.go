@@ -42,10 +42,10 @@ type ChunkEncodingFormat = uint8
 type BundleEncodingFormat = uint8
 
 const (
-	// We use uint8 to count the number of quorums, so we can have at most 255 quorums,
-	// which means the max ID can not be larger than 254 (from 0 to 254, there are 255
-	// different IDs).
-	MaxQuorumID = 254
+	// This value should always match the onchain MAX_QUORUM_COUNT value in the EigenDARegistryCoordinator.
+	// https://github.com/Layr-Labs/eigenda/blob/00cc8868b7e2d742fc6584dc1dea312193c8d4c2/contracts/src/core/EigenDARegistryCoordinatorStorage.sol#L36
+	// There are at most 192 quorum numbers, meaning the allowed IDs are [0,191].
+	MaxQuorumID = 191
 
 	// How many bits for the bundle's header.
 	NumBundleHeaderBits = 64
