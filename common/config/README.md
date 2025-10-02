@@ -17,7 +17,7 @@ requirements:
 2. Variables must all be "simple" types.
     - any primitive (`int`, `float`, `string`, etc.)
     - `time.Duration`
-    - nested structs that themselves only contain simple types (recursive type nested not permitted)
+    - nested structs that themselves only contain simple types (recursive type nesting not permitted)
     - pointers to any of the above
 3. The struct must implement the `config.VerifiableConfig` interface (see below).
 4. The config must have a default constructor method.
