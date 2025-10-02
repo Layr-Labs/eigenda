@@ -315,7 +315,7 @@ func (m *EigenDAManager) backupToSecondary(ctx context.Context, commitment []byt
 		// Only propagate the error if errorOnInsertFailure is enabled.
 		// This allows the caller to return HTTP 500 to the client.
 		if m.secondary.ErrorOnInsertFailure() {
-			return fmt.Errorf("secondary storage write failed: %w", err)
+			return fmt.Errorf("a secondary storage write failed and error-on-secondary-insert-failure is enabled: %w", err)
 		}
 	}
 
