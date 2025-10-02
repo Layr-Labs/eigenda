@@ -24,7 +24,10 @@ type InfrastructureConfig struct {
 	MetadataTableNameV2 string
 
 	// Number of relay instances to start, if not specified, no relays will be started.
-	RelayCount                      int
+	RelayCount int
+
+	// The following fields are temporary, to be able to test different payments configurations. They will be removed
+	// once legacy payments are removed.
 	UserReservationSymbolsPerSecond uint64
 	ClientLedgerMode                clientledger.ClientLedgerMode
 	ControllerUseNewPayments        bool
