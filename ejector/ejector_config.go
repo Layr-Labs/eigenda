@@ -20,104 +20,104 @@ type EjectorConfig struct {
 	////////////////////////
 
 	// The address of the contract directory contract.
-	contractDirectoryAddress string
+	ContractDirectoryAddress string
 
 	// The Ethereum RPC URL to use for connecting to the blockchain.
-	ethRPCURL string
+	EthRPCURL string
 
 	// The private key to use for signing ejection transactions.
-	privateKey string
+	PrivateKey string
 
 	// The URL of the Eigenda Data API to use for looking up signing rates.
-	dataApiUrl string
+	DataApiUrl string
 
 	////////////////////////
 	// Optional arguments //
 	////////////////////////
 
 	// The period with which to evaluate validators for ejection.
-	ejectionPeriod time.Duration
+	EjectionPeriod time.Duration
 
 	// The time window over which to evaluate signing metrics when deciding whether to eject a validator.
-	ejectionCriteriaTimeWindow time.Duration
+	EjectionCriteriaTimeWindow time.Duration
 
 	// The time between starting an ejection and when the ejection can be finalized.
-	ejectionFinalizationDelay time.Duration
+	EjectionFinalizationDelay time.Duration
 
 	// The minimum time to wait before retrying a failed ejection.
-	ejectionRetryDelay time.Duration
+	EjectionRetryDelay time.Duration
 
 	// The maximum number of consecutive failed ejection attempts before giving up on ejecting a validator.
-	maxConsecutiveFailedEjectionAttempts uint32
+	MaxConsecutiveFailedEjectionAttempts uint32
 
 	// The maximum fraction of stake (out of 1.0) that can be ejected during an ejection time period.
-	ejectionRateLimit float64
+	EjectionRateLimit float64
 
 	// The time period over which the ejection rate limit is calculated. The ejection manager will be allowed to eject
-	// ejectionRateLimit fraction of stake every ejectionThrottleTimePeriod.
-	ejectionThrottleTimePeriod time.Duration
+	// ejectionRateLimit fraction of stake every EjectionThrottleTimePeriod.
+	EjectionThrottleTimePeriod time.Duration
 
 	// If true, then the ejection manager will immediately be able to eject ejectionRateLimit fraction of stake when it
 	// starts up. If false, then the ejection manager will need to wait before it has this capacity.
-	startEjectionThrottleFull bool
+	StartEjectionThrottleFull bool
 }
 
 // DefaultEjectorConfig returns a default configuration for the ejector.
 func DefaultEjectorConfig() *EjectorConfig {
 	return &EjectorConfig{
-		ejectionPeriod:                       time.Minute,
-		ejectionCriteriaTimeWindow:           10 * time.Minute,
-		ejectionFinalizationDelay:            time.Hour,
-		ejectionRetryDelay:                   24 * time.Hour,
-		maxConsecutiveFailedEjectionAttempts: 5,
-		ejectionRateLimit:                    0.05, // 5% of stake can be ejected every ejectionThrottleTimePeriod
-		ejectionThrottleTimePeriod:           24 * time.Hour,
-		startEjectionThrottleFull:            false,
+		EjectionPeriod:                       time.Minute,
+		EjectionCriteriaTimeWindow:           10 * time.Minute,
+		EjectionFinalizationDelay:            time.Hour,
+		EjectionRetryDelay:                   24 * time.Hour,
+		MaxConsecutiveFailedEjectionAttempts: 5,
+		EjectionRateLimit:                    0.05, // 5% of stake can be ejected every EjectionThrottleTimePeriod
+		EjectionThrottleTimePeriod:           24 * time.Hour,
+		StartEjectionThrottleFull:            false,
 	}
 }
 
 // Verify checks that the configuration is valid.
 func (c *EjectorConfig) Verify() error {
-	if c.ejectionPeriod <= 0 {
-		return fmt.Errorf("invalid ejection period: %s", c.ejectionPeriod)
+	if c.EjectionPeriod <= 0 {
+		return fmt.Errorf("invalid ejection period: %s", c.EjectionPeriod)
 	}
 
-	if c.ejectionCriteriaTimeWindow <= 0 {
-		return fmt.Errorf("invalid ejection criteria time window: %s", c.ejectionCriteriaTimeWindow)
+	if c.EjectionCriteriaTimeWindow <= 0 {
+		return fmt.Errorf("invalid ejection criteria time window: %s", c.EjectionCriteriaTimeWindow)
 	}
 
-	if c.contractDirectoryAddress == "" {
-		return fmt.Errorf("invalid contract directory address: %s", c.contractDirectoryAddress)
+	if c.ContractDirectoryAddress == "" {
+		return fmt.Errorf("invalid contract directory address: %s", c.ContractDirectoryAddress)
 	}
 
-	if c.ejectionFinalizationDelay <= 0 {
-		return fmt.Errorf("invalid ejection finalization delay: %s", c.ejectionFinalizationDelay)
+	if c.EjectionFinalizationDelay <= 0 {
+		return fmt.Errorf("invalid ejection finalization delay: %s", c.EjectionFinalizationDelay)
 	}
 
-	if c.ejectionRetryDelay <= 0 {
-		return fmt.Errorf("invalid ejection retry delay: %s", c.ejectionRetryDelay)
+	if c.EjectionRetryDelay <= 0 {
+		return fmt.Errorf("invalid ejection retry delay: %s", c.EjectionRetryDelay)
 	}
 
-	if c.maxConsecutiveFailedEjectionAttempts == 0 {
+	if c.MaxConsecutiveFailedEjectionAttempts == 0 {
 		return fmt.Errorf("invalid max consecutive failed ejection attempts: %d",
-			c.maxConsecutiveFailedEjectionAttempts)
+			c.MaxConsecutiveFailedEjectionAttempts)
 	}
 
-	if c.ejectionRateLimit <= 0 || c.ejectionRateLimit > 1.0 {
-		return fmt.Errorf("invalid ejection rate limit: %f", c.ejectionRateLimit)
+	if c.EjectionRateLimit <= 0 || c.EjectionRateLimit > 1.0 {
+		return fmt.Errorf("invalid ejection rate limit: %f", c.EjectionRateLimit)
 	}
 
-	if c.ejectionThrottleTimePeriod <= 0 {
-		return fmt.Errorf("invalid ejection throttle time period: %s", c.ejectionThrottleTimePeriod)
+	if c.EjectionThrottleTimePeriod <= 0 {
+		return fmt.Errorf("invalid ejection throttle time period: %s", c.EjectionThrottleTimePeriod)
 	}
-	if c.ethRPCURL == "" {
-		return fmt.Errorf("invalid Ethereum RPC URL: %s", c.ethRPCURL)
+	if c.EthRPCURL == "" {
+		return fmt.Errorf("invalid Ethereum RPC URL: %s", c.EthRPCURL)
 	}
-	if c.privateKey == "" {
+	if c.PrivateKey == "" {
 		return fmt.Errorf("invalid private key")
 	}
-	if c.dataApiUrl == "" {
-		return fmt.Errorf("invalid data API URL: %s", c.dataApiUrl)
+	if c.DataApiUrl == "" {
+		return fmt.Errorf("invalid data API URL: %s", c.DataApiUrl)
 	}
 
 	return nil

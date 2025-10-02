@@ -4,27 +4,29 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
 type Foo struct {
-	String  string
-	Int     int
-	Int64   int64
-	Int32   int32
-	Int16   int16
-	Int8    int8
-	Uint    uint
-	Uint64  uint64
-	Uint32  uint32
-	Uint16  uint16
-	Uint8   uint8
-	Float64 float64
-	Float32 float32
-	Bool    bool
-	Bar     Bar
-	Baz     *Baz
+	String   string
+	Int      int
+	Int64    int64
+	Int32    int32
+	Int16    int16
+	Int8     int8
+	Uint     uint
+	Uint64   uint64
+	Uint32   uint32
+	Uint16   uint16
+	Uint8    uint8
+	Float64  float64
+	Float32  float32
+	Duration time.Duration
+	Bool     bool
+	Bar      Bar
+	Baz      *Baz
 }
 
 func DefaultFoo() *Foo {
@@ -143,13 +145,13 @@ func TestJSONParsing(t *testing.T) {
 
 func TestYAMLParsing(t *testing.T) {
 
-	configFile := "testdata/config.yml"
+	configFile := "testdata/config.yaml"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
-	require.Equal(t, "this value came from config.yml", foo.String)
+	require.Equal(t, "this value came from config.yaml", foo.String)
 	require.Equal(t, 200, foo.Int)
 	require.Equal(t, int64(201), foo.Int64)
 	require.Equal(t, int32(203), foo.Int32)
@@ -262,14 +264,14 @@ func TestJSONConfigOverride(t *testing.T) {
 
 func TestYAMLConfigOverride(t *testing.T) {
 
-	configFile := "testdata/config.yml"
-	overrideFile := "testdata/config_override.yml"
+	configFile := "testdata/config.yaml"
+	overrideFile := "testdata/config_override.yaml"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
-	require.Equal(t, "this value came from config.yml", foo.String) // from base
+	require.Equal(t, "this value came from config.yaml", foo.String) // from base
 	require.Equal(t, -200, foo.Int)                                 // from override
 	require.Equal(t, int64(201), foo.Int64)                         // from base
 	require.Equal(t, int32(-203), foo.Int32)                        // from override
@@ -372,9 +374,6 @@ func TestDefaultValues(t *testing.T) {
 	require.Equal(t, 336, foo.Baz.Y)                  // default
 	require.Equal(t, false, foo.Baz.Z)                // overridden
 }
-
-// TODO claude: when parsing from environment variables, it can't convert strings into the appropriate types.
-// Can you fix that? The test below fails due to this problem. Run it before you attempt to fix.
 
 func TestEnvironmentVariables(t *testing.T) {
 

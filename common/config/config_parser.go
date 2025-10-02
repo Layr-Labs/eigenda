@@ -33,7 +33,7 @@ func ParseConfigFromCLI[T VerifiableConfig](constructor func() T, envPrefix stri
 // default values before calling this function.
 //
 // The envPrefix is used to prefix environment variables. May not be empty. Environment variables with this prefix
-// are required to be bound to a configuration field, otherwise an error is returned. TODO expand docs
+// are required to be bound to a configuration field, otherwise an error is returned. See README.md for more details.
 func ParseConfig[T VerifiableConfig](constructor func() T, envPrefix string, configPaths ...string) (T, error) {
 	if envPrefix == "" {
 		var zero T
@@ -99,7 +99,7 @@ func ParseConfig[T VerifiableConfig](constructor func() T, envPrefix string, con
 }
 
 func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
-	path, err := util.SanitizePath(path) // TODO extract sanitize path from LittDB
+	path, err := util.SanitizePath(path)
 	if err != nil {
 		return fmt.Errorf("failed to sanitize config path %q: %w", path, err)
 	}

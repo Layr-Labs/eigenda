@@ -11,6 +11,7 @@ Uint16 = 9
 Uint8 = 10
 Float64 = 11.11
 Float32 = 12.12
+Duration = "13s"
 Bool = false
 
 Bar.A = "bar A"

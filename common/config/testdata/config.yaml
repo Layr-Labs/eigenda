@@ -11,6 +11,7 @@ Uint16: 209
 Uint8: 210
 Float64: 211.11
 Float32: 212.12
+Duration: 213s
 Bool: false
 
 Bar:
