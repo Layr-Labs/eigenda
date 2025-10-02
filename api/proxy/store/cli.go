@@ -5,17 +5,17 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
 	"github.com/urfave/cli/v2"
 )
 
 var (
-	BackendsToEnableFlagName = withFlagPrefix("backends-to-enable")
-	DispersalBackendFlagName = withFlagPrefix("dispersal-backend")
-	FallbackTargetsFlagName  = withFlagPrefix("fallback-targets")
-	CacheTargetsFlagName     = withFlagPrefix("cache-targets")
-	ConcurrentWriteThreads   = withFlagPrefix("concurrent-write-routines")
-	WriteOnCacheMissFlagName = withFlagPrefix("write-on-cache-miss")
+	BackendsToEnableFlagName              = withFlagPrefix("backends-to-enable")
+	DispersalBackendFlagName              = withFlagPrefix("dispersal-backend")
+	FallbackTargetsFlagName               = withFlagPrefix("fallback-targets")
+	CacheTargetsFlagName                  = withFlagPrefix("cache-targets")
+	ConcurrentWriteThreads                = withFlagPrefix("concurrent-write-routines")
+	WriteOnCacheMissFlagName              = withFlagPrefix("write-on-cache-miss")
+	ErrorOnSecondaryInsertFailureFlagName = withFlagPrefix("error-on-secondary-insert-failure")
 )
 
 func withFlagPrefix(s string) string {
@@ -74,10 +74,15 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "WRITE_ON_CACHE_MISS"),
 			Category: category,
 		},
+		&cli.BoolFlag{
+			Name: ErrorOnSecondaryInsertFailureFlagName,
+			Usage: "Return HTTP 500 if any secondary storage write fails. " +
+				"Cannot be used with concurrent-write-routines > 0.",
+			Value:    false,
+			EnvVars:  withEnvPrefix(envPrefix, "ERROR_ON_SECONDARY_INSERT_FAILURE"),
+			Category: category,
+		},
 	}
-
-	// Append secondary storage flags
-	flags = append(flags, secondary.CLIFlags(envPrefix, category)...)
 
 	return flags
 }
@@ -123,8 +128,6 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		}
 	}
 
-	secondaryCfg := secondary.ReadConfig(ctx)
-
 	return Config{
 		BackendsToEnable:              backends,
 		DispersalBackend:              dispersalBackend,
@@ -132,6 +135,6 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		FallbackTargets:               filteredFallbackTargets,
 		CacheTargets:                  filteredCacheTargets,
 		WriteOnCacheMiss:              ctx.Bool(WriteOnCacheMissFlagName),
-		ErrorOnSecondaryInsertFailure: secondaryCfg.ErrorOnSecondaryInsertFailure,
+		ErrorOnSecondaryInsertFailure: ctx.Bool(ErrorOnSecondaryInsertFailureFlagName),
 	}, nil
 }

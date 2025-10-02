@@ -153,7 +153,7 @@ func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitmen
 
 	// If errorOnInsertFailure is enabled and any writes failed (partial success), return error
 	if sm.errorOnInsertFailure && len(errs) > 0 {
-		return fmt.Errorf("failed to write to %d of %d secondary targets (strict mode enabled): %w",
+		return fmt.Errorf("failed to write to %d of %d secondary targets (error-on-secondary-insert-failure=true): %w",
 			len(errs), len(sources), errors.Join(errs...))
 	}
 
