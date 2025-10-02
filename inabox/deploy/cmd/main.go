@@ -204,7 +204,7 @@ func startLocalstack(ctx *cli.Context, config *deploy.Config) error {
 	context, cancel := context.WithTimeout(ctx.Context, 30*time.Second)
 	defer cancel()
 
-	_, err := testbed.NewLocalStackContainerWithOptions(context, testbed.LocalStackOptions{
+	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(context, testbed.LocalStackOptions{
 		ExposeHostPort: true,
 		HostPort:       ctx.String(localstackPortFlagName),
 		Services:       []string{"s3", "dynamodb", "kms"},
@@ -215,10 +215,11 @@ func startLocalstack(ctx *cli.Context, config *deploy.Config) error {
 	}
 
 	deployConfig := testbed.DeployResourcesConfig{
-		LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", ctx.String(localstackPortFlagName)),
+		LocalStackEndpoint:  localstackContainer.Endpoint(),
 		MetadataTableName:   metadataTableName,
 		BucketTableName:     bucketTableName,
 		V2MetadataTableName: metadataTableNameV2,
+		AWSConfig:           localstackContainer.GetAWSClientConfig(),
 	}
 	if err := testbed.DeployResources(context, deployConfig); err != nil {
 		return fmt.Errorf("failed to deploy resources: %w", err)

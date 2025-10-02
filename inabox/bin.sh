@@ -315,22 +315,8 @@ function start_detached_for_tests {
         pids="$pids $pid"
     done
 
-    files=($(ls $testpath/envs/relay*.env))
-    last_index=$(( ${#files[@]} - 1 ))
-    for i in "${!files[@]}"; do
-        FILE=${files[$i]}
-        set -a
-        source $FILE
-        set +a
-        id=$(basename $FILE | tr -d -c 0-9)
-        ../relay/bin/relay > $testpath/logs/relay${id}.log 2>&1 &
-
-        pid="$!"
-        pids="$pids $pid"
-
-        ./wait-for 0.0.0.0:${RELAY_GRPC_PORT} -- echo "Relay up" &
-        waiters="$waiters $!"
-    done
+    # Skip relay nodes - they run as goroutines in tests
+    echo "Skipping relay nodes (running as goroutines in tests)"
 
     # Skip operator nodes - they run as goroutines in tests
     echo "Skipping operator nodes (running as goroutines in tests)"

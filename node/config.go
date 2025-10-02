@@ -10,8 +10,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
@@ -395,7 +395,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			ctx.GlobalInt(flags.ReservationMaxLedgersFlag.Name),
 			ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
 			// this is hardcoded: it's a parameter just in case, but it's never expected to change
-			reservation.OverfillOncePermitted,
+			ratelimit.OverfillOncePermitted,
 			ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),
 		)
 		if err != nil {

@@ -33,7 +33,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test/random"
@@ -128,20 +128,14 @@ func NewTestClient(
 		g2TrailingPath = ""
 	}
 
-	kzgConfig := &kzg.KzgConfig{
-		LoadG2Points:    true,
-		G1Path:          g1Path,
-		G2Path:          g2Path,
-		G2TrailingPath:  g2TrailingPath,
-		CacheDir:        srsTablesPath,
-		SRSOrder:        config.SRSOrder,
-		SRSNumberToLoad: config.SRSNumberToLoad,
-		NumWorker:       32,
-	}
-
-	kzgProver, err := prover.NewProver(prover.KzgConfigFromV1Config(kzgConfig), nil)
+	kzgCommitter, err := committer.NewFromConfig(committer.Config{
+		G1SRSPath:         g1Path,
+		G2SRSPath:         g2Path,
+		G2TrailingSRSPath: g2TrailingPath,
+		SRSNumberToLoad:   config.SRSNumberToLoad,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create KZG prover: %w", err)
+		return nil, fmt.Errorf("new committer: %w", err)
 	}
 
 	disperserConfig := &clientsv2.DisperserClientConfig{
@@ -156,7 +150,7 @@ func NewTestClient(
 		logger,
 		disperserConfig,
 		signer,
-		kzgProver,
+		kzgCommitter,
 		accountant,
 		metricsv2.NoopDispersalMetrics,
 	)
@@ -303,6 +297,16 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
+	kzgConfig := &kzg.KzgConfig{
+		LoadG2Points:    true,
+		G1Path:          g1Path,
+		G2Path:          g2Path,
+		G2TrailingPath:  g2TrailingPath,
+		CacheDir:        srsTablesPath,
+		SRSOrder:        config.SRSOrder,
+		SRSNumberToLoad: config.SRSNumberToLoad,
+		NumWorker:       32,
+	}
 	verifierKzgConfig := verifier.KzgConfigFromV1Config(kzgConfig)
 	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig, nil)
 	if err != nil {

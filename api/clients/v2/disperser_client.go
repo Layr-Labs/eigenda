@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
@@ -36,7 +36,7 @@ type DisperserClient struct {
 	config                  *DisperserClientConfig
 	signer                  corev2.BlobRequestSigner
 	clientPool              *common.GRPCClientPool[disperser_rpc.DisperserClient]
-	prover                  *prover.Prover
+	committer               *committer.Committer
 	accountant              *Accountant
 	accountantLock          sync.Mutex
 	initOnceAccountant      sync.Once
@@ -68,7 +68,7 @@ func NewDisperserClient(
 	logger logging.Logger,
 	config *DisperserClientConfig,
 	signer corev2.BlobRequestSigner,
-	prover *prover.Prover,
+	committer *committer.Committer,
 	accountant *Accountant,
 	metrics metrics.DispersalMetricer,
 ) (*DisperserClient, error) {
@@ -113,7 +113,7 @@ func NewDisperserClient(
 		config:     config,
 		signer:     signer,
 		clientPool: clientPool,
-		prover:     prover,
+		committer:  committer,
 		accountant: accountant,
 		metrics:    metrics,
 	}, nil
@@ -222,8 +222,8 @@ func (c *DisperserClient) DisperseBlob(
 	probe.SetStage("get_commitments")
 
 	var blobCommitments encoding.BlobCommitments
-	if c.prover == nil {
-		// if prover is not configured, get blob commitments from disperser
+	if c.committer == nil {
+		// if committer is not configured, get blob commitments from disperser
 		commitments, err := c.GetBlobCommitment(ctx, data)
 		if err != nil {
 			// Failover worthy error because it means the disperser is not responsive.
@@ -247,8 +247,8 @@ func (c *DisperserClient) DisperseBlob(
 				lengthFromCommitment, symbolLength, err)
 		}
 	} else {
-		// if prover is configured, get commitments from prover
-		blobCommitments, err = c.prover.GetCommitmentsForPaddedLength(data)
+		// if committer is configured, get commitments from committer
+		blobCommitments, err = c.committer.GetCommitmentsForPaddedLength(data)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error getting blob commitments: %w", err)
 		}

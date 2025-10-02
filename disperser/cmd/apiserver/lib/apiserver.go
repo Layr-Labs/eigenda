@@ -19,7 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -136,11 +136,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
 	if config.DisperserVersion == V2 {
-		// load G2 points because v2 apiserver exposes an rpc endpoint to compute kzg commitments
-		config.ProverKzgConfig.LoadG2Points = true
-		prover, err := proverv2.NewProver(&config.ProverKzgConfig, nil)
+		committer, err := committer.NewFromConfig(config.KzgCommitterConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create encoder: %w", err)
+			return fmt.Errorf("new committer: %w", err)
 		}
 		baseBlobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
 		blobMetadataStore := blobstorev2.NewInstrumentedMetadataStore(baseBlobMetadataStore, blobstorev2.InstrumentedMetadataStoreConfig{
@@ -157,7 +155,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			transactor,
 			meterer,
 			authv2.NewPaymentStateAuthenticator(config.AuthPmtStateRequestMaxPastAge, config.AuthPmtStateRequestMaxFutureAge),
-			prover,
+			committer,
 			config.MaxNumSymbolsPerBlob,
 			config.OnchainStateRefreshInterval,
 			logger,

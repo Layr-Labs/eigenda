@@ -52,7 +52,7 @@ func setupTest(t *testing.T) *inaboxtests.InfrastructureHarness {
 	// Start all the necessary infrastructure like anvil, graph node, and eigenda components
 	// TODO(dmanc): We really only need to register operators on chain, maybe add some sort of
 	// configuration to allow that mode.
-	infraHarness, err := inaboxtests.SetupInfrastructure(config)
+	infraHarness, err := inaboxtests.SetupInfrastructure(t.Context(), config)
 	require.NoError(t, err, "failed to setup global infrastructure")
 
 	// Update the graph URL to use the container from infrastructure

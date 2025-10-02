@@ -1,4 +1,4 @@
-package reservation
+package ratelimit
 
 import (
 	"testing"
@@ -40,7 +40,7 @@ func TestFill(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
-		success, err := leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity+10))
+		success, err := leakyBucket.Fill(testStartTime, leakyBucket.bucketCapacity+10)
 		require.NoError(t, err)
 		require.True(t, success)
 		require.Equal(t, leakyBucket.bucketCapacity+10, leakyBucket.currentFillLevel, "first overfill should succeed")
@@ -51,7 +51,7 @@ func TestFill(t *testing.T) {
 		require.False(t, success, "overfill should fail, if bucket is already over capacity")
 
 		// let some time elapse, so there is a little bit of available capacity
-		success, err = leakyBucket.Fill(testStartTime.Add(time.Second), uint32(leakyBucket.bucketCapacity+10))
+		success, err = leakyBucket.Fill(testStartTime.Add(time.Second), leakyBucket.bucketCapacity+10)
 		require.NoError(t, err)
 		require.True(t, success, "any available capacity should permit overfill")
 	})
@@ -61,7 +61,7 @@ func TestFill(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
-		success, err := leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity-10))
+		success, err := leakyBucket.Fill(testStartTime, leakyBucket.bucketCapacity-10)
 		require.NoError(t, err)
 		require.True(t, success)
 		require.Equal(t, leakyBucket.bucketCapacity-10, leakyBucket.currentFillLevel)
@@ -76,7 +76,7 @@ func TestFill(t *testing.T) {
 		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, false, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 
-		success, err := leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity))
+		success, err := leakyBucket.Fill(testStartTime, leakyBucket.bucketCapacity)
 		require.NoError(t, err)
 		require.True(t, success)
 		require.Equal(t, leakyBucket.bucketCapacity, leakyBucket.currentFillLevel)
@@ -154,7 +154,7 @@ func TestRevertFill(t *testing.T) {
 }
 
 func TestLeak(t *testing.T) {
-	leakRate := uint64(5)
+	leakRate := float64(5)
 
 	// This test uses a large capacity, to make sure that none of the fills or leaks are bumping up against the
 	// limits of the bucket
@@ -181,7 +181,7 @@ func TestLeak(t *testing.T) {
 
 	// compute how much should have leaked throughout the test duration
 	timeDelta := workingTime.Sub(testStartTime)
-	expectedLeak := timeDelta.Seconds() * float64(leakRate)
+	expectedLeak := timeDelta.Seconds() * leakRate
 
 	// original fill, minus what we expected to leak, plus what we filled during iteration
 	expectedFill := halfFull - expectedLeak + float64(iterations)
@@ -207,4 +207,77 @@ func TestTimeRegression(t *testing.T) {
 	err = leakyBucket.RevertFill(testStartTime.Add(2*time.Second), 50)
 	require.Error(t, err)
 	require.ErrorAs(t, err, &timeMovedBackwardError)
+}
+
+func TestReconfigure(t *testing.T) {
+	rand := random.NewTestRandom()
+
+	leakyBucket, err := NewLeakyBucket(1, 11*time.Second, false, OverfillOncePermitted, testStartTime)
+	require.NoError(t, err)
+	require.NotNil(t, leakyBucket)
+
+	now := rand.Time()
+
+	// Leak a few times, do not advance time. All should pass.
+	for i := 1; i <= 6; i++ {
+		success, err := leakyBucket.Fill(now, 2)
+		require.NoError(t, err)
+		require.True(t, success)
+	}
+
+	// We are currently overfilled, so we should be unable to fill any more.
+	success, err := leakyBucket.Fill(now, 1)
+	require.NoError(t, err)
+	require.False(t, success, "overfill should not be permitted when already overfilled")
+
+	fillLevel, err := leakyBucket.GetFillLevel(now)
+	require.NoError(t, err)
+	require.Equal(t, 12.0, fillLevel)
+
+	// Advance time by 5 seconds, should leak 5 symbols.
+	now = now.Add(5 * time.Second)
+
+	// At this point in time, the expected fill level is 7.
+	// Resize the leak rate to 2 symbols per second, and bucket duration to 1 second.
+	// Resulting bucket size is 2 symbols, so we should be overfilled.
+	err = leakyBucket.Reconfigure(2, 1*time.Second, OverfillNotPermitted, now)
+	require.NoError(t, err)
+
+	fillLevel, err = leakyBucket.GetFillLevel(now)
+	require.NoError(t, err)
+	require.Equal(t, 7.0, fillLevel, "fill level should be unchanged by reconfigure")
+
+	// Wait 3 seconds, should leak 5 symbols, for a resulting fill level of 1.
+	now = now.Add(3 * time.Second)
+	fillLevel, err = leakyBucket.GetFillLevel(now)
+	require.NoError(t, err)
+	require.Equal(t, 1.0, fillLevel, "fill level should be 1 after leaking")
+
+	// We toggled off overfill, so we should not be able to fill beyond capacity.
+	success, err = leakyBucket.Fill(now, 2)
+	require.NoError(t, err)
+	require.False(t, success, "overfill should not be permitted")
+
+	// Now, increase the bucket size to 10 symbols, and enable overfill once again.
+	err = leakyBucket.Reconfigure(2, 5*time.Second, OverfillOncePermitted, now)
+	require.NoError(t, err)
+
+	fillLevel, err = leakyBucket.GetFillLevel(now)
+	require.NoError(t, err)
+	require.Equal(t, 1.0, fillLevel, "fill level should be unchanged by reconfigure")
+
+	// We should be able to fill up to 10 symbols now.
+	success, err = leakyBucket.Fill(now, 9)
+	require.NoError(t, err)
+	require.True(t, success, "fill within capacity should be permitted")
+
+	fillLevel, err = leakyBucket.GetFillLevel(now)
+	require.NoError(t, err)
+	require.Equal(t, 10.0, fillLevel, "fill level should be 10 after fill")
+
+	// Let a little drain away to verify that we can overfill again.
+	now = now.Add(1 * time.Second)
+	success, err = leakyBucket.Fill(now, 100)
+	require.NoError(t, err)
+	require.True(t, success, "overfill should be permitted again")
 }
