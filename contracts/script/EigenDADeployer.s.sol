@@ -272,9 +272,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             TransparentUpgradeableProxy(payable(address(socketRegistry))), address(socketRegistryImplementation)
         );
 
-        registryCoordinatorImplementation = new EigenDARegistryCoordinator(
-            IServiceManager(address(eigenDAServiceManager)), stakeRegistry, apkRegistry, indexRegistry, socketRegistry
-        );
+        registryCoordinatorImplementation = new EigenDARegistryCoordinator(address(eigenDADirectory));
 
         {
             IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams =
@@ -305,7 +303,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 abi.encodeWithSelector(
                     EigenDARegistryCoordinator.initialize.selector,
                     addressConfig.eigenDACommunityMultisig,
-                    addressConfig.churner,
                     addressConfig.ejector,
                     IPauserRegistry(address(eigenDAPauserReg)),
                     0, // initial paused status is nothing paused

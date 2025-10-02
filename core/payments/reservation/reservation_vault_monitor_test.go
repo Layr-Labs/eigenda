@@ -1,6 +1,7 @@
 package reservation
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -67,8 +68,11 @@ func TestReservationVaultMonitor(t *testing.T) {
 		})
 	}
 
+	var mu sync.Mutex
 	capturedUpdates := make(map[gethcommon.Address]*Reservation)
 	updateReservation := func(accountID gethcommon.Address, newReservation *Reservation) error {
+		mu.Lock()
+		defer mu.Unlock()
 		capturedUpdates[accountID] = newReservation
 		return nil
 	}
@@ -86,14 +90,18 @@ func TestReservationVaultMonitor(t *testing.T) {
 	require.NotNil(t, monitor)
 
 	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		mu.Lock()
+		defer mu.Unlock()
 		return len(capturedUpdates)
 	}, time.Second)
+	mu.Lock()
 	for i, addr := range accounts {
 		reservation, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())
 		require.NotNil(t, reservation)
 		require.Equal(t, uint64(100+i*10), reservation.symbolsPerSecond)
 	}
+	mu.Unlock()
 
 	// update one of the reservations
 	testAccount := accounts[2]
@@ -105,21 +113,15 @@ func TestReservationVaultMonitor(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
-	// Clear captured updates to verify new updates
-	capturedUpdates = make(map[gethcommon.Address]*Reservation)
-
 	// Wait for the monitor to fetch the updated reservation
-	test.AssertEventuallyEquals(t, len(accounts), func() int {
-		return len(capturedUpdates)
+	test.AssertEventuallyEquals(t, uint64(999), func() uint64 {
+		mu.Lock()
+		defer mu.Unlock()
+		return capturedUpdates[testAccount].symbolsPerSecond
 	}, time.Second)
 
-	// Check that the specific account was updated correctly
-	updatedReservation, ok := capturedUpdates[testAccount]
-	require.True(t, ok, "account %s should have been updated", testAccount.Hex())
-	require.NotNil(t, updatedReservation)
-	require.Equal(t, uint64(999), updatedReservation.symbolsPerSecond)
-
 	// Other accounts should remain unchanged
+	mu.Lock()
 	for i, addr := range accounts {
 		if addr != testAccount {
 			reservation, ok := capturedUpdates[addr]
@@ -128,6 +130,7 @@ func TestReservationVaultMonitor(t *testing.T) {
 			require.Equal(t, uint64(100+i*10), reservation.symbolsPerSecond)
 		}
 	}
+	mu.Unlock()
 }
 
 func TestReservationVaultMonitorNoBatching(t *testing.T) {
@@ -153,8 +156,11 @@ func TestReservationVaultMonitorNoBatching(t *testing.T) {
 		})
 	}
 
+	var mu sync.Mutex
 	capturedUpdates := make(map[gethcommon.Address]*Reservation)
 	updateReservation := func(accountID gethcommon.Address, newReservation *Reservation) error {
+		mu.Lock()
+		defer mu.Unlock()
 		capturedUpdates[accountID] = newReservation
 		return nil
 	}
@@ -173,12 +179,16 @@ func TestReservationVaultMonitorNoBatching(t *testing.T) {
 
 	// Wait for updates
 	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		mu.Lock()
+		defer mu.Unlock()
 		return len(capturedUpdates)
 	}, time.Second)
+	mu.Lock()
 	for i, addr := range accounts {
 		reservation, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())
 		require.NotNil(t, reservation)
 		require.Equal(t, uint64(200+i*20), reservation.symbolsPerSecond)
 	}
+	mu.Unlock()
 }

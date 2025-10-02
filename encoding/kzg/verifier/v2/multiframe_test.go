@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -15,6 +16,9 @@ func TestUniversalVerify(t *testing.T) {
 	harness := getTestHarness()
 
 	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	require.Nil(t, err)
+
+	committer, err := committer.NewFromConfig(*harness.committerConfig)
 	require.Nil(t, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
@@ -30,7 +34,9 @@ func TestUniversalVerify(t *testing.T) {
 		inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 		require.Nil(t, err)
 
-		commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
+		commit, _, _, err := committer.GetCommitments(inputFr)
+		require.Nil(t, err)
+		frames, fIndices, err := enc.GetFrames(inputFr)
 		require.Nil(t, err)
 
 		// create samples
@@ -62,6 +68,9 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.Nil(t, err)
 
+	committer, err := committer.NewFromConfig(*harness.committerConfig)
+	require.Nil(t, err)
+
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
 	assert.NoError(t, err)
 
@@ -75,7 +84,9 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 		inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 		require.Nil(t, err)
 
-		commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
+		commit, _, _, err := committer.GetCommitments(inputFr)
+		require.Nil(t, err)
+		frames, fIndices, err := enc.GetFrames(inputFr)
 		require.Nil(t, err)
 
 		// create samples

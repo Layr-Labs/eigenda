@@ -1,12 +1,11 @@
 package verifier_test
 
 import (
-	"fmt"
 	"strconv"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/test/random"
@@ -17,17 +16,12 @@ func TestLengthProof(t *testing.T) {
 	harness := getTestHarness()
 	testRand := random.NewTestRandom(134)
 	maxNumSymbols := uint64(1 << 19) // our stored G1 and G2 files only contain this many pts
-	harness.proverV2KzgConfig.SRSNumberToLoad = maxNumSymbols
+	harness.committerConfig.SRSNumberToLoad = maxNumSymbols
 
-	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	committer, err := committer.NewFromConfig(*harness.committerConfig)
 	require.Nil(t, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
-	require.Nil(t, err)
-
-	// We use numsys=1 and numpar=0 to mean that we don't erasure code, so the data stays the same size.
-	params := encoding.ParamsFromSysPar(1, 0, maxNumSymbols*encoding.BYTES_PER_SYMBOL)
-	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
 	for numSymbols := uint64(1); numSymbols < maxNumSymbols; numSymbols *= 2 {
@@ -40,10 +34,8 @@ func TestLengthProof(t *testing.T) {
 			require.Nil(t, err)
 			require.Equal(t, uint64(len(inputFr)), numSymbols)
 
-			_, lengthCommitment, lengthProof, _, _, err := enc.Encode(inputFr)
+			_, lengthCommitment, lengthProof, err := committer.GetCommitments(inputFr)
 			require.Nil(t, err)
-
-			fmt.Println("lengthCommitment", lengthCommitment, "lengthProof", lengthProof)
 
 			require.NoError(t, v.VerifyLengthProof(lengthCommitment, lengthProof, numSymbols),
 				"low degree verification failed\n")

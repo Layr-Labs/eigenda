@@ -3,8 +3,7 @@ package verifier_test
 import (
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 
@@ -16,20 +15,16 @@ import (
 func TestBatchEquivalence(t *testing.T) {
 	harness := getTestHarness()
 
-	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	committer, err := committer.NewFromConfig(*harness.committerConfig)
 	require.NoError(t, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
 	require.NoError(t, err)
 
-	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
-	enc, err := group.GetKzgEncoder(params)
-	require.NoError(t, err)
-
 	inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 	require.NoError(t, err)
 
-	commit, g2commit, _, _, _, err := enc.Encode(inputFr)
+	commit, g2commit, _, err := committer.GetCommitments(inputFr)
 	require.NoError(t, err)
 
 	numBlob := 5

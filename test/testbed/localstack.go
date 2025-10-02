@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -14,7 +15,7 @@ import (
 )
 
 const (
-	LocalStackImage = "localstack/localstack:latest"
+	LocalStackImage = "localstack/localstack:4.7.0"
 	LocalStackPort  = "4566/tcp"
 )
 
@@ -144,13 +145,13 @@ func (ls *LocalStackContainer) GetServiceEndpoint(service string) string {
 	return ls.Endpoint()
 }
 
-// GetAWSConfig returns AWS SDK configuration for connecting to LocalStack
-func (ls *LocalStackContainer) GetAWSConfig() map[string]string {
-	return map[string]string{
-		"AWS_ACCESS_KEY_ID":     "test",
-		"AWS_SECRET_ACCESS_KEY": "test",
-		"AWS_DEFAULT_REGION":    ls.options.Region,
-		"AWS_ENDPOINT_URL":      ls.Endpoint(),
+// GetAWSClientConfig returns AWS client configuration for connecting to LocalStack
+func (ls *LocalStackContainer) GetAWSClientConfig() aws.ClientConfig {
+	return aws.ClientConfig{
+		Region:          ls.options.Region,
+		EndpointURL:     ls.Endpoint(),
+		AccessKey:       "test",
+		SecretAccessKey: "test",
 	}
 }
 

@@ -221,7 +221,6 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/shirou/gopsutil/v4 v4.25.5 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/spf13/viper v1.21.0
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/supranational/blst v0.3.14 // indirect
 	github.com/swaggo/files v1.0.1
@@ -262,7 +261,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/go-viper/mapstructure/v2 v2.4.0
+require (
+	github.com/go-viper/mapstructure/v2 v2.4.0
+	github.com/spf13/viper v1.21.0
+)
 
 require (
 	github.com/sagikazarmark/locafero v0.11.0 // indirect

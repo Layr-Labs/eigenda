@@ -131,12 +131,13 @@ func (v *Verifier) VerifyLengthProof(
 	return nil
 }
 
-// The function verify low degree proof against a poly commitment
-// We wish to show x^shift poly = shiftedPoly, with
-// With shift = SRSOrder - length and
-// proof = commit(shiftedPoly) on G1
-// so we can verify by checking
-// e( commit_1, [x^shift]_2) = e( proof_1, G_2 )
+// This function verifies a low degree proof against a poly commitment.
+// We wish to show x^shift poly = shiftedPoly, with shift = 2^28 - blob_length.
+// We verify this by checking the pairing equation:
+// e( s^shift G1, p(s)G2 ) = e( G1, p(s^shift)G2 )
+// Note that we also need to verify that the blob_commitment and length_commitment are equivalent,
+// by verifying the other pairing equation: e(blob_commitment,G2) = e(length_commitment,C2)
+// TODO(samlaf): can we move that other pairing check in here?
 func verifyLengthProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) error {
 	return pairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
 }

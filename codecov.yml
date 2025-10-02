@@ -71,3 +71,6 @@ ignore:
 
   # Resource files
   - "resources/**"
+
+  # Tools and utilities
+  - "tools/**"

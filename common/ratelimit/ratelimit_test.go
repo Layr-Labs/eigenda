@@ -1,10 +1,11 @@
-package ratelimit
+package ratelimit_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,7 +28,7 @@ func makeTestRatelimiter(t *testing.T) (common.RateLimiter, error) {
 		return nil, err
 	}
 
-	ratelimiter := NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
+	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
 
 	return ratelimiter, nil
 

@@ -130,7 +130,10 @@ func (rl *ReservationLedger) IsBucketEmpty(now time.Time) bool {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
-	return rl.leakyBucket.CheckFillLevel(now) <= 0
+	// Intentionally ignore the error here, can only happen if time moved backwards.
+	fillLevel, _ := rl.leakyBucket.GetFillLevel(now)
+
+	return fillLevel <= 0
 }
 
 // UpdateReservation updates the reservation parameters and recreates the leaky bucket, if necessary
@@ -158,33 +161,25 @@ func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation, now 
 	}
 
 	// Create new config with the updated reservation
-	newConfig := ReservationLedgerConfig{
-		reservation:            *newReservation,
-		startFull:              rl.config.startFull,
-		overfillBehavior:       rl.config.overfillBehavior,
-		bucketCapacityDuration: rl.config.bucketCapacityDuration,
+	newConfig, err := NewReservationLedgerConfig(
+		*newReservation,
+		rl.config.minNumSymbols,
+		rl.config.startFull,
+		rl.config.overfillBehavior,
+		rl.config.bucketCapacityDuration)
+	if err != nil {
+		return fmt.Errorf("new reservation ledger config: %w", err)
 	}
+	rl.config = *newConfig
 
-	previousFillLevel := rl.leakyBucket.CheckFillLevel(now)
-
-	newLeakyBucket, err := ratelimit.NewLeakyBucket(
+	err = rl.leakyBucket.Reconfigure(
 		float64(newConfig.reservation.symbolsPerSecond),
 		newConfig.bucketCapacityDuration,
-		false, // fill level is explicitly set below
 		newConfig.overfillBehavior,
-		now,
-	)
+		now)
 	if err != nil {
-		return fmt.Errorf("new leaky bucket: %w", err)
+		return fmt.Errorf("reconfigure leaky bucket: %w", err)
 	}
-
-	err = newLeakyBucket.SetFillLevel(now, previousFillLevel)
-	if err != nil {
-		return fmt.Errorf("set fill level: %w", err)
-	}
-
-	rl.config = newConfig
-	rl.leakyBucket = newLeakyBucket
 
 	return nil
 }
@@ -194,5 +189,5 @@ func (rl *ReservationLedger) GetBucketCapacity() float64 {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
-	return rl.leakyBucket.GetBucketCapacity()
+	return rl.leakyBucket.GetCapacity()
 }

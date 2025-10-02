@@ -1510,9 +1510,15 @@ func TestThrottlePreventsEjection(t *testing.T) {
 
 			// Verify bucket state
 			em := manager.(*ejectionManager)
-			require.Equal(t, 0.01, em.getLeakyBucketForQuorum(0).CheckFillLevel(currentTime))
-			require.Equal(t, 0.01, em.getLeakyBucketForQuorum(1).CheckFillLevel(currentTime))
-			require.Equal(t, 0.33, em.getLeakyBucketForQuorum(2).CheckFillLevel(currentTime))
+			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.01, fill)
+			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.01, fill)
+			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.33, fill)
 		}
 		if isTriggerTime(currentTime, previousTime, ejectionTimeB) {
 			// This should be prevented by throttling.
@@ -1525,9 +1531,15 @@ func TestThrottlePreventsEjection(t *testing.T) {
 
 			// Verify bucket state. Throttled ejection should not have resulted in any change.
 			em := manager.(*ejectionManager)
-			require.Equal(t, 0.01, em.getLeakyBucketForQuorum(0).CheckFillLevel(currentTime))
-			require.Equal(t, 0.01, em.getLeakyBucketForQuorum(1).CheckFillLevel(currentTime))
-			require.Equal(t, 0.33, em.getLeakyBucketForQuorum(2).CheckFillLevel(currentTime))
+			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.01, fill)
+			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.01, fill)
+			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.33, fill)
 		}
 		if isTriggerTime(currentTime, previousTime, ejectionTimeC) {
 			// This should be allowed, since overfill is allowed and the bucket should not be completely full.
@@ -1691,9 +1703,15 @@ func TestFailureToStartRevertsThrottle(t *testing.T) {
 
 			// Verify bucket state. Any changes to the bucket from the failed ejection should have been rolled back.
 			em := manager.(*ejectionManager)
-			require.Equal(t, 0.0, em.getLeakyBucketForQuorum(0).CheckFillLevel(currentTime))
-			require.Equal(t, 0.0, em.getLeakyBucketForQuorum(1).CheckFillLevel(currentTime))
-			require.Equal(t, 0.0, em.getLeakyBucketForQuorum(2).CheckFillLevel(currentTime))
+			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.0, fill)
+			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.0, fill)
+			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.0, fill)
 		}
 		if isTriggerTime(currentTime, previousTime, ejectionTimeB) {
 			// This should NOT be prevented by throttling, since the previous ejection failed.
@@ -1706,9 +1724,15 @@ func TestFailureToStartRevertsThrottle(t *testing.T) {
 
 			// Verify bucket state.
 			em := manager.(*ejectionManager)
-			require.Equal(t, 0.01, em.getLeakyBucketForQuorum(0).CheckFillLevel(currentTime))
-			require.Equal(t, 0.01, em.getLeakyBucketForQuorum(1).CheckFillLevel(currentTime))
-			require.Equal(t, 0.33, em.getLeakyBucketForQuorum(2).CheckFillLevel(currentTime))
+			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.01, fill)
+			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.01, fill)
+			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.33, fill)
 		}
 		if isTriggerTime(currentTime, previousTime, ejectionTimeC) {
 			// This should be allowed, since overfill is allowed and the bucket should not be completely full.
@@ -1856,9 +1880,15 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 
 			// Verify bucket state
 			em := manager.(*ejectionManager)
-			require.Equal(t, 0.01, em.getLeakyBucketForQuorum(0).CheckFillLevel(currentTime))
-			require.Equal(t, 0.01, em.getLeakyBucketForQuorum(1).CheckFillLevel(currentTime))
-			require.Equal(t, 0.33, em.getLeakyBucketForQuorum(2).CheckFillLevel(currentTime))
+			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.01, fill)
+			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.01, fill)
+			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.33, fill)
 		}
 		if isTriggerTime(currentTime, previousTime, ejectionTimeB) {
 			// This should be prevented by throttling.
@@ -1871,9 +1901,15 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 
 			// Verify bucket state. Throttled ejection should not have resulted in any change.
 			em := manager.(*ejectionManager)
-			require.Equal(t, 0.01, em.getLeakyBucketForQuorum(0).CheckFillLevel(currentTime))
-			require.Equal(t, 0.01, em.getLeakyBucketForQuorum(1).CheckFillLevel(currentTime))
-			require.Equal(t, 0.33, em.getLeakyBucketForQuorum(2).CheckFillLevel(currentTime))
+			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.01, fill)
+			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.01, fill)
+			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.33, fill)
 		}
 		if isTriggerTime(currentTime, previousTime, ejectionTimeC) {
 			// This should be allowed, since overfill is allowed and the bucket should not be completely full.
@@ -1918,9 +1954,15 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 			// The failure to finalize should have rolled back the throttle. C's ejection should not have started
 			// yet, so there should be nothing in any of the buckets after the rollback.
 			em := manager.(*ejectionManager)
-			require.Equal(t, 0.0, em.getLeakyBucketForQuorum(0).CheckFillLevel(currentTime))
-			require.Equal(t, 0.0, em.getLeakyBucketForQuorum(1).CheckFillLevel(currentTime))
-			require.Equal(t, 0.0, em.getLeakyBucketForQuorum(2).CheckFillLevel(currentTime))
+			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.0, fill)
+			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.0, fill)
+			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			require.NoError(t, err)
+			require.Equal(t, 0.0, fill)
 		}
 		if isTriggerTime(currentTime, previousTime, expectedFinalizeTimeB) {
 			// Should not be finalized since the start was throttled.

@@ -488,9 +488,7 @@ func (d *Dispatcher) updateAttestation(
 
 	aggregationStartTime := time.Now()
 	signatureAggregation, err := d.aggregator.AggregateSignatures(
-		ctx,
-		d.chainState,
-		uint(batchData.Batch.BatchHeader.ReferenceBlockNumber),
+		batchData.OperatorState,
 		quorumAttestation,
 		sortedNonZeroQuorums)
 	d.metrics.reportAggregateSignaturesLatency(time.Since(aggregationStartTime))

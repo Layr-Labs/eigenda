@@ -256,3 +256,13 @@ func (r *TestRandom) DurationRange(min time.Duration, max time.Duration) time.Du
 func (r *TestRandom) Address() geth.Address {
 	return geth.BytesToAddress(r.Bytes(20))
 }
+
+// FrElements generates a slice of num random field elements.
+func (r *TestRandom) FrElements(num uint64) []fr.Element {
+	elements := make([]fr.Element, num)
+	for i := range num {
+		b := r.Bytes(fr.Bytes)
+		_ = elements[i].SetBytes(b)
+	}
+	return elements
+}

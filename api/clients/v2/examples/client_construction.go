@@ -2,7 +2,6 @@ package examples
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -30,7 +29,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -52,12 +51,12 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 		panic(fmt.Sprintf("create logger: %v", err))
 	}
 
-	kzgProver, err := createKzgProver()
+	kzgCommitter, err := createKzgCommitter()
 	if err != nil {
-		return nil, fmt.Errorf("create kzg prover: %v", err)
+		return nil, fmt.Errorf("create kzg committer: %w", err)
 	}
 
-	disperserClient, err := createDisperserClient(logger, privateKeyHex, kzgProver)
+	disperserClient, err := createDisperserClient(logger, privateKeyHex, kzgCommitter)
 	if err != nil {
 		return nil, fmt.Errorf("create disperser client: %w", err)
 	}
@@ -263,7 +262,7 @@ func createRelayClient(
 func createDisperserClient(
 	logger logging.Logger,
 	privateKey string,
-	kzgProver *prover.Prover,
+	kzgCommitter *committer.Committer,
 ) (*clients.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
@@ -280,7 +279,7 @@ func createDisperserClient(
 		logger,
 		disperserClientConfig,
 		signer,
-		kzgProver,
+		kzgCommitter,
 		nil,
 		metrics.NoopDispersalMetrics)
 }
@@ -296,15 +295,13 @@ func createKzgVerifier() (*verifier.Verifier, error) {
 	return blobVerifier, nil
 }
 
-func createKzgProver() (*prover.Prover, error) {
-	kzgConfigV1 := createKzgConfig()
-	kzgConfig := prover.KzgConfigFromV1Config(&kzgConfigV1)
-	kzgProver, err := prover.NewProver(kzgConfig, nil)
+func createKzgCommitter() (*committer.Committer, error) {
+	committer, err := committer.NewFromConfig(createCommitterConfig())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create committer from config: %w", err)
 	}
 
-	return kzgProver, nil
+	return committer, nil
 }
 
 func createCertVerifier(
@@ -364,6 +361,16 @@ func createKzgConfig() kzg.KzgConfig {
 		SRSOrder:        encoding.SRSOrder,
 		SRSNumberToLoad: uint64(1<<13) / encoding.BYTES_PER_SYMBOL,
 		NumWorker:       4,
+	}
+}
+
+func createCommitterConfig() committer.Config {
+	srsPath := "../../../../resources/srs"
+	return committer.Config{
+		G1SRSPath:         filepath.Join(srsPath, "g1.point"),
+		G2SRSPath:         filepath.Join(srsPath, "g2.point"),
+		G2TrailingSRSPath: filepath.Join(srsPath, "g2.trailing.point"),
+		SRSNumberToLoad:   uint64(1<<13) / encoding.BYTES_PER_SYMBOL,
 	}
 }
 
@@ -511,15 +518,18 @@ func createOnDemandLedger(
 		return nil, fmt.Errorf("get payment state from disperser: %w", err)
 	}
 
+	var cumulativePayment *big.Int
 	if paymentState.GetCumulativePayment() == nil {
-		return nil, errors.New("received nil cumulative payment from disperser")
+		cumulativePayment = big.NewInt(0)
+	} else {
+		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
 	}
 
 	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
 		totalDeposits,
 		new(big.Int).SetUint64(pricePerSymbol),
 		minNumSymbols,
-		new(big.Int).SetBytes(paymentState.GetCumulativePayment()),
+		cumulativePayment,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new on-demand ledger: %w", err)

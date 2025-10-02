@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"math/big"
+	"sync"
 
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core/payments"
@@ -11,6 +12,8 @@ import (
 
 // TestPaymentVault is a test implementation of the PaymentVault interface
 type TestPaymentVault struct {
+	mu sync.Mutex
+
 	// Storage for individual account deposits
 	totalDeposits map[gethcommon.Address]*big.Int
 
@@ -38,6 +41,8 @@ func NewTestPaymentVault() *TestPaymentVault {
 }
 
 func (t *TestPaymentVault) SetTotalDeposit(account gethcommon.Address, amount *big.Int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if amount == nil {
 		delete(t.totalDeposits, account)
 	} else {
@@ -46,22 +51,32 @@ func (t *TestPaymentVault) SetTotalDeposit(account gethcommon.Address, amount *b
 }
 
 func (t *TestPaymentVault) SetGlobalSymbolsPerSecond(value uint64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.globalSymbolsPerSecond = value
 }
 
 func (t *TestPaymentVault) SetGlobalRatePeriodInterval(value uint64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.globalRatePeriodInterval = value
 }
 
 func (t *TestPaymentVault) SetMinNumSymbols(value uint32) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.minNumSymbols = value
 }
 
 func (t *TestPaymentVault) SetPricePerSymbol(value uint64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.PricePerSymbol = value
 }
 
 func (t *TestPaymentVault) GetTotalDeposits(ctx context.Context, accountIDs []gethcommon.Address) ([]*big.Int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	result := make([]*big.Int, len(accountIDs))
 	for i, accountID := range accountIDs {
 		if deposit, exists := t.totalDeposits[accountID]; exists {
@@ -74,6 +89,8 @@ func (t *TestPaymentVault) GetTotalDeposits(ctx context.Context, accountIDs []ge
 }
 
 func (t *TestPaymentVault) GetTotalDeposit(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if deposit, exists := t.totalDeposits[accountID]; exists {
 		return new(big.Int).Set(deposit), nil
 	}
@@ -81,22 +98,32 @@ func (t *TestPaymentVault) GetTotalDeposit(ctx context.Context, accountID gethco
 }
 
 func (t *TestPaymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.globalSymbolsPerSecond, nil
 }
 
 func (t *TestPaymentVault) GetGlobalRatePeriodInterval(ctx context.Context) (uint64, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.globalRatePeriodInterval, nil
 }
 
 func (t *TestPaymentVault) GetMinNumSymbols(ctx context.Context) (uint32, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.minNumSymbols, nil
 }
 
 func (t *TestPaymentVault) GetPricePerSymbol(ctx context.Context) (uint64, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.PricePerSymbol, nil
 }
 
 func (t *TestPaymentVault) SetReservation(account gethcommon.Address, reservation *bindings.IPaymentVaultReservation) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if reservation == nil {
 		delete(t.reservations, account)
 	} else {
@@ -108,6 +135,8 @@ func (t *TestPaymentVault) GetReservations(
 	ctx context.Context,
 	accountIDs []gethcommon.Address,
 ) ([]*bindings.IPaymentVaultReservation, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	result := make([]*bindings.IPaymentVaultReservation, len(accountIDs))
 	for i, accountID := range accountIDs {
 		if reservation, exists := t.reservations[accountID]; exists {
@@ -123,6 +152,8 @@ func (t *TestPaymentVault) GetReservation(
 	ctx context.Context,
 	accountID gethcommon.Address,
 ) (*bindings.IPaymentVaultReservation, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if reservation, exists := t.reservations[accountID]; exists {
 		return reservation, nil
 	}
