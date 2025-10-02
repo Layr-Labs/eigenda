@@ -139,20 +139,11 @@ func (cfg *Config) checkV1Config() error {
 		}
 	}
 
-	// cert verification is enabled
-	// TODO: move this verification logic to verify/cli.go
-	if cfg.VerifierConfigV1.VerifyCerts {
-		if cfg.MemstoreEnabled {
-			return fmt.Errorf(
-				"cannot enable cert verification when memstore is enabled. use --%s",
-				verify.CertVerificationDisabledFlagName)
-		}
-		if cfg.VerifierConfigV1.RPCURL == "" {
-			return fmt.Errorf("cert verification enabled but eth rpc is not set")
-		}
-		if cfg.ClientConfigV1.EdaClientCfg.SvcManagerAddr == "" || cfg.VerifierConfigV1.SvcManagerAddr == "" {
-			return fmt.Errorf("cert verification enabled but svc manager address is not set")
-		}
+	// validate verifier configuration using centralized validation logic
+	err := verify.ValidateVerifierConfig(cfg.VerifierConfigV1, cfg.MemstoreEnabled,
+		cfg.ClientConfigV1.EdaClientCfg.EthRpcUrl, cfg.ClientConfigV1.EdaClientCfg.SvcManagerAddr)
+	if err != nil {
+		return fmt.Errorf("verifier config validation failed: %w", err)
 	}
 
 	return nil
