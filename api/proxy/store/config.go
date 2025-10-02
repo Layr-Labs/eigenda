@@ -64,7 +64,7 @@ func (cfg *Config) Check() error {
 	// verify that ErrorOnSecondaryInsertFailure is not enabled with async writes
 	if cfg.ErrorOnSecondaryInsertFailure && cfg.AsyncPutWorkers > 0 {
 		return fmt.Errorf("error-on-secondary-insert-failure requires synchronous writes " +
-			"(concurrent-write-routines must be 0)")
+			"(i.e, storage.concurrent-write-routines must be 0)")
 	}
 
 	return nil
