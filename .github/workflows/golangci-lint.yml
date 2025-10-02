@@ -25,10 +25,18 @@ jobs:
           version: ${{ env.MISE_VERSION }}
           experimental: true
       - run: go version
-      
-      - name: Run linter
+
+      - name: Resolve PR base (live)
+        if: startsWith(github.ref, 'refs/pull/')
         env:
-          PR_BASE: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${GITHUB_REF#refs/pull/}"; PR_NUMBER="${PR_NUMBER%%/*}"
+          PR_BASE="$(gh pr view "$PR_NUMBER" --json baseRefName -q .baseRefName || true)"
+          echo "PR_BASE=$PR_BASE" >> "$GITHUB_ENV"
+          echo "Using PR_BASE=$PR_BASE"
+
+      - name: Run linter
         run: |
           if [ -n "$PR_BASE" ]; then
             make lint LINT_BASE_REV=origin/$PR_BASE
