@@ -14,6 +14,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	controllerGrpcPort = uint16(30000)
+)
+
 var logger = test.GetLogger()
 
 func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
@@ -221,12 +225,20 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e_v2_reservation",
 		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e_v2_ondemand",
 		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
+		DISPERSER_SERVER_CONTROLLER_ADDRESS:      fmt.Sprintf("localhost:%d", controllerGrpcPort),
 
 		// V2 inabox test is setup with a client that doesn't setup a client for some reason,
 		// so it calls the grpc GetBlobCommitment to generate commitments.
 		// DisperserV2 uses the V2 prover which always uses SRSOrder=2^28.
 		// So it needs the trailing g2 points to generate correct length commitments.
-		DISPERSER_SERVER_G2_TRAILING_PATH: "../resources/srs/g2.trailing.point",
+		DISPERSER_SERVER_G2_TRAILING_PATH:               "../resources/srs/g2.trailing.point",
+		DISPERSER_SERVER_ONCHAIN_STATE_REFRESH_INTERVAL: "1s",
+	}
+
+	if env.UseControllerMediatedPayments {
+		v.DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS = "true"
+	} else {
+		v.DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS = "false"
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -354,6 +366,17 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "5",
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
+	}
+
+	if env.UseControllerMediatedPayments {
+		v.CONTROLLER_GRPC_SERVER_ENABLE = "true"
+		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "true"
+		v.CONTROLLER_GRPC_PORT = fmt.Sprintf("%d", controllerGrpcPort)
+		v.CONTROLLER_ON_DEMAND_PAYMENTS_TABLE_NAME = "e2e_v2_ondemand"
+		v.CONTROLLER_PAYMENT_VAULT_UPDATE_INTERVAL = "1s"
+	} else {
+		v.CONTROLLER_GRPC_SERVER_ENABLE = "false"
+		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "false"
 	}
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
