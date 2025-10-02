@@ -162,12 +162,9 @@ func TestReadWriteBlobs(t *testing.T) {
 	go func() {
 		_ = server.Start(ctx)
 	}()
-	time.Sleep(100 * time.Millisecond) // Give server time to start
 
 	defer func() {
 		err = server.Stop()
-		require.NoError(t, err)
-		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -259,12 +256,9 @@ func TestReadNonExistentBlob(t *testing.T) {
 	go func() {
 		_ = server.Start(ctx)
 	}()
-	time.Sleep(100 * time.Millisecond) // Give server time to start
 
 	defer func() {
 		err = server.Stop()
-		require.NoError(t, err)
-		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -332,12 +326,9 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 	go func() {
 		_ = server.Start(ctx)
 	}()
-	time.Sleep(100 * time.Millisecond) // Give server time to start
 
 	defer func() {
 		err = server.Stop()
-		require.NoError(t, err)
-		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -483,12 +474,9 @@ func TestReadWriteChunks(t *testing.T) {
 	go func() {
 		_ = server.Start(ctx)
 	}()
-	time.Sleep(100 * time.Millisecond) // Give server time to start
 
 	defer func() {
 		err = server.Stop()
-		require.NoError(t, err)
-		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -717,12 +705,9 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	go func() {
 		_ = server.Start(ctx)
 	}()
-	time.Sleep(100 * time.Millisecond) // Give server time to start
 
 	defer func() {
 		err = server.Stop()
-		require.NoError(t, err)
-		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -879,12 +864,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	go func() {
 		_ = server.Start(ctx)
 	}()
-	time.Sleep(100 * time.Millisecond) // Give server time to start
 
 	defer func() {
 		err = server.Stop()
-		require.NoError(t, err)
-		err = listener.Close()
 		require.NoError(t, err)
 	}()
 
@@ -1193,12 +1175,9 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	go func() {
 		_ = server.Start(ctx)
 	}()
-	time.Sleep(100 * time.Millisecond) // Give server time to start
 
 	defer func() {
 		err = server.Stop()
-		require.NoError(t, err)
-		err = listener.Close()
 		require.NoError(t, err)
 	}()
 

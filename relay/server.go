@@ -590,7 +590,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// Serve grpc requests
 	s.logger.Info("GRPC Listening", "address", s.listener.Addr().String())
 	if err := s.grpcServer.Serve(s.listener); err != nil {
-		return errors.New("could not start GRPC server")
+		return fmt.Errorf("could not start GRPC server: %w", err)
 	}
 
 	return nil
