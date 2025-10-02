@@ -37,32 +37,6 @@ import (
 type OperatorHarnessConfig struct {
 	TestConfig *deploy.Config
 	TestName   string
-	Logger     logging.Logger
-}
-
-// SetupOperatorHarness creates and initializes the operator harness
-func SetupOperatorHarness(
-	ctx context.Context,
-	config *OperatorHarnessConfig,
-	chainHarness *ChainHarness,
-) (*OperatorHarness, error) {
-	harness := &OperatorHarness{
-		Servers:   make([]*grpc.Server, 0),
-		ServersV2: make([]*grpc.ServerV2, 0),
-	}
-
-	// Store references we'll need
-	harness.testConfig = config.TestConfig
-	harness.testName = config.TestName
-	harness.logger = config.Logger
-	harness.chainHarness = chainHarness
-
-	// Start all operators
-	if err := harness.StartOperators(ctx); err != nil {
-		return nil, err
-	}
-
-	return harness, nil
 }
 
 // OperatorHarness manages operator instances for integration tests
@@ -73,10 +47,34 @@ type OperatorHarness struct {
 	// Internal fields for operator management
 	testConfig   *deploy.Config
 	testName     string
-	logger       logging.Logger
 	chainHarness *ChainHarness
 	srsG1Path    string
 	srsG2Path    string
+}
+
+// SetupOperatorHarness creates and initializes the operator harness
+func SetupOperatorHarness(
+	ctx context.Context,
+	logger logging.Logger,
+	chainHarness *ChainHarness,
+	config *OperatorHarnessConfig,
+) (*OperatorHarness, error) {
+	harness := &OperatorHarness{
+		Servers:   make([]*grpc.Server, 0),
+		ServersV2: make([]*grpc.ServerV2, 0),
+	}
+
+	// Store references we'll need
+	harness.testConfig = config.TestConfig
+	harness.testName = config.TestName
+	harness.chainHarness = chainHarness
+
+	// Start all operators
+	if err := harness.StartOperators(ctx, logger); err != nil {
+		return nil, err
+	}
+
+	return harness, nil
 }
 
 // getSRSPaths returns the correct paths to SRS files based on the source file location.
@@ -103,14 +101,14 @@ func getSRSPaths() (g1Path, g2Path string, err error) {
 
 // operatorListeners holds the four network listeners for a single operator
 type operatorListeners struct {
-	v1Dispersal  net.Listener
-	v1Retrieval  net.Listener
-	v2Dispersal  net.Listener
-	v2Retrieval  net.Listener
+	v1Dispersal net.Listener
+	v1Retrieval net.Listener
+	v2Dispersal net.Listener
+	v2Retrieval net.Listener
 }
 
 // StartOperators starts all operator nodes configured in the test config
-func (oh *OperatorHarness) StartOperators(ctx context.Context) error {
+func (oh *OperatorHarness) StartOperators(ctx context.Context, logger logging.Logger) error {
 	// Get SRS paths first - fail early if we can't find them
 	g1Path, g2Path, err := getSRSPaths()
 	if err != nil {
@@ -144,7 +142,7 @@ func (oh *OperatorHarness) StartOperators(ctx context.Context) error {
 		return fmt.Errorf("no operators found in config")
 	}
 
-	oh.logger.Info("Pre-creating listeners for operator goroutines", "count", operatorCount)
+	logger.Info("Pre-creating listeners for operator goroutines", "count", operatorCount)
 
 	// Pre-create all listeners with port 0 (OS assigns ports)
 	allListeners := make([]operatorListeners, operatorCount)
@@ -152,12 +150,12 @@ func (oh *OperatorHarness) StartOperators(ctx context.Context) error {
 		listeners, err := oh.createOperatorListeners(i)
 		if err != nil {
 			// Clean up any listeners we created before failing
-			oh.closeAllListeners(allListeners[:i])
+			oh.closeAllListeners(logger, allListeners[:i])
 			return err
 		}
 		allListeners[i] = listeners
 
-		oh.logger.Info("Created listeners for operator", "index", i,
+		logger.Info("Created listeners for operator", "index", i,
 			"v1DispersalPort", listeners.v1Dispersal.Addr().(*net.TCPAddr).Port,
 			"v1RetrievalPort", listeners.v1Retrieval.Addr().(*net.TCPAddr).Port,
 			"v2DispersalPort", listeners.v2Dispersal.Addr().(*net.TCPAddr).Port,
@@ -166,16 +164,16 @@ func (oh *OperatorHarness) StartOperators(ctx context.Context) error {
 
 	// Now start each operator with its pre-created listeners
 	for i, listeners := range allListeners {
-		server, serverV2, err := oh.startOperator(ctx, i, listeners)
+		server, serverV2, err := oh.startOperator(ctx, logger, i, listeners)
 		if err != nil {
 			// Clean up any operators we started and all remaining listeners
-			oh.Cleanup(context.Background(), oh.logger)
-			oh.closeAllListeners(allListeners[i:])
+			oh.Cleanup(context.Background(), logger)
+			oh.closeAllListeners(logger, allListeners[i:])
 			return fmt.Errorf("failed to start operator %d: %w", i, err)
 		}
 		oh.Servers = append(oh.Servers, server)
 		oh.ServersV2 = append(oh.ServersV2, serverV2)
-		oh.logger.Info("Started operator", "index", i,
+		logger.Info("Started operator", "index", i,
 			"v1DispersalPort", server.GetDispersalPort(),
 			"v1RetrievalPort", server.GetRetrievalPort(),
 			"v2DispersalPort", serverV2.GetDispersalPort(),
@@ -224,33 +222,33 @@ func (oh *OperatorHarness) createOperatorListeners(operatorIndex int) (operatorL
 }
 
 // closeAllListeners closes all listeners in the slice
-func (oh *OperatorHarness) closeAllListeners(allListeners []operatorListeners) {
+func (oh *OperatorHarness) closeAllListeners(logger logging.Logger, allListeners []operatorListeners) {
 	for i, listeners := range allListeners {
 		if listeners.v1Dispersal != nil {
 			if err := listeners.v1Dispersal.Close(); err != nil {
-				oh.logger.Warn("Failed to close v1 dispersal listener", "operatorIndex", i, "error", err)
+				logger.Warn("Failed to close v1 dispersal listener", "operatorIndex", i, "error", err)
 			}
 		}
 		if listeners.v1Retrieval != nil {
 			if err := listeners.v1Retrieval.Close(); err != nil {
-				oh.logger.Warn("Failed to close v1 retrieval listener", "operatorIndex", i, "error", err)
+				logger.Warn("Failed to close v1 retrieval listener", "operatorIndex", i, "error", err)
 			}
 		}
 		if listeners.v2Dispersal != nil {
 			if err := listeners.v2Dispersal.Close(); err != nil {
-				oh.logger.Warn("Failed to close v2 dispersal listener", "operatorIndex", i, "error", err)
+				logger.Warn("Failed to close v2 dispersal listener", "operatorIndex", i, "error", err)
 			}
 		}
 		if listeners.v2Retrieval != nil {
 			if err := listeners.v2Retrieval.Close(); err != nil {
-				oh.logger.Warn("Failed to close v2 retrieval listener", "operatorIndex", i, "error", err)
+				logger.Warn("Failed to close v2 retrieval listener", "operatorIndex", i, "error", err)
 			}
 		}
 	}
 }
 
 // startOperator starts a single operator with the given index and pre-created listeners
-func (oh *OperatorHarness) startOperator(ctx context.Context, operatorIndex int, listeners operatorListeners) (*grpc.Server, *grpc.ServerV2, error) {
+func (oh *OperatorHarness) startOperator(ctx context.Context, logger logging.Logger, operatorIndex int, listeners operatorListeners) (*grpc.Server, *grpc.ServerV2, error) {
 	// Get operator's private key
 	operatorName := fmt.Sprintf("opr%d", operatorIndex)
 
@@ -489,7 +487,7 @@ func (oh *OperatorHarness) startOperator(ctx context.Context, operatorIndex int,
 
 	// Wait for servers to be ready
 	time.Sleep(100 * time.Millisecond)
-	operatorLogger.Info("Operator servers started successfully",
+	logger.Info("Operator servers started successfully",
 		"v1DispersalPort", listeners.v1Dispersal.Addr().(*net.TCPAddr).Port,
 		"v1RetrievalPort", listeners.v1Retrieval.Addr().(*net.TCPAddr).Port,
 		"v2DispersalPort", listeners.v2Dispersal.Addr().(*net.TCPAddr).Port,
