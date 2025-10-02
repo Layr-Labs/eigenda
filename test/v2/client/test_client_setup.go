@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -146,20 +147,14 @@ func GetClient(configPath string) (*TestClient, error) {
 	return client, nil
 }
 
+// skipInCI skips the test if running in a CI environment, unless explicitly running live tests in CI.
 func skipInCI(t *testing.T) {
-
-	// The environment variable "CI" will be set when running inside a github action.
-	// The environment variable "LIVE_TESTS" will be set when running live tests, which is a specific github action.
-	//
-	// There are three situations we want to consider:
-	//
-	// 1. When running a tests locally, we want to run live tests if requested. "CI" will not be set, and so
-	//    we will not skip the test.
-	// 2. When we are running general unit tests as a github action, we specifically don't want to run live tests.
-	//    "CI" will be set, and "LIVE_TESTS" will not be set, so we skip the test.
-	// 3. When we are running live tests as a github action, we want to run the test. Both "CI" and "LIVE_TESTS" will
-	//    be set, so we do not skip the test.
-	if os.Getenv("CI") != "" && os.Getenv("LIVE_TESTS") == "" {
-		t.Skip("Skipping test in CI environment")
+	// Normally we want to skip these tests in CI. But if we are explicitly running live tests in CI,
+	// do not skip them, even though we are in a CI environment.
+	if os.Getenv("LIVE_TESTS") != "" {
+		return
 	}
+
+	// We aren't running a live test, so skip if in CI.
+	test.SkipInCI(t)
 }
