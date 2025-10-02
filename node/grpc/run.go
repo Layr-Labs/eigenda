@@ -2,8 +2,6 @@ package grpc
 
 import (
 	"errors"
-	"fmt"
-	"net"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -13,8 +11,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
-
-const localhost = "0.0.0.0"
 
 func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logger logging.Logger) error {
 	if config.EnableV1 && serverV1 == nil {
@@ -34,11 +30,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			return
 		}
 		for {
-			addr := fmt.Sprintf("%s:%s", localhost, config.InternalDispersalPort)
-			listener, err := net.Listen("tcp", addr)
-			if err != nil {
-				logger.Fatalf("Could not start tcp listener: %v", err)
-			}
+			listener := serverV1.dispersalListener
 
 			opt := grpc.MaxRecvMsgSize(60 * 1024 * 1024 * 1024) // 60 GiB
 			gs := grpc.NewServer(opt)
@@ -65,11 +57,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			return
 		}
 		for {
-			addr := fmt.Sprintf("%s:%s", localhost, config.InternalV2DispersalPort)
-			listener, err := net.Listen("tcp", addr)
-			if err != nil {
-				logger.Fatalf("Could not start tcp listener: %v", err)
-			}
+			listener := serverV2.dispersalListener
 
 			opt := grpc.MaxRecvMsgSize(config.GRPCMsgSizeLimitV2)
 			gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption())
@@ -96,11 +84,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			return
 		}
 		for {
-			addr := fmt.Sprintf("%s:%s", localhost, config.InternalRetrievalPort)
-			listener, err := net.Listen("tcp", addr)
-			if err != nil {
-				logger.Fatalf("Could not start tcp listener: %v", err)
-			}
+			listener := serverV1.retrievalListener
 
 			opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
 			gs := grpc.NewServer(opt)
@@ -126,11 +110,8 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			return
 		}
 		for {
-			addr := fmt.Sprintf("%s:%s", localhost, config.InternalV2RetrievalPort)
-			listener, err := net.Listen("tcp", addr)
-			if err != nil {
-				logger.Fatalf("Could not start tcp listener: %v", err)
-			}
+			listener := serverV2.retrievalListener
+
 			opt := grpc.MaxRecvMsgSize(config.GRPCMsgSizeLimitV2)
 			gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption())
 

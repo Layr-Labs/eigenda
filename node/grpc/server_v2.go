@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"runtime"
 	"time"
 
@@ -41,6 +42,10 @@ type ServerV2 struct {
 
 	// The current software version.
 	softwareVersion *version.Semver
+
+	// Pre-created listeners for the gRPC servers
+	dispersalListener net.Listener
+	retrievalListener net.Listener
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -52,7 +57,9 @@ func NewServerV2(
 	ratelimiter common.RateLimiter,
 	registry *prometheus.Registry,
 	reader core.Reader,
-	softwareVersion *version.Semver) (*ServerV2, error) {
+	softwareVersion *version.Semver,
+	dispersalListener net.Listener,
+	retrievalListener net.Listener) (*ServerV2, error) {
 
 	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
@@ -91,7 +98,31 @@ func NewServerV2(
 		blobAuthenticator:  blobAuthenticator,
 		replayGuardian:     replayGuardian,
 		softwareVersion:    softwareVersion,
+		dispersalListener:  dispersalListener,
+		retrievalListener:  retrievalListener,
 	}, nil
+}
+
+// GetDispersalPort returns the port number the dispersal listener is bound to.
+func (s *ServerV2) GetDispersalPort() int {
+	if s.dispersalListener == nil {
+		return 0
+	}
+	return s.dispersalListener.Addr().(*net.TCPAddr).Port
+}
+
+// GetRetrievalPort returns the port number the retrieval listener is bound to.
+func (s *ServerV2) GetRetrievalPort() int {
+	if s.retrievalListener == nil {
+		return 0
+	}
+	return s.retrievalListener.Addr().(*net.TCPAddr).Port
+}
+
+// Stop gracefully stops the server
+func (s *ServerV2) Stop() {
+	// TODO: implement graceful shutdown when node supports it
+	s.logger.Info("ServerV2 stop requested")
 }
 
 func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (*pb.GetNodeInfoReply, error) {
