@@ -25,7 +25,15 @@ func VerifyBlobLength(commitments encoding.BlobCommitments) error {
 
 // VerifyLengthProof verifies the length proof (low degree proof).
 // See https://layr-labs.github.io/eigenda/protocol/architecture/encoding.html#validation-via-kzg
-// Since it doesn't depend on the encoding parameters, we leave it as a method of Verifier, not ParametrizedVerifier.
+//
+// This function verifies a low degree proof against a poly commitment.
+// We wish to show x^shift poly = shiftedPoly, with shift = 2^28 - blob_length.
+// We verify this by checking the pairing equation:
+// e( s^shift G1, p(s)G2 ) = e( G1, p(s^shift)G2 )
+// Note that we also need to verify that the blob_commitment and length_commitment are equivalent,
+// by verifying the other pairing equation: e(blob_commitment,G2) = e(length_commitment,C2)
+// This is done in [VerifyCommitEquivalenceBatch].
+// TODO(samlaf): can we move combine the 2 pairings into a single function?
 func VerifyLengthProof(
 	lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, commitmentLength uint64,
 ) error {
@@ -44,22 +52,11 @@ func VerifyLengthProof(
 	// G1ReversePowerOf2SRS contains the 28 hardcoded points that we need.
 	g1Challenge := srs.G1ReversePowerOf2SRS[commitmentLengthLog]
 
-	err := verifyLengthProof(lengthCommit, lengthProof, &g1Challenge)
+	err := eigenbn254.PairingsVerify(&g1Challenge, lengthCommit, &kzg.GenG1, lengthProof)
 	if err != nil {
-		return fmt.Errorf("low degree proof: %w", err)
+		return fmt.Errorf("verify pairing: %w", err)
 	}
 	return nil
-}
-
-// This function verifies a low degree proof against a poly commitment.
-// We wish to show x^shift poly = shiftedPoly, with shift = 2^28 - blob_length.
-// We verify this by checking the pairing equation:
-// e( s^shift G1, p(s)G2 ) = e( G1, p(s^shift)G2 )
-// Note that we also need to verify that the blob_commitment and length_commitment are equivalent,
-// by verifying the other pairing equation: e(blob_commitment,G2) = e(length_commitment,C2)
-// TODO(samlaf): can we move that other pairing check in here?
-func verifyLengthProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) error {
-	return eigenbn254.PairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
 }
 
 type CommitmentPair struct {
