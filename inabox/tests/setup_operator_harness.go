@@ -142,35 +142,26 @@ func (oh *OperatorHarness) StartOperators(ctx context.Context, logger logging.Lo
 		return fmt.Errorf("no operators found in config")
 	}
 
-	logger.Info("Pre-creating listeners for operator goroutines", "count", operatorCount)
+	logger.Info("Starting operators", "count", operatorCount)
 
-	// Pre-create all listeners with port 0 (OS assigns ports)
-	allListeners := make([]operatorListeners, operatorCount)
+	// Create listeners and start each operator
 	for i := range operatorCount {
 		listeners, err := oh.createOperatorListeners(i)
 		if err != nil {
-			// Clean up any listeners we created before failing
-			oh.closeAllListeners(logger, allListeners[:i])
-			return err
+			// Clean up any operators already started (Stop() will close their listeners)
+			oh.Cleanup(logger)
+			return fmt.Errorf("failed to create listeners for operator %d: %w", i, err)
 		}
-		allListeners[i] = listeners
 
-		logger.Info("Created listeners for operator", "index", i,
-			"v1DispersalPort", listeners.v1Dispersal.Addr().(*net.TCPAddr).Port,
-			"v1RetrievalPort", listeners.v1Retrieval.Addr().(*net.TCPAddr).Port,
-			"v2DispersalPort", listeners.v2Dispersal.Addr().(*net.TCPAddr).Port,
-			"v2RetrievalPort", listeners.v2Retrieval.Addr().(*net.TCPAddr).Port)
-	}
-
-	// Now start each operator with its pre-created listeners
-	for i, listeners := range allListeners {
 		server, serverV2, err := oh.startOperator(ctx, logger, i, listeners)
 		if err != nil {
-			// Clean up any operators we started and all remaining listeners
-			oh.Cleanup(context.Background(), logger)
-			oh.closeAllListeners(logger, allListeners[i:])
+			// Close listeners for this failed operator
+			oh.closeListeners(logger, listeners)
+			// Clean up any operators already started (Stop() will close their listeners)
+			oh.Cleanup(logger)
 			return fmt.Errorf("failed to start operator %d: %w", i, err)
 		}
+
 		oh.Servers = append(oh.Servers, server)
 		oh.ServersV2 = append(oh.ServersV2, serverV2)
 		logger.Info("Started operator", "index", i,
@@ -221,28 +212,26 @@ func (oh *OperatorHarness) createOperatorListeners(operatorIndex int) (operatorL
 	return listeners, nil
 }
 
-// closeAllListeners closes all listeners in the slice
-func (oh *OperatorHarness) closeAllListeners(logger logging.Logger, allListeners []operatorListeners) {
-	for i, listeners := range allListeners {
-		if listeners.v1Dispersal != nil {
-			if err := listeners.v1Dispersal.Close(); err != nil {
-				logger.Warn("Failed to close v1 dispersal listener", "operatorIndex", i, "error", err)
-			}
+// closeListeners closes a set of operator listeners
+func (oh *OperatorHarness) closeListeners(logger logging.Logger, listeners operatorListeners) {
+	if listeners.v1Dispersal != nil {
+		if err := listeners.v1Dispersal.Close(); err != nil {
+			logger.Warn("Failed to close v1 dispersal listener", "error", err)
 		}
-		if listeners.v1Retrieval != nil {
-			if err := listeners.v1Retrieval.Close(); err != nil {
-				logger.Warn("Failed to close v1 retrieval listener", "operatorIndex", i, "error", err)
-			}
+	}
+	if listeners.v1Retrieval != nil {
+		if err := listeners.v1Retrieval.Close(); err != nil {
+			logger.Warn("Failed to close v1 retrieval listener", "error", err)
 		}
-		if listeners.v2Dispersal != nil {
-			if err := listeners.v2Dispersal.Close(); err != nil {
-				logger.Warn("Failed to close v2 dispersal listener", "operatorIndex", i, "error", err)
-			}
+	}
+	if listeners.v2Dispersal != nil {
+		if err := listeners.v2Dispersal.Close(); err != nil {
+			logger.Warn("Failed to close v2 dispersal listener", "error", err)
 		}
-		if listeners.v2Retrieval != nil {
-			if err := listeners.v2Retrieval.Close(); err != nil {
-				logger.Warn("Failed to close v2 retrieval listener", "operatorIndex", i, "error", err)
-			}
+	}
+	if listeners.v2Retrieval != nil {
+		if err := listeners.v2Retrieval.Close(); err != nil {
+			logger.Warn("Failed to close v2 retrieval listener", "error", err)
 		}
 	}
 }
@@ -504,7 +493,7 @@ func (oh *OperatorHarness) startOperator(
 }
 
 // Cleanup releases resources held by the OperatorHarness
-func (oh *OperatorHarness) Cleanup(ctx context.Context, logger logging.Logger) {
+func (oh *OperatorHarness) Cleanup(logger logging.Logger) {
 	if len(oh.Servers) == 0 {
 		return
 	}

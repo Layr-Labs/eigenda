@@ -89,10 +89,21 @@ func (s *Server) GetRetrievalPort() int {
 	return s.retrievalListener.Addr().(*net.TCPAddr).Port
 }
 
-// Stop gracefully stops the server
+// Stop shuts down the listeners
 func (s *Server) Stop() {
-	// TODO(dmanc): implement graceful shutdown
 	s.logger.Info("Server stop requested")
+
+	if s.dispersalListener != nil {
+		if err := s.dispersalListener.Close(); err != nil {
+			s.logger.Warn("Failed to close dispersal listener", "error", err)
+		}
+	}
+
+	if s.retrievalListener != nil {
+		if err := s.retrievalListener.Close(); err != nil {
+			s.logger.Warn("Failed to close retrieval listener", "error", err)
+		}
+	}
 }
 
 func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {

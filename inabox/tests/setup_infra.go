@@ -161,7 +161,7 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	defer cleanupCancel()
 
 	// Stop operator goroutines using the harness cleanup
-	infra.OperatorHarness.Cleanup(cleanupCtx, infra.Logger)
+	infra.OperatorHarness.Cleanup(infra.Logger)
 
 	// Stop test binaries
 	infra.Logger.Info("Stopping binaries")
