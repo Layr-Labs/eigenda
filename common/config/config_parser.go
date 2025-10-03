@@ -12,8 +12,7 @@ import (
 )
 
 // ParseConfigFromCLI parses configuration, pulling config paths from command line arguments. Assumes that any command
-// line argument, if present, is a config path. The resulting config is written into target. If there should be default
-// values in the config, target should be initialized with those default values before calling this function.
+// line argument, if present, is a config path. Default values must be set in the constructor.
 func ParseConfigFromCLI[T VerifiableConfig](constructor func() T, envPrefix string) (T, error) {
 	configPaths := make([]string, 0)
 	configPaths = append(configPaths, os.Args...)

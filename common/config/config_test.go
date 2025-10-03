@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/node"
 	"github.com/stretchr/testify/require"
 )
 
@@ -458,4 +459,27 @@ func TestVerificaitonFailure(t *testing.T) {
 	_, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "String may not be 'invalid'")
+}
+
+func TestDocGeneration(t *testing.T) {
+
+	packagePaths := []string{
+		"github.com/Layr-Labs/eigenda/node",
+		"github.com/Layr-Labs/eigensdk-go/signer/bls/types",
+		"github.com/Layr-Labs/eigenda/common/geth",
+		"github.com/Layr-Labs/eigenda/common",
+		"github.com/Layr-Labs/eigensdk-go/logging",
+		"github.com/Layr-Labs/eigenda/encoding/kzg",
+		"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation",
+	}
+
+	err := DocumentConfig(
+		func() node.Config {
+			return node.Config{}
+		},
+		"NODE",
+		packagePaths,
+		"config.md")
+	require.NoError(t, err)
+
 }
