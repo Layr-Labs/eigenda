@@ -77,33 +77,3 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 	}
 
 }
-
-func BenchmarkVerifyBlob(b *testing.B) {
-	harness := getTestHarness()
-
-	committer, err := committer.NewFromConfig(*harness.committerConfig)
-	require.NoError(b, err)
-
-	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
-	require.NoError(b, err)
-
-	blobSize := 8 * 256
-	numSamples := 30
-	blobs := make([][]byte, numSamples)
-	for i := 0; i < numSamples; i++ {
-		blob := make([]byte, blobSize)
-		_, _ = rand.Read(blob)
-		blobs[i] = blob
-	}
-
-	commitments, err := committer.GetCommitmentsForPaddedLength(blobs[0])
-	require.NoError(b, err)
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		err = v.VerifyBlobLength(commitments)
-		require.NoError(b, err)
-	}
-
-}

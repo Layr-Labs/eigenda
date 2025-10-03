@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/big"
 
+	eigenbn254 "github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/resources/srs"
 
@@ -161,22 +162,20 @@ func (v *Verifier) UniversalVerifySubBatch(
 		samples[i] = sample
 	}
 
-	return v.UniversalVerify(params, samples, numBlobs)
+	return v.universalVerify(params, samples, numBlobs)
 }
 
 // UniversalVerify implements batch verification on a set of chunks given the same chunk dimension (chunkLen, numChunk).
 // The details is given in Ethereum Research post whose authors are George Kadianakis, Ansgar Dietrichs, Dankrad Feist
 // https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240
 //
-// m is number of blob, samples is a list of chunks
-//
-// The order of samples do not matter.
+// samples is a list of chunks. The order of samples do not matter.
 // Each sample need not have unique row, it is possible that multiple chunks of the same blob are validated altogether
-func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sample, m int) error {
+func (v *Verifier) universalVerify(params encoding.EncodingParams, samples []Sample, numBlobs int) error {
 	// precheck
 	for i, s := range samples {
-		if s.RowIndex >= m {
-			fmt.Printf("sample %v has %v Row, but there are only %v blobs\n", i, s.RowIndex, m)
+		if s.RowIndex >= numBlobs {
+			fmt.Printf("sample %v has %v Row, but there are only %v blobs\n", i, s.RowIndex, numBlobs)
 			return errors.New("sample.RowIndex and numBlob are inconsistent")
 		}
 	}
@@ -193,13 +192,13 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 	}
 
 	n := len(samples)
-	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLength, m)
+	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLength, numBlobs)
 	if n == 0 {
 		return errors.New("the number of samples (i.e. chunks) must not be empty")
 	}
 
 	// generate random field elements to aggregate equality check
-	randomsFr, err := CreateRandomnessVector(n)
+	randomsFr, err := eigenbn254.RandomFrs(n)
 	if err != nil {
 		return err
 	}
@@ -230,7 +229,7 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 	rhsG1, err := genRhsG1(
 		samples,
 		randomsFr,
-		m,
+		numBlobs,
 		params,
 		verifier.Fs,
 		verifier.g1SRS,
@@ -240,5 +239,5 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 		return fmt.Errorf("generate rhsG1: %w", err)
 	}
 
-	return pairingsVerify(&lhsG1, lhsG2, rhsG1, rhsG2)
+	return eigenbn254.PairingsVerify(&lhsG1, lhsG2, rhsG1, rhsG2)
 }

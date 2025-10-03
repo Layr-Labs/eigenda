@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 )
 
-func TestVerify(t *testing.T) {
+func TestVerifyFrame(t *testing.T) {
 	harness := getTestHarness()
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))

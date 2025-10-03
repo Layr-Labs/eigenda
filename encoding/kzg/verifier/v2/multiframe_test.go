@@ -29,7 +29,7 @@ func TestUniversalVerify(t *testing.T) {
 	require.Nil(t, err)
 
 	numBlob := 5
-	samples := make([]verifier.Sample, 0)
+	samples := make([]encoding.Sample, 0)
 	for z := 0; z < numBlob; z++ {
 		inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 		require.Nil(t, err)
@@ -49,18 +49,17 @@ func TestUniversalVerify(t *testing.T) {
 
 			assert.Equal(t, j, q, "leading coset inconsistency")
 
-			sample := verifier.Sample{
-				Commitment: *commit,
-				Proof:      f.Proof,
-				RowIndex:   z,
-				Coeffs:     f.Coeffs,
-				X:          uint(q),
+			sample := encoding.Sample{
+				Commitment:      (*encoding.G1Commitment)(commit),
+				Chunk:           &f,
+				BlobIndex:       z,
+				AssignmentIndex: uint(i),
 			}
 			samples = append(samples, sample)
 		}
 	}
 
-	assert.True(t, v.UniversalVerify(params, samples, numBlob) == nil, "universal batch verification failed\n")
+	assert.True(t, v.UniversalVerifySubBatch(params, samples, numBlob) == nil, "universal batch verification failed\n")
 }
 
 func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
@@ -79,7 +78,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	assert.NoError(t, err)
 
 	numBlob := 5
-	samples := make([]verifier.Sample, 0)
+	samples := make([]encoding.Sample, 0)
 	for z := 0; z < numBlob; z++ {
 		inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 		require.Nil(t, err)
@@ -99,16 +98,15 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 
 			assert.Equal(t, j, q, "leading coset inconsistency")
 
-			sample := verifier.Sample{
-				Commitment: *commit,
-				Proof:      f.Proof,
-				RowIndex:   z,
-				Coeffs:     f.Coeffs,
-				X:          uint(q),
+			sample := encoding.Sample{
+				Commitment:      (*encoding.G1Commitment)(commit),
+				Chunk:           &f,
+				BlobIndex:       z,
+				AssignmentIndex: uint(i),
 			}
 			samples = append(samples, sample)
 		}
 	}
 
-	assert.True(t, v.UniversalVerify(params, samples, numBlob) == nil, "universal batch verification failed\n")
+	assert.True(t, v.UniversalVerifySubBatch(params, samples, numBlob) == nil, "universal batch verification failed\n")
 }

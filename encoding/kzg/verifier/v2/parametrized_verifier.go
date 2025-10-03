@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/big"
 
+	eigenbn254 "github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -16,7 +17,6 @@ import (
 )
 
 type ParametrizedVerifier struct {
-	*KzgConfig
 	g1SRS kzg.G1SRS
 	Fs    *fft.FFTSettings
 }
@@ -82,5 +82,5 @@ func verifyFrame(
 	// e([commitment - interpolation_polynomial]^(-1), [1]) * e([proof],  [s^n - x^n]) = 1_T
 	//
 
-	return pairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &frame.Proof, &xnMinusYn)
+	return eigenbn254.PairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &frame.Proof, &xnMinusYn)
 }
