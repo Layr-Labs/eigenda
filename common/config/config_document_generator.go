@@ -32,7 +32,7 @@ func DocumentConfig[T any]( // TODO T VerifiableConfig
 
 	if t.Name() == "" {
 		return fmt.Errorf("target type must be a named type, got %v", t)
-	}}
+	}
 
 	fields, err := gatherConfigFieldData(defaultConfig, envPrefix, packagePaths)
 	if err != nil {
@@ -40,7 +40,7 @@ func DocumentConfig[T any]( // TODO T VerifiableConfig
 	}
 
 	markdownString := generateMarkdownDoc(t.Name(), fields)
-	
+
 	if outputPath == "" {
 		fmt.Println(markdownString)
 		return nil
