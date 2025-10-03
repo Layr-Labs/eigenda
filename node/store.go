@@ -90,6 +90,7 @@ func (s *Store) DeleteExpiredEntries(currentTimeUnixSec int64, timeLimitSec uint
 	for {
 		select {
 		case <-ctx.Done():
+			s.logger.Info("Stopping DeleteExpiredEntries due to context cancellation")
 			return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, ctx.Err()
 		default:
 			blobsDeleted, err := s.deleteExpiredBlobs(currentTimeUnixSec, numBatchesToDeleteAtomically)
