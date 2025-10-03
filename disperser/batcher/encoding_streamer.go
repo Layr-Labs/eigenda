@@ -328,9 +328,10 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 			continue
 		}
 
-		blobLength := encoding.GetBlobLength(metadata.RequestMetadata.BlobSize)
+		blobLength := encoding.GetBlobLength(uint32(metadata.RequestMetadata.BlobSize))
 
-		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(state.OperatorState, blobLength, e.StreamerConfig.TargetNumChunks, quorum)
+		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(
+			state.OperatorState, uint(blobLength), e.TargetNumChunks, quorum)
 		if err != nil {
 			e.logger.Error("error calculating chunk length", "err", err)
 			continue
@@ -345,7 +346,8 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 			},
 			ChunkLength: chunkLength,
 		}
-		assignments, info, err := e.assignmentCoordinator.GetAssignments(state.OperatorState, blobLength, blobQuorumInfo)
+		assignments, info, err := e.assignmentCoordinator.GetAssignments(
+			state.OperatorState, uint(blobLength), blobQuorumInfo)
 		if err != nil {
 			e.logger.Error("error getting assignments", "err", err)
 			continue

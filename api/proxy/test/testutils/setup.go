@@ -15,9 +15,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	enablement "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
@@ -25,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
@@ -132,6 +133,9 @@ type TestConfig struct {
 	UseKeccak256ModeS3 bool
 	UseS3Caching       bool
 	UseS3Fallback      bool
+
+	ClientLedgerMode     clientledger.ClientLedgerMode
+	VaultMonitorInterval time.Duration
 }
 
 // NewTestConfig returns a new TestConfig
@@ -156,16 +160,18 @@ func NewTestConfig(
 			OpKeccakCommitment:  true,
 			StandardCommitment:  true,
 		},
-		BackendsToEnable:   backendsToEnable,
-		DispersalBackend:   dispersalBackend,
-		Backend:            backend,
-		Retrievers:         []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
-		Expiration:         14 * 24 * time.Hour,
-		UseKeccak256ModeS3: false,
-		UseS3Caching:       false,
-		UseS3Fallback:      false,
-		WriteThreadCount:   0,
-		WriteOnCacheMiss:   false,
+		BackendsToEnable:     backendsToEnable,
+		DispersalBackend:     dispersalBackend,
+		Backend:              backend,
+		Retrievers:           []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
+		Expiration:           14 * 24 * time.Hour,
+		UseKeccak256ModeS3:   false,
+		UseS3Caching:         false,
+		UseS3Fallback:        false,
+		WriteThreadCount:     0,
+		WriteOnCacheMiss:     false,
+		ClientLedgerMode:     clientledger.ClientLedgerModeLegacy,
+		VaultMonitorInterval: 30 * time.Second,
 	}
 }
 
@@ -266,7 +272,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			G2Path:          "../../resources/g2.point",
 			G2TrailingPath:  "../../resources/g2.trailing.point",
 			CacheDir:        "../../resources/SRSTables",
-			SRSOrder:        eigendaflags.SrsOrder,
+			SRSOrder:        encoding.SRSOrder,
 			SRSNumberToLoad: maxBlobLengthBytes / 32,
 			NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 			LoadG2Points:    true,
@@ -299,7 +305,8 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			EigenDACertVerifierOrRouterAddress: certVerifierAddress,
 			EigenDADirectory:                   eigenDADirectory,
 			RetrieversToEnable:                 testCfg.Retrievers,
-			ClientLedgerMode:                   clientledger.ClientLedgerModeLegacy,
+			ClientLedgerMode:                   testCfg.ClientLedgerMode,
+			VaultMonitorInterval:               testCfg.VaultMonitorInterval,
 		},
 	}
 	if useMemory {
@@ -338,6 +345,10 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			Host:        host,
 			Port:        0,
 			APIsEnabled: testCfg.EnabledRestAPIs,
+		},
+		ArbCustomDASvrCfg: arbitrum_altda.Config{
+			Host: host,
+			Port: 0,
 		},
 	}
 }

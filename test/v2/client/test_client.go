@@ -18,7 +18,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
@@ -34,7 +33,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test/random"
@@ -56,7 +55,7 @@ type TestClient struct {
 	config                      *TestClientConfig
 	payloadClientConfig         *clientsv2.PayloadClientConfig
 	logger                      logging.Logger
-	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
+	certVerifierAddressProvider clientsv2.CertVerifierAddressProvider
 	disperserClient             *clientsv2.DisperserClient
 	payloadDisperser            *payloaddispersal.PayloadDisperser
 	relayClient                 relay.RelayClient
@@ -129,20 +128,14 @@ func NewTestClient(
 		g2TrailingPath = ""
 	}
 
-	kzgConfig := &kzg.KzgConfig{
-		LoadG2Points:    true,
-		G1Path:          g1Path,
-		G2Path:          g2Path,
-		G2TrailingPath:  g2TrailingPath,
-		CacheDir:        srsTablesPath,
-		SRSOrder:        config.SRSOrder,
-		SRSNumberToLoad: config.SRSNumberToLoad,
-		NumWorker:       32,
-	}
-
-	kzgProver, err := prover.NewProver(kzgConfig, nil)
+	kzgCommitter, err := committer.NewFromConfig(committer.Config{
+		G1SRSPath:         g1Path,
+		G2SRSPath:         g2Path,
+		G2TrailingSRSPath: g2TrailingPath,
+		SRSNumberToLoad:   config.SRSNumberToLoad,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create KZG prover: %w", err)
+		return nil, fmt.Errorf("new committer: %w", err)
 	}
 
 	disperserConfig := &clientsv2.DisperserClientConfig{
@@ -157,14 +150,14 @@ func NewTestClient(
 		logger,
 		disperserConfig,
 		signer,
-		kzgProver,
+		kzgCommitter,
 		accountant,
 		metricsv2.NoopDispersalMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}
-	err = disperserClient.PopulateAccountant(context.Background())
+	err = disperserClient.PopulateAccountant(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to populate accountant: %w", err)
 	}
@@ -210,7 +203,15 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}
 
-	certVerifierAddressProvider := &test.TestCertVerifierAddressProvider{}
+	routerAddress, err := contractDirectory.GetContractAddress(ctx, directory.CertVerifierRouter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CertVerifierRouter address from contract directory: %w", err)
+	}
+
+	certVerifierAddressProvider, err := verification.BuildRouterAddressProvider(routerAddress, ethClient, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cert verifier address provider: %w", err)
+	}
 
 	certVerifier, err := verification.NewCertVerifier(logger, ethClient, certVerifierAddressProvider)
 	if err != nil {
@@ -296,8 +297,17 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
-	verifierKzgConfig := kzgConfig
-	verifierKzgConfig.LoadG2Points = false
+	kzgConfig := &kzg.KzgConfig{
+		LoadG2Points:    true,
+		G1Path:          g1Path,
+		G2Path:          g2Path,
+		G2TrailingPath:  g2TrailingPath,
+		CacheDir:        srsTablesPath,
+		SRSOrder:        config.SRSOrder,
+		SRSNumberToLoad: config.SRSNumberToLoad,
+		NumWorker:       32,
+	}
+	verifierKzgConfig := verifier.KzgConfigFromV1Config(kzgConfig)
 	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
@@ -375,7 +385,7 @@ func NewTestClient(
 		onlyDownloadClientConfig,
 		validatorClientMetrics)
 
-	proxyWrapper, err := NewProxyWrapper(context.Background(), logger,
+	proxyWrapper, err := NewProxyWrapper(ctx, logger,
 		&proxyconfig.AppConfig{
 			SecretConfig: proxycommon.SecretConfigV2{
 				SignerPaymentKey: privateKey,
@@ -429,7 +439,7 @@ func NewTestClient(
 					VaultMonitorInterval:               time.Second * 30,
 					PutTries:                           3,
 					MaxBlobSizeBytes:                   16 * units.MiB,
-					EigenDACertVerifierOrRouterAddress: config.EigenDACertVerifierAddressQuorums0_1,
+					EigenDACertVerifierOrRouterAddress: routerAddress.Hex(),
 					EigenDADirectory:                   contractDirectoryAddress.Hex(),
 					RetrieversToEnable: []proxycommon.RetrieverType{
 						proxycommon.RelayRetrieverType,
@@ -533,12 +543,6 @@ func (c *TestClient) GetConfig() *TestClientConfig {
 // GetLogger returns the test client's logger.
 func (c *TestClient) GetLogger() logging.Logger {
 	return c.logger
-}
-
-// SetCertVerifierAddress sets the address string which will be returned by the cert verifier address to all users of
-// the provider
-func (c *TestClient) SetCertVerifierAddress(certVerifierAddress string) {
-	c.certVerifierAddressProvider.SetCertVerifierAddress(gethcommon.HexToAddress(certVerifierAddress))
 }
 
 // GetDisperserClient returns the test client's disperser client.
@@ -655,7 +659,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		blobKey,
 		eigenDAV3Cert.RelayKeys(),
 		payload,
-		uint32(blobLengthSymbols),
+		blobLengthSymbols,
 		0)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
@@ -877,7 +881,7 @@ func (c *TestClient) ReadBlobFromValidators(
 			return fmt.Errorf("failed to read blob from validators, %s", err)
 		}
 
-		blobLengthSymbols := uint32(header.BlobCommitments.Length)
+		blobLengthSymbols := header.BlobCommitments.Length
 		var blob *coretypes.Blob
 		blob, err = coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
 		if err != nil {

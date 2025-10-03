@@ -274,7 +274,9 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 		return blobKey, params, errors.New("number of chunks must be greater than zero")
 	}
 
-	if req.GetBlobSize() == 0 || uint64(encoding.GetBlobLength(uint(req.GetBlobSize()))) > req.GetEncodingParams().GetChunkLength()*req.GetEncodingParams().GetNumChunks() {
+	if req.GetBlobSize() == 0 ||
+		(uint64(encoding.GetBlobLength(uint32(req.GetBlobSize()))) >
+			req.GetEncodingParams().GetChunkLength()*req.GetEncodingParams().GetNumChunks()) {
 		return blobKey, params, errors.New("blob size is invalid")
 	}
 
@@ -289,7 +291,7 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 		NumChunks:   req.GetEncodingParams().GetNumChunks(),
 	}
 
-	err = encoding.ValidateEncodingParams(params, s.prover.GetSRSOrder())
+	err = encoding.ValidateEncodingParams(params, encoding.SRSOrder)
 	if err != nil {
 		return blobKey, params, fmt.Errorf("invalid encoding parameters: %v", err)
 	}

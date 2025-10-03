@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/urfave/cli"
 )
 
@@ -24,15 +25,17 @@ const (
 )
 
 type Config struct {
-	DisperserVersion              DisperserVersion
-	AwsClientConfig               aws.ClientConfig
-	BlobstoreConfig               blobstore.Config
-	ServerConfig                  disperser.ServerConfig
-	LoggerConfig                  common.LoggerConfig
-	MetricsConfig                 disperser.MetricsConfig
-	RatelimiterConfig             ratelimit.Config
-	RateConfig                    apiserver.RateConfig
-	EncodingConfig                kzg.KzgConfig
+	DisperserVersion  DisperserVersion
+	AwsClientConfig   aws.ClientConfig
+	BlobstoreConfig   blobstore.Config
+	ServerConfig      disperser.ServerConfig
+	LoggerConfig      common.LoggerConfig
+	MetricsConfig     disperser.MetricsConfig
+	RatelimiterConfig ratelimit.Config
+	RateConfig        apiserver.RateConfig
+	// KzgCommitterConfig is only needed when DisperserVersion is V2.
+	// It's used by the grpc endpoint we expose to compute client commitments.
+	KzgCommitterConfig            committer.Config
 	EnableRatelimiter             bool
 	EnablePaymentMeterer          bool
 	ReservedOnly                  bool
@@ -44,7 +47,7 @@ type Config struct {
 	BucketStoreSize               int
 	EthClientConfig               geth.EthClientConfig
 	MaxBlobSize                   int
-	MaxNumSymbolsPerBlob          uint
+	MaxNumSymbolsPerBlob          uint32
 	OnchainStateRefreshInterval   time.Duration
 	ControllerAddress             string
 	UseControllerMediatedPayments bool
@@ -77,21 +80,23 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 
-	encodingConfig := kzg.ReadCLIConfig(ctx)
+	kzgCommitterConfig := committer.Config{
+		SRSNumberToLoad:   ctx.GlobalUint64(kzg.SRSLoadingNumberFlagName),
+		G1SRSPath:         ctx.GlobalString(kzg.G1PathFlagName),
+		G2SRSPath:         ctx.GlobalString(kzg.G2PathFlagName),
+		G2TrailingSRSPath: ctx.GlobalString(kzg.G2TrailingPathFlagName),
+	}
 	if version == uint(V2) {
-		if encodingConfig.G1Path == "" {
+		if kzgCommitterConfig.G1SRSPath == "" {
 			return Config{}, fmt.Errorf("G1Path must be specified for disperser version 2")
 		}
-		if encodingConfig.G2Path == "" {
+		if kzgCommitterConfig.G2SRSPath == "" {
 			return Config{}, fmt.Errorf("G2Path must be specified for disperser version 2")
 		}
-		if encodingConfig.CacheDir == "" {
-			return Config{}, fmt.Errorf("CacheDir must be specified for disperser version 2")
+		if kzgCommitterConfig.G2TrailingSRSPath == "" {
+			return Config{}, fmt.Errorf("G2TrailingPath must be specified for disperser version 2")
 		}
-		if encodingConfig.SRSOrder <= 0 {
-			return Config{}, fmt.Errorf("SRSOrder must be specified for disperser version 2")
-		}
-		if encodingConfig.SRSNumberToLoad <= 0 {
+		if kzgCommitterConfig.SRSNumberToLoad <= 0 {
 			return Config{}, fmt.Errorf("SRSNumberToLoad must be specified for disperser version 2")
 		}
 	}
@@ -119,7 +124,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		RatelimiterConfig:             ratelimiterConfig,
 		RateConfig:                    rateConfig,
-		EncodingConfig:                encodingConfig,
+		KzgCommitterConfig:            kzgCommitterConfig,
 		EnableRatelimiter:             ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		EnablePaymentMeterer:          ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
 		ReservedOnly:                  ctx.GlobalBoolT(flags.ReservedOnly.Name),
@@ -133,7 +138,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChainReadTimeout:              ctx.GlobalDuration(flags.ChainReadTimeout.Name),
 		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
 		MaxBlobSize:                   ctx.GlobalInt(flags.MaxBlobSize.Name),
-		MaxNumSymbolsPerBlob:          ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
+		MaxNumSymbolsPerBlob:          uint32(ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name)),
 		OnchainStateRefreshInterval:   ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
 		EigenDADirectory:                ctx.GlobalString(flags.EigenDADirectoryFlag.Name),

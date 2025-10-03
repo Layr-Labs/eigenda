@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common"
@@ -171,7 +172,7 @@ func (s *DispersalServerV2) checkPaymentMeter(
 	if err != nil {
 		return status.Newf(codes.InvalidArgument, "invalid blob header: %s", err.Error())
 	}
-	blobLength := encoding.GetBlobLengthPowerOf2(uint(len(req.GetBlob())))
+	blobLength := encoding.GetBlobLengthPowerOf2(uint32(len(req.GetBlob())))
 
 	// handle payments and check rate limits
 	timestamp := blobHeaderProto.GetPaymentHeader().GetTimestamp()
@@ -211,12 +212,12 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(signature))
 	}
 	blob := req.GetBlob()
-	blobSize := len(blob)
+	blobSize := uint32(len(blob))
 	if blobSize == 0 {
 		return nil, errors.New("blob size must be greater than 0")
 	}
-	blobLength := encoding.GetBlobLengthPowerOf2(uint(blobSize))
-	if blobLength > uint(s.maxNumSymbolsPerBlob) {
+	blobLength := encoding.GetBlobLengthPowerOf2(blobSize)
+	if blobLength > s.maxNumSymbolsPerBlob {
 		return nil, errors.New("blob size too big")
 	}
 
@@ -229,11 +230,11 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, errors.New("blob header must contain a commitment")
 	}
 	commitedBlobLength := blobHeaderProto.GetCommitment().GetLength()
-	if commitedBlobLength == 0 || commitedBlobLength != encoding.NextPowerOf2(commitedBlobLength) {
+	if commitedBlobLength == 0 || commitedBlobLength != math.NextPowOf2u32(commitedBlobLength) {
 		return nil, errors.New("invalid commitment length, must be a power of 2")
 	}
-	lengthPowerOf2 := encoding.GetBlobLengthPowerOf2(uint(blobSize))
-	if lengthPowerOf2 > uint(commitedBlobLength) {
+	lengthPowerOf2 := encoding.GetBlobLengthPowerOf2(blobSize)
+	if lengthPowerOf2 > commitedBlobLength {
 		return nil, fmt.Errorf("commitment length %d is less than blob length %d", commitedBlobLength, lengthPowerOf2)
 	}
 
@@ -293,7 +294,7 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
-	commitments, err := s.prover.GetCommitmentsForPaddedLength(blob)
+	commitments, err := s.committer.GetCommitmentsForPaddedLength(blob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commitments: %w", err)
 	}

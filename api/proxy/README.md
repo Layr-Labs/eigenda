@@ -12,7 +12,7 @@ A basic REST proxy server to interact with the EigenDA network:
 [![push-image-ghcr](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml)
 
 
-[V1 Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client)
+[V1 Integration Guide](https://docs.eigencloud.xyz/products/eigenda/integrations-guides/v1/eigenda-proxyv1) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client)
 
 ## Overview
 
@@ -78,7 +78,7 @@ We build and publish containers on every release to [ghcr.io/layr-labs/eigenda-p
 
 ### REST API Routes
 
-The source of truth for the routes is defined by our gorilla mux router in [./server/routing.go](./server/routing.go). We offer two sets of POST/GET routes.
+The source of truth for the routes is defined by our gorilla mux router in [./server/routing.go](https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/servers/rest/routing.go). We offer two sets of POST/GET routes.
 
 #### Standard Routes
 
@@ -329,7 +329,7 @@ This behavior is turned on by default, but configurable via the `--eigenda.confi
 
 #### Authn/Authz/Payments
 
-In order to disperse to the EigenDA V1 network in production, or at high throughput on testnet, please register your authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication keypair address should not be associated with any funds anywhere. For EigenDA V2, please see our [payments](https://docs.eigenda.xyz/releases/payments) doc.
+In order to disperse to the EigenDA V1 network in production, or at high throughput on testnet, please register your authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication keypair address should not be associated with any funds anywhere. For EigenDA V2, please see our [payments](https://docs.eigencloud.xyz/products/eigenda/core-concepts/payments) doc.
 
 > Note: Proxy only supports using a single authorization (v1) or payment (v2) key. For RaaS providers, we discourage sharing keys between rollups, and thus recommend running a single instance of the Proxy per Rollup.
 

@@ -12,10 +12,11 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
@@ -264,8 +265,10 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	if config.ServerConfig.EnableServer {
+		logger.Info("Controller gRPC server ENABLED", "port", config.ServerConfig.GrpcPort)
 		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
 		if config.ServerConfig.EnablePaymentAuthentication {
+			logger.Info("Payment authentication ENABLED - building payment authorization handler")
 			paymentAuthorizationHandler, err = buildPaymentAuthorizationHandler(
 				c,
 				logger,
@@ -274,10 +277,13 @@ func RunController(ctx *cli.Context) error {
 				contractDirectory,
 				gethClient,
 				dynamoClient.GetAwsClient(),
+				metricsRegistry,
 			)
 			if err != nil {
 				return fmt.Errorf("build payment authorization handler: %w", err)
 			}
+		} else {
+			logger.Warn("Payment authentication DISABLED - payment requests will fail")
 		}
 
 		grpcServer, err := server.NewServer(
@@ -335,11 +341,12 @@ func RunController(ctx *cli.Context) error {
 func buildPaymentAuthorizationHandler(
 	ctx context.Context,
 	logger logging.Logger,
-	onDemandConfig ondemand.OnDemandLedgerCacheConfig,
-	reservationConfig reservation.ReservationLedgerCacheConfig,
+	onDemandConfig ondemandvalidation.OnDemandLedgerCacheConfig,
+	reservationConfig reservationvalidation.ReservationLedgerCacheConfig,
 	contractDirectory *directory.ContractDirectory,
 	ethClient common.EthClient,
 	awsDynamoClient *awsdynamodb.Client,
+	metricsRegistry *prometheus.Registry,
 ) (*controllerpayments.PaymentAuthorizationHandler, error) {
 	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
@@ -365,25 +372,50 @@ func buildPaymentAuthorizationHandler(
 		globalSymbolsPerSecond,
 		globalRatePeriodInterval,
 		time.Now,
+		meterer.NewOnDemandMetererMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
 	)
 
-	onDemandValidator, err := ondemand.NewOnDemandPaymentValidator(
+	onDemandValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
 		ctx,
 		logger,
 		onDemandConfig,
 		paymentVault,
 		awsDynamoClient,
+		ondemandvalidation.NewOnDemandValidatorMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+		ondemandvalidation.NewOnDemandCacheMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create on-demand payment validator: %w", err)
 	}
 
-	reservationValidator, err := reservation.NewReservationPaymentValidator(
+	reservationValidator, err := reservationvalidation.NewReservationPaymentValidator(
 		ctx,
 		logger,
 		reservationConfig,
 		paymentVault,
 		time.Now,
+		reservationvalidation.NewReservationValidatorMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+		reservationvalidation.NewReservationCacheMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create reservation payment validator: %w", err)

@@ -1,8 +1,6 @@
 package metrics
 
 import (
-	"time"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -12,8 +10,8 @@ import (
 )
 
 const (
-	namespace                  = "eigenda_controller"
-	authorizePaymentsSubsystem = "authorize_payments"
+	Namespace                  = "eigenda_controller"
+	AuthorizePaymentsSubsystem = "authorize_payments"
 )
 
 // Encapsulates metrics for the controller GRPC server
@@ -21,9 +19,9 @@ type ServerMetrics struct {
 	logger           logging.Logger
 	grpcServerOption grpc.ServerOption
 
-	// AuthorizePayment metrics
-	authorizePaymentLatency      *prometheus.SummaryVec
-	authorizePaymentAuthFailures *prometheus.CounterVec
+	paymentAuthorizationStageTimer *common.StageTimer
+	paymentAuthorizationFailures   prometheus.Counter
+	paymentAuthorizationReplays    prometheus.Counter
 }
 
 func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *ServerMetrics {
@@ -37,34 +35,32 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 		grpcMetrics.UnaryServerInterceptor(),
 	)
 
-	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
-
-	authorizePaymentLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  namespace,
-			Name:       "authorize_payment_latency_ms",
-			Subsystem:  authorizePaymentsSubsystem,
-			Help:       "Total latency of the AuthorizePayment RPC",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	authorizePaymentAuthFailures := promauto.With(registry).NewCounterVec(
+	paymentAuthorizationFailures := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "authorize_payment_auth_failure_count",
-			Subsystem: authorizePaymentsSubsystem,
-			Help:      "Number of AuthorizePayment RPC authentication failures",
+			Namespace: Namespace,
+			Name:      "payment_authorization_failure_count",
+			Subsystem: AuthorizePaymentsSubsystem,
+			Help:      "Number of AuthorizePayment RPC failures",
 		},
-		[]string{},
 	)
+
+	paymentAuthorizationReplays := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: Namespace,
+			Name:      "payment_authorization_replay_count",
+			Subsystem: AuthorizePaymentsSubsystem,
+			Help:      "Number of payment authorization requests rejected due to replay detection",
+		},
+	)
+
+	paymentAuthorizationStageTimer := common.NewStageTimer(registry, Namespace, "payment_authorization", false)
 
 	return &ServerMetrics{
-		logger:                       logger,
-		grpcServerOption:             grpcServerOption,
-		authorizePaymentLatency:      authorizePaymentLatency,
-		authorizePaymentAuthFailures: authorizePaymentAuthFailures,
+		logger:                         logger,
+		grpcServerOption:               grpcServerOption,
+		paymentAuthorizationStageTimer: paymentAuthorizationStageTimer,
+		paymentAuthorizationFailures:   paymentAuthorizationFailures,
+		paymentAuthorizationReplays:    paymentAuthorizationReplays,
 	}
 }
 
@@ -77,20 +73,28 @@ func (m *ServerMetrics) GetGRPCServerOption() grpc.ServerOption {
 	return m.grpcServerOption
 }
 
-// Reports the total latency of an AuthorizePayment RPC.
-func (m *ServerMetrics) ReportAuthorizePaymentLatency(duration time.Duration) {
+// Increments the auth failure counter for AuthorizePayment.
+func (m *ServerMetrics) ReportAuthorizePaymentFailure() {
 	if m == nil {
 		return
 	}
 
-	m.authorizePaymentLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+	m.paymentAuthorizationFailures.Inc()
 }
 
-// Increments the auth failure counter for AuthorizePayment.
-func (m *ServerMetrics) ReportAuthorizePaymentAuthFailure() {
+// Increments the payment auth replay protection failure counter.
+func (m *ServerMetrics) ReportPaymentAuthReplayProtectionFailure() {
 	if m == nil {
 		return
 	}
 
-	m.authorizePaymentAuthFailures.WithLabelValues().Inc()
+	m.paymentAuthorizationReplays.Inc()
+}
+
+// Creates a new SequenceProbe for tracking payment authorization stages.
+func (m *ServerMetrics) NewPaymentAuthorizationProbe() *common.SequenceProbe {
+	if m == nil || m.paymentAuthorizationStageTimer == nil {
+		return nil
+	}
+	return m.paymentAuthorizationStageTimer.NewSequence()
 }

@@ -3,7 +3,7 @@ package prover
 import (
 	"errors"
 	"fmt"
-	"math"
+	gomath "math"
 	"os"
 	"strconv"
 	"strings"
@@ -18,9 +18,13 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
+// Prover is the main struct that is able to generate KZG commitments and proofs.
+// TODO(samlaf): we should split the kzg commitment functionality into its own struct/service.
+// In EigenDA V2, commitments are generated client side (or on the API server) and proofs are generated on the encoder.
+// It would make it a lot cleaner, as well as more explicit which exact SRS points are needed for which functionality.
 type Prover struct {
 	Config     *encoding.Config
-	KzgConfig  *kzg.KzgConfig
+	KzgConfig  *KzgConfig
 	encoder    *rs.Encoder
 	Srs        kzg.SRS
 	G2Trailing []bn254.G2Affine
@@ -30,12 +34,12 @@ type Prover struct {
 	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
 }
 
-func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prover, error) {
+func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, error) {
 	if encoderConfig == nil {
 		encoderConfig = encoding.DefaultConfig()
 	}
 
-	if kzgConfig.SRSNumberToLoad > kzgConfig.SRSOrder {
+	if kzgConfig.SRSNumberToLoad > encoding.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
 
@@ -61,19 +65,15 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 
 		hasG2TrailingFile := len(kzgConfig.G2TrailingPath) != 0
 		if hasG2TrailingFile {
-			fileStat, errStat := os.Stat(kzgConfig.G2TrailingPath)
-			if errStat != nil {
-				return nil, fmt.Errorf("cannot stat the G2TrailingPath: %w", errStat)
+			// TODO(samlaf): this function/check should probably be done in ReadG2PointSection
+			numG2point, err := kzg.NumberOfPointsInSRSFile(kzgConfig.G2TrailingPath, kzg.G2PointBytes)
+			if err != nil {
+				return nil, fmt.Errorf("number of points in srs file %v: %w", kzgConfig.G2TrailingPath, err)
 			}
-			fileSizeByte := fileStat.Size()
-			if fileSizeByte%64 != 0 {
-				return nil, fmt.Errorf("corrupted g2 point from the G2TrailingPath. The size of the file on the provided path has size that is not multiple of 64, which is %v. It indicates there is an incomplete g2 point", fileSizeByte)
-			}
-			// get the size
-			numG2point := uint64(fileSizeByte / kzg.G2PointBytes)
 			if numG2point < kzgConfig.SRSNumberToLoad {
-				return nil, fmt.Errorf("insufficient number of g2 points from G2TrailingPath. "+
-					"Requested %v, Actual %v", kzgConfig.SRSNumberToLoad, numG2point)
+				return nil, fmt.Errorf("kzgConfig.G2TrailingPath=%v contains %v G2 Points, "+
+					"which is < kzgConfig.SRSNumberToLoad=%v",
+					kzgConfig.G2TrailingPath, numG2point, kzgConfig.SRSNumberToLoad)
 			}
 
 			// use g2 trailing file
@@ -89,15 +89,22 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 			}
 		} else {
 			// require entire g2 srs be available on disk
+			numG2point, err := kzg.NumberOfPointsInSRSFile(kzgConfig.G2Path, kzg.G2PointBytes)
+			if err != nil {
+				return nil, fmt.Errorf("number of points in srs file: %w", err)
+			}
+			if numG2point < encoding.SRSOrder {
+				return nil, fmt.Errorf("no kzgConfig.G2TrailingPath was passed, yet the G2 SRS file %v is incomplete: contains %v < 2^28 G2 Points", kzgConfig.G2Path, numG2point)
+			}
 			g2Trailing, err = kzg.ReadG2PointSection(
 				kzgConfig.G2Path,
-				kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad,
-				kzgConfig.SRSOrder, // last exclusive
+				encoding.SRSOrder-kzgConfig.SRSNumberToLoad,
+				encoding.SRSOrder, // last exclusive
 				kzgConfig.NumWorker,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read G2 points (%v to %v) from file %v: %w",
-					kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad, kzgConfig.SRSOrder, kzgConfig.G2Path, err)
+					encoding.SRSOrder-kzgConfig.SRSNumberToLoad, encoding.SRSOrder, kzgConfig.G2Path, err)
 			}
 		}
 	}
@@ -126,77 +133,13 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 			return nil, fmt.Errorf("make cache dir: %w", err)
 		}
 
-		err = encoderGroup.PreloadAllEncoders()
+		err = encoderGroup.preloadAllEncoders()
 		if err != nil {
 			return nil, fmt.Errorf("preload all encoders: %w", err)
 		}
 	}
 
 	return encoderGroup, nil
-}
-
-func (g *Prover) PreloadAllEncoders() error {
-	paramsAll, err := GetAllPrecomputedSrsMap(g.KzgConfig.CacheDir)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("detect %v srs maps\n", len(paramsAll))
-	for i := 0; i < len(paramsAll); i++ {
-		fmt.Printf(" %v. NumChunks: %v   ChunkLength: %v\n", i, paramsAll[i].NumChunks, paramsAll[i].ChunkLength)
-	}
-
-	if len(paramsAll) == 0 {
-		return nil
-	}
-
-	for _, params := range paramsAll {
-		// get those encoders and store them
-		enc, err := g.GetKzgEncoder(params)
-		if err != nil {
-			return err
-		}
-		g.ParametrizedProvers[params] = enc
-	}
-
-	return nil
-}
-
-func (e *Prover) EncodeAndProve(
-	data []byte, params encoding.EncodingParams,
-) (encoding.BlobCommitments, []*encoding.Frame, error) {
-	enc, err := e.GetKzgEncoder(params)
-	if err != nil {
-		return encoding.BlobCommitments{}, nil, err
-	}
-
-	commit, lengthCommit, lengthProof, kzgFrames, _, err := enc.EncodeBytes(data)
-	if err != nil {
-		return encoding.BlobCommitments{}, nil, err
-	}
-
-	chunks := make([]*encoding.Frame, len(kzgFrames))
-	for ind, frame := range kzgFrames {
-
-		chunks[ind] = &encoding.Frame{
-			Coeffs: frame.Coeffs,
-			Proof:  frame.Proof,
-		}
-	}
-
-	symbols, err := rs.ToFrArray(data)
-	if err != nil {
-		return encoding.BlobCommitments{}, nil, fmt.Errorf("ToFrArray: %w", err)
-	}
-
-	length := uint(len(symbols))
-	commitments := encoding.BlobCommitments{
-		Commitment:       (*encoding.G1Commitment)(commit),
-		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
-		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           length,
-	}
-
-	return commitments, chunks, nil
 }
 
 func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, error) {
@@ -226,61 +169,6 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	return chunks, nil
 }
 
-// GetCommitmentsForPaddedLength takes in a byte slice representing a list of bn254
-// field elements (32 bytes each, except potentially the last element),
-// pads the (potentially incomplete) last element with zeroes, and returns the commitments for the padded list.
-func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommitments, error) {
-	symbols, err := rs.ToFrArray(data)
-	if err != nil {
-		return encoding.BlobCommitments{}, fmt.Errorf("ToFrArray: %w", err)
-	}
-
-	params := encoding.EncodingParams{
-		NumChunks:   2,
-		ChunkLength: 2,
-	}
-
-	enc, err := e.GetKzgEncoder(params)
-	if err != nil {
-		return encoding.BlobCommitments{}, fmt.Errorf("get kzg encoder: %w", err)
-	}
-
-	length := encoding.NextPowerOf2(uint64(len(symbols)))
-
-	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols, length)
-	if err != nil {
-		return encoding.BlobCommitments{}, fmt.Errorf("get commitments: %w", err)
-	}
-
-	commitments := encoding.BlobCommitments{
-		Commitment:       (*encoding.G1Commitment)(commit),
-		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
-		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           uint(length),
-	}
-
-	return commitments, nil
-}
-
-func (e *Prover) GetMultiFrameProofs(data []byte, params encoding.EncodingParams) ([]encoding.Proof, error) {
-	symbols, err := rs.ToFrArray(data)
-	if err != nil {
-		return nil, fmt.Errorf("ToFrArray: %w", err)
-	}
-
-	enc, err := e.GetKzgEncoder(params)
-	if err != nil {
-		return nil, fmt.Errorf("get kzg encoder: %w", err)
-	}
-
-	proofs, err := enc.GetMultiFrameProofs(symbols)
-	if err != nil {
-		return nil, fmt.Errorf("get multi frame proofs: %w", err)
-	}
-
-	return proofs, nil
-}
-
 func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedProver, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -298,86 +186,15 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 	return enc, nil
 }
 
-func (g *Prover) GetSRSOrder() uint64 {
-	return g.KzgConfig.SRSOrder
-}
-
-// Detect the precomputed table from the specified directory
-// the file name follow the name convention of
-//
-//	dimE*.coset&
-//
-// where the first * specifies the dimension of the matrix which
-// equals to the number of chunks
-// where the second & specifies the length of each chunk
-func GetAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error) {
-	files, err := os.ReadDir(tableDir)
-	if err != nil {
-		return nil, fmt.Errorf("read srs table dir: %w", err)
-	}
-
-	tables := make([]encoding.EncodingParams, 0)
-	for _, file := range files {
-		filename := file.Name()
-
-		tokens := strings.Split(filename, ".")
-
-		dimEValue, err := strconv.Atoi(tokens[0][4:])
-		if err != nil {
-			return nil, fmt.Errorf("parse dimension part of the table: %w", err)
-		}
-		cosetSizeValue, err := strconv.Atoi(tokens[1][5:])
-		if err != nil {
-			return nil, fmt.Errorf("parse coset size part of the table: %w", err)
-		}
-
-		params := encoding.EncodingParams{
-			NumChunks:   uint64(cosetSizeValue),
-			ChunkLength: uint64(dimEValue),
-		}
-		tables = append(tables, params)
-	}
-	return tables, nil
-}
-
-// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
-// The result is trimmed to the given maxInputSize.
-func (p *Prover) Decode(
-	chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64,
-) ([]byte, error) {
-	frames := make([]encoding.Frame, len(chunks))
-	for i := range chunks {
-		frames[i] = encoding.Frame{
-			Proof:  chunks[i].Proof,
-			Coeffs: chunks[i].Coeffs,
-		}
-	}
-
-	encoder, err := p.GetKzgEncoder(params)
-	if err != nil {
-		return nil, err
-	}
-
-	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
-}
-
-func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
-	res := make([]uint64, len(chunkIndices))
-	for i, d := range chunkIndices {
-		res[i] = uint64(d)
-	}
-	return res
-}
-
 func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
-	if err := encoding.ValidateEncodingParams(params, p.KzgConfig.SRSOrder); err != nil {
+	if err := encoding.ValidateEncodingParams(params, encoding.SRSOrder); err != nil {
 		return nil, fmt.Errorf("validate encoding params: %w", err)
 	}
 
 	// Create FFT settings based on params
-	n := uint8(math.Log2(float64(params.NumEvaluations())))
+	n := uint8(gomath.Log2(float64(params.NumEvaluations())))
 	if params.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * params.NumChunks)))
+		n = uint8(gomath.Log2(float64(2 * params.NumChunks)))
 	}
 	fs := fft.NewFFTSettings(n)
 
@@ -399,13 +216,13 @@ func (p *Prover) createGnarkBackendProver(
 		return nil, errors.New("GPU is not supported in gnark backend")
 	}
 
-	_, fftPointsT, err := p.SetupFFTPoints(params)
+	_, fftPointsT, err := p.setupFFTPoints(params)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create subgroup FFT settings
-	t := uint8(math.Log2(float64(2 * params.NumChunks)))
+	t := uint8(gomath.Log2(float64(2 * params.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
 	// Set KZG Prover gnark backend
@@ -413,22 +230,14 @@ func (p *Prover) createGnarkBackendProver(
 		Fs:         fs,
 		FFTPointsT: fftPointsT,
 		SFs:        sfs,
-		KzgConfig:  p.KzgConfig,
-	}
-
-	// Set KZG Commitments gnark backend
-	commitmentsBackend := &gnarkprover.KzgCommitmentsGnarkBackend{
-		Srs:        p.Srs,
-		G2Trailing: p.G2Trailing,
-		KzgConfig:  p.KzgConfig,
 	}
 
 	return &ParametrizedProver{
-		Encoder:               p.encoder,
-		EncodingParams:        params,
-		KzgConfig:             p.KzgConfig,
-		KzgMultiProofBackend:  multiproofBackend,
-		KzgCommitmentsBackend: commitmentsBackend,
+		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
+		encoder:                    p.encoder,
+		encodingParams:             params,
+		computeMultiproofNumWorker: p.KzgConfig.NumWorker,
+		kzgMultiProofBackend:       multiproofBackend,
 	}, nil
 }
 
@@ -438,8 +247,72 @@ func (p *Prover) createIcicleBackendProver(
 	return CreateIcicleBackendProver(p, params, fs)
 }
 
+func (g *Prover) preloadAllEncoders() error {
+	paramsAll, err := getAllPrecomputedSrsMap(g.KzgConfig.CacheDir)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("detect %v srs maps\n", len(paramsAll))
+	for i := 0; i < len(paramsAll); i++ {
+		fmt.Printf(" %v. NumChunks: %v   ChunkLength: %v\n", i, paramsAll[i].NumChunks, paramsAll[i].ChunkLength)
+	}
+
+	if len(paramsAll) == 0 {
+		return nil
+	}
+
+	for _, params := range paramsAll {
+		// get those encoders and store them
+		enc, err := g.GetKzgEncoder(params)
+		if err != nil {
+			return err
+		}
+		g.ParametrizedProvers[params] = enc
+	}
+
+	return nil
+}
+
+// Detect the precomputed table from the specified directory
+// the file name follow the name convention of
+//
+//	dimE*.coset&
+//
+// where the first * specifies the dimension of the matrix which
+// equals to the number of chunks
+// where the second & specifies the length of each chunk
+func getAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error) {
+	files, err := os.ReadDir(tableDir)
+	if err != nil {
+		return nil, fmt.Errorf("read srs table dir: %w", err)
+	}
+
+	tables := make([]encoding.EncodingParams, 0)
+	for _, file := range files {
+		filename := file.Name()
+
+		tokens := strings.Split(filename, ".")
+
+		dimEValue, err := strconv.Atoi(tokens[0][4:])
+		if err != nil {
+			return nil, fmt.Errorf("parse dimension part of the table: %w", err)
+		}
+		cosetSizeValue, err := strconv.Atoi(tokens[1][5:])
+		if err != nil {
+			return nil, fmt.Errorf("parse coset size part of the table: %w", err)
+		}
+
+		params := encoding.EncodingParams{
+			NumChunks:   uint64(dimEValue),
+			ChunkLength: uint64(cosetSizeValue),
+		}
+		tables = append(tables, params)
+	}
+	return tables, nil
+}
+
 // Helper methods for setup
-func (p *Prover) SetupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
+func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
 	subTable, err := NewSRSTable(p.KzgConfig.CacheDir, p.Srs.G1, p.KzgConfig.NumWorker)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create SRS table: %w", err)

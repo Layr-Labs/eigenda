@@ -20,7 +20,6 @@ import (
 )
 
 type KzgMultiProofIcicleBackend struct {
-	*kzg.KzgConfig
 	Fs             *fft.FFTSettings
 	FlatFFTPointsT []iciclebn254.Affine
 	SRSIcicle      []iciclebn254.Affine
@@ -30,6 +29,7 @@ type KzgMultiProofIcicleBackend struct {
 	MsmCfg         core.MSMConfig
 	Device         runtime.Device
 	GpuLock        sync.Mutex
+	NumWorker      uint64
 }
 
 type WorkerResult struct {
@@ -38,7 +38,7 @@ type WorkerResult struct {
 
 // This function supports batching over multiple blobs.
 // All blobs must have same size and concatenated passed as polyFr
-func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 
 	dimE := numChunks

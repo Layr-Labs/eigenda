@@ -93,7 +93,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     uint64 _pricePerSymbol = 0.447 gwei;
     uint64 _priceUpdateCooldown = 1;
     uint64 _globalSymbolsPerPeriod = 131072;
-    uint64 _reservationPeriodInterval = 300;
+    uint64 _reservationPeriodInterval = 10;
     uint64 _globalRatePeriodInterval = 30;
 
     struct AddressConfig {
@@ -272,9 +272,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             TransparentUpgradeableProxy(payable(address(socketRegistry))), address(socketRegistryImplementation)
         );
 
-        registryCoordinatorImplementation = new EigenDARegistryCoordinator(
-            IServiceManager(address(eigenDAServiceManager)), stakeRegistry, apkRegistry, indexRegistry, socketRegistry
-        );
+        registryCoordinatorImplementation = new EigenDARegistryCoordinator(address(eigenDADirectory));
 
         {
             IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams =
@@ -305,7 +303,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 abi.encodeWithSelector(
                     EigenDARegistryCoordinator.initialize.selector,
                     addressConfig.eigenDACommunityMultisig,
-                    addressConfig.churner,
                     addressConfig.ejector,
                     IPauserRegistry(address(eigenDAPauserReg)),
                     0, // initial paused status is nothing paused

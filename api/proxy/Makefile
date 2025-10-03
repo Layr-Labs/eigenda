@@ -11,7 +11,7 @@ build:
 	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
 
 clean:
-	rm bin/eigenda-proxy
+	rm -rf bin/eigenda-proxy
 
 docker-build:
 	# we only use this to build the docker image locally, so we give it the dev tag as a reminder
@@ -36,7 +36,6 @@ test-e2e-local:
 test-e2e-sepolia:
 	BACKEND=sepolia gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
-# Very simple fuzzer which generates random bytes arrays and sends them to the proxy using the standard client.
 # To clean the cached corpus, run `go clean -fuzzcache` before running this.
 test-fuzz:
 	go test ./test/fuzz -fuzz=FuzzProxyClientServerV1 -fuzztime=1m

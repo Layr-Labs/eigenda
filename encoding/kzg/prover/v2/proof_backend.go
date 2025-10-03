@@ -14,13 +14,3 @@ type KzgMultiProofsBackendV2 interface {
 }
 
 var _ KzgMultiProofsBackendV2 = &gnark.KzgMultiProofGnarkBackend{}
-
-// CommitmentDevice represents a backend capable of computing various KZG commitments.
-type KzgCommitmentsBackendV2 interface {
-	ComputeCommitmentV2(coeffs []fr.Element) (*bn254.G1Affine, error)
-	ComputeLengthCommitmentV2(coeffs []fr.Element) (*bn254.G2Affine, error)
-	ComputeLengthProofV2(coeffs []fr.Element) (*bn254.G2Affine, error)
-	ComputeLengthProofForLengthV2(blobFr []fr.Element, length uint64) (*bn254.G2Affine, error)
-}
-
-var _ KzgCommitmentsBackendV2 = &gnark.KzgCommitmentsGnarkBackend{}

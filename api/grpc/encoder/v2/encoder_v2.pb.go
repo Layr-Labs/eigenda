@@ -29,7 +29,10 @@ type EncodeBlobRequest struct {
 
 	BlobKey        []byte          `protobuf:"bytes,1,opt,name=blob_key,json=blobKey,proto3" json:"blob_key,omitempty"`
 	EncodingParams *EncodingParams `protobuf:"bytes,2,opt,name=encoding_params,json=encodingParams,proto3" json:"encoding_params,omitempty"`
-	BlobSize       uint64          `protobuf:"varint,3,opt,name=blob_size,json=blobSize,proto3" json:"blob_size,omitempty"`
+	// TODO(samlaf): we should change this to uint32, since blobLengths are uint32 everywhere.
+	// However this is a minor breaking change and would require some coordination for our
+	// deployments (encoder client/server), so leaving as is for now.
+	BlobSize uint64 `protobuf:"varint,3,opt,name=blob_size,json=blobSize,proto3" json:"blob_size,omitempty"`
 }
 
 func (x *EncodeBlobRequest) Reset() {

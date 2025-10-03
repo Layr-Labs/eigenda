@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"runtime"
 	"testing"
 	"time"
 
@@ -29,8 +28,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	kzgcommitter "github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
@@ -58,8 +56,11 @@ var (
 	bucketTableName     = fmt.Sprintf("test-BucketStore-%v", UUID)
 	s3BucketName        = "test-eigenda-blobstore"
 	v2MetadataTableName = fmt.Sprintf("test-BlobMetadata-%v-v2", UUID)
-	prover              *p.Prover
-	privateKeyHex       = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	// committer is only used in server_v2_test.go, but is instantiated here
+	// as part of the setup() function which sets up both v1 and v2 tests...
+	// TODO(samlaf): we need to move away from these global variables
+	committer     *kzgcommitter.Committer
+	privateKeyHex = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	deployLocalStack bool
 	localstackPort   = "4576"
@@ -642,10 +643,11 @@ func setup() {
 
 		// Deploy resources using the testbed DeployResources function
 		deployConfig := testbed.DeployResourcesConfig{
-			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", localstackPort),
+			LocalStackEndpoint:  localstackContainer.Endpoint(),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
 			V2MetadataTableName: v2MetadataTableName,
+			AWSConfig:           localstackContainer.GetAWSClientConfig(),
 			Logger:              logger,
 		}
 
@@ -666,20 +668,15 @@ func setup() {
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
-	config := &kzg.KzgConfig{
-		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
-		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        8192,
-		SRSNumberToLoad: 8192,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
-	}
-
-	prover, err = p.NewProver(config, nil)
+	committer, err = kzgcommitter.NewFromConfig(kzgcommitter.Config{
+		SRSNumberToLoad:   8192,
+		G1SRSPath:         "../../resources/srs/g1.point",
+		G2SRSPath:         "../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../resources/srs/g2.trailing.point",
+	})
 	if err != nil {
 		teardown()
-		logger.Fatal("Failed to initialize KZG prover:", err)
+		logger.Fatal("Failed to initialize KZG committer:", err)
 	}
 
 	dispersalServer = newTestServer(ctx, transactor, "setup")
@@ -952,7 +949,6 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 		X: commitX,
 		Y: commitY,
 	}
-	dataLength := 32
 	batchID := uint32(99)
 	batchRoot := []byte("hello")
 	referenceBlockNumber := uint32(132)
@@ -982,7 +978,7 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 		BlobInclusionProof:   inclusionProof,
 		BlobCommitment: &encoding.BlobCommitments{
 			Commitment: commitment,
-			Length:     uint(dataLength),
+			Length:     32,
 		},
 		BatchID:                 batchID,
 		ConfirmationTxnHash:     gethcommon.HexToHash("0x123"),

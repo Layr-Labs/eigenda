@@ -27,6 +27,40 @@ type PrivateKeyMaps struct {
 	BlsMap   map[string]KeyInfo
 }
 
+// OperatorInfo contains all the key information needed for an operator
+type OperatorInfo struct {
+	ECDSAPrivateKey string
+	ECDSAKeyFile    string
+	ECDSAPassword   string
+	BLSKeyPath      string
+	BLSPassword     string
+}
+
+// GenerateOperators creates a slice of OperatorInfo from PrivateKeyMaps
+func GenerateOperators(privateKeys *PrivateKeyMaps) []OperatorInfo {
+	// Count the number of operators
+	numOperators := 0
+	for key := range privateKeys.EcdsaMap {
+		if strings.HasPrefix(key, "opr") {
+			numOperators++
+		}
+	}
+
+	operators := make([]OperatorInfo, numOperators)
+	for i := 0; i < numOperators; i++ {
+		operatorKey := fmt.Sprintf("opr%d", i)
+		operators[i] = OperatorInfo{
+			ECDSAPrivateKey: privateKeys.EcdsaMap[operatorKey].PrivateKey,
+			ECDSAKeyFile:    privateKeys.EcdsaMap[operatorKey].KeyFile,
+			ECDSAPassword:   privateKeys.EcdsaMap[operatorKey].Password,
+			BLSKeyPath:      privateKeys.BlsMap[operatorKey].KeyFile,
+			BLSPassword:     privateKeys.BlsMap[operatorKey].Password,
+		}
+	}
+
+	return operators
+}
+
 // LoadPrivateKeysInput contains all the inputs needed to load private keys
 type LoadPrivateKeysInput struct {
 	NumOperators int
@@ -34,15 +68,17 @@ type LoadPrivateKeysInput struct {
 }
 
 // GetAnvilDefaultKeys returns the default private keys from Anvil's test mnemonic
+// Key for account #0 is used for deployer
+// Key for account #1 is used for batcher
 // These keys are from: "test test test test test test test test test junk"
-func GetAnvilDefaultKeys() (defaultKey string, batcher0Key string) {
+func GetAnvilDefaultKeys() (deployerKey string, batcher0Key string) {
 	// Account #0: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 (10,000 ETH)
-	defaultKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	deployerKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 	// Account #1: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 (10,000 ETH)
 	batcher0Key = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 
-	return defaultKey, batcher0Key
+	return deployerKey, batcher0Key
 }
 
 // LoadPrivateKeys constructs a mapping between service names (e.g., 'deployer', 'dis0', 'opr1') and private keys
@@ -284,6 +320,7 @@ type DeploymentConfig struct {
 	MaxOperatorCount int
 	PrivateKeys      *PrivateKeyMaps
 	Logger           logging.Logger
+	EnvVars          map[string]string
 }
 
 // DeploymentResult holds the results of contract deployment
@@ -354,6 +391,7 @@ func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) 
 		config.DeployerKey,
 		config.AnvilRPCURL,
 		nil,
+		config.EnvVars,
 		config.Logger,
 	)
 	if err != nil {
@@ -389,6 +427,7 @@ func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) 
 		config.DeployerKey,
 		config.AnvilRPCURL,
 		[]string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "inabox_v1_deploy.json"},
+		nil,
 		config.Logger); err != nil {
 		return nil, fmt.Errorf("failed to execute CertVerifierDeployerV1 script: %w", err)
 	}
@@ -421,7 +460,14 @@ func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) 
 }
 
 // execForgeScript executes a forge script with the given parameters
-func execForgeScript(script, privateKey, rpcURL string, extraArgs []string, logger logging.Logger) error {
+func execForgeScript(
+	script string,
+	privateKey string,
+	rpcURL string,
+	extraArgs []string,
+	envVars map[string]string,
+	logger logging.Logger,
+) error {
 	args := []string{"script", script,
 		"--rpc-url", rpcURL,
 		"--private-key", privateKey,
@@ -434,6 +480,13 @@ func execForgeScript(script, privateKey, rpcURL string, extraArgs []string, logg
 	cmd := exec.Command("forge", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	if len(envVars) > 0 {
+		cmd.Env = os.Environ()
+		for key, value := range envVars {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
+		}
+	}
 
 	logger.Info("Running forge command", "command", "forge "+strings.Join(args, " "))
 

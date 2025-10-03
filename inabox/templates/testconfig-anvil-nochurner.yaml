@@ -1,3 +1,5 @@
+# This template file is only used for thegraph integration tests,
+# where we don't spin up a churner. Therefore, we only specify 3 operators.
 environment:
   name: "staging"
   type: "local"
@@ -45,9 +47,9 @@ services:
       G2_PATH: ../resources/srs/g2.point
       G2_POWER_OF_2_PATH: ../resources/srs/g2.point.powerOf2
       CACHE_PATH: ../resources/srs/SRSTables
-      SRS_ORDER: 10000
-      SRS_LOAD: 10000
-      CHALLENGE_ORDER: 10000
+      SRS_ORDER: 8192
+      SRS_LOAD: 8192
+      CHALLENGE_ORDER: 8192
       LOG_LEVEL: "debug"
       LOG_FORMAT: "text"
       VERBOSE: true

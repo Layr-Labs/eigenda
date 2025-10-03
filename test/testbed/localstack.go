@@ -5,26 +5,31 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
+	"github.com/testcontainers/testcontainers-go/network"
 )
 
 const (
-	LocalStackImage = "localstack/localstack:latest"
+	LocalStackImage = "localstack/localstack:4.7.0"
 	LocalStackPort  = "4566/tcp"
 )
 
 // LocalStackOptions configures the LocalStack AWS simulation container
+//
+//nolint:lll // struct field documentation
 type LocalStackOptions struct {
-	ExposeHostPort bool           // If true, binds container port 4566 to host port (default: 4570)
-	HostPort       string         // Custom host port to bind to (defaults to "4570" if empty and ExposeHostPort is true)
-	Services       []string       // AWS services to enable (defaults to s3, dynamodb, kms)
-	Region         string         // AWS region (defaults to us-east-1)
-	Debug          bool           // Enable debug logging
-	Logger         logging.Logger // Logger for container operations (required)
+	ExposeHostPort bool                          // If true, binds container port 4566 to host port (default: 4570)
+	HostPort       string                        // Custom host port to bind to (defaults to "4570" if empty and ExposeHostPort is true)
+	Services       []string                      // AWS services to enable (defaults to s3, dynamodb, kms)
+	Region         string                        // AWS region (defaults to us-east-1)
+	Debug          bool                          // Enable debug logging
+	Logger         logging.Logger                // Logger for container operations (required)
+	Network        *testcontainers.DockerNetwork // Docker network to use (optional)
 }
 
 // LocalStackContainer wraps the official LocalStack testcontainers module
@@ -56,6 +61,11 @@ func NewLocalStackContainerWithOptions(ctx context.Context, opts LocalStackOptio
 
 	// Add logger
 	customizers = append(customizers, testcontainers.WithLogger(newTestcontainersLogger(logger)))
+
+	// Add network configuration using the network package (if provided)
+	if opts.Network != nil {
+		customizers = append(customizers, network.WithNetwork([]string{"localstack"}, opts.Network))
+	}
 
 	env := buildLocalStackEnv(opts)
 	customizers = append(customizers, testcontainers.WithEnv(env))
@@ -135,13 +145,13 @@ func (ls *LocalStackContainer) GetServiceEndpoint(service string) string {
 	return ls.Endpoint()
 }
 
-// GetAWSConfig returns AWS SDK configuration for connecting to LocalStack
-func (ls *LocalStackContainer) GetAWSConfig() map[string]string {
-	return map[string]string{
-		"AWS_ACCESS_KEY_ID":     "test",
-		"AWS_SECRET_ACCESS_KEY": "test",
-		"AWS_DEFAULT_REGION":    ls.options.Region,
-		"AWS_ENDPOINT_URL":      ls.Endpoint(),
+// GetAWSClientConfig returns AWS client configuration for connecting to LocalStack
+func (ls *LocalStackContainer) GetAWSClientConfig() aws.ClientConfig {
+	return aws.ClientConfig{
+		Region:          ls.options.Region,
+		EndpointURL:     ls.Endpoint(),
+		AccessKey:       "test",
+		SecretAccessKey: "test",
 	}
 }
 
