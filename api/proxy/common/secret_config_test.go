@@ -27,7 +27,8 @@ func TestSignerPaymentKeyMissing(t *testing.T) {
 	cfg.SignerPaymentKey = ""
 
 	err := cfg.Check()
-	require.Error(t, err)
+	// allowed because it puts the proxy in read-only mode
+	require.NoError(t, err)
 }
 
 func TestEthRPCMissing(t *testing.T) {

@@ -68,8 +68,10 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 		},
 		&cli.StringFlag{
-			Name:     SignerPaymentKeyHexFlagName,
-			Usage:    "Hex-encoded signer private key. Used for authorizing payments with EigenDA disperser. Should not be associated with an Ethereum address holding any funds.",
+			Name: SignerPaymentKeyHexFlagName,
+			Usage: "Optional hex-encoded signer private key. Used for authorizing payments with EigenDA disperser in PUT routes. " +
+				"If not provided, proxy will be started in read-only mode, and will not be able to submit blobs to EigenDA. " +
+				"Should not be associated with an Ethereum address holding any funds.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "SIGNER_PRIVATE_KEY_HEX")},
 			Category: category,
 		},
