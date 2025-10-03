@@ -135,9 +135,8 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	operatorHarnessConfig := &OperatorHarnessConfig{
 		TestConfig: testConfig,
 		TestName:   testName,
-		Logger:     logger,
 	}
-	operatorHarness, err := SetupOperatorHarness(infraCtx, operatorHarnessConfig, &infra.ChainHarness)
+	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup operator harness: %w", err)
 		return nil, setupErr

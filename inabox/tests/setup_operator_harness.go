@@ -248,7 +248,12 @@ func (oh *OperatorHarness) closeAllListeners(logger logging.Logger, allListeners
 }
 
 // startOperator starts a single operator with the given index and pre-created listeners
-func (oh *OperatorHarness) startOperator(ctx context.Context, logger logging.Logger, operatorIndex int, listeners operatorListeners) (*grpc.Server, *grpc.ServerV2, error) {
+func (oh *OperatorHarness) startOperator(
+	ctx context.Context,
+	logger logging.Logger,
+	operatorIndex int,
+	listeners operatorListeners,
+) (*grpc.Server, *grpc.ServerV2, error) {
 	// Get operator's private key
 	operatorName := fmt.Sprintf("opr%d", operatorIndex)
 
