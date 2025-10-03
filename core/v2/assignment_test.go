@@ -421,25 +421,5 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 		// Assert that the sampled operators have enough unique chunks to reconstruct the blob
 		assert.GreaterOrEqual(t, uint32(len(uniqueChunkIndices)), minChunksNeeded,
 			"Sampled operators should have enough unique chunks to reconstruct the blob")
-
-		if uint32(len(uniqueChunkIndices)) < minChunksNeeded {
-
-			fmt.Println("Quorum: 0")
-			for opID, stake := range stakes[0] {
-				fmt.Println("Stake: ", stake, "Operator: ", opID.Hex())
-			}
-
-			fmt.Println("Quorum: 1")
-			for opID, stake := range stakes[1] {
-				fmt.Println("Stake: ", stake, "Operator: ", opID.Hex())
-			}
-
-			fmt.Println("Sampled operators:")
-			for _, opID := range sampledOperators {
-				fmt.Println(opID.Hex())
-			}
-
-			t.Fatal("Sampled operators should have enough unique chunks to reconstruct the blob")
-		}
 	})
 }
