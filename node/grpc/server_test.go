@@ -187,13 +187,10 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 
 	// Create listeners with OS-allocated ports for testing
 	v1DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
-	if err != nil {
-		panic("failed to create v1 dispersal listener")
-	}
+	require.NoError(t, err)
+
 	v1RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
-	if err != nil {
-		panic("failed to create v1 retrieval listener")
-	}
+	require.NoError(t, err)
 
 	return grpc.NewServer(
 		config,
