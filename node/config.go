@@ -34,9 +34,9 @@ const (
 
 // Config contains all of the configuration information for a DA node.
 type Config struct {
-	Hostname                        string `required:"true"`
-	RetrievalPort                   string
-	DispersalPort                   string
+	Hostname                        string `docs:"required"`
+	RetrievalPort                   string `docs:"deprecated"`
+	DispersalPort                   string `docs:"unsafe"`
 	InternalRetrievalPort           string
 	InternalDispersalPort           string
 	V2DispersalPort                 string

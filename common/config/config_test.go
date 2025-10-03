@@ -474,10 +474,11 @@ func TestDocGeneration(t *testing.T) {
 	}
 
 	err := DocumentConfig(
+		"Validator",
 		func() node.Config {
 			return node.Config{}
 		},
-		"NODE",
+		"VALIDATOR",
 		packagePaths,
 		"config.md")
 	require.NoError(t, err)
