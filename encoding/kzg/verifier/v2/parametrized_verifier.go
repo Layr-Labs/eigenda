@@ -23,7 +23,7 @@ type ParametrizedVerifier struct {
 
 // VerifyFrame verifies a single frame against a commitment.
 // If needing to verify multiple frames of the same chunk length, prefer [Verifier.UniversalVerify].
-func (v *ParametrizedVerifier) VerifyFrame(
+func (v *ParametrizedVerifier) verifyFrame(
 	frame *encoding.Frame, frameIndex uint64, commitment *bn254.G1Affine, numChunks uint64,
 ) error {
 	j, err := rs.GetLeadingCosetIndex(frameIndex, numChunks)
