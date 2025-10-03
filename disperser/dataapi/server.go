@@ -221,6 +221,7 @@ type (
 		batcherHealthEndpt        string
 		eigenDAGRPCServiceChecker EigenDAGRPCServiceChecker
 		eigenDAHttpServiceChecker EigenDAHttpServiceChecker
+		poolSize                  int
 
 		operatorHandler *OperatorHandler
 		metricsHandler  *MetricsHandler
@@ -267,6 +268,12 @@ func NewServer(
 		return nil, fmt.Errorf("failed to create operatorHandler: %w", err)
 	}
 
+	// Set default pool size if not configured
+	poolSize := config.PoolSize
+	if poolSize <= 0 {
+		poolSize = 50 // default value
+	}
+
 	return &server{
 		logger:                    l,
 		serverMode:                config.ServerMode,
@@ -284,6 +291,7 @@ func NewServer(
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
 		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
 		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
+		poolSize:                  poolSize,
 		operatorHandler:           operatorHandler,
 		metricsHandler:            NewMetricsHandler(promClient, V1),
 	}, nil
