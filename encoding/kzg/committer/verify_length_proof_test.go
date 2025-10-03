@@ -51,7 +51,8 @@ func TestBatchEquivalence(t *testing.T) {
 	}
 	commitments[numBlob/2].Commitment = (*encoding.G1Commitment)(&modifiedCommit)
 
-	require.Error(t, kzgcommitment.VerifyCommitEquivalenceBatch(commitments), "batch equivalence negative test failed in outer loop\n")
+	require.Error(t, kzgcommitment.VerifyCommitEquivalenceBatch(commitments),
+		"batch equivalence negative test failed in outer loop\n")
 }
 
 func TestLengthProof(t *testing.T) {

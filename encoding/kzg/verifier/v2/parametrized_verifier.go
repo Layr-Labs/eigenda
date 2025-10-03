@@ -82,5 +82,9 @@ func verifyFrame(
 	// e([commitment - interpolation_polynomial]^(-1), [1]) * e([proof],  [s^n - x^n]) = 1_T
 	//
 
-	return eigenbn254.PairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &frame.Proof, &xnMinusYn)
+	err = eigenbn254.PairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &frame.Proof, &xnMinusYn)
+	if err != nil {
+		return fmt.Errorf("verify pairing: %w", err)
+	}
+	return nil
 }

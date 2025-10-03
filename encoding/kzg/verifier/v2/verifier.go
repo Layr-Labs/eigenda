@@ -3,11 +3,9 @@ package verifier
 import (
 	"errors"
 	"fmt"
-	gomath "math"
-	"sync"
-
 	"math"
 	"math/big"
+	"sync"
 
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -89,7 +87,7 @@ func (v *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 	}
 
 	// Create FFT settings based on params
-	n := uint8(gomath.Log2(float64(params.NumEvaluations())))
+	n := uint8(math.Log2(float64(params.NumEvaluations())))
 	fs := fft.NewFFTSettings(n)
 
 	return &ParametrizedVerifier{
@@ -338,13 +336,12 @@ func (v *Verifier) universalVerify(params encoding.EncodingParams, samples []Sam
 	// generate random field elements to aggregate equality check
 	randomsFr, err := eigenbn254.RandomFrs(n)
 	if err != nil {
-		return err
+		return fmt.Errorf("create randomness vector: %w", err)
 	}
 
 	// array of proofs
 	proofs := make([]bn254.G1Affine, n)
 	for i := 0; i < n; i++ {
-
 		proofs[i].Set(&samples[i].Proof)
 	}
 
@@ -377,5 +374,9 @@ func (v *Verifier) universalVerify(params encoding.EncodingParams, samples []Sam
 		return fmt.Errorf("generate rhsG1: %w", err)
 	}
 
-	return eigenbn254.PairingsVerify(&lhsG1, lhsG2, rhsG1, rhsG2)
+	err = eigenbn254.PairingsVerify(&lhsG1, lhsG2, rhsG1, rhsG2)
+	if err != nil {
+		return fmt.Errorf("verify pairing: %w", err)
+	}
+	return nil
 }
