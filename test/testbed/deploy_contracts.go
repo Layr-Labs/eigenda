@@ -320,7 +320,6 @@ type DeploymentConfig struct {
 	MaxOperatorCount int
 	PrivateKeys      *PrivateKeyMaps
 	Logger           logging.Logger
-	EnvVars          map[string]string
 }
 
 // DeploymentResult holds the results of contract deployment
@@ -391,7 +390,6 @@ func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) 
 		config.DeployerKey,
 		config.AnvilRPCURL,
 		nil,
-		config.EnvVars,
 		config.Logger,
 	)
 	if err != nil {
@@ -427,7 +425,6 @@ func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) 
 		config.DeployerKey,
 		config.AnvilRPCURL,
 		[]string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "inabox_v1_deploy.json"},
-		nil,
 		config.Logger); err != nil {
 		return nil, fmt.Errorf("failed to execute CertVerifierDeployerV1 script: %w", err)
 	}
@@ -465,7 +462,6 @@ func execForgeScript(
 	privateKey string,
 	rpcURL string,
 	extraArgs []string,
-	envVars map[string]string,
 	logger logging.Logger,
 ) error {
 	args := []string{"script", script,
@@ -480,13 +476,6 @@ func execForgeScript(
 	cmd := exec.Command("forge", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
-	if len(envVars) > 0 {
-		cmd.Env = os.Environ()
-		for key, value := range envVars {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
-		}
-	}
 
 	logger.Info("Running forge command", "command", "forge "+strings.Join(args, " "))
 

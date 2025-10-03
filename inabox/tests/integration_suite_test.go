@@ -7,7 +7,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	integration "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -68,7 +67,6 @@ func setupSuite(logger logging.Logger) error {
 		Logger:            logger,
 		RelayCount:        4,
 		RootPath:          "../../",
-		ClientLedgerMode:  clientledger.ClientLedgerModeLegacy,
 	}
 	var err error
 	globalInfra, err = integration.SetupInfrastructure(context.Background(), config)
