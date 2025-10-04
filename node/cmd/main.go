@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"time"
 
@@ -128,9 +129,41 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 		return err
 	}
 
+	// Create listeners for v1 and v2 servers with configured ports
+	v1DispersalListener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", config.InternalDispersalPort))
+	if err != nil {
+		return fmt.Errorf("failed to create v1 dispersal listener: %w", err)
+	}
+	v1RetrievalListener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", config.InternalRetrievalPort))
+	if err != nil {
+		_ = v1DispersalListener.Close()
+		return fmt.Errorf("failed to create v1 retrieval listener: %w", err)
+	}
+	v2DispersalListener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", config.InternalV2DispersalPort))
+	if err != nil {
+		_ = v1DispersalListener.Close()
+		_ = v1RetrievalListener.Close()
+		return fmt.Errorf("failed to create v2 dispersal listener: %w", err)
+	}
+	v2RetrievalListener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", config.InternalV2RetrievalPort))
+	if err != nil {
+		_ = v1DispersalListener.Close()
+		_ = v1RetrievalListener.Close()
+		_ = v2DispersalListener.Close()
+		return fmt.Errorf("failed to create v2 retrieval listener: %w", err)
+	}
+
 	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
 	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
-	server := nodegrpc.NewServer(config, node, logger, ratelimiter, softwareVersion)
+	server := nodegrpc.NewServer(
+		config,
+		node,
+		logger,
+		ratelimiter,
+		softwareVersion,
+		v1DispersalListener,
+		v1RetrievalListener,
+	)
 
 	reader, err := coreeth.NewReader(
 		logger,
@@ -151,7 +184,9 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 			ratelimiter,
 			reg,
 			reader,
-			softwareVersion)
+			softwareVersion,
+			v2DispersalListener,
+			v2RetrievalListener)
 		if err != nil {
 			return fmt.Errorf("failed to create server v2: %v", err)
 		}

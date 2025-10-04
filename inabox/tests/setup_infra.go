@@ -135,9 +135,8 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	operatorHarnessConfig := &OperatorHarnessConfig{
 		TestConfig: testConfig,
 		TestName:   testName,
-		Logger:     logger,
 	}
-	operatorHarness, err := SetupOperatorHarness(infraCtx, operatorHarnessConfig, &infra.ChainHarness)
+	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup operator harness: %w", err)
 		return nil, setupErr
@@ -162,7 +161,7 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	defer cleanupCancel()
 
 	// Stop operator goroutines using the harness cleanup
-	infra.OperatorHarness.Cleanup(cleanupCtx, infra.Logger)
+	infra.OperatorHarness.Cleanup(infra.Logger)
 
 	// Stop test binaries
 	infra.Logger.Info("Stopping binaries")

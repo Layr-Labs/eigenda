@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"reflect"
 	"runtime"
 	"sync"
@@ -42,6 +43,10 @@ type Server struct {
 
 	// Version of the software.
 	softwareVersion *version.Semver
+
+	// Pre-created listeners for the gRPC servers
+	dispersalListener net.Listener
+	retrievalListener net.Listener
 }
 
 // NewServer creates a new Server instance with the provided parameters.
@@ -52,15 +57,52 @@ func NewServer(
 	node *node.Node,
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
-	softwareVersion *version.Semver) *Server {
+	softwareVersion *version.Semver,
+	dispersalListener net.Listener,
+	retrievalListener net.Listener) *Server {
 
 	return &Server{
-		config:          config,
-		logger:          logger,
-		node:            node,
-		ratelimiter:     ratelimiter,
-		mu:              &sync.Mutex{},
-		softwareVersion: softwareVersion,
+		config:            config,
+		logger:            logger,
+		node:              node,
+		ratelimiter:       ratelimiter,
+		mu:                &sync.Mutex{},
+		softwareVersion:   softwareVersion,
+		dispersalListener: dispersalListener,
+		retrievalListener: retrievalListener,
+	}
+}
+
+// GetDispersalPort returns the port number the dispersal listener is bound to.
+func (s *Server) GetDispersalPort() int {
+	if s.dispersalListener == nil {
+		return 0
+	}
+	return s.dispersalListener.Addr().(*net.TCPAddr).Port
+}
+
+// GetRetrievalPort returns the port number the retrieval listener is bound to.
+func (s *Server) GetRetrievalPort() int {
+	if s.retrievalListener == nil {
+		return 0
+	}
+	return s.retrievalListener.Addr().(*net.TCPAddr).Port
+}
+
+// Stop shuts down the listeners
+func (s *Server) Stop() {
+	s.logger.Info("Server stop requested")
+
+	if s.dispersalListener != nil {
+		if err := s.dispersalListener.Close(); err != nil {
+			s.logger.Warn("Failed to close dispersal listener", "error", err)
+		}
+	}
+
+	if s.retrievalListener != nil {
+		if err := s.retrievalListener.Close(); err != nil {
+			s.logger.Warn("Failed to close retrieval listener", "error", err)
+		}
 	}
 }
 
