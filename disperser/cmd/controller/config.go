@@ -33,6 +33,7 @@ type Config struct {
 	AwsClientConfig                     aws.ClientConfig
 	DisperserStoreChunksSigningDisabled bool
 	DisperserKMSKeyID                   string
+	KMSConfig                           common.KMSKeyConfig
 	LoggerConfig                        common.LoggerConfig
 	IndexerConfig                       indexer.Config
 	ChainStateConfig                    thegraph.Config
@@ -119,6 +120,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		AwsClientConfig:                     aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		DisperserStoreChunksSigningDisabled: ctx.GlobalBool(flags.DisperserStoreChunksSigningDisabledFlag.Name),
 		DisperserKMSKeyID:                   ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
+		KMSConfig:                           common.ReadKMSKeyConfig(ctx, flags.FlagPrefix),
 		LoggerConfig:                        *loggerConfig,
 		EncodingManagerConfig: controller.EncodingManagerConfig{
 			PullInterval:                ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),

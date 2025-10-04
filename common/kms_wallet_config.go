@@ -14,7 +14,7 @@ type KMSKeyConfig struct {
 	
 	// OCI KMS fields
 	KeyOCID           string
-	CryptoEndpoint    string
+	KMSEndpoint       string
 	ManagementEndpoint string
 	
 	Disable bool
@@ -50,10 +50,10 @@ func KMSWalletCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			EnvVar:   PrefixEnvVar(envPrefix, "KMS_KEY_OCID"),
 		},
 		cli.StringFlag{
-			Name:     PrefixFlag(flagPrefix, "kms-crypto-endpoint"),
-			Usage:    "OCI KMS crypto endpoint for signing operations",
+			Name:     PrefixFlag(flagPrefix, "kms-endpoint"),
+			Usage:    "OCI KMS endpoint for signing operations",
 			Required: false,
-			EnvVar:   PrefixEnvVar(envPrefix, "KMS_CRYPTO_ENDPOINT"),
+			EnvVar:   PrefixEnvVar(envPrefix, "KMS_ENDPOINT"),
 		},
 		cli.StringFlag{
 			Name:     PrefixFlag(flagPrefix, "kms-management-endpoint"),
@@ -76,7 +76,7 @@ func ReadKMSKeyConfig(ctx *cli.Context, flagPrefix string) KMSKeyConfig {
 		KeyID:              ctx.String(PrefixFlag(flagPrefix, "kms-key-id")),
 		Region:             ctx.String(PrefixFlag(flagPrefix, "kms-key-region")),
 		KeyOCID:            ctx.String(PrefixFlag(flagPrefix, "kms-key-ocid")),
-		CryptoEndpoint:     ctx.String(PrefixFlag(flagPrefix, "kms-crypto-endpoint")),
+		KMSEndpoint:        ctx.String(PrefixFlag(flagPrefix, "kms-endpoint")),
 		ManagementEndpoint: ctx.String(PrefixFlag(flagPrefix, "kms-management-endpoint")),
 		Disable:            ctx.Bool(PrefixFlag(flagPrefix, "kms-key-disable")),
 	}
