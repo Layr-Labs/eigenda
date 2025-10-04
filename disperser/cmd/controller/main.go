@@ -196,11 +196,22 @@ func RunController(ctx *cli.Context) error {
 	if config.DisperserStoreChunksSigningDisabled {
 		logger.Warn("StoreChunks() signing is disabled")
 	} else {
-		requestSigner, err = clients.NewDispersalRequestSigner(
+		// Use factory for all KMS providers (supports both new KMS config and legacy fallback)
+		kmsConfig := config.KMSConfig
+		// If new KMS config is not provided, create legacy AWS config for backward compatibility
+		if kmsConfig.Provider == "" {
+			kmsConfig = common.KMSKeyConfig{
+				Provider: "aws",
+				KeyID:    config.DisperserKMSKeyID,
+				Region:   config.AwsClientConfig.Region,
+			}
+		}
+		
+		requestSigner, err = clients.NewDispersalRequestSignerFromKMSConfig(
 			context.Background(),
+			kmsConfig,
 			config.AwsClientConfig.Region,
-			config.AwsClientConfig.EndpointURL,
-			config.DisperserKMSKeyID)
+			config.AwsClientConfig.EndpointURL)
 		if err != nil {
 			return fmt.Errorf("failed to create request signer: %v", err)
 		}
