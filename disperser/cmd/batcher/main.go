@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
@@ -84,11 +83,12 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 
 	bucketName := config.BlobstoreConfig.BucketName
-	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
+	s3Client, err := blobstore.CreateObjectStorageClient(
+		context.Background(), config.BlobstoreConfig, config.AwsClientConfig, logger)
 	if err != nil {
 		return err
 	}
-	logger.Info("Initialized S3 client", "bucket", bucketName)
+	logger.Info("Initialized object storage client", "backend", config.BlobstoreConfig.Backend, "bucket", bucketName)
 
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
 	if err != nil {

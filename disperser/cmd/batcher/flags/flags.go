@@ -24,6 +24,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "S3_BUCKET_NAME"),
 	}
+	ObjectStorageBackendFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "object-storage-backend"),
+		Usage:    "Object storage backend to use (s3 or oci)",
+		Required: false,
+		Value:    "s3",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OBJECT_STORAGE_BACKEND"),
+	}
 	DynamoDBTableNameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "dynamodb-table-name"),
 		Usage:    "Name of the dynamodb table to store blob metadata",
@@ -213,6 +220,24 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
 	}
+	OCINamespaceFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-namespace"),
+		Usage:    "OCI Object Storage namespace",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_NAMESPACE"),
+	}
+	OCIRegionFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-region"),
+		Usage:    "OCI region",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_REGION"),
+	}
+	OCICompartmentIDFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-compartment-id"),
+		Usage:    "OCI compartment ID",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_COMPARTMENT_ID"),
+	}
 	MaxNodeConnectionsFlag = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-node-connections"),
 		Usage:    "Maximum number of connections to the node. Only used when minibatching is enabled. Defaults to 1024.",
@@ -241,6 +266,10 @@ var requiredFlags = []cli.Flag{
 }
 
 var optionalFlags = []cli.Flag{
+	ObjectStorageBackendFlag,
+	OCINamespaceFlag,
+	OCIRegionFlag,
+	OCICompartmentIDFlag,
 	MetricsHTTPPort,
 	IndexerDataDirFlag,
 	EncodingTimeoutFlag,
