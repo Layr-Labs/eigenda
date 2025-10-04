@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
@@ -101,7 +102,7 @@ func (c *validatorClient) GetBlob(
 
 	probe.SetStage("verify_commitment")
 	commitmentBatch := []encoding.BlobCommitments{blobHeader.BlobCommitments}
-	err := c.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
+	err := committer.VerifyCommitEquivalenceBatch(commitmentBatch)
 	if err != nil {
 		return nil, err
 	}

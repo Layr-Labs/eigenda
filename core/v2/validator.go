@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -183,7 +184,7 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 		})
 	}
 	// check if commitments are equivalent
-	err = v.verifier.VerifyCommitEquivalenceBatch(blobCommitmentList)
+	err = committer.VerifyCommitEquivalenceBatch(blobCommitmentList)
 	if err != nil {
 		return err
 	}
@@ -210,7 +211,7 @@ func (v *shardValidator) universalVerifyWorker(params encoding.EncodingParams, s
 }
 
 func (v *shardValidator) verifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
-	err := v.verifier.VerifyBlobLength(blobCommitments)
+	err := committer.VerifyBlobLength(blobCommitments)
 	if err != nil {
 		out <- err
 		return
