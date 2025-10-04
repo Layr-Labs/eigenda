@@ -228,13 +228,6 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_KEY_CACHE_SIZE"),
 		Value:    1024 * 1024,
 	}
-	AuthenticationTimeoutFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "authentication-timeout"),
-		Usage:    "Duration to keep authentication results",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_TIMEOUT"),
-		Value:    0, // TODO(cody-littley) remove this feature
-	}
 	AuthenticationDisabledFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-disabled"),
 		Usage:    "Disable GetChunks() authentication",
@@ -387,7 +380,6 @@ var optionalFlags = []cli.Flag{
 	GetChunkBytesBurstinessClientFlag,
 	MaxConcurrentGetChunkOpsClientFlag,
 	AuthenticationKeyCacheSizeFlag,
-	AuthenticationTimeoutFlag,
 	AuthenticationDisabledFlag,
 	GetChunksTimeoutFlag,
 	GetBlobTimeoutFlag,
