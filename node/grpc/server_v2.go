@@ -355,7 +355,9 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 	}
 
 	if corev2.MaxQuorumID < in.GetQuorumId() {
-		return nil, api.NewErrorInvalidArg("invalid quorum ID")
+		//nolint: wrapcheck
+		return nil, api.NewErrorInvalidArg(
+			fmt.Sprintf("quorumID %d must be <= maxQuorumID %d", in.GetQuorumId(), corev2.MaxQuorumID))
 	}
 
 	// The current sampling scheme will store the same chunks for all quorums, so we always use quorum 0 as the quorum key in storage.
