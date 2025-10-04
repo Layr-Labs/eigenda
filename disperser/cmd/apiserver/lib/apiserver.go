@@ -7,7 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
@@ -57,7 +56,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
 
-	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
+	s3Client, err := blobstore.CreateObjectStorageClient(
+		context.Background(), config.BlobstoreConfig, config.AwsClientConfig, logger)
 	if err != nil {
 		return err
 	}

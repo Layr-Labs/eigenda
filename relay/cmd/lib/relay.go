@@ -10,10 +10,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	blobstorefactory "github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
@@ -50,10 +50,15 @@ func RunRelay(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
-	// Create S3 client
-	s3Client, err := s3.NewClient(ctx, config.AWS, logger)
+	// Create object storage client (supports both S3 and OCI)
+	blobStoreConfig := blobstorefactory.Config{
+		BucketName: config.BucketName,
+		Backend:    blobstorefactory.ObjectStorageBackend(config.ObjectStorageBackend),
+	}
+	objectStorageClient, err := blobstorefactory.CreateObjectStorageClient(
+		ctx, blobStoreConfig, config.AWS, logger)
 	if err != nil {
-		return fmt.Errorf("failed to create s3 client: %w", err)
+		return fmt.Errorf("failed to create object storage client: %w", err)
 	}
 
 	// Create metrics registry
@@ -68,8 +73,8 @@ func RunRelay(cliCtx *cli.Context) error {
 	})
 
 	// Create blob store and chunk reader
-	blobStore := blobstore.NewBlobStore(config.BucketName, s3Client, logger)
-	chunkReader := chunkstore.NewChunkReader(logger, s3Client, config.BucketName)
+	blobStore := blobstore.NewBlobStore(config.BucketName, objectStorageClient, logger)
+	chunkReader := chunkstore.NewChunkReader(logger, objectStorageClient, config.BucketName)
 
 	// Create eth writer
 	tx, err := eth.NewWriter(logger, ethClient, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)

@@ -101,6 +101,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			Backend:    blobstore.ObjectStorageBackend(ctx.GlobalString(flags.ObjectStorageBackendFlag.Name)),
 		},
 		LoggerConfig: *loggerConfig,
 		MetricsConfig: disperser.MetricsConfig{

@@ -26,6 +26,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "S3_BUCKET_NAME"),
 	}
+	ObjectStorageBackendFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "object-storage-backend"),
+		Usage:    "Object storage backend to use (s3 or oci)",
+		Required: false,
+		Value:    "s3",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OBJECT_STORAGE_BACKEND"),
+	}
 	DynamoDBTableNameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "dynamodb-table-name"),
 		Usage:    "Name of the dynamodb table to store blob metadata",
@@ -261,6 +268,7 @@ var requiredFlags = []cli.Flag{
 }
 
 var optionalFlags = []cli.Flag{
+	ObjectStorageBackendFlag,
 	DisperserVersionFlag,
 	MetricsHTTPPort,
 	EnableMetrics,
