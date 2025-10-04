@@ -108,8 +108,11 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	// ensure that a verifier can't be added at the latest block number
 	latestBlock, err := testHarness.EthClient.BlockNumber(ctx)
 	require.NoError(t, err)
+
+	opts, err := testHarness.GetDeployerTransactOpts()
+	require.NoError(t, err)
 	_, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
-		testHarness.DeployerTransactorOpts,
+		opts,
 		uint32(latestBlock),
 		gethcommon.HexToAddress("0x0"),
 	)
@@ -117,8 +120,10 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.Contains(t, err.Error(), getSolidityFunctionSig("ABNNotInFuture(uint32)"))
 
 	// ensure that a verifier #2 can be added two blocks in the future where activation_block_number = latestBlock + 2
+	opts, err = testHarness.GetDeployerTransactOpts()
+	require.NoError(t, err)
 	tx, err := testHarness.EigenDACertVerifierRouter.AddCertVerifier(
-		testHarness.DeployerTransactorOpts,
+		opts,
 		uint32(latestBlock)+2,
 		gethcommon.HexToAddress("0x0"),
 	)
@@ -152,8 +157,10 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	latestBlock, err = testHarness.EthClient.BlockNumber(ctx)
 	require.NoError(t, err)
 
+	opts, err = testHarness.GetDeployerTransactOpts()
+	require.NoError(t, err)
 	tx, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
-		testHarness.DeployerTransactorOpts,
+		opts,
 		uint32(latestBlock)+2,
 		gethcommon.HexToAddress(globalInfra.TestConfig.EigenDA.CertVerifier),
 	)
