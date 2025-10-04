@@ -30,9 +30,9 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CONTRACT_DIRECTORY_ADDRESS"),
 	}
-	UseGraphFlag = cli.BoolTFlag{
+	UseGraphFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
-		Usage:    "Whether to use the graph node",
+		Usage:    "Whether to use the graph node instead of on-chain operatorstate backend (defaults to false)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_GRAPH"),
 	}

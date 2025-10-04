@@ -29,6 +29,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	operatorstate "github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
@@ -185,11 +186,20 @@ func RunController(ctx *cli.Context) error {
 	var ics core.IndexedChainState
 	if config.UseGraph {
 		logger.Info("Using graph node")
-
 		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
 		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 	} else {
-		return fmt.Errorf("built-in indexer is deprecated and will be removed soon, please use UseGraph=true")
+		// Default to operatorstate backend
+		logger.Info("Using operatorstate backend (on-chain)")
+		// Use the first RPC URL for direct on-chain queries
+		ethRPC := config.EthClientConfig.RPCURLs[0]
+		// Build operatorstate IndexedChainState
+		tmp, err := operatorstate.NewIndexedChainState(
+			ethRPC, registryCoordinatorAddress, operatorStateRetrieverAddress, chainState, contractDirectory)
+		if err != nil {
+			return fmt.Errorf("failed to create operatorstate IndexedChainState: %w", err)
+		}
+		ics = tmp
 	}
 
 	var requestSigner clients.DispersalRequestSigner
