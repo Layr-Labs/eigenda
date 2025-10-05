@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,15 +33,15 @@ func TestProveAllCosetThreads(t *testing.T) {
 	frames, err := group.GetFrames(harness.paddedGettysburgAddressBytes, params)
 	require.Nil(t, err)
 
-	verifierGroup, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
-	require.Nil(t, err)
-	verifier, err := verifierGroup.GetKzgVerifier(params)
+	verifier, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
 	require.Nil(t, err)
 
-	for i, frame := range frames {
-		err = verifier.VerifyFrame(frame, uint64(i), (*bn254.G1Affine)(commitments.Commitment), params.NumChunks)
-		require.Nil(t, err)
+	indices := []encoding.ChunkNumber{}
+	for i := range len(frames) {
+		indices = append(indices, encoding.ChunkNumber(i))
 	}
+	err = verifier.VerifyFrames(frames, indices, commitments, params)
+	require.Nil(t, err)
 }
 
 func TestEncodeDecodeFrame_AreInverses(t *testing.T) {

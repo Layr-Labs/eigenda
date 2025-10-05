@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/big"
 
+	eigenbn254 "github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -16,14 +17,13 @@ import (
 )
 
 type ParametrizedVerifier struct {
-	*KzgConfig
 	g1SRS kzg.G1SRS
 	Fs    *fft.FFTSettings
 }
 
 // VerifyFrame verifies a single frame against a commitment.
 // If needing to verify multiple frames of the same chunk length, prefer [Verifier.UniversalVerify].
-func (v *ParametrizedVerifier) VerifyFrame(
+func (v *ParametrizedVerifier) verifyFrame(
 	frame *encoding.Frame, frameIndex uint64, commitment *bn254.G1Affine, numChunks uint64,
 ) error {
 	j, err := rs.GetLeadingCosetIndex(frameIndex, numChunks)
@@ -82,5 +82,9 @@ func verifyFrame(
 	// e([commitment - interpolation_polynomial]^(-1), [1]) * e([proof],  [s^n - x^n]) = 1_T
 	//
 
-	return pairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &frame.Proof, &xnMinusYn)
+	err = eigenbn254.PairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &frame.Proof, &xnMinusYn)
+	if err != nil {
+		return fmt.Errorf("verify pairing: %w", err)
+	}
+	return nil
 }
