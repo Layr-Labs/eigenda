@@ -3,6 +3,8 @@ package integration
 import (
 	"context"
 	"fmt"
+	"log"
+	"math/big"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -79,16 +81,8 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("failed to get chain ID: %w", err)
 	}
 
-	// Create DeployerTransactorOpts once for reuse
-	deployerPrivateKey, err := crypto.HexToECDSA(pk)
-	if err != nil {
-		return nil, fmt.Errorf("invalid deployer private key: %w", err)
-	}
-
-	testCtx.DeployerTransactorOpts, err = bind.NewKeyedTransactorWithChainID(deployerPrivateKey, testCtx.ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("create deployer transact opts: %w", err)
-	}
+	// Create transactor options
+	testCtx.DeployerTransactorOpts = newTransactOptsFromPrivateKey(pk, testCtx.ChainID)
 
 	// Create contract bindings
 	testCtx.EigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(
@@ -328,4 +322,18 @@ func setupDefaultPayloadDisperser(
 
 	testHarness.PayloadDisperser = payloadDisperser
 	return nil
+}
+
+func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind.TransactOpts {
+	privateKey, err := crypto.HexToECDSA(privateKeyHex)
+	if err != nil {
+		log.Fatalf("invalid private key: %v", err)
+	}
+
+	opts, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+	if err != nil {
+		log.Fatalf("failed to create transactor: %v", err)
+	}
+
+	return opts
 }

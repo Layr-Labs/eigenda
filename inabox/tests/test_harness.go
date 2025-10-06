@@ -85,6 +85,9 @@ type TestHarness struct {
 	RetrievalClient            clients.RetrievalClient
 	RelayRetrievalClientV2     *payloadretrieval.RelayPayloadRetriever
 	ValidatorRetrievalClientV2 *payloadretrieval.ValidatorPayloadRetriever
+	// Tests can use this default payload disperser directly, or create custom payload dispersers via
+	// CreatePayloadDisperser().
+	PayloadDisperser *payloaddispersal.PayloadDisperser
 
 	// Core components
 	ChainReader       core.Reader
@@ -93,11 +96,7 @@ type TestHarness struct {
 	// PaymentVault interaction
 	PaymentVaultTransactor *paymentvaultbindings.ContractPaymentVaultTransactor
 
-	// Tests can use this default payload disperser directly, or create custom payload dispersers via
-	// CreatePayloadDisperser().
-	PayloadDisperser *payloaddispersal.PayloadDisperser
-
-	// Deployer credentials and transaction options
+	// Transaction options - specific to test
 	DeployerTransactorOpts   *bind.TransactOpts
 	deployerTransactOptsLock sync.Mutex
 
