@@ -77,7 +77,10 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		&cli.BoolFlag{
 			Name: ErrorOnSecondaryInsertFailureFlagName,
 			Usage: "Return HTTP 500 if any secondary storage write fails. " +
-				"Cannot be used with concurrent-write-routines > 0.",
+				"Cannot be used with concurrent-write-routines > 0. " +
+				"WARNING: Enabling this flag couples rollup batch poster liveness to secondary storage availability. " +
+				"If secondary storage becomes unavailable, batch posting will fail with HTTP 500, " +
+				"potentially causing the batch poster to enter an infinite retry loop.",
 			Value:    false,
 			EnvVars:  withEnvPrefix(envPrefix, "ERROR_ON_SECONDARY_INSERT_FAILURE"),
 			Category: category,
