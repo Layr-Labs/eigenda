@@ -133,7 +133,7 @@ func testReservationReduction(
 	require.NoError(t, err)
 
 	// Since we're dispersing at half the supported rate, assert no failures
-	resultChan := submitPayloads(
+	resultChan := mustSubmitPayloads(
 		t, testRandom, payloadDisperser, blobsPerSecond, blobBytes, submissionDuration, 1.0, 0)
 	// Drain the results channel. This test doesn't need the values.
 	for range resultChan {
@@ -157,7 +157,7 @@ func testReservationReduction(
 	registerReservation(t, testHarness, clientReservation, accountID)
 
 	// Since we're dispersing at double the supported rate, assert ~50% success rate
-	resultChan = submitPayloads(
+	resultChan = mustSubmitPayloads(
 		t, testRandom, payloadDisperser, blobsPerSecond, blobBytes, submissionDuration, 0.5, 0.25)
 	for range resultChan {
 	}
@@ -205,7 +205,7 @@ func testReservationIncrease(
 	require.NoError(t, err)
 
 	// Since we're dispersing at double the supported rate, assert ~50% success rate
-	resultChan := submitPayloads(
+	resultChan := mustSubmitPayloads(
 		t, testRandom, payloadDisperser, blobsPerSecond, blobBytes, submissionDuration, 0.5, 0.25)
 	// Drain the results channel. This test doesn't need the values.
 	for range resultChan {
@@ -229,7 +229,7 @@ func testReservationIncrease(
 	registerReservation(t, testHarness, clientReservation, accountID)
 
 	// Since we're dispersing at half the supported rate, assert no failures
-	resultChan = submitPayloads(
+	resultChan = mustSubmitPayloads(
 		t, testRandom, payloadDisperser, blobsPerSecond, blobBytes, submissionDuration, 1.0, 0)
 	for range resultChan {
 	}

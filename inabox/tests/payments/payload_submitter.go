@@ -16,7 +16,7 @@ import (
 // Submits payloads at a certain rate for a duration. Asserts the actual success rate is within tolerance of expected.
 //
 // Returns dispersal errors on a channel.
-func submitPayloads(
+func mustSubmitPayloads(
 	t *testing.T,
 	testRandom *random.TestRandom,
 	payloadDisperser *payloaddispersal.PayloadDisperser,
