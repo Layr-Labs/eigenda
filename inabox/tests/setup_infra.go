@@ -25,7 +25,7 @@ type InfrastructureConfig struct {
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
 
-	// The following fields is temporary, to be able to test different payments configurations. It will be removed
+	// The following field is temporary, to be able to test different payments configurations. It will be removed
 	// once legacy payments are removed.
 	ControllerUseNewPayments bool
 }
