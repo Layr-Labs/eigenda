@@ -97,7 +97,9 @@ type TestHarness struct {
 	PaymentVaultTransactor *paymentvaultbindings.ContractPaymentVaultTransactor
 
 	// Transaction options - specific to test
-	DeployerTransactorOpts   *bind.TransactOpts
+	DeployerTransactorOpts *bind.TransactOpts
+	// Access to the TransactOpts must be synchronized if transactions from the same account are submitted
+	// in parallel. The internal logic for determining nonce isn't threadsafe.
 	deployerTransactOptsLock sync.Mutex
 
 	// Test-specific configuration
