@@ -120,6 +120,12 @@ func (tc *TestHarness) Cleanup() {
 // Provides thread-safe access to the deployer TransactOpts.
 //
 // Returns the TransactOpts and an unlock function that MUST be called when done.
+//
+// TODO(litt3): This is a bit of a hack. The returned struct doesn't have a populated nonce field: the nonce is
+// populated by the ethereum client iff the nonce within TransactOpts is nil. An alternate strategy to the one used here
+// would be to keep track of nonce internally instead of relying on the eth client, thus hiding any synchronization
+// logic from the user of the utility. But I struggled to get that working, and decided to go with what worked for now.
+// A future task could be to improve the user experience by hiding the sync logic.
 func (tc *TestHarness) GetDeployerTransactOpts() (*bind.TransactOpts, func()) {
 	tc.deployerTransactOptsLock.Lock()
 	return tc.DeployerTransactorOpts, func() {
