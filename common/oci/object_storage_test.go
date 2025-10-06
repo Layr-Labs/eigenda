@@ -20,10 +20,14 @@ import (
 type ObjectStorageClientInterface interface {
 	GetObject(ctx context.Context, request objectstorage.GetObjectRequest) (objectstorage.GetObjectResponse, error)
 	PutObject(ctx context.Context, request objectstorage.PutObjectRequest) (objectstorage.PutObjectResponse, error)
-	DeleteObject(ctx context.Context, request objectstorage.DeleteObjectRequest) (objectstorage.DeleteObjectResponse, error)
+	DeleteObject(
+		ctx context.Context, request objectstorage.DeleteObjectRequest,
+	) (objectstorage.DeleteObjectResponse, error)
 	HeadObject(ctx context.Context, request objectstorage.HeadObjectRequest) (objectstorage.HeadObjectResponse, error)
 	ListObjects(ctx context.Context, request objectstorage.ListObjectsRequest) (objectstorage.ListObjectsResponse, error)
-	CreateBucket(ctx context.Context, request objectstorage.CreateBucketRequest) (objectstorage.CreateBucketResponse, error)
+	CreateBucket(
+		ctx context.Context, request objectstorage.CreateBucketRequest,
+	) (objectstorage.CreateBucketResponse, error)
 	SetRegion(region string)
 }
 
@@ -47,34 +51,64 @@ func (m *mockLogger) Errorf(template string, args ...interface{}) {}
 func (m *mockLogger) Fatalf(template string, args ...interface{}) {}
 func (m *mockLogger) With(tags ...any) logging.Logger             { return m }
 
-func (m *MockObjectStorageClient) GetObject(ctx context.Context, request objectstorage.GetObjectRequest) (objectstorage.GetObjectResponse, error) {
+func (m *MockObjectStorageClient) GetObject(
+	ctx context.Context, request objectstorage.GetObjectRequest,
+) (objectstorage.GetObjectResponse, error) {
 	args := m.Called(ctx, request)
-	return args.Get(0).(objectstorage.GetObjectResponse), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return objectstorage.GetObjectResponse{}, fmt.Errorf("mock GetObject error: %w", err)
+	}
+	return args.Get(0).(objectstorage.GetObjectResponse), nil
 }
 
-func (m *MockObjectStorageClient) PutObject(ctx context.Context, request objectstorage.PutObjectRequest) (objectstorage.PutObjectResponse, error) {
+func (m *MockObjectStorageClient) PutObject(
+	ctx context.Context, request objectstorage.PutObjectRequest,
+) (objectstorage.PutObjectResponse, error) {
 	args := m.Called(ctx, request)
-	return args.Get(0).(objectstorage.PutObjectResponse), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return objectstorage.PutObjectResponse{}, fmt.Errorf("mock PutObject error: %w", err)
+	}
+	return args.Get(0).(objectstorage.PutObjectResponse), nil
 }
 
-func (m *MockObjectStorageClient) DeleteObject(ctx context.Context, request objectstorage.DeleteObjectRequest) (objectstorage.DeleteObjectResponse, error) {
+func (m *MockObjectStorageClient) DeleteObject(
+	ctx context.Context, request objectstorage.DeleteObjectRequest,
+) (objectstorage.DeleteObjectResponse, error) {
 	args := m.Called(ctx, request)
-	return args.Get(0).(objectstorage.DeleteObjectResponse), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return objectstorage.DeleteObjectResponse{}, fmt.Errorf("mock DeleteObject error: %w", err)
+	}
+	return args.Get(0).(objectstorage.DeleteObjectResponse), nil
 }
 
-func (m *MockObjectStorageClient) HeadObject(ctx context.Context, request objectstorage.HeadObjectRequest) (objectstorage.HeadObjectResponse, error) {
+func (m *MockObjectStorageClient) HeadObject(
+	ctx context.Context, request objectstorage.HeadObjectRequest,
+) (objectstorage.HeadObjectResponse, error) {
 	args := m.Called(ctx, request)
-	return args.Get(0).(objectstorage.HeadObjectResponse), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return objectstorage.HeadObjectResponse{}, fmt.Errorf("mock HeadObject error: %w", err)
+	}
+	return args.Get(0).(objectstorage.HeadObjectResponse), nil
 }
 
-func (m *MockObjectStorageClient) ListObjects(ctx context.Context, request objectstorage.ListObjectsRequest) (objectstorage.ListObjectsResponse, error) {
+func (m *MockObjectStorageClient) ListObjects(
+	ctx context.Context, request objectstorage.ListObjectsRequest,
+) (objectstorage.ListObjectsResponse, error) {
 	args := m.Called(ctx, request)
-	return args.Get(0).(objectstorage.ListObjectsResponse), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return objectstorage.ListObjectsResponse{}, fmt.Errorf("mock ListObjects error: %w", err)
+	}
+	return args.Get(0).(objectstorage.ListObjectsResponse), nil
 }
 
-func (m *MockObjectStorageClient) CreateBucket(ctx context.Context, request objectstorage.CreateBucketRequest) (objectstorage.CreateBucketResponse, error) {
+func (m *MockObjectStorageClient) CreateBucket(
+	ctx context.Context, request objectstorage.CreateBucketRequest,
+) (objectstorage.CreateBucketResponse, error) {
 	args := m.Called(ctx, request)
-	return args.Get(0).(objectstorage.CreateBucketResponse), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return objectstorage.CreateBucketResponse{}, fmt.Errorf("mock CreateBucket error: %w", err)
+	}
+	return args.Get(0).(objectstorage.CreateBucketResponse), nil
 }
 
 func (m *MockObjectStorageClient) SetRegion(region string) {
@@ -104,7 +138,7 @@ func (c *testOciClient) DownloadObject(ctx context.Context, bucket string, key s
 	if err != nil {
 		return nil, fmt.Errorf("failed to download object %s from bucket %s: %w", key, bucket, err)
 	}
-	defer response.Content.Close()
+	defer func() { _ = response.Content.Close() }()
 
 	data, err := io.ReadAll(response.Content)
 	if err != nil {
@@ -219,12 +253,16 @@ func (c *testOciClient) CreateBucket(ctx context.Context, bucket string) error {
 	return nil
 }
 
-func (c *testOciClient) FragmentedUploadObject(ctx context.Context, bucket string, key string, data []byte, fragmentSize int) error {
+func (c *testOciClient) FragmentedUploadObject(
+	ctx context.Context, bucket string, key string, data []byte, fragmentSize int,
+) error {
 	// Simplified implementation for testing
 	return c.UploadObject(ctx, bucket, key, data)
 }
 
-func (c *testOciClient) FragmentedDownloadObject(ctx context.Context, bucket string, key string, fileSize int, fragmentSize int) ([]byte, error) {
+func (c *testOciClient) FragmentedDownloadObject(
+	ctx context.Context, bucket string, key string, fileSize int, fragmentSize int,
+) ([]byte, error) {
 	if fileSize <= 0 {
 		return nil, errors.New("fileSize must be greater than 0")
 	}
@@ -233,7 +271,7 @@ func (c *testOciClient) FragmentedDownloadObject(ctx context.Context, bucket str
 	}
 
 	// Simplified implementation that downloads fragments and recombines them
-	fragmentCount := getFragmentCount(fileSize, fragmentSize)
+	fragmentCount := GetFragmentCount(fileSize, fragmentSize)
 	fragments := make([]*s3.Fragment, 0, fragmentCount)
 
 	for i := 0; i < fragmentCount; i++ {
@@ -254,7 +292,7 @@ func (c *testOciClient) FragmentedDownloadObject(ctx context.Context, bucket str
 		})
 	}
 
-	return recombineFragments(fragments)
+	return RecombineFragments(fragments)
 }
 
 func createTestOCIClient(mockClient *MockObjectStorageClient) *testOciClient {
@@ -530,7 +568,7 @@ func TestGetFragmentCount(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := getFragmentCount(test.fileSize, test.fragmentSize)
+		result := GetFragmentCount(test.fileSize, test.fragmentSize)
 		assert.Equal(t, test.expected, result)
 	}
 }
@@ -549,7 +587,7 @@ func TestRecombineFragments(t *testing.T) {
 
 	fragments := []*s3.Fragment{fragment2, fragment1} // intentionally out of order
 
-	data, err := recombineFragments(fragments)
+	data, err := RecombineFragments(fragments)
 
 	require.NoError(t, err)
 	expected := []byte("0123456789abcdefghij")
@@ -557,7 +595,7 @@ func TestRecombineFragments(t *testing.T) {
 }
 
 func TestRecombineFragments_EmptyFragments(t *testing.T) {
-	_, err := recombineFragments([]*s3.Fragment{})
+	_, err := RecombineFragments([]*s3.Fragment{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no fragments")
 }
@@ -576,7 +614,7 @@ func TestRecombineFragments_MissingFinalFragment(t *testing.T) {
 
 	fragments := []*s3.Fragment{fragment1, fragment2}
 
-	_, err := recombineFragments(fragments)
+	_, err := RecombineFragments(fragments)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing final fragment")
 }
@@ -595,7 +633,7 @@ func TestRecombineFragments_MissingFragment(t *testing.T) {
 
 	fragments := []*s3.Fragment{fragment1, fragment3}
 
-	_, err := recombineFragments(fragments)
+	_, err := RecombineFragments(fragments)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing fragment with index 1")
 }

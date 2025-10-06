@@ -146,8 +146,8 @@ func TestReadKMSKeyConfig_WithEnvironmentVariables(t *testing.T) {
 
 	// Set environment variables
 	for key, value := range envVars {
-		os.Setenv(key, value)
-		defer os.Unsetenv(key)
+		_ = os.Setenv(key, value)
+		defer func(k string) { _ = os.Unsetenv(k) }(key)
 	}
 
 	// Create a test CLI context
@@ -221,10 +221,10 @@ func TestKMSWalletCLIFlags_FlagProperties(t *testing.T) {
 
 func TestReadKMSKeyConfig_CommandLineOverridesEnvironment(t *testing.T) {
 	// Set environment variables
-	os.Setenv("TEST_KMS_PROVIDER", "aws")
-	os.Setenv("TEST_KMS_KEY_ID", "env-key")
-	defer os.Unsetenv("TEST_KMS_PROVIDER")
-	defer os.Unsetenv("TEST_KMS_KEY_ID")
+	_ = os.Setenv("TEST_KMS_PROVIDER", "aws")
+	_ = os.Setenv("TEST_KMS_KEY_ID", "env-key")
+	defer func() { _ = os.Unsetenv("TEST_KMS_PROVIDER") }()
+	defer func() { _ = os.Unsetenv("TEST_KMS_KEY_ID") }()
 
 	// Create CLI app with flags that should override env vars
 	app := cli.NewApp()

@@ -284,7 +284,7 @@ func (c *ociClient) FragmentedDownloadObject(
 		return nil, errors.New("fragmentSize must be greater than 0")
 	}
 
-	fragmentKeys, err := s3.GetFragmentKeys(key, getFragmentCount(fileSize, fragmentSize))
+	fragmentKeys, err := s3.GetFragmentKeys(key, GetFragmentCount(fileSize, fragmentSize))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fragment keys: %w", err)
 	}
@@ -315,7 +315,7 @@ func (c *ociClient) FragmentedDownloadObject(
 		return nil, fmt.Errorf("context error during fragmented download: %w", err)
 	}
 
-	return recombineFragments(fragments)
+	return RecombineFragments(fragments)
 }
 
 // readResult is the result of a read task.
@@ -369,8 +369,8 @@ func (c *ociClient) readTask(
 
 // Helper functions copied from s3 package (unexported)
 
-// getFragmentCount returns the number of fragments that a file of the given size will be broken into.
-func getFragmentCount(fileSize int, fragmentSize int) int {
+// GetFragmentCount returns the number of fragments that a file of the given size will be broken into.
+func GetFragmentCount(fileSize int, fragmentSize int) int {
 	if fileSize < fragmentSize {
 		return 1
 	} else if fileSize%fragmentSize == 0 {
@@ -382,7 +382,7 @@ func getFragmentCount(fileSize int, fragmentSize int) int {
 
 // recombineFragments recombines fragments into a single file.
 // Returns an error if any fragments are missing.
-func recombineFragments(fragments []*s3.Fragment) ([]byte, error) {
+func RecombineFragments(fragments []*s3.Fragment) ([]byte, error) {
 	if len(fragments) == 0 {
 		return nil, fmt.Errorf("no fragments")
 	}
