@@ -2,6 +2,7 @@ package toeplitz
 
 import (
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -102,7 +103,7 @@ func (t *Toeplitz) getFFTCoeff(rowV []fr.Element) ([]fr.Element, error) {
 
 	out, err := t.Fs.FFT(colV, false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fft: %w", err)
 	}
 	return out, nil
 }
