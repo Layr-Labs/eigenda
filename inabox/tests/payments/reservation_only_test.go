@@ -70,31 +70,31 @@ func testReservationOnly(t *testing.T, controllerUseNewPayments bool) {
 
 	// Subtests all use unique accountIDs, so they can run in parallel
 
-	t.Run("Old client payments within limits, then over limits", func(t *testing.T) {
+	t.Run("Old client payments with reservation reduction", func(t *testing.T) {
 		t.Parallel()
-		testWithinThenOver(t, infra.Logger, testHarness, clientledger.ClientLedgerModeLegacy)
+		testReservationReduction(t, infra.Logger, testHarness, clientledger.ClientLedgerModeLegacy)
 	})
 
-	t.Run("New client payments within limits, then over limits", func(t *testing.T) {
+	t.Run("New client payments with reservation reduction", func(t *testing.T) {
 		t.Parallel()
-		testWithinThenOver(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationOnly)
+		testReservationReduction(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationOnly)
 	})
 
-	t.Run("Old client payments over limits, then within limits", func(t *testing.T) {
+	t.Run("Old client payments with reservation increase", func(t *testing.T) {
 		t.Parallel()
-		testOverThenWithin(t, infra.Logger, testHarness, clientledger.ClientLedgerModeLegacy)
+		testReservationIncrease(t, infra.Logger, testHarness, clientledger.ClientLedgerModeLegacy)
 	})
 
-	t.Run("New client payments over limits, then within limits", func(t *testing.T) {
+	t.Run("New client payments with reservation increase", func(t *testing.T) {
 		t.Parallel()
-		testOverThenWithin(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationOnly)
+		testReservationIncrease(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationOnly)
 	})
 }
 
 // - Submit blobs at a rate that is supported by the reservation, and assert that all dispersals succeed
 // - Make the reservation smaller
 // - Submit blobs at the same rate, and assert some dispersals fail
-func testWithinThenOver(
+func testReservationReduction(
 	t *testing.T,
 	logger logging.Logger,
 	testHarness *integration.TestHarness,
@@ -166,7 +166,7 @@ func testWithinThenOver(
 // - Submit blobs at a rate that is larger than the reservation, and assert some dispersals fail
 // - Make the reservation larger
 // - Submit blobs at the same rate, and assert that all dispersals succeed
-func testOverThenWithin(
+func testReservationIncrease(
 	t *testing.T,
 	logger logging.Logger,
 	testHarness *integration.TestHarness,
