@@ -2237,7 +2237,71 @@ dependencies = [
 ]
 
 [[package]]
-name = "eigenda"
+name = "eigenda-ethereum"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus",
+ "alloy-primitives",
+ "alloy-provider",
+ "alloy-rpc-client",
+ "alloy-rpc-types",
+ "alloy-rpc-types-eth",
+ "alloy-signer-local",
+ "alloy-sol-types",
+ "alloy-transport",
+ "anyhow",
+ "eigenda-verification",
+ "futures",
+ "hashbrown 0.15.5",
+ "hex",
+ "reth-trie-common",
+ "rustls",
+ "schemars 0.8.22",
+ "serde",
+ "testcontainers",
+ "thiserror 2.0.16",
+ "tracing",
+]
+
+[[package]]
+name = "eigenda-proxy"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus",
+ "alloy-provider",
+ "alloy-rpc-types",
+ "arbitrary",
+ "backon",
+ "bincode",
+ "bytes",
+ "eigenda-verification",
+ "hex",
+ "jsonschema",
+ "rand 0.8.5",
+ "reltester",
+ "reqwest",
+ "risc0-zkvm",
+ "schemars 0.8.22",
+ "serde",
+ "test-strategy",
+ "testcontainers",
+ "thiserror 2.0.16",
+ "tokio",
+ "tracing",
+ "url",
+ "wiremock",
+]
+
+[[package]]
+name = "eigenda-srs-data"
+version = "0.1.0"
+dependencies = [
+ "ark-bn254",
+ "rust-kzg-bn254-prover",
+]
+
+[[package]]
+name = "eigenda-verification"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
@@ -2247,12 +2311,12 @@ dependencies = [
  "ark-bn254",
  "ark-ec",
  "ark-ff 0.5.0",
- "ark-serialize 0.5.0",
  "bincode",
  "bitvec",
  "bytes",
  "criterion",
  "derive_more 2.0.1",
+ "eigenda-srs-data",
  "hashbrown 0.15.5",
  "hex",
  "jsonschema",
@@ -4992,8 +5056,7 @@ checksum = "48fd7bd8a6377e15ad9d42a8ec25371b94ddc67abe7c8b9127bec79bebaaae18"
 [[package]]
 name = "rust-kzg-bn254-primitives"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a986f25bc8871261f26f4ec74ef9215d0920ec140f2ef2dfd441b33fd121738b"
+source = "git+https://github.com/Layr-Labs/rust-kzg-bn254.git?rev=60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6#60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6"
 dependencies = [
  "ark-bn254",
  "ark-ec",
@@ -5011,8 +5074,7 @@ dependencies = [
 [[package]]
 name = "rust-kzg-bn254-prover"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed1af11c66ca1e505ef959e398e86c39d9b2b20d0aa9a45a62e053a8a9044209"
+source = "git+https://github.com/Layr-Labs/rust-kzg-bn254.git?rev=60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6#60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6"
 dependencies = [
  "ark-bn254",
  "ark-ec",
@@ -5578,36 +5640,29 @@ dependencies = [
  "alloy-network",
  "alloy-primitives",
  "alloy-provider",
- "alloy-rpc-client",
  "alloy-rpc-types",
  "alloy-rpc-types-eth",
  "alloy-signer",
  "alloy-signer-local",
- "alloy-sol-types",
  "alloy-transport",
  "anyhow",
  "arbitrary",
- "ark-bn254",
- "ark-serialize 0.5.0",
  "async-trait",
  "backon",
- "bincode",
  "borsh",
  "bytes",
  "derive_more 2.0.1",
- "eigenda",
+ "eigenda-ethereum",
+ "eigenda-proxy",
+ "eigenda-verification",
  "futures",
- "hashbrown 0.15.5",
  "hex",
  "jsonschema",
  "proptest",
  "rand 0.8.5",
  "reltester",
- "reqwest",
  "reth-trie-common",
  "risc0-zkvm",
- "rust-kzg-bn254-prover",
- "rustls",
  "schemars 0.8.22",
  "serde",
  "serde_json",
@@ -5620,8 +5675,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.20",
  "tracing-tree",
- "url",
- "wiremock",
 ]
 
 [[package]]
