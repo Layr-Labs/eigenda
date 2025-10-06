@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"time"
 
@@ -129,53 +128,51 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 		return err
 	}
 
-	// Create listeners for v1 and v2 servers with configured ports
-	v1DispersalListener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", config.InternalDispersalPort))
-	if err != nil {
-		return fmt.Errorf("failed to create v1 dispersal listener: %w", err)
-	}
-	v1RetrievalListener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", config.InternalRetrievalPort))
-	if err != nil {
-		_ = v1DispersalListener.Close()
-		return fmt.Errorf("failed to create v1 retrieval listener: %w", err)
-	}
-	v2DispersalListener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", config.InternalV2DispersalPort))
-	if err != nil {
-		_ = v1DispersalListener.Close()
-		_ = v1RetrievalListener.Close()
-		return fmt.Errorf("failed to create v2 dispersal listener: %w", err)
-	}
-	v2RetrievalListener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", config.InternalV2RetrievalPort))
-	if err != nil {
-		_ = v1DispersalListener.Close()
-		_ = v1RetrievalListener.Close()
-		_ = v2DispersalListener.Close()
-		return fmt.Errorf("failed to create v2 retrieval listener: %w", err)
-	}
+	var serverV1 *nodegrpc.Server
+	var v1Listeners nodegrpc.V1Listeners
+	if config.EnableV1 {
+		v1Listeners, err = nodegrpc.CreateV1Listeners(
+			fmt.Sprintf("0.0.0.0:%s", config.InternalDispersalPort),
+			fmt.Sprintf("0.0.0.0:%s", config.InternalRetrievalPort))
+		if err != nil {
+			return err
+		}
 
-	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
-	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
-	server := nodegrpc.NewServer(
-		config,
-		node,
-		logger,
-		ratelimiter,
-		softwareVersion,
-		v1DispersalListener,
-		v1RetrievalListener,
-	)
-
-	reader, err := coreeth.NewReader(
-		logger,
-		client,
-		operatorStateRetrieverAddress.Hex(),
-		eigenDAServiceManagerAddress.Hex())
-	if err != nil {
-		return fmt.Errorf("cannot create eth.Reader: %w", err)
+		// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
+		//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
+		serverV1 = nodegrpc.NewServer(
+			config,
+			node,
+			logger,
+			ratelimiter,
+			softwareVersion,
+			v1Listeners.Dispersal,
+			v1Listeners.Retrieval,
+		)
 	}
 
 	var serverV2 *nodegrpc.ServerV2
+	var v2Listeners nodegrpc.V2Listeners
 	if config.EnableV2 {
+		v2Listeners, err = nodegrpc.CreateV2Listeners(
+			fmt.Sprintf("0.0.0.0:%s", config.InternalV2DispersalPort),
+			fmt.Sprintf("0.0.0.0:%s", config.InternalV2RetrievalPort))
+		if err != nil {
+			v1Listeners.Close()
+			return err
+		}
+
+		reader, err := coreeth.NewReader(
+			logger,
+			client,
+			operatorStateRetrieverAddress.Hex(),
+			eigenDAServiceManagerAddress.Hex())
+		if err != nil {
+			v1Listeners.Close()
+			v2Listeners.Close()
+			return fmt.Errorf("cannot create eth.Reader: %w", err)
+		}
+
 		serverV2, err = nodegrpc.NewServerV2(
 			context.Background(),
 			config,
@@ -185,13 +182,21 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 			reg,
 			reader,
 			softwareVersion,
-			v2DispersalListener,
-			v2RetrievalListener)
+			v2Listeners.Dispersal,
+			v2Listeners.Retrieval)
 		if err != nil {
+			v1Listeners.Close()
+			v2Listeners.Close()
 			return fmt.Errorf("failed to create server v2: %v", err)
 		}
 	}
-	err = nodegrpc.RunServers(server, serverV2, config, logger)
+
+	err = nodegrpc.RunServers(serverV1, serverV2, config, logger)
+	if err != nil {
+		v1Listeners.Close()
+		v2Listeners.Close()
+		return fmt.Errorf("failed to start gRPC servers: %w", err)
+	}
 
 	return err
 }
