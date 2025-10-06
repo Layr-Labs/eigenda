@@ -17,6 +17,8 @@ const (
 )
 
 var (
+	kmsFlags = common.KMSWalletCLIFlags(envVarPrefix, FlagPrefix)
+
 	DynamoDBTableNameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "dynamodb-table-name"),
 		Usage:    "Name of the dynamodb table to store blob metadata",
@@ -377,4 +379,5 @@ func init() {
 	Flags = append(Flags, indexer.CLIFlags(envVarPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, thegraph.CLIFlags(envVarPrefix)...)
+	Flags = append(Flags, kmsFlags...)
 }
