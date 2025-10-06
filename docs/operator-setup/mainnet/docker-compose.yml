@@ -1,0 +1,46 @@
+version: '3.8'
+services:
+  reverse-proxy:
+    image: nginx:latest
+    ports:
+      - "${NODE_RETRIEVAL_PORT}:${NODE_RETRIEVAL_PORT}"
+      - "${NODE_V2_RETRIEVAL_PORT}:${NODE_V2_RETRIEVAL_PORT}"
+      - "${NODE_API_PORT}:${NODE_API_PORT}"
+    volumes:
+      - "${NODE_NGINX_CONF_HOST}:/etc/nginx/templates/default.conf.template:ro"
+    depends_on:
+      - da-node
+    networks:
+      - eigenda
+    environment:
+      - "REQUEST_LIMIT=10r/s"
+      - "NODE_HOST=${MAIN_SERVICE_NAME}"
+      - "BURST_LIMIT=50"
+    env_file:
+      - .env
+    restart: unless-stopped
+  da-node:
+    env_file:
+      - .env
+    container_name: ${MAIN_SERVICE_NAME}
+    image: ${MAIN_SERVICE_IMAGE}
+    ports:
+      - "${NODE_DISPERSAL_PORT}:${NODE_INTERNAL_DISPERSAL_PORT}"
+      - "${NODE_V2_DISPERSAL_PORT}:${NODE_INTERNAL_V2_DISPERSAL_PORT}"
+      - "${NODE_METRICS_PORT}:${NODE_METRICS_PORT}"
+    networks:
+      - eigenda
+    volumes:
+      - "${NODE_ECDSA_KEY_FILE_HOST}:/app/operator_keys/ecdsa_key.json:readonly"
+      - "${NODE_BLS_KEY_FILE_HOST}:/app/operator_keys/bls_key.json:readonly"
+      - "${NODE_G1_PATH_HOST}:/app/g1.point:readonly"
+      - "${NODE_G2_PATH_HOST}:/app/g2.point.powerOf2:readonly"
+      - "${NODE_CACHE_PATH_HOST}:/app/cache:rw"
+      - "${NODE_LOG_PATH_HOST}:/app/logs:rw"
+      - "${NODE_DB_PATH_HOST}:/data/operator/db:rw"
+# TODO: Uncomment and update if using remote BLS signer https://github.com/Layr-Labs/cerberus
+#      - "${NODE_BLS_SIGNER_CERT_FILE_HOST}:/app/cerberus/cerberus.crt:readonly"
+    restart: unless-stopped
+networks:
+  eigenda:
+    name: ${NETWORK_NAME}

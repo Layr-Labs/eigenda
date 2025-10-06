@@ -1,0 +1,16 @@
+apiVersion: 1
+
+# dashboard providers
+# Uses a single generic one for now.
+# see https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards
+providers:
+  - name: 'Local Files'
+    folder: '' # It will be automatically generated
+    type: file
+    disableDeletion: false
+    editable: true
+    allowUiUpdates: true
+    updateIntervalSeconds: 10
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true

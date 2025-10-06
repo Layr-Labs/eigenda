@@ -1,0 +1,214 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "EigenDA Group",
+      "folder": "alerts",
+      "interval": "5m",
+      "rules": [
+        {
+          "uid": "e6ed7f3d-dc76-412f-805d-93227be6c822",
+          "title": "EigenDA number of processed batches",
+          "condition": "E",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 3600,
+                "to": 0
+              },
+              "datasourceUid": "prometheus",
+              "model": {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "disableTextWrap": false,
+                "editorMode": "builder",
+                "expr": "node_eigenda_processed_batches_total{type=\"number\"}",
+                "fullMetaSearch": false,
+                "includeNullMetadata": true,
+                "instant": false,
+                "interval": "",
+                "intervalMs": 15000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": true,
+                "refId": "A",
+                "useBackend": false
+              }
+            },
+            {
+              "refId": "B",
+              "relativeTimeRange": {
+                "from": 3600,
+                "to": 0
+              },
+              "datasourceUid": "prometheus",
+              "model": {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "disableTextWrap": false,
+                "editorMode": "builder",
+                "expr": "node_eigenda_processed_batches_total{type=\"number\", status=\"signed\"}",
+                "fullMetaSearch": false,
+                "includeNullMetadata": true,
+                "instant": false,
+                "interval": "",
+                "intervalMs": 15000,
+                "legendFormat": "__auto",
+                "maxDataPoints": 43200,
+                "range": true,
+                "refId": "B",
+                "useBackend": false
+              }
+            },
+            {
+              "refId": "C",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "B",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "reducer": "min",
+                "refId": "C",
+                "type": "reduce"
+              }
+            },
+            {
+              "refId": "D",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        0,
+                        0
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": []
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "avg"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "name": "Expression",
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "B",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "reducer": "max",
+                "refId": "D",
+                "type": "reduce"
+              }
+            },
+            {
+              "refId": "E",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        0,
+                        0
+                      ],
+                      "type": "gt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": []
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "avg"
+                    },
+                    "type": "query"
+                  }
+                ],
+                "datasource": {
+                  "name": "Expression",
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "$C == $D",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "E",
+                "type": "math"
+              }
+            }
+          ],
+          "dasboardUid": "dcd9d495-ff1e-4794-b2b6-62634e4b40d1",
+          "panelId": 9,
+          "noDataState": "Alerting",
+          "execErrState": "Alerting",
+          "for": "5m",
+          "annotations": {
+            "__dashboardUid__": "dcd9d495-ff1e-4794-b2b6-62634e4b40d1",
+            "__panelId__": "9",
+            "description": "Number of signed batches are not increasing. Take a look at logs and see if you are signing. If your node is not receiving any traffic then you might not be signing. You may want to check https://blobs-holesky.eigenda.xyz/ to see if there are confirmed blobs. If yes, then you are missing out from serving these batches.  Please check the runbook for further debugging.",
+            "runbook_url": "https://docs.eigenlayer.xyz/operator-guides/avs-installation-and-registration/eigenda-operator-guide/",
+            "summary": "Number of signed batches are not increasing. This could be due to your node not being able to receive traffic"
+          },
+          "labels": {},
+          "isPaused": false
+        }
+      ]
+    }
+  ]
+}

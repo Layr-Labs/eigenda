@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 1m
+
+# Set default port for scrapping
+# Note: This should be updated if you update NODE_METRICS_PORT in .env file for DA node
+scrape_configs:
+  - job_name: 'prometheus'
+    scrape_interval: 1m
+    static_configs:
+      - targets: ['eigenda-native-node:9092']
+
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
