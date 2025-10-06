@@ -517,6 +517,11 @@ func TestIgnoreEnvironmentVariables(t *testing.T) {
 }
 
 func TestDocGeneration(t *testing.T) {
+	t.Parallel()
+
+	// Hard to verify a markdown file is properly formatted in a unit test.
+	//  But we should, at the very least, ensure that this doesn't crash.
+
 	packagePaths := []string{
 		"github.com/Layr-Labs/eigenda/node",
 		"github.com/Layr-Labs/eigensdk-go/signer/bls/types",
@@ -534,6 +539,7 @@ func TestDocGeneration(t *testing.T) {
 		},
 		"VALIDATOR",
 		packagePaths,
-		"config.md")
+		"config.md",
+		false)
 	require.NoError(t, err)
 }
