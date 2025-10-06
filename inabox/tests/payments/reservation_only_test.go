@@ -21,10 +21,16 @@ import (
 // Once we figure out why resources aren't being freed, then these tests will be runnable the "normal" way.
 
 func TestReservationOnly_LegacyController(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping inabox integration tests in short mode")
+	}
 	testReservationOnly(t, false)
 }
 
 func TestReservationOnly_NewController(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping inabox integration tests in short mode")
+	}
 	testReservationOnly(t, true)
 }
 
