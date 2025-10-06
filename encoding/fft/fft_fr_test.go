@@ -25,12 +25,31 @@ package fft
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func BenchmarkFFT(b *testing.B) {
+	for _, blobPowerBytes := range []uint8{17, 20, 24} {
+		b.Run("FFT_size_2^"+fmt.Sprint(blobPowerBytes)+"_bytes", func(b *testing.B) {
+
+			fs := NewFFTSettings(blobPowerBytes - 5) // subtract 5 to get symbols (2^5 = 32 bytes)
+			data := make([]fr.Element, fs.MaxWidth)
+			for i := uint64(0); i < fs.MaxWidth; i++ {
+				data[i].SetInt64(int64(i))
+			}
+
+			for b.Loop() {
+				_, err := fs.FFT(data, false)
+				require.NoError(b, err)
+			}
+		})
+	}
+}
 
 func TestFFTRoundtrip(t *testing.T) {
 	fs := NewFFTSettings(4)

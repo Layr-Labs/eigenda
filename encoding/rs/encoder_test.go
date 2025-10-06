@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,6 +19,37 @@ var (
 	numSys                   = uint64(3)
 	numPar                   = numNode - numSys
 )
+
+func BenchmarkEncode(b *testing.B) {
+	cfg := encoding.DefaultConfig()
+	enc, err := rs.NewEncoder(cfg)
+	require.Nil(b, err)
+
+	// We only have 16MiBs of SRS points. Since we use blob_version=0's 8x coding ratio,
+	// we can encode blobs of max size 2MiB (1<<21) and 8x rs encode them up to 16MiB.
+	for _, blobPower := range []uint64{17, 20, 21} {
+		b.Run("Encode_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
+			blobSizeBytes := uint64(1) << blobPower
+			params := encoding.EncodingParams{
+				NumChunks:   8192,                            // blob_version=0
+				ChunkLength: max(1, blobSizeBytes*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
+			}
+
+			rand := random.NewTestRandom()
+			blobBytes := rand.Bytes(int(blobSizeBytes))
+			for i := 0; i < len(blobBytes); i += 32 {
+				blobBytes[i] = 0 // to make them Fr elements
+			}
+			blob, err := rs.ToFrArray(blobBytes)
+			require.Nil(b, err)
+
+			for b.Loop() {
+				_, _, err = enc.Encode(blob, params)
+				require.Nil(b, err)
+			}
+		})
+	}
+}
 
 func TestEncodeDecode_InvertsWhenSamplingAllFrames(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
