@@ -287,6 +287,9 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 	return nil
 }
 
+// Calls [TestHarness.CreatePayloadDisperser] for the default account ID.
+//
+// [TestHarness.CreatePayloadDisperser] can be called with different configs to create additional payload dispersers
 func setupDefaultPayloadDisperser(
 	ctx context.Context,
 	testHarness *TestHarness,
