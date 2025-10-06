@@ -12,8 +12,8 @@ import (
 )
 
 // ParseConfig parses the configuration from the given paths and environment variables. Configuration files are
-// loaded in order, with later files overriding earlier ones. Environment variables are loaded last, and overrid values
-// from all configuration files. If there are default values in the config, the counstructor should return an instance
+// loaded in order, with later files overriding earlier ones. Environment variables are loaded last, and override values
+// from all configuration files. If there are default values in the config, the constructor should return an instance
 // initialized with those values.
 func ParseConfig[T VerifiableConfig](
 	// A function that returns a new instance of the config struct to be populated.

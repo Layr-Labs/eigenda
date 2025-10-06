@@ -449,7 +449,7 @@ func TestInvalidEnvironmentVariable(t *testing.T) {
 	require.NoError(t, os.Unsetenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED"))
 }
 
-func TestVerificaitonFailure(t *testing.T) {
+func TestVerificationFailure(t *testing.T) {
 	configFile := "test/config.toml"
 
 	// Set environment variables to override some config values.
