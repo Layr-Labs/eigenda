@@ -48,72 +48,42 @@ interface IEigenDAConfigRegistry {
     error ConfigAlreadyExists(string name);
     error ConfigDoesNotExist(string name);
 
-    event ConfigBytes32Added(string name, bytes32 indexed key, bytes32 value, string extraInfo);
-    event ConfigBytesAdded(string name, bytes32 indexed key, bytes value, string extraInfo);
-    event ConfigBytes32Replaced(string name, bytes32 indexed key, bytes32 oldValue, bytes32 newValue, string extraInfo);
-    event ConfigBytesReplaced(string name, bytes32 indexed key, bytes oldValue, bytes newValue, string extraInfo);
+    event ConfigBytes32Added(string name, bytes32 indexed key, uint256 activationKey, bytes32 value);
+    event ConfigBytesAdded(string name, bytes32 indexed key, uint256 activationKey, bytes value);
+    event ConfigBytes32Replaced(string name, bytes32 indexed key, uint256 activationKey, bytes32 oldValue, bytes32 newValue);
+    event ConfigBytesReplaced(string name, bytes32 indexed key, uint256 activationKey, bytes oldValue, bytes newValue);
     event ConfigBytes32Removed(string name, bytes32 indexed key);
     event ConfigBytesRemoved(string name, bytes32 indexed key);
 
-    /// @notice Adds a new bytes32 configuration entry to the registry by name, along with optional extra info.
-    /// @dev Reverts if the entry already exists.
-    function addConfigBytes32(string memory name, bytes32 value, string memory extraInfo) external;
+    function getConfigKey(string memory name) external pure returns (bytes32);
 
-    /// @notice Adds a new bytes configuration entry to the registry by name, along with optional extra info.
-    /// @dev Reverts if the entry already exists.
-    function addConfigBytes(string memory name, bytes memory value, string memory extraInfo) external;
+    function getConfigNameBytes32(bytes32 key) external view returns (string memory);
 
-    /// @notice Replaces an existing bytes32 configuration entry in the registry by name, along with optional extra info.
-    /// @dev Reverts if the entry does not exist.
-    function replaceConfigBytes32(string memory name, bytes32 value, string memory extraInfo) external;
+    function getConfigNameBytes(bytes32 key) external view returns (string memory);
 
-    /// @notice Replaces an existing bytes configuration entry in the registry by name, along with optional extra info.
-    /// @dev Reverts if the entry does not exist.
-    function replaceConfigBytes(string memory name, bytes memory value, string memory extraInfo) external;
+    function isKeyRegisteredBytes32(bytes32 key) external view returns (bool);
 
-    /// @notice Removes an existing bytes32 configuration entry from the registry by name.
-    /// @dev Reverts if the entry does not exist.
-    function removeConfigBytes32(string memory name) external;
+    function isKeyRegisteredBytes(bytes32 key) external view returns (bool);
 
-    /// @notice Removes an existing bytes configuration entry from the registry by name.
-    /// @dev Reverts if the entry does not exist.
-    function removeConfigBytes(string memory name) external;
+    function addConfigBytes32(string memory name, uint256 activationKey, bytes32 value) external;
 
-    /// @notice Gets the bytes32 configuration entry by name.
-    function getConfigBytes32(string memory name) external view returns (bytes32);
+    function addConfigBytes(string memory name, uint256 activationKey, bytes memory value) external;
 
-    /// @notice Gets the bytes configuration entry by name.
-    function getConfigBytes(string memory name) external view returns (bytes memory);
+    function getNumConfigCheckpointsBytes32(bytes32 key) external view returns (uint256);
 
-    /// @notice Gets the extra info associated with a bytes32 configuration entry by name.
-    function getConfigBytes32ExtraInfo(string memory name) external view returns (string memory);
+    function getNumConfigCheckpointsBytes(bytes32 key) external view returns (uint256);
 
-    /// @notice Gets the extra info associated with a bytes configuration entry by name.
-    function getConfigBytesExtraInfo(string memory name) external view returns (string memory);
+    function getConfigBytes32(bytes32 key, uint256 index) external view returns (bytes32);
 
-    /// @notice Gets the bytes32 configuration entry by keccak256 hash of the name.
-    function getConfigBytes32(bytes32 key) external view returns (bytes32);
+    function getConfigBytes(bytes32 key, uint256 index) external view returns (bytes memory);
 
-    /// @notice Gets the bytes configuration entry by keccak256 hash of the name.
-    function getConfigBytes(bytes32 key) external view returns (bytes memory);
+    function getNumRegisteredConfigsBytes32() external view returns (uint256);
 
-    /// @notice Gets the extra info associated with a bytes32 configuration entry by keccak256 hash of the name.
-    function getConfigBytes32ExtraInfo(bytes32 key) external view returns (string memory);
+    function getNumRegisteredConfigsBytes() external view returns (uint256);
 
-    /// @notice Gets the extra info associated with a bytes configuration entry by keccak256 hash of the name.
-    function getConfigBytesExtraInfo(bytes32 key) external view returns (string memory);
+    function getRegisteredConfigBytes32(uint256 index) external view returns (string memory);
 
-    /// @notice Gets the number of registered keys for bytes32 configuration entries.
-    function getNumRegisteredKeysBytes32() external view returns (uint256);
-
-    /// @notice Gets the number of registered keys for bytes configuration entries.
-    function getNumRegisteredKeysBytes() external view returns (uint256);
-
-    /// @notice Gets the registered key for bytes32 configuration entries at a specific index.
-    function getRegisteredKeyBytes32(uint256 index) external view returns (string memory);
-
-    /// @notice Gets the registered key for bytes configuration entries at a specific index.
-    function getRegisteredKeyBytes(uint256 index) external view returns (string memory);
+    function getRegisteredConfigBytes(uint256 index) external view returns (string memory);
 }
 
 /// @notice Interface for the EigenDA Directory
