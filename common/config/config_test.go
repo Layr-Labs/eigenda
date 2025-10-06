@@ -64,7 +64,7 @@ func (b *Baz) Verify() error {
 
 func TestTOMLParsing(t *testing.T) {
 
-	configFile := "testdata/config.toml"
+	configFile := "test/config.toml"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestTOMLParsing(t *testing.T) {
 
 func TestJSONParsing(t *testing.T) {
 
-	configFile := "testdata/config.json"
+	configFile := "test/config.json"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestJSONParsing(t *testing.T) {
 
 func TestYAMLParsing(t *testing.T) {
 
-	configFile := "testdata/config.yaml"
+	configFile := "test/config.yaml"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.NoError(t, err)
@@ -189,8 +189,8 @@ func TestYAMLParsing(t *testing.T) {
 
 func TestTOMLConfigOverride(t *testing.T) {
 
-	configFile := "testdata/config.toml"
-	overrideFile := "testdata/config_override.toml"
+	configFile := "test/config.toml"
+	overrideFile := "test/config_override.toml"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
 	require.NoError(t, err)
@@ -226,8 +226,8 @@ func TestTOMLConfigOverride(t *testing.T) {
 
 func TestJSONConfigOverride(t *testing.T) {
 
-	configFile := "testdata/config.json"
-	overrideFile := "testdata/config_override.json"
+	configFile := "test/config.json"
+	overrideFile := "test/config_override.json"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
 	require.NoError(t, err)
@@ -269,8 +269,8 @@ func TestJSONConfigOverride(t *testing.T) {
 
 func TestYAMLConfigOverride(t *testing.T) {
 
-	configFile := "testdata/config.yaml"
-	overrideFile := "testdata/config_override.yaml"
+	configFile := "test/config.yaml"
+	overrideFile := "test/config_override.yaml"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
 	require.NoError(t, err)
@@ -311,7 +311,7 @@ func TestYAMLConfigOverride(t *testing.T) {
 }
 
 func TestInvalidTOML(t *testing.T) {
-	configFile := "testdata/invalid_config.toml"
+	configFile := "test/invalid_config.toml"
 
 	_, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.Error(t, err)
@@ -319,7 +319,7 @@ func TestInvalidTOML(t *testing.T) {
 
 func TestDefaultValues(t *testing.T) {
 
-	configFile := "testdata/config_override.toml"
+	configFile := "test/config_override.toml"
 
 	constructor := func() *Foo {
 		return &Foo{
@@ -383,7 +383,7 @@ func TestDefaultValues(t *testing.T) {
 
 func TestEnvironmentVariables(t *testing.T) {
 
-	configFile := "testdata/config.toml"
+	configFile := "test/config.toml"
 
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
@@ -437,7 +437,7 @@ func TestEnvironmentVariables(t *testing.T) {
 }
 
 func TestInvalidEnvironmentVariable(t *testing.T) {
-	configFile := "testdata/config.toml"
+	configFile := "test/config.toml"
 
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
@@ -450,7 +450,7 @@ func TestInvalidEnvironmentVariable(t *testing.T) {
 }
 
 func TestVerificaitonFailure(t *testing.T) {
-	configFile := "testdata/config.toml"
+	configFile := "test/config.toml"
 
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "invalid")) // will cause verification to fail

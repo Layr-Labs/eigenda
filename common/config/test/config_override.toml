@@ -1,0 +1,14 @@
+Int = -1
+Int32 = -3
+Int8 = -5
+Uint64 = 10007
+Uint16 = 10009
+Float64 = -11.11
+Bool = true
+
+[Bar]
+B = -25
+
+[Baz]
+X = "toml baz partial X"
+Z = false
