@@ -55,6 +55,9 @@ type Server struct {
 	// chunkRateLimiter enforces rate limits on GetChunk operations.
 	chunkRateLimiter *limiter.ChunkRateLimiter
 
+	// listener is the network listener for the gRPC server.
+	listener net.Listener
+
 	// grpcServer is the gRPC server.
 	grpcServer *grpc.Server
 
@@ -82,8 +85,11 @@ func NewServer(
 	chunkReader chunkstore.ChunkReader,
 	chainReader core.Reader,
 	ics core.IndexedChainState,
+	listener net.Listener,
 ) (*Server, error) {
-
+	if listener == nil {
+		return nil, errors.New("listener is required")
+	}
 	if chainReader == nil {
 		return nil, errors.New("chainReader is required")
 	}
@@ -148,7 +154,7 @@ func NewServer(
 		config.GetChunksRequestMaxPastAge,
 		config.GetChunksRequestMaxPastAge)
 
-	return &Server{
+	server := &Server{
 		config:           config,
 		logger:           logger.With("component", "RelayServer"),
 		metadataProvider: mp,
@@ -160,7 +166,26 @@ func NewServer(
 		replayGuardian:   replayGuardian,
 		metrics:          relayMetrics,
 		chainReader:      chainReader,
-	}, nil
+		listener:         listener,
+	}
+
+	// Setup gRPC server
+	opt := grpc.MaxRecvMsgSize(config.MaxGRPCMessageSize)
+	keepAliveConfig := grpc.KeepaliveParams(keepalive.ServerParameters{
+		MaxConnectionIdle:     config.MaxIdleConnectionAge,
+		MaxConnectionAge:      config.MaxConnectionAge,
+		MaxConnectionAgeGrace: config.MaxConnectionAgeGrace,
+	})
+
+	server.grpcServer = grpc.NewServer(opt, relayMetrics.GetGRPCServerOption(), keepAliveConfig)
+	reflection.Register(server.grpcServer)
+	pb.RegisterRelayServer(server.grpcServer, server)
+
+	// Register Server for Health Checks
+	name := pb.Relay_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, server.grpcServer)
+
+	return server, nil
 }
 
 // GetBlob retrieves a blob stored by the relay.
@@ -540,8 +565,9 @@ func buildInsufficientGetChunksBandwidthError(
 		blobCount, chunkCount, requiredBandwidth, originalError))
 }
 
-// StartWithListener starts the server using the provided listener. This method will block until the server is stopped.
-func (s *Server) StartWithListener(ctx context.Context, listener net.Listener) error {
+// Start starts the server using the listener provided in the constructor.
+// This method will block until the server is stopped.
+func (s *Server) Start(ctx context.Context) error {
 	// Start metrics server if enabled
 	if s.config.EnableMetrics {
 		s.metrics.Start()
@@ -562,39 +588,12 @@ func (s *Server) StartWithListener(ctx context.Context, listener net.Listener) e
 	}
 
 	// Serve grpc requests
-	opt := grpc.MaxRecvMsgSize(s.config.MaxGRPCMessageSize)
-
-	keepAliveConfig := grpc.KeepaliveParams(keepalive.ServerParameters{
-		MaxConnectionIdle:     s.config.MaxIdleConnectionAge,
-		MaxConnectionAge:      s.config.MaxConnectionAge,
-		MaxConnectionAgeGrace: s.config.MaxConnectionAgeGrace,
-	})
-
-	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption(), keepAliveConfig)
-	reflection.Register(s.grpcServer)
-	pb.RegisterRelayServer(s.grpcServer, s)
-
-	// Register Server for Health Checks
-	name := pb.Relay_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, s.grpcServer)
-
-	s.logger.Info("GRPC Listening", "address", listener.Addr().String())
-	if err := s.grpcServer.Serve(listener); err != nil {
-		return errors.New("could not start GRPC server")
+	s.logger.Info("GRPC Listening", "address", s.listener.Addr().String())
+	if err := s.grpcServer.Serve(s.listener); err != nil {
+		return fmt.Errorf("could not start GRPC server: %w", err)
 	}
 
 	return nil
-}
-
-// Start starts the server listening for requests. This method will block until the server is stopped.
-func (s *Server) Start(ctx context.Context) error {
-	addr := fmt.Sprintf("0.0.0.0:%d", s.config.GRPCPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("could not start tcp listener on %s: %w", addr, err)
-	}
-
-	return s.StartWithListener(ctx, listener)
 }
 
 func (s *Server) RefreshOnchainState(ctx context.Context) error {

@@ -108,7 +108,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 
 	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
 	disperserHarnessConfig := &DisperserHarnessConfig{
-		Logger:              logger,
 		Network:             sharedDockerNetwork,
 		TestConfig:          testConfig,
 		TestName:            testName,
@@ -118,10 +117,9 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		BucketTableName:     config.BucketTableName,
 		S3BucketName:        config.S3BucketName,
 		MetadataTableNameV2: config.MetadataTableNameV2,
-		EthClient:           infra.ChainHarness.EthClient,
 		RelayCount:          config.RelayCount,
 	}
-	disperserHarness, err := SetupDisperserHarness(infraCtx, *disperserHarnessConfig)
+	disperserHarness, err := SetupDisperserHarness(infraCtx, logger, infra.ChainHarness.EthClient, *disperserHarnessConfig)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
 		return nil, setupErr
