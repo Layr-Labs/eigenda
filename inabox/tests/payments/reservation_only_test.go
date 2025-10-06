@@ -13,6 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 )
 
@@ -112,12 +114,14 @@ func testReservationReduction(
 	reservationRequiredForRate := float32(minSizeBlobPerSecondReservationSize) * blobsPerSecond
 
 	testRandom := random.NewTestRandom()
-	privateKey := integration.GenerateRandomPrivateKeyHex(t)
-	accountID := integration.GetAccountIDFromPrivateKeyHex(t, privateKey)
+	publicKey, privateKey, err := testRandom.ECDSA()
+	require.NoError(t, err)
+	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
+	accountID := crypto.PubkeyToAddress(*publicKey)
 
 	payloadDisperserConfig := integration.GetDefaultTestPayloadDisperserConfig()
 	payloadDisperserConfig.ClientLedgerMode = clientLedgerMode
-	payloadDisperserConfig.PrivateKey = privateKey
+	payloadDisperserConfig.PrivateKey = privateKeyHex
 
 	clientReservation, err := reservation.NewReservation(
 		// reservation larger than it needs to be
@@ -184,12 +188,14 @@ func testReservationIncrease(
 	reservationRequiredForRate := float32(minSizeBlobPerSecondReservationSize) * blobsPerSecond
 
 	testRandom := random.NewTestRandom()
-	privateKey := integration.GenerateRandomPrivateKeyHex(t)
-	accountID := integration.GetAccountIDFromPrivateKeyHex(t, privateKey)
+	publicKey, privateKey, err := testRandom.ECDSA()
+	require.NoError(t, err)
+	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
+	accountID := crypto.PubkeyToAddress(*publicKey)
 
 	payloadDisperserConfig := integration.GetDefaultTestPayloadDisperserConfig()
 	payloadDisperserConfig.ClientLedgerMode = clientLedgerMode
-	payloadDisperserConfig.PrivateKey = privateKey
+	payloadDisperserConfig.PrivateKey = privateKeyHex
 
 	clientReservation, err := reservation.NewReservation(
 		// reservation smaller than it needs to be
