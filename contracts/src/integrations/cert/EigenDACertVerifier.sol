@@ -9,6 +9,8 @@ import {
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
+import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {BLSSignatureChecker} from "lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
 
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
@@ -24,14 +26,13 @@ contract EigenDACertVerifier is
     IEigenDACertVerifier,
     IEigenDACertVerifierBase,
     IVersionedEigenDACertVerifier,
+    BLSSignatureChecker,
     IEigenDASemVer
 {
     error InvalidSecurityThresholds();
     error InvalidQuorumNumbersRequired(uint256 length);
 
     IEigenDAThresholdRegistry internal immutable _eigenDAThresholdRegistry;
-
-    IEigenDASignatureVerifier internal immutable _eigenDASignatureVerifier;
 
     /// @notice Security thresholds used by {checkDACert}.
     /// @dev Checked inside {EigenDACertVerificationLib-checkDACert}. Constraints to respect:
@@ -67,10 +68,10 @@ contract EigenDACertVerifier is
 
     constructor(
         IEigenDAThresholdRegistry initEigenDAThresholdRegistry,
-        IEigenDASignatureVerifier initEigenDASignatureVerifier,
+        IRegistryCoordinator _registryCoordinator,
         DATypesV1.SecurityThresholds memory initSecurityThresholds,
         bytes memory initQuorumNumbersRequired
-    ) {
+    ) BLSSignatureChecker(_registryCoordinator) {
         if (initSecurityThresholds.confirmationThreshold <= initSecurityThresholds.adversaryThreshold) {
             revert InvalidSecurityThresholds();
         }
@@ -78,9 +79,9 @@ contract EigenDACertVerifier is
             revert InvalidQuorumNumbersRequired(initQuorumNumbersRequired.length);
         }
         _eigenDAThresholdRegistry = initEigenDAThresholdRegistry;
-        _eigenDASignatureVerifier = initEigenDASignatureVerifier;
         _securityThresholds = initSecurityThresholds;
         _quorumNumbersRequired = initQuorumNumbersRequired;
+        staleStakesForbidden = true;
     }
 
     /// @notice Decodes a certificate from bytes to an EigenDACertV3
@@ -147,18 +148,21 @@ contract EigenDACertVerifier is
     /// @dev This function will revert if the certificate is invalid.
     function checkDACertReverts(CT.EigenDACertV3 calldata daCert) external view {
         CertLib.checkDACert(
-            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, daCert, _securityThresholds, _quorumNumbersRequired
+            _eigenDAThresholdRegistry,
+            IEigenDASignatureVerifier(address(this)),
+            daCert,
+            _securityThresholds,
+            _quorumNumbersRequired
         );
+    }
+
+    function eigenDASignatureVerifier() external view returns (IEigenDASignatureVerifier) {
+        return IEigenDASignatureVerifier(address(this));
     }
 
     /// @inheritdoc IEigenDACertVerifier
     function eigenDAThresholdRegistry() external view returns (IEigenDAThresholdRegistry) {
         return _eigenDAThresholdRegistry;
-    }
-
-    /// @inheritdoc IEigenDACertVerifier
-    function eigenDASignatureVerifier() external view returns (IEigenDASignatureVerifier) {
-        return _eigenDASignatureVerifier;
     }
 
     /// @inheritdoc IEigenDACertVerifier

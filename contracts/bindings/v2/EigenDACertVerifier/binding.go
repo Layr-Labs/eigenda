@@ -98,9 +98,27 @@ type EigenDATypesV2BlobInclusionInfo struct {
 	InclusionProof  []byte
 }
 
+// IBLSSignatureCheckerNonSignerStakesAndSignature is an auto generated low-level Go binding around an user-defined struct.
+type IBLSSignatureCheckerNonSignerStakesAndSignature struct {
+	NonSignerQuorumBitmapIndices []uint32
+	NonSignerPubkeys             []BN254G1Point
+	QuorumApks                   []BN254G1Point
+	ApkG2                        BN254G2Point
+	Sigma                        BN254G1Point
+	QuorumApkIndices             []uint32
+	TotalStakeIndices            []uint32
+	NonSignerStakeIndices        [][]uint32
+}
+
+// IBLSSignatureCheckerQuorumStakeTotals is an auto generated low-level Go binding around an user-defined struct.
+type IBLSSignatureCheckerQuorumStakeTotals struct {
+	SignedStakeForQuorum []*big.Int
+	TotalStakeForQuorum  []*big.Int
+}
+
 // ContractEigenDACertVerifierMetaData contains all meta data concerning the ContractEigenDACertVerifier contract.
 var ContractEigenDACertVerifierMetaData = bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"initEigenDAThresholdRegistry\",\"type\":\"address\",\"internalType\":\"contractIEigenDAThresholdRegistry\"},{\"name\":\"initEigenDASignatureVerifier\",\"type\":\"address\",\"internalType\":\"contractIEigenDASignatureVerifier\"},{\"name\":\"initSecurityThresholds\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.SecurityThresholds\",\"components\":[{\"name\":\"confirmationThreshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"adversaryThreshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"}]},{\"name\":\"initQuorumNumbersRequired\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"_decodeCert\",\"inputs\":[{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"cert\",\"type\":\"tuple\",\"internalType\":\"structEigenDACertTypes.EigenDACertV3\",\"components\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BatchHeaderV2\",\"components\":[{\"name\":\"batchRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"blobInclusionInfo\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobInclusionInfo\",\"components\":[{\"name\":\"blobCertificate\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCertificate\",\"components\":[{\"name\":\"blobHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobHeaderV2\",\"components\":[{\"name\":\"version\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCommitment\",\"components\":[{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"lengthCommitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"lengthProof\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"length\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"paymentHeaderHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"relayKeys\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"}]},{\"name\":\"blobIndex\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"inclusionProof\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]},{\"name\":\"signedQuorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"certVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"checkDACert\",\"inputs\":[{\"name\":\"abiEncodedCert\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"checkDACertReverts\",\"inputs\":[{\"name\":\"daCert\",\"type\":\"tuple\",\"internalType\":\"structEigenDACertTypes.EigenDACertV3\",\"components\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BatchHeaderV2\",\"components\":[{\"name\":\"batchRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"blobInclusionInfo\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobInclusionInfo\",\"components\":[{\"name\":\"blobCertificate\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCertificate\",\"components\":[{\"name\":\"blobHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobHeaderV2\",\"components\":[{\"name\":\"version\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCommitment\",\"components\":[{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"lengthCommitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"lengthProof\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"length\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"paymentHeaderHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"relayKeys\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"}]},{\"name\":\"blobIndex\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"inclusionProof\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]},{\"name\":\"signedQuorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"eigenDASignatureVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIEigenDASignatureVerifier\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"eigenDAThresholdRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIEigenDAThresholdRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumNumbersRequired\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"securityThresholds\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.SecurityThresholds\",\"components\":[{\"name\":\"confirmationThreshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"adversaryThreshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"semver\",\"inputs\":[],\"outputs\":[{\"name\":\"major\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"minor\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"patch\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"pure\"},{\"type\":\"error\",\"name\":\"BlobQuorumsNotSubset\",\"inputs\":[{\"name\":\"blobQuorumsBitmap\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"confirmedQuorumsBitmap\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidBlobVersion\",\"inputs\":[{\"name\":\"blobVersion\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"nextBlobVersion\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]},{\"type\":\"error\",\"name\":\"InvalidInclusionProof\",\"inputs\":[{\"name\":\"blobIndex\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"blobHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"rootHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"InvalidQuorumNumbersRequired\",\"inputs\":[{\"name\":\"length\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidSecurityThresholds\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"RequiredQuorumsNotSubset\",\"inputs\":[{\"name\":\"requiredQuorumsBitmap\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"blobQuorumsBitmap\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"SecurityAssumptionsNotMet\",\"inputs\":[{\"name\":\"gamma\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"n\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"minRequired\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"initEigenDAThresholdRegistry\",\"type\":\"address\",\"internalType\":\"contractIEigenDAThresholdRegistry\"},{\"name\":\"_registryCoordinator\",\"type\":\"address\",\"internalType\":\"contractIRegistryCoordinator\"},{\"name\":\"initSecurityThresholds\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.SecurityThresholds\",\"components\":[{\"name\":\"confirmationThreshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"adversaryThreshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"}]},{\"name\":\"initQuorumNumbersRequired\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"_decodeCert\",\"inputs\":[{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"cert\",\"type\":\"tuple\",\"internalType\":\"structEigenDACertTypes.EigenDACertV3\",\"components\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BatchHeaderV2\",\"components\":[{\"name\":\"batchRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"blobInclusionInfo\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobInclusionInfo\",\"components\":[{\"name\":\"blobCertificate\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCertificate\",\"components\":[{\"name\":\"blobHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobHeaderV2\",\"components\":[{\"name\":\"version\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCommitment\",\"components\":[{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"lengthCommitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"lengthProof\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"length\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"paymentHeaderHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"relayKeys\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"}]},{\"name\":\"blobIndex\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"inclusionProof\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]},{\"name\":\"signedQuorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"blsApkRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIBLSApkRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"certVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"checkDACert\",\"inputs\":[{\"name\":\"abiEncodedCert\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"checkDACertReverts\",\"inputs\":[{\"name\":\"daCert\",\"type\":\"tuple\",\"internalType\":\"structEigenDACertTypes.EigenDACertV3\",\"components\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BatchHeaderV2\",\"components\":[{\"name\":\"batchRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"blobInclusionInfo\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobInclusionInfo\",\"components\":[{\"name\":\"blobCertificate\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCertificate\",\"components\":[{\"name\":\"blobHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobHeaderV2\",\"components\":[{\"name\":\"version\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCommitment\",\"components\":[{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"lengthCommitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"lengthProof\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"length\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"paymentHeaderHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"relayKeys\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"}]},{\"name\":\"blobIndex\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"inclusionProof\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]},{\"name\":\"signedQuorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"checkSignatures\",\"inputs\":[{\"name\":\"msgHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"params\",\"type\":\"tuple\",\"internalType\":\"structIBLSSignatureChecker.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structIBLSSignatureChecker.QuorumStakeTotals\",\"components\":[{\"name\":\"signedStakeForQuorum\",\"type\":\"uint96[]\",\"internalType\":\"uint96[]\"},{\"name\":\"totalStakeForQuorum\",\"type\":\"uint96[]\",\"internalType\":\"uint96[]\"}]},{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"delegation\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIDelegationManager\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"eigenDASignatureVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIEigenDASignatureVerifier\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"eigenDAThresholdRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIEigenDAThresholdRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumNumbersRequired\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"registryCoordinator\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIRegistryCoordinator\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"securityThresholds\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.SecurityThresholds\",\"components\":[{\"name\":\"confirmationThreshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"adversaryThreshold\",\"type\":\"uint8\",\"internalType\":\"uint8\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"semver\",\"inputs\":[],\"outputs\":[{\"name\":\"major\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"minor\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"patch\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"setStaleStakesForbidden\",\"inputs\":[{\"name\":\"value\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"stakeRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIStakeRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"staleStakesForbidden\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"trySignatureAndApkVerification\",\"inputs\":[{\"name\":\"msgHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"apk\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"outputs\":[{\"name\":\"pairingSuccessful\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"siganatureIsValid\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"StaleStakesForbiddenUpdate\",\"inputs\":[{\"name\":\"value\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"BlobQuorumsNotSubset\",\"inputs\":[{\"name\":\"blobQuorumsBitmap\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"confirmedQuorumsBitmap\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidBlobVersion\",\"inputs\":[{\"name\":\"blobVersion\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"nextBlobVersion\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]},{\"type\":\"error\",\"name\":\"InvalidInclusionProof\",\"inputs\":[{\"name\":\"blobIndex\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"blobHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"rootHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"InvalidQuorumNumbersRequired\",\"inputs\":[{\"name\":\"length\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidSecurityThresholds\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"RequiredQuorumsNotSubset\",\"inputs\":[{\"name\":\"requiredQuorumsBitmap\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"blobQuorumsBitmap\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"SecurityAssumptionsNotMet\",\"inputs\":[{\"name\":\"gamma\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"n\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"minRequired\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]",
 	ID:  "ContractEigenDACertVerifier",
 }
 
@@ -127,9 +145,9 @@ func (c *ContractEigenDACertVerifier) Instance(backend bind.ContractBackend, add
 // PackConstructor is the Go binding used to pack the parameters required for
 // contract deployment.
 //
-// Solidity: constructor(address initEigenDAThresholdRegistry, address initEigenDASignatureVerifier, (uint8,uint8) initSecurityThresholds, bytes initQuorumNumbersRequired) returns()
-func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackConstructor(initEigenDAThresholdRegistry common.Address, initEigenDASignatureVerifier common.Address, initSecurityThresholds EigenDATypesV1SecurityThresholds, initQuorumNumbersRequired []byte) []byte {
-	enc, err := contractEigenDACertVerifier.abi.Pack("", initEigenDAThresholdRegistry, initEigenDASignatureVerifier, initSecurityThresholds, initQuorumNumbersRequired)
+// Solidity: constructor(address initEigenDAThresholdRegistry, address _registryCoordinator, (uint8,uint8) initSecurityThresholds, bytes initQuorumNumbersRequired) returns()
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackConstructor(initEigenDAThresholdRegistry common.Address, _registryCoordinator common.Address, initSecurityThresholds EigenDATypesV1SecurityThresholds, initQuorumNumbersRequired []byte) []byte {
+	enc, err := contractEigenDACertVerifier.abi.Pack("", initEigenDAThresholdRegistry, _registryCoordinator, initSecurityThresholds, initQuorumNumbersRequired)
 	if err != nil {
 		panic(err)
 	}
@@ -168,6 +186,41 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackDecodeCert
 		return *new(EigenDACertTypesEigenDACertV3), err
 	}
 	out0 := *abi.ConvertType(out[0], new(EigenDACertTypesEigenDACertV3)).(*EigenDACertTypesEigenDACertV3)
+	return out0, nil
+}
+
+// PackBlsApkRegistry is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x5df45946.  This method will panic if any
+// invalid/nil inputs are passed.
+//
+// Solidity: function blsApkRegistry() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackBlsApkRegistry() []byte {
+	enc, err := contractEigenDACertVerifier.abi.Pack("blsApkRegistry")
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
+
+// TryPackBlsApkRegistry is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x5df45946.  This method will return an error
+// if any inputs are invalid/nil.
+//
+// Solidity: function blsApkRegistry() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackBlsApkRegistry() ([]byte, error) {
+	return contractEigenDACertVerifier.abi.Pack("blsApkRegistry")
+}
+
+// UnpackBlsApkRegistry is the Go binding that unpacks the parameters returned
+// from invoking the contract method with ID 0x5df45946.
+//
+// Solidity: function blsApkRegistry() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackBlsApkRegistry(data []byte) (common.Address, error) {
+	out, err := contractEigenDACertVerifier.abi.Unpack("blsApkRegistry", data)
+	if err != nil {
+		return *new(common.Address), err
+	}
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 	return out0, nil
 }
 
@@ -261,6 +314,85 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackCheckDACertR
 // Solidity: function checkDACertReverts(((bytes32,uint32),(((uint16,bytes,((uint256,uint256),(uint256[2],uint256[2]),(uint256[2],uint256[2]),uint32),bytes32),bytes,uint32[]),uint32,bytes),(uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]),bytes) daCert) view returns()
 func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackCheckDACertReverts(daCert EigenDACertTypesEigenDACertV3) ([]byte, error) {
 	return contractEigenDACertVerifier.abi.Pack("checkDACertReverts", daCert)
+}
+
+// PackCheckSignatures is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x6efb4636.  This method will panic if any
+// invalid/nil inputs are passed.
+//
+// Solidity: function checkSignatures(bytes32 msgHash, bytes quorumNumbers, uint32 referenceBlockNumber, (uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]) params) view returns((uint96[],uint96[]), bytes32)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackCheckSignatures(msgHash [32]byte, quorumNumbers []byte, referenceBlockNumber uint32, params IBLSSignatureCheckerNonSignerStakesAndSignature) []byte {
+	enc, err := contractEigenDACertVerifier.abi.Pack("checkSignatures", msgHash, quorumNumbers, referenceBlockNumber, params)
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
+
+// TryPackCheckSignatures is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x6efb4636.  This method will return an error
+// if any inputs are invalid/nil.
+//
+// Solidity: function checkSignatures(bytes32 msgHash, bytes quorumNumbers, uint32 referenceBlockNumber, (uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]) params) view returns((uint96[],uint96[]), bytes32)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackCheckSignatures(msgHash [32]byte, quorumNumbers []byte, referenceBlockNumber uint32, params IBLSSignatureCheckerNonSignerStakesAndSignature) ([]byte, error) {
+	return contractEigenDACertVerifier.abi.Pack("checkSignatures", msgHash, quorumNumbers, referenceBlockNumber, params)
+}
+
+// CheckSignaturesOutput serves as a container for the return parameters of contract
+// method CheckSignatures.
+type CheckSignaturesOutput struct {
+	Arg0 IBLSSignatureCheckerQuorumStakeTotals
+	Arg1 [32]byte
+}
+
+// UnpackCheckSignatures is the Go binding that unpacks the parameters returned
+// from invoking the contract method with ID 0x6efb4636.
+//
+// Solidity: function checkSignatures(bytes32 msgHash, bytes quorumNumbers, uint32 referenceBlockNumber, (uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]) params) view returns((uint96[],uint96[]), bytes32)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackCheckSignatures(data []byte) (CheckSignaturesOutput, error) {
+	out, err := contractEigenDACertVerifier.abi.Unpack("checkSignatures", data)
+	outstruct := new(CheckSignaturesOutput)
+	if err != nil {
+		return *outstruct, err
+	}
+	outstruct.Arg0 = *abi.ConvertType(out[0], new(IBLSSignatureCheckerQuorumStakeTotals)).(*IBLSSignatureCheckerQuorumStakeTotals)
+	outstruct.Arg1 = *abi.ConvertType(out[1], new([32]byte)).(*[32]byte)
+	return *outstruct, nil
+}
+
+// PackDelegation is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0xdf5cf723.  This method will panic if any
+// invalid/nil inputs are passed.
+//
+// Solidity: function delegation() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackDelegation() []byte {
+	enc, err := contractEigenDACertVerifier.abi.Pack("delegation")
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
+
+// TryPackDelegation is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0xdf5cf723.  This method will return an error
+// if any inputs are invalid/nil.
+//
+// Solidity: function delegation() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackDelegation() ([]byte, error) {
+	return contractEigenDACertVerifier.abi.Pack("delegation")
+}
+
+// UnpackDelegation is the Go binding that unpacks the parameters returned
+// from invoking the contract method with ID 0xdf5cf723.
+//
+// Solidity: function delegation() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackDelegation(data []byte) (common.Address, error) {
+	out, err := contractEigenDACertVerifier.abi.Unpack("delegation", data)
+	if err != nil {
+		return *new(common.Address), err
+	}
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	return out0, nil
 }
 
 // PackEigenDASignatureVerifier is the Go binding used to pack the parameters required for calling
@@ -368,6 +500,41 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackQuorumNumb
 	return out0, nil
 }
 
+// PackRegistryCoordinator is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x6d14a987.  This method will panic if any
+// invalid/nil inputs are passed.
+//
+// Solidity: function registryCoordinator() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackRegistryCoordinator() []byte {
+	enc, err := contractEigenDACertVerifier.abi.Pack("registryCoordinator")
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
+
+// TryPackRegistryCoordinator is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x6d14a987.  This method will return an error
+// if any inputs are invalid/nil.
+//
+// Solidity: function registryCoordinator() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackRegistryCoordinator() ([]byte, error) {
+	return contractEigenDACertVerifier.abi.Pack("registryCoordinator")
+}
+
+// UnpackRegistryCoordinator is the Go binding that unpacks the parameters returned
+// from invoking the contract method with ID 0x6d14a987.
+//
+// Solidity: function registryCoordinator() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackRegistryCoordinator(data []byte) (common.Address, error) {
+	out, err := contractEigenDACertVerifier.abi.Unpack("registryCoordinator", data)
+	if err != nil {
+		return *new(common.Address), err
+	}
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	return out0, nil
+}
+
 // PackSecurityThresholds is the Go binding used to pack the parameters required for calling
 // the contract method with ID 0x21b9b2fb.  This method will panic if any
 // invalid/nil inputs are passed.
@@ -447,6 +614,183 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackSemver(dat
 	outstruct.Minor = *abi.ConvertType(out[1], new(uint8)).(*uint8)
 	outstruct.Patch = *abi.ConvertType(out[2], new(uint8)).(*uint8)
 	return *outstruct, nil
+}
+
+// PackSetStaleStakesForbidden is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x416c7e5e.  This method will panic if any
+// invalid/nil inputs are passed.
+//
+// Solidity: function setStaleStakesForbidden(bool value) returns()
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackSetStaleStakesForbidden(value bool) []byte {
+	enc, err := contractEigenDACertVerifier.abi.Pack("setStaleStakesForbidden", value)
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
+
+// TryPackSetStaleStakesForbidden is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x416c7e5e.  This method will return an error
+// if any inputs are invalid/nil.
+//
+// Solidity: function setStaleStakesForbidden(bool value) returns()
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackSetStaleStakesForbidden(value bool) ([]byte, error) {
+	return contractEigenDACertVerifier.abi.Pack("setStaleStakesForbidden", value)
+}
+
+// PackStakeRegistry is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x68304835.  This method will panic if any
+// invalid/nil inputs are passed.
+//
+// Solidity: function stakeRegistry() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackStakeRegistry() []byte {
+	enc, err := contractEigenDACertVerifier.abi.Pack("stakeRegistry")
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
+
+// TryPackStakeRegistry is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x68304835.  This method will return an error
+// if any inputs are invalid/nil.
+//
+// Solidity: function stakeRegistry() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackStakeRegistry() ([]byte, error) {
+	return contractEigenDACertVerifier.abi.Pack("stakeRegistry")
+}
+
+// UnpackStakeRegistry is the Go binding that unpacks the parameters returned
+// from invoking the contract method with ID 0x68304835.
+//
+// Solidity: function stakeRegistry() view returns(address)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackStakeRegistry(data []byte) (common.Address, error) {
+	out, err := contractEigenDACertVerifier.abi.Unpack("stakeRegistry", data)
+	if err != nil {
+		return *new(common.Address), err
+	}
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	return out0, nil
+}
+
+// PackStaleStakesForbidden is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0xb98d0908.  This method will panic if any
+// invalid/nil inputs are passed.
+//
+// Solidity: function staleStakesForbidden() view returns(bool)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackStaleStakesForbidden() []byte {
+	enc, err := contractEigenDACertVerifier.abi.Pack("staleStakesForbidden")
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
+
+// TryPackStaleStakesForbidden is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0xb98d0908.  This method will return an error
+// if any inputs are invalid/nil.
+//
+// Solidity: function staleStakesForbidden() view returns(bool)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackStaleStakesForbidden() ([]byte, error) {
+	return contractEigenDACertVerifier.abi.Pack("staleStakesForbidden")
+}
+
+// UnpackStaleStakesForbidden is the Go binding that unpacks the parameters returned
+// from invoking the contract method with ID 0xb98d0908.
+//
+// Solidity: function staleStakesForbidden() view returns(bool)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackStaleStakesForbidden(data []byte) (bool, error) {
+	out, err := contractEigenDACertVerifier.abi.Unpack("staleStakesForbidden", data)
+	if err != nil {
+		return *new(bool), err
+	}
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+	return out0, nil
+}
+
+// PackTrySignatureAndApkVerification is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x171f1d5b.  This method will panic if any
+// invalid/nil inputs are passed.
+//
+// Solidity: function trySignatureAndApkVerification(bytes32 msgHash, (uint256,uint256) apk, (uint256[2],uint256[2]) apkG2, (uint256,uint256) sigma) view returns(bool pairingSuccessful, bool siganatureIsValid)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackTrySignatureAndApkVerification(msgHash [32]byte, apk BN254G1Point, apkG2 BN254G2Point, sigma BN254G1Point) []byte {
+	enc, err := contractEigenDACertVerifier.abi.Pack("trySignatureAndApkVerification", msgHash, apk, apkG2, sigma)
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
+
+// TryPackTrySignatureAndApkVerification is the Go binding used to pack the parameters required for calling
+// the contract method with ID 0x171f1d5b.  This method will return an error
+// if any inputs are invalid/nil.
+//
+// Solidity: function trySignatureAndApkVerification(bytes32 msgHash, (uint256,uint256) apk, (uint256[2],uint256[2]) apkG2, (uint256,uint256) sigma) view returns(bool pairingSuccessful, bool siganatureIsValid)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackTrySignatureAndApkVerification(msgHash [32]byte, apk BN254G1Point, apkG2 BN254G2Point, sigma BN254G1Point) ([]byte, error) {
+	return contractEigenDACertVerifier.abi.Pack("trySignatureAndApkVerification", msgHash, apk, apkG2, sigma)
+}
+
+// TrySignatureAndApkVerificationOutput serves as a container for the return parameters of contract
+// method TrySignatureAndApkVerification.
+type TrySignatureAndApkVerificationOutput struct {
+	PairingSuccessful bool
+	SiganatureIsValid bool
+}
+
+// UnpackTrySignatureAndApkVerification is the Go binding that unpacks the parameters returned
+// from invoking the contract method with ID 0x171f1d5b.
+//
+// Solidity: function trySignatureAndApkVerification(bytes32 msgHash, (uint256,uint256) apk, (uint256[2],uint256[2]) apkG2, (uint256,uint256) sigma) view returns(bool pairingSuccessful, bool siganatureIsValid)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackTrySignatureAndApkVerification(data []byte) (TrySignatureAndApkVerificationOutput, error) {
+	out, err := contractEigenDACertVerifier.abi.Unpack("trySignatureAndApkVerification", data)
+	outstruct := new(TrySignatureAndApkVerificationOutput)
+	if err != nil {
+		return *outstruct, err
+	}
+	outstruct.PairingSuccessful = *abi.ConvertType(out[0], new(bool)).(*bool)
+	outstruct.SiganatureIsValid = *abi.ConvertType(out[1], new(bool)).(*bool)
+	return *outstruct, nil
+}
+
+// ContractEigenDACertVerifierStaleStakesForbiddenUpdate represents a StaleStakesForbiddenUpdate event raised by the ContractEigenDACertVerifier contract.
+type ContractEigenDACertVerifierStaleStakesForbiddenUpdate struct {
+	Value bool
+	Raw   *types.Log // Blockchain specific contextual infos
+}
+
+const ContractEigenDACertVerifierStaleStakesForbiddenUpdateEventName = "StaleStakesForbiddenUpdate"
+
+// ContractEventName returns the user-defined event name.
+func (ContractEigenDACertVerifierStaleStakesForbiddenUpdate) ContractEventName() string {
+	return ContractEigenDACertVerifierStaleStakesForbiddenUpdateEventName
+}
+
+// UnpackStaleStakesForbiddenUpdateEvent is the Go binding that unpacks the event data emitted
+// by contract.
+//
+// Solidity: event StaleStakesForbiddenUpdate(bool value)
+func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackStaleStakesForbiddenUpdateEvent(log *types.Log) (*ContractEigenDACertVerifierStaleStakesForbiddenUpdate, error) {
+	event := "StaleStakesForbiddenUpdate"
+	if log.Topics[0] != contractEigenDACertVerifier.abi.Events[event].ID {
+		return nil, errors.New("event signature mismatch")
+	}
+	out := new(ContractEigenDACertVerifierStaleStakesForbiddenUpdate)
+	if len(log.Data) > 0 {
+		if err := contractEigenDACertVerifier.abi.UnpackIntoInterface(out, event, log.Data); err != nil {
+			return nil, err
+		}
+	}
+	var indexed abi.Arguments
+	for _, arg := range contractEigenDACertVerifier.abi.Events[event].Inputs {
+		if arg.Indexed {
+			indexed = append(indexed, arg)
+		}
+	}
+	if err := abi.ParseTopics(out, indexed, log.Topics[1:]); err != nil {
+		return nil, err
+	}
+	out.Raw = log
+	return out, nil
 }
 
 // UnpackError attempts to decode the provided error data using user-defined

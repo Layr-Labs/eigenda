@@ -4,6 +4,7 @@ pragma solidity =0.8.12;
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
+import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
@@ -52,11 +53,14 @@ contract CertVerifierDeployerV2 is Script, Test {
         // 2 - read dependency contract addresses from EigenDA Directory namespaced resolution
         //     contract and ensure that addresses are correct w.r.t their intended interfaces
 
+        address registryCoordinator =
+            IEigenDADirectory(eigenDADirectory).getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME);
+        if (registryCoordinator == address(0)) {
+            revert("RegistryCoordinator contract address not set in provided EigenDADirectory contract");
+        }
+
         address eigenDAServiceManager =
             IEigenDADirectory(eigenDADirectory).getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME);
-        if (eigenDAServiceManager == address(0)) {
-            revert("EigenDAServiceManager contract address not set in provided EigenDADirectory contract");
-        }
 
         // 2.a - assume we can read a batch number that's greater than zero
         uint32 batchNumber = IEigenDAServiceManager(eigenDAServiceManager).taskNumber();
@@ -99,7 +103,7 @@ contract CertVerifierDeployerV2 is Script, Test {
         eigenDACertVerifier = address(
             new EigenDACertVerifier(
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
-                IEigenDASignatureVerifier(eigenDAServiceManager),
+                IRegistryCoordinator(registryCoordinator),
                 defaultSecurityThresholds,
                 quorumNumbersRequired
             )

@@ -380,7 +380,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         eigenDACertVerifier = new EigenDACertVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
-            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            IRegistryCoordinator(address(registryCoordinator)),
             defaultSecurityThresholds,
             hex"0001"
         );
