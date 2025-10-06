@@ -65,7 +65,7 @@ func (b *Baz) Verify() error {
 
 func TestTOMLParsing(t *testing.T) {
 
-	configFile := "testdata/config.toml"
+	configFile := "test/config.toml"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.NoError(t, err)
@@ -106,7 +106,7 @@ func TestTOMLParsing(t *testing.T) {
 
 func TestJSONParsing(t *testing.T) {
 
-	configFile := "testdata/config.json"
+	configFile := "test/config.json"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.NoError(t, err)
@@ -148,7 +148,7 @@ func TestJSONParsing(t *testing.T) {
 
 func TestYAMLParsing(t *testing.T) {
 
-	configFile := "testdata/config.yaml"
+	configFile := "test/config.yaml"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.NoError(t, err)
@@ -190,8 +190,8 @@ func TestYAMLParsing(t *testing.T) {
 
 func TestTOMLConfigOverride(t *testing.T) {
 
-	configFile := "testdata/config.toml"
-	overrideFile := "testdata/config_override.toml"
+	configFile := "test/config.toml"
+	overrideFile := "test/config_override.toml"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
 	require.NoError(t, err)
@@ -227,8 +227,8 @@ func TestTOMLConfigOverride(t *testing.T) {
 
 func TestJSONConfigOverride(t *testing.T) {
 
-	configFile := "testdata/config.json"
-	overrideFile := "testdata/config_override.json"
+	configFile := "test/config.json"
+	overrideFile := "test/config_override.json"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
 	require.NoError(t, err)
@@ -270,8 +270,8 @@ func TestJSONConfigOverride(t *testing.T) {
 
 func TestYAMLConfigOverride(t *testing.T) {
 
-	configFile := "testdata/config.yaml"
-	overrideFile := "testdata/config_override.yaml"
+	configFile := "test/config.yaml"
+	overrideFile := "test/config_override.yaml"
 
 	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
 	require.NoError(t, err)
@@ -312,7 +312,7 @@ func TestYAMLConfigOverride(t *testing.T) {
 }
 
 func TestInvalidTOML(t *testing.T) {
-	configFile := "testdata/invalid_config.toml"
+	configFile := "test/invalid_config.toml"
 
 	_, err := ParseConfig(DefaultFoo, "FOO", configFile)
 	require.Error(t, err)
@@ -320,7 +320,7 @@ func TestInvalidTOML(t *testing.T) {
 
 func TestDefaultValues(t *testing.T) {
 
-	configFile := "testdata/config_override.toml"
+	configFile := "test/config_override.toml"
 
 	constructor := func() *Foo {
 		return &Foo{
@@ -384,7 +384,7 @@ func TestDefaultValues(t *testing.T) {
 
 func TestEnvironmentVariables(t *testing.T) {
 
-	configFile := "testdata/config.toml"
+	configFile := "test/config.toml"
 
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
@@ -438,7 +438,7 @@ func TestEnvironmentVariables(t *testing.T) {
 }
 
 func TestInvalidEnvironmentVariable(t *testing.T) {
-	configFile := "testdata/config.toml"
+	configFile := "test/config.toml"
 
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
@@ -450,8 +450,8 @@ func TestInvalidEnvironmentVariable(t *testing.T) {
 	require.NoError(t, os.Unsetenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED"))
 }
 
-func TestVerificaitonFailure(t *testing.T) {
-	configFile := "testdata/config.toml"
+func TestVerificationFailure(t *testing.T) {
+	configFile := "test/config.toml"
 
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "invalid")) // will cause verification to fail
@@ -461,8 +461,62 @@ func TestVerificaitonFailure(t *testing.T) {
 	require.Contains(t, err.Error(), "String may not be 'invalid'")
 }
 
-func TestDocGeneration(t *testing.T) {
+func TestIgnoreEnvironmentVariables(t *testing.T) {
 
+	configFile := "test/config.toml"
+
+	// Set environment variables to override some config values.
+	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
+	require.NoError(t, os.Setenv("PREFIX_INT", "-999"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_B", "-777"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_BAZ_X", "env var bar baz X"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_BAZ_Y", "444"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_BAZ_Z", "false"))
+	require.NoError(t, os.Setenv("PREFIX_INT64", "0")) // zero value
+	require.NoError(t, os.Setenv("PREFIX_INT32", "0")) // zero value
+
+	require.NoError(t, os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored"))
+
+	foo, err := ParseConfig(DefaultFoo, "", configFile) // intentionally empty prefix
+	require.NoError(t, err)
+
+	// Verify that environment variables did not override the config file values.
+	require.Equal(t, "this value came from config.toml", foo.String) // from config, env should be ignored
+	require.Equal(t, 0, foo.Int)                                     // from config, env should be ignored
+	require.Equal(t, int64(1), foo.Int64)                            // from config, env should be ignored
+	require.Equal(t, int32(3), foo.Int32)                            // from config, env should be ignored
+	require.Equal(t, int16(4), foo.Int16)                            // from config
+	require.Equal(t, int8(5), foo.Int8)                              // from config
+	require.Equal(t, uint(6), foo.Uint)                              // from config
+	require.Equal(t, uint64(7), foo.Uint64)                          // from config
+	require.Equal(t, uint32(8), foo.Uint32)                          // from config
+	require.Equal(t, uint16(9), foo.Uint16)                          // from config
+	require.Equal(t, uint8(10), foo.Uint8)                           // from config
+	require.Equal(t, 11.11, foo.Float64)                             // from config
+	require.Equal(t, float32(12.12), foo.Float32)                    // from config
+	require.Equal(t, 5*time.Second, foo.Duration)                    // from config
+	require.Equal(t, false, foo.Bool)                                // from config
+
+	// Bar field
+	require.Equal(t, "bar A", foo.Bar.A) // from config
+	require.Equal(t, 25, foo.Bar.B)      // from config, env should be ignored
+	require.Equal(t, true, foo.Bar.C)    // from config
+
+	// Bar.Baz field
+	require.NotNil(t, foo.Bar.Baz)
+	require.Equal(t, "barD baz X", foo.Bar.Baz.X) // from config, env should be ignored
+	require.Equal(t, 26, foo.Bar.Baz.Y)           // from config, env should be ignored
+	require.Equal(t, false, foo.Bar.Baz.Z)        // from config, env should be ignored
+
+	// Baz field - the env vars use FOO_BAZ_PARTIAL_* which doesn't match foo.Baz,
+	// so these should come from config
+	require.NotNil(t, foo.Baz)
+	require.Equal(t, "baz X", foo.Baz.X) // from config
+	require.Equal(t, 27, foo.Baz.Y)      // from config
+	require.Equal(t, true, foo.Baz.Z)    // from config
+}
+
+func TestDocGeneration(t *testing.T) {
 	packagePaths := []string{
 		"github.com/Layr-Labs/eigenda/node",
 		"github.com/Layr-Labs/eigensdk-go/signer/bls/types",
@@ -482,5 +536,4 @@ func TestDocGeneration(t *testing.T) {
 		packagePaths,
 		"config.md")
 	require.NoError(t, err)
-
 }

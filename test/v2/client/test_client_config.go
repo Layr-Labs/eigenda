@@ -75,7 +75,7 @@ func DefaultTestClientConfig() *TestClientConfig {
 		ProxyPort:                       1234,
 		RelayConnectionCount:            8,
 		DisperserConnectionCount:        8,
-		ClientLedgerPaymentMode:         string(clientledger.ClientLedgerModeOnDemandOnly),
+		ClientLedgerPaymentMode:         string(clientledger.ClientLedgerModeLegacy),
 	}
 }
 

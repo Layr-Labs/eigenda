@@ -15,10 +15,10 @@ requirements:
 
 1. All variables must be exported.
 2. Variables must all be "simple" types.
-    - any primitive (`int`, `float`, `string`, etc.)
-    - `time.Duration`
-    - nested structs that themselves only contain simple types (recursive type nesting not permitted)
-    - pointers to any of the above
+    a. any primitive (`int`, `float`, `string`, etc.)
+    b. `time.Duration`
+    b. nested structs that themselves only contain simple types (recursive type nested not permitted)
+    c. pointers to any of the above
 3. The struct must implement the `config.VerifiableConfig` interface (see below).
 4. The config must have a default constructor method.
 
@@ -51,9 +51,13 @@ ParseConfig[T VerifiableConfig](constructor func() T, envPrefix string, configPa
 `ParseConfig()` will load data from the configuration files in order (later files override values from earlier files).
 After loading configuration files, `ParseConfig()` loads environment variables (overriding values set by config files).
 
+The `envPrefix` argument is used when parsing environment variables. All environment variables without the specified
+prefix are ignored. If `envPrefix` is an empty string, then environment variable parsing is skipped.
+
 Example:
 
 ```go
+// All environment variables will start with "MYAPP_".
 const MyAppPrefix = "MYAPP"
 
 type MyConfig struct {

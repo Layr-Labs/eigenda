@@ -174,7 +174,7 @@ func (c *DisperserClient) DisperseBlob(
 	for _, q := range quorums {
 		if q > corev2.MaxQuorumID {
 			//nolint:wrapcheck
-			return nil, nil, api.NewErrorInvalidArg("quorum number must be less than 256")
+			return nil, nil, api.NewErrorInvalidArg(fmt.Sprintf("quorum number %d must be <= %d", q, corev2.MaxQuorumID))
 		}
 	}
 
