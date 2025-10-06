@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -206,9 +207,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 
 	disperserClientConfig := &clientsv2.DisperserClientConfig{
 		Hostname: "localhost",
-		// TODO(litt3): there needs to be a better way to configure this. I'm not addressing this for now, since this
-		// is how it is currently being done, and dynamic port definition will be a larger change.
-		Port: "32005",
+		Port:     strconv.Itoa(int(config.APIServerPort)),
 	}
 
 	accountId, err := signer.GetAccountID()

@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
@@ -247,7 +246,7 @@ func registerReservation(
 	t *testing.T,
 	testHarness *integration.TestHarness,
 	newReservation *reservation.Reservation,
-	accountID common.Address,
+	accountID gethcommon.Address,
 ) {
 	err := testHarness.UpdateReservationOnChain(t, accountID, newReservation)
 	require.NoError(t, err)

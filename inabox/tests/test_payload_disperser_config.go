@@ -16,6 +16,9 @@ type TestPayloadDisperserConfig struct {
 	// Private key to use for the disperser account (hex string with or without 0x prefix).
 	// If empty string, a random private key will be generated.
 	PrivateKey string
+
+	// The port of the API server's gRPC server
+	APIServerPort uint16
 }
 
 // Returns a PayloadDisperserConfig with default values for testing.
@@ -26,5 +29,6 @@ func GetDefaultTestPayloadDisperserConfig() TestPayloadDisperserConfig {
 	return TestPayloadDisperserConfig{
 		ClientLedgerMode: clientledger.ClientLedgerModeLegacy,
 		PrivateKey:       "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded",
+		APIServerPort:    32005,
 	}
 }
