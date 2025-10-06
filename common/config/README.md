@@ -145,6 +145,21 @@ Bar.B = "5s"
 Bar.C.ValueStoredInAVariableWithALongName = "yet another string"
 ```
 
+An alternate way to write the same config:
+
+```toml
+X = 1234
+Y = 3.14159265359
+Z = "this is a string"
+
+[[bar]]
+A = "this is another string"
+B = "5s"
+
+[[bar.C]]
+ValueStoredInAVariableWithALongName = "yet another string"
+```
+
 ## Mistyped Config
 
 If there is a config value that does not have a corresponding entry in the config struct, the configuration framework

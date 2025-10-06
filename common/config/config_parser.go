@@ -34,19 +34,20 @@ func ParseConfigFromCLI[T VerifiableConfig](constructor func() T, envPrefix stri
 //
 // The envPrefix is used to prefix environment variables. May not be empty. Environment variables with this prefix
 // are required to be bound to a configuration field, otherwise an error is returned. See README.md for more details.
-func ParseConfig[T VerifiableConfig](constructor func() T, envPrefix string, configPaths ...string) (T, error) {
-	if envPrefix == "" {
-		var zero T
-		return zero, fmt.Errorf("envPrefix may not be empty")
-	}
+func ParseConfig[T VerifiableConfig](
+	// A function that returns a new instance of the config struct to be populated.
+	// The struct should contain default values if any are desired.
+	constructor func() T,
+	// The prefix to use for environment variables. If empty, then environment variables are not read.
+	envPrefix string,
+	// A list of zero or more paths to configuration files. Later files override earlier ones.
+	// If environment variables are read, they override all configuration files.
+	configPaths ...string,
+) (T, error) {
 
 	target := constructor()
 
-	// Configure viper.
 	viperInstance := viper.New()
-	viperInstance.SetEnvPrefix(envPrefix)
-	viperInstance.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viperInstance.AutomaticEnv()
 
 	// Load each config file in order.
 	for i, path := range configPaths {
@@ -57,21 +58,26 @@ func ParseConfig[T VerifiableConfig](constructor func() T, envPrefix string, con
 		}
 	}
 
-	// Walk the struct and figure out what environment variables to bind to it.
-	boundVars, err := bindEnvs(viperInstance, envPrefix, target)
-	if err != nil {
-		var zero T
-		return zero, fmt.Errorf("failed to bind environment variables: %w", err)
+	if envPrefix != "" {
+		viperInstance.SetEnvPrefix(envPrefix)
+		viperInstance.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+		viperInstance.AutomaticEnv()
+
+		// Walk the struct and figure out what environment variables to bind to it.
+		boundVars, err := bindEnvs(viperInstance, envPrefix, target)
+		if err != nil {
+			var zero T
+			return zero, fmt.Errorf("failed to bind environment variables: %w", err)
+		}
+
+		// Make sure there aren't any invalid environment variables set.
+		err = checkForInvalidEnvVars(boundVars, envPrefix)
+		if err != nil {
+			var zero T
+			return zero, fmt.Errorf("invalid environment variables: %w", err)
+		}
 	}
 
-	// Make sure there aren't any invalid environment variables set.
-	err = checkForInvalidEnvVars(boundVars, envPrefix)
-	if err != nil {
-		var zero T
-		return zero, fmt.Errorf("invalid environment variables: %w", err)
-	}
-
-	// Use viper to unmarshal environment variables into the target struct.
 	decoderConfig := &mapstructure.DecoderConfig{
 		ErrorUnused:      true,
 		WeaklyTypedInput: true, // Allow automatic type conversion from strings (e.g., env vars)
