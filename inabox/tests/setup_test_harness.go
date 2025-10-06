@@ -123,7 +123,7 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("failed to setup retrieval clients: %w", err)
 	}
 
-	if err := setupPaymentVaultTransactor(ctx, testCtx, infra); err != nil {
+	if err := setupPaymentVaultTransactor(ctx, testCtx); err != nil {
 		return nil, fmt.Errorf("setup payment vault transactor: %w", err)
 	}
 
@@ -288,26 +288,6 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 	return nil
 }
 
-func setupPaymentVaultTransactor(
-	ctx context.Context,
-	testHarness *TestHarness,
-	infra *InfrastructureHarness,
-) error {
-	paymentVaultAddr, err := testHarness.ContractDirectory.GetContractAddress(ctx, directory.PaymentVault)
-	if err != nil {
-		return fmt.Errorf("get PaymentVault address: %w", err)
-	}
-
-	transactor, err := paymentvaultbindings.NewContractPaymentVaultTransactor(paymentVaultAddr, testHarness.EthClient)
-	if err != nil {
-		return fmt.Errorf("new PaymentVault transactor: %w", err)
-	}
-
-	testHarness.PaymentVaultTransactor = transactor
-
-	return nil
-}
-
 func setupDefaultPayloadDisperser(
 	ctx context.Context,
 	testHarness *TestHarness,
@@ -336,4 +316,23 @@ func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind
 	}
 
 	return opts
+}
+
+func setupPaymentVaultTransactor(
+	ctx context.Context,
+	testHarness *TestHarness,
+) error {
+	paymentVaultAddr, err := testHarness.ContractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	transactor, err := paymentvaultbindings.NewContractPaymentVaultTransactor(paymentVaultAddr, testHarness.EthClient)
+	if err != nil {
+		return fmt.Errorf("new PaymentVault transactor: %w", err)
+	}
+
+	testHarness.PaymentVaultTransactor = transactor
+
+	return nil
 }
