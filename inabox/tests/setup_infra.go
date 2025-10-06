@@ -15,7 +15,6 @@ import (
 type InfrastructureConfig struct {
 	TemplateName        string
 	TestName            string
-	InMemoryBlobStore   bool
 	Logger              logging.Logger
 	RootPath            string
 	MetadataTableName   string
@@ -87,14 +86,13 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 
 	// Create infrastructure harness early so we can populate it incrementally
 	infra := &InfrastructureHarness{
-		SharedNetwork:     sharedDockerNetwork,
-		TestConfig:        testConfig,
-		TemplateName:      config.TemplateName,
-		TestName:          testName,
-		InMemoryBlobStore: config.InMemoryBlobStore,
-		LocalStackPort:    "4570",
-		Logger:            config.Logger,
-		Cancel:            infraCancel,
+		SharedNetwork:  sharedDockerNetwork,
+		TestConfig:     testConfig,
+		TemplateName:   config.TemplateName,
+		TestName:       testName,
+		LocalStackPort: "4570",
+		Logger:         config.Logger,
+		Cancel:         infraCancel,
 	}
 
 	// Setup Chain Harness first (Anvil, Graph Node, Contracts, Churner)
@@ -116,7 +114,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		Network:             sharedDockerNetwork,
 		TestConfig:          testConfig,
 		TestName:            testName,
-		InMemoryBlobStore:   config.InMemoryBlobStore,
 		LocalStackPort:      infra.LocalStackPort,
 		MetadataTableName:   config.MetadataTableName,
 		BucketTableName:     config.BucketTableName,
