@@ -151,8 +151,8 @@ func (oh *OperatorHarness) StartOperators(ctx context.Context, logger logging.Lo
 		oh.Servers = append(oh.Servers, server)
 		oh.ServersV2 = append(oh.ServersV2, serverV2)
 		logger.Info("Started operator", "index", i,
-			// "v1DispersalPort", server.GetDispersalPort(),
-			// "v1RetrievalPort", server.GetRetrievalPort(),
+			"v1DispersalPort", server.GetDispersalPort(),
+			"v1RetrievalPort", server.GetRetrievalPort(),
 			"v2DispersalPort", serverV2.GetDispersalPort(),
 			"v2RetrievalPort", serverV2.GetRetrievalPort())
 	}
@@ -232,7 +232,7 @@ func (oh *OperatorHarness) startOperator(
 		Timeout:                        30 * time.Second,
 		RegisterNodeAtStart:            true,
 		ExpirationPollIntervalSec:      10,
-		EnableV1:                       false,
+		EnableV1:                       true,
 		EnableV2:                       true,
 		DbPath:                         fmt.Sprintf("testdata/%s/db/operator_%d", oh.testName, operatorIndex),
 		LogPath:                        logFilePath,
