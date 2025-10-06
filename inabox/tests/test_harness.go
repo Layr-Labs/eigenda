@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"sync/atomic"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,7 +31,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/testcontainers/testcontainers-go"
 )
 
@@ -98,9 +97,9 @@ type TestHarness struct {
 	// CreatePayloadDisperser().
 	PayloadDisperser *payloaddispersal.PayloadDisperser
 
-	// Deployer credentials for creating transaction opts
-	deployerPrivateKeyHex string
-	deployerPreviousNonce atomic.Uint64
+	// Deployer credentials and transaction options
+	DeployerTransactorOpts   *bind.TransactOpts
+	deployerTransactOptsLock sync.Mutex
 
 	// Test-specific configuration
 	NumConfirmations int
@@ -116,21 +115,14 @@ func (tc *TestHarness) Cleanup() {
 	// Most will be garbage collected, but connections will be closed when EthClient is garbage collected
 }
 
-// Creates a fresh TransactOpts for the deployer account with the next nonce.
-// Safe for concurrent use across parallel tests.
-func (tc *TestHarness) GetDeployerTransactOpts() (*bind.TransactOpts, error) {
-	privateKey, err := crypto.HexToECDSA(tc.deployerPrivateKeyHex)
-	if err != nil {
-		return nil, fmt.Errorf("invalid private key: %w", err)
+// Provides thread-safe access to the deployer TransactOpts.
+//
+// Returns the TransactOpts and an unlock function that MUST be called when done.
+func (tc *TestHarness) GetDeployerTransactOpts() (*bind.TransactOpts, func()) {
+	tc.deployerTransactOptsLock.Lock()
+	return tc.DeployerTransactorOpts, func() {
+		tc.deployerTransactOptsLock.Unlock()
 	}
-
-	opts, err := bind.NewKeyedTransactorWithChainID(privateKey, tc.ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("create transactor: %w", err)
-	}
-
-	opts.Nonce = big.NewInt(int64(tc.deployerPreviousNonce.Add(1)))
-	return opts, nil
 }
 
 // Updates the reservation for the specified account on the PaymentVault contract
@@ -150,10 +142,8 @@ func (tc *TestHarness) UpdateReservationOnChain(
 		QuorumSplits:     quorumSplits,
 	}
 
-	opts, err := tc.GetDeployerTransactOpts()
-	if err != nil {
-		return fmt.Errorf("get deployer transact opts: %w", err)
-	}
+	opts, unlock := tc.GetDeployerTransactOpts()
+	defer unlock()
 
 	tx, err := tc.PaymentVaultTransactor.SetReservation(
 		opts,
@@ -164,7 +154,6 @@ func (tc *TestHarness) UpdateReservationOnChain(
 		return fmt.Errorf("set reservation: %w", err)
 	}
 
-	MineAnvilBlocks(t, tc.RPCClient, 1)
 	receipt, err := bind.WaitMined(t.Context(), tc.EthClient, tx)
 	if err != nil {
 		return fmt.Errorf("wait mined: %w", err)

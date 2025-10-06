@@ -109,24 +109,24 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	latestBlock, err := testHarness.EthClient.BlockNumber(ctx)
 	require.NoError(t, err)
 
-	opts, err := testHarness.GetDeployerTransactOpts()
-	require.NoError(t, err)
+	opts, unlock := testHarness.GetDeployerTransactOpts()
 	_, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
 		opts,
 		uint32(latestBlock),
 		gethcommon.HexToAddress("0x0"),
 	)
+	unlock()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), getSolidityFunctionSig("ABNNotInFuture(uint32)"))
 
 	// ensure that a verifier #2 can be added two blocks in the future where activation_block_number = latestBlock + 2
-	opts, err = testHarness.GetDeployerTransactOpts()
-	require.NoError(t, err)
+	opts, unlock = testHarness.GetDeployerTransactOpts()
 	tx, err := testHarness.EigenDACertVerifierRouter.AddCertVerifier(
 		opts,
 		uint32(latestBlock)+2,
 		gethcommon.HexToAddress("0x0"),
 	)
+	unlock()
 	require.NoError(t, err)
 	integration.MineAnvilBlocks(t, testHarness.RPCClient, 1)
 
@@ -157,13 +157,13 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	latestBlock, err = testHarness.EthClient.BlockNumber(ctx)
 	require.NoError(t, err)
 
-	opts, err = testHarness.GetDeployerTransactOpts()
-	require.NoError(t, err)
+	opts, unlock = testHarness.GetDeployerTransactOpts()
 	tx, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
 		opts,
 		uint32(latestBlock)+2,
 		gethcommon.HexToAddress(globalInfra.TestConfig.EigenDA.CertVerifier),
 	)
+	unlock()
 	require.NoError(t, err)
 	integration.MineAnvilBlocks(t, testHarness.RPCClient, 10)
 

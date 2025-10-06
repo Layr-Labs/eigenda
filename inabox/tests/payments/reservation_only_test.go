@@ -21,12 +21,12 @@ import (
 // Once we figure out why resources aren't being freed, then these tests will be runnable the "normal" way.
 
 func TestReservationOnly_LegacyController(t *testing.T) {
-	t.Skip("Manual test for now")
+	// t.Skip("Manual test for now")
 	testReservationOnly(t, false)
 }
 
 func TestReservationOnly_NewController(t *testing.T) {
-	t.Skip("Manual test for now")
+	// t.Skip("Manual test for now")
 	testReservationOnly(t, true)
 }
 
@@ -67,7 +67,6 @@ func testReservationOnly(t *testing.T, controllerUseNewPayments bool) {
 		})
 	}
 	require.NoError(t, err)
-	integration.MineAnvilBlocks(t, testHarness.RPCClient, 6)
 
 	// Subtests all use unique accountIDs, so they can run in parallel
 

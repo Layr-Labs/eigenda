@@ -25,7 +25,9 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -77,14 +79,16 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("failed to get chain ID: %w", err)
 	}
 
-	// Store deployer private key for creating fresh TransactOpts
-	testCtx.deployerPrivateKeyHex = pk
-
-	pendingNonce, err := testCtx.EthClient.PendingNonceAt(ctx, testCtx.EthClient.GetAccountAddress())
+	// Create DeployerTransactorOpts once for reuse
+	deployerPrivateKey, err := crypto.HexToECDSA(pk)
 	if err != nil {
-		return nil, fmt.Errorf("get pending nonce: %w", err)
+		return nil, fmt.Errorf("invalid deployer private key: %w", err)
 	}
-	testCtx.deployerPreviousNonce.Store(pendingNonce - 1)
+
+	testCtx.DeployerTransactorOpts, err = bind.NewKeyedTransactorWithChainID(deployerPrivateKey, testCtx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("create deployer transact opts: %w", err)
+	}
 
 	// Create contract bindings
 	testCtx.EigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(
