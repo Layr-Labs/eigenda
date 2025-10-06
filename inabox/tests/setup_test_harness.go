@@ -127,7 +127,6 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("setup payment vault transactor: %w", err)
 	}
 
-	// Setup default PayloadDisperser and TestAccountID
 	if err := setupDefaultPayloadDisperser(ctx, testCtx, infra); err != nil {
 		return nil, fmt.Errorf("setup default payload disperser: %w", err)
 	}
