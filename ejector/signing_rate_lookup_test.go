@@ -17,7 +17,7 @@ func TestDataApiLookup(t *testing.T) {
 	logger := common.TestLogger(t)
 	url := "https://dataapi.eigenda.xyz"
 
-	lookup := NewDynamoSigningRateLookup(logger, url, 100*time.Second)
+	lookup := NewDataApiSigningRateLookup(logger, url, 100*time.Second)
 
 	signingRates, err := lookup.GetSigningRates(1*time.Hour, []core.QuorumID{0, 1}, ProtocolVersionV2, false)
 	require.NoError(t, err)

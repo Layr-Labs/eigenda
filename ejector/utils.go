@@ -41,7 +41,7 @@ func combineSigningRates(
 // Sorts the given signing rates in place by unsigned bytes in descending order. The first entry will
 // have the highest number of unsigned bytes, the last entry the lowest. Breaks ties by ordering by
 // number of unsigned batches, also in descending order. Breaks further ties by ordering by validator ID
-// in lexicographical order.d
+// in lexicographical order.
 func sortByUnsignedBytesDescending(rates []*validator.ValidatorSigningRate) {
 	sort.Slice(rates, func(i, j int) bool {
 		// Primary sort: unsigned bytes (descending)

@@ -17,33 +17,34 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-var _ SigningRateLookup = (*dynamoSigningRateLookup)(nil)
+var _ SigningRateLookup = (*dataApiSigningRateLookup)(nil)
 
 // Uses batch information in dynamoDB to determine signing rates.
-type dynamoSigningRateLookup struct {
+type dataApiSigningRateLookup struct {
 	logger     logging.Logger
 	url        string
 	httpClient *http.Client
 }
 
-func NewDynamoSigningRateLookup(
+// Looks up signing rates from the DataAPI at the given URL.
+func NewDataApiSigningRateLookup(
 	logger logging.Logger,
 	url string,
 	httpTimeout time.Duration,
-) *dynamoSigningRateLookup {
+) *dataApiSigningRateLookup {
 
 	httpClient := &http.Client{
 		Timeout: httpTimeout,
 	}
 
-	return &dynamoSigningRateLookup{
+	return &dataApiSigningRateLookup{
 		logger:     logger,
 		url:        url,
 		httpClient: httpClient,
 	}
 }
 
-func (srl *dynamoSigningRateLookup) GetSigningRates(
+func (srl *dataApiSigningRateLookup) GetSigningRates(
 	timeSpan time.Duration,
 	quorums []core.QuorumID,
 	version ProtocolVersion,
@@ -64,7 +65,7 @@ func (srl *dynamoSigningRateLookup) GetSigningRates(
 }
 
 // Look up signing rates for v1.
-func (srl *dynamoSigningRateLookup) getV1SigningRates(
+func (srl *dataApiSigningRateLookup) getV1SigningRates(
 	timeSpan time.Duration,
 	quorums []core.QuorumID,
 ) ([]*validator.ValidatorSigningRate, error) {
@@ -166,7 +167,7 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 }
 
 // Look up signing rates for v2.
-func (srl *dynamoSigningRateLookup) getV2SigningRates(
+func (srl *dataApiSigningRateLookup) getV2SigningRates(
 	timeSpan time.Duration,
 	quorums []core.QuorumID,
 	omitPerfectSigners bool,
