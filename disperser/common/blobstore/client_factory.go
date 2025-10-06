@@ -19,7 +19,11 @@ func CreateObjectStorageClient(
 
 	switch config.Backend {
 	case S3Backend:
-		return s3.NewClient(ctx, awsConfig, logger)
+		client, err := s3.NewClient(ctx, awsConfig, logger)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create S3 client: %w", err)
+		}
+		return client, nil
 	case OCIBackend:
 		ociConfig := oci.ObjectStorageConfig{
 			Namespace:                   config.OCINamespace,
@@ -29,7 +33,11 @@ func CreateObjectStorageClient(
 			FragmentParallelismConstant: awsConfig.FragmentParallelismConstant,
 			FragmentParallelismFactor:   awsConfig.FragmentParallelismFactor,
 		}
-		return oci.NewObjectStorageClient(ctx, ociConfig, logger)
+		client, err := oci.NewObjectStorageClient(ctx, ociConfig, logger)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create OCI object storage client: %w", err)
+		}
+		return client, nil
 	default:
 		return nil, fmt.Errorf("unsupported object storage backend: %s", config.Backend)
 	}

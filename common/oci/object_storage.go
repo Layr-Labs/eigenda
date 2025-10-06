@@ -95,7 +95,11 @@ func (c *ociClient) DownloadObject(ctx context.Context, bucket string, key strin
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object from OCI: %w", err)
 	}
-	defer response.Content.Close()
+	defer func() {
+		if closeErr := response.Content.Close(); closeErr != nil {
+			c.logger.Warn("Failed to close response body", "error", closeErr)
+		}
+	}()
 
 	data, err := io.ReadAll(response.Content)
 	if err != nil {
@@ -219,7 +223,7 @@ func (c *ociClient) FragmentedUploadObject(
 
 	fragments, err := s3.BreakIntoFragments(key, data, fragmentSize)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to break data into fragments: %w", err)
 	}
 	resultChannel := make(chan error, len(fragments))
 
@@ -240,7 +244,10 @@ func (c *ociClient) FragmentedUploadObject(
 			return err
 		}
 	}
-	return ctx.Err()
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("context error during fragmented upload: %w", err)
+	}
+	return nil
 }
 
 // fragmentedWriteTask writes a single fragment to OCI Object Storage.
@@ -279,7 +286,7 @@ func (c *ociClient) FragmentedDownloadObject(
 
 	fragmentKeys, err := s3.GetFragmentKeys(key, getFragmentCount(fileSize, fragmentSize))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get fragment keys: %w", err)
 	}
 	resultChannel := make(chan *readResult, len(fragmentKeys))
 
@@ -304,8 +311,8 @@ func (c *ociClient) FragmentedDownloadObject(
 		fragments[result.fragment.Index] = result.fragment
 	}
 
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("context error during fragmented download: %w", err)
 	}
 
 	return recombineFragments(fragments)
@@ -341,7 +348,11 @@ func (c *ociClient) readTask(
 		result.err = err
 		return
 	}
-	defer response.Content.Close()
+	defer func() {
+		if closeErr := response.Content.Close(); closeErr != nil {
+			c.logger.Warn("Failed to close response body", "error", closeErr)
+		}
+	}()
 
 	data, err := io.ReadAll(response.Content)
 	if err != nil {

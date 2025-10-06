@@ -83,7 +83,8 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 
 	bucketName := config.BlobstoreConfig.BucketName
-	s3Client, err := blobstore.CreateObjectStorageClient(context.Background(), config.BlobstoreConfig, config.AwsClientConfig, logger)
+	s3Client, err := blobstore.CreateObjectStorageClient(
+		context.Background(), config.BlobstoreConfig, config.AwsClientConfig, logger)
 	if err != nil {
 		return err
 	}

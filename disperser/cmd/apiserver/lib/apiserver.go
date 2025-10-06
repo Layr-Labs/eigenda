@@ -56,7 +56,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
 
-	s3Client, err := blobstore.CreateObjectStorageClient(context.Background(), config.BlobstoreConfig, config.AwsClientConfig, logger)
+	s3Client, err := blobstore.CreateObjectStorageClient(
+		context.Background(), config.BlobstoreConfig, config.AwsClientConfig, logger)
 	if err != nil {
 		return err
 	}
