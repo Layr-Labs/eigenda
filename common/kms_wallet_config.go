@@ -7,16 +7,16 @@ import (
 type KMSKeyConfig struct {
 	// Provider specifies the KMS provider: "aws" or "oci"
 	Provider string
-	
+
 	// AWS KMS fields
-	KeyID   string
-	Region  string
-	
+	KeyID  string
+	Region string
+
 	// OCI KMS fields
-	KeyOCID           string
-	KMSEndpoint       string
+	KeyOCID            string
+	KMSEndpoint        string
 	ManagementEndpoint string
-	
+
 	Disable bool
 }
 

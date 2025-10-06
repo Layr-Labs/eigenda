@@ -15,12 +15,12 @@ import (
 
 // OCIKMSSigner implements the signer interface using OCI KMS
 type OCIKMSSigner struct {
-	ctx                context.Context
-	cryptoClient       keymanagement.KmsCryptoClient
-	managementClient   keymanagement.KmsManagementClient
-	publicKey          *ecdsa.PublicKey
-	keyOCID            string
-	chainID            *big.Int
+	ctx              context.Context
+	cryptoClient     keymanagement.KmsCryptoClient
+	managementClient keymanagement.KmsManagementClient
+	publicKey        *ecdsa.PublicKey
+	keyOCID          string
+	chainID          *big.Int
 }
 
 // NewOCIKMSSigner creates a new OCI KMS signer
@@ -31,7 +31,7 @@ func NewOCIKMSSigner(
 	publicKey *ecdsa.PublicKey,
 	keyOCID string,
 	chainID *big.Int) *OCIKMSSigner {
-	
+
 	return &OCIKMSSigner{
 		ctx:              ctx,
 		cryptoClient:     cryptoClient,
@@ -56,12 +56,12 @@ func (s *OCIKMSSigner) GetAddress() common.Address {
 func (s *OCIKMSSigner) SignTransaction(tx *types.Transaction) (*types.Transaction, error) {
 	signer := types.NewEIP155Signer(s.chainID)
 	hash := signer.Hash(tx)
-	
+
 	signature, err := s.SignMessage(hash.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	
+
 	signedTx, err := tx.WithSignature(signer, signature)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply signature to transaction: %w", err)

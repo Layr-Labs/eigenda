@@ -60,8 +60,8 @@ type Config struct {
 	Backend    ObjectStorageBackend
 
 	// OCI specific configuration
-	OCINamespace    string
-	OCIRegion       string
+	OCINamespace     string
+	OCIRegion        string
 	OCICompartmentID string
 }
 

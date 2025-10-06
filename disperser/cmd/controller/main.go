@@ -206,7 +206,7 @@ func RunController(ctx *cli.Context) error {
 				Region:   config.AwsClientConfig.Region,
 			}
 		}
-		
+
 		requestSigner, err = clients.NewDispersalRequestSignerFromKMSConfig(
 			context.Background(),
 			kmsConfig,

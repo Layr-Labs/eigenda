@@ -32,7 +32,7 @@ type ObjectStorageConfig struct {
 
 // ociClient implements the S3 Client interface using OCI Object Storage
 type ociClient struct {
-	cfg                *ObjectStorageConfig
+	cfg                 *ObjectStorageConfig
 	objectStorageClient objectstorage.ObjectStorageClient
 
 	// concurrencyLimiter is a channel that limits the number of concurrent operations.
@@ -200,8 +200,8 @@ func (c *ociClient) CreateBucket(ctx context.Context, bucket string) error {
 	createBucketRequest := objectstorage.CreateBucketRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		CreateBucketDetails: objectstorage.CreateBucketDetails{
-			Name:           oraclecommon.String(bucket),
-			CompartmentId:  oraclecommon.String(c.cfg.CompartmentID),
+			Name:             oraclecommon.String(bucket),
+			CompartmentId:    oraclecommon.String(c.cfg.CompartmentID),
 			PublicAccessType: objectstorage.CreateBucketDetailsPublicAccessTypeNopublicaccess,
 		},
 	}
