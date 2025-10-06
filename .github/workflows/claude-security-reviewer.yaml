@@ -18,6 +18,7 @@ jobs:
           
 
       - uses: Layr-Labs/security-shared-workflows/actions/claude-pr-review@713409e1ebdd156dcc1b5dced0f0fbb063b0fee5
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         with:
           claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           
