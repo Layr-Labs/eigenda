@@ -1,4 +1,4 @@
-# Configuration Management
+# Configuration Managmenet
 
 This configuration "framework" attempts to achieve maximal simplicity when it comes to creating, modifying, and
 and maintaining configuration. Configuration is inherently a simple concept, and so the execution of configuration
@@ -15,10 +15,10 @@ requirements:
 
 1. All variables must be exported.
 2. Variables must all be "simple" types.
-    - any primitive (`int`, `float`, `string`, etc.)
-    - `time.Duration`
-    - nested structs that themselves only contain simple types (recursive type nesting not permitted)
-    - pointers to any of the above
+    a. any primitive (`int`, `float`, `string`, etc.)
+    b. `time.Duration`
+    b. nested structs that themselves only contain simple types (recursive type nested not permitted)
+    c. pointers to any of the above
 3. The struct must implement the `config.VerifiableConfig` interface (see below).
 4. The config must have a default constructor method.
 
@@ -31,7 +31,7 @@ type VerifiableConfig interface {
 }
 ```
 
-Although in theory the `Verify()` method can be a no-op, it is highly recommended to implement basic sanity checking.
+Although in theory the `Verify()` method can be a no-op, it is highly reccomended to implement basic santity checking.
 
 The "constructor" for a config object must satisfy the interface `func() T` where `T` 
 implements `config.VerifiableConfig`.
@@ -51,9 +51,13 @@ ParseConfig[T VerifiableConfig](constructor func() T, envPrefix string, configPa
 `ParseConfig()` will load data from the configuration files in order (later files override values from earlier files).
 After loading configuration files, `ParseConfig()` loads environment variables (overriding values set by config files).
 
+The `envPrefix` argument is used when parsing environment variables. All environment variables without the specified
+prefix are ignored. If `envPrefix` is an empty string, then environment variable parsing is skipped.
+
 Example:
 
 ```go
+// All environment variables will start with "MYAPP_".
 const MyAppPrefix = "MYAPP"
 
 type MyConfig struct {
@@ -71,7 +75,7 @@ cfg, err := config.ParseConfig(DefaultMyConfig, MyAppPrefix, "path/to/config1.to
 
 ## ParseConfigFromCLI()
 
-An alternate way of parsing configuration is with the following method:
+An alternate way of parsing configuaration is with the following method:
 
 ```
 ParseConfigFromCLI[T VerifiableConfig](constructor func() T, envPrefix string) (T, error)
@@ -81,10 +85,10 @@ The primary difference between this method and `ParseConfig()` is that `ParseCon
 command line arguments provided to the process are configuration file paths. Using this method is functionally
 equivalent to parsing for file paths from the CLI arguments, then passing those file paths into `ParseConfig()`.
 
-Although use of `ParseConfigFromCLI()` is not required to use this framework, it is highly encouraged. Any time
+Although use of `ParseConfigFromCLI()` is not required to use this framwork, it is highly encouraged. Any time
 configuration is sourced through multiple pathways, complexity grows. If configuration is large enough that the
-config framework is needed, then it's best if all configuration flows through the config framework. A hodge-podge
-of CLI arguments mixed with the configuration framework adds a lot of unnecessary complexity.
+config framework is needed, then it's best if all configuration flows through the config framwork. A hodge-podge
+of CLI arguments mixed with the configuration framework adds a lot of unecessary complexity.
 
 # Documenting Config
 
@@ -112,7 +116,7 @@ grug no like yaml, yaml look simple sometimes, but grug know yaml only pretend b
 but grug not reach for club if not use toml.
 ```
 
-In order to set a variable in a config file, simply mirror the struct and variable names in "the obvious way".
+In order to set a varaible in a config file, simply mirror the struct and variable names in "the obvious way".
 Below is an example using toml.
 
 ```go
@@ -145,21 +149,6 @@ Bar.B = "5s"
 Bar.C.ValueStoredInAVariableWithALongName = "yet another string"
 ```
 
-An alternate way to write the same config:
-
-```toml
-X = 1234
-Y = 3.14159265359
-Z = "this is a string"
-
-[[bar]]
-A = "this is another string"
-B = "5s"
-
-[[bar.C]]
-ValueStoredInAVariableWithALongName = "yet another string"
-```
-
 ## Mistyped Config
 
 If there is a config value that does not have a corresponding entry in the config struct, the configuration framework
@@ -178,7 +167,7 @@ should contain only upper case letters and underscores.
 
 For each entry in a config struct, there is an environment variable that is mapped to that entry. The name of the
 environment variable is `PREFIX_NAMEOFVARIABLE`. If the variable is in a nested struct, for each "parent variable",
-add the name of the parent variable in uppercase, and separate parent variables with underscores. 
+add the name of the parent variable in uppercase, and seperate parent variables with underscores. 
 
 The following example shows the names of the environment variables that could be used to configure the following
 struct.
@@ -206,7 +195,7 @@ type Baz struct {
 
 ## Mistyped Environment Variables
 
-The config framework looks at all environment variables that begin with the prefix. If it finds any environment
+The config framework looks at all enviornment variables that begin with the prefix. If it finds any environment
 variable with the prefix that does not map to an entry in the config struct, it returns an error. This is intentional.
 Similar to mistyped config, an environment variable that doesn't map to a config entry is likely to be a bug.
 
@@ -214,7 +203,7 @@ Similar to mistyped config, an environment variable that doesn't map to a config
 
 The purpose of the constructor is to set default values in the struct. The config API requires a constructor method
 in order to strongly encourage users of this framework to set sane default values where possible. In general,
-the fewer values that are required to be set, the easier it is to configure something.
+the fewer values that are requried to be set, the easier it is to configure something.
 
 # Required Values
 
