@@ -135,7 +135,7 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 			fmt.Sprintf("0.0.0.0:%s", config.InternalDispersalPort),
 			fmt.Sprintf("0.0.0.0:%s", config.InternalRetrievalPort))
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create v1 listeners: %w", err)
 		}
 
 		// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
@@ -159,7 +159,7 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 			fmt.Sprintf("0.0.0.0:%s", config.InternalV2RetrievalPort))
 		if err != nil {
 			v1Listeners.Close()
-			return err
+			return fmt.Errorf("failed to create v2 listeners: %w", err)
 		}
 
 		reader, err := coreeth.NewReader(
