@@ -11,29 +11,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ParseConfigFromCLI parses configuration, pulling config paths from command line arguments. Assumes that any command
-// line argument, if present, is a config path. The resulting config is written into target. If there should be default
-// values in the config, target should be initialized with those default values before calling this function.
-func ParseConfigFromCLI[T VerifiableConfig](constructor func() T, envPrefix string) (T, error) {
-	configPaths := make([]string, 0)
-	configPaths = append(configPaths, os.Args...)
-
-	cfg, err := ParseConfig(constructor, envPrefix, configPaths...)
-	if err != nil {
-		var zero T
-		return zero, fmt.Errorf("failed to parse config from CLI: %w", err)
-	}
-
-	return cfg, nil
-}
-
 // ParseConfig parses the configuration from the given paths and environment variables. Configuration files are
 // loaded in order, with later files overriding earlier ones. Environment variables are loaded last, and overrid values
-// from all configuration files. If there are default values in the config, target should be initialized with those
-// default values before calling this function.
-//
-// The envPrefix is used to prefix environment variables. May not be empty. Environment variables with this prefix
-// are required to be bound to a configuration field, otherwise an error is returned. See README.md for more details.
+// from all configuration files. If there are default values in the config, the counstructor should return an instance
+// initialized with those values.
 func ParseConfig[T VerifiableConfig](
 	// A function that returns a new instance of the config struct to be populated.
 	// The struct should contain default values if any are desired.
@@ -45,7 +26,7 @@ func ParseConfig[T VerifiableConfig](
 	configPaths ...string,
 ) (T, error) {
 
-	target := constructor()
+	cfg := constructor()
 
 	viperInstance := viper.New()
 
@@ -64,7 +45,7 @@ func ParseConfig[T VerifiableConfig](
 		viperInstance.AutomaticEnv()
 
 		// Walk the struct and figure out what environment variables to bind to it.
-		boundVars, err := bindEnvs(viperInstance, envPrefix, target)
+		boundVars, err := bindEnvs(viperInstance, envPrefix, cfg)
 		if err != nil {
 			var zero T
 			return zero, fmt.Errorf("failed to bind environment variables: %w", err)
@@ -81,7 +62,7 @@ func ParseConfig[T VerifiableConfig](
 	decoderConfig := &mapstructure.DecoderConfig{
 		ErrorUnused:      true,
 		WeaklyTypedInput: true, // Allow automatic type conversion from strings (e.g., env vars)
-		Result:           target,
+		Result:           cfg,
 		TagName:          "mapstructure",
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(), // Support time.Duration parsing from strings
@@ -98,13 +79,13 @@ func ParseConfig[T VerifiableConfig](
 	}
 
 	// Verify configuration invariants.
-	err = target.Verify()
+	err = cfg.Verify()
 	if err != nil {
 		var zero T
 		return zero, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	return target, nil
+	return cfg, nil
 }
 
 func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
