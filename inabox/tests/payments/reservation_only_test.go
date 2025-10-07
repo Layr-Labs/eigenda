@@ -53,7 +53,6 @@ func testReservationOnly(t *testing.T, clientLedgerMode clientledger.ClientLedge
 	infraConfig := &integration.InfrastructureConfig{
 		TemplateName:                    "testconfig-anvil.yaml",
 		TestName:                        "",
-		InMemoryBlobStore:               false,
 		Logger:                          test.GetLogger(),
 		RootPath:                        "../../../",
 		RelayCount:                      4,

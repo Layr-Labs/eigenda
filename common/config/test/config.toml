@@ -1,0 +1,29 @@
+String = "this value came from config.toml"
+Int64 = 1
+Int32 = 3
+Int16 = 4
+Int8 = 5
+Uint = 6
+Uint64 = 7
+Uint32 = 8
+Uint16 = 9
+Uint8 = 10
+Float64 = 11.11
+Float32 = 12.12
+Duration = "5s"
+Bool = false
+
+[Bar]
+A = "bar A"
+B = 25
+C = true
+
+[Bar.Baz]
+X = "barD baz X"
+Y = 26
+Z = false
+
+[Baz]
+X = "baz X"
+Y = 27
+Z = true
