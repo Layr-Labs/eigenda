@@ -274,10 +274,10 @@ $ cast wallet new --json > keypair.json
 $ PRIVATE_KEY=$(jq -r '.[0].private_key' keypair.json | tail -c +3)
 
 ## If running with on-demand, follow the steps to deposit ETH on L1: https://docs.eigencloud.xyz/products/eigenda/integrations-guides/quick-start/v2/#on-demand-data-dispersal
-## If running with reservation, register the keypair ETH address and wait for approval: https://forms.gle/niMzQqj1JEzqHEny9
+## If running with reservation, send us the ETH address for requesting a reservation: https://forms.gle/niMzQqj1JEzqHEny9
 
 ## Start the binary
-$ set -a; . ./.env && ./bin/eigenda-proxy
+$ set -a; source ./.env && ./bin/eigenda-proxy
 ```
 
 ### Features and Configuration Options (flags/env vars)
