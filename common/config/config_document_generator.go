@@ -444,7 +444,7 @@ func generateMarkdownDoc(
 		sb.WriteString("|------|------|-------------|\n")
 
 		for _, f := range requiredFields {
-			sb.WriteString(fmt.Sprintf("| `%s`<br>`%s` | `%s` | %s |\n",
+			sb.WriteString(fmt.Sprintf("| $${\\color{red}\\texttt{%s}}$$<br>`%s` | `%s` | %s |\n",
 				escapeMarkdown(f.TOML),
 				escapeMarkdown(f.EnvVar),
 				escapeMarkdown(f.FieldType),
@@ -463,7 +463,7 @@ func generateMarkdownDoc(
 			if f.FieldType == "string" {
 				defaultString = fmt.Sprintf(`"%s"`, f.DefaultValue)
 			}
-			sb.WriteString(fmt.Sprintf("| `%s`<br>`%s` | `%s` | `%s` | %s |\n",
+			sb.WriteString(fmt.Sprintf("| $${\\color{red}\\texttt{%s}}$$<br>`%s` | `%s` | `%s` | %s |\n",
 				escapeMarkdown(f.TOML),
 				escapeMarkdown(f.EnvVar),
 				escapeMarkdown(f.FieldType),
@@ -485,7 +485,7 @@ func generateMarkdownDoc(
 				defaultString = fmt.Sprintf(`"%s"`, f.DefaultValue)
 			}
 
-			sb.WriteString(fmt.Sprintf("| `%s`<br>`%s` | `%s` | `%s` | %s |\n",
+			sb.WriteString(fmt.Sprintf("| $${\\color{red}\\texttt{%s}}$$<br>`%s` | `%s` | `%s` | %s |\n",
 				escapeMarkdown(f.TOML),
 				escapeMarkdown(f.EnvVar),
 				escapeMarkdown(f.FieldType),
