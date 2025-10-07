@@ -5,6 +5,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
+// RsGnarkBackend implements the RsBackend interface using Eigenda's FFT library
 type RsGnarkBackend struct {
 	Fs *fft.FFTSettings
 }

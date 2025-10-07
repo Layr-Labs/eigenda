@@ -246,7 +246,7 @@ func testZeroPoly(t *testing.T, scale uint8, seed int64) {
 		}
 	}
 
-	zeroEval, zeroPoly, _ := fs.ZeroPolyViaMultiplication(missingIndices, uint64(len(exists)))
+	zeroEval, zeroPoly, _ := fs.zeroPolyViaMultiplication(missingIndices, uint64(len(exists)))
 
 	for i, v := range exists {
 		if !v {
@@ -254,7 +254,7 @@ func testZeroPoly(t *testing.T, scale uint8, seed int64) {
 			//xbls.CopyFr(&at, &fs.ExpandedRootsOfUnity[i])
 			at.Set(&fs.ExpandedRootsOfUnity[i])
 			var out fr.Element
-			EvalPolyAt(&out, zeroPoly, &at)
+			evalPolyAt(&out, zeroPoly, &at)
 			if !out.IsZero() {
 				t.Errorf("expected zero at %d, but got: %s", i, out.String())
 			}

@@ -3,10 +3,8 @@
 package rs
 
 import (
-	"sync"
+	"fmt"
 
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
 	rsicicle "github.com/Layr-Labs/eigenda/encoding/rs/icicle"
 )
@@ -15,24 +13,19 @@ const (
 	defaultNTTSize = 25 // Used for NTT setup in Icicle backend
 )
 
-func CreateIcicleBackendEncoder(e *Encoder, params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
+func createIcicleBackend(enableGPU bool) (*rsicicle.RsIcicleBackend, error) {
 	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
-		GPUEnable: e.Config.GPUEnable,
+		GPUEnable: enableGPU,
 		NTTSize:   defaultNTTSize,
 		// No MSM setup needed for encoder
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new icicle device: %w", err)
 	}
 
-	return &ParametrizedEncoder{
-		Config: e.Config,
-		Params: params,
-		Fs:     fs,
-		RSEncoderComputer: &rsicicle.RsIcicleBackend{
-			NttCfg:  icicleDevice.NttCfg,
-			Device:  icicleDevice.Device,
-			GpuLock: sync.Mutex{},
-		},
+	return &rsicicle.RsIcicleBackend{
+		NttCfg: icicleDevice.NttCfg,
+		Device: icicleDevice.Device,
 	}, nil
+
 }

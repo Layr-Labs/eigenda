@@ -31,6 +31,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr/fft"
 )
 
 type FFTSettings struct {
@@ -42,6 +43,9 @@ type FFTSettings struct {
 	ExpandedRootsOfUnity []fr.Element
 	// reverse domain, same as inverse values of domain. Also starting and ending with 1.
 	ReverseRootsOfUnity []fr.Element
+	// Used for Fr FFTs using gnark-crypto library
+	// TODO: replace FFTSettings entirely with this
+	Domain *fft.Domain
 }
 
 // NewFFTSettings creates FFTSettings for a given maximum scale (log2 of max width).
@@ -59,12 +63,14 @@ func NewFFTSettings(maxScale uint8) *FFTSettings {
 	for i, j := uint64(0), uint64(len(rootz)-1); i < j; i, j = i+1, j-1 {
 		rootzReverse[i], rootzReverse[j] = rootzReverse[j], rootzReverse[i]
 	}
+	domain := fft.NewDomain(width)
 
 	return &FFTSettings{
 		MaxWidth:             width,
 		RootOfUnity:          root,
 		ExpandedRootsOfUnity: rootz,
 		ReverseRootsOfUnity:  rootzReverse,
+		Domain:               domain,
 	}
 }
 

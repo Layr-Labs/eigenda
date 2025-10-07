@@ -53,7 +53,7 @@ func TestFFTSettings_RecoverPolyFromSamples_Simple(t *testing.T) {
 	subset[0] = &data[0]
 	subset[3] = &data[3]
 
-	recovered, err := fs.RecoverPolyFromSamples(subset, fs.ZeroPolyViaMultiplication)
+	recovered, err := fs.RecoverPolyFromSamples(subset)
 	require.Nil(t, err)
 
 	for i := range recovered {
@@ -118,7 +118,7 @@ func TestFFTSettings_RecoverPolyFromSamples(t *testing.T) {
 			t.Run(fmt.Sprintf("random_subset_%d_known_%d", i, known), func(t *testing.T) {
 				subset := randomSubset(known, uint64(i))
 
-				recovered, err := fs.RecoverPolyFromSamples(subset, fs.ZeroPolyViaMultiplication)
+				recovered, err := fs.RecoverPolyFromSamples(subset)
 				require.Nil(t, err)
 
 				for i := range recovered {
