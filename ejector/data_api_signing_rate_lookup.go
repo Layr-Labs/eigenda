@@ -133,7 +133,7 @@ func (srl *dataApiSigningRateLookup) getV1SigningRates(
 		return nil, fmt.Errorf("error parsing response body: %w", err)
 	}
 
-	// Use a map to combine results from multiple quorums.©
+	// Use a map to combine results from multiple quorums.
 	signingRateMap := make(map[core.OperatorID]*validator.ValidatorSigningRate)
 
 	for _, data := range response.Data {
