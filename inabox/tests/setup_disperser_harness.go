@@ -147,7 +147,6 @@ func SetupDisperserHarness(
 	harness.DynamoDBTables.BlobMetaV2 = config.MetadataTableNameV2
 	harness.S3Buckets.BlobStore = config.S3BucketName
 
-	// Setup LocalStack if not using in-memory blob store
 	localstack, err := setupLocalStackResources(ctx, logger, config)
 	if err != nil {
 		return nil, err
