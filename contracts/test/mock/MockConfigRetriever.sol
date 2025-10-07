@@ -30,12 +30,16 @@ contract MockConfigRetriever {
         return directory.getActivationKeyBytes32(key, index);
     }
 
-    function getActivationKeyBytes(bytes32 key, uint256 index) external view returns (bytes32) {
+    function getActivationKeyBytes(bytes32 key, uint256 index) external view returns (uint256) {
         return directory.getActivationKeyBytes(key, index);
     }
 
     /// @notice Retrieves all configs with activation keys greater than or equal to the specified activation key.
-    function getAllConfigsGeActivationKeyBytes32(bytes32 key, uint256 activationKey) external view returns (uint256[] memory, bytes32[] memory) {
+    function getAllConfigsGeActivationKeyBytes32(bytes32 key, uint256 activationKey)
+        external
+        view
+        returns (uint256[] memory, bytes32[] memory)
+    {
         uint256 numCheckpoints = directory.getNumCheckpointsBytes32(key);
         uint256 count = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
@@ -59,7 +63,11 @@ contract MockConfigRetriever {
     }
 
     /// @notice Retrieves all configs with activation keys greater than or equal to the specified activation key.
-    function getAllConfigsGeActivationKeyBytes(bytes32 key, uint256 activationKey) external view returns (uint256[] memory, bytes[] memory) {
+    function getAllConfigsGeActivationKeyBytes(bytes32 key, uint256 activationKey)
+        external
+        view
+        returns (uint256[] memory, bytes[] memory)
+    {
         uint256 numCheckpoints = directory.getNumCheckpointsBytes(key);
         uint256 count = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {

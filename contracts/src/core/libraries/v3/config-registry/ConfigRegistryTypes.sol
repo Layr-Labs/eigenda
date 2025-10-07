@@ -2,7 +2,6 @@
 pragma solidity ^0.8.9;
 
 library ConfigRegistryTypes {
-
     struct NameSet {
         mapping(bytes32 => string) names;
         string[] nameList;
@@ -14,7 +13,7 @@ library ConfigRegistryTypes {
     }
 
     struct BytesCheckpoint {
-        uint256 activationKey; // defined by whoever puts the config in
+        uint256 activationKey;
         bytes value;
     }
 

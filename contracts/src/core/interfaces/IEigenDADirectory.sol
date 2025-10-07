@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+import {ConfigRegistryTypes} from "src/core/libraries/v3/config-registry/ConfigRegistryTypes.sol";
+
 interface IEigenDAAddressDirectory {
     error AddressAlreadyExists(string name);
     error AddressDoesNotExist(string name);
@@ -48,42 +50,31 @@ interface IEigenDAConfigRegistry {
     error ConfigAlreadyExists(string name);
     error ConfigDoesNotExist(string name);
 
-    event ConfigBytes32Added(string name, bytes32 indexed key, uint256 activationKey, bytes32 value);
-    event ConfigBytesAdded(string name, bytes32 indexed key, uint256 activationKey, bytes value);
-    event ConfigBytes32Replaced(string name, bytes32 indexed key, uint256 activationKey, bytes32 oldValue, bytes32 newValue);
-    event ConfigBytesReplaced(string name, bytes32 indexed key, uint256 activationKey, bytes oldValue, bytes newValue);
-    event ConfigBytes32Removed(string name, bytes32 indexed key);
-    event ConfigBytesRemoved(string name, bytes32 indexed key);
-
-    function getConfigKey(string memory name) external pure returns (bytes32);
-
-    function getConfigNameBytes32(bytes32 key) external view returns (string memory);
-
-    function getConfigNameBytes(bytes32 key) external view returns (string memory);
-
-    function isKeyRegisteredBytes32(bytes32 key) external view returns (bool);
-
-    function isKeyRegisteredBytes(bytes32 key) external view returns (bool);
-
     function addConfigBytes32(string memory name, uint256 activationKey, bytes32 value) external;
 
     function addConfigBytes(string memory name, uint256 activationKey, bytes memory value) external;
 
-    function getNumConfigCheckpointsBytes32(bytes32 key) external view returns (uint256);
+    function getNumCheckpointsBytes32(bytes32 key) external view returns (uint256);
 
-    function getNumConfigCheckpointsBytes(bytes32 key) external view returns (uint256);
+    function getNumCheckpointsBytes(bytes32 key) external view returns (uint256);
 
     function getConfigBytes32(bytes32 key, uint256 index) external view returns (bytes32);
 
     function getConfigBytes(bytes32 key, uint256 index) external view returns (bytes memory);
 
-    function getNumRegisteredConfigsBytes32() external view returns (uint256);
+    function getActivationKeyBytes32(bytes32 key, uint256 index) external view returns (uint256);
 
-    function getNumRegisteredConfigsBytes() external view returns (uint256);
+    function getActivationKeyBytes(bytes32 key, uint256 index) external view returns (uint256);
 
-    function getRegisteredConfigBytes32(uint256 index) external view returns (string memory);
+    function getCheckpointBytes32(bytes32 key, uint256 index)
+        external
+        view
+        returns (ConfigRegistryTypes.Bytes32Checkpoint memory);
 
-    function getRegisteredConfigBytes(uint256 index) external view returns (string memory);
+    function getCheckpointBytes(bytes32 key, uint256 index)
+        external
+        view
+        returns (ConfigRegistryTypes.BytesCheckpoint memory);
 }
 
 /// @notice Interface for the EigenDA Directory
