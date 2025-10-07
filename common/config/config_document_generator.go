@@ -440,74 +440,44 @@ func generateMarkdownDoc(
 
 	if len(requiredFields) > 0 {
 		sb.WriteString("## Required Fields\n\n")
-		sb.WriteString("<table>\n")
-		sb.WriteString("<thead>\n")
-		sb.WriteString("<tr>\n")
-		sb.WriteString("<th>TOML&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Environment Variable&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Type&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("</tr>\n")
-		sb.WriteString("</thead>\n")
-		sb.WriteString("<tbody>\n")
+		sb.WriteString("| TOML | Environment Variable | Type | Description |\n")
+		sb.WriteString("|------|----------------------|------|-------------|\n")
 
 		for _, f := range requiredFields {
-			sb.WriteString("<tr>\n")
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(f.TOML)))
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(f.EnvVar)))
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(f.FieldType)))
-			sb.WriteString(fmt.Sprintf("<td>%s</td>\n", escapeHTML(f.Godoc)))
-			sb.WriteString("</tr>\n")
+			sb.WriteString(fmt.Sprintf("| `%s` | `%s` | `%s` | %s |\n",
+				escapeMarkdown(f.TOML),
+				escapeMarkdown(f.EnvVar),
+				escapeMarkdown(f.FieldType),
+				escapeMarkdown(f.Godoc)))
 		}
-		sb.WriteString("</tbody>\n")
-		sb.WriteString("</table>\n")
+		sb.WriteString("\n")
 	}
 
 	if len(optionalFields) > 0 {
-		sb.WriteString("\n## Optional Fields\n\n")
-		sb.WriteString("<table>\n")
-		sb.WriteString("<thead>\n")
-		sb.WriteString("<tr>\n")
-		sb.WriteString("<th>TOML&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Environment Variable&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Type&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Default&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("</tr>\n")
-		sb.WriteString("</thead>\n")
-		sb.WriteString("<tbody>\n")
+		sb.WriteString("## Optional Fields\n\n")
+		sb.WriteString("| TOML | Environment Variable | Type | Default | Description |\n")
+		sb.WriteString("|------|----------------------|------|---------|-------------|\n")
 
 		for _, f := range optionalFields {
 			defaultString := f.DefaultValue
 			if f.FieldType == "string" {
 				defaultString = fmt.Sprintf(`"%s"`, f.DefaultValue)
 			}
-			sb.WriteString("<tr>\n")
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(f.TOML)))
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(f.EnvVar)))
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(f.FieldType)))
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(defaultString)))
-			sb.WriteString(fmt.Sprintf("<td>%s</td>\n", escapeHTML(f.Godoc)))
-			sb.WriteString("</tr>\n")
+			sb.WriteString(fmt.Sprintf("| `%s` | `%s` | `%s` | `%s` | %s |\n",
+				escapeMarkdown(f.TOML),
+				escapeMarkdown(f.EnvVar),
+				escapeMarkdown(f.FieldType),
+				escapeMarkdown(defaultString),
+				escapeMarkdown(f.Godoc)))
 		}
-		sb.WriteString("</tbody>\n")
-		sb.WriteString("</table>\n")
+		sb.WriteString("\n")
 	}
 
 	if len(unsafeFields) > 0 {
-		sb.WriteString("\n## Unsafe Fields\n\n")
+		sb.WriteString("## Unsafe Fields\n\n")
 		sb.WriteString("These fields are generally unsafe to modify unless you know what you are doing.\n\n")
-		sb.WriteString("<table>\n")
-		sb.WriteString("<thead>\n")
-		sb.WriteString("<tr>\n")
-		sb.WriteString("<th>TOML&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Environment Variable&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Type&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Default&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("<th>Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>\n")
-		sb.WriteString("</tr>\n")
-		sb.WriteString("</thead>\n")
-		sb.WriteString("<tbody>\n")
+		sb.WriteString("| TOML | Environment Variable | Type | Default | Description |\n")
+		sb.WriteString("|------|----------------------|------|---------|-------------|\n")
 
 		for _, f := range unsafeFields {
 			defaultString := f.DefaultValue
@@ -515,42 +485,35 @@ func generateMarkdownDoc(
 				defaultString = fmt.Sprintf(`"%s"`, f.DefaultValue)
 			}
 
-			sb.WriteString("<tr>\n")
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(f.TOML)))
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(f.EnvVar)))
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(f.FieldType)))
-			sb.WriteString(fmt.Sprintf("<td><code>%s</code></td>\n", escapeHTML(defaultString)))
-			sb.WriteString(fmt.Sprintf("<td>%s</td>\n", escapeHTML(f.Godoc)))
-			sb.WriteString("</tr>\n")
+			sb.WriteString(fmt.Sprintf("| `%s` | `%s` | `%s` | `%s` | %s |\n",
+				escapeMarkdown(f.TOML),
+				escapeMarkdown(f.EnvVar),
+				escapeMarkdown(f.FieldType),
+				escapeMarkdown(defaultString),
+				escapeMarkdown(f.Godoc)))
 		}
-		sb.WriteString("</tbody>\n")
-		sb.WriteString("</table>\n")
 	}
 
 	return sb.String()
 }
 
-// escapeHTML escapes special characters for HTML output.
-func escapeHTML(s string) string {
+// escapeMarkdown escapes special characters in markdown table cells.
+func escapeMarkdown(s string) string {
 	var sb strings.Builder
 	for _, r := range s {
 		switch r {
-		case '&':
-			sb.WriteString("&amp;")
-		case '<':
-			sb.WriteString("&lt;")
-		case '>':
-			sb.WriteString("&gt;")
-		case '"':
-			sb.WriteString("&quot;")
-		case '\'':
-			sb.WriteString("&#39;")
+		case '|':
+			// Escape pipe characters which are table delimiters
+			sb.WriteString("\\|")
 		case '\n':
-			// Replace newlines with <br> for HTML line breaks
+			// Replace newlines with <br> for markdown line breaks within table cells
 			sb.WriteString("<br>")
 		case '\r':
 			// Skip carriage returns
 			continue
+		case '\\':
+			// Escape backslashes
+			sb.WriteString("\\\\")
 		default:
 			sb.WriteRune(r)
 		}
