@@ -21,7 +21,11 @@ type HeartbeatMessage struct {
 
 // HeartbeatMonitor listens for heartbeat messages from different components, updates their last seen timestamps,
 // writes a summary to the specified file, and logs warnings if any component stalls.
-func HeartbeatMonitor(logger logging.Logger, livenessChan <-chan HeartbeatMessage, config HeartbeatMonitorConfig) error {
+func HeartbeatMonitor(
+	logger logging.Logger,
+	livenessChan <-chan HeartbeatMessage,
+	config HeartbeatMonitorConfig,
+) error {
 	// Map to keep track of last heartbeat per component
 	lastHeartbeats := make(map[string]time.Time)
 	// Create a timer that periodically checks for stalls

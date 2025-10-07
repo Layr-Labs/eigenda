@@ -556,7 +556,4 @@ func stopController(instance *controller.Controller, logger logging.Logger) {
 
 	// Note: EncodingManager and Dispatcher don't have explicit Stop methods in the current implementation
 	logger.Info("Controller stopped")
-	if instance.Server != nil {
-		// TODO(dmanc): Add graceful shutdown of server
-	}
 }
