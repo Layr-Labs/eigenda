@@ -65,6 +65,11 @@ type DispatcherConfig struct {
 	// Important signing thresholds for metrics reporting.
 	// Values should be between 0.0 (0% signed) and 1.0 (100% signed).
 	SignificantSigningMetricsThresholds []string
+
+	// NumConcurrentRequests is the size of the worker pool for dispersal requests
+	NumConcurrentRequests int
+	// NodeClientCacheSize is the maximum number of node clients to cache
+	NodeClientCacheSize int
 }
 
 func DefaultDispatcherConfig() *DispatcherConfig {
@@ -79,6 +84,8 @@ func DefaultDispatcherConfig() *DispatcherConfig {
 		MaxBatchSize:                          32,
 		SignificantSigningThresholdPercentage: 55,
 		SignificantSigningMetricsThresholds:   []string{"0.55", "0.67"},
+		NumConcurrentRequests:                 600,
+		NodeClientCacheSize:                   400,
 	}
 }
 

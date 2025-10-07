@@ -45,13 +45,11 @@ type Controller struct {
 }
 
 // StartController creates and starts the encoding manager and dispatcher.
-// This is the shared logic between the main controller binary and test harnesses.
 func StartController(
 	ctx context.Context,
 	logger logging.Logger,
 	ethClient common.EthClient,
 	dynamoClient dynamodb.Client,
-	awsDynamoClient *awsdynamodb.Client,
 	metadataTableName string,
 	metricsRegistry *prometheus.Registry,
 	requestSigner clients.DispersalRequestSigner,
@@ -62,9 +60,6 @@ func StartController(
 	operatorStateSubgraphURL string,
 	encodingManagerConfig *EncodingManagerConfig,
 	dispatcherConfig *DispatcherConfig,
-	numConcurrentEncodingRequests int,
-	numConcurrentDispersalRequests int,
-	nodeClientCacheSize int,
 
 	// Chain state config
 	chainStateConfig thegraph.Config,
@@ -105,7 +100,7 @@ func StartController(
 	}
 
 	// Create encoding manager
-	encodingPool := workerpool.New(numConcurrentEncodingRequests)
+	encodingPool := workerpool.New(encodingManagerConfig.NumConcurrentRequests)
 	encodingManagerBlobSet := NewBlobSet()
 
 	// Heartbeat monitor
@@ -132,11 +127,11 @@ func StartController(
 	}
 
 	// Create dispatcher components
-	dispatcherPool := workerpool.New(numConcurrentDispersalRequests)
+	dispatcherPool := workerpool.New(dispatcherConfig.NumConcurrentRequests)
 	chainState := eth.NewChainState(chainReader, ethClient)
 	ics := thegraph.MakeIndexedChainState(chainStateConfig, chainState, logger)
 
-	nodeClientManager, err := NewNodeClientManager(nodeClientCacheSize, requestSigner, logger)
+	nodeClientManager, err := NewNodeClientManager(dispatcherConfig.NodeClientCacheSize, requestSigner, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create node client manager: %w", err)
 	}
@@ -249,7 +244,7 @@ func StartController(
 				*reservationConfig,
 				contractDirectory,
 				ethClient,
-				awsDynamoClient,
+				dynamoClient.GetAwsClient(),
 				metricsRegistry,
 			)
 			if err != nil {

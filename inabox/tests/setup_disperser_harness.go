@@ -515,7 +515,6 @@ func startController(
 		controllerLogger,
 		ethClient,
 		dynamoClient,
-		nil, // awsDynamoClient - not needed for tests
 		config.MetadataTableNameV2,
 		metricsRegistry,
 		requestSigner,
@@ -525,9 +524,6 @@ func startController(
 		operatorStateSubgraphURL,
 		encodingManagerConfig,
 		dispatcherConfig,
-		10,  // numConcurrentEncodingRequests
-		10,  // numConcurrentDispersalRequests
-		100, // nodeClientCacheSize
 
 		// Chain state config
 		chainStateConfig,

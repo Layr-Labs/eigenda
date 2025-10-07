@@ -141,7 +141,6 @@ func RunController(cliCtx *cli.Context) error {
 		logger,
 		gethClient,
 		dynamoClient,
-		dynamoClient.GetAwsClient(),
 		config.DynamoDBTableName,
 		metricsRegistry,
 		requestSigner,
@@ -151,9 +150,6 @@ func RunController(cliCtx *cli.Context) error {
 		config.ChainStateConfig.Endpoint,
 		&config.EncodingManagerConfig,
 		&config.DispatcherConfig,
-		config.NumConcurrentEncodingRequests,
-		config.NumConcurrentDispersalRequests,
-		config.NodeClientCacheSize,
 
 		// Chain state config
 		config.ChainStateConfig,

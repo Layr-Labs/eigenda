@@ -42,6 +42,8 @@ type EncodingManagerConfig struct {
 	MaxNumBlobsPerIteration int32
 	// OnchainStateRefreshInterval is the interval at which the onchain state is refreshed
 	OnchainStateRefreshInterval time.Duration
+	// NumConcurrentRequests is the size of the worker pool for encoding requests
+	NumConcurrentRequests int
 }
 
 func DefaultEncodingManagerConfig() *EncodingManagerConfig {
@@ -52,6 +54,7 @@ func DefaultEncodingManagerConfig() *EncodingManagerConfig {
 		NumEncodingRetries:          3,
 		MaxNumBlobsPerIteration:     128,
 		OnchainStateRefreshInterval: 1 * time.Hour,
+		NumConcurrentRequests:       250,
 	}
 }
 
