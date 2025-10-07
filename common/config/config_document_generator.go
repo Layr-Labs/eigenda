@@ -448,7 +448,7 @@ func generateMarkdownDoc(
 				escapeMarkdown(f.TOML),
 				escapeMarkdown(f.EnvVar),
 				escapeMarkdown(f.FieldType),
-				escapeMarkdown(f.Godoc)))
+				escapeMarkdown(reformatGodoc(f.Godoc))))
 		}
 		sb.WriteString("\n")
 	}
@@ -468,7 +468,7 @@ func generateMarkdownDoc(
 				escapeMarkdown(f.EnvVar),
 				escapeMarkdown(f.FieldType),
 				escapeMarkdown(defaultString),
-				escapeMarkdown(f.Godoc)))
+				escapeMarkdown(reformatGodoc(f.Godoc))))
 		}
 		sb.WriteString("\n")
 	}
@@ -490,11 +490,32 @@ func generateMarkdownDoc(
 				escapeMarkdown(f.EnvVar),
 				escapeMarkdown(f.FieldType),
 				escapeMarkdown(defaultString),
-				escapeMarkdown(f.Godoc)))
+				escapeMarkdown(reformatGodoc(f.Godoc))))
 		}
 	}
 
 	return sb.String()
+}
+
+// reformatGodoc reformats godoc strings by replacing single newlines with spaces,
+// but preserving multiple consecutive newlines as paragraph breaks.
+func reformatGodoc(s string) string {
+	// Split by double newlines to preserve paragraph breaks
+	paragraphs := strings.Split(s, "\n\n")
+
+	var result []string
+	for _, para := range paragraphs {
+		// Within each paragraph, replace single newlines with spaces
+		normalized := strings.ReplaceAll(para, "\n", " ")
+		// Clean up multiple spaces
+		normalized = strings.Join(strings.Fields(normalized), " ")
+		if normalized != "" {
+			result = append(result, normalized)
+		}
+	}
+
+	// Join paragraphs with <br><br> for markdown rendering
+	return strings.Join(result, "<br><br>")
 }
 
 // escapeMarkdown escapes special characters in markdown table cells.
