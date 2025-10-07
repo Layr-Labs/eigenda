@@ -273,15 +273,11 @@ $ cast wallet new --json > keypair.json
 ## Extract keypair private key and remove 0x prefix
 $ PRIVATE_KEY=$(jq -r '.[0].private_key' keypair.json | tail -c +3)
 
-## If running V1 against testnet or mainnet, register the keypair ETH address and wait for approval: https://forms.gle/niMzQqj1JEzqHEny9
+## If running with on-demand, follow the steps to deposit ETH on L1: https://docs.eigencloud.xyz/products/eigenda/integrations-guides/quick-start/v2/#on-demand-data-dispersal
+## If running with reservation, register the keypair ETH address and wait for approval: https://forms.gle/niMzQqj1JEzqHEny9
 
-## Run EigenDA Proxy with EigenDA V1 backend
-$ ./bin/eigenda-proxy \
-    --port 3100 \
-    --eigenda.disperser-rpc disperser-holesky.eigenda.xyz:443 \
-    --eigenda.signer-private-key-hex $PRIVATE_KEY \
-    --eigenda.eth-rpc https://ethereum-holesky-rpc.publicnode.com \
-    --eigenda.svc-manager-addr 0xD4A7E1Bd8015057293f0D0A557088c286942e84b
+## Start the binary
+$ source .env && ./bin/eigenda-proxy
 ```
 
 ### Features and Configuration Options (flags/env vars)
