@@ -13,30 +13,20 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	validatorclientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	paymentvaultbindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core"
-	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
-	"github.com/Layr-Labs/eigenda/core/payments"
-	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
-	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
-	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -116,6 +106,13 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("failed to create router caller: %w", err)
 	}
 
+	eigenDADirectoryAddr := gethcommon.HexToAddress(infra.TestConfig.EigenDA.EigenDADirectory)
+	testCtx.ContractDirectory, err = directory.NewContractDirectory(
+		ctx, infra.Logger, testCtx.EthClient, eigenDADirectoryAddr)
+	if err != nil {
+		return nil, fmt.Errorf("create contract directory: %w", err)
+	}
+
 	// Setup verifiers and cert builder
 	if err := setupVerifiersForContext(testCtx, infra); err != nil {
 		return nil, fmt.Errorf("failed to setup verifiers: %w", err)
@@ -126,13 +123,12 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("failed to setup retrieval clients: %w", err)
 	}
 
-	// Setup payload disperser
-	if err := setupPayloadDisperserForContext(ctx, testCtx, infra); err != nil {
-		return nil, fmt.Errorf("failed to setup payload disperser: %w", err)
+	if err := setupPaymentVaultTransactor(ctx, testCtx); err != nil {
+		return nil, fmt.Errorf("setup payment vault transactor: %w", err)
 	}
 
-	if err := setupPaymentVaultTransactor(ctx, testCtx, infra); err != nil {
-		return nil, fmt.Errorf("setup payment vault transactor: %w", err)
+	if err := setupDefaultPayloadDisperser(ctx, testCtx, infra); err != nil {
+		return nil, fmt.Errorf("setup default payload disperser: %w", err)
 	}
 
 	return testCtx, nil
@@ -291,253 +287,23 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 	return nil
 }
 
-func setupPayloadDisperserForContext(
+// Calls [TestHarness.CreatePayloadDisperser] for the default account ID.
+//
+// [TestHarness.CreatePayloadDisperser] can be called with different configs to create additional payload dispersers
+func setupDefaultPayloadDisperser(
 	ctx context.Context,
 	testHarness *TestHarness,
 	infra *InfrastructureHarness,
 ) error {
-	// Set up the block monitor
-	blockMonitor, err := verification.NewBlockNumberMonitor(infra.Logger, testHarness.EthClient, time.Second*1)
+	// default value for the private key is the one that has the reservation pre-registered on-chain
+	config := GetDefaultTestPayloadDisperserConfig()
+	payloadDisperser, err := testHarness.CreatePayloadDisperser(ctx, infra.Logger, config)
 	if err != nil {
-		return fmt.Errorf("failed to create block number monitor: %w", err)
+		return fmt.Errorf("create payload disperser: %w", err)
 	}
 
-	// Set up the PayloadDisperser
-	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
-	if err != nil {
-		return fmt.Errorf("failed to create blob request signer: %w", err)
-	}
-
-	disperserClientConfig := &clientsv2.DisperserClientConfig{
-		Hostname: "localhost",
-		Port:     "32005",
-	}
-
-	accountId, err := signer.GetAccountID()
-	if err != nil {
-		return fmt.Errorf("error getting account ID: %w", err)
-	}
-	testHarness.TestAccountID = accountId
-
-	accountant := clientsv2.NewAccountant(
-		accountId,
-		nil,
-		nil,
-		0,
-		0,
-		0,
-		0,
-		metrics.NoopAccountantMetrics,
-	)
-
-	disperserClient, err := clientsv2.NewDisperserClient(
-		infra.Logger,
-		disperserClientConfig,
-		signer,
-		nil, // no prover so will query disperser for generating commitments
-		accountant,
-		metrics.NoopDispersalMetrics,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create disperser client: %w", err)
-	}
-
-	// Create ClientLedger based on configured mode
-	var clientLedger *clientledger.ClientLedger
-	mode := infra.TestConfig.ClientLedgerMode
-	if mode != clientledger.ClientLedgerModeLegacy {
-		eigenDADirectoryAddr := gethcommon.HexToAddress(infra.TestConfig.EigenDA.EigenDADirectory)
-		clientLedger, err = buildClientLedger(
-			ctx,
-			infra.Logger,
-			testHarness.EthClient,
-			eigenDADirectoryAddr,
-			accountId,
-			mode,
-			disperserClient,
-		)
-		if err != nil {
-			return fmt.Errorf("build client ledger: %w", err)
-		}
-	}
-
-	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
-		PayloadClientConfig:    *clientsv2.GetDefaultPayloadClientConfig(),
-		DisperseBlobTimeout:    2 * time.Minute,
-		BlobCompleteTimeout:    2 * time.Minute,
-		BlobStatusPollInterval: 1 * time.Second,
-		ContractCallTimeout:    5 * time.Second,
-	}
-
-	testHarness.PayloadDisperser, err = payloaddispersal.NewPayloadDisperser(
-		infra.Logger,
-		payloadDisperserConfig,
-		disperserClient,
-		blockMonitor,
-		testHarness.CertBuilder,
-		testHarness.RouterCertVerifier,
-		clientLedger,
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create payload disperser: %w", err)
-	}
-
+	testHarness.PayloadDisperser = payloadDisperser
 	return nil
-}
-
-func buildClientLedger(
-	ctx context.Context,
-	logger logging.Logger,
-	ethClient common.EthClient,
-	eigenDADirectoryAddr gethcommon.Address,
-	accountID gethcommon.Address,
-	mode clientledger.ClientLedgerMode,
-	disperserClient *clientsv2.DisperserClient,
-) (*clientledger.ClientLedger, error) {
-	contractDirectory, err := directory.NewContractDirectory(ctx, logger, ethClient, eigenDADirectoryAddr)
-	if err != nil {
-		return nil, fmt.Errorf("new contract directory: %w", err)
-	}
-
-	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
-	if err != nil {
-		return nil, fmt.Errorf("get PaymentVault address: %w", err)
-	}
-
-	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddr)
-	if err != nil {
-		return nil, fmt.Errorf("new payment vault: %w", err)
-	}
-
-	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get min num symbols: %w", err)
-	}
-
-	var reservationLedger *reservation.ReservationLedger
-	var onDemandLedger *ondemand.OnDemandLedger
-
-	// Build reservation ledger if needed
-	needsReservation := mode == clientledger.ClientLedgerModeReservationOnly ||
-		mode == clientledger.ClientLedgerModeReservationAndOnDemand
-	if needsReservation {
-		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
-		if err != nil {
-			return nil, fmt.Errorf("build reservation ledger: %w", err)
-		}
-	}
-
-	// Build on-demand ledger if needed
-	needsOnDemand := mode == clientledger.ClientLedgerModeOnDemandOnly ||
-		mode == clientledger.ClientLedgerModeReservationAndOnDemand
-	if needsOnDemand {
-		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
-		if err != nil {
-			return nil, fmt.Errorf("build on-demand ledger: %w", err)
-		}
-	}
-
-	ledger := clientledger.NewClientLedger(
-		ctx,
-		logger,
-		metrics.NoopAccountantMetrics,
-		accountID,
-		mode,
-		reservationLedger,
-		onDemandLedger,
-		time.Now,
-		paymentVault,
-		1*time.Second, // update interval for vault monitoring
-	)
-
-	return ledger, nil
-}
-
-func buildReservationLedger(
-	ctx context.Context,
-	paymentVault payments.PaymentVault,
-	accountID gethcommon.Address,
-	minNumSymbols uint32,
-) (*reservation.ReservationLedger, error) {
-	reservationData, err := paymentVault.GetReservation(ctx, accountID)
-	if err != nil {
-		return nil, fmt.Errorf("get reservation: %w", err)
-	}
-	if reservationData == nil {
-		return nil, fmt.Errorf("no reservation found for account %s", accountID.Hex())
-	}
-
-	clientReservation, err := reservation.NewReservation(
-		reservationData.SymbolsPerSecond,
-		time.Unix(int64(reservationData.StartTimestamp), 0),
-		time.Unix(int64(reservationData.EndTimestamp), 0),
-		reservationData.QuorumNumbers,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("new reservation: %w", err)
-	}
-
-	reservationConfig, err := reservation.NewReservationLedgerConfig(
-		*clientReservation,
-		minNumSymbols,
-		true,
-		ratelimit.OverfillOncePermitted,
-		10*time.Second,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("new reservation ledger config: %w", err)
-	}
-
-	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, time.Now())
-	if err != nil {
-		return nil, fmt.Errorf("new reservation ledger: %w", err)
-	}
-
-	return reservationLedger, nil
-}
-
-func buildOnDemandLedger(
-	ctx context.Context,
-	paymentVault payments.PaymentVault,
-	accountID gethcommon.Address,
-	minNumSymbols uint32,
-	disperserClient *clientsv2.DisperserClient,
-) (*ondemand.OnDemandLedger, error) {
-	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get price per symbol: %w", err)
-	}
-
-	totalDeposits, err := paymentVault.GetTotalDeposit(ctx, accountID)
-	if err != nil {
-		return nil, fmt.Errorf("get total deposit from vault: %w", err)
-	}
-
-	paymentState, err := disperserClient.GetPaymentState(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get payment state from disperser: %w", err)
-	}
-
-	var cumulativePayment *big.Int
-	if paymentState.GetCumulativePayment() == nil {
-		cumulativePayment = big.NewInt(0)
-	} else {
-		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
-	}
-
-	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
-		totalDeposits,
-		new(big.Int).SetUint64(pricePerSymbol),
-		minNumSymbols,
-		cumulativePayment,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("on-demand ledger from value: %w", err)
-	}
-
-	return onDemandLedger, nil
 }
 
 func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind.TransactOpts {
@@ -557,16 +323,8 @@ func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind
 func setupPaymentVaultTransactor(
 	ctx context.Context,
 	testHarness *TestHarness,
-	infra *InfrastructureHarness,
 ) error {
-	eigenDADirectoryAddr := gethcommon.HexToAddress(infra.TestConfig.EigenDA.EigenDADirectory)
-	contractDirectory, err := directory.NewContractDirectory(
-		ctx, infra.Logger, testHarness.EthClient, eigenDADirectoryAddr)
-	if err != nil {
-		return fmt.Errorf("new contract directory: %w", err)
-	}
-
-	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	paymentVaultAddr, err := testHarness.ContractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
 		return fmt.Errorf("get PaymentVault address: %w", err)
 	}
