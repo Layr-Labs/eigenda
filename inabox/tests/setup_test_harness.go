@@ -1,4 +1,4 @@
-package integration_test
+package integration
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	validatorclientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
@@ -21,9 +20,10 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
+	paymentvaultbindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core"
-	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
@@ -106,6 +106,13 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("failed to create router caller: %w", err)
 	}
 
+	eigenDADirectoryAddr := gethcommon.HexToAddress(infra.TestConfig.EigenDA.EigenDADirectory)
+	testCtx.ContractDirectory, err = directory.NewContractDirectory(
+		ctx, infra.Logger, testCtx.EthClient, eigenDADirectoryAddr)
+	if err != nil {
+		return nil, fmt.Errorf("create contract directory: %w", err)
+	}
+
 	// Setup verifiers and cert builder
 	if err := setupVerifiersForContext(testCtx, infra); err != nil {
 		return nil, fmt.Errorf("failed to setup verifiers: %w", err)
@@ -116,9 +123,12 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("failed to setup retrieval clients: %w", err)
 	}
 
-	// Setup payload disperser
-	if err := setupPayloadDisperserForContext(testCtx, infra); err != nil {
-		return nil, fmt.Errorf("failed to setup payload disperser: %w", err)
+	if err := setupPaymentVaultTransactor(ctx, testCtx); err != nil {
+		return nil, fmt.Errorf("setup payment vault transactor: %w", err)
+	}
+
+	if err := setupDefaultPayloadDisperser(ctx, testCtx, infra); err != nil {
+		return nil, fmt.Errorf("setup default payload disperser: %w", err)
 	}
 
 	return testCtx, nil
@@ -277,75 +287,22 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 	return nil
 }
 
-func setupPayloadDisperserForContext(testHarness *TestHarness, infra *InfrastructureHarness) error {
-	// Set up the block monitor
-	blockMonitor, err := verification.NewBlockNumberMonitor(infra.Logger, testHarness.EthClient, time.Second*1)
+// Calls [TestHarness.CreatePayloadDisperser] for the default account ID.
+//
+// [TestHarness.CreatePayloadDisperser] can be called with different configs to create additional payload dispersers
+func setupDefaultPayloadDisperser(
+	ctx context.Context,
+	testHarness *TestHarness,
+	infra *InfrastructureHarness,
+) error {
+	// default value for the private key is the one that has the reservation pre-registered on-chain
+	config := GetDefaultTestPayloadDisperserConfig()
+	payloadDisperser, err := testHarness.CreatePayloadDisperser(ctx, infra.Logger, config)
 	if err != nil {
-		return fmt.Errorf("failed to create block number monitor: %w", err)
+		return fmt.Errorf("create payload disperser: %w", err)
 	}
 
-	// Set up the PayloadDisperser
-	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
-	if err != nil {
-		return fmt.Errorf("failed to create blob request signer: %w", err)
-	}
-
-	disperserClientConfig := &clientsv2.DisperserClientConfig{
-		Hostname: "localhost",
-		Port:     "32005",
-	}
-
-	accountId, err := signer.GetAccountID()
-	if err != nil {
-		return fmt.Errorf("error getting account ID: %w", err)
-	}
-
-	accountant := clientsv2.NewAccountant(
-		accountId,
-		nil,
-		nil,
-		0,
-		0,
-		0,
-		0,
-		metrics.NoopAccountantMetrics,
-	)
-
-	disperserClient, err := clientsv2.NewDisperserClient(
-		infra.Logger,
-		disperserClientConfig,
-		signer,
-		nil, // no prover so will query disperser for generating commitments
-		accountant,
-		metrics.NoopDispersalMetrics,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create disperser client: %w", err)
-	}
-
-	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
-		PayloadClientConfig:    *clientsv2.GetDefaultPayloadClientConfig(),
-		DisperseBlobTimeout:    2 * time.Minute,
-		BlobCompleteTimeout:    2 * time.Minute,
-		BlobStatusPollInterval: 1 * time.Second,
-		ContractCallTimeout:    5 * time.Second,
-	}
-
-	testHarness.PayloadDisperser, err = payloaddispersal.NewPayloadDisperser(
-		infra.Logger,
-		payloadDisperserConfig,
-		disperserClient,
-		blockMonitor,
-		testHarness.CertBuilder,
-		testHarness.RouterCertVerifier,
-		nil,
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create payload disperser: %w", err)
-	}
-
+	testHarness.PayloadDisperser = payloadDisperser
 	return nil
 }
 
@@ -361,4 +318,23 @@ func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind
 	}
 
 	return opts
+}
+
+func setupPaymentVaultTransactor(
+	ctx context.Context,
+	testHarness *TestHarness,
+) error {
+	paymentVaultAddr, err := testHarness.ContractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	transactor, err := paymentvaultbindings.NewContractPaymentVaultTransactor(paymentVaultAddr, testHarness.EthClient)
+	if err != nil {
+		return fmt.Errorf("new PaymentVault transactor: %w", err)
+	}
+
+	testHarness.PaymentVaultTransactor = transactor
+
+	return nil
 }

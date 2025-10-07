@@ -1,9 +1,27 @@
 dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
-.PHONY: run-e2e-tests start-inabox stop-inabox new-testdata-dir clean start-infra stop-infra start-services stop-services
+.PHONY: run-e2e-tests start-inabox stop-inabox new-testdata-dir clean start-infra stop-infra start-services stop-services run-payment-test
 
 # Starts a short-lived inabox devnet, and runs integration/e2e tests against it.
 run-e2e-tests:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
+
+# Uses the inabox framework to run tests of the payment system
+# Runs each test individually with cleanup between them to avoid teardown issues. This is an ugly workaround, and should
+# be removed as soon as we figure out why in-test teardown isn't always succeeding.
+run-payments-tests:
+	@for test in \
+		TestReservationOnly_LegacyController \
+		TestReservationOnly_NewController; do \
+		echo "Running $$test..."; \
+		if ! go test ./tests/payments -v -run "^$$test$$"; then \
+			echo "❌ TEST FAILED: $$test"; \
+			$(MAKE) -s stop-inabox; \
+			exit 1; \
+		fi; \
+		$(MAKE) -s stop-inabox; \
+	done; \
+	echo "========================================="; \
+	echo "✅ ALL PAYMENT TESTS PASSED"
 
 # Starts a long-lived inabox local devnet.
 # If you need to make configuration changes to inabox,
@@ -23,6 +41,7 @@ start-inabox: new-testdata-dir start-infra start-services
 	@echo 'export EIGENDA_CERT_VERIFIER_ROUTER_ADDR=$$(cast call $$EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER")'
 	@echo "export EIGENDA_DISPERSER_V1_URL=localhost:32003"
 	@echo "export EIGENDA_DISPERSER_V2_URL=localhost:32005"
+	@echo "export EIGENDA_PROXY_URL=http://localhost:3100"
 	@echo
 	@echo "You can query other contract addresses from the directory:"
 	@echo 'cast call $$EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "SERVICE_MANAGER"'
@@ -35,6 +54,9 @@ start-inabox: new-testdata-dir start-infra start-services
 	@echo "EigenDA services (disperser, validators, etc) are ran as local processes."
 	@echo "Their config is available under `pwd`/testdata/_latest/envs"
 	@echo "Their logs are available under `pwd`/testdata/_latest/logs"
+	@echo
+	@echo "To disperse a blob via the proxy, run:"
+	@echo 'curl -X POST -d my-eigenda-payload "$$EIGENDA_PROXY_URL/put?commitment_mode=standard"'
 
 stop-inabox: stop-services stop-infra
 
@@ -87,3 +109,10 @@ start-services:
 
 stop-services:
 	./bin.sh stop-detached
+
+############################################################################
+#                               Tools                                      #
+############################################################################
+
+gen:
+	cd ./deploy/codegen && ./gen.sh

@@ -89,3 +89,9 @@ batchConfirmers = []
 confirmationThreshold = 55
 adversaryThreshold = 33
 quorumNumbersRequired = [0, 1]
+
+[initParams.eigenDA.disperser]
+dispersers = []
+
+[initParams.eigenDA.relay]
+relays = []

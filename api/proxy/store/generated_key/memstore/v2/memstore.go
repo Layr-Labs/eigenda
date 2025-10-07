@@ -71,13 +71,13 @@ var _ common.EigenDAV2Store = (*MemStore)(nil)
 func New(
 	ctx context.Context, log logging.Logger, config *memconfig.SafeConfig,
 	g1SRS []bn254.G1Affine,
-) (*MemStore, error) {
+) *MemStore {
 	return &MemStore{
 		ephemeraldb.New(ctx, config, log),
 		log,
 		g1SRS,
 		codecs.PolynomialFormEval,
-	}, nil
+	}
 }
 
 // generateRandomCert ... generates a pseudo random EigenDA V3 certificate

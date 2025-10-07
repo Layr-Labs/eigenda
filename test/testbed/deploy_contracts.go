@@ -457,7 +457,13 @@ func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) 
 }
 
 // execForgeScript executes a forge script with the given parameters
-func execForgeScript(script, privateKey, rpcURL string, extraArgs []string, logger logging.Logger) error {
+func execForgeScript(
+	script string,
+	privateKey string,
+	rpcURL string,
+	extraArgs []string,
+	logger logging.Logger,
+) error {
 	args := []string{"script", script,
 		"--rpc-url", rpcURL,
 		"--private-key", privateKey,

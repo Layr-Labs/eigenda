@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
+	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/urfave/cli/v2"
 )
@@ -70,7 +72,7 @@ func DeployAll(ctx *cli.Context) error {
 		return fmt.Errorf("failed to set environment variable: %w", err)
 	}
 
-	err = startChainInfra(ctx, config)
+	_, err = startChainInfra(ctx, config)
 	if err != nil {
 		return fmt.Errorf("start chain infra: %w", err)
 	}
@@ -83,6 +85,47 @@ func DeployAll(ctx *cli.Context) error {
 	err = config.DeployExperiment()
 	if err != nil {
 		return fmt.Errorf("deploy experiment: %w", err)
+	}
+
+	logger.Info("Generating disperser keypair")
+	err = config.GenerateDisperserKeypair()
+	if err != nil {
+		logger.Errorf("could not generate disperser keypair: %v", err)
+		panic(err)
+	}
+
+	// Create eth client
+	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{config.Deployers[0].RPC},
+		PrivateKeyString: config.Pks.EcdsaMap[config.EigenDA.Deployer].PrivateKey[2:],
+		NumConfirmations: 0,
+		NumRetries:       3,
+	}, gcommon.Address{}, logger)
+	if err != nil {
+		logger.Errorf("could not create eth client for registration: %v", err)
+		panic(err)
+	}
+
+	logger.Info("Registering disperser keypair on-chain")
+	config.PerformDisperserRegistrations(ethClient)
+
+	// Register blob versions
+	config.RegisterBlobVersions(ethClient)
+
+	// Register relay URLs
+	relayURLs := []string{
+		"localhost:32035",
+		"localhost:32037",
+		"localhost:32039",
+		"localhost:32041",
+	}
+	config.RegisterRelays(ethClient, relayURLs, ethClient.GetAccountAddress())
+
+	logger.Info("Generating variables")
+	err = config.GenerateAllVariables()
+	if err != nil {
+		logger.Errorf("could not generate environment variables: %v", err)
+		panic(err)
 	}
 
 	logger.Info("Deployment complete. You can now run `make start-services` to start the services.")
@@ -106,7 +149,7 @@ func readTestConfig(ctx *cli.Context) (*deploy.Config, error) {
 }
 
 // Spins up an anvil chain and a graph node (if DeploySubgraphs=true)
-func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
+func startChainInfra(ctx *cli.Context, config *deploy.Config) (*testbed.AnvilContainer, error) {
 	// Create a shared Docker network for all containers
 	// TODO(samlaf): seems like there's no way with testcontainers-go@v0.38 to give this network a name...
 	// https://pkg.go.dev/github.com/testcontainers/testcontainers-go@v0.38.0/network#WithNetworkName
@@ -117,7 +160,7 @@ func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
 		network.WithAttachable(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create docker network: %w", err)
+		return nil, fmt.Errorf("failed to create docker network: %w", err)
 	}
 	logger.Info("Created Docker network", "name", dockerNetwork.Name)
 
@@ -126,9 +169,10 @@ func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
 		HostPort:       "8545",
 		Logger:         logger,
 		Network:        dockerNetwork,
+		BlockTime:      1,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start anvil container: %w", err)
+		return nil, fmt.Errorf("failed to start anvil container: %w", err)
 	}
 
 	if deployer, ok := config.GetDeployer(config.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
@@ -148,11 +192,11 @@ func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
 			EthereumRPC: anvilC.InternalEndpoint(),
 		})
 		if err != nil {
-			return fmt.Errorf("failed to start graph node: %w", err)
+			return nil, fmt.Errorf("failed to start graph node: %w", err)
 		}
 	}
 
-	return nil
+	return anvilC, nil
 
 }
 
@@ -160,7 +204,7 @@ func startLocalstack(ctx *cli.Context, config *deploy.Config) error {
 	context, cancel := context.WithTimeout(ctx.Context, 30*time.Second)
 	defer cancel()
 
-	_, err := testbed.NewLocalStackContainerWithOptions(context, testbed.LocalStackOptions{
+	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(context, testbed.LocalStackOptions{
 		ExposeHostPort: true,
 		HostPort:       ctx.String(localstackPortFlagName),
 		Services:       []string{"s3", "dynamodb", "kms"},
@@ -171,10 +215,11 @@ func startLocalstack(ctx *cli.Context, config *deploy.Config) error {
 	}
 
 	deployConfig := testbed.DeployResourcesConfig{
-		LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", ctx.String(localstackPortFlagName)),
+		LocalStackEndpoint:  localstackContainer.Endpoint(),
 		MetadataTableName:   metadataTableName,
 		BucketTableName:     bucketTableName,
 		V2MetadataTableName: metadataTableNameV2,
+		AWSConfig:           localstackContainer.GetAWSClientConfig(),
 	}
 	if err := testbed.DeployResources(context, deployConfig); err != nil {
 		return fmt.Errorf("failed to deploy resources: %w", err)

@@ -223,6 +223,16 @@ function start_detached {
         waiters="$waiters $!"
     done
 
+    for FILE in $(ls $testpath/envs/proxy*.env); do
+        set -a
+        source $FILE
+        set +a
+        ../api/proxy/bin/eigenda-proxy > $testpath/logs/proxy.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+    done
+
     echo $pids > $pid_file
 
     for waiter in $waiters; do
@@ -230,7 +240,7 @@ function start_detached {
     done
 }
 
-# Start binaries for tests (without churner which runs as a goroutine)
+# Start binaries for tests (without churner and operators which run as goroutines)
 function start_detached_for_tests {
 
     pids=""
@@ -305,43 +315,13 @@ function start_detached_for_tests {
         pids="$pids $pid"
     done
 
-    files=($(ls $testpath/envs/relay*.env))
-    last_index=$(( ${#files[@]} - 1 ))
-    for i in "${!files[@]}"; do
-        FILE=${files[$i]}
-        set -a
-        source $FILE
-        set +a
-        id=$(basename $FILE | tr -d -c 0-9)
-        ../relay/bin/relay > $testpath/logs/relay${id}.log 2>&1 &
+    # Skip relay nodes - they run as goroutines in tests
+    echo "Skipping relay nodes (running as goroutines in tests)"
 
-        pid="$!"
-        pids="$pids $pid"
+    # Skip operator nodes - they run as goroutines in tests
+    echo "Skipping operator nodes (running as goroutines in tests)"
 
-        ./wait-for 0.0.0.0:${RELAY_GRPC_PORT} -- echo "Relay up" &
-        waiters="$waiters $!"
-    done
-
-    files=($(ls $testpath/envs/opr*.env))
-    last_index=$(( ${#files[@]} - 1 ))
-
-    for i in "${!files[@]}"; do
-        if [ $i -eq $last_index ]; then
-            sleep 10  # Sleep for 10 seconds before the last loop iteration
-        fi
-        FILE=${files[$i]}
-        set -a
-        source $FILE
-        set +a
-        id=$(basename $FILE | tr -d -c 0-9)
-        ../node/bin/node > $testpath/logs/opr${id}.log 2>&1 &
-
-        pid="$!"
-        pids="$pids $pid"
-
-        ./wait-for 0.0.0.0:${NODE_DISPERSAL_PORT} -- echo "Node up" &
-        waiters="$waiters $!"
-    done
+    # We don't spin up a proxy here because they are not needed for tests currently.
 
     echo $pids > $pid_file
 
@@ -388,7 +368,7 @@ help() {
     echo "Commands:"
     echo "  start                      Start all services in the foreground with trap on SIGINT"
     echo "  start-detached             Start all services in the background and log output to files"
-    echo "  start-detached-for-tests   Start services for tests (no churner, runs as goroutine)"
+    echo "  start-detached-for-tests   Start services for tests (churner and operators run as goroutines)"
     echo "  stop-detached              Stop all background services started with start-detached"
     echo "  force-stop                 Force kill all EigenDA related processes"
     echo ""

@@ -1,9 +1,7 @@
 package thegraph_test
 
 import (
-	"context"
 	"flag"
-	"fmt"
 	"testing"
 	"time"
 
@@ -12,27 +10,20 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	inaboxtests "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/Layr-Labs/eigenda/test"
-	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go/network"
 )
 
 var (
 	templateName string
 	testName     string
 	graphUrl     string
-
-	localstackPort      = "4570"
-	metadataTableName   = "test-BlobMetadata"
-	bucketTableName     = "test-BucketStore"
-	metadataTableNameV2 = "test-BlobMetadata-v2"
-	testQuorums         = []uint8{0, 1}
-
-	logger = test.GetLogger()
+	testQuorums  = []uint8{0, 1}
+	logger       = test.GetLogger()
 )
 
 func init() {
@@ -41,9 +32,7 @@ func init() {
 	flag.StringVar(&graphUrl, "graphurl", "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state", "")
 }
 
-func setupTest(t *testing.T) (
-	*testbed.AnvilContainer, *testbed.LocalStackContainer, *testbed.GraphNodeContainer, *deploy.Config,
-) {
+func setupTest(t *testing.T) *inaboxtests.InfrastructureHarness {
 	t.Helper()
 
 	if testing.Short() {
@@ -51,105 +40,38 @@ func setupTest(t *testing.T) (
 	}
 
 	flag.Parse()
-	ctx := t.Context()
-	rootPath := "../../"
 
-	if testName == "" {
-		var err error
-		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
-		require.NoError(t, err, "failed to create test directory")
+	// Setup infrastructure using the centralized function
+	config := &inaboxtests.InfrastructureConfig{
+		TemplateName: templateName,
+		TestName:     testName,
+		Logger:       logger,
+		RootPath:     "../../",
 	}
 
-	testConfig := deploy.ReadTestConfig(testName, rootPath)
-	testConfig.Deployers[0].DeploySubgraphs = true
+	// Start all the necessary infrastructure like anvil, graph node, and eigenda components
+	// TODO(dmanc): We really only need to register operators on chain, maybe add some sort of
+	// configuration to allow that mode.
+	infraHarness, err := inaboxtests.SetupInfrastructure(t.Context(), config)
+	require.NoError(t, err, "failed to setup global infrastructure")
 
-	// Create a shared Docker network for all containers
-	nw, err := network.New(ctx,
-		network.WithDriver("bridge"),
-		network.WithAttachable())
-	require.NoError(t, err, "failed to create Docker network")
-	logger.Info("Created Docker network", "name", nw.Name)
-
-	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
-		ExposeHostPort: true,
-		HostPort:       localstackPort,
-		Services:       []string{"s3", "dynamodb", "kms"},
-		Logger:         logger,
-		Network:        nw,
-	})
-	require.NoError(t, err, "failed to start localstack container")
-
-	deployConfig := testbed.DeployResourcesConfig{
-		LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
-		MetadataTableName:   metadataTableName,
-		BucketTableName:     bucketTableName,
-		V2MetadataTableName: metadataTableNameV2,
-		Logger:              logger,
+	// Update the graph URL to use the container from infrastructure
+	if infraHarness.ChainHarness.GraphNode != nil {
+		graphUrl = infraHarness.ChainHarness.GraphNode.HTTPURL() + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
 	}
-	err = testbed.DeployResources(ctx, deployConfig)
-	require.NoError(t, err, "failed to deploy resources")
-
-	anvilContainer, err := testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
-		ExposeHostPort: true,
-		HostPort:       "8545",
-		Logger:         logger,
-		Network:        nw,
-	})
-	require.NoError(t, err, "failed to start anvil container")
-	anvilContainerPort := anvilContainer.RpcURL()
-	anvilInternalEndpoint := anvilContainer.InternalEndpoint()
-	logger.Info("Anvil RPC URL", "url", anvilContainerPort, "internal", anvilInternalEndpoint)
-
-	logger.Info("Starting graph node")
-	graphNodeContainer, err := testbed.NewGraphNodeContainerWithOptions(ctx, testbed.GraphNodeOptions{
-		PostgresDB:     "graph-node",
-		PostgresUser:   "graph-node",
-		PostgresPass:   "let-me-in",
-		EthereumRPC:    anvilInternalEndpoint,
-		ExposeHostPort: true,
-		HostHTTPPort:   "8000",
-		HostWSPort:     "8001",
-		HostAdminPort:  "8020",
-		HostIPFSPort:   "5001",
-		Logger:         logger,
-		Network:        nw,
-	})
-	require.NoError(t, err, "failed to start graph node")
-
-	// Update the graph URL to use the new container
-	graphUrl = graphNodeContainer.HTTPURL() + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
-
-	logger.Info("Deploying experiment")
-	err = testConfig.DeployExperiment()
-	require.NoError(t, err, "failed to deploy experiment")
-
-	logger.Info("Starting binaries")
-	testConfig.StartBinaries(true)
 
 	t.Cleanup(func() {
-		logger.Info("Stopping containers and services")
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		logger.Info("Stop binaries")
-		testConfig.StopBinaries()
-
-		logger.Info("Stop graph node")
-		_ = graphNodeContainer.Terminate(ctx)
-
-		_ = anvilContainer.Terminate(ctx)
-		_ = localstackContainer.Terminate(ctx)
-
-		logger.Info("Removing Docker network")
-		_ = nw.Remove(ctx)
+		logger.Info("Tearing down test infrastructure")
+		inaboxtests.TeardownInfrastructure(infraHarness)
 	})
 
-	return anvilContainer, localstackContainer, graphNodeContainer, testConfig
+	return infraHarness
 }
 
 func TestIndexerIntegration(t *testing.T) {
 	ctx := t.Context()
-	_, _, _, testConfig := setupTest(t)
+	infraHarness := setupTest(t)
+	testConfig := infraHarness.TestConfig
 
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 	tx, err := eth.NewWriter(

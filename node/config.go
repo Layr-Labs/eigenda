@@ -10,8 +10,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
@@ -191,7 +191,7 @@ type Config struct {
 	StoreChunksBufferSizeBytes uint64
 
 	// The size of the cache for operator states. Cache will remember operator states for this number of unique blocks.
-	operatorStateCacheSize uint64
+	OperatorStateCacheSize uint64
 
 	// Controls how often the ejection sentinel checks to see if the node is being ejected. This should be configured
 	// to be smaller than the onchain ejection period.
@@ -395,7 +395,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			ctx.GlobalInt(flags.ReservationMaxLedgersFlag.Name),
 			ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
 			// this is hardcoded: it's a parameter just in case, but it's never expected to change
-			reservation.OverfillOncePermitted,
+			ratelimit.OverfillOncePermitted,
 			ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),
 		)
 		if err != nil {
@@ -478,7 +478,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		StoreChunksBufferTimeout:        ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
 		StoreChunksBufferSizeFraction:   ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
 		StoreChunksBufferSizeBytes:      uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
-		operatorStateCacheSize:          ctx.GlobalUint64(flags.OperatorStateCacheSizeFlag.Name),
+		OperatorStateCacheSize:          ctx.GlobalUint64(flags.OperatorStateCacheSizeFlag.Name),
 		EjectionSentinelPeriod:          ctx.GlobalDuration(flags.EjectionSentinelPeriodFlag.Name),
 		EjectionDefenseEnabled:          ctx.GlobalBool(flags.EjectionDefenseEnabledFlag.Name),
 		IgnoreVersionForEjectionDefense: ctx.GlobalBool(flags.IgnoreVersionForEjectionDefenseFlag.Name),
