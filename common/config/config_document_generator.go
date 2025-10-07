@@ -32,7 +32,7 @@ const DeprecatedTag = "deprecated"
 const UnsafeTag = "unsafe"
 
 // Generates documentation for a configuration struct by parsing the configuration. Output is deterministic.
-func DocumentConfig[T any]( // TODO T VerifiableConfig
+func DocumentConfig[T VerifiableConfig](
 	// The name of the thing being documented, e.g. "Validator".
 	componentName string,
 	// The default constructor for the config struct. Default values will be extracted from the returned struct.
@@ -52,9 +52,6 @@ func DocumentConfig[T any]( // TODO T VerifiableConfig
 		return fmt.Errorf("envPrefix may not be empty")
 	}
 	defaultConfig := constructor()
-
-	// TODO
-	fmt.Printf("Default config: %+v\n", defaultConfig)
 
 	// Unwrap pointer to get the named type
 	t := reflect.TypeOf(defaultConfig)
@@ -317,6 +314,7 @@ func gatherConfigFieldData(
 			fields = append(fields, nestedFieldData...)
 		case reflect.Ptr:
 			// Handle pointer to struct
+			// nolint:nestif
 			if field.Type.Elem().Kind() == reflect.Struct {
 				fieldValue := targetValue.Field(i)
 
@@ -345,8 +343,6 @@ func gatherConfigFieldData(
 				fields = append(fields, nestedFieldData...)
 			} else {
 				// Pointer to non-struct type, treat as regular field.
-				// TODO be sure to unit test this
-
 				var toml string
 				if tomlPrefix == "" {
 					toml = field.Name

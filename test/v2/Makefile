@@ -18,4 +18,4 @@ test:
 
 document-config:
 	@mkdir -p ../../docs/config
-	@cd ../.. && go run test/v2/load/generate_config_docs/main.go
+	@cd ../.. && go run test/v2/load/config_docs/main.go

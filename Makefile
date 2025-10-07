@@ -144,3 +144,7 @@ semver:
 ##### Proxies to other local Makefiles #####
 mdbook-serve:
 	$(MAKE) -C docs/spec serve
+
+# Generates documentation for configuration files.
+document-config:
+	cd test/v2 && $(MAKE) document-config

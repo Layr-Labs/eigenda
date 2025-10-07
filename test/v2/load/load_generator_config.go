@@ -1,8 +1,11 @@
 package load
 
 import (
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 )
+
+var _ config.VerifiableConfig = (*TrafficGeneratorConfig)(nil)
 
 // Configuration for the traffic generator.
 //
@@ -15,8 +18,13 @@ type TrafficGeneratorConfig struct {
 	Load LoadGeneratorConfig
 }
 
+func (c *TrafficGeneratorConfig) Verify() error {
+	// TODO(cody.littley): This is a place holder. Implement this when integrating new config with traffic generator.
+	return nil
+}
+
 // DefaultTrafficGeneratorConfig returns a default configuration for the traffic generator.
-func DefaultTrafficGeneratorConfig() *TrafficGeneratorConfig { // TODO fix pointer
+func DefaultTrafficGeneratorConfig() *TrafficGeneratorConfig {
 	return &TrafficGeneratorConfig{
 		Environment: *client.DefaultTestClientConfig(),
 		Load:        *DefaultLoadGeneratorConfig(),
