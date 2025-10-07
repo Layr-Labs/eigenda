@@ -129,11 +129,11 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 	}
 
 	var serverV1 *nodegrpc.Server
-	var v1Listeners nodegrpc.V1Listeners
+	var v1Listeners nodegrpc.Listeners
 	if config.EnableV1 {
-		v1Listeners, err = nodegrpc.CreateV1Listeners(
-			fmt.Sprintf("0.0.0.0:%s", config.InternalDispersalPort),
-			fmt.Sprintf("0.0.0.0:%s", config.InternalRetrievalPort))
+		v1Listeners, err = nodegrpc.CreateListeners(
+			config.InternalDispersalPort,
+			config.InternalRetrievalPort)
 		if err != nil {
 			return fmt.Errorf("failed to create v1 listeners: %w", err)
 		}
@@ -152,13 +152,15 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 	}
 
 	var serverV2 *nodegrpc.ServerV2
-	var v2Listeners nodegrpc.V2Listeners
+	var v2Listeners nodegrpc.Listeners
 	if config.EnableV2 {
-		v2Listeners, err = nodegrpc.CreateV2Listeners(
-			fmt.Sprintf("0.0.0.0:%s", config.InternalV2DispersalPort),
-			fmt.Sprintf("0.0.0.0:%s", config.InternalV2RetrievalPort))
+		v2Listeners, err = nodegrpc.CreateListeners(
+			config.InternalV2DispersalPort,
+			config.InternalV2RetrievalPort)
 		if err != nil {
-			v1Listeners.Close()
+			if config.EnableV1 {
+				v1Listeners.Close()
+			}
 			return fmt.Errorf("failed to create v2 listeners: %w", err)
 		}
 
@@ -168,7 +170,9 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 			operatorStateRetrieverAddress.Hex(),
 			eigenDAServiceManagerAddress.Hex())
 		if err != nil {
-			v1Listeners.Close()
+			if config.EnableV1 {
+				v1Listeners.Close()
+			}
 			v2Listeners.Close()
 			return fmt.Errorf("cannot create eth.Reader: %w", err)
 		}
@@ -185,7 +189,9 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 			v2Listeners.Dispersal,
 			v2Listeners.Retrieval)
 		if err != nil {
-			v1Listeners.Close()
+			if config.EnableV1 {
+				v1Listeners.Close()
+			}
 			v2Listeners.Close()
 			return fmt.Errorf("failed to create server v2: %v", err)
 		}
@@ -193,8 +199,12 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 
 	err = nodegrpc.RunServers(serverV1, serverV2, config, logger)
 	if err != nil {
-		v1Listeners.Close()
-		v2Listeners.Close()
+		if config.EnableV1 {
+			v1Listeners.Close()
+		}
+		if config.EnableV2 {
+			v2Listeners.Close()
+		}
 		return fmt.Errorf("failed to start gRPC servers: %w", err)
 	}
 
