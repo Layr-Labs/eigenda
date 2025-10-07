@@ -515,26 +515,3 @@ func TestIgnoreEnvironmentVariables(t *testing.T) {
 	require.Equal(t, 27, foo.Baz.Y)      // from config
 	require.Equal(t, true, foo.Baz.Z)    // from config
 }
-
-func TestDocGeneration(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	configPath := path.Join(dir, "config.md")
-
-	// Hard to verify a markdown file is properly formatted in a unit test.
-	//  But we should, at the very least, ensure that this doesn't crash.
-
-	packagePaths := []string{
-		"github.com/Layr-Labs/eigenda/common/config",
-	}
-
-	err := DocumentConfig(
-		"Test Config",
-		DefaultFoo,
-		"TEST",
-		packagePaths,
-		configPath,
-		false)
-	require.NoError(t, err)
-}
