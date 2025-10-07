@@ -4,47 +4,281 @@
 
 ## Required Fields
 
-| TOML | Environment Variable | Type | Description |
-|------|----------------------|------|-------------|
-| Environment.ContractDirectoryAddress | TRAFFIC_GENERATOR_ENVIRONMENT_CONTRACTDIRECTORYADDRESS | string | The contract address for the EigenDA address directory, where all contract addresses are stored |
-| Environment.DisperserHostname | TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERHOSTNAME | string | The disperser's hostname (url or IP address) |
-| Environment.DisperserPort | TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERPORT | int | The disperser's port |
-| Environment.EthRPCURLs | TRAFFIC_GENERATOR_ENVIRONMENT_ETHRPCURLS | []string | The URL(s) to point the eth client to<br><br>Either this or EthRPCURLsVar must be set. If both are set, EthRPCURLs is used. |
-| Environment.EthRPCUrlsVar | TRAFFIC_GENERATOR_ENVIRONMENT_ETHRPCURLSVAR | string | The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.<br><br>Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used. |
-| Environment.KeyPath | TRAFFIC_GENERATOR_ENVIRONMENT_KEYPATH | string | The location where the test client's private key is stored. This is the key for the account that is<br>paying for dispersals.<br><br>Either this or KeyVar must be set. If both are set, KeyPath is used. |
-| Environment.KeyVar | TRAFFIC_GENERATOR_ENVIRONMENT_KEYVAR | string | The environment variable that contains the private key for the account that is paying for dispersals.<br><br>This is used if KeyPath is not set. |
-| Environment.SRSPath | TRAFFIC_GENERATOR_ENVIRONMENT_SRSPATH | string | The location where the SRS files can be found. |
-| Environment.SubgraphURL | TRAFFIC_GENERATOR_ENVIRONMENT_SUBGRAPHURL | string | The URL/IP of a subgraph to use for the chain state |
+<table>
+<thead>
+<tr>
+<th>TOML</th>
+<th>Environment Variable</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Environment.ContractDirectoryAddress</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_CONTRACTDIRECTORYADDRESS</code></td>
+<td><code>string</code></td>
+<td>The contract address for the EigenDA address directory, where all contract addresses are stored</td>
+</tr>
+<tr>
+<td><code>Environment.DisperserHostname</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERHOSTNAME</code></td>
+<td><code>string</code></td>
+<td>The disperser&#39;s hostname (url or IP address)</td>
+</tr>
+<tr>
+<td><code>Environment.DisperserPort</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERPORT</code></td>
+<td><code>int</code></td>
+<td>The disperser&#39;s port</td>
+</tr>
+<tr>
+<td><code>Environment.EthRPCURLs</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_ETHRPCURLS</code></td>
+<td><code>[]string</code></td>
+<td>The URL(s) to point the eth client to<br><br>Either this or EthRPCURLsVar must be set. If both are set, EthRPCURLs is used.</td>
+</tr>
+<tr>
+<td><code>Environment.EthRPCUrlsVar</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_ETHRPCURLSVAR</code></td>
+<td><code>string</code></td>
+<td>The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.<br><br>Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.</td>
+</tr>
+<tr>
+<td><code>Environment.KeyPath</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_KEYPATH</code></td>
+<td><code>string</code></td>
+<td>The location where the test client&#39;s private key is stored. This is the key for the account that is<br>paying for dispersals.<br><br>Either this or KeyVar must be set. If both are set, KeyPath is used.</td>
+</tr>
+<tr>
+<td><code>Environment.KeyVar</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_KEYVAR</code></td>
+<td><code>string</code></td>
+<td>The environment variable that contains the private key for the account that is paying for dispersals.<br><br>This is used if KeyPath is not set.</td>
+</tr>
+<tr>
+<td><code>Environment.SRSPath</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_SRSPATH</code></td>
+<td><code>string</code></td>
+<td>The location where the SRS files can be found.</td>
+</tr>
+<tr>
+<td><code>Environment.SubgraphURL</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_SUBGRAPHURL</code></td>
+<td><code>string</code></td>
+<td>The URL/IP of a subgraph to use for the chain state</td>
+</tr>
+</tbody>
+</table>
 
 ## Optional Fields
 
-| TOML | Environment Variable | Type | Default | Description |
-|------|----------------------|------|---------|-------------|
-| Environment.ClientLedgerPaymentMode | TRAFFIC_GENERATOR_ENVIRONMENT_CLIENTLEDGERPAYMENTMODE | string | "legacy" | Client ledger mode used for payments. |
-| Environment.DisableMetrics | TRAFFIC_GENERATOR_ENVIRONMENT_DISABLEMETRICS | bool | false | If true, do not start the metrics server. |
-| Environment.DisperserConnectionCount | TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERCONNECTIONCOUNT | uint | 8 | The number of connections to open for each disperser. |
-| Environment.MaxBlobSize | TRAFFIC_GENERATOR_ENVIRONMENT_MAXBLOBSIZE | uint64 | 16777216 | The maximum blob size supported by the EigenDA network |
-| Environment.MetricsPort | TRAFFIC_GENERATOR_ENVIRONMENT_METRICSPORT | int | 9101 | The port to use for metrics (if metrics are being collected) |
-| Environment.ProxyPort | TRAFFIC_GENERATOR_ENVIRONMENT_PROXYPORT | int | 1234 | The port to use for the proxy. |
-| Environment.RelayConnectionCount | TRAFFIC_GENERATOR_ENVIRONMENT_RELAYCONNECTIONCOUNT | uint | 8 | The number of connections to open for each relay. |
-| Environment.SRSNumberToLoad | TRAFFIC_GENERATOR_ENVIRONMENT_SRSNUMBERTOLOAD | uint64 | 0 | The SRS number to load, increasing this beyond necessary can cause the client to take a long time to start |
-| Environment.SRSOrder | TRAFFIC_GENERATOR_ENVIRONMENT_SRSORDER | uint64 | 268435456 | The SRS order to use for the test |
-| Environment.ValidatorReadComputePoolSize | TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCOMPUTEPOOLSIZE | int | 20 | The size of the thread pool for CPU heavy operations. |
-| Environment.ValidatorReadConnectionPoolSize | TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCONNECTIONPOOLSIZE | int | 100 | The size of the thread pool for read operations. |
-| Load.BlobSizeMB | TRAFFIC_GENERATOR_LOAD_BLOBSIZEMB | float64 | 2 | The size of the blobs to write, in megabytes. |
-| Load.DispersalTimeout | TRAFFIC_GENERATOR_LOAD_DISPERSALTIMEOUT | uint32 | 600 | The timeout for each blob dispersal, in seconds. |
-| Load.EnablePprof | TRAFFIC_GENERATOR_LOAD_ENABLEPPROF | bool | false | EnablePprof enables the pprof HTTP server for profiling |
-| Load.FrequencyAcceleration | TRAFFIC_GENERATOR_LOAD_FREQUENCYACCELERATION | float64 | 0.0025 | FrequencyAcceleration determines the speed at which the frequency of blob submissions accelerates at startup<br>time, in HZ/s. Frequency will start at 0 and accelerate to the target frequency at this rate. If 0, then<br>the frequency will immediately be set to the target frequency. |
-| Load.GasEstimationParallelism | TRAFFIC_GENERATOR_LOAD_GASESTIMATIONPARALLELISM | uint64 | 300 | The maximum number of parallel gas estimation operations in flight. |
-| Load.GasEstimationTimeout | TRAFFIC_GENERATOR_LOAD_GASESTIMATIONTIMEOUT | uint32 | 15 | The timeout for gas estimation operations, in seconds. |
-| Load.MBPerSecond | TRAFFIC_GENERATOR_LOAD_MBPERSECOND | float64 | 0.5 | The desired number of megabytes bytes per second to write. |
-| Load.PprofHttpPort | TRAFFIC_GENERATOR_LOAD_PPROFHTTPPORT | int | 6060 | PprofHttpPort is the port that the pprof HTTP server listens on |
-| Load.RelayReadAmplification | TRAFFIC_GENERATOR_LOAD_RELAYREADAMPLIFICATION | float64 | 1 | By default, this utility reads each blob back from each relay once. The number of<br>reads per relay is multiplied by this factor. For example, If this is set to 3,<br>then each blob is read back from each relay 3 times. If less than 1, then this value<br>is treated as a probability. For example, if this is set to 0.5, then each blob is read back<br>from each relay with a 50% chance. If running with the proxy, this value is used to determine<br>how many times to read each blob back from the proxy (since in the normal case, proxy reads translate<br>to relay reads). |
-| Load.RelayReadParallelism | TRAFFIC_GENERATOR_LOAD_RELAYREADPARALLELISM | uint64 | 300 | The maximum number of parallel blob relay read operations in flight. |
-| Load.RelayReadTimeout | TRAFFIC_GENERATOR_LOAD_RELAYREADTIMEOUT | uint32 | 600 | The timeout for reading a blob from a relay, in seconds. This is the timeout per individual read. |
-| Load.SubmissionParallelism | TRAFFIC_GENERATOR_LOAD_SUBMISSIONPARALLELISM | uint64 | 300 | The maximum number of parallel blobs submissions in flight. |
-| Load.UseProxy | TRAFFIC_GENERATOR_LOAD_USEPROXY | bool | false | If true, then route traffic through the proxy instead of directly using the GRPC clients. |
-| Load.ValidatorReadAmplification | TRAFFIC_GENERATOR_LOAD_VALIDATORREADAMPLIFICATION | float64 | 1 | By default, this utility reads chunks once. The number of chunk reads is multiplied<br>by this factor. If this is set to 3, then chunks are read back 3 times. If less than 1,<br>then this value is treated as a probability. For example, if this is set to 0.5, then<br>each chunk is read back from validators with a 50% chance. Ignored if the load generator is configured<br>to use the proxy. |
-| Load.ValidatorReadParallelism | TRAFFIC_GENERATOR_LOAD_VALIDATORREADPARALLELISM | uint64 | 300 | The maximum number of parallel blob validator read operations in flight. |
-| Load.ValidatorReadTimeout | TRAFFIC_GENERATOR_LOAD_VALIDATORREADTIMEOUT | uint32 | 600 | The timeout for reading a blob from the validators, in seconds. This is the timeout per individual read. |
-| Load.ValidatorVerificationFraction | TRAFFIC_GENERATOR_LOAD_VALIDATORVERIFICATIONFRACTION | float64 | 0.01 | A number between 0 and 1.0 that specifies the fraction of blobs that are verified by the validator.<br>If 1.0, all blobs are verified. If 0.0, no blobs are verified. If 0.5, half of the blobs are verified. |
+<table>
+<thead>
+<tr>
+<th>TOML</th>
+<th>Environment Variable</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Environment.ClientLedgerPaymentMode</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_CLIENTLEDGERPAYMENTMODE</code></td>
+<td><code>string</code></td>
+<td><code>&quot;legacy&quot;</code></td>
+<td>Client ledger mode used for payments.</td>
+</tr>
+<tr>
+<td><code>Environment.DisableMetrics</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISABLEMETRICS</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td>If true, do not start the metrics server.</td>
+</tr>
+<tr>
+<td><code>Environment.DisperserConnectionCount</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERCONNECTIONCOUNT</code></td>
+<td><code>uint</code></td>
+<td><code>8</code></td>
+<td>The number of connections to open for each disperser.</td>
+</tr>
+<tr>
+<td><code>Environment.MaxBlobSize</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_MAXBLOBSIZE</code></td>
+<td><code>uint64</code></td>
+<td><code>16777216</code></td>
+<td>The maximum blob size supported by the EigenDA network</td>
+</tr>
+<tr>
+<td><code>Environment.MetricsPort</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_METRICSPORT</code></td>
+<td><code>int</code></td>
+<td><code>9101</code></td>
+<td>The port to use for metrics (if metrics are being collected)</td>
+</tr>
+<tr>
+<td><code>Environment.ProxyPort</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_PROXYPORT</code></td>
+<td><code>int</code></td>
+<td><code>1234</code></td>
+<td>The port to use for the proxy.</td>
+</tr>
+<tr>
+<td><code>Environment.RelayConnectionCount</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_RELAYCONNECTIONCOUNT</code></td>
+<td><code>uint</code></td>
+<td><code>8</code></td>
+<td>The number of connections to open for each relay.</td>
+</tr>
+<tr>
+<td><code>Environment.SRSNumberToLoad</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_SRSNUMBERTOLOAD</code></td>
+<td><code>uint64</code></td>
+<td><code>0</code></td>
+<td>The SRS number to load, increasing this beyond necessary can cause the client to take a long time to start</td>
+</tr>
+<tr>
+<td><code>Environment.SRSOrder</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_SRSORDER</code></td>
+<td><code>uint64</code></td>
+<td><code>268435456</code></td>
+<td>The SRS order to use for the test</td>
+</tr>
+<tr>
+<td><code>Environment.ValidatorReadComputePoolSize</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCOMPUTEPOOLSIZE</code></td>
+<td><code>int</code></td>
+<td><code>20</code></td>
+<td>The size of the thread pool for CPU heavy operations.</td>
+</tr>
+<tr>
+<td><code>Environment.ValidatorReadConnectionPoolSize</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCONNECTIONPOOLSIZE</code></td>
+<td><code>int</code></td>
+<td><code>100</code></td>
+<td>The size of the thread pool for read operations.</td>
+</tr>
+<tr>
+<td><code>Load.BlobSizeMB</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_BLOBSIZEMB</code></td>
+<td><code>float64</code></td>
+<td><code>2</code></td>
+<td>The size of the blobs to write, in megabytes.</td>
+</tr>
+<tr>
+<td><code>Load.DispersalTimeout</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_DISPERSALTIMEOUT</code></td>
+<td><code>uint32</code></td>
+<td><code>600</code></td>
+<td>The timeout for each blob dispersal, in seconds.</td>
+</tr>
+<tr>
+<td><code>Load.EnablePprof</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_ENABLEPPROF</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td>EnablePprof enables the pprof HTTP server for profiling</td>
+</tr>
+<tr>
+<td><code>Load.FrequencyAcceleration</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_FREQUENCYACCELERATION</code></td>
+<td><code>float64</code></td>
+<td><code>0.0025</code></td>
+<td>FrequencyAcceleration determines the speed at which the frequency of blob submissions accelerates at startup<br>time, in HZ/s. Frequency will start at 0 and accelerate to the target frequency at this rate. If 0, then<br>the frequency will immediately be set to the target frequency.</td>
+</tr>
+<tr>
+<td><code>Load.GasEstimationParallelism</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_GASESTIMATIONPARALLELISM</code></td>
+<td><code>uint64</code></td>
+<td><code>300</code></td>
+<td>The maximum number of parallel gas estimation operations in flight.</td>
+</tr>
+<tr>
+<td><code>Load.GasEstimationTimeout</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_GASESTIMATIONTIMEOUT</code></td>
+<td><code>uint32</code></td>
+<td><code>15</code></td>
+<td>The timeout for gas estimation operations, in seconds.</td>
+</tr>
+<tr>
+<td><code>Load.MBPerSecond</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_MBPERSECOND</code></td>
+<td><code>float64</code></td>
+<td><code>0.5</code></td>
+<td>The desired number of megabytes bytes per second to write.</td>
+</tr>
+<tr>
+<td><code>Load.PprofHttpPort</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_PPROFHTTPPORT</code></td>
+<td><code>int</code></td>
+<td><code>6060</code></td>
+<td>PprofHttpPort is the port that the pprof HTTP server listens on</td>
+</tr>
+<tr>
+<td><code>Load.RelayReadAmplification</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_RELAYREADAMPLIFICATION</code></td>
+<td><code>float64</code></td>
+<td><code>1</code></td>
+<td>By default, this utility reads each blob back from each relay once. The number of<br>reads per relay is multiplied by this factor. For example, If this is set to 3,<br>then each blob is read back from each relay 3 times. If less than 1, then this value<br>is treated as a probability. For example, if this is set to 0.5, then each blob is read back<br>from each relay with a 50% chance. If running with the proxy, this value is used to determine<br>how many times to read each blob back from the proxy (since in the normal case, proxy reads translate<br>to relay reads).</td>
+</tr>
+<tr>
+<td><code>Load.RelayReadParallelism</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_RELAYREADPARALLELISM</code></td>
+<td><code>uint64</code></td>
+<td><code>300</code></td>
+<td>The maximum number of parallel blob relay read operations in flight.</td>
+</tr>
+<tr>
+<td><code>Load.RelayReadTimeout</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_RELAYREADTIMEOUT</code></td>
+<td><code>uint32</code></td>
+<td><code>600</code></td>
+<td>The timeout for reading a blob from a relay, in seconds. This is the timeout per individual read.</td>
+</tr>
+<tr>
+<td><code>Load.SubmissionParallelism</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_SUBMISSIONPARALLELISM</code></td>
+<td><code>uint64</code></td>
+<td><code>300</code></td>
+<td>The maximum number of parallel blobs submissions in flight.</td>
+</tr>
+<tr>
+<td><code>Load.UseProxy</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_USEPROXY</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td>If true, then route traffic through the proxy instead of directly using the GRPC clients.</td>
+</tr>
+<tr>
+<td><code>Load.ValidatorReadAmplification</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_VALIDATORREADAMPLIFICATION</code></td>
+<td><code>float64</code></td>
+<td><code>1</code></td>
+<td>By default, this utility reads chunks once. The number of chunk reads is multiplied<br>by this factor. If this is set to 3, then chunks are read back 3 times. If less than 1,<br>then this value is treated as a probability. For example, if this is set to 0.5, then<br>each chunk is read back from validators with a 50% chance. Ignored if the load generator is configured<br>to use the proxy.</td>
+</tr>
+<tr>
+<td><code>Load.ValidatorReadParallelism</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_VALIDATORREADPARALLELISM</code></td>
+<td><code>uint64</code></td>
+<td><code>300</code></td>
+<td>The maximum number of parallel blob validator read operations in flight.</td>
+</tr>
+<tr>
+<td><code>Load.ValidatorReadTimeout</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_VALIDATORREADTIMEOUT</code></td>
+<td><code>uint32</code></td>
+<td><code>600</code></td>
+<td>The timeout for reading a blob from the validators, in seconds. This is the timeout per individual read.</td>
+</tr>
+<tr>
+<td><code>Load.ValidatorVerificationFraction</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_VALIDATORVERIFICATIONFRACTION</code></td>
+<td><code>float64</code></td>
+<td><code>0.01</code></td>
+<td>A number between 0 and 1.0 that specifies the fraction of blobs that are verified by the validator.<br>If 1.0, all blobs are verified. If 0.0, no blobs are verified. If 0.5, half of the blobs are verified.</td>
+</tr>
+</tbody>
+</table>
