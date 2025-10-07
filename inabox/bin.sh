@@ -305,15 +305,8 @@ function start_detached_for_tests {
         pids="$pids $pid"
     done
 
-    for FILE in $(ls $testpath/envs/controller*.env); do
-        set -a
-        source $FILE
-        set +a
-        ../disperser/bin/controller > $testpath/logs/controller.log 2>&1 &
-
-        pid="$!"
-        pids="$pids $pid"
-    done
+    # Skip controller - it runs as a goroutine in tests
+    echo "Skipping controller (running as goroutine in tests)"
 
     # Skip relay nodes - they run as goroutines in tests
     echo "Skipping relay nodes (running as goroutines in tests)"
