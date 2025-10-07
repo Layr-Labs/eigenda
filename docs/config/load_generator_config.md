@@ -4,281 +4,281 @@
 
 ## Required Fields
 
-<table style="width: 100%; table-layout: fixed;">
+<table>
 <thead>
 <tr>
-<th style="width: 20%;">TOML</th>
-<th style="width: 25%;">Environment Variable</th>
-<th style="width: 15%;">Type</th>
-<th style="width: 40%;">Description</th>
+<th>TOML&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+<th>Environment Variable&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+<th>Type&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+<th>Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.ContractDirectoryAddress</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_CONTRACTDIRECTORYADDRESS</code></td>
-<td style="word-wrap: break-word;"><code>string</code></td>
-<td style="word-wrap: break-word;">The contract address for the EigenDA address directory, where all contract addresses are stored</td>
+<td><code>Environment.ContractDirectoryAddress</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_CONTRACTDIRECTORYADDRESS</code></td>
+<td><code>string</code></td>
+<td>The contract address for the EigenDA address directory, where all contract addresses are stored</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.DisperserHostname</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERHOSTNAME</code></td>
-<td style="word-wrap: break-word;"><code>string</code></td>
-<td style="word-wrap: break-word;">The disperser&#39;s hostname (url or IP address)</td>
+<td><code>Environment.DisperserHostname</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERHOSTNAME</code></td>
+<td><code>string</code></td>
+<td>The disperser&#39;s hostname (url or IP address)</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.DisperserPort</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERPORT</code></td>
-<td style="word-wrap: break-word;"><code>int</code></td>
-<td style="word-wrap: break-word;">The disperser&#39;s port</td>
+<td><code>Environment.DisperserPort</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERPORT</code></td>
+<td><code>int</code></td>
+<td>The disperser&#39;s port</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.EthRPCURLs</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_ETHRPCURLS</code></td>
-<td style="word-wrap: break-word;"><code>[]string</code></td>
-<td style="word-wrap: break-word;">The URL(s) to point the eth client to<br><br>Either this or EthRPCURLsVar must be set. If both are set, EthRPCURLs is used.</td>
+<td><code>Environment.EthRPCURLs</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_ETHRPCURLS</code></td>
+<td><code>[]string</code></td>
+<td>The URL(s) to point the eth client to<br><br>Either this or EthRPCURLsVar must be set. If both are set, EthRPCURLs is used.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.EthRPCUrlsVar</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_ETHRPCURLSVAR</code></td>
-<td style="word-wrap: break-word;"><code>string</code></td>
-<td style="word-wrap: break-word;">The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.<br><br>Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.</td>
+<td><code>Environment.EthRPCUrlsVar</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_ETHRPCURLSVAR</code></td>
+<td><code>string</code></td>
+<td>The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.<br><br>Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.KeyPath</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_KEYPATH</code></td>
-<td style="word-wrap: break-word;"><code>string</code></td>
-<td style="word-wrap: break-word;">The location where the test client&#39;s private key is stored. This is the key for the account that is<br>paying for dispersals.<br><br>Either this or KeyVar must be set. If both are set, KeyPath is used.</td>
+<td><code>Environment.KeyPath</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_KEYPATH</code></td>
+<td><code>string</code></td>
+<td>The location where the test client&#39;s private key is stored. This is the key for the account that is<br>paying for dispersals.<br><br>Either this or KeyVar must be set. If both are set, KeyPath is used.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.KeyVar</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_KEYVAR</code></td>
-<td style="word-wrap: break-word;"><code>string</code></td>
-<td style="word-wrap: break-word;">The environment variable that contains the private key for the account that is paying for dispersals.<br><br>This is used if KeyPath is not set.</td>
+<td><code>Environment.KeyVar</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_KEYVAR</code></td>
+<td><code>string</code></td>
+<td>The environment variable that contains the private key for the account that is paying for dispersals.<br><br>This is used if KeyPath is not set.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.SRSPath</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_SRSPATH</code></td>
-<td style="word-wrap: break-word;"><code>string</code></td>
-<td style="word-wrap: break-word;">The location where the SRS files can be found.</td>
+<td><code>Environment.SRSPath</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_SRSPATH</code></td>
+<td><code>string</code></td>
+<td>The location where the SRS files can be found.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.SubgraphURL</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_SUBGRAPHURL</code></td>
-<td style="word-wrap: break-word;"><code>string</code></td>
-<td style="word-wrap: break-word;">The URL/IP of a subgraph to use for the chain state</td>
+<td><code>Environment.SubgraphURL</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_SUBGRAPHURL</code></td>
+<td><code>string</code></td>
+<td>The URL/IP of a subgraph to use for the chain state</td>
 </tr>
 </tbody>
 </table>
 
 ## Optional Fields
 
-<table style="width: 100%; table-layout: fixed;">
+<table>
 <thead>
 <tr>
-<th style="width: 18%;">TOML</th>
-<th style="width: 22%;">Environment Variable</th>
-<th style="width: 12%;">Type</th>
-<th style="width: 15%;">Default</th>
-<th style="width: 33%;">Description</th>
+<th>TOML&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+<th>Environment Variable&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+<th>Type&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+<th>Default&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+<th>Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.ClientLedgerPaymentMode</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_CLIENTLEDGERPAYMENTMODE</code></td>
-<td style="word-wrap: break-word;"><code>string</code></td>
-<td style="word-wrap: break-word;"><code>&quot;legacy&quot;</code></td>
-<td style="word-wrap: break-word;">Client ledger mode used for payments.</td>
+<td><code>Environment.ClientLedgerPaymentMode</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_CLIENTLEDGERPAYMENTMODE</code></td>
+<td><code>string</code></td>
+<td><code>&quot;legacy&quot;</code></td>
+<td>Client ledger mode used for payments.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.DisableMetrics</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISABLEMETRICS</code></td>
-<td style="word-wrap: break-word;"><code>bool</code></td>
-<td style="word-wrap: break-word;"><code>false</code></td>
-<td style="word-wrap: break-word;">If true, do not start the metrics server.</td>
+<td><code>Environment.DisableMetrics</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISABLEMETRICS</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td>If true, do not start the metrics server.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.DisperserConnectionCount</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERCONNECTIONCOUNT</code></td>
-<td style="word-wrap: break-word;"><code>uint</code></td>
-<td style="word-wrap: break-word;"><code>8</code></td>
-<td style="word-wrap: break-word;">The number of connections to open for each disperser.</td>
+<td><code>Environment.DisperserConnectionCount</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERCONNECTIONCOUNT</code></td>
+<td><code>uint</code></td>
+<td><code>8</code></td>
+<td>The number of connections to open for each disperser.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.MaxBlobSize</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_MAXBLOBSIZE</code></td>
-<td style="word-wrap: break-word;"><code>uint64</code></td>
-<td style="word-wrap: break-word;"><code>16777216</code></td>
-<td style="word-wrap: break-word;">The maximum blob size supported by the EigenDA network</td>
+<td><code>Environment.MaxBlobSize</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_MAXBLOBSIZE</code></td>
+<td><code>uint64</code></td>
+<td><code>16777216</code></td>
+<td>The maximum blob size supported by the EigenDA network</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.MetricsPort</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_METRICSPORT</code></td>
-<td style="word-wrap: break-word;"><code>int</code></td>
-<td style="word-wrap: break-word;"><code>9101</code></td>
-<td style="word-wrap: break-word;">The port to use for metrics (if metrics are being collected)</td>
+<td><code>Environment.MetricsPort</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_METRICSPORT</code></td>
+<td><code>int</code></td>
+<td><code>9101</code></td>
+<td>The port to use for metrics (if metrics are being collected)</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.ProxyPort</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_PROXYPORT</code></td>
-<td style="word-wrap: break-word;"><code>int</code></td>
-<td style="word-wrap: break-word;"><code>1234</code></td>
-<td style="word-wrap: break-word;">The port to use for the proxy.</td>
+<td><code>Environment.ProxyPort</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_PROXYPORT</code></td>
+<td><code>int</code></td>
+<td><code>1234</code></td>
+<td>The port to use for the proxy.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.RelayConnectionCount</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_RELAYCONNECTIONCOUNT</code></td>
-<td style="word-wrap: break-word;"><code>uint</code></td>
-<td style="word-wrap: break-word;"><code>8</code></td>
-<td style="word-wrap: break-word;">The number of connections to open for each relay.</td>
+<td><code>Environment.RelayConnectionCount</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_RELAYCONNECTIONCOUNT</code></td>
+<td><code>uint</code></td>
+<td><code>8</code></td>
+<td>The number of connections to open for each relay.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.SRSNumberToLoad</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_SRSNUMBERTOLOAD</code></td>
-<td style="word-wrap: break-word;"><code>uint64</code></td>
-<td style="word-wrap: break-word;"><code>0</code></td>
-<td style="word-wrap: break-word;">The SRS number to load, increasing this beyond necessary can cause the client to take a long time to start</td>
+<td><code>Environment.SRSNumberToLoad</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_SRSNUMBERTOLOAD</code></td>
+<td><code>uint64</code></td>
+<td><code>0</code></td>
+<td>The SRS number to load, increasing this beyond necessary can cause the client to take a long time to start</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.SRSOrder</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_SRSORDER</code></td>
-<td style="word-wrap: break-word;"><code>uint64</code></td>
-<td style="word-wrap: break-word;"><code>268435456</code></td>
-<td style="word-wrap: break-word;">The SRS order to use for the test</td>
+<td><code>Environment.SRSOrder</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_SRSORDER</code></td>
+<td><code>uint64</code></td>
+<td><code>268435456</code></td>
+<td>The SRS order to use for the test</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.ValidatorReadComputePoolSize</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCOMPUTEPOOLSIZE</code></td>
-<td style="word-wrap: break-word;"><code>int</code></td>
-<td style="word-wrap: break-word;"><code>20</code></td>
-<td style="word-wrap: break-word;">The size of the thread pool for CPU heavy operations.</td>
+<td><code>Environment.ValidatorReadComputePoolSize</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCOMPUTEPOOLSIZE</code></td>
+<td><code>int</code></td>
+<td><code>20</code></td>
+<td>The size of the thread pool for CPU heavy operations.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Environment.ValidatorReadConnectionPoolSize</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCONNECTIONPOOLSIZE</code></td>
-<td style="word-wrap: break-word;"><code>int</code></td>
-<td style="word-wrap: break-word;"><code>100</code></td>
-<td style="word-wrap: break-word;">The size of the thread pool for read operations.</td>
+<td><code>Environment.ValidatorReadConnectionPoolSize</code></td>
+<td><code>TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCONNECTIONPOOLSIZE</code></td>
+<td><code>int</code></td>
+<td><code>100</code></td>
+<td>The size of the thread pool for read operations.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.BlobSizeMB</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_BLOBSIZEMB</code></td>
-<td style="word-wrap: break-word;"><code>float64</code></td>
-<td style="word-wrap: break-word;"><code>2</code></td>
-<td style="word-wrap: break-word;">The size of the blobs to write, in megabytes.</td>
+<td><code>Load.BlobSizeMB</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_BLOBSIZEMB</code></td>
+<td><code>float64</code></td>
+<td><code>2</code></td>
+<td>The size of the blobs to write, in megabytes.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.DispersalTimeout</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_DISPERSALTIMEOUT</code></td>
-<td style="word-wrap: break-word;"><code>uint32</code></td>
-<td style="word-wrap: break-word;"><code>600</code></td>
-<td style="word-wrap: break-word;">The timeout for each blob dispersal, in seconds.</td>
+<td><code>Load.DispersalTimeout</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_DISPERSALTIMEOUT</code></td>
+<td><code>uint32</code></td>
+<td><code>600</code></td>
+<td>The timeout for each blob dispersal, in seconds.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.EnablePprof</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_ENABLEPPROF</code></td>
-<td style="word-wrap: break-word;"><code>bool</code></td>
-<td style="word-wrap: break-word;"><code>false</code></td>
-<td style="word-wrap: break-word;">EnablePprof enables the pprof HTTP server for profiling</td>
+<td><code>Load.EnablePprof</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_ENABLEPPROF</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td>EnablePprof enables the pprof HTTP server for profiling</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.FrequencyAcceleration</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_FREQUENCYACCELERATION</code></td>
-<td style="word-wrap: break-word;"><code>float64</code></td>
-<td style="word-wrap: break-word;"><code>0.0025</code></td>
-<td style="word-wrap: break-word;">FrequencyAcceleration determines the speed at which the frequency of blob submissions accelerates at startup<br>time, in HZ/s. Frequency will start at 0 and accelerate to the target frequency at this rate. If 0, then<br>the frequency will immediately be set to the target frequency.</td>
+<td><code>Load.FrequencyAcceleration</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_FREQUENCYACCELERATION</code></td>
+<td><code>float64</code></td>
+<td><code>0.0025</code></td>
+<td>FrequencyAcceleration determines the speed at which the frequency of blob submissions accelerates at startup<br>time, in HZ/s. Frequency will start at 0 and accelerate to the target frequency at this rate. If 0, then<br>the frequency will immediately be set to the target frequency.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.GasEstimationParallelism</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_GASESTIMATIONPARALLELISM</code></td>
-<td style="word-wrap: break-word;"><code>uint64</code></td>
-<td style="word-wrap: break-word;"><code>300</code></td>
-<td style="word-wrap: break-word;">The maximum number of parallel gas estimation operations in flight.</td>
+<td><code>Load.GasEstimationParallelism</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_GASESTIMATIONPARALLELISM</code></td>
+<td><code>uint64</code></td>
+<td><code>300</code></td>
+<td>The maximum number of parallel gas estimation operations in flight.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.GasEstimationTimeout</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_GASESTIMATIONTIMEOUT</code></td>
-<td style="word-wrap: break-word;"><code>uint32</code></td>
-<td style="word-wrap: break-word;"><code>15</code></td>
-<td style="word-wrap: break-word;">The timeout for gas estimation operations, in seconds.</td>
+<td><code>Load.GasEstimationTimeout</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_GASESTIMATIONTIMEOUT</code></td>
+<td><code>uint32</code></td>
+<td><code>15</code></td>
+<td>The timeout for gas estimation operations, in seconds.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.MBPerSecond</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_MBPERSECOND</code></td>
-<td style="word-wrap: break-word;"><code>float64</code></td>
-<td style="word-wrap: break-word;"><code>0.5</code></td>
-<td style="word-wrap: break-word;">The desired number of megabytes bytes per second to write.</td>
+<td><code>Load.MBPerSecond</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_MBPERSECOND</code></td>
+<td><code>float64</code></td>
+<td><code>0.5</code></td>
+<td>The desired number of megabytes bytes per second to write.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.PprofHttpPort</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_PPROFHTTPPORT</code></td>
-<td style="word-wrap: break-word;"><code>int</code></td>
-<td style="word-wrap: break-word;"><code>6060</code></td>
-<td style="word-wrap: break-word;">PprofHttpPort is the port that the pprof HTTP server listens on</td>
+<td><code>Load.PprofHttpPort</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_PPROFHTTPPORT</code></td>
+<td><code>int</code></td>
+<td><code>6060</code></td>
+<td>PprofHttpPort is the port that the pprof HTTP server listens on</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.RelayReadAmplification</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_RELAYREADAMPLIFICATION</code></td>
-<td style="word-wrap: break-word;"><code>float64</code></td>
-<td style="word-wrap: break-word;"><code>1</code></td>
-<td style="word-wrap: break-word;">By default, this utility reads each blob back from each relay once. The number of<br>reads per relay is multiplied by this factor. For example, If this is set to 3,<br>then each blob is read back from each relay 3 times. If less than 1, then this value<br>is treated as a probability. For example, if this is set to 0.5, then each blob is read back<br>from each relay with a 50% chance. If running with the proxy, this value is used to determine<br>how many times to read each blob back from the proxy (since in the normal case, proxy reads translate<br>to relay reads).</td>
+<td><code>Load.RelayReadAmplification</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_RELAYREADAMPLIFICATION</code></td>
+<td><code>float64</code></td>
+<td><code>1</code></td>
+<td>By default, this utility reads each blob back from each relay once. The number of<br>reads per relay is multiplied by this factor. For example, If this is set to 3,<br>then each blob is read back from each relay 3 times. If less than 1, then this value<br>is treated as a probability. For example, if this is set to 0.5, then each blob is read back<br>from each relay with a 50% chance. If running with the proxy, this value is used to determine<br>how many times to read each blob back from the proxy (since in the normal case, proxy reads translate<br>to relay reads).</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.RelayReadParallelism</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_RELAYREADPARALLELISM</code></td>
-<td style="word-wrap: break-word;"><code>uint64</code></td>
-<td style="word-wrap: break-word;"><code>300</code></td>
-<td style="word-wrap: break-word;">The maximum number of parallel blob relay read operations in flight.</td>
+<td><code>Load.RelayReadParallelism</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_RELAYREADPARALLELISM</code></td>
+<td><code>uint64</code></td>
+<td><code>300</code></td>
+<td>The maximum number of parallel blob relay read operations in flight.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.RelayReadTimeout</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_RELAYREADTIMEOUT</code></td>
-<td style="word-wrap: break-word;"><code>uint32</code></td>
-<td style="word-wrap: break-word;"><code>600</code></td>
-<td style="word-wrap: break-word;">The timeout for reading a blob from a relay, in seconds. This is the timeout per individual read.</td>
+<td><code>Load.RelayReadTimeout</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_RELAYREADTIMEOUT</code></td>
+<td><code>uint32</code></td>
+<td><code>600</code></td>
+<td>The timeout for reading a blob from a relay, in seconds. This is the timeout per individual read.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.SubmissionParallelism</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_SUBMISSIONPARALLELISM</code></td>
-<td style="word-wrap: break-word;"><code>uint64</code></td>
-<td style="word-wrap: break-word;"><code>300</code></td>
-<td style="word-wrap: break-word;">The maximum number of parallel blobs submissions in flight.</td>
+<td><code>Load.SubmissionParallelism</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_SUBMISSIONPARALLELISM</code></td>
+<td><code>uint64</code></td>
+<td><code>300</code></td>
+<td>The maximum number of parallel blobs submissions in flight.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.UseProxy</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_USEPROXY</code></td>
-<td style="word-wrap: break-word;"><code>bool</code></td>
-<td style="word-wrap: break-word;"><code>false</code></td>
-<td style="word-wrap: break-word;">If true, then route traffic through the proxy instead of directly using the GRPC clients.</td>
+<td><code>Load.UseProxy</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_USEPROXY</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td>If true, then route traffic through the proxy instead of directly using the GRPC clients.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.ValidatorReadAmplification</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_VALIDATORREADAMPLIFICATION</code></td>
-<td style="word-wrap: break-word;"><code>float64</code></td>
-<td style="word-wrap: break-word;"><code>1</code></td>
-<td style="word-wrap: break-word;">By default, this utility reads chunks once. The number of chunk reads is multiplied<br>by this factor. If this is set to 3, then chunks are read back 3 times. If less than 1,<br>then this value is treated as a probability. For example, if this is set to 0.5, then<br>each chunk is read back from validators with a 50% chance. Ignored if the load generator is configured<br>to use the proxy.</td>
+<td><code>Load.ValidatorReadAmplification</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_VALIDATORREADAMPLIFICATION</code></td>
+<td><code>float64</code></td>
+<td><code>1</code></td>
+<td>By default, this utility reads chunks once. The number of chunk reads is multiplied<br>by this factor. If this is set to 3, then chunks are read back 3 times. If less than 1,<br>then this value is treated as a probability. For example, if this is set to 0.5, then<br>each chunk is read back from validators with a 50% chance. Ignored if the load generator is configured<br>to use the proxy.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.ValidatorReadParallelism</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_VALIDATORREADPARALLELISM</code></td>
-<td style="word-wrap: break-word;"><code>uint64</code></td>
-<td style="word-wrap: break-word;"><code>300</code></td>
-<td style="word-wrap: break-word;">The maximum number of parallel blob validator read operations in flight.</td>
+<td><code>Load.ValidatorReadParallelism</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_VALIDATORREADPARALLELISM</code></td>
+<td><code>uint64</code></td>
+<td><code>300</code></td>
+<td>The maximum number of parallel blob validator read operations in flight.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.ValidatorReadTimeout</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_VALIDATORREADTIMEOUT</code></td>
-<td style="word-wrap: break-word;"><code>uint32</code></td>
-<td style="word-wrap: break-word;"><code>600</code></td>
-<td style="word-wrap: break-word;">The timeout for reading a blob from the validators, in seconds. This is the timeout per individual read.</td>
+<td><code>Load.ValidatorReadTimeout</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_VALIDATORREADTIMEOUT</code></td>
+<td><code>uint32</code></td>
+<td><code>600</code></td>
+<td>The timeout for reading a blob from the validators, in seconds. This is the timeout per individual read.</td>
 </tr>
 <tr>
-<td style="word-wrap: break-word;"><code>Load.ValidatorVerificationFraction</code></td>
-<td style="word-wrap: break-word;"><code>TRAFFIC_GENERATOR_LOAD_VALIDATORVERIFICATIONFRACTION</code></td>
-<td style="word-wrap: break-word;"><code>float64</code></td>
-<td style="word-wrap: break-word;"><code>0.01</code></td>
-<td style="word-wrap: break-word;">A number between 0 and 1.0 that specifies the fraction of blobs that are verified by the validator.<br>If 1.0, all blobs are verified. If 0.0, no blobs are verified. If 0.5, half of the blobs are verified.</td>
+<td><code>Load.ValidatorVerificationFraction</code></td>
+<td><code>TRAFFIC_GENERATOR_LOAD_VALIDATORVERIFICATIONFRACTION</code></td>
+<td><code>float64</code></td>
+<td><code>0.01</code></td>
+<td>A number between 0 and 1.0 that specifies the fraction of blobs that are verified by the validator.<br>If 1.0, all blobs are verified. If 0.0, no blobs are verified. If 0.5, half of the blobs are verified.</td>
 </tr>
 </tbody>
 </table>
