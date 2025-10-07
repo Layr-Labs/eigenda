@@ -26,12 +26,12 @@ import (
 // Once we figure out why resources aren't being freed, then these tests will be runnable the "normal" way.
 
 func TestLegacyController(t *testing.T) {
-	// t.Skip("Manual test for now")
+	t.Skip("Manual test for now")
 	testWithControllerMode(t, false)
 }
 
 func TestNewController(t *testing.T) {
-	// t.Skip("Manual test for now")
+	t.Skip("Manual test for now")
 	testWithControllerMode(t, true)
 }
 
