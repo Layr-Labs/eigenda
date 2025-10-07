@@ -24,6 +24,9 @@ type InfrastructureConfig struct {
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
 
+	// DisableController disables the controller deployment when set to true.
+	DisableController bool
+
 	// The following field is temporary, to be able to test different payments configurations. It will be removed
 	// once legacy payments are removed.
 	ControllerUseNewPayments bool
@@ -115,6 +118,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		S3BucketName:        config.S3BucketName,
 		MetadataTableNameV2: config.MetadataTableNameV2,
 		RelayCount:          config.RelayCount,
+		DisableController:   config.DisableController,
 	}
 	disperserHarness, err := SetupDisperserHarness(
 		infraCtx,

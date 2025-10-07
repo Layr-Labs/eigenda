@@ -43,10 +43,11 @@ func setupTest(t *testing.T) *inaboxtests.InfrastructureHarness {
 
 	// Setup infrastructure using the centralized function
 	config := &inaboxtests.InfrastructureConfig{
-		TemplateName: templateName,
-		TestName:     testName,
-		Logger:       logger,
-		RootPath:     "../../",
+		TemplateName:      templateName,
+		TestName:          testName,
+		Logger:            logger,
+		RootPath:          "../../",
+		DisableController: true,
 	}
 
 	// Start all the necessary infrastructure like anvil, graph node, and eigenda components

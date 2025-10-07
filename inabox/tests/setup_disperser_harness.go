@@ -44,6 +44,9 @@ type DisperserHarnessConfig struct {
 
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
+
+	// DisableController disables the controller deployment when set to true.
+	DisableController bool
 }
 
 // TODO: Add encoder, api server, batcher
@@ -179,9 +182,13 @@ func SetupDisperserHarness(
 		logger.Warn("Relay count is not specified, skipping relay setup")
 	}
 
-	// Start controller as a singleton goroutine
-	if err := startController(ctx, ethClient, operatorStateSubgraphURL, harness, config); err != nil {
-		return nil, fmt.Errorf("failed to start controller: %w", err)
+	// Start controller as a singleton goroutine (unless disabled)
+	if !config.DisableController {
+		if err := startController(ctx, ethClient, operatorStateSubgraphURL, harness, config); err != nil {
+			return nil, fmt.Errorf("failed to start controller: %w", err)
+		}
+	} else {
+		logger.Info("Controller deployment disabled, skipping controller setup")
 	}
 
 	// Start remaining binaries (disperser, encoder, batcher, etc.)
