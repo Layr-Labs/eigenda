@@ -25,11 +25,10 @@ import (
 
 // DisperserHarnessConfig contains the configuration for setting up the disperser harness
 type DisperserHarnessConfig struct {
-	Network           *testcontainers.DockerNetwork
-	TestConfig        *deploy.Config
-	TestName          string
-	InMemoryBlobStore bool
-	LocalStackPort    string
+	Network        *testcontainers.DockerNetwork
+	TestConfig     *deploy.Config
+	TestName       string
+	LocalStackPort string
 
 	// LocalStack resources for blobstore and metadata store
 	MetadataTableName   string
@@ -148,30 +147,24 @@ func SetupDisperserHarness(
 	harness.DynamoDBTables.BlobMetaV2 = config.MetadataTableNameV2
 	harness.S3Buckets.BlobStore = config.S3BucketName
 
-	// Setup LocalStack if not using in-memory blob store
-	if !config.InMemoryBlobStore {
-		localstack, err := setupLocalStackResources(ctx, logger, config)
-		if err != nil {
-			return nil, err
-		}
-		harness.LocalStack = localstack
+	localstack, err := setupLocalStackResources(ctx, logger, config)
+	if err != nil {
+		return nil, err
+	}
+	harness.LocalStack = localstack
 
-		// Generate disperser keypair and perform registrations
-		if err := setupDisperserKeypairAndRegistrations(logger, ethClient, config); err != nil {
-			return nil, err
-		}
+	// Generate disperser keypair and perform registrations
+	if err := setupDisperserKeypairAndRegistrations(logger, ethClient, config); err != nil {
+		return nil, err
+	}
 
-		// Start relay goroutines if relay count is specified
-		if config.RelayCount > 0 {
-			if err := startRelays(ctx, logger, ethClient, harness, config); err != nil {
-				return nil, fmt.Errorf("failed to start relays: %w", err)
-			}
-		} else {
-			logger.Warn("Relay count is not specified, skipping relay setup")
+	// Start relay goroutines if relay count is specified
+	if config.RelayCount > 0 {
+		if err := startRelays(ctx, logger, ethClient, harness, config); err != nil {
+			return nil, fmt.Errorf("failed to start relays: %w", err)
 		}
 	} else {
-		// TODO(dmanc): Do the relays even work when not using S3 as the blob store?
-		logger.Info("Using in-memory blob store, skipping LocalStack setup")
+		logger.Warn("Relay count is not specified, skipping relay setup")
 	}
 
 	// Start remaining binaries (disperser, encoder, batcher, etc.)

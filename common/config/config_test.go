@@ -3,10 +3,10 @@ package config
 import (
 	"fmt"
 	"os"
+	"path"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/node"
 	"github.com/stretchr/testify/require"
 )
 
@@ -519,27 +519,22 @@ func TestIgnoreEnvironmentVariables(t *testing.T) {
 func TestDocGeneration(t *testing.T) {
 	t.Parallel()
 
+	dir := t.TempDir()
+	configPath := path.Join(dir, "config.md")
+
 	// Hard to verify a markdown file is properly formatted in a unit test.
 	//  But we should, at the very least, ensure that this doesn't crash.
 
 	packagePaths := []string{
-		"github.com/Layr-Labs/eigenda/node",
-		"github.com/Layr-Labs/eigensdk-go/signer/bls/types",
-		"github.com/Layr-Labs/eigenda/common/geth",
-		"github.com/Layr-Labs/eigenda/common",
-		"github.com/Layr-Labs/eigensdk-go/logging",
-		"github.com/Layr-Labs/eigenda/encoding/kzg",
-		"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation",
+		"github.com/Layr-Labs/eigenda/common/config",
 	}
 
 	err := DocumentConfig(
-		"Validator",
-		func() node.Config {
-			return node.Config{}
-		},
-		"VALIDATOR",
+		"Test Config",
+		DefaultFoo,
+		"TEST",
 		packagePaths,
-		"config.md",
+		configPath,
 		false)
 	require.NoError(t, err)
 }
