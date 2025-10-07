@@ -3,6 +3,8 @@ pragma solidity ^0.8.9;
 
 import {EigenDADirectory} from "src/core/EigenDADirectory.sol";
 
+/// @notice Demo contract to demonstrate a view contract on the periphery that handles more complex retrieval logic
+///         so that the core contract remains simple and gas efficient
 contract MockConfigRetriever {
     EigenDADirectory public directory;
 
@@ -52,8 +54,9 @@ contract MockConfigRetriever {
         bytes32[] memory configs = new bytes32[](count);
         uint256 index = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            if (directory.getActivationKeyBytes32(key, i) >= activationKey) {
-                activationKeys[index] = directory.getActivationKeyBytes32(key, i);
+            uint256 activationKeyAtIdx = directory.getActivationKeyBytes32(key, i);
+            if (activationKeyAtIdx >= activationKey) {
+                activationKeys[index] = activationKeyAtIdx;
                 configs[index] = directory.getConfigBytes32(key, i);
                 index++;
             }
@@ -80,8 +83,9 @@ contract MockConfigRetriever {
         bytes[] memory configs = new bytes[](count);
         uint256 index = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            if (directory.getActivationKeyBytes(key, i) >= activationKey) {
-                activationKeys[index] = directory.getActivationKeyBytes(key, i);
+            uint256 activationKeyAtIdx = directory.getActivationKeyBytes(key, i);
+            if (activationKeyAtIdx >= activationKey) {
+                activationKeys[index] = activationKeyAtIdx;
                 configs[index] = directory.getConfigBytes(key, i);
                 index++;
             }

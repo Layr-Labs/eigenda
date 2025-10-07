@@ -4,13 +4,9 @@ pragma solidity ^0.8.9;
 import {ConfigRegistryStorage as S} from "src/core/libraries/v3/config-registry/ConfigRegistryStorage.sol";
 import {ConfigRegistryTypes as T} from "src/core/libraries/v3/config-registry/ConfigRegistryTypes.sol";
 
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-
 library ConfigRegistryLib {
     event ConfigBytes32Set(bytes32 key, uint256 activationKey, bytes32 value);
     event ConfigBytesSet(bytes32 key, uint256 activationKey, bytes value);
-
-    error NoCheckpoints();
 
     function getKey(string memory name) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(name));
@@ -103,5 +99,25 @@ library ConfigRegistryLib {
 
     function getRegisteredKeyBytes(uint256 index) internal view returns (string memory) {
         return S.layout().bytesConfig.nameSet.nameList[index];
+    }
+
+    function getNameBytes32(bytes32 key) internal view returns (string memory) {
+        string memory name = S.layout().bytes32Config.nameSet.names[key];
+        require(bytes(name).length > 0, "Key not registered");
+        return name;
+    }
+
+    function getNameBytes(bytes32 key) internal view returns (string memory) {
+        string memory name = S.layout().bytesConfig.nameSet.names[key];
+        require(bytes(name).length > 0, "Key not registered");
+        return name;
+    }
+
+    function getNameListBytes32() internal view returns (string[] memory) {
+        return S.layout().bytes32Config.nameSet.nameList;
+    }
+
+    function getNameListBytes() internal view returns (string[] memory) {
+        return S.layout().bytesConfig.nameSet.nameList;
     }
 }

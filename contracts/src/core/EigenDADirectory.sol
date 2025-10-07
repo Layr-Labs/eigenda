@@ -185,4 +185,24 @@ contract EigenDADirectory is IEigenDADirectory {
     {
         return ConfigRegistryLib.getCheckpointBytes(key, index);
     }
+
+    /// @inheritdoc IEigenDAConfigRegistry
+    function getConfigNameBytes32(bytes32 key) external view returns (string memory) {
+        return ConfigRegistryLib.getNameBytes32(key);
+    }
+
+    /// @inheritdoc IEigenDAConfigRegistry
+    function getConfigNameBytes(bytes32 key) external view returns (string memory) {
+        return ConfigRegistryLib.getNameBytes(key);
+    }
+
+    /// @inheritdoc IEigenDAConfigRegistry
+    function getAllConfigNamesBytes32() external view returns (string[] memory) {
+        return ConfigRegistryLib.getNameListBytes32();
+    }
+
+    /// @inheritdoc IEigenDAConfigRegistry
+    function getAllConfigNamesBytes() external view returns (string[] memory) {
+        return ConfigRegistryLib.getNameListBytes();
+    }
 }

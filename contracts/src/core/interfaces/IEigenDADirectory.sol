@@ -75,6 +75,14 @@ interface IEigenDAConfigRegistry {
         external
         view
         returns (ConfigRegistryTypes.BytesCheckpoint memory);
+
+    function getConfigNameBytes32(bytes32 key) external view returns (string memory);
+
+    function getConfigNameBytes(bytes32 key) external view returns (string memory);
+
+    function getAllConfigNamesBytes32() external view returns (string[] memory);
+
+    function getAllConfigNamesBytes() external view returns (string[] memory);
 }
 
 /// @notice Interface for the EigenDA Directory
