@@ -16,7 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common/v2"
+	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -65,6 +65,21 @@ type DispatcherConfig struct {
 	// Important signing thresholds for metrics reporting.
 	// Values should be between 0.0 (0% signed) and 1.0 (100% signed).
 	SignificantSigningMetricsThresholds []string
+}
+
+func DefaultDispatcherConfig() *DispatcherConfig {
+	return &DispatcherConfig{
+		PullInterval:                          1 * time.Second,
+		FinalizationBlockDelay:                75,
+		AttestationTimeout:                    45 * time.Second,
+		BatchMetadataUpdatePeriod:             time.Minute,
+		BatchAttestationTimeout:               55 * time.Second,
+		SignatureTickInterval:                 50 * time.Millisecond,
+		NumRequestRetries:                     0,
+		MaxBatchSize:                          32,
+		SignificantSigningThresholdPercentage: 55,
+		SignificantSigningMetricsThresholds:   []string{"0.55", "0.67"},
+	}
 }
 
 type Dispatcher struct {
@@ -211,7 +226,7 @@ func (d *Dispatcher) HandleBatch(
 	batchProbe *common.SequenceProbe,
 ) (chan core.SigningMessage, *batchData, error) {
 	// Signal Liveness to indicate no stall
-	healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
+	healthcheck.SignalHeartbeat(d.logger, "dispatcher", d.controllerLivenessChan)
 
 	// Get a batch of blobs to dispatch
 	// This also writes a batch header and blob inclusion info for each blob in metadata store

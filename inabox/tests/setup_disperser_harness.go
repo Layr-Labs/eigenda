@@ -14,21 +14,17 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
-	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/gammazero/workerpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -482,86 +478,11 @@ func startController(
 	// Create metrics registry
 	metricsRegistry := prometheus.NewRegistry()
 
-	// Create metadata store
-	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, controllerLogger, config.MetadataTableNameV2)
-	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
-		ServiceName: "controller",
-		Registry:    metricsRegistry,
-		Backend:     blobstore.BackendDynamoDB,
-	})
-
-	// Create chain reader
-	chainReader, err := eth.NewReader(
-		controllerLogger,
-		ethClient,
-		config.TestConfig.EigenDA.OperatorStateRetriever,
-		config.TestConfig.EigenDA.ServiceManager)
-	if err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to create chain reader: %w", err)
-	}
-
-	// Create encoder client
-	// TODO(dmanc): Replace hardcoded port with OS-allocated port
-	encoderClient, err := encoder.NewEncoderClientV2("localhost:34001")
-	if err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to create encoder client: %w", err)
-	}
-
-	// Create encoding manager
-	encodingPool := workerpool.New(10) // Default concurrency
-	encodingManagerBlobSet := controller.NewBlobSet()
-	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
-
 	// Get available relays from config
 	availableRelays := make([]corev2.RelayKey, config.RelayCount)
 	for i := range config.RelayCount {
 		availableRelays[i] = corev2.RelayKey(i)
 	}
-
-	encodingManagerConfig := controller.EncodingManagerConfig{
-		NumRelayAssignment:          uint16(config.RelayCount),
-		AvailableRelays:             availableRelays,
-		PullInterval:                2 * time.Second,
-		EncodingRequestTimeout:      5 * time.Minute,
-		StoreTimeout:                15 * time.Second,
-		NumEncodingRetries:          3,
-		MaxNumBlobsPerIteration:     128,
-		EncoderAddress:              "localhost:34000",
-		OnchainStateRefreshInterval: 1 * time.Hour,
-	}
-	encodingManager, err := controller.NewEncodingManager(
-		&encodingManagerConfig,
-		metadataStore,
-		encodingPool,
-		encoderClient,
-		chainReader,
-		controllerLogger,
-		metricsRegistry,
-		encodingManagerBlobSet,
-		controllerLivenessChan,
-	)
-	if err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to create encoding manager: %w", err)
-	}
-
-	// Create signature aggregator
-	sigAgg, err := core.NewStdSignatureAggregator(controllerLogger, chainReader)
-	if err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to create signature aggregator: %w", err)
-	}
-
-	// Create dispatcher
-	dispatcherPool := workerpool.New(10) // Default concurrency
-	chainState := eth.NewChainState(chainReader, ethClient)
-	ics := thegraph.MakeIndexedChainState(thegraph.Config{
-		Endpoint:     operatorStateSubgraphURL,
-		PullInterval: 100 * time.Millisecond,
-		MaxRetries:   5,
-	}, chainState, controllerLogger)
 
 	requestSigner, err := clients.NewDispersalRequestSigner(
 		ctx,
@@ -572,84 +493,65 @@ func startController(
 		_ = logFile.Close()
 		return fmt.Errorf("failed to create dispersal request signer: %w", err)
 	}
-	nodeClientManager, err := controller.NewNodeClientManager(100, requestSigner, controllerLogger)
-	if err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to create node client manager: %w", err)
-	}
 
-	beforeDispatch := func(blobKey corev2.BlobKey) error {
-		encodingManagerBlobSet.RemoveBlob(blobKey)
-		return nil
-	}
-	dispatcherBlobSet := controller.NewBlobSet()
+	// Build encoding manager configs
+	encodingManagerConfig := controller.DefaultEncodingManagerConfig()
+	encodingManagerConfig.NumRelayAssignment = uint16(config.RelayCount)
+	encodingManagerConfig.AvailableRelays = availableRelays
+	encodingManagerConfig.EncoderAddress = "localhost:34001"
 
-	batchMetadataManager, err := metadata.NewBatchMetadataManager(
+	// Build dispatcher configs
+	dispatcherConfig := controller.DefaultDispatcherConfig()
+	dispatcherConfig.FinalizationBlockDelay = 5
+	dispatcherConfig.BatchMetadataUpdatePeriod = 100 * time.Millisecond
+
+	// Chain state config
+	chainStateConfig := thegraph.DefaultConfig()
+	chainStateConfig.Endpoint = operatorStateSubgraphURL
+
+	// Start controller using shared function
+	controllerInstance, err := controller.StartController(
 		ctx,
 		controllerLogger,
 		ethClient,
-		ics,
-		gethcommon.HexToAddress(config.TestConfig.EigenDA.RegistryCoordinator),
-		100*time.Millisecond,
-		5,
-	)
-	if err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to create batch metadata manager: %w", err)
-	}
-
-	dispatcherConfig := controller.DispatcherConfig{
-		PullInterval:                          3 * time.Second,
-		FinalizationBlockDelay:                5,
-		AttestationTimeout:                    5 * time.Second,
-		BatchMetadataUpdatePeriod:             100 * time.Millisecond,
-		BatchAttestationTimeout:               6 * time.Second,
-		SignatureTickInterval:                 1 * time.Second,
-		NumRequestRetries:                     3,
-		MaxBatchSize:                          100,
-		SignificantSigningThresholdPercentage: 55,
-	}
-	dispatcher, err := controller.NewDispatcher(
-		&dispatcherConfig,
-		metadataStore,
-		dispatcherPool,
-		ics,
-		batchMetadataManager,
-		sigAgg,
-		nodeClientManager,
-		controllerLogger,
+		dynamoClient,
+		nil, // awsDynamoClient - not needed for tests
+		config.MetadataTableNameV2,
 		metricsRegistry,
-		beforeDispatch,
-		dispatcherBlobSet,
-		controllerLivenessChan,
+		requestSigner,
+		gethcommon.HexToAddress(config.TestConfig.EigenDA.OperatorStateRetriever),
+		gethcommon.HexToAddress(config.TestConfig.EigenDA.ServiceManager),
+		gethcommon.HexToAddress(config.TestConfig.EigenDA.RegistryCoordinator),
+		operatorStateSubgraphURL,
+		encodingManagerConfig,
+		dispatcherConfig,
+		10,  // numConcurrentEncodingRequests
+		10,  // numConcurrentDispersalRequests
+		100, // nodeClientCacheSize
+
+		// Chain state config
+		chainStateConfig,
+
+		// Optional components (not needed for tests)
+		nil,                                  // metricsServer
+		"",                                   // readinessProbePath
+		healthcheck.HeartbeatMonitorConfig{}, // No heartbeat monitor for tests
+
+		// Server config (not needed for tests for now)
+		nil, // serverConfig
+		nil, // onDemandConfig
+		nil, // reservationConfig
+		nil, // contractDirectory
 	)
 	if err != nil {
 		_ = logFile.Close()
-		return fmt.Errorf("failed to create dispatcher: %w", err)
-	}
-
-	// Recover state
-	if err := controller.RecoverState(ctx, metadataStore, controllerLogger); err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to recover state: %w", err)
-	}
-
-	// Start encoding manager
-	if err := encodingManager.Start(ctx); err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to start encoding manager: %w", err)
-	}
-
-	// Start dispatcher
-	if err := dispatcher.Start(ctx); err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to start dispatcher: %w", err)
+		return fmt.Errorf("failed to start controller: %w", err)
 	}
 
 	// Store controller instance in harness
 	harness.Controller = &ControllerInstance{
-		EncodingManager: encodingManager,
-		Dispatcher:      dispatcher,
+		EncodingManager: controllerInstance.EncodingManager,
+		Dispatcher:      controllerInstance.Dispatcher,
 		LogFile:         logFile,
 	}
 
