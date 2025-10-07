@@ -9,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 )
 
@@ -18,6 +18,18 @@ type DispersalRequestSigner interface {
 	// SignStoreChunksRequest signs a StoreChunksRequest. Does not modify the request
 	// (i.e. it does not insert the signature).
 	SignStoreChunksRequest(ctx context.Context, request *grpc.StoreChunksRequest) ([]byte, error)
+}
+
+type DispersalRequestSignerConfig struct {
+	Region   string
+	Endpoint string
+	KeyID    string
+}
+
+func DefaultDispersalRequestSignerConfig() DispersalRequestSignerConfig {
+	return DispersalRequestSignerConfig{
+		Region: "us-east-1",
+	}
 }
 
 var _ DispersalRequestSigner = &requestSigner{}
@@ -31,36 +43,34 @@ type requestSigner struct {
 // NewDispersalRequestSigner creates a new DispersalRequestSigner.
 func NewDispersalRequestSigner(
 	ctx context.Context,
-	region string,
-	endpoint string,
-	keyID string) (DispersalRequestSigner, error) {
-
+	config DispersalRequestSignerConfig,
+) (DispersalRequestSigner, error) {
 	// Load the AWS SDK configuration, which will automatically detect credentials
 	// from environment variables, IAM roles, or AWS config files
-	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(region),
+	cfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithRegion(config.Region),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	var keyManager *kms.Client
-	if endpoint != "" {
+	if config.Endpoint != "" {
 		keyManager = kms.New(kms.Options{
-			Region:       region,
-			BaseEndpoint: aws.String(endpoint),
+			Region:       config.Region,
+			BaseEndpoint: aws.String(config.Endpoint),
 		})
 	} else {
 		keyManager = kms.NewFromConfig(cfg)
 	}
 
-	key, err := aws2.LoadPublicKeyKMS(ctx, keyManager, keyID)
+	key, err := aws2.LoadPublicKeyKMS(ctx, keyManager, config.KeyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
 	}
 
 	return &requestSigner{
-		keyID:      keyID,
+		keyID:      config.KeyID,
 		publicKey:  key,
 		keyManager: keyManager,
 	}, nil

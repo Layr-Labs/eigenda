@@ -57,14 +57,7 @@ type DisperserHarness struct {
 		BlobStore string
 	}
 	RelayServers []*relay.Server
-	Controller   *ControllerInstance
-}
-
-// ControllerInstance holds the controller components
-type ControllerInstance struct {
-	EncodingManager *controller.EncodingManager
-	Dispatcher      *controller.Dispatcher
-	LogFile         *os.File
+	Controller   *controller.Controller
 }
 
 // setupLocalStackResources initializes LocalStack and deploys AWS resources
@@ -458,15 +451,15 @@ func startController(
 		},
 	}
 
-	// Create AWS clients using LocalStack container's configuration
-	awsConfig := harness.LocalStack.GetAWSClientConfig()
-
 	// Create logger
 	controllerLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
 		_ = logFile.Close()
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
+
+	// Create AWS clients using LocalStack container's configuration
+	awsConfig := harness.LocalStack.GetAWSClientConfig()
 
 	// Create DynamoDB client
 	dynamoClient, err := dynamodb.NewClient(awsConfig, controllerLogger)
@@ -486,9 +479,11 @@ func startController(
 
 	requestSigner, err := clients.NewDispersalRequestSigner(
 		ctx,
-		awsConfig.Region,
-		awsConfig.EndpointURL,
-		config.TestConfig.DisperserKMSKeyID)
+		clients.DispersalRequestSignerConfig{
+			Region:   awsConfig.Region,
+			Endpoint: awsConfig.EndpointURL,
+			KeyID:    config.TestConfig.DisperserKMSKeyID,
+		})
 	if err != nil {
 		_ = logFile.Close()
 		return fmt.Errorf("failed to create dispersal request signer: %w", err)
@@ -524,16 +519,13 @@ func startController(
 		operatorStateSubgraphURL,
 		encodingManagerConfig,
 		dispatcherConfig,
-
-		// Chain state config
 		chainStateConfig,
-
 		// Optional components (not needed for tests)
 		nil,                                  // metricsServer
 		"",                                   // readinessProbePath
 		healthcheck.HeartbeatMonitorConfig{}, // No heartbeat monitor for tests
-
-		// Server config (not needed for tests for now)
+		// Server config
+		// TODO(dmanc): Add server config
 		nil, // serverConfig
 		nil, // onDemandConfig
 		nil, // reservationConfig
@@ -545,10 +537,10 @@ func startController(
 	}
 
 	// Store controller instance in harness
-	harness.Controller = &ControllerInstance{
+	harness.Controller = &controller.Controller{
 		EncodingManager: controllerInstance.EncodingManager,
 		Dispatcher:      controllerInstance.Dispatcher,
-		LogFile:         logFile,
+		Server:          controllerInstance.Server,
 	}
 
 	controllerLogger.Info("Controller started successfully", "logFile", logFilePath)
@@ -557,18 +549,14 @@ func startController(
 }
 
 // stopController stops the controller
-func stopController(instance *ControllerInstance, logger logging.Logger) {
+func stopController(instance *controller.Controller, logger logging.Logger) {
 	if instance == nil {
 		return
 	}
 
 	// Note: EncodingManager and Dispatcher don't have explicit Stop methods in the current implementation
-	// They use context cancellation. In a production setup, you'd want to add proper shutdown methods.
 	logger.Info("Controller stopped")
-
-	if instance.LogFile != nil {
-		if err := instance.LogFile.Close(); err != nil {
-			logger.Warn("Failed to close controller log file", "error", err)
-		}
+	if instance.Server != nil {
+		// TODO(dmanc): Add graceful shutdown of server
 	}
 }
