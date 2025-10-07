@@ -53,6 +53,9 @@ func DocumentConfig[T any]( // TODO T VerifiableConfig
 	}
 	defaultConfig := constructor()
 
+	// TODO
+	fmt.Printf("Default config: %+v\n", defaultConfig)
+
 	// Unwrap pointer to get the named type
 	t := reflect.TypeOf(defaultConfig)
 	if t.Kind() == reflect.Ptr {
@@ -265,8 +268,15 @@ func gatherConfigFieldData(
 	packagePaths []string,
 ) ([]*configFieldData, error) {
 
+	// Handle pointer to struct
+	targetValue := reflect.ValueOf(target)
+	if targetValue.Kind() == reflect.Ptr {
+		targetValue = targetValue.Elem()
+	}
+	targetType := targetValue.Type()
+
 	// Find the source file and line number where the target type is defined.
-	structFile, line, err := findTypeDefLocation(packagePaths, reflect.TypeOf(target))
+	structFile, line, err := findTypeDefLocation(packagePaths, targetType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find source file for target type %T: %w", target, err)
 	}
@@ -278,13 +288,6 @@ func gatherConfigFieldData(
 	}
 
 	var fields []*configFieldData
-
-	// Handle pointer to struct
-	targetValue := reflect.ValueOf(target)
-	if targetValue.Kind() == reflect.Ptr {
-		targetValue = targetValue.Elem()
-	}
-	targetType := targetValue.Type()
 
 	// For each field in the struct, gather its data.
 	for i := 0; i < targetType.NumField(); i++ {

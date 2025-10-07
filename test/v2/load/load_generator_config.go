@@ -1,6 +1,8 @@
 package load
 
-import "github.com/Layr-Labs/eigenda/test/v2/client"
+import (
+	"github.com/Layr-Labs/eigenda/test/v2/client"
+)
 
 // Configuration for the traffic generator.
 //
@@ -13,7 +15,13 @@ type TrafficGeneratorConfig struct {
 	Load LoadGeneratorConfig
 }
 
-// TODO future cody: generate a doc from TrafficGeneratorConfig!
+// DefaultTrafficGeneratorConfig returns a default configuration for the traffic generator.
+func DefaultTrafficGeneratorConfig() *TrafficGeneratorConfig { // TODO fix pointer
+	return &TrafficGeneratorConfig{
+		Environment: *client.DefaultTestClientConfig(),
+		Load:        *DefaultLoadGeneratorConfig(),
+	}
+}
 
 // LoadGeneratorConfig is the configuration for the load generator.
 type LoadGeneratorConfig struct {
