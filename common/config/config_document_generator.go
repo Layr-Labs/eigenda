@@ -299,8 +299,8 @@ func gatherConfigFieldData(
 		switch field.Type.Kind() { //nolint:exhaustive // only handling struct and pointer types
 
 		case reflect.Struct:
-			// Recurse for nested structs
-			tmp := reflect.New(field.Type).Elem().Interface()
+			// Recurse for nested structs, using the actual field value to preserve defaults
+			nestedValue := targetValue.Field(i).Interface()
 			nestedEnvVarPrefix := envVarPrefix + "_" + strings.ToUpper(field.Name)
 
 			var nestedTomlPrefix string
@@ -310,7 +310,7 @@ func gatherConfigFieldData(
 				nestedTomlPrefix = tomlPrefix + "." + field.Name
 			}
 
-			nestedFieldData, err := gatherConfigFieldData(tmp, nestedEnvVarPrefix, nestedTomlPrefix, packagePaths)
+			nestedFieldData, err := gatherConfigFieldData(nestedValue, nestedEnvVarPrefix, nestedTomlPrefix, packagePaths)
 			if err != nil {
 				return nil, fmt.Errorf("failed to gather field data for field %s: %w", field.Name, err)
 			}
@@ -318,7 +318,16 @@ func gatherConfigFieldData(
 		case reflect.Ptr:
 			// Handle pointer to struct
 			if field.Type.Elem().Kind() == reflect.Struct {
-				tmp := reflect.New(field.Type.Elem()).Interface()
+				fieldValue := targetValue.Field(i)
+
+				// Use the actual pointer value if it's not nil, otherwise use the actual field which may be nil
+				var nestedValue interface{}
+				if !fieldValue.IsNil() {
+					nestedValue = fieldValue.Interface()
+				} else {
+					// If the pointer is nil, we still pass it along so the recursion can handle it
+					nestedValue = fieldValue.Interface()
+				}
 
 				nestedEnvVarPrefix := envVarPrefix + "_" + strings.ToUpper(field.Name)
 
@@ -329,7 +338,7 @@ func gatherConfigFieldData(
 					nestedTomlPrefix = tomlPrefix + "." + field.Name
 				}
 
-				nestedFieldData, err := gatherConfigFieldData(tmp, nestedEnvVarPrefix, nestedTomlPrefix, packagePaths)
+				nestedFieldData, err := gatherConfigFieldData(nestedValue, nestedEnvVarPrefix, nestedTomlPrefix, packagePaths)
 				if err != nil {
 					return nil, fmt.Errorf("failed to gather field data for field %s: %w", field.Name, err)
 				}
@@ -348,11 +357,20 @@ func gatherConfigFieldData(
 				docsTag := field.Tag.Get("docs")
 				required, deprecated, unsafe := parseDocsTag(docsTag)
 
+				// Get the actual value from the field
+				fieldValue := targetValue.Field(i)
+				var defaultValueStr string
+				if fieldValue.IsNil() {
+					defaultValueStr = "nil"
+				} else {
+					defaultValueStr = fmt.Sprintf("%v", fieldValue.Elem().Interface())
+				}
+
 				fields = append(fields, &configFieldData{
 					EnvVar:       envVarPrefix + "_" + strings.ToUpper(field.Name),
 					TOML:         toml,
 					FieldType:    field.Type.String(),
-					DefaultValue: fmt.Sprintf("%v", targetValue.Field(i).Interface()),
+					DefaultValue: defaultValueStr,
 					Godoc:        godocs[field.Name],
 					Required:     required,
 					Deprecated:   deprecated,

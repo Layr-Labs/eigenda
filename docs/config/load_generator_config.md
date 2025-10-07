@@ -20,31 +20,31 @@
 
 | TOML | Environment Variable | Type | Default | Description |
 |------|----------------------|------|---------|-------------|
-| Environment.ClientLedgerPaymentMode | TRAFFIC_GENERATOR_ENVIRONMENT_CLIENTLEDGERPAYMENTMODE | string | "" | Client ledger mode used for payments. |
+| Environment.ClientLedgerPaymentMode | TRAFFIC_GENERATOR_ENVIRONMENT_CLIENTLEDGERPAYMENTMODE | string | "legacy" | Client ledger mode used for payments. |
 | Environment.DisableMetrics | TRAFFIC_GENERATOR_ENVIRONMENT_DISABLEMETRICS | bool | false | If true, do not start the metrics server. |
-| Environment.DisperserConnectionCount | TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERCONNECTIONCOUNT | uint | 0 | The number of connections to open for each disperser. |
-| Environment.MaxBlobSize | TRAFFIC_GENERATOR_ENVIRONMENT_MAXBLOBSIZE | uint64 | 0 | The maximum blob size supported by the EigenDA network |
-| Environment.MetricsPort | TRAFFIC_GENERATOR_ENVIRONMENT_METRICSPORT | int | 0 | The port to use for metrics (if metrics are being collected) |
-| Environment.ProxyPort | TRAFFIC_GENERATOR_ENVIRONMENT_PROXYPORT | int | 0 | The port to use for the proxy. |
-| Environment.RelayConnectionCount | TRAFFIC_GENERATOR_ENVIRONMENT_RELAYCONNECTIONCOUNT | uint | 0 | The number of connections to open for each relay. |
+| Environment.DisperserConnectionCount | TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERCONNECTIONCOUNT | uint | 8 | The number of connections to open for each disperser. |
+| Environment.MaxBlobSize | TRAFFIC_GENERATOR_ENVIRONMENT_MAXBLOBSIZE | uint64 | 16777216 | The maximum blob size supported by the EigenDA network |
+| Environment.MetricsPort | TRAFFIC_GENERATOR_ENVIRONMENT_METRICSPORT | int | 9101 | The port to use for metrics (if metrics are being collected) |
+| Environment.ProxyPort | TRAFFIC_GENERATOR_ENVIRONMENT_PROXYPORT | int | 1234 | The port to use for the proxy. |
+| Environment.RelayConnectionCount | TRAFFIC_GENERATOR_ENVIRONMENT_RELAYCONNECTIONCOUNT | uint | 8 | The number of connections to open for each relay. |
 | Environment.SRSNumberToLoad | TRAFFIC_GENERATOR_ENVIRONMENT_SRSNUMBERTOLOAD | uint64 | 0 | The SRS number to load, increasing this beyond necessary can cause the client to take a long time to start |
-| Environment.SRSOrder | TRAFFIC_GENERATOR_ENVIRONMENT_SRSORDER | uint64 | 0 | The SRS order to use for the test |
-| Environment.ValidatorReadComputePoolSize | TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCOMPUTEPOOLSIZE | int | 0 | The size of the thread pool for CPU heavy operations. |
-| Environment.ValidatorReadConnectionPoolSize | TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCONNECTIONPOOLSIZE | int | 0 | The size of the thread pool for read operations. |
-| Load.BlobSizeMB | TRAFFIC_GENERATOR_LOAD_BLOBSIZEMB | float64 | 0 | The size of the blobs to write, in megabytes. |
-| Load.DispersalTimeout | TRAFFIC_GENERATOR_LOAD_DISPERSALTIMEOUT | uint32 | 0 | The timeout for each blob dispersal, in seconds. |
+| Environment.SRSOrder | TRAFFIC_GENERATOR_ENVIRONMENT_SRSORDER | uint64 | 268435456 | The SRS order to use for the test |
+| Environment.ValidatorReadComputePoolSize | TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCOMPUTEPOOLSIZE | int | 20 | The size of the thread pool for CPU heavy operations. |
+| Environment.ValidatorReadConnectionPoolSize | TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATORREADCONNECTIONPOOLSIZE | int | 100 | The size of the thread pool for read operations. |
+| Load.BlobSizeMB | TRAFFIC_GENERATOR_LOAD_BLOBSIZEMB | float64 | 2 | The size of the blobs to write, in megabytes. |
+| Load.DispersalTimeout | TRAFFIC_GENERATOR_LOAD_DISPERSALTIMEOUT | uint32 | 600 | The timeout for each blob dispersal, in seconds. |
 | Load.EnablePprof | TRAFFIC_GENERATOR_LOAD_ENABLEPPROF | bool | false | EnablePprof enables the pprof HTTP server for profiling |
-| Load.FrequencyAcceleration | TRAFFIC_GENERATOR_LOAD_FREQUENCYACCELERATION | float64 | 0 | FrequencyAcceleration determines the speed at which the frequency of blob submissions accelerates at startup<br>time, in HZ/s. Frequency will start at 0 and accelerate to the target frequency at this rate. If 0, then<br>the frequency will immediately be set to the target frequency. |
-| Load.GasEstimationParallelism | TRAFFIC_GENERATOR_LOAD_GASESTIMATIONPARALLELISM | uint64 | 0 | The maximum number of parallel gas estimation operations in flight. |
-| Load.GasEstimationTimeout | TRAFFIC_GENERATOR_LOAD_GASESTIMATIONTIMEOUT | uint32 | 0 | The timeout for gas estimation operations, in seconds. |
-| Load.MBPerSecond | TRAFFIC_GENERATOR_LOAD_MBPERSECOND | float64 | 0 | The desired number of megabytes bytes per second to write. |
-| Load.PprofHttpPort | TRAFFIC_GENERATOR_LOAD_PPROFHTTPPORT | int | 0 | PprofHttpPort is the port that the pprof HTTP server listens on |
-| Load.RelayReadAmplification | TRAFFIC_GENERATOR_LOAD_RELAYREADAMPLIFICATION | float64 | 0 | By default, this utility reads each blob back from each relay once. The number of<br>reads per relay is multiplied by this factor. For example, If this is set to 3,<br>then each blob is read back from each relay 3 times. If less than 1, then this value<br>is treated as a probability. For example, if this is set to 0.5, then each blob is read back<br>from each relay with a 50% chance. If running with the proxy, this value is used to determine<br>how many times to read each blob back from the proxy (since in the normal case, proxy reads translate<br>to relay reads). |
-| Load.RelayReadParallelism | TRAFFIC_GENERATOR_LOAD_RELAYREADPARALLELISM | uint64 | 0 | The maximum number of parallel blob relay read operations in flight. |
-| Load.RelayReadTimeout | TRAFFIC_GENERATOR_LOAD_RELAYREADTIMEOUT | uint32 | 0 | The timeout for reading a blob from a relay, in seconds. This is the timeout per individual read. |
-| Load.SubmissionParallelism | TRAFFIC_GENERATOR_LOAD_SUBMISSIONPARALLELISM | uint64 | 0 | The maximum number of parallel blobs submissions in flight. |
+| Load.FrequencyAcceleration | TRAFFIC_GENERATOR_LOAD_FREQUENCYACCELERATION | float64 | 0.0025 | FrequencyAcceleration determines the speed at which the frequency of blob submissions accelerates at startup<br>time, in HZ/s. Frequency will start at 0 and accelerate to the target frequency at this rate. If 0, then<br>the frequency will immediately be set to the target frequency. |
+| Load.GasEstimationParallelism | TRAFFIC_GENERATOR_LOAD_GASESTIMATIONPARALLELISM | uint64 | 300 | The maximum number of parallel gas estimation operations in flight. |
+| Load.GasEstimationTimeout | TRAFFIC_GENERATOR_LOAD_GASESTIMATIONTIMEOUT | uint32 | 15 | The timeout for gas estimation operations, in seconds. |
+| Load.MBPerSecond | TRAFFIC_GENERATOR_LOAD_MBPERSECOND | float64 | 0.5 | The desired number of megabytes bytes per second to write. |
+| Load.PprofHttpPort | TRAFFIC_GENERATOR_LOAD_PPROFHTTPPORT | int | 6060 | PprofHttpPort is the port that the pprof HTTP server listens on |
+| Load.RelayReadAmplification | TRAFFIC_GENERATOR_LOAD_RELAYREADAMPLIFICATION | float64 | 1 | By default, this utility reads each blob back from each relay once. The number of<br>reads per relay is multiplied by this factor. For example, If this is set to 3,<br>then each blob is read back from each relay 3 times. If less than 1, then this value<br>is treated as a probability. For example, if this is set to 0.5, then each blob is read back<br>from each relay with a 50% chance. If running with the proxy, this value is used to determine<br>how many times to read each blob back from the proxy (since in the normal case, proxy reads translate<br>to relay reads). |
+| Load.RelayReadParallelism | TRAFFIC_GENERATOR_LOAD_RELAYREADPARALLELISM | uint64 | 300 | The maximum number of parallel blob relay read operations in flight. |
+| Load.RelayReadTimeout | TRAFFIC_GENERATOR_LOAD_RELAYREADTIMEOUT | uint32 | 600 | The timeout for reading a blob from a relay, in seconds. This is the timeout per individual read. |
+| Load.SubmissionParallelism | TRAFFIC_GENERATOR_LOAD_SUBMISSIONPARALLELISM | uint64 | 300 | The maximum number of parallel blobs submissions in flight. |
 | Load.UseProxy | TRAFFIC_GENERATOR_LOAD_USEPROXY | bool | false | If true, then route traffic through the proxy instead of directly using the GRPC clients. |
-| Load.ValidatorReadAmplification | TRAFFIC_GENERATOR_LOAD_VALIDATORREADAMPLIFICATION | float64 | 0 | By default, this utility reads chunks once. The number of chunk reads is multiplied<br>by this factor. If this is set to 3, then chunks are read back 3 times. If less than 1,<br>then this value is treated as a probability. For example, if this is set to 0.5, then<br>each chunk is read back from validators with a 50% chance. Ignored if the load generator is configured<br>to use the proxy. |
-| Load.ValidatorReadParallelism | TRAFFIC_GENERATOR_LOAD_VALIDATORREADPARALLELISM | uint64 | 0 | The maximum number of parallel blob validator read operations in flight. |
-| Load.ValidatorReadTimeout | TRAFFIC_GENERATOR_LOAD_VALIDATORREADTIMEOUT | uint32 | 0 | The timeout for reading a blob from the validators, in seconds. This is the timeout per individual read. |
-| Load.ValidatorVerificationFraction | TRAFFIC_GENERATOR_LOAD_VALIDATORVERIFICATIONFRACTION | float64 | 0 | A number between 0 and 1.0 that specifies the fraction of blobs that are verified by the validator.<br>If 1.0, all blobs are verified. If 0.0, no blobs are verified. If 0.5, half of the blobs are verified. |
+| Load.ValidatorReadAmplification | TRAFFIC_GENERATOR_LOAD_VALIDATORREADAMPLIFICATION | float64 | 1 | By default, this utility reads chunks once. The number of chunk reads is multiplied<br>by this factor. If this is set to 3, then chunks are read back 3 times. If less than 1,<br>then this value is treated as a probability. For example, if this is set to 0.5, then<br>each chunk is read back from validators with a 50% chance. Ignored if the load generator is configured<br>to use the proxy. |
+| Load.ValidatorReadParallelism | TRAFFIC_GENERATOR_LOAD_VALIDATORREADPARALLELISM | uint64 | 300 | The maximum number of parallel blob validator read operations in flight. |
+| Load.ValidatorReadTimeout | TRAFFIC_GENERATOR_LOAD_VALIDATORREADTIMEOUT | uint32 | 600 | The timeout for reading a blob from the validators, in seconds. This is the timeout per individual read. |
+| Load.ValidatorVerificationFraction | TRAFFIC_GENERATOR_LOAD_VALIDATORVERIFICATIONFRACTION | float64 | 0.01 | A number between 0 and 1.0 that specifies the fraction of blobs that are verified by the validator.<br>If 1.0, all blobs are verified. If 0.0, no blobs are verified. If 0.5, half of the blobs are verified. |
