@@ -159,14 +159,25 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	gethClient, _ := mustMakeRetriever()
 
+	var runners []*nodegrpc.Runner
 	for _, op := range ops {
 		idStr := hexutil.Encode(op.Node.Config.ID[:])
 		fmt.Println("Operator: ", idStr)
 
 		fmt.Println("Starting server")
-		err = nodegrpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
+		runner, err := nodegrpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
 		require.NoError(t, err)
+		runners = append(runners, runner)
 	}
+
+	// Cleanup all runners when test finishes
+	t.Cleanup(func() {
+		for _, runner := range runners {
+			if runner != nil {
+				runner.Stop()
+			}
+		}
+	})
 
 	blob := makeTestBlob()
 	requestedAt := uint64(time.Now().UnixNano())

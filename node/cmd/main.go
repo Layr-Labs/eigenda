@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -51,16 +53,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("application failed: %v", err)
 	}
-
-	select {}
 }
 
-func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
+func NodeMain(cliCtx *cli.Context, softwareVersion *version.Semver) error {
 
 	// TODO (cody.littley): pull all business logic in this function into the NewNode() constructor.
 
 	log.Println("Initializing Node")
-	config, err := node.NewConfig(ctx)
+	config, err := node.NewConfig(cliCtx)
 	if err != nil {
 		return err
 	}
@@ -114,9 +114,13 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 		return fmt.Errorf("failed to get ServiceManager address: %w", err)
 	}
 
+	// Create a cancellable context for the node
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // Ensure context is always cleaned up
+
 	// Create and start the node.
 	node, err := node.NewNode(
-		context.Background(),
+		ctx,
 		reg,
 		config,
 		contractDirectory,
@@ -127,6 +131,7 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 	if err != nil {
 		return err
 	}
+	defer node.Shutdown() // Ensure node is always properly shut down (idempotent)
 
 	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
 	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
@@ -156,7 +161,35 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 			return fmt.Errorf("failed to create server v2: %v", err)
 		}
 	}
-	err = nodegrpc.RunServers(server, serverV2, config, logger)
 
-	return err
+	// Create a channel to signal when shutdown is complete
+	shutdownComplete := make(chan struct{})
+
+	runner, err := nodegrpc.RunServers(server, serverV2, config, logger)
+	if err != nil {
+		return fmt.Errorf("failed to run servers: %w", err)
+	}
+
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigChan
+		logger.Infof("Received signal %v, initiating graceful shutdown", sig)
+
+		// Shutdown in correct order
+		runner.Stop()
+		node.Shutdown()
+
+		close(shutdownComplete)
+	}()
+
+	logger.Info("Node is running")
+
+	// Block until shutdown signal is received
+	<-shutdownComplete
+	logger.Info("Node shutdown complete")
+
+	return nil
 }
