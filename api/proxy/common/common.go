@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+const (
+	// limit requests to only 32 MiB to mitigate potential DoS attacks
+	MaxServerPOSTRequestBodySize int64 = 1024 * 1024 * 32
+)
+
 // Helper utility functions //
 
 func ContainsDuplicates[P comparable](s []P) bool {
