@@ -24,7 +24,7 @@ type SigningRateLookup interface {
 		timeSpan time.Duration,
 		// A list of quorums to include. If empty, all quorums are included. If more than one quorum is given,
 		// the results for each quorum are "summed" together. That is to say, each validator will only be returned in
-		// a single result, and its signing rate will be equal to the sum of its signing rates across the all 
+		// a single result, and its signing rate will be equal to the sum of its signing rates across the all
 		// given quorums.
 		quorums []core.QuorumID,
 		// Whether to collect signing rates for protocol version v1 or v2. Not all implementations may support both.
