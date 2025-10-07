@@ -1,6 +1,9 @@
 package ejector
 
 import (
+	"bytes"
+	"encoding/hex"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -12,13 +15,18 @@ import (
 func combineSigningRates(
 	rateA *validator.ValidatorSigningRate,
 	rateB *validator.ValidatorSigningRate,
-) *validator.ValidatorSigningRate {
+) (*validator.ValidatorSigningRate, error) {
 
 	if rateA == nil {
-		return rateB
+		return rateB, nil
 	}
 	if rateB == nil {
-		return rateA
+		return rateA, nil
+	}
+
+	if !bytes.Equal(rateA.GetValidatorId(), rateB.GetValidatorId()) {
+		return nil, fmt.Errorf("cannot combine mismatched validator IDs: %s vs %s",
+			hex.EncodeToString(rateA.GetValidatorId()), hex.EncodeToString(rateB.GetValidatorId()))
 	}
 
 	totalSignedBatches := rateA.GetSignedBatches() + rateB.GetSignedBatches()
@@ -30,12 +38,12 @@ func combineSigningRates(
 
 	return &validator.ValidatorSigningRate{
 		ValidatorId:     rateA.GetValidatorId(),
-		SignedBatches:   rateA.GetSignedBatches() + rateB.GetSignedBatches(),
+		SignedBatches:   totalSignedBatches,
 		UnsignedBatches: rateA.GetUnsignedBatches() + rateB.GetUnsignedBatches(),
 		SignedBytes:     rateA.GetSignedBytes() + rateB.GetSignedBytes(),
 		UnsignedBytes:   rateA.GetUnsignedBytes() + rateB.GetUnsignedBytes(),
 		SigningLatency:  latency,
-	}
+	}, nil
 }
 
 // Sorts the given signing rates in place by unsigned bytes in descending order. The first entry will

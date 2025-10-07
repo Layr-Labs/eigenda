@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -17,7 +16,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-var _ SigningRateLookup = (*dataApiSigningRateLookup)(nil)
+var _ = (*dataApiSigningRateLookup)(nil)
 
 // Uses batch information in dynamoDB to determine signing rates.
 type dataApiSigningRateLookup struct {
@@ -88,8 +87,7 @@ func (srl *dataApiSigningRateLookup) getV1SigningRates(
 	}
 	// add query parameters
 	q := url.Query()
-	// end: datetime formatted in "2006-01-02T15:04:05Z"
-	q.Set("end", now.UTC().Format("2006-01-02T15:04:05Z"))
+	q.Set("end", now.UTC().Format(time.RFC3339))
 	// interval: lookback window in seconds
 	q.Set("interval", strconv.Itoa(int(timeSpan.Seconds())))
 	url.RawQuery = q.Encode()
@@ -130,16 +128,16 @@ func (srl *dataApiSigningRateLookup) getV1SigningRates(
 	}
 
 	var response dataapi.OperatorsNonsigningPercentage
-	err = json.NewDecoder(strings.NewReader(string(respBody))).Decode(&response)
+	err = json.Unmarshal(respBody, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing response body: %w", err)
 	}
 
-	// Use a map to combine results from multiple quorums.
+	// Use a map to combine results from multiple quorums.©
 	signingRateMap := make(map[core.OperatorID]*validator.ValidatorSigningRate)
 
 	for _, data := range response.Data {
-
+		// If quorumSet is empty, then we include all quorums.
 		if len(quorumSet) > 0 {
 			if _, ok := quorumSet[data.QuorumId]; !ok {
 				// This quorum is not in the requested set, skip it.
@@ -152,10 +150,13 @@ func (srl *dataApiSigningRateLookup) getV1SigningRates(
 			return nil, fmt.Errorf("error translating dataapi rate to proto: %w", err)
 		}
 
-		signingRateMap[core.OperatorID(signingRate.GetValidatorId())] =
+		signingRateMap[core.OperatorID(signingRate.GetValidatorId())], err =
 			combineSigningRates(
 				signingRateMap[core.OperatorID(signingRate.GetValidatorId())],
 				signingRate)
+		if err != nil {
+			return nil, fmt.Errorf("error combining signing rates: %w", err)
+		}
 	}
 
 	signingRates := make([]*validator.ValidatorSigningRate, 0, len(signingRateMap))
@@ -191,8 +192,7 @@ func (srl *dataApiSigningRateLookup) getV2SigningRates(
 	}
 	// add query parameters
 	q := url.Query()
-	// end: datetime formatted in "2006-01-02T15:04:05Z"
-	q.Set("end", now.UTC().Format("2006-01-02T15:04:05Z"))
+	q.Set("end", now.UTC().Format(time.RFC3339))
 	// interval: lookback window in seconds
 	q.Set("interval", strconv.Itoa(int(timeSpan.Seconds())))
 	if omitPerfectSigners {
@@ -236,7 +236,7 @@ func (srl *dataApiSigningRateLookup) getV2SigningRates(
 	}
 
 	var response dataapiv2.OperatorsSigningInfoResponse
-	err = json.NewDecoder(strings.NewReader(string(respBody))).Decode(&response)
+	err = json.Unmarshal(respBody, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing response body: %w", err)
 	}
@@ -257,10 +257,13 @@ func (srl *dataApiSigningRateLookup) getV2SigningRates(
 			return nil, fmt.Errorf("error translating dataapi rate to proto: %w", err)
 		}
 
-		signingRateMap[core.OperatorID(signingRate.GetValidatorId())] =
+		signingRateMap[core.OperatorID(signingRate.GetValidatorId())], err =
 			combineSigningRates(
 				signingRateMap[core.OperatorID(signingRate.GetValidatorId())],
 				signingRate)
+		if err != nil {
+			return nil, fmt.Errorf("error combining signing rates: %w", err)
+		}
 	}
 
 	signingRates := make([]*validator.ValidatorSigningRate, 0, len(signingRateMap))
