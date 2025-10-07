@@ -166,6 +166,8 @@ func (e Environment) IsLocal() bool {
 	return e.Type == "local"
 }
 
+// Config is used by devnet inabox, whereas inabox when spun up for tests uses InfrastructureConfig instead.
+// TODO: We should eventually find a way to consolidate them.
 type Config struct {
 	rootPath string
 
