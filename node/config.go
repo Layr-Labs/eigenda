@@ -34,18 +34,13 @@ const (
 
 // Config contains all of the configuration information for a DA node.
 type Config struct {
-	// The hostname or IP address that the node will bind to.
-	Hostname string `docs:"required"`
-	// The port that the node will listen on for chunk retrieval requests (v1).
-	RetrievalPort string `docs:"requpred"`
-	// The port that the node will listen on for chunk dispersal requests (v1).
-	DispersalPort         string `docs:"required"`
-	InternalRetrievalPort string
-	InternalDispersalPort string
-	// The port that the node will listen on for chunk dispersal requests (v2).
-	V2DispersalPort string `docs:"required"`
-	// The port that the node will listen on for chunk retrieval requests (v2).
-	V2RetrievalPort                 string `docs:"required"`
+	Hostname                        string
+	RetrievalPort                   string
+	DispersalPort                   string
+	InternalRetrievalPort           string
+	InternalDispersalPort           string
+	V2DispersalPort                 string
+	V2RetrievalPort                 string
 	InternalV2DispersalPort         string
 	InternalV2RetrievalPort         string
 	EnableNodeApi                   bool
@@ -65,19 +60,18 @@ type Config struct {
 	DbPath                          string
 	LogPath                         string
 	ID                              core.OperatorID
-	// The address of the EigenDA contract directory.
-	EigenDADirectory               string `docs:"required"`
-	PubIPProviders                 []string
-	PubIPCheckInterval             time.Duration `docs:"deprecated"`
-	ChurnerUrl                     string
-	DataApiUrl                     string
-	NumBatchValidators             int
-	NumBatchDeserializationWorkers int
-	EnableGnarkBundleEncoding      bool
-	ClientIPHeader                 string
-	ChurnerUseSecureGrpc           bool
-	RelayUseSecureGrpc             bool
-	RelayMaxMessageSize            uint
+	EigenDADirectory                string
+	PubIPProviders                  []string
+	PubIPCheckInterval              time.Duration
+	ChurnerUrl                      string
+	DataApiUrl                      string
+	NumBatchValidators              int
+	NumBatchDeserializationWorkers  int
+	EnableGnarkBundleEncoding       bool
+	ClientIPHeader                  string
+	ChurnerUseSecureGrpc            bool
+	RelayUseSecureGrpc              bool
+	RelayMaxMessageSize             uint
 	// The number of connections to establish with each relay node.
 	RelayConnectionPoolSize        uint
 	ReachabilityPollIntervalSec    uint64
@@ -96,7 +90,7 @@ type Config struct {
 
 	OnchainStateRefreshInterval time.Duration
 	ChunkDownloadTimeout        time.Duration
-	GRPCMsgSizeLimitV2          int `docs:"unsafe"`
+	GRPCMsgSizeLimitV2          int
 
 	PprofHttpPort string
 	EnablePprof   bool

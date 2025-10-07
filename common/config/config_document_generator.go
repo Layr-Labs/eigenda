@@ -490,7 +490,7 @@ func generateMarkdownDoc(
 				escapeMarkdown(f.EnvVar),
 				escapeMarkdown(f.FieldType),
 				escapeMarkdown(defaultString),
-				escapeMarkdown(reformatGodoc(f.Godoc))))
+				escapeMarkdown(f.Godoc)))
 		}
 	}
 
