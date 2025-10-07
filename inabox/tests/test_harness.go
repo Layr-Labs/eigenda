@@ -54,11 +54,10 @@ type InfrastructureHarness struct {
 	// TODO: Add harness when we need it
 
 	// Legacy deployment configuration
-	TestConfig        *deploy.Config
-	TemplateName      string
-	TestName          string
-	InMemoryBlobStore bool
-	LocalStackPort    string
+	TestConfig     *deploy.Config
+	TemplateName   string
+	TestName       string
+	LocalStackPort string
 
 	// Logger for the infrastructure components
 	Logger logging.Logger

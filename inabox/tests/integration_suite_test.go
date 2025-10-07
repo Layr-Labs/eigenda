@@ -17,15 +17,13 @@ var globalInfra *integration.InfrastructureHarness
 
 // Configuration constants from command line flags
 var (
-	templateName      string
-	testName          string
-	inMemoryBlobStore bool
+	templateName string
+	testName     string
 )
 
 func init() {
 	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
-	flag.BoolVar(&inMemoryBlobStore, "inMemoryBlobStore", false, "whether to use in-memory blob store")
 }
 
 func TestMain(m *testing.M) {
@@ -61,12 +59,11 @@ func setupSuite(logger logging.Logger) error {
 
 	// Setup the global infrastructure
 	config := &integration.InfrastructureConfig{
-		TemplateName:      templateName,
-		TestName:          testName,
-		InMemoryBlobStore: inMemoryBlobStore,
-		Logger:            logger,
-		RelayCount:        4,
-		RootPath:          "../../",
+		TemplateName: templateName,
+		TestName:     testName,
+		Logger:       logger,
+		RelayCount:   4,
+		RootPath:     "../../",
 	}
 	var err error
 	globalInfra, err = integration.SetupInfrastructure(context.Background(), config)

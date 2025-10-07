@@ -46,7 +46,6 @@ func testReservationOnly(t *testing.T, controllerUseNewPayments bool) {
 	infraConfig := &integration.InfrastructureConfig{
 		TemplateName:             "testconfig-anvil.yaml",
 		TestName:                 "",
-		InMemoryBlobStore:        false,
 		Logger:                   test.GetLogger(),
 		RootPath:                 "../../../",
 		RelayCount:               4,
