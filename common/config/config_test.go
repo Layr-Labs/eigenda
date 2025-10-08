@@ -66,7 +66,7 @@ func TestTOMLParsing(t *testing.T) {
 
 	configFile := "test/config.toml"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
+	foo, err := ParseConfig(DefaultFoo(), "FOO", configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -107,7 +107,7 @@ func TestJSONParsing(t *testing.T) {
 
 	configFile := "test/config.json"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
+	foo, err := ParseConfig(DefaultFoo(), "FOO", configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -149,7 +149,7 @@ func TestYAMLParsing(t *testing.T) {
 
 	configFile := "test/config.yaml"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
+	foo, err := ParseConfig(DefaultFoo(), "FOO", configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -192,7 +192,7 @@ func TestTOMLConfigOverride(t *testing.T) {
 	configFile := "test/config.toml"
 	overrideFile := "test/config_override.toml"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
+	foo, err := ParseConfig(DefaultFoo(), "FOO", configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -229,7 +229,7 @@ func TestJSONConfigOverride(t *testing.T) {
 	configFile := "test/config.json"
 	overrideFile := "test/config_override.json"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
+	foo, err := ParseConfig(DefaultFoo(), "FOO", configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -272,7 +272,7 @@ func TestYAMLConfigOverride(t *testing.T) {
 	configFile := "test/config.yaml"
 	overrideFile := "test/config_override.yaml"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
+	foo, err := ParseConfig(DefaultFoo(), "FOO", configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -313,7 +313,7 @@ func TestYAMLConfigOverride(t *testing.T) {
 func TestInvalidTOML(t *testing.T) {
 	configFile := "test/invalid_config.toml"
 
-	_, err := ParseConfig(DefaultFoo, "FOO", configFile)
+	_, err := ParseConfig(DefaultFoo(), "FOO", configFile)
 	require.Error(t, err)
 }
 
@@ -344,7 +344,7 @@ func TestDefaultValues(t *testing.T) {
 		}
 	}
 
-	foo, err := ParseConfig(constructor, "FOO", configFile)
+	foo, err := ParseConfig(constructor(), "FOO", configFile)
 	require.NoError(t, err)
 
 	// Fields that are overridden by config_override.toml
@@ -397,7 +397,7 @@ func TestEnvironmentVariables(t *testing.T) {
 
 	require.NoError(t, os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored"))
 
-	foo, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
+	foo, err := ParseConfig(DefaultFoo(), "PREFIX", configFile)
 	require.NoError(t, err)
 
 	// Verify that environment variables have overridden the config file values.
@@ -443,7 +443,7 @@ func TestInvalidEnvironmentVariable(t *testing.T) {
 	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
 	require.NoError(t, os.Setenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED", "should not be ignored"))
 
-	_, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
+	_, err := ParseConfig(DefaultFoo(), "PREFIX", configFile)
 	require.Error(t, err)
 
 	require.NoError(t, os.Unsetenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED"))
@@ -455,7 +455,7 @@ func TestVerificationFailure(t *testing.T) {
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "invalid")) // will cause verification to fail
 
-	_, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
+	_, err := ParseConfig(DefaultFoo(), "PREFIX", configFile)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "String may not be 'invalid'")
 }
@@ -476,7 +476,7 @@ func TestIgnoreEnvironmentVariables(t *testing.T) {
 
 	require.NoError(t, os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored"))
 
-	foo, err := ParseConfig(DefaultFoo, "", configFile) // intentionally empty prefix
+	foo, err := ParseConfig(DefaultFoo(), "", configFile) // intentionally empty prefix
 	require.NoError(t, err)
 
 	// Verify that environment variables did not override the config file values.

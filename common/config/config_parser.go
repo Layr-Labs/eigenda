@@ -13,21 +13,16 @@ import (
 
 // ParseConfig parses the configuration from the given paths and environment variables. Configuration files are
 // loaded in order, with later files overriding earlier ones. Environment variables are loaded last, and override values
-// from all configuration files. If there are default values in the config, the constructor should return an instance
-// initialized with those values.
+// from all configuration files. If there are default values in the config, those values should be in the provided cfg.
 func ParseConfig[T VerifiableConfig](
-	// A function that returns a new instance of the config struct to be populated.
-	// The struct should contain default values if any are desired.
-	constructor func() T,
+	// The configuration to populate, should already contain any default values.
+	cfg T,
 	// The prefix to use for environment variables. If empty, then environment variables are not read.
 	envPrefix string,
 	// A list of zero or more paths to configuration files. Later files override earlier ones.
 	// If environment variables are read, they override all configuration files.
 	configPaths ...string,
 ) (T, error) {
-
-	cfg := constructor()
-
 	viperInstance := viper.New()
 
 	// Load each config file in order.
