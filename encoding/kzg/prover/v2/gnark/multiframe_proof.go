@@ -140,25 +140,23 @@ func (p *KzgMultiProofGnarkBackend) computeCoeffStore(
 	return coeffStore, nil
 }
 
-// output is in the form see primeField toeplitz and has len [2*dimE-1]
+// output is in the form see primeField toeplitz and has len [2*dimE]
 //
 // phi ^ (coset size ) = 1
 //
 // implicitly pad slices to power of 2
-//
-// Returns a slice of size 2*dimE
 func (p *KzgMultiProofGnarkBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
 	// there is a constant term
 	m := uint64(len(polyFr)) - 1
-	dim := (m - j) / l
 
 	// maximal number of unique values from a toeplitz matrix
 	// TODO(samlaf): we set this to 2*dimE-1, but then GetFFTCoeff returns a new slice of size 2*dimE
 	// Can we just create an initial slice of size 2*dimE and modify it in place..?
 	tDim := 2*dimE - 1
-
 	toeV := make([]fr.Element, tDim)
-	for i := uint64(0); i < dim; i++ {
+
+	dim := (m - j) / l
+	for i := range dim {
 		toeV[i].Set(&polyFr[m-(j+i*l)])
 	}
 
