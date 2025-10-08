@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -17,8 +18,10 @@ type HeartbeatMonitorConfig struct {
 	MaxStallDuration time.Duration
 }
 
+var _ config.VerifiableConfig = &HeartbeatMonitorConfig{}
+
 // Validate checks that the configuration is valid, returning an error if it is not.
-func (c *HeartbeatMonitorConfig) Validate() error {
+func (c *HeartbeatMonitorConfig) Verify() error {
 	if c.FilePath == "" {
 		return fmt.Errorf("FilePath is required")
 	}
@@ -40,7 +43,7 @@ func NewHeartbeatMonitor(
 	livenessChan <-chan HeartbeatMessage,
 	config HeartbeatMonitorConfig,
 ) error {
-	if err := config.Validate(); err != nil {
+	if err := config.Verify(); err != nil {
 		return fmt.Errorf("invalid config: %w", err)
 	}
 
