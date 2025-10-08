@@ -7,13 +7,28 @@ import (
 	"github.com/Layr-Labs/eigenda/common/config"
 )
 
-var _ config.VerifiableConfig = (*TestConfig)(nil)
+var _ config.DocumentedConfig = (*TestConfig)(nil)
 
 type TestConfig struct {
 	A string
 	B int
 	C bool
 	D time.Duration
+}
+
+// GetEnvVarPrefix implements config.DocumentedConfig.
+func (t *TestConfig) GetEnvVarPrefix() string {
+	panic("TEST")
+}
+
+// GetName implements config.DocumentedConfig.
+func (t *TestConfig) GetName() string {
+	panic("Test")
+}
+
+// GetPackagePaths implements config.DocumentedConfig.
+func (t *TestConfig) GetPackagePaths() []string {
+	return []string{"github.com/Layr-Labs/eigenda/common/config/bootstrap_test"}
 }
 
 // Verify implements config.VerifiableConfig.
@@ -34,7 +49,7 @@ func DefaultTestConfig() *TestConfig {
 }
 
 func main() {
-	cfg, err := config.Bootstrap(DefaultTestConfig, "TEST")
+	cfg, err := config.Bootstrap(DefaultTestConfig)
 	if err != nil {
 		panic(err)
 	}

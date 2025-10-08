@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
 )
 
 // The environment variable prefix to use for the ejector configuration.
 const EjectorConfigEnvPrefix = "EJECTOR"
 
-var _ config.VerifiableConfig = (*EjectorConfig)(nil)
+var _ config.DocumentedConfig = (*EjectorConfig)(nil)
 
 // Configuration for the ejector.
 type EjectorConfig struct {
@@ -36,9 +35,6 @@ type EjectorConfig struct {
 
 	// The timeout to use when making requests to the Data API.
 	DataApiTimeout time.Duration
-
-	// Logger configuration.
-	LoggerConfig *common.LoggerConfig
 
 	// The period with which to evaluate validators for ejection.
 	EjectionPeriod time.Duration
@@ -85,11 +81,24 @@ func DefaultEjectorConfig() *EjectorConfig {
 		EjectionThrottle:                     0.05, // 5% of stake can be ejected every EjectionThrottleTimePeriod
 		EjectionThrottleTimePeriod:           24 * time.Hour,
 		StartEjectionThrottleFull:            false,
-		LoggerConfig:                         common.DefaultLoggerConfig(),
 		EjectionFinalizationPeriod:           time.Minute,
 		DataApiTimeout:                       60 * time.Second,
 		EthRpcRetryCount:                     3,
 		EthBlockConfirmations:                0,
+	}
+}
+
+func (c *EjectorConfig) GetEnvVarPrefix() string {
+	return "EJECTOR"
+}
+
+func (c *EjectorConfig) GetName() string {
+	return "Ejector"
+}
+
+func (c *EjectorConfig) GetPackagePaths() []string {
+	return []string{
+		"github.com/Layr-Labs/eigenda/ejector",
 	}
 }
 

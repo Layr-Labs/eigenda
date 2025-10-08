@@ -16,8 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const ejectorEnvVarPrefix = "EJECTOR"
-
 func main() {
 	ctx := context.Background()
 
@@ -32,12 +30,12 @@ func main() {
 
 // Run the ejector. This method is split from main() so we only have to use panic() once.
 func run(ctx context.Context) error {
-	cfg, err := config.Bootstrap(ejector.DefaultEjectorConfig, ejectorEnvVarPrefix)
+	cfg, err := config.Bootstrap(ejector.DefaultEjectorConfig)
 	if err != nil {
 		return fmt.Errorf("failed to bootstrap config: %w", err)
 	}
 
-	logger, err := common.NewLogger(cfg.LoggerConfig)
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
