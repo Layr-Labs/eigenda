@@ -21,11 +21,8 @@ import (
 const MaxUint16 = ^uint16(0)
 
 type Config struct {
-	EncodingManagerConfig          controller.EncodingManagerConfig
-	DispatcherConfig               controller.DispatcherConfig
-	NumConcurrentEncodingRequests  int
-	NumConcurrentDispersalRequests int
-	NodeClientCacheSize            int
+	EncodingManagerConfig controller.EncodingManagerConfig
+	DispatcherConfig      controller.DispatcherConfig
 
 	DynamoDBTableName string
 
@@ -130,6 +127,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EncoderAddress:              ctx.GlobalString(flags.EncoderAddressFlag.Name),
 			MaxNumBlobsPerIteration:     int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
 			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
 		},
 		DispatcherConfig: controller.DispatcherConfig{
 			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
@@ -142,10 +140,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxBatchSize:                          int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
 			SignificantSigningThresholdPercentage: uint8(ctx.GlobalUint(flags.SignificantSigningThresholdPercentageFlag.Name)),
 			SignificantSigningMetricsThresholds:   ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
+			NumConcurrentRequests:                 ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
+			NodeClientCacheSize:                   ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 		},
-		NumConcurrentEncodingRequests:   ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-		NumConcurrentDispersalRequests:  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
-		NodeClientCacheSize:             ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),
 		UseGraph:                        ctx.GlobalBool(flags.UseGraphFlag.Name),
