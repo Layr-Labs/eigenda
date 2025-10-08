@@ -35,6 +35,7 @@ func NewToeplitz(v []fr.Element, fs *fft.FFTSettings) (*Toeplitz, error) {
 
 // Take FFT on Toeplitz vector, coefficient is used for computing hadamard product
 // but carried with multi scalar multiplication
+// Returns a slice of size 2*dimE
 func (t *Toeplitz) GetFFTCoeff() ([]fr.Element, error) {
 	cv := t.extendCirculantVec()
 	// TODO(samlaf): why do we convert to row if inside getFFTCoeff we convert back to col?

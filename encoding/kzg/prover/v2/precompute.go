@@ -78,13 +78,14 @@ func NewSRSTable(tableDir string, s1 []bn254.G1Affine, numWorker uint64) (*SRSTa
 	}, nil
 }
 
+// Returns an SRS Table of size [l][2*dimE]
 func (p *SRSTable) GetSubTables(
 	numChunks uint64,
 	chunkLen uint64,
 ) ([][]bn254.G1Affine, error) {
 	cosetSize := chunkLen
 	dimE := numChunks
-	m := numChunks*chunkLen - 1
+	m := numChunks*chunkLen - 1 // poly degree
 	dim := m / cosetSize
 
 	param := TableParam{
@@ -137,6 +138,7 @@ type DispatchReturn struct {
 }
 
 // m = len(poly) - 1, which is deg
+// Returns a slice of size [l][2*dimE]
 func (p *SRSTable) Precompute(dim, dimE, l, m uint64, filePath string, numWorker uint64) [][]bn254.G1Affine {
 	order := dimE * l
 	if l == 1 {

@@ -311,7 +311,8 @@ func getAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 	return tables, nil
 }
 
-// Helper methods for setup
+// Returns SRSTable SRS points, as well as its transpose.
+// fftPoints has size [l][2*dimE], and its transpose has size [2*dimE][l]
 func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
 	subTable, err := NewSRSTable(p.KzgConfig.CacheDir, p.Srs.G1, p.KzgConfig.NumWorker)
 	if err != nil {
