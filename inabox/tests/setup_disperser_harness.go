@@ -45,8 +45,8 @@ type DisperserHarnessConfig struct {
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
 
-	// DisableController disables the controller deployment when set to true.
-	DisableController bool
+	// OperatorStateSubgraphURL is the URL for the operator state subgraph
+	OperatorStateSubgraphURL string
 }
 
 // TODO: Add encoder, api server, batcher
@@ -129,14 +129,13 @@ func SetupDisperserHarness(
 	ctx context.Context,
 	logger logging.Logger,
 	ethClient common.EthClient,
-	operatorStateSubgraphURL string,
 	config DisperserHarnessConfig,
 ) (*DisperserHarness, error) {
 	harness := &DisperserHarness{
 		RelayServers: make([]*relay.Server, 0),
 	}
 
-	if operatorStateSubgraphURL == "" {
+	if config.OperatorStateSubgraphURL == "" {
 		return nil, fmt.Errorf("operator state subgraph URL is required")
 	}
 
@@ -182,13 +181,9 @@ func SetupDisperserHarness(
 		logger.Warn("Relay count is not specified, skipping relay setup")
 	}
 
-	// Start controller as a singleton goroutine (unless disabled)
-	if !config.DisableController {
-		if err := startController(ctx, ethClient, operatorStateSubgraphURL, harness, config); err != nil {
-			return nil, fmt.Errorf("failed to start controller: %w", err)
-		}
-	} else {
-		logger.Info("Controller deployment disabled, skipping controller setup")
+	// Start controller goroutine
+	if err := startController(ctx, ethClient, config.OperatorStateSubgraphURL, harness, config); err != nil {
+		return nil, fmt.Errorf("failed to start controller: %w", err)
 	}
 
 	// Start remaining binaries (disperser, encoder, batcher, etc.)
