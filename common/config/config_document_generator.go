@@ -79,8 +79,6 @@ func DocumentConfig[T DocumentedConfig](
 
 	destination := path.Join(directory, fmt.Sprintf("%s.md", defaultConfig.GetName()))
 
-	fmt.Printf("Writing config doc to %q...\n", destination) // TODO
-	fmt.Printf("Config doc content:\n%s\n", markdownString)  // TODO
 	if err := os.WriteFile(destination, []byte(markdownString), 0o644); err != nil {
 		return fmt.Errorf("failed to write config doc to %q: %w", destination, err)
 	}
