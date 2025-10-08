@@ -147,4 +147,4 @@ mdbook-serve:
 
 # Generates documentation for configuration files.
 document-config:
-	cd test/v2 && $(MAKE) document-config
+	cd common/config/doc_generator && go run .

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/types"
 	"os"
+	"path"
 	"reflect"
 	"sort"
 	"strings"
@@ -32,25 +33,15 @@ const DeprecatedTag = "deprecated"
 const UnsafeTag = "unsafe"
 
 // Generates documentation for a configuration struct by parsing the configuration. Output is deterministic.
-func DocumentConfig[T VerifiableConfig](
-	// The name of the thing being documented, e.g. "Validator".
-	componentName string,
+func DocumentConfig[T DocumentedConfig](
 	// The default constructor for the config struct. Default values will be extracted from the returned struct.
 	constructor func() T,
-	// The prefix for environment variables that will set fields in this config struct.
-	envPrefix string,
-	// A list of package import paths to search for the source file defining the config struct.
-	// The package for the struct and the packages for any nested structs must be included in this list.
-	packagePaths []string,
-	// The path to write the generated markdown document to.
-	outputPath string,
+	// The directory where the generated markdown file should be written.
+	directory string,
 	// If true, fields without GoDoc comments will cause this method to return an error.
 	requireDocs bool,
 ) error {
 
-	if envPrefix == "" {
-		return fmt.Errorf("envPrefix may not be empty")
-	}
 	defaultConfig := constructor()
 
 	// Unwrap pointer to get the named type
@@ -63,7 +54,11 @@ func DocumentConfig[T VerifiableConfig](
 		return fmt.Errorf("target type must be a named type, got %v", t)
 	}
 
-	fields, err := gatherConfigFieldData(defaultConfig, envPrefix, "", packagePaths)
+	fields, err := gatherConfigFieldData(
+		defaultConfig,
+		defaultConfig.GetEnvVarPrefix(),
+		"",
+		defaultConfig.GetPackagePaths())
 	if err != nil {
 		return fmt.Errorf("failed to gather config field data: %w", err)
 	}
@@ -80,15 +75,14 @@ func DocumentConfig[T VerifiableConfig](
 		}
 	}
 
-	markdownString := generateMarkdownDoc(componentName, fields)
+	markdownString := generateMarkdownDoc(defaultConfig.GetName(), fields)
 
-	if outputPath == "" {
-		fmt.Println(markdownString)
-		return nil
-	}
+	destination := path.Join(directory, fmt.Sprintf("%s.md", defaultConfig.GetName()))
 
-	if err := os.WriteFile(outputPath, []byte(markdownString), 0o644); err != nil {
-		return fmt.Errorf("failed to write config doc to %q: %w", outputPath, err)
+	fmt.Printf("Writing config doc to %q...\n", destination) // TODO
+	fmt.Printf("Config doc content:\n%s\n", markdownString)  // TODO
+	if err := os.WriteFile(destination, []byte(markdownString), 0o644); err != nil {
+		return fmt.Errorf("failed to write config doc to %q: %w", destination, err)
 	}
 
 	return nil

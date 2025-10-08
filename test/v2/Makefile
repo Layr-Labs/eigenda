@@ -15,7 +15,3 @@ clean:
 
 test:
 	cd live && go test
-
-document-config:
-	@mkdir -p ../../docs/config
-	@cd ../.. && go run test/v2/load/config_docs/main.go
