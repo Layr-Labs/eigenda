@@ -178,7 +178,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         eigenDACertVerifier = new EigenDACertVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
-            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            IRegistryCoordinator(address(registryCoordinator)),
             defaultSecurityThresholds,
             quorumNumbersRequired
         );
