@@ -323,11 +323,13 @@ func RunController(ctx *cli.Context) error {
 
 	// Start heartbeat monitor
 	go func() {
-		err := healthcheck.HeartbeatMonitor(
-			config.ControllerHealthProbePath,
-			controllerMaxStallDuration,
-			controllerLivenessChan,
+		err := healthcheck.NewHeartbeatMonitor(
 			logger,
+			controllerLivenessChan,
+			healthcheck.HeartbeatMonitorConfig{
+				FilePath:         config.ControllerHealthProbePath,
+				MaxStallDuration: controllerMaxStallDuration,
+			},
 		)
 		if err != nil {
 			logger.Warn("Heartbeat monitor exited with error", "err", err)
