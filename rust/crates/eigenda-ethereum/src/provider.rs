@@ -17,7 +17,10 @@ use rustls::crypto::{CryptoProvider, aws_lc_rs};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::contracts::{EigenDaContracts, HOLESKY, MAINNET, SEPOLIA};
+use crate::contracts::{
+    EIGENDA_DIRECTORY_HOLESKY, EIGENDA_DIRECTORY_MAINNET, EIGENDA_DIRECTORY_SEPOLIA,
+    EigenDaContracts,
+};
 use crate::extraction::{CertStateData, contract};
 use crate::provider::IEigenDADirectory::getAddressCall;
 
@@ -109,9 +112,9 @@ impl EigenDaProvider {
             .erased();
 
         let directory_address = match config.network {
-            Network::Mainnet => MAINNET,
-            Network::Holesky => HOLESKY,
-            Network::Sepolia => SEPOLIA,
+            Network::Mainnet => EIGENDA_DIRECTORY_MAINNET,
+            Network::Holesky => EIGENDA_DIRECTORY_HOLESKY,
+            Network::Sepolia => EIGENDA_DIRECTORY_SEPOLIA,
         };
 
         let contracts = EigenDaContracts::new(&ethereum, directory_address).await?;

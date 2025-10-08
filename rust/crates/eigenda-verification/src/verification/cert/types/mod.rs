@@ -16,7 +16,7 @@ use alloy_primitives::aliases::U96;
 use ark_bn254::G1Affine;
 use hashbrown::HashMap;
 
-use crate::cert::solidity::VersionedBlobParams;
+use crate::cert::solidity::{SecurityThresholds, VersionedBlobParams};
 use crate::verification::cert::bitmap::Bitmap;
 use crate::verification::cert::hash::TruncHash;
 use crate::verification::cert::types::history::History;
@@ -59,6 +59,11 @@ pub struct Storage {
     pub total_stake_history: HashMap<QuorumNumber, History<Stake>>,
     /// Historical individual operator stakes per quorum
     pub operator_stake_history: HashMap<B256, HashMap<QuorumNumber, History<Stake>>>,
+    /// Security thresholds for confirmation and adversary limits
+    pub security_thresholds: SecurityThresholds,
+    /// Quorum numbers required to sign certificates
+    pub required_quorum_numbers: alloy_primitives::Bytes,
+    /// Historical on-chain storage data for verification
     /// Stale stake prevention data (feature-gated)
     #[cfg(feature = "stale-stakes-forbidden")]
     pub staleness: Staleness,

@@ -1,9 +1,9 @@
 use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
 use alloy_primitives::B256;
-use eigenda_verification::cert::StandardCommitment;
 use eigenda_verification::verification::cert::CertVerificationInputs;
 use eigenda_verification::verification::cert::types::Storage;
 use eigenda_verification::verification::cert::types::history::HistoryError;
+use eigenda_verification::{cert::StandardCommitment, verification::cert::Cert};
 use reth_trie_common::AccountProof;
 use reth_trie_common::proof::ProofVerificationError;
 use serde::{Deserialize, Serialize};
@@ -142,6 +142,12 @@ impl CertStateData {
             }
         };
 
+        let security_thresholds = SecurityThresholdsV2Extractor::new(cert)
+            .decode_data(&self.cert_verifier.storage_proofs)?;
+
+        let required_quorum_numbers = QuorumNumbersRequiredV2Extractor::new(cert)
+            .decode_data(&self.cert_verifier.storage_proofs)?;
+
         let storage = Storage {
             quorum_count,
             current_block,
@@ -151,25 +157,20 @@ impl CertStateData {
             apk_history,
             versioned_blob_params,
             next_blob_version,
+            security_thresholds,
+            required_quorum_numbers,
             #[cfg(feature = "stale-stakes-forbidden")]
             staleness,
         };
 
-        let security_thresholds = SecurityThresholdsV2Extractor::new(cert)
-            .decode_data(&self.cert_verifier.storage_proofs)?;
-
-        let required_quorum_numbers = QuorumNumbersRequiredV2Extractor::new(cert)
-            .decode_data(&self.cert_verifier.storage_proofs)?;
-
-        let inputs = CertVerificationInputs {
+        let cert = Cert {
             batch_header: cert.batch_header_v2().clone(),
             blob_inclusion_info: cert.blob_inclusion_info().clone(),
             non_signer_stakes_and_signature: cert.nonsigner_stake_and_signature().clone(),
-            security_thresholds,
-            required_quorum_numbers,
             signed_quorum_numbers: cert.signed_quorum_numbers().clone(),
-            storage,
         };
+
+        let inputs = CertVerificationInputs { cert, storage };
 
         Ok(inputs)
     }

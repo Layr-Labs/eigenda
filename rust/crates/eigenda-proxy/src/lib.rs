@@ -1,6 +1,6 @@
 //! EigenDA Proxy Client Library
 //!
-//! This crate provides a client for interacting with EigenDA proxy nodes.
+//! This crate provides a client for interacting with an [EigenDA proxy](https://github.com/Layr-Labs/eigenda/tree/master/api/proxy)
 //! It supports storing and retrieving blob data through the EigenDA network
 //! using standard commitments and certificates.
 
@@ -30,7 +30,7 @@ const DEFAULT_MAX_RETRY_DELAY: Duration = Duration::from_secs(10);
 /// Configuration for the [`crate::ProxyClient`].
 #[derive(Debug, Clone, JsonSchema, PartialEq, Serialize, Deserialize)]
 pub struct EigenDaProxyConfig {
-    /// URL of the EigenDA proxy node.
+    /// URL of the EigenDA proxy.
     pub url: String,
     /// The initial backoff in milliseconds used when retrying EigenDA proxy
     /// requests. It is increased on each subsequent retry.
@@ -42,7 +42,7 @@ pub struct EigenDaProxyConfig {
     pub max_retry_times: Option<u64>,
 }
 
-/// HTTP client for interacting with EigenDA proxy nodes.
+/// HTTP client for interacting with EigenDA proxy.
 ///
 /// The `ProxyClient` provides methods to store and retrieve blob data
 /// from EigenDA through a proxy service. It includes built-in retry

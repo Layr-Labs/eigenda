@@ -53,7 +53,6 @@ use ark_bn254::{G1Affine, G2Affine};
 use hashbrown::HashMap;
 use tracing::instrument;
 
-use crate::cert::solidity::SecurityThresholds;
 use crate::cert::{BatchHeaderV2, BlobInclusionInfo, G1Point, NonSignerStakesAndSignature};
 use crate::verification::cert::error::CertVerificationError::{self, *};
 use crate::verification::cert::hash::HashExt;
@@ -64,24 +63,27 @@ use crate::verification::cert::types::{
 
 /// Input parameters for certificate verification
 ///
-/// Contains all the data needed to perform comprehensive certificate validation,
+/// Contains all the data needed to perform certificate validation,
 /// including on-chain state data, signature information, and security parameters.
 #[derive(Clone, Debug)]
 pub struct CertVerificationInputs {
+    /// Certificate data
+    pub cert: Cert,
+    /// Storage state
+    pub storage: Storage,
+}
+
+/// Certificate data structure containing all information needed for verification
+#[derive(Clone, Debug)]
+pub struct Cert {
     /// Batch header containing the merkle root and reference block number
     pub batch_header: BatchHeaderV2,
     /// Blob inclusion proof and certificate information
     pub blob_inclusion_info: BlobInclusionInfo,
     /// Non-signer information and aggregated signatures
     pub non_signer_stakes_and_signature: NonSignerStakesAndSignature,
-    /// Security thresholds for confirmation and adversary limits
-    pub security_thresholds: SecurityThresholds,
-    /// Quorum numbers required to sign certificates
-    pub required_quorum_numbers: alloy_primitives::Bytes,
     /// Quorum numbers that actually signed this certificate
     pub signed_quorum_numbers: alloy_primitives::Bytes,
-    /// Historical on-chain storage data for verification
-    pub storage: Storage,
 }
 
 /// Performs comprehensive EigenDA certificate verification.
@@ -176,15 +178,14 @@ pub struct CertVerificationInputs {
 /// - Security parameters enforce adequate redundancy for data recovery
 #[instrument]
 pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationError> {
-    let CertVerificationInputs {
+    let CertVerificationInputs { cert, storage } = inputs;
+
+    let Cert {
         batch_header,
         blob_inclusion_info,
         non_signer_stakes_and_signature,
-        security_thresholds,
-        required_quorum_numbers,
         signed_quorum_numbers,
-        storage,
-    } = inputs;
+    } = cert;
 
     let NonSignerStakesAndSignature {
         non_signer_quorum_bitmap_indices,
@@ -206,6 +207,8 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
         apk_history,
         versioned_blob_params,
         next_blob_version,
+        security_thresholds,
+        required_quorum_numbers,
         #[cfg(feature = "stale-stakes-forbidden")]
         staleness,
     } = storage;
@@ -454,7 +457,7 @@ pub mod test_utils {
     use crate::verification::cert::hash::{HashExt, TruncHash, streaming_keccak256};
     use crate::verification::cert::types::Storage;
     use crate::verification::cert::types::history::{History, Update};
-    use crate::verification::cert::{CertVerificationInputs, convert};
+    use crate::verification::cert::{Cert, CertVerificationInputs, convert};
 
     /// Generate valid test inputs for certificate verification
     ///
@@ -638,6 +641,8 @@ pub mod test_utils {
             }
         };
 
+        let required_quorum_numbers: Bytes = [0, 2].into();
+
         let storage = Storage {
             quorum_count: u8::MAX,
             current_block: 43,
@@ -647,21 +652,20 @@ pub mod test_utils {
             apk_history,
             versioned_blob_params,
             next_blob_version,
+            security_thresholds,
+            required_quorum_numbers,
             #[cfg(feature = "stale-stakes-forbidden")]
             staleness,
         };
 
-        let required_quorum_numbers: Bytes = [0, 2].into();
-
-        CertVerificationInputs {
+        let cert = Cert {
             batch_header,
             blob_inclusion_info,
             non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
             signed_quorum_numbers,
-            storage,
-        }
+        };
+
+        CertVerificationInputs { cert, storage }
     }
 
     /// Computes batch header and signature for test certificate generation
@@ -736,7 +740,7 @@ mod tests {
         let mut inputs = success_inputs();
 
         // any change to blobCertificate causes the leaf node hash to differ
-        inputs.blob_inclusion_info.blob_certificate.signature = [0u8; 32].into();
+        inputs.cert.blob_inclusion_info.blob_certificate.signature = [0u8; 32].into();
 
         let err = verify(inputs).unwrap_err();
 
@@ -747,7 +751,7 @@ mod tests {
     fn reference_block_past_current_block() {
         let mut inputs = success_inputs();
 
-        inputs.batch_header.reference_block_number = 43;
+        inputs.cert.batch_header.reference_block_number = 43;
         inputs.storage.current_block = 42;
 
         let err = verify(inputs).unwrap_err();
@@ -759,7 +763,7 @@ mod tests {
     fn reference_block_at_current_block() {
         let mut inputs = success_inputs();
 
-        inputs.batch_header.reference_block_number = 42;
+        inputs.cert.batch_header.reference_block_number = 42;
         inputs.storage.current_block = 42;
 
         let err = verify(inputs).unwrap_err();
@@ -772,11 +776,13 @@ mod tests {
         let mut inputs = success_inputs();
 
         inputs
+            .cert
             .non_signer_stakes_and_signature
             .non_signer_pubkeys
             .clear();
 
         inputs
+            .cert
             .non_signer_stakes_and_signature
             .non_signer_quorum_bitmap_indices
             .clear();
@@ -790,7 +796,7 @@ mod tests {
     fn empty_quorum_vecs() {
         let mut inputs = success_inputs();
 
-        inputs.signed_quorum_numbers = [].into();
+        inputs.cert.signed_quorum_numbers = [].into();
 
         let err = verify(inputs).unwrap_err();
 
@@ -839,6 +845,7 @@ mod tests {
         let mut inputs = success_inputs();
 
         inputs
+            .cert
             .non_signer_stakes_and_signature
             .non_signer_quorum_bitmap_indices[0] = 42;
 
@@ -872,6 +879,7 @@ mod tests {
         let mut inputs = success_inputs();
 
         inputs
+            .cert
             .non_signer_stakes_and_signature
             .non_signer_pubkeys
             .reverse();
@@ -1019,7 +1027,7 @@ mod tests {
     fn signature_verification_failure() {
         let mut inputs = success_inputs();
 
-        inputs.non_signer_stakes_and_signature.sigma = G1Point::default();
+        inputs.cert.non_signer_stakes_and_signature.sigma = G1Point::default();
 
         let err = verify(inputs).unwrap_err();
 
@@ -1051,6 +1059,7 @@ mod tests {
             });
 
         inputs
+            .cert
             .blob_inclusion_info
             .blob_certificate
             .blob_header
@@ -1059,11 +1068,11 @@ mod tests {
         // any change to blobCertificate requires recomputing...
         let secret_keys = vec![Fr::from(43u64), Fr::from(44u64)];
         let (batch_header, sigma) =
-            compute_batch_header_and_sigma(&inputs.blob_inclusion_info, secret_keys);
+            compute_batch_header_and_sigma(&inputs.cert.blob_inclusion_info, secret_keys);
 
-        inputs.batch_header = batch_header;
+        inputs.cert.batch_header = batch_header;
 
-        inputs.non_signer_stakes_and_signature.sigma = sigma.into();
+        inputs.cert.non_signer_stakes_and_signature.sigma = sigma.into();
 
         let err = verify(inputs).unwrap_err();
 
@@ -1073,7 +1082,7 @@ mod tests {
     #[test]
     fn blob_quorums_do_not_contain_required_quorums() {
         let mut inputs = success_inputs();
-        inputs.required_quorum_numbers = [1].into(); // 3 is not in blob_quorums: [0, 2]
+        inputs.storage.required_quorum_numbers = [1].into(); // 3 is not in blob_quorums: [0, 2]
 
         let err = verify(inputs).unwrap_err();
 

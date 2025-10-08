@@ -47,7 +47,7 @@ use sov_eigenda_adapter::EigenDaConfig;
 
 let config = EigenDaConfig {
     ethereum_rpc_url: "https://mainnet.infura.io/v3/your-key".to_string(),
-    eigenda_proxy_url: "https://proxy.eigenda.network".to_string(),
+    eigenda_proxy_url: "http://localhost:3100".to_string(),
     rollup_namespace: "your-rollup-namespace".to_string(),
     // Additional configuration options...
 };

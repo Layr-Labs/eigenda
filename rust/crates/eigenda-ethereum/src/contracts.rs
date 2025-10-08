@@ -4,13 +4,17 @@ use alloy_primitives::{Address, address};
 use serde::{Deserialize, Serialize};
 
 /// EigenDA directory address on Ethereum mainnet.
-pub const MAINNET: Address = address!("0x64AB2e9A86FA2E183CB6f01B2D4050c1c2dFAad4");
+pub const EIGENDA_DIRECTORY_MAINNET: Address =
+    address!("0x64AB2e9A86FA2E183CB6f01B2D4050c1c2dFAad4");
 /// EigenDA directory address on the Holesky test network.
-pub const HOLESKY: Address = address!("0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE");
+pub const EIGENDA_DIRECTORY_HOLESKY: Address =
+    address!("0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE");
 /// EigenDA directory address on the Sepolia test network.
-pub const SEPOLIA: Address = address!("0x9620dC4B3564198554e4D2b06dEFB7A369D90257");
+pub const EIGENDA_DIRECTORY_SEPOLIA: Address =
+    address!("0x9620dC4B3564198554e4D2b06dEFB7A369D90257");
 
-/// EigenDA relevant contracts.
+/// EigenDA relevant contracts. Addresses are retrieved from the the EigenDADirectory contract for
+/// the respective network (i.e. Mainnent, Sepolia)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EigenDaContracts {
     /// # Ethereum description
