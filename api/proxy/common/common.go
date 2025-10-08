@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	// limit requests to only 32 MiB to mitigate potential DoS attacks
+	// limit requests to 16 MiB (max_blob_size) to mitigate potential DoS attacks
 	MaxServerPOSTRequestBodySize int64 = 1024 * 1024 * 32
 )
 
