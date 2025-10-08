@@ -8,52 +8,56 @@ library ConfigRegistryLib {
     event ConfigBytes32Set(bytes32 key, uint256 activationKey, bytes32 value);
     event ConfigBytesSet(bytes32 key, uint256 activationKey, bytes value);
 
-    function getKey(string memory name) internal pure returns (bytes32) {
+    function getNameDigest(string memory name) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(name));
     }
 
-    function getNumCheckpointsBytes32(bytes32 key) internal view returns (uint256) {
-        return S.layout().bytes32Config.values[key].length;
+    function getNumCheckpointsBytes32(bytes32 nameDigest) internal view returns (uint256) {
+        return S.layout().bytes32Config.values[nameDigest].length;
     }
 
-    function getNumCheckpointsBytes(bytes32 key) internal view returns (uint256) {
-        return S.layout().bytesConfig.values[key].length;
+    function getNumCheckpointsBytes(bytes32 nameDigest) internal view returns (uint256) {
+        return S.layout().bytesConfig.values[nameDigest].length;
     }
 
-    function getConfigBytes32(bytes32 key, uint256 index) internal view returns (bytes32) {
-        return S.layout().bytes32Config.values[key][index].value;
+    function getConfigBytes32(bytes32 nameDigest, uint256 index) internal view returns (bytes32) {
+        return S.layout().bytes32Config.values[nameDigest][index].value;
     }
 
-    function getConfigBytes(bytes32 key, uint256 index) internal view returns (bytes memory) {
-        return S.layout().bytesConfig.values[key][index].value;
+    function getConfigBytes(bytes32 nameDigest, uint256 index) internal view returns (bytes memory) {
+        return S.layout().bytesConfig.values[nameDigest][index].value;
     }
 
-    function getActivationKeyBytes32(bytes32 key, uint256 index) internal view returns (uint256) {
-        return S.layout().bytes32Config.values[key][index].activationKey;
+    function getActivationKeyBytes32(bytes32 nameDigest, uint256 index) internal view returns (uint256) {
+        return S.layout().bytes32Config.values[nameDigest][index].activationKey;
     }
 
-    function getActivationKeyBytes(bytes32 key, uint256 index) internal view returns (uint256) {
-        return S.layout().bytesConfig.values[key][index].activationKey;
+    function getActivationKeyBytes(bytes32 nameDigest, uint256 index) internal view returns (uint256) {
+        return S.layout().bytesConfig.values[nameDigest][index].activationKey;
     }
 
-    function getCheckpointBytes32(bytes32 key, uint256 index) internal view returns (T.Bytes32Checkpoint memory) {
-        return S.layout().bytes32Config.values[key][index];
+    function getCheckpointBytes32(bytes32 nameDigest, uint256 index)
+        internal
+        view
+        returns (T.Bytes32Checkpoint memory)
+    {
+        return S.layout().bytes32Config.values[nameDigest][index];
     }
 
-    function getCheckpointBytes(bytes32 key, uint256 index) internal view returns (T.BytesCheckpoint memory) {
-        return S.layout().bytesConfig.values[key][index];
+    function getCheckpointBytes(bytes32 nameDigest, uint256 index) internal view returns (T.BytesCheckpoint memory) {
+        return S.layout().bytesConfig.values[nameDigest][index];
     }
 
-    function addConfigBytes32(bytes32 key, uint256 activationKey, bytes32 value) internal {
+    function addConfigBytes32(bytes32 nameDigest, uint256 activationKey, bytes32 value) internal {
         T.Bytes32Cfg storage cfg = S.layout().bytes32Config;
-        cfg.values[key].push(T.Bytes32Checkpoint({value: value, activationKey: activationKey}));
-        emit ConfigBytes32Set(key, activationKey, value);
+        cfg.values[nameDigest].push(T.Bytes32Checkpoint({value: value, activationKey: activationKey}));
+        emit ConfigBytes32Set(nameDigest, activationKey, value);
     }
 
-    function addConfigBytes(bytes32 key, uint256 activationKey, bytes memory value) internal {
+    function addConfigBytes(bytes32 nameDigest, uint256 activationKey, bytes memory value) internal {
         T.BytesCfg storage cfg = S.layout().bytesConfig;
-        cfg.values[key].push(T.BytesCheckpoint({value: value, activationKey: activationKey}));
-        emit ConfigBytesSet(key, activationKey, value);
+        cfg.values[nameDigest].push(T.BytesCheckpoint({value: value, activationKey: activationKey}));
+        emit ConfigBytesSet(nameDigest, activationKey, value);
     }
 
     function registerKeyBytes32(string memory name) internal {
@@ -65,24 +69,24 @@ library ConfigRegistryLib {
     }
 
     function registerKey(T.NameSet storage nameSet, string memory name) internal {
-        bytes32 key = getKey(name);
-        if (bytes(nameSet.names[key]).length == 0) {
+        bytes32 nameDigest = getNameDigest(name);
+        if (bytes(nameSet.names[nameDigest]).length == 0) {
             require(bytes(name).length > 0, "Name cannot be empty");
-            nameSet.names[key] = name;
+            nameSet.names[nameDigest] = name;
             nameSet.nameList.push(name);
         }
     }
 
-    function isKeyRegistered(T.NameSet storage nameSet, bytes32 key) internal view returns (bool) {
-        return bytes(nameSet.names[key]).length > 0;
+    function isKeyRegistered(T.NameSet storage nameSet, bytes32 nameDigest) internal view returns (bool) {
+        return bytes(nameSet.names[nameDigest]).length > 0;
     }
 
-    function isKeyRegisteredBytes32(bytes32 key) internal view returns (bool) {
-        return isKeyRegistered(S.layout().bytes32Config.nameSet, key);
+    function isKeyRegisteredBytes32(bytes32 nameDigest) internal view returns (bool) {
+        return isKeyRegistered(S.layout().bytes32Config.nameSet, nameDigest);
     }
 
-    function isKeyRegisteredBytes(bytes32 key) internal view returns (bool) {
-        return isKeyRegistered(S.layout().bytesConfig.nameSet, key);
+    function isKeyRegisteredBytes(bytes32 nameDigest) internal view returns (bool) {
+        return isKeyRegistered(S.layout().bytesConfig.nameSet, nameDigest);
     }
 
     function getNumRegisteredKeysBytes32() internal view returns (uint256) {
@@ -101,14 +105,14 @@ library ConfigRegistryLib {
         return S.layout().bytesConfig.nameSet.nameList[index];
     }
 
-    function getNameBytes32(bytes32 key) internal view returns (string memory) {
-        string memory name = S.layout().bytes32Config.nameSet.names[key];
+    function getNameBytes32(bytes32 nameDigest) internal view returns (string memory) {
+        string memory name = S.layout().bytes32Config.nameSet.names[nameDigest];
         require(bytes(name).length > 0, "Key not registered");
         return name;
     }
 
-    function getNameBytes(bytes32 key) internal view returns (string memory) {
-        string memory name = S.layout().bytesConfig.nameSet.names[key];
+    function getNameBytes(bytes32 nameDigest) internal view returns (string memory) {
+        string memory name = S.layout().bytesConfig.nameSet.names[nameDigest];
         require(bytes(name).length > 0, "Key not registered");
         return name;
     }

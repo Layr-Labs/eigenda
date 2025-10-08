@@ -10,7 +10,7 @@ library ConfigRegistryTypes {
         string[] nameList;
     }
 
-    /// @notice Structs to represent checkpoints for fixed-size byte32 configurations
+    /// @notice Struct to represent checkpoints for fixed-size byte32 configurations
     /// @param activationKey The activation key (e.g., block number or timestamp) for the checkpoint
     /// @param value The bytes32 configuration value at this checkpoint
     struct Bytes32Checkpoint {
@@ -18,7 +18,7 @@ library ConfigRegistryTypes {
         bytes32 value;
     }
 
-    /// @notice Structs to represent checkpoints for variable-size bytes configurations
+    /// @notice Struct to represent checkpoints for variable-size bytes configurations
     /// @param activationKey The activation key (e.g., block number or timestamp) for the checkpoint
     /// @param value The bytes configuration value at this checkpoint
     struct BytesCheckpoint {
