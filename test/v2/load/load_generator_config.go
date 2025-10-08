@@ -1,5 +1,31 @@
 package load
 
+import (
+	"github.com/Layr-Labs/eigenda/common/config"
+	"github.com/Layr-Labs/eigenda/test/v2/client"
+)
+
+var _ config.DocumentedConfig = (*TrafficGeneratorConfig)(nil)
+
+// Configuration for the traffic generator.
+//
+// TODO(cody.littley): This parent struct is not currently used for deploying a traffic generator,
+// but that will soon change. When the change is made, I will also do some renaming to make things cleaner.
+type TrafficGeneratorConfig struct {
+	// Configures the environment towards which the traffic generator will run.
+	Environment client.TestClientConfig
+	// Configures the load the traffic generator will produce.
+	Load LoadGeneratorConfig
+}
+
+// DefaultTrafficGeneratorConfig returns a default configuration for the traffic generator.
+func DefaultTrafficGeneratorConfig() *TrafficGeneratorConfig {
+	return &TrafficGeneratorConfig{
+		Environment: *client.DefaultTestClientConfig(),
+		Load:        *DefaultLoadGeneratorConfig(),
+	}
+}
+
 // LoadGeneratorConfig is the configuration for the load generator.
 type LoadGeneratorConfig struct {
 	// The desired number of megabytes bytes per second to write.
@@ -72,4 +98,24 @@ func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 		FrequencyAcceleration:         0.0025,
 		UseProxy:                      false,
 	}
+}
+
+func (c *TrafficGeneratorConfig) GetEnvVarPrefix() string {
+	return "TRAFFIC_GENERATOR"
+}
+
+func (c *TrafficGeneratorConfig) GetName() string {
+	return "TrafficGenerator"
+}
+
+func (c *TrafficGeneratorConfig) GetPackagePaths() []string {
+	return []string{
+		"github.com/Layr-Labs/eigenda/test/v2/client",
+		"github.com/Layr-Labs/eigenda/test/v2/load",
+	}
+}
+
+func (c *TrafficGeneratorConfig) Verify() error {
+	// TODO(cody.littley): This is a place holder. Implement this when integrating new config with traffic generator.
+	return nil
 }
