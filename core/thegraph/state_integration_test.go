@@ -70,9 +70,13 @@ func TestIndexerIntegration(t *testing.T) {
 
 	client := infraHarness.ChainHarness.EthClient
 	tx, err := eth.NewWriter(
-		// TODO(dmanc): Expose the operator state retriever and service manager addresses in the test harness
+		// TODO(dmanc): Expose the operator state retriever and service manager addresses in the infrastructure harness
 		// or use the contract directory. Then we can remove the dependency on the test config.
-		logger, client, infraHarness.TestConfig.EigenDA.OperatorStateRetriever, infraHarness.TestConfig.EigenDA.ServiceManager)
+		logger,
+		client,
+		infraHarness.TestConfig.EigenDA.OperatorStateRetriever,
+		infraHarness.TestConfig.EigenDA.ServiceManager,
+	)
 	require.NoError(t, err, "failed to create eth writer")
 
 	cs := thegraph.NewIndexedChainState(eth.NewChainState(tx, client), graphql.NewClient(graphUrl, nil), logger)
@@ -86,5 +90,10 @@ func TestIndexerIntegration(t *testing.T) {
 
 	state, err := cs.GetIndexedOperatorState(ctx, headerNum, testQuorums)
 	require.NoError(t, err, "failed to get indexed operator state")
-	require.Equal(t, len(infraHarness.OperatorHarness.OperatorInstances), len(state.IndexedOperators), "operator count mismatch")
+	require.Equal(
+		t,
+		len(infraHarness.OperatorHarness.OperatorInstances),
+		len(state.IndexedOperators),
+		"operator count mismatch",
+	)
 }

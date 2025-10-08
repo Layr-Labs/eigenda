@@ -24,12 +24,13 @@ type InfrastructureConfig struct {
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
 
-	// DisableDisperser disables the disperser deployment when set to true. This is useful for tests that do not require the
-	// disperser infrastructure to be deployed (e.g. testing graph node with operator registration)
+	// DisableDisperser disables the disperser deployment when set to true. This is useful for
+	// tests that do not require the disperser infrastructure to be deployed (e.g. testing graph
+	// node with operator registration)
 	DisableDisperser bool
 
-	// The following field is temporary, to be able to test different payments configurations. It will be removed
-	// once legacy payments are removed.
+	// The following field is temporary, to be able to test different payments configurations.
+	// It will be removed once legacy payments are removed.
 	ControllerUseNewPayments bool
 }
 
@@ -111,16 +112,17 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
 	if !config.DisableDisperser {
 		disperserHarnessConfig := &DisperserHarnessConfig{
-			Network:                  sharedDockerNetwork,
-			TestConfig:               testConfig,
-			TestName:                 testName,
-			LocalStackPort:           infra.LocalStackPort,
-			MetadataTableName:        config.MetadataTableName,
-			BucketTableName:          config.BucketTableName,
-			S3BucketName:             config.S3BucketName,
-			MetadataTableNameV2:      config.MetadataTableNameV2,
-			RelayCount:               config.RelayCount,
-			OperatorStateSubgraphURL: infra.ChainHarness.GraphNode.HTTPURL() + "/subgraphs/name/Layr-Labs/eigenda-operator-state",
+			Network:             sharedDockerNetwork,
+			TestConfig:          testConfig,
+			TestName:            testName,
+			LocalStackPort:      infra.LocalStackPort,
+			MetadataTableName:   config.MetadataTableName,
+			BucketTableName:     config.BucketTableName,
+			S3BucketName:        config.S3BucketName,
+			MetadataTableNameV2: config.MetadataTableNameV2,
+			RelayCount:          config.RelayCount,
+			OperatorStateSubgraphURL: infra.ChainHarness.GraphNode.HTTPURL() +
+				"/subgraphs/name/Layr-Labs/eigenda-operator-state",
 		}
 		disperserHarness, err := SetupDisperserHarness(
 			infraCtx,
