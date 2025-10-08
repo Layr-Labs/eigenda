@@ -646,7 +646,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.Opera
 				return w.Result(), nil
 			}), "custom", "")
 
-		n := &node.Node{
+		node := &node.Node{
 			Config:                  config,
 			Logger:                  logger,
 			KeyPair:                 op.KeyPair,
@@ -669,20 +669,40 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.Opera
 		reader := &coremock.MockWriter{}
 		reader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
-		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter, version.DefaultVersion())
+		// Create listeners with OS-allocated ports for testing
+		v1DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+		v1RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+		v2DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+		v2RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+
+		serverV1 := nodegrpc.NewServer(
+			config,
+			node,
+			logger,
+			rateLimiter,
+			version.DefaultVersion(),
+			v1DispersalListener,
+			v1RetrievalListener,
+		)
 		serverV2, err := nodegrpc.NewServerV2(
 			ctx,
 			config,
-			n,
+			node,
 			logger,
 			rateLimiter,
 			prometheus.NewRegistry(),
 			reader,
-			version.DefaultVersion())
+			version.DefaultVersion(),
+			v2DispersalListener,
+			v2RetrievalListener)
 		require.NoError(t, err)
 
 		ops[id] = TestOperator{
-			Node:     n,
+			Node:     node,
 			ServerV1: serverV1,
 			ServerV2: serverV2,
 		}

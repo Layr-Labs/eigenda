@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"gopkg.in/yaml.v3"
 )
@@ -153,6 +152,8 @@ func (e Environment) IsLocal() bool {
 	return e.Type == "local"
 }
 
+// Config is used by devnet inabox, whereas inabox when spun up for tests uses InfrastructureConfig instead.
+// TODO: We should eventually find a way to consolidate them.
 type Config struct {
 	rootPath string
 
@@ -194,9 +195,7 @@ type Config struct {
 	// DisperserKMSKeyID is the KMS key ID used to encrypt disperser data
 	DisperserKMSKeyID string
 
-	UserReservationSymbolsPerSecond uint64
-	ClientLedgerMode                clientledger.ClientLedgerMode
-	UseControllerMediatedPayments   bool
+	UseControllerMediatedPayments bool
 }
 
 func (env *Config) IsEigenDADeployed() bool {

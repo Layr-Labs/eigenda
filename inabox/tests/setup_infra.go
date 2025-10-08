@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/testcontainers/testcontainers-go/network"
@@ -25,11 +24,9 @@ type InfrastructureConfig struct {
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
 
-	// The following fields are temporary, to be able to test different payments configurations. They will be removed
+	// The following field is temporary, to be able to test different payments configurations. It will be removed
 	// once legacy payments are removed.
-	UserReservationSymbolsPerSecond uint64
-	ClientLedgerMode                clientledger.ClientLedgerMode
-	ControllerUseNewPayments        bool
+	ControllerUseNewPayments bool
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
@@ -58,8 +55,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 
 	testConfig := deploy.ReadTestConfig(testName, config.RootPath)
-	testConfig.UserReservationSymbolsPerSecond = config.UserReservationSymbolsPerSecond
-	testConfig.ClientLedgerMode = config.ClientLedgerMode
 	testConfig.UseControllerMediatedPayments = config.ControllerUseNewPayments
 
 	// Create a long-lived context for the infrastructure lifecycle
@@ -132,9 +127,8 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	operatorHarnessConfig := &OperatorHarnessConfig{
 		TestConfig: testConfig,
 		TestName:   testName,
-		Logger:     logger,
 	}
-	operatorHarness, err := SetupOperatorHarness(infraCtx, operatorHarnessConfig, &infra.ChainHarness)
+	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup operator harness: %w", err)
 		return nil, setupErr
@@ -159,7 +153,7 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	defer cleanupCancel()
 
 	// Stop operator goroutines using the harness cleanup
-	infra.OperatorHarness.Cleanup(cleanupCtx, infra.Logger)
+	infra.OperatorHarness.Cleanup(infra.Logger)
 
 	// Stop test binaries
 	infra.Logger.Info("Stopping binaries")

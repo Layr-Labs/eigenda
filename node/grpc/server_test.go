@@ -184,7 +184,23 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 		Validator:      val,
 		ValidationPool: workerpool.New(1),
 	}
-	return grpc.NewServer(config, node, logger, ratelimiter, version.DefaultVersion())
+
+	// Create listeners with OS-allocated ports for testing
+	v1DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
+	v1RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
+	return grpc.NewServer(
+		config,
+		node,
+		logger,
+		ratelimiter,
+		version.DefaultVersion(),
+		v1DispersalListener,
+		v1RetrievalListener,
+	)
 }
 
 func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold uint8) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
