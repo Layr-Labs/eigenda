@@ -14,7 +14,11 @@ import (
 )
 
 type KzgMultiProofGnarkBackend struct {
-	Fs         *fft.FFTSettings
+	Fs *fft.FFTSettings
+	// FFTPointsT contains the transposed SRSTable points.
+	// See section 3.1 of https://eprint.iacr.org/2023/033.pdf:
+	//   "Note that the vector multiplied by the matrix is independent from the polynomial coefficients,
+	//   so its Fourier transform can be precomputed"
 	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
 	SFs        *fft.FFTSettings
 }
@@ -23,15 +27,32 @@ type WorkerResult struct {
 	err error
 }
 
+// Computes a KZG multi-reveal proof for chunks containing in each frame.
+//
+// Each RS encoded blob contains numChunks*chunkLen field elements (symbols).
+// For each chunk, we generate a multiproof opening for the chunkLen field elements
+// belonging to that chunk.
+// There are thus 2 levels of acceleration:
+// 1. multiproof generates a single proof per chunk, revealing all field elements contained in that chunk.
+// 2. each of the numChunks multiproofs are generated in parallel
+//
+// This algorithm is described in the "Fast Amortized KZG/Kate Proofs" papers. For background, read:
+// 1. https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html (single multiproof theory)
+// 2. https://eprint.iacr.org/2023/033.pdf (how to compute the single multiproof fast)
+// 3. https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf (fast multiple multiproofs)
 func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 	polyFr []fr.Element, numChunks, chunkLen, numWorker uint64,
 ) ([]bn254.G1Affine, error) {
+	// We describe the steps in the computation by following section 2.2 of
+	// https://eprint.iacr.org/2023/033.pdf, generalized to the multiple multiproofs case.
+	// eqn (1) DFT_2d(s^) is already precomputed and stored in [p.FFTPointsT].
+
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
 	dimE := numChunks
 	l := chunkLen
 
-	// Pre-processing stage
+	// eqn (2) DFT_2d(c^)
 	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
 	if err != nil {
 		return nil, fmt.Errorf("coefficient computation error: %w", err)
@@ -44,6 +65,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 	for i := uint64(0); i < dimE*2; i++ {
 
 		go func(k uint64) {
+			// eqn (3) u=y*v
 			_, err := sumVec[k].MultiExp(p.FFTPointsT[k], coeffStore[k], ecc.MultiExpConfig{})
 			// handle error
 			msmErrors <- err
@@ -59,7 +81,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 
 	msmDone := time.Now()
 
-	// only 1 ifft is needed
+	// eqn (4) h^ = iDFT_2d(u)
 	sumVecInv, err := p.Fs.FFTG1(sumVec, true)
 	if err != nil {
 		return nil, fmt.Errorf("fft error: %w", err)
@@ -67,8 +89,14 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 
 	firstECNttDone := time.Now()
 
-	// outputs is out of order - buttefly
-	proofs, err := p.Fs.FFTG1(sumVecInv[:dimE], false)
+	// last step (5) "take first d elements of h^ as h"
+	h := sumVecInv[:dimE]
+
+	// Now that we have h, we compute C_T = FFT(h), from section 2.1.
+	// Also see https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf section 2
+	// for more explanation as to why we take the FFT.
+	// outputs is out of order - butterfly
+	proofs, err := p.Fs.FFTG1(h, false)
 	if err != nil {
 		return nil, fmt.Errorf("fft error: %w", err)
 	}
@@ -86,7 +114,8 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 	return proofs, nil
 }
 
-// Helper function to handle coefficient computation
+// Helper function to handle coefficient computation.
+// Returns a [2*dimE][l] slice.
 func (p *KzgMultiProofGnarkBackend) computeCoeffStore(
 	polyFr []fr.Element, numWorker, l, dimE uint64,
 ) ([][]fr.Element, error) {
@@ -166,7 +195,6 @@ func (p *KzgMultiProofGnarkBackend) GetSlicesCoeff(polyFr []fr.Element, dimE, j,
 
 	toeV := make([]fr.Element, tDim)
 	for i := uint64(0); i < dim; i++ {
-
 		toeV[i].Set(&polyFr[m-(j+i*l)])
 	}
 

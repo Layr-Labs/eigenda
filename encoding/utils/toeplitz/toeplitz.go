@@ -36,13 +36,13 @@ func NewToeplitz(v []fr.Element, fs *fft.FFTSettings) (*Toeplitz, error) {
 // Take FFT on Toeplitz vector, coefficient is used for computing hadamard product
 // but carried with multi scalar multiplication
 func (t *Toeplitz) GetFFTCoeff() ([]fr.Element, error) {
-	cv := t.extendCircularVec()
+	cv := t.extendCirculantVec()
 	// TODO(samlaf): why do we convert to row if inside getFFTCoeff we convert back to col?
 	rv := t.fromColVToRowV(cv)
 	return t.getFFTCoeff(rv)
 }
 
-// Expand toeplitz matrix into circular matrix
+// Expand toeplitz matrix into circulant matrix
 // the outcome is a also concise representation
 // if   V is (v_0, v_1, v_2, v_3, v_4, v_5, v_6)
 // then E is (v_0, v_6, v_5, v_4, 0,   v_3, v_2, v_1)
@@ -55,13 +55,12 @@ func (t *Toeplitz) GetFFTCoeff() ([]fr.Element, error) {
 // [v_4, 0  , v_3, v_2, v_1, v_0, v_6, v_5 ]
 // [v_5, v_4, 0  , v_3, v_2, v_1, v_0, v_6 ]
 // [v_6, v_5, v_4, 0  , v_3, v_2, v_1, v_0 ]
-func (t *Toeplitz) extendCircularVec() []fr.Element {
+func (t *Toeplitz) extendCirculantVec() []fr.Element {
 	E := make([]fr.Element, len(t.V)+1) // extra 1 from extended, equal to 2*dimE
-	numRow := t.getMatDim()
 	E[0].Set(&t.V[0])
-
+	
+	numRow := t.getMatDim()
 	for i := 1; i < numRow; i++ {
-
 		E[i].Set(&t.V[len(t.V)-i])
 	}
 
@@ -86,14 +85,13 @@ func (t *Toeplitz) fromColVToRowV(cv []fr.Element) []fr.Element {
 	rv[0].Set(&cv[0])
 
 	for i := 1; i < n; i++ {
-
 		rv[i].Set(&cv[n-i])
 	}
 
 	return rv
 }
 
-// Taking FFT on the circular matrix vector
+// Taking FFT on the circulant matrix vector
 func (t *Toeplitz) getFFTCoeff(rowV []fr.Element) ([]fr.Element, error) {
 	n := len(rowV)
 	colV := make([]fr.Element, n)

@@ -67,7 +67,7 @@ func TestExtendCircularVec(t *testing.T) {
 	toep, err := NewToeplitz(v, fs)
 	require.Nil(t, err)
 
-	cVec := toep.extendCircularVec()
+	cVec := toep.extendCirculantVec()
 	assert.Equal(t, cVec[0], v[0])
 	assert.Equal(t, cVec[1], v[6])
 	assert.Equal(t, cVec[2], v[5])
@@ -95,7 +95,7 @@ func TestFromColVToRowV(t *testing.T) {
 	toep, err := NewToeplitz(v, fs)
 	require.Nil(t, err)
 
-	cVec := toep.extendCircularVec()
+	cVec := toep.extendCirculantVec()
 	rVec := toep.fromColVToRowV(cVec)
 	assert.Equal(t, rVec[0], v[0])
 	assert.Equal(t, rVec[1], v[1])

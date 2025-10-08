@@ -323,6 +323,8 @@ func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Aff
 		return nil, nil, fmt.Errorf("failed to get sub tables: %w", err)
 	}
 
+	// TODO(samlaf): if we only use the transposed points in MultiProof,
+	// why didn't we store the SRSTables in transposed form?
 	fftPointsT := make([][]bn254.G1Affine, len(fftPoints[0]))
 	for i := range fftPointsT {
 		fftPointsT[i] = make([]bn254.G1Affine, len(fftPoints))
