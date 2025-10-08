@@ -79,6 +79,21 @@ func createTestKMSKey(
 	return keyID, publicAddress
 }
 
+func TestKMSSignatureVerificationWithEmptyKeyID(t *testing.T) {
+	ctx := t.Context()
+
+	// Try to create signer with empty KeyID - validation should catch it immediately
+	_, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:   region,
+		Endpoint: localstackHost,
+		KeyID:    "", // Empty KeyID
+	})
+
+	require.Error(t, err, "should fail to create signer with empty KeyID")
+	require.Contains(t, err.Error(), "invalid configuration")
+	require.Contains(t, err.Error(), "KeyID is required")
+}
+
 func TestKMSSignatureVerification(t *testing.T) {
 	ctx := t.Context()
 	rand := random.NewTestRandom()
