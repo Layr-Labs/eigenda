@@ -459,7 +459,7 @@ func generateMarkdownDoc(
 
 	if len(optionalFields) > 0 {
 		sb.WriteString("## Optional Fields\n\n")
-		sb.WriteString("| Name | Type/Default | Description |\n")
+		sb.WriteString("| Name | Type<br>Default | Description |\n")
 		sb.WriteString("|------|--------------|-------------|\n")
 
 		for _, f := range optionalFields {
@@ -480,7 +480,7 @@ func generateMarkdownDoc(
 	if len(unsafeFields) > 0 {
 		sb.WriteString("## Unsafe Fields\n\n")
 		sb.WriteString("These fields are generally unsafe to modify unless you know what you are doing.\n\n")
-		sb.WriteString("| Name | Type/Default | Description |\n")
+		sb.WriteString("| Name | Type<br>Default | Description |\n")
 		sb.WriteString("|------|--------------|-------------|\n")
 
 		for _, f := range unsafeFields {

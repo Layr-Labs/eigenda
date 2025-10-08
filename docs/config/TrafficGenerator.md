@@ -18,7 +18,7 @@
 
 ## Optional Fields
 
-| Name | Type/Default | Description |
+| Name | Type<br>Default | Description |
 |------|--------------|-------------|
 | $${\color{red}\texttt{Environment.ClientLedgerPaymentMode}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_CLIENTLEDGERPAYMENTMODE` | `string`<br>`"legacy"` | Client ledger mode used for payments. |
 | $${\color{red}\texttt{Environment.DisableMetrics}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISABLEMETRICS` | `bool`<br>`false` | If true, do not start the metrics server. |
