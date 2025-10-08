@@ -3,7 +3,6 @@ package gnark
 import (
 	"fmt"
 	"log/slog"
-	"math"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -11,20 +10,17 @@ import (
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"golang.org/x/sync/errgroup"
 )
 
 type KzgMultiProofGnarkBackend struct {
 	Fs *fft.FFTSettings
-	// FFTPointsT contains the transposed SRSTable points.
+	// FFTPointsT contains the transposed SRSTable points, of size [2*dimE][l]=[2*numChunks][chunkLen].
 	// See section 3.1 of https://eprint.iacr.org/2023/033.pdf:
 	//   "Note that the vector multiplied by the matrix is independent from the polynomial coefficients,
 	//   so its Fourier transform can be precomputed"
-	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
+	FFTPointsT [][]bn254.G1Affine
 	SFs        *fft.FFTSettings
-}
-
-type WorkerResult struct {
-	err error
 }
 
 // Computes a KZG multi-reveal proof for chunks containing in each frame.
@@ -61,22 +57,20 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 
 	// compute proof by multi scaler multiplication
 	sumVec := make([]bn254.G1Affine, dimE*2)
-	msmErrors := make(chan error, dimE*2)
-	for i := uint64(0); i < dimE*2; i++ {
 
-		go func(k uint64) {
+	g := new(errgroup.Group)
+	for i := uint64(0); i < dimE*2; i++ {
+		g.Go(func() error {
 			// eqn (3) u=y*v
-			_, err := sumVec[k].MultiExp(p.FFTPointsT[k], coeffStore[k], ecc.MultiExpConfig{})
-			// handle error
-			msmErrors <- err
-		}(i)
+			_, err := sumVec[i].MultiExp(p.FFTPointsT[i], coeffStore[i], ecc.MultiExpConfig{})
+			if err != nil {
+				return fmt.Errorf("multi exp: %w", err)
+			}
+			return nil
+		})
 	}
-
-	for i := uint64(0); i < dimE*2; i++ {
-		err := <-msmErrors
-		if err != nil {
-			return nil, fmt.Errorf("msm error: %w", err)
-		}
+	if err := g.Wait(); err != nil {
+		return nil, fmt.Errorf("errgroup: %w", err)
 	}
 
 	msmDone := time.Now()
@@ -119,78 +113,48 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 func (p *KzgMultiProofGnarkBackend) computeCoeffStore(
 	polyFr []fr.Element, numWorker, l, dimE uint64,
 ) ([][]fr.Element, error) {
-	jobChan := make(chan uint64, numWorker)
-	results := make(chan WorkerResult, numWorker)
-
 	coeffStore := make([][]fr.Element, dimE*2)
 	for i := range coeffStore {
 		coeffStore[i] = make([]fr.Element, l)
 	}
 
-	// Start workers
-	for w := uint64(0); w < numWorker; w++ {
-		go p.proofWorker(polyFr, jobChan, l, dimE, coeffStore, results)
+	// Worker pool to compute each column of coeffStore in parallel
+	g := new(errgroup.Group)
+	g.SetLimit(int(numWorker))
+	for j := range l {
+		g.Go(func() error {
+			coeffs, err := p.getSlicesCoeff(polyFr, dimE, j, l)
+			if err != nil {
+				return fmt.Errorf("get slices coeff: %w", err)
+			}
+			for i := range len(coeffs) {
+				// fill in coeffStore column j with coeffs
+				coeffStore[i][j] = coeffs[i]
+			}
+			return nil
+		})
 	}
-
-	// Send jobs
-	for j := uint64(0); j < l; j++ {
-		jobChan <- j
+	if err := g.Wait(); err != nil {
+		return nil, fmt.Errorf("errgroup: %w", err)
 	}
-	close(jobChan)
-
-	// Collect results
-	var lastErr error
-	for w := uint64(0); w < numWorker; w++ {
-		if wr := <-results; wr.err != nil {
-			lastErr = wr.err
-		}
-	}
-
-	if lastErr != nil {
-		return nil, fmt.Errorf("proof worker error: %w", lastErr)
-	}
-
 	return coeffStore, nil
 }
 
-func (p *KzgMultiProofGnarkBackend) proofWorker(
-	polyFr []fr.Element,
-	jobChan <-chan uint64,
-	l uint64,
-	dimE uint64,
-	coeffStore [][]fr.Element,
-	results chan<- WorkerResult,
-) {
-
-	for j := range jobChan {
-		coeffs, err := p.GetSlicesCoeff(polyFr, dimE, j, l)
-		if err != nil {
-			results <- WorkerResult{
-				err: err,
-			}
-		} else {
-			for i := 0; i < len(coeffs); i++ {
-				coeffStore[i][j] = coeffs[i]
-			}
-		}
-	}
-
-	results <- WorkerResult{
-		err: nil,
-	}
-}
-
-// output is in the form see primeField toeplitz
+// output is in the form see primeField toeplitz and has len [2*dimE-1]
 //
 // phi ^ (coset size ) = 1
 //
 // implicitly pad slices to power of 2
-func (p *KzgMultiProofGnarkBackend) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
+//
+// Returns a slice of size 2*dimE
+func (p *KzgMultiProofGnarkBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
 	// there is a constant term
 	m := uint64(len(polyFr)) - 1
 	dim := (m - j) / l
 
 	// maximal number of unique values from a toeplitz matrix
+	// TODO(samlaf): we set this to 2*dimE-1, but then GetFFTCoeff returns a new slice of size 2*dimE
+	// Can we just create an initial slice of size 2*dimE and modify it in place..?
 	tDim := 2*dimE - 1
 
 	toeV := make([]fr.Element, tDim)
@@ -208,12 +172,4 @@ func (p *KzgMultiProofGnarkBackend) GetSlicesCoeff(polyFr []fr.Element, dimE, j,
 		return nil, fmt.Errorf("toeplitz get fft coeff: %w", err)
 	}
 	return e, nil
-}
-
-/*
-returns the power of 2 which is immediately bigger than the input
-*/
-func CeilIntPowerOf2Num(d uint64) uint64 {
-	nextPower := math.Ceil(math.Log2(float64(d)))
-	return uint64(math.Pow(2.0, nextPower))
 }
