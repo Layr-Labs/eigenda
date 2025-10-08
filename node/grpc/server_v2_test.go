@@ -3,6 +3,7 @@ package grpc_test
 import (
 	"context"
 	"errors"
+	"net"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -120,6 +121,12 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	// The eth client is only utilized for StoreChunks validation, which is disabled in these tests
 	var reader *coreeth.Reader
 
+	// Create listeners with OS-allocated ports for testing
+	v2DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+	v2RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
 	server, err := grpc.NewServerV2(
 		context.Background(),
 		config,
@@ -128,7 +135,9 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		ratelimiter,
 		prometheus.NewRegistry(),
 		reader,
-		version.DefaultVersion())
+		version.DefaultVersion(),
+		v2DispersalListener,
+		v2RetrievalListener)
 
 	require.NoError(t, err)
 	return &testComponents{
