@@ -188,7 +188,11 @@ func RunController(cliCtx *cli.Context) error {
 	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 
 	// Create node client manager
-	nodeClientManager, err := controller.NewNodeClientManager(config.DispatcherConfig.NodeClientCacheSize, requestSigner, logger)
+	nodeClientManager, err := controller.NewNodeClientManager(
+		config.DispatcherConfig.NodeClientCacheSize,
+		requestSigner,
+		logger,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %w", err)
 	}
