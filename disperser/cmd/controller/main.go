@@ -9,7 +9,15 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -19,7 +27,13 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
+	payments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
+	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
 )
@@ -138,41 +152,201 @@ func RunController(cliCtx *cli.Context) error {
 	}
 
 	ctx := context.Background()
-	_, err = controller.StartController(
+
+	// Create metadata store
+	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.DynamoDBTableName)
+	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+		ServiceName: "controller",
+		Registry:    metricsRegistry,
+		Backend:     blobstore.BackendDynamoDB,
+	})
+
+	// Create chain reader
+	chainReader, err := eth.NewReader(
+		logger,
+		gethClient,
+		operatorStateRetrieverAddress.Hex(),
+		serviceManagerAddress.Hex())
+	if err != nil {
+		return fmt.Errorf("failed to create chain reader: %w", err)
+	}
+
+	// Create encoder client
+	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
+	if err != nil {
+		return fmt.Errorf("failed to create encoder client: %w", err)
+	}
+
+	// Create signature aggregator
+	sigAgg, err := core.NewStdSignatureAggregator(logger, chainReader)
+	if err != nil {
+		return fmt.Errorf("failed to create signature aggregator: %w", err)
+	}
+
+	// Create indexed chain state
+	chainState := eth.NewChainState(chainReader, gethClient)
+	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+
+	// Create node client manager
+	nodeClientManager, err := controller.NewNodeClientManager(config.DispatcherConfig.NodeClientCacheSize, requestSigner, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create node client manager: %w", err)
+	}
+
+	// Create batch metadata manager
+	batchMetadataManager, err := metadata.NewBatchMetadataManager(
 		ctx,
 		logger,
 		gethClient,
-		dynamoClient,
-		config.DynamoDBTableName,
-		metricsRegistry,
-		requestSigner,
-		operatorStateRetrieverAddress,
-		serviceManagerAddress,
+		ics,
 		registryCoordinatorAddress,
-		config.ChainStateConfig.Endpoint,
+		config.DispatcherConfig.BatchMetadataUpdatePeriod,
+		config.DispatcherConfig.FinalizationBlockDelay,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create batch metadata manager: %w", err)
+	}
+
+	// Build payment authorization handler if needed
+	var paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
+	if config.ServerConfig.EnableServer && config.ServerConfig.EnablePaymentAuthentication {
+		logger.Info("Payment authentication ENABLED - building payment authorization handler")
+		paymentAuthorizationHandler, err = buildPaymentAuthorizationHandler(
+			ctx,
+			logger,
+			config.OnDemandConfig,
+			config.ReservationConfig,
+			contractDirectory,
+			gethClient,
+			dynamoClient.GetAwsClient(),
+			metricsRegistry,
+		)
+		if err != nil {
+			return fmt.Errorf("build payment authorization handler: %w", err)
+		}
+	}
+
+	// Create controller
+	c, err := controller.NewController(
+		logger,
+		metadataStore,
+		chainReader,
+		encoderClient,
+		ics,
+		batchMetadataManager,
+		sigAgg,
+		nodeClientManager,
+		metricsRegistry,
 		&config.EncodingManagerConfig,
 		&config.DispatcherConfig,
+		&config.ServerConfig,
+		paymentAuthorizationHandler,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create controller: %w", err)
+	}
 
-		// Chain state config
-		config.ChainStateConfig,
-
-		// Optional components
-		metricsServer,
-		config.ControllerReadinessProbePath,
-		healthcheck.HeartbeatMonitorConfig{
+	// Start controller
+	if err := c.Start(ctx, controller.StartOptions{
+		MetricsServer:      metricsServer,
+		ReadinessProbePath: config.ControllerReadinessProbePath,
+		HeartbeatMonitorConfig: healthcheck.HeartbeatMonitorConfig{
 			FilePath:         config.ControllerHealthProbePath,
 			MaxStallDuration: controllerMaxStallDuration,
 		},
-
-		// Server config
-		&config.ServerConfig,
-		&config.OnDemandConfig,
-		&config.ReservationConfig,
-		contractDirectory,
-	)
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to start controller: %w", err)
 	}
 
 	return nil
+}
+
+func buildPaymentAuthorizationHandler(
+	ctx context.Context,
+	logger logging.Logger,
+	onDemandConfig ondemandvalidation.OnDemandLedgerCacheConfig,
+	reservationConfig reservationvalidation.ReservationLedgerCacheConfig,
+	contractDirectory *directory.ContractDirectory,
+	ethClient common.EthClient,
+	awsDynamoClient *awsdynamodb.Client,
+	metricsRegistry *prometheus.Registry,
+) (*payments.PaymentAuthorizationHandler, error) {
+	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddress)
+	if err != nil {
+		return nil, fmt.Errorf("create payment vault: %w", err)
+	}
+
+	globalSymbolsPerSecond, err := paymentVault.GetGlobalSymbolsPerSecond(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get global symbols per second: %w", err)
+	}
+
+	globalRatePeriodInterval, err := paymentVault.GetGlobalRatePeriodInterval(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get global rate period interval: %w", err)
+	}
+
+	onDemandMeterer := meterer.NewOnDemandMeterer(
+		globalSymbolsPerSecond,
+		globalRatePeriodInterval,
+		time.Now,
+		meterer.NewOnDemandMetererMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+	)
+
+	onDemandValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
+		ctx,
+		logger,
+		onDemandConfig,
+		paymentVault,
+		awsDynamoClient,
+		ondemandvalidation.NewOnDemandValidatorMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+		ondemandvalidation.NewOnDemandCacheMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create on-demand payment validator: %w", err)
+	}
+
+	reservationValidator, err := reservationvalidation.NewReservationPaymentValidator(
+		ctx,
+		logger,
+		reservationConfig,
+		paymentVault,
+		time.Now,
+		reservationvalidation.NewReservationValidatorMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+		reservationvalidation.NewReservationCacheMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create reservation payment validator: %w", err)
+	}
+
+	return payments.NewPaymentAuthorizationHandler(
+		onDemandMeterer,
+		onDemandValidator,
+		reservationValidator,
+	), nil
 }

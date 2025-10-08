@@ -13,12 +13,14 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
@@ -506,44 +508,94 @@ func startController(
 	chainStateConfig := thegraph.DefaultConfig()
 	chainStateConfig.Endpoint = operatorStateSubgraphURL
 
-	// Start controller using shared function
-	controllerInstance, err := controller.StartController(
+	// Create metadata store
+	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, controllerLogger, config.MetadataTableNameV2)
+	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+		ServiceName: "controller",
+		Registry:    metricsRegistry,
+		Backend:     blobstore.BackendDynamoDB,
+	})
+
+	// Create chain reader
+	chainReader, err := eth.NewReader(
+		controllerLogger,
+		ethClient,
+		config.TestConfig.EigenDA.OperatorStateRetriever,
+		config.TestConfig.EigenDA.ServiceManager)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create chain reader: %w", err)
+	}
+
+	// Create encoder client
+	encoderClient, err := encoder.NewEncoderClientV2(encodingManagerConfig.EncoderAddress)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create encoder client: %w", err)
+	}
+
+	// Create signature aggregator
+	sigAgg, err := core.NewStdSignatureAggregator(controllerLogger, chainReader)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create signature aggregator: %w", err)
+	}
+
+	// Create indexed chain state
+	chainState := eth.NewChainState(chainReader, ethClient)
+	ics := thegraph.MakeIndexedChainState(chainStateConfig, chainState, controllerLogger)
+
+	// Create node client manager
+	nodeClientManager, err := controller.NewNodeClientManager(dispatcherConfig.NodeClientCacheSize, requestSigner, controllerLogger)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create node client manager: %w", err)
+	}
+
+	// Create batch metadata manager
+	batchMetadataManager, err := metadata.NewBatchMetadataManager(
 		ctx,
 		controllerLogger,
 		ethClient,
-		dynamoClient,
-		config.MetadataTableNameV2,
-		metricsRegistry,
-		requestSigner,
-		gethcommon.HexToAddress(config.TestConfig.EigenDA.OperatorStateRetriever),
-		gethcommon.HexToAddress(config.TestConfig.EigenDA.ServiceManager),
+		ics,
 		gethcommon.HexToAddress(config.TestConfig.EigenDA.RegistryCoordinator),
-		operatorStateSubgraphURL,
-		encodingManagerConfig,
-		dispatcherConfig,
-		chainStateConfig,
-		// Optional components (not needed for tests)
-		nil,                                  // metricsServer
-		"",                                   // readinessProbePath
-		healthcheck.HeartbeatMonitorConfig{}, // No heartbeat monitor for tests
-		// Server config
-		// TODO(dmanc): Add server config
-		nil, // serverConfig
-		nil, // onDemandConfig
-		nil, // reservationConfig
-		nil, // contractDirectory
+		dispatcherConfig.BatchMetadataUpdatePeriod,
+		dispatcherConfig.FinalizationBlockDelay,
 	)
 	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create batch metadata manager: %w", err)
+	}
+
+	// Create controller
+	controllerInstance, err := controller.NewController(
+		controllerLogger,
+		metadataStore,
+		chainReader,
+		encoderClient,
+		ics,
+		batchMetadataManager,
+		sigAgg,
+		nodeClientManager,
+		metricsRegistry,
+		encodingManagerConfig,
+		dispatcherConfig,
+		nil, // No server config for tests
+		nil, // No payment authorization handler for tests
+	)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create controller: %w", err)
+	}
+
+	// Start controller
+	if err := controllerInstance.Start(ctx, controller.StartOptions{}); err != nil {
 		_ = logFile.Close()
 		return fmt.Errorf("failed to start controller: %w", err)
 	}
 
 	// Store controller instance in harness
-	harness.Controller = &controller.Controller{
-		EncodingManager: controllerInstance.EncodingManager,
-		Dispatcher:      controllerInstance.Dispatcher,
-		Server:          controllerInstance.Server,
-	}
+	harness.Controller = controllerInstance
 
 	controllerLogger.Info("Controller started successfully", "logFile", logFilePath)
 
