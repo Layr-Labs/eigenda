@@ -1,3 +1,7 @@
+// toeplitz package is outdated, and only kept around for v1 prover.
+// prover v2 replaces this implementation with an inlined version
+// that does a lot less needless allocations and copies.
+// See getSlicesCoeff in encoding/kzg/prover/v2/gnark/multiframe_proof.go
 package toeplitz
 
 import (
@@ -59,7 +63,7 @@ func (t *Toeplitz) GetFFTCoeff() ([]fr.Element, error) {
 func (t *Toeplitz) extendCirculantVec() []fr.Element {
 	E := make([]fr.Element, len(t.V)+1) // extra 1 from extended, equal to 2*dimE
 	E[0].Set(&t.V[0])
-	
+
 	numRow := t.getMatDim()
 	for i := 1; i < numRow; i++ {
 		E[i].Set(&t.V[len(t.V)-i])
