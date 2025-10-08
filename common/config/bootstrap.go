@@ -46,10 +46,7 @@ var (
 )
 
 // Reads command line arguments, loads configuration from files and environment variables as specified.
-func Bootstrap[T VerifiableConfig](
-	constructor func() T,
-	defaultEnvVarPrefix string,
-) (T, error) {
+func Bootstrap[T DocumentedConfig](constructor func() T) (T, error) {
 
 	// We need a logger before we have a logger config. Once we parse config, we can initialize the real logger.
 	bootstrapLogger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -58,7 +55,7 @@ func Bootstrap[T VerifiableConfig](
 		return zero, fmt.Errorf("failed to create bootstrap logger: %w", err)
 	}
 
-	action, cfgChan := buildHandler(bootstrapLogger, constructor, defaultEnvVarPrefix)
+	action, cfgChan := buildHandler(bootstrapLogger, constructor)
 
 	app := &cli.App{
 		Flags: []cli.Flag{
@@ -91,10 +88,9 @@ func Bootstrap[T VerifiableConfig](
 
 }
 
-func buildHandler[T VerifiableConfig](
+func buildHandler[T DocumentedConfig](
 	logger logging.Logger,
 	constructor func() T,
-	defaultEnvVarPrefix string,
 ) (cli.ActionFunc, chan T) {
 
 	cfgChan := make(chan T, 1)
@@ -106,13 +102,6 @@ func buildHandler[T VerifiableConfig](
 		overrideEnvPrefix := cliCTX.String(overrideEnvPrefixFlag.Name)
 		configFiles := cliCTX.StringSlice(configFileFlag.Name)
 
-		prefix := defaultEnvVarPrefix
-		if disableEnvVars {
-			prefix = ""
-		} else if overrideEnvPrefix != "" {
-			prefix = overrideEnvPrefix
-		}
-
 		if debug {
 			waitForDebugger(logger)
 		}
@@ -121,7 +110,16 @@ func buildHandler[T VerifiableConfig](
 			startPprofServer(logger, pprofPort)
 		}
 
-		cfg, err := ParseConfig(constructor, prefix, configFiles...)
+		defaultConfig := constructor()
+
+		prefix := defaultConfig.GetEnvVarPrefix()
+		if disableEnvVars {
+			prefix = ""
+		} else if overrideEnvPrefix != "" {
+			prefix = overrideEnvPrefix
+		}
+
+		cfg, err := ParseConfig(defaultConfig, prefix, configFiles...)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}

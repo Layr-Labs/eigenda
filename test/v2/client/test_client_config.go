@@ -12,32 +12,32 @@ import (
 // TestClientConfig is the configuration for the test client.
 type TestClientConfig struct {
 	// The location where the SRS files can be found.
-	SRSPath string
+	SRSPath string `docs:"required"`
 	// The location where the test client's private key is stored. This is the key for the account that is
 	// paying for dispersals.
 	//
 	// Either this or KeyVar must be set. If both are set, KeyPath is used.
-	KeyPath string
+	KeyPath string `docs:"required"`
 	// The environment variable that contains the private key for the account that is paying for dispersals.
 	//
 	// This is used if KeyPath is not set.
-	KeyVar string
+	KeyVar string `docs:"required"`
 	// The disperser's hostname (url or IP address)
-	DisperserHostname string
+	DisperserHostname string `docs:"required"`
 	// The disperser's port
-	DisperserPort int
+	DisperserPort int `docs:"required"`
 	// The URL(s) to point the eth client to
 	//
 	// Either this or EthRPCURLsVar must be set. If both are set, EthRPCURLs is used.
-	EthRPCURLs []string
+	EthRPCURLs []string `docs:"required"`
 	// The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.
 	//
 	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.
-	EthRPCUrlsVar string
+	EthRPCUrlsVar string `docs:"required"`
 	// The contract address for the EigenDA address directory, where all contract addresses are stored
-	ContractDirectoryAddress string
+	ContractDirectoryAddress string `docs:"required"`
 	// The URL/IP of a subgraph to use for the chain state
-	SubgraphURL string
+	SubgraphURL string `docs:"required"`
 	// The SRS order to use for the test
 	SRSOrder uint64
 	// The SRS number to load, increasing this beyond necessary can cause the client to take a long time to start
