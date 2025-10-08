@@ -78,11 +78,17 @@ func Bootstrap[T VerifiableConfig](
 		return zero, fmt.Errorf("error parsing command line arguments: %w", err)
 	}
 
-	// If the help flag was set, don't block waiting for cfgChan.
-	// TODO Claude implement this
+	// If the help flag was set, the action never runs and cfgChan is never written to.
+	// Check if we have a config; if not, the help was shown and we should exit.
+	select {
+	case cfg := <-cfgChan:
+		return cfg, nil
+	default:
+		// Help was shown, return zero value
+		var zero T
+		return zero, nil
+	}
 
-	cfg := <-cfgChan
-	return cfg, nil
 }
 
 func buildHandler[T VerifiableConfig](
