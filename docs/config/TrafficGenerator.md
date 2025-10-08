@@ -4,7 +4,7 @@
 
 ## Required Fields
 
-| Name | Info | Description |
+| Name | Type | Description |
 |------|------|-------------|
 | $${\color{red}\texttt{Environment.ContractDirectoryAddress}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_CONTRACTDIRECTORYADDRESS` | `string` | The contract address for the EigenDA address directory, where all contract addresses are stored |
 | $${\color{red}\texttt{Environment.DisperserHostname}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERHOSTNAME` | `string` | The disperser's hostname (url or IP address) |
@@ -18,8 +18,8 @@
 
 ## Optional Fields
 
-| Name | Info | Description |
-|------|------|-------------|
+| Name | Type/Default | Description |
+|------|--------------|-------------|
 | $${\color{red}\texttt{Environment.ClientLedgerPaymentMode}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_CLIENTLEDGERPAYMENTMODE` | `string`<br>`"legacy"` | Client ledger mode used for payments. |
 | $${\color{red}\texttt{Environment.DisableMetrics}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISABLEMETRICS` | `bool`<br>`false` | If true, do not start the metrics server. |
 | $${\color{red}\texttt{Environment.DisperserConnectionCount}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSERCONNECTIONCOUNT` | `uint`<br>`8` | The number of connections to open for each disperser. |

@@ -231,9 +231,9 @@ type configFieldData struct {
 
 // parseDocsTag parses the `docs` struct tag and returns whether the field is required, deprecated, or unsafe.
 // Only one tag value is allowed per field.
-func parseDocsTag(tag string) (required bool, deprecated bool, unsafe bool) {
+func parseDocsTag(tag string) (required bool, deprecated bool, unsafe bool, err error) {
 	if tag == "" {
-		return false, false, false
+		return false, false, false, nil
 	}
 
 	// Trim whitespace for flexibility
@@ -246,8 +246,10 @@ func parseDocsTag(tag string) (required bool, deprecated bool, unsafe bool) {
 		deprecated = true
 	case UnsafeTag:
 		unsafe = true
+	default:
+		return false, false, false, fmt.Errorf("invalid docs tag value %q", tag)
 	}
-	return required, deprecated, unsafe
+	return required, deprecated, unsafe, nil
 }
 
 func gatherConfigFieldData(
@@ -259,8 +261,20 @@ func gatherConfigFieldData(
 
 	// Handle pointer to struct
 	targetValue := reflect.ValueOf(target)
+
+	// Check if the value is valid (handles nil interface case)
+	if !targetValue.IsValid() {
+		return nil, fmt.Errorf("cannot process invalid (nil interface) value")
+	}
+
 	if targetValue.Kind() == reflect.Ptr {
-		targetValue = targetValue.Elem()
+		// If the pointer is nil, create a zero value of the pointed-to type
+		if targetValue.IsNil() {
+			targetType := targetValue.Type().Elem()
+			targetValue = reflect.New(targetType).Elem()
+		} else {
+			targetValue = targetValue.Elem()
+		}
 	}
 	targetType := targetValue.Type()
 
@@ -309,15 +323,7 @@ func gatherConfigFieldData(
 			// nolint:nestif
 			if field.Type.Elem().Kind() == reflect.Struct {
 				fieldValue := targetValue.Field(i)
-
-				// Use the actual pointer value if it's not nil, otherwise use the actual field which may be nil
-				var nestedValue interface{}
-				if !fieldValue.IsNil() {
-					nestedValue = fieldValue.Interface()
-				} else {
-					// If the pointer is nil, we still pass it along so the recursion can handle it
-					nestedValue = fieldValue.Interface()
-				}
+				nestedValue := fieldValue.Interface()
 
 				nestedEnvVarPrefix := envVarPrefix + "_" + strings.ToUpper(field.Name)
 
@@ -343,7 +349,10 @@ func gatherConfigFieldData(
 				}
 
 				docsTag := field.Tag.Get("docs")
-				required, deprecated, unsafe := parseDocsTag(docsTag)
+				required, deprecated, unsafe, err := parseDocsTag(docsTag)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse docs tag for field %s: %w", field.Name, err)
+				}
 
 				// Get the actual value from the field
 				fieldValue := targetValue.Field(i)
@@ -376,7 +385,10 @@ func gatherConfigFieldData(
 			}
 
 			docsTag := field.Tag.Get("docs")
-			required, deprecated, unsafe := parseDocsTag(docsTag)
+			required, deprecated, unsafe, err := parseDocsTag(docsTag)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse docs tag for field %s: %w", field.Name, err)
+			}
 
 			fields = append(fields, &configFieldData{
 				EnvVar:       envVarPrefix + "_" + strings.ToUpper(field.Name),
@@ -432,7 +444,7 @@ func generateMarkdownDoc(
 
 	if len(requiredFields) > 0 {
 		sb.WriteString("## Required Fields\n\n")
-		sb.WriteString("| Name | Info | Description |\n")
+		sb.WriteString("| Name | Type | Description |\n")
 		sb.WriteString("|------|------|-------------|\n")
 
 		for _, f := range requiredFields {
@@ -447,8 +459,8 @@ func generateMarkdownDoc(
 
 	if len(optionalFields) > 0 {
 		sb.WriteString("## Optional Fields\n\n")
-		sb.WriteString("| Name | Info | Description |\n")
-		sb.WriteString("|------|------|-------------|\n")
+		sb.WriteString("| Name | Type/Default | Description |\n")
+		sb.WriteString("|------|--------------|-------------|\n")
 
 		for _, f := range optionalFields {
 			defaultString := f.DefaultValue
@@ -468,8 +480,8 @@ func generateMarkdownDoc(
 	if len(unsafeFields) > 0 {
 		sb.WriteString("## Unsafe Fields\n\n")
 		sb.WriteString("These fields are generally unsafe to modify unless you know what you are doing.\n\n")
-		sb.WriteString("| Name | Info | Description |\n")
-		sb.WriteString("|------|------|-------------|\n")
+		sb.WriteString("| Name | Type/Default | Description |\n")
+		sb.WriteString("|------|--------------|-------------|\n")
 
 		for _, f := range unsafeFields {
 			defaultString := f.DefaultValue
