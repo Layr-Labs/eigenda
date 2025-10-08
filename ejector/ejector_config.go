@@ -87,7 +87,7 @@ func DefaultEjectorConfig() *EjectorConfig {
 		StartEjectionThrottleFull:            false,
 		LoggerConfig:                         common.DefaultLoggerConfig(),
 		EjectionFinalizationPeriod:           time.Minute,
-		DataApiTimeout:                       time.Duration(60 * time.Second),
+		DataApiTimeout:                       60 * time.Second,
 		EthRpcRetryCount:                     3,
 		EthBlockConfirmations:                0,
 	}
@@ -127,8 +127,8 @@ func (c *EjectorConfig) Verify() error {
 	if c.EjectionThrottleTimePeriod <= 0 {
 		return fmt.Errorf("invalid ejection throttle time period: %s", c.EjectionThrottleTimePeriod)
 	}
-	if c.EthRPCURL == "" {
-		return fmt.Errorf("invalid Ethereum RPC URL: %s", c.EthRPCURL)
+	if len(c.EthRpcUrls) == 0 {
+		return fmt.Errorf("invalid Ethereum RPC URLs: must provide at least one URL")
 	}
 	if c.PrivateKey == "" {
 		return fmt.Errorf("invalid private key")

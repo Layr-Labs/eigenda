@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/ejector"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const ejectorEnvVarPrefix = "EJECTOR"
@@ -40,8 +42,19 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	// TODO is this important?
-	var senderAddress gethcommon.Address
+	var privateKey *ecdsa.PrivateKey
+	privateKey, err = crypto.HexToECDSA(cfg.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	// Derive the public address from the private key
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("failed to get ECDSA public key")
+	}
+	senderAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
 
 	gethClient, err := geth.NewMultiHomingClient(
 		geth.EthClientConfig{
@@ -66,7 +79,27 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("failed to create contract directory: %w", err)
 	}
 
-	ejectionTransactor := ejector.NewEjectionTransactor()
+	ejectionContractAddress, err := contractDirectory.GetContractAddress(ctx, directory.EigenDAEjectionManager)
+	if err != nil {
+		return fmt.Errorf("failed to get ejection manager address: %w", err)
+	}
+
+	chainID, err := gethClient.ChainID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get chain ID: %w", err)
+	}
+
+	ejectionTransactor, err := ejector.NewEjectionTransactor(
+		ctx,
+		gethClient,
+		ejectionContractAddress,
+		senderAddress,
+		privateKey,
+		chainID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create ejection transactor: %w", err)
+	}
 
 	ejectionManager, err := ejector.NewEjectionManager(
 		ctx,
