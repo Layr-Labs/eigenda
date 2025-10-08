@@ -12,11 +12,10 @@ import (
 )
 
 var (
-	pprofFlag = &cli.IntFlag{
-		Name:    "pprof-port",
+	pprofFlag = &cli.BoolFlag{
+		Name:    "pprof",
 		Aliases: []string{"p"},
-		Usage:   "Port for the pprof server.",
-		Value:   6060,
+		Usage:   "If set, starts a pprof server.",
 	}
 	pprofPortFlag = &cli.IntFlag{
 		Name:    "pprof-port",
@@ -63,6 +62,7 @@ func Bootstrap[T VerifiableConfig](
 
 	app := &cli.App{
 		Flags: []cli.Flag{
+			pprofFlag,
 			pprofPortFlag,
 			debugFlag,
 			disableEnvVarsFlag,
@@ -78,8 +78,17 @@ func Bootstrap[T VerifiableConfig](
 		return zero, fmt.Errorf("error parsing command line arguments: %w", err)
 	}
 
-	cfg := <-cfgChan
-	return cfg, nil
+	// If the help flag was set, the action never runs and cfgChan is never written to.
+	// Check if we have a config; if not, the help was shown and we should exit.
+	select {
+	case cfg := <-cfgChan:
+		return cfg, nil
+	default:
+		// Help was shown, return zero value
+		var zero T
+		return zero, nil
+	}
+
 }
 
 func buildHandler[T VerifiableConfig](
