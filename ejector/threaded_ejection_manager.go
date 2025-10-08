@@ -30,14 +30,14 @@ func NewThreadedEjectionManager(
 	ctx context.Context,
 	logger logging.Logger,
 	ejectionManager EjectionManager,
-	period time.Duration,
+	config *EjectorConfig,
 ) *ThreadedEjectionManager {
 	tem := &ThreadedEjectionManager{
 		ctx:                 ctx,
 		logger:              logger,
 		ejectionManager:     ejectionManager,
 		ejectionRequestChan: make(chan geth.Address),
-		period:              period,
+		period:              config.EjectionPeriod,
 	}
 	go tem.mainLoop()
 	return tem

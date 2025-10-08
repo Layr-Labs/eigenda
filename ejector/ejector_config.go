@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
 )
 
@@ -15,25 +16,29 @@ var _ config.VerifiableConfig = (*EjectorConfig)(nil)
 // Configuration for the ejector.
 type EjectorConfig struct {
 
-	////////////////////////
-	// Required arguments //
-	////////////////////////
-
 	// The address of the contract directory contract.
-	ContractDirectoryAddress string
+	ContractDirectoryAddress string `docs:"required"`
 
-	// The Ethereum RPC URL to use for connecting to the blockchain.
-	EthRPCURL string
+	// The Ethereum RPC URL(s) to use for connecting to the blockchain.
+	EthRpcUrls []string `docs:"required"`
 
 	// The private key to use for signing ejection transactions.
-	PrivateKey string
+	PrivateKey string `docs:"required"`
 
 	// The URL of the Eigenda Data API to use for looking up signing rates.
-	DataApiUrl string
+	DataApiUrl string `docs:"required"`
 
-	////////////////////////
-	// Optional arguments //
-	////////////////////////
+	// The number of times to retry a failed Ethereum RPC call.
+	EthRpcRetryCount int
+
+	// The number of block confirmations to wait for before considering an ejection transaction to be confirmed.
+	EthBlockConfirmations int
+
+	// The timeout to use when making requests to the Data API.
+	DataApiTimeout time.Duration
+
+	// Logger configuration.
+	LoggerConfig *common.LoggerConfig
 
 	// The period with which to evaluate validators for ejection.
 	EjectionPeriod time.Duration
@@ -51,7 +56,7 @@ type EjectorConfig struct {
 	MaxConsecutiveFailedEjectionAttempts uint32
 
 	// The maximum fraction of stake (out of 1.0) that can be ejected during an ejection time period.
-	EjectionRateLimit float64
+	EjectionThrottle float64
 
 	// The time period over which the ejection rate limit is calculated. The ejection manager will be allowed to eject
 	// ejectionRateLimit fraction of stake every EjectionThrottleTimePeriod.
@@ -60,6 +65,13 @@ type EjectorConfig struct {
 	// If true, then the ejection manager will immediately be able to eject ejectionRateLimit fraction of stake when it
 	// starts up. If false, then the ejection manager will need to wait before it has this capacity.
 	StartEjectionThrottleFull bool
+
+	// A list of validator addresses that we should never attempt to eject, even if they otherwise
+	// meet the ejection criteria.
+	DoNotEjectTheseValidators []string
+
+	// The period at which to periodically attempt to finalize ejections that have been started.
+	EjectionFinalizationPeriod time.Duration
 }
 
 // DefaultEjectorConfig returns a default configuration for the ejector.
@@ -70,9 +82,14 @@ func DefaultEjectorConfig() *EjectorConfig {
 		EjectionFinalizationDelay:            time.Hour,
 		EjectionRetryDelay:                   24 * time.Hour,
 		MaxConsecutiveFailedEjectionAttempts: 5,
-		EjectionRateLimit:                    0.05, // 5% of stake can be ejected every EjectionThrottleTimePeriod
+		EjectionThrottle:                     0.05, // 5% of stake can be ejected every EjectionThrottleTimePeriod
 		EjectionThrottleTimePeriod:           24 * time.Hour,
 		StartEjectionThrottleFull:            false,
+		LoggerConfig:                         common.DefaultLoggerConfig(),
+		EjectionFinalizationPeriod:           time.Minute,
+		DataApiTimeout:                       time.Duration(60 * time.Second),
+		EthRpcRetryCount:                     3,
+		EthBlockConfirmations:                0,
 	}
 }
 
@@ -103,8 +120,8 @@ func (c *EjectorConfig) Verify() error {
 			c.MaxConsecutiveFailedEjectionAttempts)
 	}
 
-	if c.EjectionRateLimit <= 0 || c.EjectionRateLimit > 1.0 {
-		return fmt.Errorf("invalid ejection rate limit: %f", c.EjectionRateLimit)
+	if c.EjectionThrottle <= 0 || c.EjectionThrottle > 1.0 {
+		return fmt.Errorf("invalid ejection rate limit: %f", c.EjectionThrottle)
 	}
 
 	if c.EjectionThrottleTimePeriod <= 0 {

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+
 // For a target trigger time, determine if it is time to trigger. Time to trigger is defined as the first
 // timestamp that appears after the target time (which means that the previous time is before the target time).
 func isTriggerTime(now time.Time, previousTime time.Time, target time.Time) bool {
@@ -40,26 +41,22 @@ func TestStandardEjection(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 1.00
-	bucketDuration := time.Hour
-	startBucketFull := true
-	var blacklist []geth.Address
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     1.00,
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            true,
+		DoNotEjectTheseValidators:            []string{},
+	}
 
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -80,7 +77,7 @@ func TestStandardEjection(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, nil)
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -88,7 +85,7 @@ func TestStandardEjection(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, nil)
-			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -100,7 +97,7 @@ func TestStandardEjection(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, nil)
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -168,31 +165,26 @@ func TestConstructorBlacklist(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 1.00
-	bucketDuration := time.Hour
-	startBucketFull := true
-
 	// Blacklist B and C, so only A should be ejected.
-	blacklist := []geth.Address{
-		validatorB,
-		validatorC,
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     1.00,
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            true,
+		DoNotEjectTheseValidators: []string{
+			validatorB.Hex(),
+			validatorC.Hex(),
+		},
 	}
 
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -211,7 +203,7 @@ func TestConstructorBlacklist(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, nil)
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -286,26 +278,22 @@ func TestEjectionAlreadyInProgress(t *testing.T) {
 	err := ejectionTransactor.StartEjection(t.Context(), validatorB)
 	require.Error(t, err)
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 1.00
-	bucketDuration := time.Hour
-	startBucketFull := true
-	var blacklist []geth.Address
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     1.00,
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            true,
+		DoNotEjectTheseValidators:            []string{},
+	}
 
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -326,7 +314,7 @@ func TestEjectionAlreadyInProgress(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, nil)
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -334,7 +322,7 @@ func TestEjectionAlreadyInProgress(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 			manager.BeginEjection(validatorB, nil)
-			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -342,7 +330,7 @@ func TestEjectionAlreadyInProgress(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorC]
 			require.False(t, started)
 			manager.BeginEjection(validatorC, nil)
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -410,26 +398,22 @@ func TestMinimumTimeBetweenEjections(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 1.00
-	bucketDuration := time.Hour
-	startBucketFull := true
-	var blacklist []geth.Address
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     1.00,
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            true,
+		DoNotEjectTheseValidators:            []string{},
+	}
 
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Simulate an ejection for B before we start the main loop. The retry delay is configured to be > 10 minutes,
@@ -458,7 +442,7 @@ func TestMinimumTimeBetweenEjections(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, nil)
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -473,7 +457,7 @@ func TestMinimumTimeBetweenEjections(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, nil)
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -553,26 +537,22 @@ func TestEjectedBySomebodyElse(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 1.00
-	bucketDuration := time.Hour
-	startBucketFull := true
-	var blacklist []geth.Address
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     1.00,
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            true,
+		DoNotEjectTheseValidators:            []string{},
+	}
 
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -593,7 +573,7 @@ func TestEjectedBySomebodyElse(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, nil)
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -601,7 +581,7 @@ func TestEjectedBySomebodyElse(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, nil)
-			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -613,7 +593,7 @@ func TestEjectedBySomebodyElse(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, nil)
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -697,26 +677,22 @@ func TestCancellation(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := rand.DurationRange(0, time.Minute)
-	retryAttempts := uint32(3)
-	maxEjectionRate := 1.00
-	bucketDuration := time.Hour
-	startBucketFull := true
-	var blacklist []geth.Address
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: uint32(3),
+		EjectionThrottle:                     1.00,
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            true,
+		DoNotEjectTheseValidators:            []string{},
+	}
 
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	ejectionTimeA := currentTime.Add(time.Minute)
@@ -744,7 +720,7 @@ func TestCancellation(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, nil)
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -752,7 +728,7 @@ func TestCancellation(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, nil)
-			expectedFinalizeTimeB1 = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB1 = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -760,7 +736,7 @@ func TestCancellation(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, nil)
-			expectedFinalizeTimeB2 = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB2 = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -768,7 +744,7 @@ func TestCancellation(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, nil)
-			expectedFinalizeTimeB3 = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB3 = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -788,7 +764,7 @@ func TestCancellation(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, nil)
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -888,26 +864,22 @@ func TestEjectionInProgressError(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 1.00
-	bucketDuration := time.Hour
-	startBucketFull := true
-	var blacklist []geth.Address
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     1.00,
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            true,
+		DoNotEjectTheseValidators:            []string{},
+	}
 
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -941,7 +913,7 @@ func TestEjectionInProgressError(t *testing.T) {
 			delete(ejectionTransactor.isEjectionInProgressErrors, validatorA)
 			manager.BeginEjection(validatorA, nil)
 
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -949,7 +921,7 @@ func TestEjectionInProgressError(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, nil)
-			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -961,7 +933,7 @@ func TestEjectionInProgressError(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, nil)
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -1039,26 +1011,22 @@ func TestStartEjectionError(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 1.00
-	bucketDuration := time.Hour
-	startBucketFull := true
-	var blacklist []geth.Address
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     1.00,
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            true,
+		DoNotEjectTheseValidators:            []string{},
+	}
 
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -1090,7 +1058,7 @@ func TestStartEjectionError(t *testing.T) {
 			delete(ejectionTransactor.startEjectionErrors, validatorA)
 
 			manager.BeginEjection(validatorA, nil)
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -1098,7 +1066,7 @@ func TestStartEjectionError(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, nil)
-			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -1110,7 +1078,7 @@ func TestStartEjectionError(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, nil)
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -1178,26 +1146,22 @@ func TestIsValidatorPresentInAnyQuorumError(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 1.00
-	bucketDuration := time.Hour
-	startBucketFull := true
-	var blacklist []geth.Address
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     1.00,
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            true,
+		DoNotEjectTheseValidators:            []string{},
+	}
 
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -1218,7 +1182,7 @@ func TestIsValidatorPresentInAnyQuorumError(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, nil)
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -1226,7 +1190,7 @@ func TestIsValidatorPresentInAnyQuorumError(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, nil)
-			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -1238,7 +1202,7 @@ func TestIsValidatorPresentInAnyQuorumError(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, nil)
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -1314,26 +1278,22 @@ func TestCompleteEjectionFailure(t *testing.T) {
 	// Make CompleteEjection return an error for A. We should still see other ejections complete successfully.
 	ejectionTransactor.completeEjectionErrors[validatorA] = errors.New("intentional error")
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 1.00
-	bucketDuration := time.Hour
-	startBucketFull := true
-	var blacklist []geth.Address
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     1.00,
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            true,
+		DoNotEjectTheseValidators:            []string{},
+	}
 
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -1354,7 +1314,7 @@ func TestCompleteEjectionFailure(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, nil)
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -1362,7 +1322,7 @@ func TestCompleteEjectionFailure(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, nil)
-			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -1374,7 +1334,7 @@ func TestCompleteEjectionFailure(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, nil)
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -1443,14 +1403,6 @@ func TestThrottlePreventsEjection(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 0.33 / time.Hour.Seconds()
-	bucketDuration := time.Hour
-	startBucketFull := false // Start with an empty bucket (i.e. full capacity to eject)
-	var blacklist []geth.Address
-
 	// Validators A and B are ejected at the same time. Since bucket size is 0.33 and both have 0.33 stake,
 	// only one should be able to proceed immediately. By the time we get to validator C, the bucket won't be
 	// completely full, and since overfill is allowed, C should be able to proceed as well.
@@ -1472,18 +1424,22 @@ func TestThrottlePreventsEjection(t *testing.T) {
 		},
 	}
 
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     0.33 / time.Hour.Seconds(),
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            false, // Start with an empty bucket (i.e. full capacity to eject)
+		DoNotEjectTheseValidators:            []string{},
+	}
+
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -1504,7 +1460,7 @@ func TestThrottlePreventsEjection(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, stakes[validatorA])
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 
@@ -1525,7 +1481,7 @@ func TestThrottlePreventsEjection(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, stakes[validatorB])
-			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 
@@ -1550,7 +1506,7 @@ func TestThrottlePreventsEjection(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, stakes[validatorC])
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -1597,7 +1553,7 @@ func TestThrottlePreventsEjection(t *testing.T) {
 	require.Len(t, ejectionTransactor.completedEjections, 2)
 
 	// Allow enough time to pass to empty the bucket.
-	currentTime = currentTime.Add(bucketDuration)
+	currentTime = currentTime.Add(config.EjectionThrottleTimePeriod)
 
 	// Now that enough time has passed, B should be able to proceed.
 	manager.BeginEjection(validatorB, stakes[validatorB])
@@ -1632,14 +1588,6 @@ func TestFailureToStartRevertsThrottle(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 0.33 / time.Hour.Seconds()
-	bucketDuration := time.Hour
-	startBucketFull := false // Start with an empty bucket (i.e. full capacity to eject)
-	var blacklist []geth.Address
-
 	// Validators A and B are ejected at the same time. Since bucket size is 0.33 and both have 0.33 stake,
 	// only one should be able to proceed immediately. By the time we get to validator C, the bucket won't be
 	// completely full, and since overfill is allowed, C should be able to proceed as well.
@@ -1661,18 +1609,22 @@ func TestFailureToStartRevertsThrottle(t *testing.T) {
 		},
 	}
 
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     0.33 / time.Hour.Seconds(),
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            false, // Start with an empty bucket (i.e. full capacity to eject)
+		DoNotEjectTheseValidators:            []string{},
+	}
+
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -1697,7 +1649,7 @@ func TestFailureToStartRevertsThrottle(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, stakes[validatorA])
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 
@@ -1718,7 +1670,7 @@ func TestFailureToStartRevertsThrottle(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, stakes[validatorB])
-			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 
@@ -1743,7 +1695,7 @@ func TestFailureToStartRevertsThrottle(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, stakes[validatorC])
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -1813,14 +1765,6 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
 	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
 
-	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
-	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
-	retryAttempts := rand.Uint32Range(1, 3)
-	maxEjectionRate := 0.33 / time.Hour.Seconds()
-	bucketDuration := time.Hour
-	startBucketFull := false // Start with an empty bucket (i.e. full capacity to eject)
-	var blacklist []geth.Address
-
 	// Validators A and B are ejected at the same time. Since bucket size is 0.33 and both have 0.33 stake,
 	// only one should be able to proceed immediately. By the time we get to validator C, the bucket won't be
 	// completely full, and since overfill is allowed, C should be able to proceed as well.
@@ -1842,18 +1786,22 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 		},
 	}
 
+	config := &EjectorConfig{
+		EjectionFinalizationDelay:            time.Minute + rand.DurationRange(0, time.Minute),
+		EjectionRetryDelay:                   10*time.Minute + rand.DurationRange(0, time.Minute),
+		MaxConsecutiveFailedEjectionAttempts: rand.Uint32Range(1, 3),
+		EjectionThrottle:                     0.33 / time.Hour.Seconds(),
+		EjectionThrottleTimePeriod:           time.Hour,
+		StartEjectionThrottleFull:            false, // Start with an empty bucket (i.e. full capacity to eject)
+		DoNotEjectTheseValidators:            []string{},
+	}
+
 	manager, err := NewEjectionManager(
 		t.Context(),
 		logger,
+		config,
 		timeSource,
-		ejectionTransactor,
-		ejectionDelay,
-		retryDelay,
-		retryAttempts,
-		maxEjectionRate,
-		bucketDuration,
-		startBucketFull,
-		blacklist)
+		ejectionTransactor)
 	require.NoError(t, err)
 
 	// Eject A and B at the same time. Eject C a bit later.
@@ -1874,7 +1822,7 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, stakes[validatorA])
-			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeA = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 
@@ -1895,7 +1843,7 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, stakes[validatorB])
-			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeB = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 
@@ -1920,7 +1868,7 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, stakes[validatorC])
 
-			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
+			expectedFinalizeTimeC = currentTime.Add(config.EjectionFinalizationDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}

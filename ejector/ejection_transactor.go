@@ -22,3 +22,45 @@ type EjectionTransactor interface {
 	// Complete the ejection proceedings against the operator with the given address.
 	CompleteEjection(ctx context.Context, addressToEject geth.Address) error
 }
+
+var _ EjectionTransactor = &ejectionTransactor{}
+
+// ejectionTransactor is the production implementation of the EjectionTransactor interface.
+type ejectionTransactor struct {
+}
+
+// Create a new EjectionTransactor.
+func NewEjectionTransactor() EjectionTransactor {
+	return &ejectionTransactor{}
+}
+
+// CompleteEjection implements EjectionTransactor.
+func (e *ejectionTransactor) CompleteEjection(
+	ctx context.Context,
+	addressToEject geth.Address,
+) error {
+	panic("unimplemented")
+}
+
+// IsEjectionInProgress implements EjectionTransactor.
+func (e *ejectionTransactor) IsEjectionInProgress(
+	ctx context.Context,
+	addressToCheck geth.Address,
+) (bool, error) {
+	panic("unimplemented")
+}
+
+// IsValidatorPresentInAnyQuorum implements EjectionTransactor.
+func (e *ejectionTransactor) IsValidatorPresentInAnyQuorum(
+	ctx context.Context,
+	addressToCheck geth.Address,
+) (bool, error) {
+	panic("unimplemented")
+}
+
+// StartEjection implements EjectionTransactor.
+func (e *ejectionTransactor) StartEjection(
+	ctx context.Context,
+	addressToEject geth.Address) error {
+	panic("unimplemented")
+}

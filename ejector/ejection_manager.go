@@ -42,8 +42,10 @@ type inProgressEjection struct {
 // ejections, not deciding when it is appropriate to eject. That is to say, this utility does not monitor validator
 // signing rates.
 type ejectionManager struct {
-	ctx        context.Context
-	logger     logging.Logger
+	ctx    context.Context
+	logger logging.Logger
+
+	// Provides the wall clock time.
 	timeSource func() time.Time
 
 	// A set of validators that we will not attempt to eject.
@@ -85,41 +87,26 @@ type ejectionManager struct {
 	quorumRateLimits map[core.QuorumID]*ratelimit.LeakyBucket
 
 	// Configures throttle for maximum stake (as a fraction of 1.0) that can be ejected per second in each quorum.
-	maxEjectionRate float64
+	ejectionThrottle float64
 
 	// Determines the bucket size for the rate limiter. The bucket is sized equal to the amount that can be drained
 	// in this interval.
-	throttleBucketInterval time.Duration
+	ejectionThrottleTimePeriod time.Duration
 
 	// If true, when starting up the leaky bucket used by the throttle will be full, meaning that we will need to
 	// wait for some time before being able to eject. If false, the bucket starts empty and we can eject immediately.
-	startThrottleFull bool
+	startEjectionThrottleFull bool
 }
 
 // Create a new ejectionManager.
 func NewEjectionManager(
 	ctx context.Context,
 	logger logging.Logger,
+	config *EjectorConfig,
 	// A source of time.
 	timeSource func() time.Time,
 	// Submits ejection transactions.
 	transactor EjectionTransactor,
-	// the minimum time between starting an ejection and completing it
-	ejectionFinalizationDelay time.Duration,
-	// the minimum time between two consecutive ejection attempts for the same validator
-	ejectionRetryDelay time.Duration,
-	// the maximum number of consecutive failed ejection attempts before a validator is blacklisted
-	maxConsecutiveFailedEjectionAttempts uint32,
-	// Configures throttle for maximum stake (as a fraction of 1.0) that can be ejected per second in each quorum.
-	maxEjectionRate float64,
-	// Determines the bucket size for the rate limiter. The bucket is sized equal to the amount that can be drained
-	// in this interval.
-	throttleBucketInterval time.Duration,
-	// If true, when starting up the leaky bucket used by the throttle will be full, meaning that we will need to
-	// wait for some time before being able to eject. If false, the bucket starts empty and we can eject immediately.
-	startThrottleFull bool,
-	// A set of validators that we will not attempt to eject. May be nil.
-	ejectionBlacklist []geth.Address,
 ) (EjectionManager, error) {
 
 	em := &ejectionManager{
@@ -131,26 +118,26 @@ func NewEjectionManager(
 		ejectionsInProgress:                  make(map[geth.Address]*inProgressEjection),
 		failedEjectionAttempts:               make(map[geth.Address]uint32),
 		transactor:                           transactor,
-		ejectionFinalizationDelay:            ejectionFinalizationDelay,
-		ejectionRetryDelay:                   ejectionRetryDelay,
-		maxConsecutiveFailedEjectionAttempts: maxConsecutiveFailedEjectionAttempts,
+		ejectionFinalizationDelay:            config.EjectionFinalizationDelay,
+		ejectionRetryDelay:                   config.EjectionRetryDelay,
+		maxConsecutiveFailedEjectionAttempts: config.MaxConsecutiveFailedEjectionAttempts,
 		quorumRateLimits:                     make(map[core.QuorumID]*ratelimit.LeakyBucket),
-		maxEjectionRate:                      maxEjectionRate,
-		throttleBucketInterval:               throttleBucketInterval,
-		startThrottleFull:                    startThrottleFull,
+		ejectionThrottle:                     config.EjectionThrottle,
+		ejectionThrottleTimePeriod:           config.EjectionThrottleTimePeriod,
+		startEjectionThrottleFull:            config.StartEjectionThrottleFull,
 	}
 
-	for _, addr := range ejectionBlacklist {
-		em.ejectionBlacklist[addr] = struct{}{}
+	for _, addr := range config.DoNotEjectTheseValidators {
+		em.ejectionBlacklist[geth.HexToAddress(addr)] = struct{}{}
 	}
 
 	// Set up a throttle for quorum 0. We will always have a quorum 0, and this allows us to check to see
 	// if the throttle config is valid. Checking here lets us assume it is valid later on.
 	var err error
 	em.quorumRateLimits[0], err = ratelimit.NewLeakyBucket(
-		maxEjectionRate,
-		throttleBucketInterval,
-		startThrottleFull,
+		config.EjectionThrottle,
+		config.EjectionThrottleTimePeriod,
+		config.StartEjectionThrottleFull,
 		ratelimit.OverfillOncePermitted,
 		timeSource())
 	if err != nil {
@@ -319,9 +306,9 @@ func (em *ejectionManager) getLeakyBucketForQuorum(qid core.QuorumID) *ratelimit
 	if !ok {
 		var err error
 		leakyBucket, err = ratelimit.NewLeakyBucket(
-			em.maxEjectionRate,
-			em.throttleBucketInterval,
-			em.startThrottleFull,
+			em.ejectionThrottle,
+			em.ejectionThrottleTimePeriod,
+			em.startEjectionThrottleFull,
 			ratelimit.OverfillOncePermitted,
 			em.timeSource())
 		em.quorumRateLimits[qid] = leakyBucket

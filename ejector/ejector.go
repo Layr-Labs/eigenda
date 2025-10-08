@@ -41,11 +41,10 @@ type Ejector struct {
 func NewEjector(
 	ctx context.Context,
 	logger logging.Logger,
+	config *EjectorConfig,
 	ejectionManager *ThreadedEjectionManager,
 	signingRateLookupV1 SigningRateLookup,
 	signingRateLookupV2 SigningRateLookup,
-	period time.Duration,
-	ejectionCriteriaTimeWindow time.Duration,
 	validatorIDToAddressCache *eth.ValidatorIDToAddressCache,
 ) *Ejector {
 	e := &Ejector{
@@ -54,8 +53,8 @@ func NewEjector(
 		ejectionManager:            ejectionManager,
 		signingRateLookupV1:        signingRateLookupV1,
 		signingRateLookupV2:        signingRateLookupV2,
-		period:                     period,
-		ejectionCriteriaTimeWindow: ejectionCriteriaTimeWindow,
+		period:                     config.EjectionPeriod,
+		ejectionCriteriaTimeWindow: config.EjectionCriteriaTimeWindow,
 		validatorIDToAddressCache:  validatorIDToAddressCache,
 	}
 
