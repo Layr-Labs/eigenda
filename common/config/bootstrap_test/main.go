@@ -18,12 +18,12 @@ type TestConfig struct {
 
 // GetEnvVarPrefix implements config.DocumentedConfig.
 func (t *TestConfig) GetEnvVarPrefix() string {
-	panic("TEST")
+	return "TEST"
 }
 
 // GetName implements config.DocumentedConfig.
 func (t *TestConfig) GetName() string {
-	panic("Test")
+	return "TestConfig"
 }
 
 // GetPackagePaths implements config.DocumentedConfig.

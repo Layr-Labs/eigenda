@@ -110,21 +110,16 @@ func buildHandler[T DocumentedConfig](
 			startPprofServer(logger, pprofPort)
 		}
 
-		// Pre-build the default config to get its env var prefix, then create a new constructor
-		// that returns this pre-built config.
 		defaultConfig := constructor()
-		prefix := defaultConfig.GetEnvVarPrefix()
-		constructor := func() T {
-			return defaultConfig
-		}
 
+		prefix := defaultConfig.GetEnvVarPrefix()
 		if disableEnvVars {
 			prefix = ""
 		} else if overrideEnvPrefix != "" {
 			prefix = overrideEnvPrefix
 		}
 
-		cfg, err := ParseConfig(constructor, prefix, configFiles...)
+		cfg, err := ParseConfig(defaultConfig, prefix, configFiles...)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}

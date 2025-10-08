@@ -57,7 +57,7 @@ func DocumentConfig[T DocumentedConfig](
 	fields, err := gatherConfigFieldData(
 		defaultConfig,
 		defaultConfig.GetEnvVarPrefix(),
-		"",
+		"", // toml prefix used for recursion, top-level has no prefix
 		defaultConfig.GetPackagePaths())
 	if err != nil {
 		return fmt.Errorf("failed to gather config field data: %w", err)
@@ -313,7 +313,11 @@ func gatherConfigFieldData(
 				nestedTomlPrefix = tomlPrefix + "." + field.Name
 			}
 
-			nestedFieldData, err := gatherConfigFieldData(nestedValue, nestedEnvVarPrefix, nestedTomlPrefix, packagePaths)
+			nestedFieldData, err := gatherConfigFieldData(
+				nestedValue,
+				nestedEnvVarPrefix,
+				nestedTomlPrefix,
+				packagePaths)
 			if err != nil {
 				return nil, fmt.Errorf("failed to gather field data for field %s: %w", field.Name, err)
 			}
