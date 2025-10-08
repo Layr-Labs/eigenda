@@ -17,7 +17,7 @@ import (
 
 // Sentinel errors for configuration validation
 var (
-	ErrKeyIDRequired = errors.New("KeyID is required")
+	ErrKeyIDRequired  = errors.New("KeyID is required")
 	ErrRegionRequired = errors.New("Region is required")
 )
 
