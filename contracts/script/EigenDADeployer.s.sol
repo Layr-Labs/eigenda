@@ -93,7 +93,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     uint64 _pricePerSymbol = 0.447 gwei;
     uint64 _priceUpdateCooldown = 1;
     uint64 _globalSymbolsPerPeriod = 131072;
-    uint64 _reservationPeriodInterval = 300;
+    uint64 _reservationPeriodInterval = 10;
     uint64 _globalRatePeriodInterval = 30;
 
     struct AddressConfig {

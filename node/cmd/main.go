@@ -128,21 +128,55 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 		return err
 	}
 
-	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
-	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
-	server := nodegrpc.NewServer(config, node, logger, ratelimiter, softwareVersion)
+	var serverV1 *nodegrpc.Server
+	var v1Listeners nodegrpc.Listeners
+	if config.EnableV1 {
+		v1Listeners, err = nodegrpc.CreateListeners(
+			config.InternalDispersalPort,
+			config.InternalRetrievalPort)
+		if err != nil {
+			return fmt.Errorf("failed to create v1 listeners: %w", err)
+		}
 
-	reader, err := coreeth.NewReader(
-		logger,
-		client,
-		operatorStateRetrieverAddress.Hex(),
-		eigenDAServiceManagerAddress.Hex())
-	if err != nil {
-		return fmt.Errorf("cannot create eth.Reader: %w", err)
+		// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
+		//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
+		serverV1 = nodegrpc.NewServer(
+			config,
+			node,
+			logger,
+			ratelimiter,
+			softwareVersion,
+			v1Listeners.Dispersal,
+			v1Listeners.Retrieval,
+		)
 	}
 
 	var serverV2 *nodegrpc.ServerV2
+	var v2Listeners nodegrpc.Listeners
 	if config.EnableV2 {
+		v2Listeners, err = nodegrpc.CreateListeners(
+			config.InternalV2DispersalPort,
+			config.InternalV2RetrievalPort)
+		if err != nil {
+			if config.EnableV1 {
+				v1Listeners.Close()
+			}
+			return fmt.Errorf("failed to create v2 listeners: %w", err)
+		}
+
+		reader, err := coreeth.NewReader(
+			logger,
+			client,
+			operatorStateRetrieverAddress.Hex(),
+			eigenDAServiceManagerAddress.Hex())
+		if err != nil {
+			if config.EnableV1 {
+				v1Listeners.Close()
+			}
+			v2Listeners.Close()
+			return fmt.Errorf("cannot create eth.Reader: %w", err)
+		}
+
 		serverV2, err = nodegrpc.NewServerV2(
 			context.Background(),
 			config,
@@ -151,12 +185,28 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 			ratelimiter,
 			reg,
 			reader,
-			softwareVersion)
+			softwareVersion,
+			v2Listeners.Dispersal,
+			v2Listeners.Retrieval)
 		if err != nil {
+			if config.EnableV1 {
+				v1Listeners.Close()
+			}
+			v2Listeners.Close()
 			return fmt.Errorf("failed to create server v2: %v", err)
 		}
 	}
-	err = nodegrpc.RunServers(server, serverV2, config, logger)
+
+	err = nodegrpc.RunServers(serverV1, serverV2, config, logger)
+	if err != nil {
+		if config.EnableV1 {
+			v1Listeners.Close()
+		}
+		if config.EnableV2 {
+			v2Listeners.Close()
+		}
+		return fmt.Errorf("failed to start gRPC servers: %w", err)
+	}
 
 	return err
 }

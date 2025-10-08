@@ -3,19 +3,21 @@ package verifier
 import (
 	"errors"
 	"fmt"
-	gomath "math"
-	"math/bits"
+	"math"
+	"math/big"
 	"sync"
 
-	"github.com/Layr-Labs/eigenda/common/math"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/resources/srs"
+	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 
+	eigenbn254 "github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/resources/srs"
 
-	"github.com/consensys/gnark-crypto/ecc/bn254"
 	_ "go.uber.org/automaxprocs"
 )
 
@@ -56,7 +58,7 @@ func NewVerifier(config *KzgConfig, encoderConfig *encoding.Config) (*Verifier, 
 	return encoderGroup, nil
 }
 
-func (v *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
+func (v *Verifier) getKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
 	if err := encoding.ValidateEncodingParams(params, encoding.SRSOrder); err != nil {
 		return nil, fmt.Errorf("validate encoding params: %w", err)
 	}
@@ -85,68 +87,20 @@ func (v *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 	}
 
 	// Create FFT settings based on params
-	n := uint8(gomath.Log2(float64(params.NumEvaluations())))
+	n := uint8(math.Log2(float64(params.NumEvaluations())))
 	fs := fft.NewFFTSettings(n)
 
 	return &ParametrizedVerifier{
-		KzgConfig: v.kzgConfig,
-		g1SRS:     v.G1SRS,
-		Fs:        fs,
+		g1SRS: v.G1SRS,
+		Fs:    fs,
 	}, nil
-}
-
-func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error {
-	return v.VerifyLengthProof(
-		(*bn254.G2Affine)(commitments.LengthCommitment),
-		(*bn254.G2Affine)(commitments.LengthProof),
-		uint64(commitments.Length),
-	)
-}
-
-// VerifyLengthProof verifies the length proof (low degree proof).
-// See https://layr-labs.github.io/eigenda/protocol/architecture/encoding.html#validation-via-kzg
-// Since it doesn't depend on the encoding parameters, we leave it as a method of Verifier, not ParametrizedVerifier.
-func (v *Verifier) VerifyLengthProof(
-	lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, commitmentLength uint64,
-) error {
-	// This also prevents commitmentLength=0.
-	if !math.IsPowerOfTwo(commitmentLength) {
-		return fmt.Errorf("commitment length %d is not a power of 2", commitmentLength)
-	}
-	// Because commitmentLength is power of 2, we know its represented as 100..0 in binary,
-	// so counting the number of trailing zeros gives us log2(commitmentLength).
-	// We need commitmentLengthLog <= 27 because we have hardcoded SRS points only for that range.
-	commitmentLengthLog := bits.TrailingZeros64(commitmentLength)
-	if commitmentLengthLog > 27 {
-		return fmt.Errorf("commitment length %d is > max possible 2^28", commitmentLength)
-	}
-	// g1Challenge = [tau^(2^28 - commitmentLength)]_1
-	// G1ReversePowerOf2SRS contains the 28 hardcoded points that we need.
-	g1Challenge := srs.G1ReversePowerOf2SRS[commitmentLengthLog]
-
-	err := verifyLengthProof(lengthCommit, lengthProof, &g1Challenge)
-	if err != nil {
-		return fmt.Errorf("low degree proof: %w", err)
-	}
-	return nil
-}
-
-// This function verifies a low degree proof against a poly commitment.
-// We wish to show x^shift poly = shiftedPoly, with shift = 2^28 - blob_length.
-// We verify this by checking the pairing equation:
-// e( s^shift G1, p(s)G2 ) = e( G1, p(s^shift)G2 )
-// Note that we also need to verify that the blob_commitment and length_commitment are equivalent,
-// by verifying the other pairing equation: e(blob_commitment,G2) = e(length_commitment,C2)
-// TODO(samlaf): can we move that other pairing check in here?
-func verifyLengthProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) error {
-	return pairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
 }
 
 // VerifyFrame verifies a single frame against a commitment.
 // If needing to verify multiple frames of the same chunk length, prefer [Verifier.UniversalVerify].
 //
 // This function is only used in the v1 and v2 validator (distributed) retrievers.
-// TODO(samlaf): replace these with UniversalVerify, and consider deleting this function.
+// TODO(samlaf): replace with UniversalVerifySubBatch, and consider deleting this function.
 func (v *Verifier) VerifyFrames(
 	frames []*encoding.Frame,
 	indices []encoding.ChunkNumber,
@@ -157,13 +111,13 @@ func (v *Verifier) VerifyFrames(
 		return fmt.Errorf("invalid number of frames and indices: %d != %d", len(frames), len(indices))
 	}
 
-	verifier, err := v.GetKzgVerifier(params)
+	verifier, err := v.getKzgVerifier(params)
 	if err != nil {
 		return err
 	}
 
 	for ind := range frames {
-		err = verifier.VerifyFrame(
+		err = verifier.verifyFrame(
 			frames[ind],
 			uint64(indices[ind]),
 			(*bn254.G1Affine)(commitments.Commitment),
@@ -178,8 +132,38 @@ func (v *Verifier) VerifyFrames(
 	return nil
 }
 
+// TODO(mooselumph): Cleanup this function
+func (v *Verifier) UniversalVerifySubBatch(
+	params encoding.EncodingParams, samplesCore []encoding.Sample, numBlobs int,
+) error {
+
+	samples := make([]Sample, len(samplesCore))
+
+	for i, sc := range samplesCore {
+		x, err := rs.GetLeadingCosetIndex(
+			uint64(sc.AssignmentIndex),
+			params.NumChunks,
+		)
+		if err != nil {
+			return fmt.Errorf("get leading coset index: %w", err)
+		}
+
+		sample := Sample{
+			Commitment: (bn254.G1Affine)(*sc.Commitment),
+			Proof:      sc.Chunk.Proof,
+			RowIndex:   sc.BlobIndex,
+			Coeffs:     sc.Chunk.Coeffs,
+			X:          uint(x),
+		}
+		samples[i] = sample
+	}
+
+	return v.universalVerify(params, samples, numBlobs)
+}
+
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 // The result is trimmed to the given maxInputSize.
+// TODO(samlaf): this should probably not exist here, just call the encoder directly.
 func (v *Verifier) Decode(
 	chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64,
 ) ([]byte, error) {
@@ -199,20 +183,200 @@ func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
 	return res
 }
 
-func pairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, b2 *bn254.G2Affine) error {
-	var negB1 bn254.G1Affine
-	negB1.Neg(b1)
+// Sample is the basic unit for a verification
+// A blob may contain multiple Samples
+type Sample struct {
+	Commitment bn254.G1Affine
+	Proof      bn254.G1Affine
+	RowIndex   int // corresponds to a row in the verification matrix
+	Coeffs     []fr.Element
+	X          uint // X is the evaluating index which corresponds to the leading coset
+}
 
-	P := [2]bn254.G1Affine{*a1, negB1}
-	Q := [2]bn254.G2Affine{*a2, *b2}
+// the rhsG1 consists of three terms, see
+// https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
+func genRhsG1(
+	samples []Sample, randomsFr []fr.Element, m int,
+	params encoding.EncodingParams, fftSettings *fft.FFTSettings, g1SRS kzg.G1SRS, proofs []bn254.G1Affine,
+) (*bn254.G1Affine, error) {
+	n := len(samples)
+	commits := make([]bn254.G1Affine, m)
+	D := params.ChunkLength
 
-	ok, err := bn254.PairingCheck(P[:], Q[:])
+	var tmp fr.Element
+
+	// first term
+	// get coeffs to compute the aggregated commitment
+	// note the coeff is affected by how many chunks are validated per blob
+	// if x chunks are sampled from one blob, we need to compute the sum of all
+	// x random field element corresponding to each sample
+	aggCommitCoeffs := make([]fr.Element, m)
+	setCommit := make([]bool, m)
+	for k := 0; k < n; k++ {
+		s := samples[k]
+		row := s.RowIndex
+
+		aggCommitCoeffs[row].Add(&aggCommitCoeffs[row], &randomsFr[k])
+
+		if !setCommit[row] {
+			commits[row].Set(&s.Commitment)
+
+			setCommit[row] = true
+		} else {
+
+			if !commits[row].Equal(&s.Commitment) {
+				return nil, errors.New("samples of the same row has different commitments")
+			}
+		}
+	}
+
+	var aggCommit bn254.G1Affine
+	_, err := aggCommit.MultiExp(commits, aggCommitCoeffs, ecc.MultiExpConfig{})
 	if err != nil {
-		return fmt.Errorf("PairingCheck: %w", err)
-	}
-	if !ok {
-		return errors.New("PairingCheck pairing not ok. SRS is invalid")
+		return nil, fmt.Errorf("compute aggregated commitment G1: %w", err)
 	}
 
+	// second term
+	// compute the aggregated interpolation polynomial
+	aggPolyCoeffs := make([]fr.Element, D)
+
+	// we sum over the weighted coefficients (by the random field element) over all D monomial in all n samples
+	for k := 0; k < n; k++ {
+		coeffs := samples[k].Coeffs
+
+		rk := randomsFr[k]
+		// for each monomial in a given polynomial, multiply its coefficient with the corresponding random field,
+		// then sum it with others. Given ChunkLen (D) is identical for all samples in a subBatch.
+		// The operation is always valid.
+		for j := uint64(0); j < D; j++ {
+			tmp.Mul(&coeffs[j], &rk)
+			//bls.MulModFr(&tmp, &coeffs[j], &rk)
+			//bls.AddModFr(&aggPolyCoeffs[j], &aggPolyCoeffs[j], &tmp)
+			aggPolyCoeffs[j].Add(&aggPolyCoeffs[j], &tmp)
+		}
+	}
+
+	// All samples in a subBatch has identical chunkLen
+	var aggPolyG1 bn254.G1Affine
+	_, err = aggPolyG1.MultiExp(g1SRS[:D], aggPolyCoeffs, ecc.MultiExpConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute aggregated polynomial G1: %w", err)
+	}
+
+	// third term
+	// leading coset is an evaluation index, here we compute the weighted leading coset evaluation by random fields
+	lcCoeffs := make([]fr.Element, n)
+
+	// get leading coset powers
+	leadingDs := make([]fr.Element, n)
+	bigD := big.NewInt(int64(D))
+
+	for k := 0; k < n; k++ {
+
+		// got the leading coset field element
+		h := fftSettings.ExpandedRootsOfUnity[samples[k].X]
+		var hPow fr.Element
+		hPow.Exp(h, bigD)
+		leadingDs[k].Set(&hPow)
+	}
+
+	// applying the random weights to leading coset elements
+	for k := 0; k < n; k++ {
+		rk := randomsFr[k]
+
+		lcCoeffs[k].Mul(&rk, &leadingDs[k])
+	}
+
+	var offsetG1 bn254.G1Affine
+	_, err = offsetG1.MultiExp(proofs, lcCoeffs, ecc.MultiExpConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute offset G1: %w", err)
+	}
+
+	var rhsG1 bn254.G1Affine
+
+	rhsG1.Sub(&aggCommit, &aggPolyG1)
+
+	rhsG1.Add(&rhsG1, &offsetG1)
+	return &rhsG1, nil
+}
+
+// UniversalVerify implements batch verification on a set of chunks given the same chunk dimension (chunkLen, numChunk).
+// The details is given in Ethereum Research post whose authors are George Kadianakis, Ansgar Dietrichs, Dankrad Feist
+// https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240
+//
+// samples is a list of chunks. The order of samples do not matter.
+// Each sample need not have unique row, it is possible that multiple chunks of the same blob are validated altogether
+func (v *Verifier) universalVerify(params encoding.EncodingParams, samples []Sample, numBlobs int) error {
+	// precheck
+	for i, s := range samples {
+		if s.RowIndex >= numBlobs {
+			fmt.Printf("sample %v has %v Row, but there are only %v blobs\n", i, s.RowIndex, numBlobs)
+			return errors.New("sample.RowIndex and numBlob are inconsistent")
+		}
+	}
+
+	verifier, err := v.getKzgVerifier(params)
+	if err != nil {
+		return err
+	}
+
+	D := params.ChunkLength
+
+	if D > v.kzgConfig.SRSNumberToLoad {
+		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v", D, v.kzgConfig.SRSNumberToLoad)
+	}
+
+	n := len(samples)
+	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLength, numBlobs)
+	if n == 0 {
+		return errors.New("the number of samples (i.e. chunks) must not be empty")
+	}
+
+	// generate random field elements to aggregate equality check
+	randomsFr, err := eigenbn254.RandomFrs(n)
+	if err != nil {
+		return fmt.Errorf("create randomness vector: %w", err)
+	}
+
+	// array of proofs
+	proofs := make([]bn254.G1Affine, n)
+	for i := 0; i < n; i++ {
+		proofs[i].Set(&samples[i].Proof)
+	}
+
+	// lhs g1
+	var lhsG1 bn254.G1Affine
+	_, err = lhsG1.MultiExp(proofs, randomsFr, ecc.MultiExpConfig{})
+	if err != nil {
+		return fmt.Errorf("compute lhsG1: %w", err)
+	}
+
+	// lhs g2
+	exponent := uint64(math.Log2(float64(D)))
+	G2atD := srs.G2PowerOf2SRS[exponent]
+	lhsG2 := &G2atD
+
+	// rhs g2
+	rhsG2 := &kzg.GenG2
+
+	// rhs g1
+	rhsG1, err := genRhsG1(
+		samples,
+		randomsFr,
+		numBlobs,
+		params,
+		verifier.Fs,
+		verifier.g1SRS,
+		proofs,
+	)
+	if err != nil {
+		return fmt.Errorf("generate rhsG1: %w", err)
+	}
+
+	err = eigenbn254.PairingsVerify(&lhsG1, lhsG2, rhsG1, rhsG2)
+	if err != nil {
+		return fmt.Errorf("verify pairing: %w", err)
+	}
 	return nil
 }

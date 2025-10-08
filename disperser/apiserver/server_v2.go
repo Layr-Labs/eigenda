@@ -143,7 +143,7 @@ func NewDispersalServerV2(
 		controllerConnection = connection
 		controllerClient = controller.NewControllerServiceClient(connection)
 
-		logger.Info("Using controller-based payment system")
+		logger.Info("Using controller-based payment system", "controller", controllerAddress)
 	} else {
 		logger.Info("Using legacy payment metering system")
 	}
