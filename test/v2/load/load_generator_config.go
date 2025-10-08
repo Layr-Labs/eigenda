@@ -5,7 +5,7 @@ import (
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 )
 
-var _ config.VerifiableConfig = (*TrafficGeneratorConfig)(nil)
+var _ config.DocumentedConfig = (*TrafficGeneratorConfig)(nil)
 
 // Configuration for the traffic generator.
 //
@@ -16,11 +16,6 @@ type TrafficGeneratorConfig struct {
 	Environment client.TestClientConfig
 	// Configures the load the traffic generator will produce.
 	Load LoadGeneratorConfig
-}
-
-func (c *TrafficGeneratorConfig) Verify() error {
-	// TODO(cody.littley): This is a place holder. Implement this when integrating new config with traffic generator.
-	return nil
 }
 
 // DefaultTrafficGeneratorConfig returns a default configuration for the traffic generator.
@@ -103,4 +98,24 @@ func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 		FrequencyAcceleration:         0.0025,
 		UseProxy:                      false,
 	}
+}
+
+func (c *TrafficGeneratorConfig) GetEnvVarPrefix() string {
+	return "TRAFFIC_GENERATOR"
+}
+
+func (c *TrafficGeneratorConfig) GetName() string {
+	return "TrafficGenerator"
+}
+
+func (c *TrafficGeneratorConfig) GetPackagePaths() []string {
+	return []string{
+		"github.com/Layr-Labs/eigenda/test/v2/client",
+		"github.com/Layr-Labs/eigenda/test/v2/load",
+	}
+}
+
+func (c *TrafficGeneratorConfig) Verify() error {
+	// TODO(cody.littley): This is a place holder. Implement this when integrating new config with traffic generator.
+	return nil
 }
