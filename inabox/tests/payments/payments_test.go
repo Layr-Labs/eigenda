@@ -115,7 +115,7 @@ func testReservationReduction(
 	clientLedgerMode clientledger.ClientLedgerMode,
 ) {
 	// will be billed as a minimum size blob
-	blobBytes := 1000
+	payloadBytes := 1000
 	// long enough to approach expected averages
 	submissionDuration := 30 * time.Second
 	blobsPerSecond := float32(0.5)
@@ -150,7 +150,7 @@ func testReservationReduction(
 
 	// Since we're dispersing at half the supported rate, assert no failures
 	resultChan := mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond, blobBytes, submissionDuration, 1.0, 0)
+		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 1.0, 0)
 	// Drain the results channel. This test doesn't need the values.
 	for range resultChan {
 	}
@@ -175,7 +175,7 @@ func testReservationReduction(
 
 	// Since we're dispersing at double the supported rate, assert ~50% success rate
 	resultChan = mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond, blobBytes, submissionDuration, 0.5, 0.25)
+		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 0.5, 0.25)
 	for range resultChan {
 	}
 }
@@ -190,7 +190,7 @@ func testReservationIncrease(
 	clientLedgerMode clientledger.ClientLedgerMode,
 ) {
 	// will be billed as a minimum size blob
-	blobBytes := 1000
+	payloadBytes := 1000
 	// long enough to approach expected averages
 	submissionDuration := 30 * time.Second
 	blobsPerSecond := float32(0.5)
@@ -225,7 +225,7 @@ func testReservationIncrease(
 
 	// Since we're dispersing at double the supported rate, assert ~50% success rate
 	resultChan := mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond, blobBytes, submissionDuration, 0.5, 0.25)
+		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 0.5, 0.25)
 	// Drain the results channel. This test doesn't need the values.
 	for range resultChan {
 	}
@@ -250,7 +250,7 @@ func testReservationIncrease(
 
 	// Since we're dispersing at half the supported rate, assert no failures
 	resultChan = mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond, blobBytes, submissionDuration, 1.0, 0)
+		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 1.0, 0)
 	for range resultChan {
 	}
 }
@@ -290,17 +290,17 @@ func testOnDemandOnly(
 	require.NoError(t, err)
 
 	// will be billed as a minimum size blob
-	blobBytes := 1000
+	payloadBytes := 1000
 
 	// disperse the number of blobs that we expect to succeed
 	for i := 0; i < blobsToDisperse; i++ {
-		payload := coretypes.Payload(testRandom.Bytes(blobBytes))
+		payload := coretypes.Payload(testRandom.Bytes(payloadBytes))
 		_, err := payloadDisperser.SendPayload(t.Context(), payload)
 		require.NoError(t, err)
 	}
 
 	// the very next dispersal should fail
-	payload := coretypes.Payload(testRandom.Bytes(blobBytes))
+	payload := coretypes.Payload(testRandom.Bytes(payloadBytes))
 	_, err = payloadDisperser.SendPayload(t.Context(), payload)
 	require.Error(t, err)
 
@@ -315,13 +315,13 @@ func testOnDemandOnly(
 
 	// disperse the number of blobs that we expect to succeed
 	for i := 0; i < blobsToDisperse; i++ {
-		payload := coretypes.Payload(testRandom.Bytes(blobBytes))
+		payload := coretypes.Payload(testRandom.Bytes(payloadBytes))
 		_, err := payloadDisperser.SendPayload(t.Context(), payload)
 		require.NoError(t, err)
 	}
 
 	// the very next dispersal should fail
-	payload = coretypes.Payload(testRandom.Bytes(blobBytes))
+	payload = coretypes.Payload(testRandom.Bytes(payloadBytes))
 	_, err = payloadDisperser.SendPayload(t.Context(), payload)
 	require.Error(t, err)
 }
