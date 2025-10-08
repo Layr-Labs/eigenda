@@ -76,15 +76,6 @@ func NewDispersalRequestSigner(
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	// Load the AWS SDK configuration, which will automatically detect credentials
-	// from environment variables, IAM roles, or AWS config files
-	cfg, err := awsconfig.LoadDefaultConfig(ctx,
-		awsconfig.WithRegion(config.Region),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load AWS config: %w", err)
-	}
-
 	var kmsClient *kms.Client
 	if config.Endpoint != "" {
 		kmsClient = kms.New(kms.Options{
@@ -92,6 +83,14 @@ func NewDispersalRequestSigner(
 			BaseEndpoint: aws.String(config.Endpoint),
 		})
 	} else {
+		// Load the AWS SDK configuration, which will automatically detect credentials
+		// from environment variables, IAM roles, or AWS config files
+		cfg, err := awsconfig.LoadDefaultConfig(ctx,
+			awsconfig.WithRegion(config.Region),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		}
 		kmsClient = kms.NewFromConfig(cfg)
 	}
 
