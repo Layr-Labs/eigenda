@@ -2,4 +2,5 @@
 api/docs/*.html linguist-generated=true
 *.pb.go linguist-generated=true
 inabox/deploy/env_vars.go linguist-generated=true
+docs/config/*.md linguist-generated=true
 # contracts/bindings/*.go   linguist-generated=true      Enable once bindings are checked in CI
