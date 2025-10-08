@@ -366,12 +366,17 @@ Browse our [Makefile](./Makefile) for a list of available commands such as `make
 
 Unit tests can be run with `make test-unit`.
 
-#### Integration / E2E
+#### End-to-End (E2E) Tests
 
-Integration tests against op framework can be run with `make test-e2e`. These tests use the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch
-submission and state derivation. Tests are run both in a local environment, and in a holesky testnet environment.
+E2E tests validate full client ↔ proxy ↔ EigenDA flows.  
+Use the provided `make` targets to run them with different backends:
 
-These tests also assert E2E client <-> server interactions using simple/op clients.
+| Command | Description |
+|----------|--------------|
+| `make test-e2e-local` | Runs E2E tests against a local **memstore** backend (fast, isolated). |
+| `make test-e2e-sepolia` | Same as testnet but runs on **Sepolia** network. |
+
+All commands execute `./test/e2e` with environment-specific settings and output via [gotestsum](https://github.com/gotestyourself/gotestsum).
 
 #### Fuzz
 
