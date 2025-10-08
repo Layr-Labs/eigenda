@@ -191,7 +191,7 @@ func StartController(
 	// Start heartbeat monitor
 	if heartbeatMonitorConfig.FilePath != "" {
 		go func() {
-			err := healthcheck.HeartbeatMonitor(
+			err := healthcheck.NewHeartbeatMonitor(
 				logger,
 				controllerLivenessChan,
 				healthcheck.HeartbeatMonitorConfig{

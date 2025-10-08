@@ -48,7 +48,7 @@ func TestHeartbeatMonitor_WritesSummaryAndStops(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		// monitor will exit when channel is closed
-		err := healthcheck.HeartbeatMonitor(
+		err := healthcheck.NewHeartbeatMonitor(
 			logger,
 			ch,
 			healthcheck.HeartbeatMonitorConfig{
@@ -96,7 +96,7 @@ func TestHeartbeatMonitor_StallWarning(t *testing.T) {
 	ch := make(chan healthcheck.HeartbeatMessage)
 	done := make(chan error, 1)
 	go func() {
-		err := healthcheck.HeartbeatMonitor(
+		err := healthcheck.NewHeartbeatMonitor(
 			logger,
 			ch,
 			healthcheck.HeartbeatMonitorConfig{

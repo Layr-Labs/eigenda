@@ -9,9 +9,23 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
+// HeartbeatMonitorConfig configures the heartbeat monitoring system that tracks component health.
 type HeartbeatMonitorConfig struct {
-	FilePath         string
+	// FilePath is the path to the file where heartbeat status will be written. Required.
+	FilePath string
+	// MaxStallDuration is the maximum time allowed between heartbeats before a component is considered stalled. Required.
 	MaxStallDuration time.Duration
+}
+
+// Validate checks that the configuration is valid, returning an error if it is not.
+func (c *HeartbeatMonitorConfig) Validate() error {
+	if c.FilePath == "" {
+		return fmt.Errorf("FilePath is required")
+	}
+	if c.MaxStallDuration <= 0 {
+		return fmt.Errorf("MaxStallDuration must be positive, got %v", c.MaxStallDuration)
+	}
+	return nil
 }
 
 type HeartbeatMessage struct {
@@ -21,11 +35,15 @@ type HeartbeatMessage struct {
 
 // HeartbeatMonitor listens for heartbeat messages from different components, updates their last seen timestamps,
 // writes a summary to the specified file, and logs warnings if any component stalls.
-func HeartbeatMonitor(
+func NewHeartbeatMonitor(
 	logger logging.Logger,
 	livenessChan <-chan HeartbeatMessage,
 	config HeartbeatMonitorConfig,
 ) error {
+	if err := config.Validate(); err != nil {
+		return fmt.Errorf("invalid config: %w", err)
+	}
+
 	// Map to keep track of last heartbeat per component
 	lastHeartbeats := make(map[string]time.Time)
 	// Create a timer that periodically checks for stalls
