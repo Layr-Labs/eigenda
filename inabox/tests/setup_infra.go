@@ -14,8 +14,8 @@ import (
 type InfrastructureConfig struct {
 	TemplateName        string
 	TestName            string
-	InMemoryBlobStore   bool
 	Logger              logging.Logger
+	RootPath            string
 	MetadataTableName   string
 	BucketTableName     string
 	S3BucketName        string
@@ -23,6 +23,10 @@ type InfrastructureConfig struct {
 
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
+
+	// The following field is temporary, to be able to test different payments configurations. It will be removed
+	// once legacy payments are removed.
+	ControllerUseNewPayments bool
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
@@ -40,19 +44,18 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 
 	logger := config.Logger
 
-	rootPath := "../../"
-
 	// Create test directory if needed
 	testName := config.TestName
 	if testName == "" {
 		var err error
-		testName, err = deploy.CreateNewTestDirectory(config.TemplateName, rootPath)
+		testName, err = deploy.CreateNewTestDirectory(config.TemplateName, config.RootPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create test directory: %w", err)
 		}
 	}
 
-	testConfig := deploy.ReadTestConfig(testName, rootPath)
+	testConfig := deploy.ReadTestConfig(testName, config.RootPath)
+	testConfig.UseControllerMediatedPayments = config.ControllerUseNewPayments
 
 	// Create a long-lived context for the infrastructure lifecycle
 	infraCtx, infraCancel := context.WithCancel(ctx)
@@ -78,14 +81,13 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 
 	// Create infrastructure harness early so we can populate it incrementally
 	infra := &InfrastructureHarness{
-		SharedNetwork:     sharedDockerNetwork,
-		TestConfig:        testConfig,
-		TemplateName:      config.TemplateName,
-		TestName:          testName,
-		InMemoryBlobStore: config.InMemoryBlobStore,
-		LocalStackPort:    "4570",
-		Logger:            config.Logger,
-		Cancel:            infraCancel,
+		SharedNetwork:  sharedDockerNetwork,
+		TestConfig:     testConfig,
+		TemplateName:   config.TemplateName,
+		TestName:       testName,
+		LocalStackPort: "4570",
+		Logger:         config.Logger,
+		Cancel:         infraCancel,
 	}
 
 	// Setup Chain Harness first (Anvil, Graph Node, Contracts, Churner)
@@ -104,20 +106,17 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 
 	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
 	disperserHarnessConfig := &DisperserHarnessConfig{
-		Logger:              logger,
 		Network:             sharedDockerNetwork,
 		TestConfig:          testConfig,
 		TestName:            testName,
-		InMemoryBlobStore:   config.InMemoryBlobStore,
 		LocalStackPort:      infra.LocalStackPort,
 		MetadataTableName:   config.MetadataTableName,
 		BucketTableName:     config.BucketTableName,
 		S3BucketName:        config.S3BucketName,
 		MetadataTableNameV2: config.MetadataTableNameV2,
-		EthClient:           infra.ChainHarness.EthClient,
 		RelayCount:          config.RelayCount,
 	}
-	disperserHarness, err := SetupDisperserHarness(infraCtx, *disperserHarnessConfig)
+	disperserHarness, err := SetupDisperserHarness(infraCtx, logger, infra.ChainHarness.EthClient, *disperserHarnessConfig)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
 		return nil, setupErr
@@ -128,9 +127,8 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	operatorHarnessConfig := &OperatorHarnessConfig{
 		TestConfig: testConfig,
 		TestName:   testName,
-		Logger:     logger,
 	}
-	operatorHarness, err := SetupOperatorHarness(infraCtx, operatorHarnessConfig, &infra.ChainHarness)
+	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
 	if err != nil {
 		setupErr = fmt.Errorf("failed to setup operator harness: %w", err)
 		return nil, setupErr
@@ -155,7 +153,7 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	defer cleanupCancel()
 
 	// Stop operator goroutines using the harness cleanup
-	infra.OperatorHarness.Cleanup(cleanupCtx, infra.Logger)
+	infra.OperatorHarness.Cleanup(infra.Logger)
 
 	// Stop test binaries
 	infra.Logger.Info("Stopping binaries")

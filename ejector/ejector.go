@@ -106,7 +106,11 @@ func (e *Ejector) evaluateValidators() {
 	}
 
 	// Combine data from v1 and v2 lookups, since the validator is likely to cancel ejection if it is active in either.
-	signingRates := combineSigningRateSlices(v1SigningRates, v2SigningRates)
+	signingRates, err := combineSigningRateSlices(v1SigningRates, v2SigningRates)
+	if err != nil {
+		e.logger.Error("error combining signing rates", "error", err)
+		return
+	}
 	sortByUnsignedBytesDescending(signingRates)
 
 	for _, signingRate := range signingRates {

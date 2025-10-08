@@ -23,16 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const (
-	churnerImage   = "ghcr.io/layr-labs/eigenda/churner:local"
-	disImage       = "ghcr.io/layr-labs/eigenda/disperser:local"
-	encoderImage   = "ghcr.io/layr-labs/eigenda/encoder:local"
-	batcherImage   = "ghcr.io/layr-labs/eigenda/batcher:local"
-	nodeImage      = "ghcr.io/layr-labs/eigenda/node:local"
-	retrieverImage = "ghcr.io/layr-labs/eigenda/retriever:local"
-	relayImage     = "ghcr.io/layr-labs/eigenda/relay:local"
-)
-
 // convertToTestbedPrivateKeys converts the current PkConfig to testbed.PrivateKeyMaps
 func (env *Config) convertToTestbedPrivateKeys() *testbed.PrivateKeyMaps {
 	if env.Pks == nil {

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -17,33 +16,34 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-var _ SigningRateLookup = (*dynamoSigningRateLookup)(nil)
+var _ = (*dataApiSigningRateLookup)(nil)
 
 // Uses batch information in dynamoDB to determine signing rates.
-type dynamoSigningRateLookup struct {
+type dataApiSigningRateLookup struct {
 	logger     logging.Logger
 	url        string
 	httpClient *http.Client
 }
 
-func NewDynamoSigningRateLookup(
+// Looks up signing rates from the DataAPI at the given URL.
+func NewDataApiSigningRateLookup(
 	logger logging.Logger,
 	url string,
 	httpTimeout time.Duration,
-) *dynamoSigningRateLookup {
+) *dataApiSigningRateLookup {
 
 	httpClient := &http.Client{
 		Timeout: httpTimeout,
 	}
 
-	return &dynamoSigningRateLookup{
+	return &dataApiSigningRateLookup{
 		logger:     logger,
 		url:        url,
 		httpClient: httpClient,
 	}
 }
 
-func (srl *dynamoSigningRateLookup) GetSigningRates(
+func (srl *dataApiSigningRateLookup) GetSigningRates(
 	timeSpan time.Duration,
 	quorums []core.QuorumID,
 	version ProtocolVersion,
@@ -64,7 +64,7 @@ func (srl *dynamoSigningRateLookup) GetSigningRates(
 }
 
 // Look up signing rates for v1.
-func (srl *dynamoSigningRateLookup) getV1SigningRates(
+func (srl *dataApiSigningRateLookup) getV1SigningRates(
 	timeSpan time.Duration,
 	quorums []core.QuorumID,
 ) ([]*validator.ValidatorSigningRate, error) {
@@ -87,8 +87,7 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 	}
 	// add query parameters
 	q := url.Query()
-	// end: datetime formatted in "2006-01-02T15:04:05Z"
-	q.Set("end", now.UTC().Format("2006-01-02T15:04:05Z"))
+	q.Set("end", now.UTC().Format(time.RFC3339))
 	// interval: lookback window in seconds
 	q.Set("interval", strconv.Itoa(int(timeSpan.Seconds())))
 	url.RawQuery = q.Encode()
@@ -129,7 +128,7 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 	}
 
 	var response dataapi.OperatorsNonsigningPercentage
-	err = json.NewDecoder(strings.NewReader(string(respBody))).Decode(&response)
+	err = json.Unmarshal(respBody, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing response body: %w", err)
 	}
@@ -138,7 +137,7 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 	signingRateMap := make(map[core.OperatorID]*validator.ValidatorSigningRate)
 
 	for _, data := range response.Data {
-
+		// If quorumSet is empty, then we include all quorums.
 		if len(quorumSet) > 0 {
 			if _, ok := quorumSet[data.QuorumId]; !ok {
 				// This quorum is not in the requested set, skip it.
@@ -151,10 +150,13 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 			return nil, fmt.Errorf("error translating dataapi rate to proto: %w", err)
 		}
 
-		signingRateMap[core.OperatorID(signingRate.GetValidatorId())] =
+		signingRateMap[core.OperatorID(signingRate.GetValidatorId())], err =
 			combineSigningRates(
 				signingRateMap[core.OperatorID(signingRate.GetValidatorId())],
 				signingRate)
+		if err != nil {
+			return nil, fmt.Errorf("error combining signing rates: %w", err)
+		}
 	}
 
 	signingRates := make([]*validator.ValidatorSigningRate, 0, len(signingRateMap))
@@ -166,7 +168,7 @@ func (srl *dynamoSigningRateLookup) getV1SigningRates(
 }
 
 // Look up signing rates for v2.
-func (srl *dynamoSigningRateLookup) getV2SigningRates(
+func (srl *dataApiSigningRateLookup) getV2SigningRates(
 	timeSpan time.Duration,
 	quorums []core.QuorumID,
 	omitPerfectSigners bool,
@@ -190,8 +192,7 @@ func (srl *dynamoSigningRateLookup) getV2SigningRates(
 	}
 	// add query parameters
 	q := url.Query()
-	// end: datetime formatted in "2006-01-02T15:04:05Z"
-	q.Set("end", now.UTC().Format("2006-01-02T15:04:05Z"))
+	q.Set("end", now.UTC().Format(time.RFC3339))
 	// interval: lookback window in seconds
 	q.Set("interval", strconv.Itoa(int(timeSpan.Seconds())))
 	if omitPerfectSigners {
@@ -235,7 +236,7 @@ func (srl *dynamoSigningRateLookup) getV2SigningRates(
 	}
 
 	var response dataapiv2.OperatorsSigningInfoResponse
-	err = json.NewDecoder(strings.NewReader(string(respBody))).Decode(&response)
+	err = json.Unmarshal(respBody, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing response body: %w", err)
 	}
@@ -256,10 +257,13 @@ func (srl *dynamoSigningRateLookup) getV2SigningRates(
 			return nil, fmt.Errorf("error translating dataapi rate to proto: %w", err)
 		}
 
-		signingRateMap[core.OperatorID(signingRate.GetValidatorId())] =
+		signingRateMap[core.OperatorID(signingRate.GetValidatorId())], err =
 			combineSigningRates(
 				signingRateMap[core.OperatorID(signingRate.GetValidatorId())],
 				signingRate)
+		if err != nil {
+			return nil, fmt.Errorf("error combining signing rates: %w", err)
+		}
 	}
 
 	signingRates := make([]*validator.ValidatorSigningRate, 0, len(signingRateMap))
