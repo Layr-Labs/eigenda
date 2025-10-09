@@ -16,7 +16,7 @@ import (
 type KzgMultiProofGnarkBackend struct {
 	Fs *fft.FFTSettings
 	// FFTPointsT contains the transposed SRSTable points, of size [2*dimE][l]=[2*numChunks][chunkLen].
-	// See section 3.1 of https://eprint.iacr.org/2023/033.pdf:
+	// See section 3.1.1 of https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf:
 	//   "Note that the vector multiplied by the matrix is independent from the polynomial coefficients,
 	//   so its Fourier transform can be precomputed"
 	FFTPointsT [][]bn254.G1Affine
