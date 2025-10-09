@@ -475,6 +475,7 @@ func toScreamingSnakeCase(s string) string {
 			if isPrevPrevUpper {
 				// Multiple uppercase letters followed by lowercase
 				// Check if this is a single lowercase letter or if multiple lowercase letters follow
+				// nolint:staticcheck
 				isSingleLowercase := i == len(runes)-1 || !(runes[i+1] >= 'a' && runes[i+1] <= 'z')
 
 				if !isSingleLowercase {
