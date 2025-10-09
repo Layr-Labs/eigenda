@@ -423,9 +423,11 @@ func gatherConfigFieldData(
 //     Examples: "myField" -> "MY_FIELD", "field123Name" -> "FIELD123_NAME"
 //
 //  2. When N consecutive uppercase letters are followed by a lowercase letter:
-//     - Group all uppercase letters except the last one
-//     - The last uppercase letter starts the next word
-//     Examples: "IPAddress" -> "IP_ADDRESS", "MyYAMLParser" -> "MY_YAML_PARSER"
+//     - If only a single lowercase letter follows, keep it grouped with the uppercase letters
+//       (This handles common pluralization patterns like "URLs", "IDs", etc. Without this exception,
+//       "URLs" would become "UR_LS" instead of "URLS", which breaks the semantic meaning of the acronym)
+//     - If multiple lowercase letters follow, split before the last uppercase letter
+//     Examples: "IPAddress" -> "IP_ADDRESS", "URLs" -> "URLS", "IDs" -> "IDS"
 //
 //  3. When N consecutive uppercase letters are at the end (not followed by lowercase):
 //     - Group all uppercase letters together (no split)
@@ -469,14 +471,21 @@ func toScreamingSnakeCase(s string) string {
 
 				if isPrevPrevUpper {
 					// Multiple uppercase letters followed by lowercase
-					// Need to insert underscore before the last uppercase letter
-					// e.g., "YAMLParser" at 'a': need underscore before 'P'
-					// Remove the last character we wrote (the last uppercase letter)
-					resultStr := result.String()
-					result.Reset()
-					result.WriteString(resultStr[:len(resultStr)-1])
-					result.WriteRune('_')
-					result.WriteRune(prev)
+					// Check if this is a single lowercase letter or if multiple lowercase letters follow
+					isSingleLowercase := i == len(runes)-1 || !(runes[i+1] >= 'a' && runes[i+1] <= 'z')
+
+					if !isSingleLowercase {
+						// Multiple lowercase letters follow, so split before the last uppercase letter
+						// e.g., "YAMLParser" at 'a': need underscore before 'P'
+						// Remove the last character we wrote (the last uppercase letter)
+						resultStr := result.String()
+						result.Reset()
+						result.WriteString(resultStr[:len(resultStr)-1])
+						result.WriteRune('_')
+						result.WriteRune(prev)
+					}
+					// If single lowercase, keep it grouped with the uppercase letters (no split)
+					// e.g., "URLs" -> "URLS", "IDs" -> "IDS"
 				}
 			}
 		}

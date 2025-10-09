@@ -127,6 +127,16 @@ func TestToScreamingSnakeCase(t *testing.T) {
 			input:    "UserAPI",
 			expected: "USER_API",
 		},
+		{
+			name:     "MySQLDatabase - mixed case with uppercase sequence",
+			input:    "MySQLDatabase",
+			expected: "MY_SQL_DATABASE",
+		},
+		{
+			name:     "Single Trailing lower case",
+			input:    "EthRpcURLs",
+			expected: "ETH_RPC_URLS",
+		},
 	}
 
 	for _, tt := range tests {
