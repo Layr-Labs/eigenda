@@ -220,7 +220,7 @@ func NewDispatcher(
 	for _, threshold := range config.SignificantSigningMetricsThresholds {
 		significantThreshold, err := strconv.ParseFloat(threshold, 64)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse significant signing metrics threshold: %v", err)
+			return nil, fmt.Errorf("failed to parse significant signing metrics threshold: %w", err)
 		}
 		significantThresholds = append(significantThresholds, significantThreshold)
 	}
