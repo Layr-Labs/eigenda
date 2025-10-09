@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -23,12 +24,6 @@ import (
 // Write toggling allows a user to use the ALT DA server in "read only" mode
 // which is typical behavior for all rollup operator nodes outside of the batch poster
 // TODO: Add support for "read only" mode
-//
-// Server request body limits are used to impose a maximum on the allowed request body size
-// TODO: Understand if this is actually used/respected in DA client anywhere
-// TODO: Add env ingestion for these values
-// TODO: Determine a proper default given EigenDA's large batch uniqueness. The defaultBodyLimit
-// //    is currently set to 5 mib which is too low for integration EigenDA
 //
 // The ALT DA server implementation should be a thin wrapper over the existing
 // storage abstractions with lightweight translation from the existing critical
@@ -57,6 +52,8 @@ func NewServer(ctx context.Context, cfg *Config, h *Handlers) (*Server, error) {
 	if err := rpcServer.RegisterName("daprovider", h); err != nil {
 		return nil, fmt.Errorf("failed to register daprovider: %w", err)
 	}
+
+	rpcServer.SetHTTPBodyLimit(int(common.MaxServerPOSTRequestBodySize))
 
 	addr, ok := listener.Addr().(*net.TCPAddr)
 	if !ok {
