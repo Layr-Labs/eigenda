@@ -137,6 +137,11 @@ func TestToScreamingSnakeCase(t *testing.T) {
 			input:    "EthRpcURLs",
 			expected: "ETH_RPC_URLS",
 		},
+		{
+			name:     "Two letter words",
+			input:    "DoReMiFaSoLaTiDo",
+			expected: "DO_RE_MI_FA_SO_LA_TI_DO",
+		},
 	}
 
 	for _, tt := range tests {
