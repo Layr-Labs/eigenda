@@ -198,11 +198,8 @@ func RunController(ctx *cli.Context) error {
 	} else {
 		requestSigner, err = clients.NewDispersalRequestSigner(
 			context.Background(),
-			clients.DispersalRequestSignerConfig{
-				Region:   config.AwsClientConfig.Region,
-				Endpoint: config.AwsClientConfig.EndpointURL,
-				KeyID:    config.DisperserKMSKeyID,
-			})
+			config.DispersalRequestSignerConfig,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create request signer: %v", err)
 		}

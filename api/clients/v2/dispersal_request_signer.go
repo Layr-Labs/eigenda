@@ -66,10 +66,6 @@ func NewDispersalRequestSigner(
 	ctx context.Context,
 	config DispersalRequestSignerConfig,
 ) (DispersalRequestSigner, error) {
-	if err := config.Verify(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
-
 	var kmsClient *kms.Client
 	if config.Endpoint != "" {
 		kmsClient = kms.New(kms.Options{

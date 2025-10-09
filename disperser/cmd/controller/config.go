@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -32,7 +33,7 @@ type Config struct {
 	EthClientConfig                     geth.EthClientConfig
 	AwsClientConfig                     aws.ClientConfig
 	DisperserStoreChunksSigningDisabled bool
-	DisperserKMSKeyID                   string
+	DispersalRequestSignerConfig        clients.DispersalRequestSignerConfig
 	LoggerConfig                        common.LoggerConfig
 	IndexerConfig                       indexer.Config
 	ChainStateConfig                    thegraph.Config
@@ -113,13 +114,18 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("create reservation config: %w", err)
 	}
 
+	awsClientConfig := aws.ReadClientConfig(ctx, flags.FlagPrefix)
 	config := Config{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		EthClientConfig:                     ethClientConfig,
 		AwsClientConfig:                     aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		DisperserStoreChunksSigningDisabled: ctx.GlobalBool(flags.DisperserStoreChunksSigningDisabledFlag.Name),
-		DisperserKMSKeyID:                   ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
 		LoggerConfig:                        *loggerConfig,
+		DispersalRequestSignerConfig: clients.DispersalRequestSignerConfig{
+			KeyID:    ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
+			Region:   awsClientConfig.Region,
+			Endpoint: awsClientConfig.EndpointURL,
+		},
 		EncodingManagerConfig: controller.EncodingManagerConfig{
 			PullInterval:                ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
 			EncodingRequestTimeout:      ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
@@ -157,8 +163,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		OnDemandConfig:                  onDemandConfig,
 		ReservationConfig:               reservationConfig,
 	}
-	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
-		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")
+
+	if err := config.DispersalRequestSignerConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid dispersal request signer config: %w", err)
 	}
 
 	return config, nil
