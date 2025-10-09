@@ -304,7 +304,7 @@ func gatherConfigFieldData(
 		case reflect.Struct:
 			// Recurse for nested structs, using the actual field value to preserve defaults
 			nestedValue := targetValue.Field(i).Interface()
-			nestedEnvVarPrefix := envVarPrefix + "_" + strings.ToUpper(field.Name)
+			nestedEnvVarPrefix := envVarPrefix + "_" + toScreamingSnakeCase(field.Name)
 
 			var nestedTomlPrefix string
 			if tomlPrefix == "" {
@@ -329,7 +329,7 @@ func gatherConfigFieldData(
 				fieldValue := targetValue.Field(i)
 				nestedValue := fieldValue.Interface()
 
-				nestedEnvVarPrefix := envVarPrefix + "_" + strings.ToUpper(field.Name)
+				nestedEnvVarPrefix := envVarPrefix + "_" + toScreamingSnakeCase(field.Name)
 
 				var nestedTomlPrefix string
 				if tomlPrefix == "" {
@@ -368,7 +368,7 @@ func gatherConfigFieldData(
 				}
 
 				fields = append(fields, &configFieldData{
-					EnvVar:       envVarPrefix + "_" + strings.ToUpper(field.Name),
+					EnvVar:       envVarPrefix + "_" + toScreamingSnakeCase(field.Name),
 					TOML:         toml,
 					FieldType:    field.Type.String(),
 					DefaultValue: defaultValueStr,
@@ -395,7 +395,7 @@ func gatherConfigFieldData(
 			}
 
 			fields = append(fields, &configFieldData{
-				EnvVar:       envVarPrefix + "_" + strings.ToUpper(field.Name),
+				EnvVar:       envVarPrefix + "_" + toScreamingSnakeCase(field.Name),
 				TOML:         toml,
 				FieldType:    field.Type.String(),
 				DefaultValue: fmt.Sprintf("%v", targetValue.Field(i).Interface()),
@@ -413,6 +413,83 @@ func gatherConfigFieldData(
 	})
 
 	return fields, nil
+}
+
+// Converts a string in CamelCase to SCREAMING_SNAKE_CASE.
+//
+// Rules:
+//
+//  1. Insert underscore before any uppercase letter that follows a non-uppercase letter
+//     Examples: "myField" -> "MY_FIELD", "field123Name" -> "FIELD123_NAME"
+//
+//  2. When N consecutive uppercase letters are followed by a lowercase letter:
+//     - Group all uppercase letters except the last one
+//     - The last uppercase letter starts the next word
+//     Examples: "IPAddress" -> "IP_ADDRESS", "MyYAMLParser" -> "MY_YAML_PARSER"
+//
+//  3. When N consecutive uppercase letters are at the end (not followed by lowercase):
+//     - Group all uppercase letters together (no split)
+//     Examples: "NodeID" -> "NODE_ID", "ServerHTTP" -> "SERVER_HTTP"
+//
+//  4. Strings that are already all uppercase remain unchanged
+//     Examples: "FIELD" -> "FIELD", "HTTP" -> "HTTP"
+func toScreamingSnakeCase(s string) string {
+	if s == "" {
+		return ""
+	}
+
+	var result strings.Builder
+	result.Grow(len(s) + len(s)/2) // Pre-allocate with estimate for underscores
+
+	runes := []rune(s)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+
+		// Check if we should insert an underscore before this character
+		if i > 0 {
+			prev := runes[i-1]
+			isCurrentUpper := r >= 'A' && r <= 'Z'
+			isPrevUpper := prev >= 'A' && prev <= 'Z'
+			isCurrentLower := r >= 'a' && r <= 'z'
+
+			// Insert underscore if:
+			// 1. Current is uppercase, previous is not uppercase (camelCase boundary)
+			// 2. Current is lowercase, previous is uppercase, and there are multiple consecutive uppercase before
+			//    This handles the transition from consecutive uppercase to lowercase
+			//    e.g., "YAMLParser" -> at 'a', we need underscore before 'P'
+
+			if isCurrentUpper && !isPrevUpper {
+				// Transition from lowercase/other to uppercase: "myField" -> "my_Field"
+				result.WriteRune('_')
+			} else if isCurrentLower && isPrevUpper && i >= 2 {
+				// We're at a lowercase letter after uppercase(s)
+				// Check if there were multiple consecutive uppercase letters before this
+				prevPrev := runes[i-2]
+				isPrevPrevUpper := prevPrev >= 'A' && prevPrev <= 'Z'
+
+				if isPrevPrevUpper {
+					// Multiple uppercase letters followed by lowercase
+					// Need to insert underscore before the last uppercase letter
+					// e.g., "YAMLParser" at 'a': need underscore before 'P'
+					// Remove the last character we wrote (the last uppercase letter)
+					resultStr := result.String()
+					result.Reset()
+					result.WriteString(resultStr[:len(resultStr)-1])
+					result.WriteRune('_')
+					result.WriteRune(prev)
+				}
+			}
+		}
+
+		// Convert to uppercase
+		if r >= 'a' && r <= 'z' {
+			result.WriteRune(r - 'a' + 'A')
+		} else {
+			result.WriteRune(r)
+		}
+	}
+
+	return result.String()
 }
 
 func generateMarkdownDoc(
