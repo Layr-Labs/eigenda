@@ -4,7 +4,6 @@
 package e2e
 
 import (
-	"os"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
@@ -20,12 +19,12 @@ import (
 // We don't really have an alternative however given that the read-only feature is only
 // implemented inside the EigenDAV2 store.
 func TestProxyV2ReadOnlyMode(t *testing.T) {
-	// set this since BuildTestSuiteConfig below requires it.
-	err := os.Setenv(testutils.EthRPCEnvVar, "https://ethereum-sepolia.rpc.subquery.network/public")
-	require.NoError(t, err)
+	if testutils.GetBackend() == testutils.MemstoreBackend {
+		t.Skip("Don't run for memstore backend, since read-only mode is only implemented for eigenda v2 backend")
+	}
 
 	// We test against sepolia backend in order to test the client creation code (which reads the signer private key).
-	testCfg := testutils.NewTestConfig(testutils.SepoliaBackend, common.V2EigenDABackend, nil)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 	tsConfig.SecretConfig.SignerPaymentKey = "" // ensure no signer key is set
 	ts, kill := testutils.CreateTestSuite(tsConfig)
@@ -38,7 +37,7 @@ func TestProxyV2ReadOnlyMode(t *testing.T) {
 	daClient := standard_client.New(cfg)
 
 	t.Log("Setting input data on proxy server...")
-	_, err = daClient.SetData(ts.Ctx, testBlob)
+	_, err := daClient.SetData(ts.Ctx, testBlob)
 	require.Error(t, err)
 	// expect 500 in read-only mode. Routes are turned off but we don't have an explicit "read-only" mode config,
 	// so error return only says "PUT routes are disabled, did you provide a signer private key?".
