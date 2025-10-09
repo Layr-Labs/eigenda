@@ -113,12 +113,12 @@ interface IEigenDAConfigRegistry {
         view
         returns (ConfigRegistryTypes.BytesCheckpoint memory);
 
-    /// @notice Gets the name of a 32 byte configuration entry by its key.
+    /// @notice Gets the name of a 32 byte configuration entry by its name digest.
     /// @param nameDigest The hash of the name of the configuration entry.
     /// @return The name of the configuration entry.
     function getConfigNameBytes32(bytes32 nameDigest) external view returns (string memory);
 
-    /// @notice Gets the name of a variable length byte configuration entry by its key.
+    /// @notice Gets the name of a variable length byte configuration entry by its name digest.
     /// @param nameDigest The hash of the name of the configuration entry.
     /// @return The name of the configuration entry.
     function getConfigNameBytes(bytes32 nameDigest) external view returns (string memory);
