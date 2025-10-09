@@ -42,6 +42,20 @@ type EncodingManagerConfig struct {
 	MaxNumBlobsPerIteration int32
 	// OnchainStateRefreshInterval is the interval at which the onchain state is refreshed
 	OnchainStateRefreshInterval time.Duration
+	// NumConcurrentRequests is the size of the worker pool for encoding requests
+	NumConcurrentRequests int
+}
+
+func DefaultEncodingManagerConfig() *EncodingManagerConfig {
+	return &EncodingManagerConfig{
+		PullInterval:                2 * time.Second,
+		EncodingRequestTimeout:      5 * time.Minute,
+		StoreTimeout:                15 * time.Second,
+		NumEncodingRetries:          3,
+		MaxNumBlobsPerIteration:     128,
+		OnchainStateRefreshInterval: 1 * time.Hour,
+		NumConcurrentRequests:       250,
+	}
 }
 
 // EncodingManager is responsible for pulling queued blobs from the blob
@@ -172,7 +186,7 @@ func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.Blo
 // WARNING: This method is not thread-safe. It should only be called from a single goroutine.
 func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	// Signal Liveness to indicate no stall
-	healthcheck.SignalHeartbeat("encodingManager", e.controllerLivenessChan, e.logger)
+	healthcheck.SignalHeartbeat(e.logger, "encodingManager", e.controllerLivenessChan)
 
 	// Get a batch of blobs to encode
 	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)

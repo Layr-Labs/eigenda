@@ -24,8 +24,13 @@ type InfrastructureConfig struct {
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
 
-	// The following field is temporary, to be able to test different payments configurations. It will be removed
-	// once legacy payments are removed.
+	// DisableDisperser disables the disperser deployment when set to true. This is useful for
+	// tests that do not require the disperser infrastructure to be deployed (e.g. testing graph
+	// node with operator registration)
+	DisableDisperser bool
+
+	// The following field is temporary, to be able to test different payments configurations.
+	// It will be removed once legacy payments are removed.
 	ControllerUseNewPayments bool
 }
 
@@ -105,23 +110,34 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	infra.ChainHarness = *chainHarness
 
 	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
-	disperserHarnessConfig := &DisperserHarnessConfig{
-		Network:             sharedDockerNetwork,
-		TestConfig:          testConfig,
-		TestName:            testName,
-		LocalStackPort:      infra.LocalStackPort,
-		MetadataTableName:   config.MetadataTableName,
-		BucketTableName:     config.BucketTableName,
-		S3BucketName:        config.S3BucketName,
-		MetadataTableNameV2: config.MetadataTableNameV2,
-		RelayCount:          config.RelayCount,
+	if !config.DisableDisperser {
+		disperserHarnessConfig := &DisperserHarnessConfig{
+			Network:             sharedDockerNetwork,
+			TestConfig:          testConfig,
+			TestName:            testName,
+			LocalStackPort:      infra.LocalStackPort,
+			MetadataTableName:   config.MetadataTableName,
+			BucketTableName:     config.BucketTableName,
+			S3BucketName:        config.S3BucketName,
+			MetadataTableNameV2: config.MetadataTableNameV2,
+			RelayCount:          config.RelayCount,
+			OperatorStateSubgraphURL: infra.ChainHarness.GraphNode.HTTPURL() +
+				"/subgraphs/name/Layr-Labs/eigenda-operator-state",
+		}
+		disperserHarness, err := SetupDisperserHarness(
+			infraCtx,
+			logger,
+			infra.ChainHarness.EthClient,
+			*disperserHarnessConfig,
+		)
+		if err != nil {
+			setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
+			return nil, setupErr
+		}
+		infra.DisperserHarness = *disperserHarness
+	} else {
+		logger.Info("Disperser deployment disabled, skipping disperser harness setup")
 	}
-	disperserHarness, err := SetupDisperserHarness(infraCtx, logger, infra.ChainHarness.EthClient, *disperserHarnessConfig)
-	if err != nil {
-		setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
-		return nil, setupErr
-	}
-	infra.DisperserHarness = *disperserHarness
 
 	// Setup Operator Harness third (requires chain and disperser to be ready)
 	operatorHarnessConfig := &OperatorHarnessConfig{
