@@ -323,7 +323,7 @@ func RunController(ctx *cli.Context) error {
 			config.HeartbeatMonitorConfig,
 		)
 		if err != nil {
-			logger.Warn("Heartbeat monitor failed", "err", err)s
+			logger.Warn("Heartbeat monitor failed", "err", err)
 		}
 	}()
 
