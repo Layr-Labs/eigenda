@@ -12,7 +12,7 @@ A basic REST proxy server to interact with the EigenDA network:
 [![push-image-ghcr](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml)
 
 
-[V1 Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client)
+[V1 Integration Guide](https://docs.eigencloud.xyz/products/eigenda/integrations-guides/v1/eigenda-proxyv1) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client)
 
 ## Overview
 
@@ -78,7 +78,7 @@ We build and publish containers on every release to [ghcr.io/layr-labs/eigenda-p
 
 ### REST API Routes
 
-The source of truth for the routes is defined by our gorilla mux router in [./server/routing.go](./server/routing.go). We offer two sets of POST/GET routes.
+The source of truth for the routes is defined by our gorilla mux router in [./server/routing.go](https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/servers/rest/routing.go). We offer two sets of POST/GET routes.
 
 #### Standard Routes
 
@@ -329,7 +329,7 @@ This behavior is turned on by default, but configurable via the `--eigenda.confi
 
 #### Authn/Authz/Payments
 
-In order to disperse to the EigenDA V1 network in production, or at high throughput on testnet, please register your authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication keypair address should not be associated with any funds anywhere. For EigenDA V2, please see our [payments](https://docs.eigenda.xyz/releases/payments) doc.
+In order to disperse to the EigenDA V1 network in production, or at high throughput on testnet, please register your authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication keypair address should not be associated with any funds anywhere. For EigenDA V2, please see our [payments](https://docs.eigencloud.xyz/products/eigenda/core-concepts/payments) doc.
 
 > Note: Proxy only supports using a single authorization (v1) or payment (v2) key. For RaaS providers, we discourage sharing keys between rollups, and thus recommend running a single instance of the Proxy per Rollup.
 
@@ -366,12 +366,17 @@ Browse our [Makefile](./Makefile) for a list of available commands such as `make
 
 Unit tests can be run with `make test-unit`.
 
-#### Integration / E2E
+#### End-to-End (E2E) Tests
 
-Integration tests against op framework can be run with `make test-e2e`. These tests use the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch
-submission and state derivation. Tests are run both in a local environment, and in a holesky testnet environment.
+E2E tests validate full client ↔ proxy ↔ EigenDA flows.  
+Use the provided `make` targets to run them with different backends:
 
-These tests also assert E2E client <-> server interactions using simple/op clients.
+| Command | Description |
+|----------|--------------|
+| `make test-e2e-local` | Runs E2E tests against a local **memstore** backend (fast, isolated). |
+| `make test-e2e-sepolia` | Same as testnet but runs on **Sepolia** network. |
+
+All commands execute `./test/e2e` with environment-specific settings and output via [gotestsum](https://github.com/gotestyourself/gotestsum).
 
 #### Fuzz
 

@@ -10,10 +10,8 @@ run-e2e-tests:
 # be removed as soon as we figure out why in-test teardown isn't always succeeding.
 run-payments-tests:
 	@for test in \
-		TestReservationOnly_LegacyClient_LegacyController \
-		TestReservationOnly_LegacyClient_NewController \
-		TestReservationOnly_NewClient_LegacyController \
-		TestReservationOnly_NewClient_NewController; do \
+		TestLegacyController \
+		TestNewController; do \
 		echo "Running $$test..."; \
 		if ! go test ./tests/payments -v -run "^$$test$$"; then \
 			echo "❌ TEST FAILED: $$test"; \
