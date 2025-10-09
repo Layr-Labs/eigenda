@@ -2,8 +2,8 @@
 pragma solidity ^0.8.9;
 
 library ConfigRegistryTypes {
-    /// @notice Struct to keep track of names associated with config keys
-    /// @param names Mapping from config key to name
+    /// @notice Struct to keep track of names associated with name digests
+    /// @param names Mapping from name digest to name
     /// @param nameList List of all config names
     struct NameSet {
         mapping(bytes32 => string) names;
@@ -27,6 +27,8 @@ library ConfigRegistryTypes {
     }
 
     /// @notice Struct to hold all bytes32 configuration checkpoints and associated names
+    /// @param values Mapping from name digest to array of Bytes32Checkpoint structs. This entire structure is meant to be able to be queried.
+    /// @param nameSet The NameSet struct to manage names associated with the configuration entries
     /// @dev See docs for the structs for more information
     struct Bytes32Cfg {
         mapping(bytes32 => Bytes32Checkpoint[]) values;
