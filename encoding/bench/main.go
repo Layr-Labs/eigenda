@@ -13,6 +13,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -74,6 +75,18 @@ func main() {
 		PreloadEncoder:  true,
 	}
 
+	// Create commiter
+	committerConfig := &committer.Config{
+		SRSNumberToLoad:   524288,
+		G1SRSPath:         "/home/ubuntu/eigenda/resources/srs/g1.point",
+		G2SRSPath:         "/home/ubuntu/eigenda/resources/srs/g2.point",
+		G2TrailingSRSPath: "/home/ubuntu/eigenda/resources/srs/g2.trailing.point",
+	}
+	committer, err := committer.NewFromConfig(*committerConfig)
+	if err != nil {
+		log.Fatalf("Failed to create committer: %v", err)
+	}
+
 	verifierKzgConfig = &verifierv2.KzgConfig{
 		G1Path:          "/home/ubuntu/eigenda/resources/srs/g1.point",
 		SRSNumberToLoad: 524288,
@@ -117,7 +130,7 @@ func main() {
 		defer trace.Stop()
 	}
 
-	results := runBenchmark(p, &config)
+	results := runBenchmark(p, committer, &config)
 	if config.MemProfile != "" {
 		f, err := os.Create(config.MemProfile)
 		if err != nil {
@@ -144,7 +157,7 @@ func main() {
 	fmt.Printf("Benchmark results written to %s\n", config.OutputFile)
 }
 
-func runBenchmark(p *proverv2.Prover, config *Config) []BenchmarkResult {
+func runBenchmark(p *proverv2.Prover, committer *committer.Committer, config *Config) []BenchmarkResult {
 	var results []BenchmarkResult
 
 	// Fixed coding ratio of 8
@@ -155,7 +168,7 @@ func runBenchmark(p *proverv2.Prover, config *Config) []BenchmarkResult {
 		if chunkLen < 1 {
 			continue // Skip invalid configurations
 		}
-		result := benchmarkEncodeAndVerify(p, blobLength, config.NumChunks, chunkLen, config.EnableVerify)
+		result := benchmarkEncodeAndVerify(p, committer, blobLength, config.NumChunks, chunkLen, config.EnableVerify)
 		results = append(results, result)
 	}
 	return results
@@ -163,6 +176,7 @@ func runBenchmark(p *proverv2.Prover, config *Config) []BenchmarkResult {
 
 func benchmarkEncodeAndVerify(
 	p *proverv2.Prover,
+	committer *committer.Committer,
 	blobLength uint64,
 	numChunks uint64,
 	chunkLen uint64,
@@ -187,7 +201,7 @@ func benchmarkEncodeAndVerify(
 		inputFr[i].SetInt64(int64(i + 1))
 	}
 
-	commit, _, _, err := enc.GetCommitments(inputFr)
+	commit, _, _, err := committer.GetCommitments(inputFr)
 	if err != nil {
 		log.Fatal(err)
 	}
