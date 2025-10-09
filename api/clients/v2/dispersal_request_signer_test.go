@@ -90,7 +90,6 @@ func TestKMSSignatureVerificationWithEmptyKeyID(t *testing.T) {
 	})
 
 	require.Error(t, err, "should fail to create signer with empty KeyID")
-	require.ErrorIs(t, err, ErrKeyIDRequired, "error should be ErrKeyIDRequired")
 }
 
 func TestKMSSignatureVerificationWithEmptyRegion(t *testing.T) {
@@ -104,7 +103,6 @@ func TestKMSSignatureVerificationWithEmptyRegion(t *testing.T) {
 	})
 
 	require.Error(t, err, "should fail to create signer with empty Region")
-	require.ErrorIs(t, err, ErrRegionRequired, "error should be ErrRegionRequired")
 }
 
 func TestKMSSignatureVerification(t *testing.T) {

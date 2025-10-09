@@ -15,12 +15,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Sentinel errors for configuration validation
-var (
-	ErrKeyIDRequired  = errors.New("KeyID is required")
-	ErrRegionRequired = errors.New("Region is required")
-)
-
 // DispersalRequestSigner encapsulates the logic for signing GetChunks requests.
 type DispersalRequestSigner interface {
 	// SignStoreChunksRequest signs a StoreChunksRequest. Does not modify the request
@@ -50,10 +44,10 @@ func DefaultDispersalRequestSignerConfig() DispersalRequestSignerConfig {
 // Verify checks that the configuration is valid, returning an error if it is not.
 func (c *DispersalRequestSignerConfig) Verify() error {
 	if c.KeyID == "" {
-		return ErrKeyIDRequired
+		return errors.New("KeyID is required")
 	}
 	if c.Region == "" {
-		return ErrRegionRequired
+		return errors.New("Region is required")
 	}
 
 	return nil
