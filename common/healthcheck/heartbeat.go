@@ -20,6 +20,14 @@ type HeartbeatMonitorConfig struct {
 
 var _ config.VerifiableConfig = &HeartbeatMonitorConfig{}
 
+// GetDefaultHeartbeatMonitorConfig returns a HeartbeatMonitorConfig with sensible default values.
+func GetDefaultHeartbeatMonitorConfig() *HeartbeatMonitorConfig {
+	return &HeartbeatMonitorConfig{
+		FilePath:         "/tmp/controller-health",
+		MaxStallDuration: 4 * time.Minute,
+	}
+}
+
 // Validate checks that the configuration is valid, returning an error if it is not.
 func (c *HeartbeatMonitorConfig) Verify() error {
 	if c.FilePath == "" {
