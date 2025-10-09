@@ -424,8 +424,8 @@ func gatherConfigFieldData(
 //
 //  2. When N consecutive uppercase letters are followed by a lowercase letter:
 //     - If only a single lowercase letter follows, keep it grouped with the uppercase letters
-//       (This handles common pluralization patterns like "URLs", "IDs", etc. Without this exception,
-//       "URLs" would become "UR_LS" instead of "URLS", which breaks the semantic meaning of the acronym)
+//     (This handles common pluralization patterns like "URLs", "IDs", etc. Without this exception,
+//     "URLs" would become "UR_LS" instead of "URLS", which breaks the semantic meaning of the acronym)
 //     - If multiple lowercase letters follow, split before the last uppercase letter
 //     Examples: "IPAddress" -> "IP_ADDRESS", "URLs" -> "URLS", "IDs" -> "IDS"
 //
@@ -441,64 +441,61 @@ func toScreamingSnakeCase(s string) string {
 	}
 
 	var result strings.Builder
-	result.Grow(len(s) + len(s)/2) // Pre-allocate with estimate for underscores
 
 	runes := []rune(s)
 	for i := 0; i < len(runes); i++ {
 		r := runes[i]
 
-		// Check if we should insert an underscore before this character
-		if i > 0 {
-			prev := runes[i-1]
-			isCurrentUpper := r >= 'A' && r <= 'Z'
-			isPrevUpper := prev >= 'A' && prev <= 'Z'
-			isCurrentLower := r >= 'a' && r <= 'z'
+		if i == 0 {
+			// First character, don't prepend underscore
+			result.WriteRune(r)
+			continue
+		}
 
-			// Insert underscore if:
-			// 1. Current is uppercase, previous is not uppercase (camelCase boundary)
-			// 2. Current is lowercase, previous is uppercase, and there are multiple consecutive uppercase before
-			//    This handles the transition from consecutive uppercase to lowercase
-			//    e.g., "YAMLParser" -> at 'a', we need underscore before 'P'
+		prev := runes[i-1]
+		isCurrentUpper := r >= 'A' && r <= 'Z'
+		isPrevUpper := prev >= 'A' && prev <= 'Z'
+		isCurrentLower := r >= 'a' && r <= 'z'
 
-			if isCurrentUpper && !isPrevUpper {
-				// Transition from lowercase/other to uppercase: "myField" -> "my_Field"
-				result.WriteRune('_')
-			} else if isCurrentLower && isPrevUpper && i >= 2 {
-				// We're at a lowercase letter after uppercase(s)
-				// Check if there were multiple consecutive uppercase letters before this
-				prevPrev := runes[i-2]
-				isPrevPrevUpper := prevPrev >= 'A' && prevPrev <= 'Z'
+		// Insert underscore if:
+		// 1. Current is uppercase, previous is not uppercase (camelCase boundary)
+		// 2. Current is lowercase, previous is uppercase, and there are multiple consecutive uppercase before
+		//    This handles the transition from consecutive uppercase to lowercase
+		//    e.g., "YAMLParser" -> at 'a', we need underscore before 'P'
 
-				if isPrevPrevUpper {
-					// Multiple uppercase letters followed by lowercase
-					// Check if this is a single lowercase letter or if multiple lowercase letters follow
-					isSingleLowercase := i == len(runes)-1 || !(runes[i+1] >= 'a' && runes[i+1] <= 'z')
+		if isCurrentUpper && !isPrevUpper {
+			// Transition from lowercase/other to uppercase: "myField" -> "my_Field"
+			result.WriteRune('_')
+		} else if isCurrentLower && isPrevUpper && i >= 2 {
+			// We're at a lowercase letter after uppercase(s)
+			// Check if there were multiple consecutive uppercase letters before this
+			prevPrev := runes[i-2]
+			isPrevPrevUpper := prevPrev >= 'A' && prevPrev <= 'Z'
 
-					if !isSingleLowercase {
-						// Multiple lowercase letters follow, so split before the last uppercase letter
-						// e.g., "YAMLParser" at 'a': need underscore before 'P'
-						// Remove the last character we wrote (the last uppercase letter)
-						resultStr := result.String()
-						result.Reset()
-						result.WriteString(resultStr[:len(resultStr)-1])
-						result.WriteRune('_')
-						result.WriteRune(prev)
-					}
-					// If single lowercase, keep it grouped with the uppercase letters (no split)
-					// e.g., "URLs" -> "URLS", "IDs" -> "IDS"
+			if isPrevPrevUpper {
+				// Multiple uppercase letters followed by lowercase
+				// Check if this is a single lowercase letter or if multiple lowercase letters follow
+				isSingleLowercase := i == len(runes)-1 || !(runes[i+1] >= 'a' && runes[i+1] <= 'z')
+
+				if !isSingleLowercase {
+					// Multiple lowercase letters follow, so split before the last uppercase letter
+					// e.g., "YAMLParser" at 'a': need underscore before 'P'
+					// Remove the last character we wrote (the last uppercase letter)
+					resultStr := result.String()
+					result.Reset()
+					result.WriteString(resultStr[:len(resultStr)-1])
+					result.WriteRune('_')
+					result.WriteRune(prev)
 				}
+				// If single lowercase, keep it grouped with the uppercase letters (no split)
+				// e.g., "URLs" -> "URLS", "IDs" -> "IDS"
 			}
 		}
 
-		// Convert to uppercase
-		if r >= 'a' && r <= 'z' {
-			result.WriteRune(r - 'a' + 'A')
-		} else {
-			result.WriteRune(r)
-		}
+		result.WriteRune(r)
 	}
 
-	return result.String()
+	return strings.ToUpper(result.String())
 }
 
 func generateMarkdownDoc(
