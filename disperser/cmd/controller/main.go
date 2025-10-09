@@ -46,8 +46,6 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
-
-	controllerMaxStallDuration = 240 * time.Second
 )
 
 func main() {
@@ -317,22 +315,15 @@ func RunController(ctx *cli.Context) error {
 		logger.Warn("Failed to create readiness file", "error", err, "path", config.ControllerReadinessProbePath)
 	}
 
-	if _, err := os.Create(config.ControllerHealthProbePath); err != nil {
-		logger.Warn("Failed to create healthProbe file: %v", err)
-	}
-
 	// Start heartbeat monitor
 	go func() {
 		err := healthcheck.NewHeartbeatMonitor(
 			logger,
 			controllerLivenessChan,
-			healthcheck.HeartbeatMonitorConfig{
-				FilePath:         config.ControllerHealthProbePath,
-				MaxStallDuration: controllerMaxStallDuration,
-			},
+			config.HeartbeatMonitorConfig,
 		)
 		if err != nil {
-			logger.Warn("Heartbeat monitor exited with error", "err", err)
+			logger.Warn("Heartbeat monitor failed", "err", err)s
 		}
 	}()
 
