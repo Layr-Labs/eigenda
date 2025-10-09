@@ -47,9 +47,6 @@ interface IEigenDAAddressDirectory {
 ///         Supports both bytes32 and bytes types for configuration values, and maintains a checkpointed structure for each configuration entry
 ///         by an arbitrary activation key.
 interface IEigenDAConfigRegistry {
-    error ConfigAlreadyExists(string name);
-    error ConfigDoesNotExist(string name);
-
     /// @notice Adds a 32 byte configuration value to the configuration registry.
     /// @param name The name of the configuration entry.
     /// @param activationKey The activation key for the configuration entry.

@@ -5,8 +5,10 @@ import {ConfigRegistryStorage as S} from "src/core/libraries/v3/config-registry/
 import {ConfigRegistryTypes as T} from "src/core/libraries/v3/config-registry/ConfigRegistryTypes.sol";
 
 library ConfigRegistryLib {
-    event ConfigBytes32Set(bytes32 key, uint256 activationKey, bytes32 value);
-    event ConfigBytesSet(bytes32 key, uint256 activationKey, bytes value);
+    event ConfigBytes32Set(bytes32 nameDigest, uint256 activationKey, bytes32 value);
+    event ConfigBytesSet(bytes32 nameDigest, uint256 activationKey, bytes value);
+
+    error NameDigestNotRegistered(bytes32 nameDigest);
 
     function getNameDigest(string memory name) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(name));
@@ -60,15 +62,15 @@ library ConfigRegistryLib {
         emit ConfigBytesSet(nameDigest, activationKey, value);
     }
 
-    function registerKeyBytes32(string memory name) internal {
-        registerKey(S.layout().bytes32Config.nameSet, name);
+    function registerNameBytes32(string memory name) internal {
+        registerName(S.layout().bytes32Config.nameSet, name);
     }
 
-    function registerKeyBytes(string memory name) internal {
-        registerKey(S.layout().bytesConfig.nameSet, name);
+    function registerNameBytes(string memory name) internal {
+        registerName(S.layout().bytesConfig.nameSet, name);
     }
 
-    function registerKey(T.NameSet storage nameSet, string memory name) internal {
+    function registerName(T.NameSet storage nameSet, string memory name) internal {
         bytes32 nameDigest = getNameDigest(name);
         if (bytes(nameSet.names[nameDigest]).length == 0) {
             require(bytes(name).length > 0, "Name cannot be empty");
@@ -77,43 +79,47 @@ library ConfigRegistryLib {
         }
     }
 
-    function isKeyRegistered(T.NameSet storage nameSet, bytes32 nameDigest) internal view returns (bool) {
+    function isNameDigestRegistered(T.NameSet storage nameSet, bytes32 nameDigest) internal view returns (bool) {
         return bytes(nameSet.names[nameDigest]).length > 0;
     }
 
-    function isKeyRegisteredBytes32(bytes32 nameDigest) internal view returns (bool) {
-        return isKeyRegistered(S.layout().bytes32Config.nameSet, nameDigest);
+    function isNameRegisteredBytes32(bytes32 nameDigest) internal view returns (bool) {
+        return isNameDigestRegistered(S.layout().bytes32Config.nameSet, nameDigest);
     }
 
-    function isKeyRegisteredBytes(bytes32 nameDigest) internal view returns (bool) {
-        return isKeyRegistered(S.layout().bytesConfig.nameSet, nameDigest);
+    function isNameRegisteredBytes(bytes32 nameDigest) internal view returns (bool) {
+        return isNameDigestRegistered(S.layout().bytesConfig.nameSet, nameDigest);
     }
 
-    function getNumRegisteredKeysBytes32() internal view returns (uint256) {
+    function getNumRegisteredNamesBytes32() internal view returns (uint256) {
         return S.layout().bytes32Config.nameSet.nameList.length;
     }
 
-    function getNumRegisteredKeysBytes() internal view returns (uint256) {
+    function getNumRegisteredNamesBytes() internal view returns (uint256) {
         return S.layout().bytesConfig.nameSet.nameList.length;
     }
 
-    function getRegisteredKeyBytes32(uint256 index) internal view returns (string memory) {
+    function getRegisteredNameBytes32(uint256 index) internal view returns (string memory) {
         return S.layout().bytes32Config.nameSet.nameList[index];
     }
 
-    function getRegisteredKeyBytes(uint256 index) internal view returns (string memory) {
+    function getRegisteredNameBytes(uint256 index) internal view returns (string memory) {
         return S.layout().bytesConfig.nameSet.nameList[index];
     }
 
     function getNameBytes32(bytes32 nameDigest) internal view returns (string memory) {
         string memory name = S.layout().bytes32Config.nameSet.names[nameDigest];
-        require(bytes(name).length > 0, "Key not registered");
+        if (bytes(name).length == 0) {
+            revert NameDigestNotRegistered(nameDigest);
+        }
         return name;
     }
 
     function getNameBytes(bytes32 nameDigest) internal view returns (string memory) {
         string memory name = S.layout().bytesConfig.nameSet.names[nameDigest];
-        require(bytes(name).length > 0, "Key not registered");
+        if (bytes(name).length == 0) {
+            revert NameDigestNotRegistered(nameDigest);
+        }
         return name;
     }
 

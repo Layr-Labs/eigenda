@@ -121,21 +121,15 @@ contract EigenDADirectory is IEigenDADirectory {
     /// @inheritdoc IEigenDAConfigRegistry
     function addConfigBytes32(string memory name, uint256 activationKey, bytes32 value) external onlyOwner {
         bytes32 key = ConfigRegistryLib.getNameDigest(name);
-        if (ConfigRegistryLib.isKeyRegisteredBytes32(key)) {
-            revert ConfigAlreadyExists(name);
-        }
         ConfigRegistryLib.addConfigBytes32(key, activationKey, value);
-        ConfigRegistryLib.registerKeyBytes32(name);
+        ConfigRegistryLib.registerNameBytes32(name);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
     function addConfigBytes(string memory name, uint256 activationKey, bytes memory value) external onlyOwner {
         bytes32 key = ConfigRegistryLib.getNameDigest(name);
-        if (ConfigRegistryLib.isKeyRegisteredBytes(key)) {
-            revert ConfigAlreadyExists(name);
-        }
         ConfigRegistryLib.addConfigBytes(key, activationKey, value);
-        ConfigRegistryLib.registerKeyBytes(name);
+        ConfigRegistryLib.registerNameBytes(name);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
