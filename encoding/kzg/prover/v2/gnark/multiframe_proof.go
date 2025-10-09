@@ -158,9 +158,13 @@ func (p *KzgMultiProofGnarkBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j,
 	for i := range dim {
 		toeplitzExtendedVec[i].Set(&polyFr[m-(j+i*l)])
 	}
-	// We keep the first element as is, and reverse the rest of the slice.
-	// This is classic Toeplitz manipulations, as for example describe in
-	// https://alinush.github.io/2020/03/19/multiplying-a-vector-by-a-toeplitz-matrix.html
+	// Abstracting away the complex indices needed for extracting the multiproof coset,
+	// toeplitzExtendedVec here looks like: [f_m,f_{m-1},..., f_0,0,0,...,0] (half zeros)
+	// We then reverse it to put it in circulant form: [f_m,0 ,0...,0, f_1,f_1,...,f_{m-1}]
+	// This matches Proposition 2 item 2 of https://eprint.iacr.org/2023/033.pdf.
+	// Note that this only works because our toeplitz matrix contains many zeros and because
+	// we set the extra free diagonal to 0 (alin's blog post uses a_0 for that diagonal).
+	// For the generic case, see: https://alinush.github.io/2020/03/19/multiplying-a-vector-by-a-toeplitz-matrix.html
 	slices.Reverse(toeplitzExtendedVec[1:])
 
 	out, err := p.Fs.FFT(toeplitzExtendedVec, false)
