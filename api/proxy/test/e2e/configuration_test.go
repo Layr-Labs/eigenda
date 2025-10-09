@@ -17,14 +17,15 @@ import (
 // is in read-only mode, meaning that POST routes return 500 errors, while GET routes work as expected.
 // TODO(samlaf): Feels a bit dumb to run a simple test like this in e2e framework,
 // since it takes 9 seconds, requires an actual eth-rpc (adds ci flakiness), etc.
-// We don't really have an alternative right now however afaiu.
+// We don't really have an alternative however given that the read-only feature is only
+// implemented inside the EigenDAV2 store.
 func TestProxyV2ReadOnlyMode(t *testing.T) {
 	// set this since BuildTestSuiteConfig below requires it.
-	err := os.Setenv(testutils.EthRPCEnvVar, "https://1rpc.io/sepolia")
+	err := os.Setenv(testutils.EthRPCEnvVar, "https://ethereum-sepolia.rpc.subquery.network/public")
 	require.NoError(t, err)
 
 	// We test against sepolia backend in order to test the client creation code (which reads the signer private key).
-	testCfg := testutils.NewTestConfig(testutils.SepoliaBackend, common.V2EigenDABackend, []common.EigenDABackend{common.V2EigenDABackend})
+	testCfg := testutils.NewTestConfig(testutils.SepoliaBackend, common.V2EigenDABackend, nil)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 	tsConfig.SecretConfig.SignerPaymentKey = "" // ensure no signer key is set
 	ts, kill := testutils.CreateTestSuite(tsConfig)
