@@ -2,7 +2,6 @@ package dataapi
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"strings"
 	"time"
@@ -81,13 +80,15 @@ func NewEigenDAServiceHealthCheck(grpcConnection GRPCConn, disperserHostName, ch
 	// Create Pre-configured connections to the services
 	// Saves from having to create new connection on each request
 
-	disperserConn, err := grpcConnection.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})))
+	// Use default system roots and hostname verification for secure TLS
+	disperserConn, err := grpcConnection.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
 
 	if err != nil {
 		return nil
 	}
 
-	churnerConn, err := grpcConnection.Dial(churnerHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})))
+	// Use default system roots and hostname verification for secure TLS
+	churnerConn, err := grpcConnection.Dial(churnerHostName, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
 
 	if err != nil {
 		return nil
@@ -146,3 +147,4 @@ func (sac *EigenDAServiceAvailabilityCheck) CloseConnections() error {
 
 	return nil
 }
+
