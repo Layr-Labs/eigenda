@@ -158,5 +158,12 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")
 	}
 
+	if err := config.EncodingManagerConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid encoding manager config: %w", err)
+	}
+	if err := config.DispatcherConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid dispatcher config: %w", err)
+	}
+
 	return config, nil
 }

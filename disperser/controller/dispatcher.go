@@ -214,18 +214,14 @@ func NewDispatcher(
 		return nil, errors.New("config is required")
 	}
 
-	// TODO: Verify should be called as part of the config framework, delete this once the controller
-	// is updated to use the config framework
-	if err := config.Verify(); err != nil {
-		return nil, fmt.Errorf("invalid dispatcher config: %w", err)
-	}
-
 	// CLI library doesn't support float slices at current version, parsing must happen manually.
 	// Verify() has already validated that these parse correctly and are in range.
 	significantThresholds := make([]float64, 0, len(config.SignificantSigningMetricsThresholds))
 	for _, threshold := range config.SignificantSigningMetricsThresholds {
-		// This parse is guaranteed to succeed since Verify() already validated it
-		significantThreshold, _ := strconv.ParseFloat(threshold, 64)
+		significantThreshold, err := strconv.ParseFloat(threshold, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse significant signing metrics threshold: %v", err)
+		}
 		significantThresholds = append(significantThresholds, significantThreshold)
 	}
 
