@@ -86,8 +86,8 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 	// last step (5) "take first d elements of h^ as h"
 	h := sumVecInv[:dimE]
 
-	// Now that we have h, we compute C_T = FFT(h), from section 2.1.
-	// Also see https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf section 2
+	// Now that we have h, we compute C_T = FFT(h).
+	// See https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf eqn 29.
 	// for more explanation as to why we take the FFT.
 	// outputs is out of order - butterfly
 	proofs, err := p.Fs.FFTG1(h, false)
