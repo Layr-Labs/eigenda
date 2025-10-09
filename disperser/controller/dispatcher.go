@@ -54,7 +54,7 @@ type DispatcherConfig struct {
 	AttestationTimeout time.Duration
 
 	// BatchAttestationTimeout is the maximum time to wait for all nodes to provide signatures for a batch.
-	// Must be positive and must be longer than AttestationTimeout.
+	// Must be positive and must be longer or equal to the AttestationTimeout.
 	BatchAttestationTimeout time.Duration
 
 	// SignatureTickInterval is how frequently attestations are updated in the blob metadata store
@@ -106,8 +106,8 @@ func (c *DispatcherConfig) Verify() error {
 	if c.BatchAttestationTimeout <= 0 {
 		return fmt.Errorf("BatchAttestationTimeout must be positive, got %v", c.BatchAttestationTimeout)
 	}
-	if c.BatchAttestationTimeout <= c.AttestationTimeout {
-		return fmt.Errorf("BatchAttestationTimeout must be longer than AttestationTimeout, got %v <= %v",
+	if c.BatchAttestationTimeout < c.AttestationTimeout {
+		return fmt.Errorf("BatchAttestationTimeout must be longer than AttestationTimeout, got %v < %v",
 			c.BatchAttestationTimeout, c.AttestationTimeout)
 	}
 	if c.SignatureTickInterval <= 0 {
