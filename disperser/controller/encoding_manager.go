@@ -75,6 +75,7 @@ func DefaultEncodingManagerConfig() *EncodingManagerConfig {
 		MaxNumBlobsPerIteration:     128,
 		OnchainStateRefreshInterval: 1 * time.Hour,
 		NumConcurrentRequests:       250,
+		NumRelayAssignment:          1,
 	}
 }
 
@@ -153,6 +154,8 @@ func NewEncodingManager(
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 ) (*EncodingManager, error) {
+	// TODO: Verify should be called as part of the config framework, delete this once the controller
+	// is updated to use the config framework
 	if err := config.Verify(); err != nil {
 		return nil, fmt.Errorf("invalid encoding manager config: %w", err)
 	}

@@ -54,7 +54,7 @@ type DispatcherConfig struct {
 	AttestationTimeout time.Duration
 
 	// BatchAttestationTimeout is the maximum time to wait for all nodes to provide signatures for a batch.
-	// Must be positive and should be longer than AttestationTimeout.
+	// Must be positive and must be longer than AttestationTimeout.
 	BatchAttestationTimeout time.Duration
 
 	// SignatureTickInterval is how frequently attestations are updated in the blob metadata store
@@ -105,6 +105,10 @@ func (c *DispatcherConfig) Verify() error {
 	}
 	if c.BatchAttestationTimeout <= 0 {
 		return fmt.Errorf("BatchAttestationTimeout must be positive, got %v", c.BatchAttestationTimeout)
+	}
+	if c.BatchAttestationTimeout <= c.AttestationTimeout {
+		return fmt.Errorf("BatchAttestationTimeout must be longer than AttestationTimeout, got %v <= %v",
+			c.BatchAttestationTimeout, c.AttestationTimeout)
 	}
 	if c.SignatureTickInterval <= 0 {
 		return fmt.Errorf("SignatureTickInterval must be positive, got %v", c.SignatureTickInterval)
@@ -209,6 +213,9 @@ func NewDispatcher(
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
+
+	// TODO: Verify should be called as part of the config framework, delete this once the controller
+	// is updated to use the config framework
 	if err := config.Verify(); err != nil {
 		return nil, fmt.Errorf("invalid dispatcher config: %w", err)
 	}
