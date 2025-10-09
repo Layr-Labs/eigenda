@@ -37,7 +37,7 @@ const (
 	minioAdmin       = "minioadmin"
 	backendEnvVar    = "BACKEND"
 	privateKeyEnvVar = "SIGNER_PRIVATE_KEY"
-	ethRPCEnvVar     = "ETHEREUM_RPC"
+	EthRPCEnvVar     = "ETHEREUM_RPC"
 	transport        = "http"
 	host             = "127.0.0.1"
 	disperserPort    = "443"
@@ -212,11 +212,8 @@ func createS3Config() s3.Config {
 func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	useMemory := testCfg.Backend == MemstoreBackend
 	pk := os.Getenv(privateKeyEnvVar)
-	if pk == "" && !useMemory {
-		panic("SIGNER_PRIVATE_KEY environment variable not set")
-	}
 
-	ethRPC := os.Getenv(ethRPCEnvVar)
+	ethRPC := os.Getenv(EthRPCEnvVar)
 	if ethRPC == "" && !useMemory {
 		panic("ETHEREUM_RPC environment variable is not set")
 	}

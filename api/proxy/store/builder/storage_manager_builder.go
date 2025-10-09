@@ -373,30 +373,37 @@ func buildEigenDAV2Backend(
 		return nil, fmt.Errorf("no payload retrievers enabled, please enable at least one retriever type")
 	}
 
-	payloadDisperser, err := buildPayloadDisperser(
-		ctx,
-		log,
-		config.ClientConfigV2,
-		secrets,
-		ethClient,
-		kzgProver,
-		contractDirectory,
-		certVerifier,
-		operatorStateRetrieverAddr,
-		registryCoordinator,
-		registry,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("build payload disperser: %w", err)
+	var payloadDisperser *payloaddispersal.PayloadDisperser
+
+	if secrets.SignerPaymentKey == "" {
+		log.Warn("No SignerPaymentKey provided: EigenDA V2 backend configured in read-only mode")
+	} else {
+		log.Info("SignerPaymentKey available: EigenDA V2 backend configured with write support")
+		payloadDisperser, err = buildPayloadDisperser(
+			ctx,
+			log,
+			config.ClientConfigV2,
+			secrets,
+			ethClient,
+			kzgProver,
+			contractDirectory,
+			certVerifier,
+			operatorStateRetrieverAddr,
+			registryCoordinator,
+			registry,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("build payload disperser: %w", err)
+		}
 	}
 
 	eigenDAV2Store, err := eigenda_v2.NewStore(
 		log,
-		config.ClientConfigV2.PutTries,
-		config.ClientConfigV2.RBNRecencyWindowSize,
 		payloadDisperser,
-		retrievers,
+		config.ClientConfigV2.PutTries,
 		certVerifier,
+		config.ClientConfigV2.RBNRecencyWindowSize,
+		retrievers,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create v2 store: %w", err)
