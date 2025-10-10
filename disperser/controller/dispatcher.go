@@ -214,14 +214,14 @@ func NewDispatcher(
 		return nil, errors.New("config is required")
 	}
 
+	if err := config.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
 	// CLI library doesn't support float slices at current version, parsing must happen manually.
-	// Verify() has already validated that these parse correctly and are in range.
 	significantThresholds := make([]float64, 0, len(config.SignificantSigningMetricsThresholds))
 	for _, threshold := range config.SignificantSigningMetricsThresholds {
-		significantThreshold, err := strconv.ParseFloat(threshold, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse significant signing metrics threshold: %w", err)
-		}
+		significantThreshold, _ := strconv.ParseFloat(threshold, 64)
 		significantThresholds = append(significantThresholds, significantThreshold)
 	}
 

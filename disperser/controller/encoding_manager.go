@@ -154,6 +154,10 @@ func NewEncodingManager(
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 ) (*EncodingManager, error) {
+	if err := config.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
 	return &EncodingManager{
 		EncodingManagerConfig:  config,
 		blobMetadataStore:      blobMetadataStore,
