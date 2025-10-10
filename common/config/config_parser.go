@@ -140,7 +140,18 @@ func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
 //
 // This function returns a set containing the names of all environment variables that were bound. This is used
 // to detect unused environment variables (which are likely misconfigurations).
-func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[string]struct{}, error) {
+func bindEnvs(
+	// The viper instance that will parse environment variables.
+	v *viper.Viper,
+	// The prefix to use for environment variables.
+	prefix string,
+	// The struct to walk.
+	target any,
+	// The "path" to the current struct in the tree. This should be empty when calling this function initially.
+	// Each step in the path is the name of a field in the config struct.
+	path ...string,
+) (map[string]struct{}, error) {
+
 	boundVars := make(map[string]struct{})
 
 	targetValue := reflect.ValueOf(target)
@@ -181,14 +192,14 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 				}
 			} else {
 				// Pointer to non-struct type, bind as regular field
-				env := prefix + "_" + strings.ToUpper(strings.ReplaceAll(strings.Join(keyPath, "_"), ".", "_"))
+				env := buildEnvVarName(prefix, keyPath...)
 				boundVars[env] = struct{}{}
 				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
 					return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
 				}
 			}
 		default:
-			env := prefix + "_" + strings.ToUpper(strings.ReplaceAll(strings.Join(keyPath, "_"), ".", "_"))
+			env := buildEnvVarName(prefix, keyPath...)
 			boundVars[env] = struct{}{}
 			if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
 				return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
@@ -197,6 +208,18 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 	}
 
 	return boundVars, nil
+}
+
+// Derive the name of an environment variable from the given prefix and path.
+func buildEnvVarName(prefix string, path ...string) string {
+	sb := strings.Builder{}
+	sb.WriteString(prefix)
+
+	for _, p := range path {
+		sb.WriteString("_")
+		sb.WriteString(toScreamingSnakeCase(p))
+	}
+	return sb.String()
 }
 
 // checkForInvalidEnvVars checks for any environment variables with the given prefix that were not bound to any
