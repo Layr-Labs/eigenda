@@ -69,9 +69,9 @@ func NewFromConfig(config Config) (*Committer, error) {
 	if config.G2SRSPath == "" {
 		return nil, fmt.Errorf("G2SRSPath is empty")
 	}
-	if config.G2TrailingSRSPath == "" {
-		return nil, fmt.Errorf("G2TrailingSRSPath is empty")
-	}
+	// if config.G2TrailingSRSPath == "" { // TODO check with Sam prior to merging
+	// 	return nil, fmt.Errorf("G2TrailingSRSPath is empty")
+	// }
 
 	// ReadG1/G2Points is CPU bound, the actual reading is very fast, but the parsing is slow.
 	// We just spin up as many goroutines as we have CPUs.
