@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
@@ -132,10 +133,7 @@ func testReservationReduction(
 	submissionDuration := 30 * time.Second
 	blobsPerSecond := float32(0.5)
 
-	paymentVaultAddress, err := testHarness.ContractDirectory.GetContractAddress(t.Context(), directory.PaymentVault)
-	require.NoError(t, err)
-	paymentVault, err := vault.NewPaymentVault(logger, testHarness.EthClient, paymentVaultAddress)
-	require.NoError(t, err)
+	paymentVault := getPaymentVault(t, testHarness, logger)
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(t.Context())
 	require.NoError(t, err)
 
@@ -212,10 +210,7 @@ func testReservationIncrease(
 	submissionDuration := 30 * time.Second
 	blobsPerSecond := float32(0.5)
 
-	paymentVaultAddress, err := testHarness.ContractDirectory.GetContractAddress(t.Context(), directory.PaymentVault)
-	require.NoError(t, err)
-	paymentVault, err := vault.NewPaymentVault(logger, testHarness.EthClient, paymentVaultAddress)
-	require.NoError(t, err)
+	paymentVault := getPaymentVault(t, testHarness, logger)
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(t.Context())
 	require.NoError(t, err)
 
@@ -289,10 +284,7 @@ func testOnDemandOnly(
 	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
 	accountID := crypto.PubkeyToAddress(*publicKey)
 
-	paymentVaultAddress, err := testHarness.ContractDirectory.GetContractAddress(t.Context(), directory.PaymentVault)
-	require.NoError(t, err)
-	paymentVault, err := vault.NewPaymentVault(logger, testHarness.EthClient, paymentVaultAddress)
-	require.NoError(t, err)
+	paymentVault := getPaymentVault(t, testHarness, logger)
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(t.Context())
 	require.NoError(t, err)
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(t.Context())
@@ -360,17 +352,14 @@ func testReservationAndOnDemand(
 	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
 	accountID := crypto.PubkeyToAddress(*publicKey)
 
-	paymentVaultAddress, err := testHarness.ContractDirectory.GetContractAddress(t.Context(), directory.PaymentVault)
-	require.NoError(t, err)
-	paymentVault, err := vault.NewPaymentVault(logger, testHarness.EthClient, paymentVaultAddress)
-	require.NoError(t, err)
+	paymentVault := getPaymentVault(t, testHarness, logger)
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(t.Context())
 	require.NoError(t, err)
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(t.Context())
 	require.NoError(t, err)
 
 	payloadBytes := 1000
-	submissionDuration := 60 * time.Second
+	submissionDuration := 30 * time.Second
 	blobsPerSecond := float32(0.5)
 
 	// this is the total amount of billable symbols that are being dispersed
@@ -446,4 +435,13 @@ func depositOnDemand(
 	require.NoError(t, err)
 	// the vault monitor checks every 1 second, so this should be plenty of time
 	time.Sleep(3 * time.Second)
+}
+
+func getPaymentVault(t *testing.T, testHarness *integration.TestHarness, logger logging.Logger) payments.PaymentVault {
+	paymentVaultAddress, err := testHarness.ContractDirectory.GetContractAddress(t.Context(), directory.PaymentVault)
+	require.NoError(t, err)
+	paymentVault, err := vault.NewPaymentVault(logger, testHarness.EthClient, paymentVaultAddress)
+	require.NoError(t, err)
+
+	return paymentVault
 }
