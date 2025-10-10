@@ -52,13 +52,15 @@ func New(g1SRS []bn254.G1Affine, g2SRS []bn254.G2Affine, g2TrailingSRS []bn254.G
 }
 
 type Config struct {
-	// Number of SRS points to load from all 3 SRS files. Must be a power of 2.
+	// Number of SRS points to load from SRS files. Must be a power of 2.
 	// Committer will only be able to compute commitments for blobs of size up to this number of field elements.
 	// e.g. if SRSNumberToLoad=2^19, then the committer can compute commitments for blobs of size up to
 	// 2^19 field elements = 2^19 * 32 bytes = 16 MiB.
-	SRSNumberToLoad   uint64
-	G1SRSPath         string
-	G2SRSPath         string
+	SRSNumberToLoad uint64
+	G1SRSPath       string
+	G2SRSPath       string
+	// G2TrailingSRSPath is optional and only needed if G2SRSPath does not
+	// point to the full SRS file (containing 2^28 points).
 	G2TrailingSRSPath string
 }
 
@@ -84,20 +86,51 @@ func NewFromConfig(config Config) (*Committer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read G2 points from %s: %w", config.G2SRSPath, err)
 	}
-	// TODO(samlaf): we should have a function ReadG2TrailingPoints that reads from the end of the file.
-	numG2point, err := kzg.NumberOfPointsInSRSFile(config.G2TrailingSRSPath, kzg.G2PointBytes)
-	if err != nil {
-		return nil, fmt.Errorf("number of points in srs file %v: %w", config.G2TrailingSRSPath, err)
-	}
-	if numG2point < config.SRSNumberToLoad {
-		return nil, fmt.Errorf("kzgConfig.G2TrailingPath=%v contains %v G2 Points, "+
-			"which is < kzgConfig.SRSNumberToLoad=%v",
-			config.G2TrailingSRSPath, numG2point, config.SRSNumberToLoad)
-	}
-	g2TrailingSRS, err := kzg.ReadG2PointSection(
-		config.G2TrailingSRSPath, numG2point-config.SRSNumberToLoad, numG2point, numWorkers)
-	if err != nil {
-		return nil, fmt.Errorf("read G2 trailing points from %s: %w", config.G2TrailingSRSPath, err)
+
+	var g2TrailingSRS []bn254.G2Affine
+	hasG2TrailingFile := len(config.G2TrailingSRSPath) != 0
+	if hasG2TrailingFile {
+		// TODO(samlaf): this function/check should probably be done in ReadG2PointSection
+		numG2point, err := kzg.NumberOfPointsInSRSFile(config.G2TrailingSRSPath, kzg.G2PointBytes)
+		if err != nil {
+			return nil, fmt.Errorf("number of points in srs file %v: %w", config.G2TrailingSRSPath, err)
+		}
+		if numG2point < config.SRSNumberToLoad {
+			return nil, fmt.Errorf("config.G2TrailingPath=%v contains %v G2 Points, "+
+				"which is < config.SRSNumberToLoad=%v",
+				config.G2TrailingSRSPath, numG2point, config.SRSNumberToLoad)
+		}
+
+		// use g2 trailing file
+		g2TrailingSRS, err = kzg.ReadG2PointSection(
+			config.G2TrailingSRSPath,
+			numG2point-config.SRSNumberToLoad,
+			numG2point, // last exclusive
+			numWorkers,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read G2 trailing points (%v to %v) from file %v: %w",
+				numG2point-config.SRSNumberToLoad, numG2point, config.G2TrailingSRSPath, err)
+		}
+	} else {
+		// require entire G2SRSPath to contain all 2^28 points, from which we can read the trailing points
+		numG2point, err := kzg.NumberOfPointsInSRSFile(config.G2SRSPath, kzg.G2PointBytes)
+		if err != nil {
+			return nil, fmt.Errorf("number of points in srs file: %w", err)
+		}
+		if numG2point < encoding.SRSOrder {
+			return nil, fmt.Errorf("no config.G2TrailingPath was passed, yet the G2 SRS file %v is incomplete: contains %v < 2^28 G2 Points", config.G2SRSPath, numG2point)
+		}
+		g2TrailingSRS, err = kzg.ReadG2PointSection(
+			config.G2SRSPath,
+			encoding.SRSOrder-config.SRSNumberToLoad,
+			encoding.SRSOrder, // last exclusive
+			numWorkers,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read G2 points (%v to %v) from file %v: %w",
+				encoding.SRSOrder-config.SRSNumberToLoad, encoding.SRSOrder, config.G2SRSPath, err)
+		}
 	}
 
 	return New(g1SRS, g2SRS, g2TrailingSRS)
