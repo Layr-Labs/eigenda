@@ -403,6 +403,107 @@ func testErrorOnSecondaryInsertFailureFlagOn(t *testing.T, dispersalBackend comm
 	require.Contains(t, err.Error(), "500", "Expected HTTP 500 error")
 }
 
+// TestErrorOnSecondaryInsertFailureFlagOffPartialFailureV1 verifies that when the flag is OFF (default),
+// partial secondary storage failures are tolerated - PUT succeeds if at least one backend succeeds.
+func TestErrorOnSecondaryInsertFailureFlagOffPartialFailureV1(t *testing.T) {
+	testErrorOnSecondaryInsertFailureFlagOffPartialFailure(t, common.V1EigenDABackend)
+}
+
+func TestErrorOnSecondaryInsertFailureFlagOffPartialFailureV2(t *testing.T) {
+	testErrorOnSecondaryInsertFailureFlagOffPartialFailure(t, common.V2EigenDABackend)
+}
+
+func testErrorOnSecondaryInsertFailureFlagOffPartialFailure(t *testing.T, dispersalBackend common.EigenDABackend) {
+	t.Parallel()
+
+	if testutils.GetBackend() != testutils.MemstoreBackend {
+		t.Skip("test only runs with memstore backend")
+	}
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
+	// Use both cache and fallback - cache will fail, fallback will succeed
+	testCfg.UseS3Caching = true
+	testCfg.UseS3Fallback = true
+	testCfg.ErrorOnSecondaryInsertFailure = false // default: OFF
+	testCfg.WriteThreadCount = 0
+
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	// Override with invalid S3 config to force all secondary write failures
+	tsConfig.StoreBuilderConfig.S3Config = s3.Config{
+		Bucket:          "invalid-bucket-name",
+		Endpoint:        "invalid-endpoint:9000",
+		AccessKeyID:     "invalid-key",
+		AccessKeySecret: "invalid-secret",
+		EnableTLS:       false,
+		CredentialType:  s3.CredentialTypeStatic,
+	}
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	testBlob := testutils.RandBytes(100)
+	cfg := &standard_client.Config{
+		URL: ts.RestAddress(),
+	}
+	daClient := standard_client.New(cfg)
+
+	// With flag OFF, secondary failures are logged but not returned as errors
+	// PUT should succeed because primary storage (EigenDA) succeeds
+	t.Log("Setting data - should succeed because flag OFF means secondary failures are tolerated")
+	blobInfo, err := daClient.SetData(ts.Ctx, testBlob)
+	require.NoError(t, err, "PUT should succeed when flag OFF even if all secondaries fail")
+
+	// Verify data can be read back from primary storage
+	retrievedBlob, err := daClient.GetData(ts.Ctx, blobInfo)
+	require.NoError(t, err)
+	require.Equal(t, testBlob, retrievedBlob)
+}
+
+// TestErrorOnSecondaryInsertFailureFlagOnSuccessV1 verifies that when the flag is ON
+// and all secondary writes succeed, PUT succeeds normally (happy path).
+func TestErrorOnSecondaryInsertFailureFlagOnSuccessV1(t *testing.T) {
+	testErrorOnSecondaryInsertFailureFlagOnSuccess(t, common.V1EigenDABackend)
+}
+
+func TestErrorOnSecondaryInsertFailureFlagOnSuccessV2(t *testing.T) {
+	testErrorOnSecondaryInsertFailureFlagOnSuccess(t, common.V2EigenDABackend)
+}
+
+func testErrorOnSecondaryInsertFailureFlagOnSuccess(t *testing.T, dispersalBackend common.EigenDABackend) {
+	t.Parallel()
+
+	if testutils.GetBackend() != testutils.MemstoreBackend {
+		t.Skip("test only runs with memstore backend")
+	}
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
+	testCfg.UseS3Fallback = true
+	testCfg.ErrorOnSecondaryInsertFailure = true // Enable flag
+	testCfg.WriteThreadCount = 0
+
+	// Use valid S3 config
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	testBlob := testutils.RandBytes(100)
+	cfg := &standard_client.Config{
+		URL: ts.RestAddress(),
+	}
+	daClient := standard_client.New(cfg)
+
+	// PUT should succeed because all backends (primary + S3) work
+	t.Log("Setting data - should succeed with valid S3 config and flag ON")
+	blobInfo, err := daClient.SetData(ts.Ctx, testBlob)
+	require.NoError(t, err, "PUT should succeed when flag ON and all writes succeed")
+
+	// Verify data can be read back
+	t.Log("Getting data back to verify")
+	retrievedBlob, err := daClient.GetData(ts.Ctx, blobInfo)
+	require.NoError(t, err)
+	require.Equal(t, testBlob, retrievedBlob)
+}
+
 func TestProxyMemConfigClientCanGetAndPatchV1(t *testing.T) {
 	testProxyMemConfigClientCanGetAndPatch(t, common.V1EigenDABackend)
 }
