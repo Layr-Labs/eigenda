@@ -12,7 +12,11 @@ import (
 )
 
 func main() {
-	cfg, err := config.Bootstrap(load.DefaultTrafficGeneratorConfig)
+
+	cfg, err := config.Bootstrap(
+		load.DefaultTrafficGeneratorConfig,
+		"TRAFFIC_GENERATOR_V2_SERVICE_PORT", // set automatically by kubernetes
+	)
 	if err != nil {
 		panic(fmt.Errorf("failed to bootstrap config: %w", err))
 	}

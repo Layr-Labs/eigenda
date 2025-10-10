@@ -67,7 +67,7 @@ func GetConfig(logger logging.Logger, prefix string, configPath string) (*TestCl
 		return cfg, nil
 	}
 
-	cfg, err := config.ParseConfig(logger, DefaultTestClientConfig(), prefix, configPath)
+	cfg, err := config.ParseConfig(logger, DefaultTestClientConfig(), prefix, nil, configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}

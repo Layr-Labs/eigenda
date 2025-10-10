@@ -23,6 +23,9 @@ func ParseConfig[T VerifiableConfig](
 	cfg T,
 	// The prefix to use for environment variables. If empty, then environment variables are not read.
 	envPrefix string,
+	// A list of environment variables that should be ignored when sanity checking environment variables.
+	// Useful for situations where external systems set environment variables that would otherwise cause problems.
+	ignoredEnvVars []string,
 	// A list of zero or more paths to configuration files. Later files override earlier ones.
 	// If environment variables are read, they override all configuration files.
 	configPaths ...string,
@@ -51,7 +54,7 @@ func ParseConfig[T VerifiableConfig](
 		}
 
 		// Make sure there aren't any invalid environment variables set.
-		err = checkForInvalidEnvVars(logger, boundVars, envPrefix)
+		err = checkForInvalidEnvVars(logger, boundVars, envPrefix, ignoredEnvVars)
 		if err != nil {
 			var zero T
 			return zero, fmt.Errorf("invalid environment variables: %w", err)
@@ -231,10 +234,16 @@ func checkForInvalidEnvVars(
 	logger logging.Logger,
 	boundVars map[string]struct{},
 	envPrefix string,
+	ignoredEnvVars []string,
 ) error {
 	if envPrefix == "" {
 		// Nothing we can do if there is no prefix.
 		return nil
+	}
+
+	ignoredSet := make(map[string]struct{}, len(ignoredEnvVars))
+	for _, v := range ignoredEnvVars {
+		ignoredSet[v] = struct{}{}
 	}
 
 	for _, env := range os.Environ() {
@@ -242,10 +251,17 @@ func checkForInvalidEnvVars(
 		if len(parts) != 2 {
 			continue
 		}
+		
 		key := parts[0]
 		if !strings.HasPrefix(key, envPrefix+"_") {
 			continue
 		}
+
+		if _, ok := ignoredSet[key]; ok {
+			// ignore this variable
+			continue
+		}
+
 		if _, ok := boundVars[key]; !ok {
 			sb := strings.Builder{}
 			sb.WriteString("environment variable ")
