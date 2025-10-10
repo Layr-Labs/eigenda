@@ -217,7 +217,7 @@ func benchmarkEncodeAndVerify(
 	verifyStart := time.Now()
 
 	if verifyResults {
-		v, err := verifierv2.NewVerifier(verifierKzgConfig, nil)
+		v, err := verifierv2.NewVerifier(verifierKzgConfig)
 		if err != nil {
 			log.Fatalf("Failed to create verifier: %v", err)
 		}
@@ -227,7 +227,7 @@ func benchmarkEncodeAndVerify(
 			samples = append(samples, encoding.Sample{
 				Commitment:      (*encoding.G1Commitment)(commit),
 				Chunk:           &frame,
-				AssignmentIndex: uint(i),
+				AssignmentIndex: encoding.ChunkNumber(i),
 				BlobIndex:       0,
 			})
 		}
