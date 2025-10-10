@@ -11,23 +11,24 @@ import (
 )
 
 type Foo struct {
-	String   string
-	Int      int
-	Int64    int64
-	Int32    int32
-	Int16    int16
-	Int8     int8
-	Uint     uint
-	Uint64   uint64
-	Uint32   uint32
-	Uint16   uint16
-	Uint8    uint8
-	Float64  float64
-	Float32  float32
-	Duration time.Duration
-	Bool     bool
-	Bar      Bar
-	Baz      *Baz
+	String                       string
+	Int                          int
+	Int64                        int64
+	Int32                        int32
+	Int16                        int16
+	Int8                         int8
+	Uint                         uint
+	Uint64                       uint64
+	Uint32                       uint32
+	Uint16                       uint16
+	Uint8                        uint8
+	Float64                      float64
+	Float32                      float32
+	Duration                     time.Duration
+	Bool                         bool
+	Bar                          Bar
+	Baz                          *Baz
+	ThisIsAFieldWithAComplexName string
 }
 
 func DefaultFoo() *Foo {
@@ -43,10 +44,11 @@ func (f *Foo) Verify() error {
 }
 
 type Bar struct {
-	A   string
-	B   int
-	C   bool
-	Baz *Baz
+	A                                  string
+	B                                  int
+	C                                  bool
+	Baz                                *Baz
+	ThisIsANestedFieldWithAComplexName int
 }
 
 func (b *Bar) Verify() error {
@@ -54,9 +56,10 @@ func (b *Bar) Verify() error {
 }
 
 type Baz struct {
-	X string
-	Y int
-	Z bool
+	X                           string
+	Y                           int
+	Z                           bool
+	ThisFieldIsNestedEvenDeeper float64
 }
 
 func (b *Baz) Verify() error {
@@ -514,4 +517,22 @@ func TestIgnoreEnvironmentVariables(t *testing.T) {
 	require.Equal(t, "baz X", foo.Baz.X) // from config
 	require.Equal(t, 27, foo.Baz.Y)      // from config
 	require.Equal(t, true, foo.Baz.Z)    // from config
+}
+
+func TestScreamingSnakeCaseFlag(t *testing.T) {
+
+	require.NoError(t, os.Setenv("TEST_THIS_IS_A_FIELD_WITH_A_COMPLEX_NAME", "value from env var"))
+	require.NoError(t, os.Setenv("TEST_BAR_THIS_IS_A_NESTED_FIELD_WITH_A_COMPLEX_NAME", "123"))
+	require.NoError(t, os.Setenv("TEST_BAR_BAZ_THIS_FIELD_IS_NESTED_EVEN_DEEPER", "456.789"))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "TEST")
+	require.NoError(t, err)
+
+	require.Equal(t, "value from env var", foo.ThisIsAFieldWithAComplexName)
+	require.Equal(t, 123, foo.Bar.ThisIsANestedFieldWithAComplexName)
+	require.Equal(t, 456.789, foo.Bar.Baz.ThisFieldIsNestedEvenDeeper)
+
+	require.NoError(t, os.Unsetenv("TEST_THIS_IS_A_FIELD_WITH_A_COMPLEX_NAME"))
+	require.NoError(t, os.Unsetenv("TEST_BAR_THIS_IS_A_NESTED_FIELD_WITH_A_COMPLEX_NAME"))
+	require.NoError(t, os.Unsetenv("TEST_BAR_BAZ_THIS_FIELD_IS_NESTED_EVEN_DEEPER"))
 }
