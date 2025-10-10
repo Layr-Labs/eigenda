@@ -3,6 +3,7 @@ package live
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test/random"
@@ -15,7 +16,7 @@ import (
 func emptyPayloadProxyDispersalTest(t *testing.T, environment string) {
 	var payload []byte
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	err := c.DisperseAndVerifyWithProxy(t.Context(), payload)
 	require.NoError(t, err)
@@ -36,7 +37,7 @@ func TestEmptyPayloadProxyDispersal(t *testing.T) {
 func microscopicBlobProxyDispersalTest(t *testing.T, environment string) {
 	payload := []byte{1}
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	err := c.DisperseAndVerifyWithProxy(t.Context(), payload)
 	require.NoError(t, err)
@@ -58,7 +59,7 @@ func smallBlobProxyDispersalTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	err := c.DisperseAndVerifyWithProxy(t.Context(), payload)
 	require.NoError(t, err)
@@ -77,7 +78,7 @@ func TestSmallBlobProxyDispersal(t *testing.T) {
 
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func maximumSizedBlobProxyDispersalTest(t *testing.T, environment string) {
-	config, err := client.GetConfig("LIVE_TEST", environment)
+	config, err := client.GetConfig(common.TestLogger(t), "LIVE_TEST", environment)
 	require.NoError(t, err)
 
 	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(
@@ -87,7 +88,7 @@ func maximumSizedBlobProxyDispersalTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 	payload := rand.Bytes(int(maxPermissibleDataLength))
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	err = c.DisperseAndVerifyWithProxy(t.Context(), payload)
 	require.NoError(t, err)

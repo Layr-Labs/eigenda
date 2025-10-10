@@ -119,7 +119,7 @@ func buildHandler[T DocumentedConfig](
 			prefix = overrideEnvPrefix
 		}
 
-		cfg, err := ParseConfig(defaultConfig, prefix, configFiles...)
+		cfg, err := ParseConfig(logger, defaultConfig, prefix, configFiles...)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}

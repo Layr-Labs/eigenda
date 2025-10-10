@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 )
@@ -15,6 +17,8 @@ import (
 // loaded in order, with later files overriding earlier ones. Environment variables are loaded last, and override values
 // from all configuration files. If there are default values in the config, those values should be in the provided cfg.
 func ParseConfig[T VerifiableConfig](
+	// Used to log debug information about environment variables if something goes wrong.
+	logger logging.Logger,
 	// The configuration to populate, should already contain any default values.
 	cfg T,
 	// The prefix to use for environment variables. If empty, then environment variables are not read.
@@ -47,7 +51,7 @@ func ParseConfig[T VerifiableConfig](
 		}
 
 		// Make sure there aren't any invalid environment variables set.
-		err = checkForInvalidEnvVars(boundVars, envPrefix)
+		err = checkForInvalidEnvVars(logger, boundVars, envPrefix)
 		if err != nil {
 			var zero T
 			return zero, fmt.Errorf("invalid environment variables: %w", err)
@@ -200,7 +204,11 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 // not correspond to any configuration field (e.g. due to a typo).
 //
 // This function returns an error if any invalid environment variables are found.
-func checkForInvalidEnvVars(boundVars map[string]struct{}, envPrefix string) error {
+func checkForInvalidEnvVars(
+	logger logging.Logger,
+	boundVars map[string]struct{},
+	envPrefix string,
+) error {
 	if envPrefix == "" {
 		// Nothing we can do if there is no prefix.
 		return nil
@@ -216,6 +224,24 @@ func checkForInvalidEnvVars(boundVars map[string]struct{}, envPrefix string) err
 			continue
 		}
 		if _, ok := boundVars[key]; !ok {
+			sb := strings.Builder{}
+			sb.WriteString("environment variable ")
+			sb.WriteString(key)
+			sb.WriteString(" is not bound to any configuration field. Legal environment variables are:\n")
+
+			sortedVars := make([]string, 0, len(boundVars))
+			for k := range boundVars {
+				sortedVars = append(sortedVars, k)
+			}
+			slices.Sort(sortedVars)
+
+			for _, k := range sortedVars {
+				sb.WriteString("  - ")
+				sb.WriteString(k)
+				sb.WriteString("\n")
+			}
+			logger.Error(sb.String())
+
 			return fmt.Errorf("environment variable %q is not bound to any configuration field", key)
 		}
 	}
