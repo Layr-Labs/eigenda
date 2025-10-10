@@ -758,9 +758,10 @@ func buildReservationLedger(
 		true,
 		// this is a parameter for flexibility, but there aren't plans to operate with anything other than this value
 		ratelimit.OverfillOncePermitted,
-		// TODO(litt3): is there a different place we should define this? hardcoding makes sense... it's just a
-		// question of *where*
-		time.Minute,
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		30*time.Second,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger config: %w", err)
