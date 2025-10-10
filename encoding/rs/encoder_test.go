@@ -21,13 +21,13 @@ var (
 )
 
 func BenchmarkEncode(b *testing.B) {
-	cfg := encoding.DefaultConfig()
+	cfg := getBenchmarkConfig()
 	enc, err := rs.NewEncoder(cfg)
 	require.Nil(b, err)
 
 	// We only have 16MiBs of SRS points. Since we use blob_version=0's 8x coding ratio,
-	// we can encode blobs of max size 2MiB (1<<21) and 8x rs encode them up to 16MiB.
-	for _, blobPower := range []uint64{17, 20, 21} {
+	// we can encode blobs of max size 16MiB (1<<24) and 8x rs encode them up to 128MiB.
+	for _, blobPower := range []uint64{17, 20, 21, 24} {
 		b.Run("Encode_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
 			blobSizeBytes := uint64(1) << blobPower
 			params := encoding.EncodingParams{
