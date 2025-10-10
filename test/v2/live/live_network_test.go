@@ -23,6 +23,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+
+
 // getEnvironmentName takes an environment string as listed in environments (aka a path to a config file describing
 // the environment) and returns the name of the environment. Assumes the path is in the format of
 // "path/to/ENVIRONMENT_NAME.json".
@@ -234,7 +236,7 @@ func TestMediumBlobDispersal(t *testing.T) {
 func largeBlobDispersalTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 
-	config, err := client.GetConfig(environment)
+	config, err := client.GetConfig(client.LiveTestPrefix, environment)
 	require.NoError(t, err)
 	maxBlobSize := int(config.MaxBlobSize)
 
@@ -296,7 +298,7 @@ func TestSmallBlobDispersalAllQuorumsSets(t *testing.T) {
 
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func maximumSizedBlobDispersalTest(t *testing.T, environment string) {
-	config, err := client.GetConfig(environment)
+	config, err := client.GetConfig(client.LiveTestPrefix, environment)
 	require.NoError(t, err)
 
 	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(
@@ -325,7 +327,7 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 
 // Disperse a blob that is too large (>16MB after padding)
 func tooLargeBlobDispersalTest(t *testing.T, environment string) {
-	config, err := client.GetConfig(environment)
+	config, err := client.GetConfig(client.LiveTestPrefix, environment)
 	require.NoError(t, err)
 
 	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)

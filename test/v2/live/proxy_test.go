@@ -77,7 +77,7 @@ func TestSmallBlobProxyDispersal(t *testing.T) {
 
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func maximumSizedBlobProxyDispersalTest(t *testing.T, environment string) {
-	config, err := client.GetConfig(environment)
+	config, err := client.GetConfig("LIVE_TEST", environment)
 	require.NoError(t, err)
 
 	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(

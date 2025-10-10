@@ -71,14 +71,14 @@ type TestClient struct {
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
-	metrics                     *testClientMetrics
+	metrics                     *TestClientMetrics
 }
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(
 	ctx context.Context,
 	logger logging.Logger,
-	metrics *testClientMetrics,
+	metrics *TestClientMetrics,
 	config *TestClientConfig) (*TestClient, error) {
 
 	if config.SRSNumberToLoad == 0 {
@@ -162,7 +162,7 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to populate accountant: %w", err)
 	}
 
-	ethRPCUrls, err := loadEthRPCURLs(config.EthRPCURLs, config.EthRPCUrlsVar)
+	ethRPCUrls, err := loadEthRPCURLs(config.EthRpcUrls, config.EthRpcUrlsVar)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load Ethereum RPC URLs: %w", err)
 	}
@@ -303,7 +303,7 @@ func NewTestClient(
 		G2Path:          g2Path,
 		G2TrailingPath:  g2TrailingPath,
 		CacheDir:        srsTablesPath,
-		SRSOrder:        config.SRSOrder,
+		SRSOrder:        config.SrsOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
 	}
@@ -333,7 +333,7 @@ func NewTestClient(
 
 	chainState := eth.NewChainState(ethReader, ethClient)
 	icsConfig := thegraph.Config{
-		Endpoint:     config.SubgraphURL,
+		Endpoint:     config.SubgraphUrl,
 		PullInterval: 100 * time.Millisecond,
 		MaxRetries:   5,
 	}
