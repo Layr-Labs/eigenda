@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
@@ -44,8 +45,8 @@ type Config struct {
 
 	MetricsPort                  int
 	ControllerReadinessProbePath string
-	ControllerHealthProbePath    string
 	ServerConfig                 server.Config
+	HeartbeatMonitorConfig       healthcheck.HeartbeatMonitorConfig
 
 	OnDemandConfig    ondemandvalidation.OnDemandLedgerCacheConfig
 	ReservationConfig reservationvalidation.ReservationLedgerCacheConfig
@@ -118,6 +119,14 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("create reservation config: %w", err)
 	}
 
+	heartbeatMonitorConfig := healthcheck.HeartbeatMonitorConfig{
+		FilePath:         ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
+		MaxStallDuration: ctx.GlobalDuration(flags.ControllerHeartbeatMaxStallDurationFlag.Name),
+	}
+	if err := heartbeatMonitorConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid heartbeat monitor config: %w", err)
+	}
+
 	awsClientConfig := aws.ReadClientConfig(ctx, flags.FlagPrefix)
 	config := Config{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
@@ -162,8 +171,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAContractDirectoryAddress: ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
 		MetricsPort:                     ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
-		ControllerHealthProbePath:       ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 		ServerConfig:                    serverConfig,
+		HeartbeatMonitorConfig:          heartbeatMonitorConfig,
 		OnDemandConfig:                  onDemandConfig,
 		ReservationConfig:               reservationConfig,
 	}

@@ -16,7 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common/v2"
+	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -211,7 +211,7 @@ func (d *Dispatcher) HandleBatch(
 	batchProbe *common.SequenceProbe,
 ) (chan core.SigningMessage, *batchData, error) {
 	// Signal Liveness to indicate no stall
-	healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
+	healthcheck.SignalHeartbeat(d.logger, "dispatcher", d.controllerLivenessChan)
 
 	// Get a batch of blobs to dispatch
 	// This also writes a batch header and blob inclusion info for each blob in metadata store

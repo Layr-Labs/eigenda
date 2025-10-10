@@ -217,6 +217,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_HEALTH_PROBE_PATH"),
 		Value:    "/tmp/controller-health",
 	}
+	ControllerHeartbeatMaxStallDurationFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "heartbeat-max-stall-duration"),
+		Usage:    "Maximum time allowed between heartbeats before a component is considered stalled",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "HEARTBEAT_MAX_STALL_DURATION"),
+		Value:    4 * time.Minute,
+	}
 	SignificantSigningThresholdPercentageFlag = cli.UintFlag{
 		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-percentage"),
 		Usage: "Percentage of stake that represents a 'significant' signing threshold. Currently used to track" +
@@ -343,6 +350,7 @@ var optionalFlags = []cli.Flag{
 	DisperserKMSKeyIDFlag,
 	ControllerReadinessProbePathFlag,
 	ControllerHealthProbePathFlag,
+	ControllerHeartbeatMaxStallDurationFlag,
 	SignificantSigningThresholdPercentageFlag,
 	SignificantSigningMetricsThresholdsFlag,
 	EigenDAContractDirectoryAddressFlag,
