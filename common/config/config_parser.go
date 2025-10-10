@@ -164,8 +164,8 @@ func bindEnvs(
 		if field.PkgPath != "" { // unexported
 			continue
 		}
-		name := strings.ToLower(field.Name)
-		keyPath := append(path, name)
+
+		keyPath := append(path, field.Name)
 
 		switch field.Type.Kind() { //nolint:exhaustive // only handling struct and pointer types
 
