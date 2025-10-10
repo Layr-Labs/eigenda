@@ -32,7 +32,7 @@ import (
 )
 
 // unshift poly, in-place. Multiplies each coeff with 1/shift_factor**i
-func (fs *FFTSettings) ShiftPoly(poly []fr.Element) {
+func (fs *FFTSettings) shiftPoly(poly []fr.Element) {
 	var shiftFactor fr.Element
 	shiftFactor.SetInt64(int64(5))
 	var factorPower fr.Element
@@ -55,7 +55,7 @@ func (fs *FFTSettings) ShiftPoly(poly []fr.Element) {
 }
 
 // unshift poly, in-place. Multiplies each coeff with shift_factor**i
-func (fs *FFTSettings) UnshiftPoly(poly []fr.Element) {
+func (fs *FFTSettings) unshiftPoly(poly []fr.Element) {
 	var shiftFactor fr.Element
 
 	shiftFactor.SetInt64(int64(5))
@@ -76,7 +76,7 @@ func (fs *FFTSettings) UnshiftPoly(poly []fr.Element) {
 	}
 }
 
-func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element, zeroPolyFn ZeroPolyFn) ([]fr.Element, error) {
+func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element) ([]fr.Element, error) {
 	// TODO: using a single additional temporary array, all the FFTs can run in-place.
 
 	missingIndices := make([]uint64, 0, len(samples))
@@ -86,7 +86,7 @@ func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element, zeroPolyFn 
 		}
 	}
 
-	zeroEval, zeroPoly, err := zeroPolyFn(missingIndices, uint64(len(samples)))
+	zeroEval, zeroPoly, err := fs.zeroPolyViaMultiplication(missingIndices, uint64(len(samples)))
 	if err != nil {
 		return nil, err
 	}
@@ -112,10 +112,10 @@ func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element, zeroPolyFn 
 		return nil, err
 	}
 	// shift in-place
-	fs.ShiftPoly(polyWithZero)
+	fs.shiftPoly(polyWithZero)
 	shiftedPolyWithZero := polyWithZero
 
-	fs.ShiftPoly(zeroPoly)
+	fs.shiftPoly(zeroPoly)
 	shiftedZeroPoly := zeroPoly
 
 	evalShiftedPolyWithZero, err := fs.FFT(shiftedPolyWithZero, false)
@@ -136,7 +136,7 @@ func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element, zeroPolyFn 
 	if err != nil {
 		return nil, err
 	}
-	fs.UnshiftPoly(shiftedReconstructedPoly)
+	fs.unshiftPoly(shiftedReconstructedPoly)
 	reconstructedPoly := shiftedReconstructedPoly
 
 	reconstructedData, err := fs.FFT(reconstructedPoly, false)

@@ -126,7 +126,7 @@ func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [
 	// Do the last partial first: it is no longer than the others and the padding can remain in place for the rest.
 	last := uint64(len(ps) - 1)
 	padPoly(pPadded, ps[last])
-	if err := fs.InplaceFFT(pPadded, mulEvalPs, false); err != nil {
+	if err := fs.inplaceFFT(pPadded, mulEvalPs, false); err != nil {
 		return nil, err
 	}
 	for i := uint64(0); i < last; i++ {
@@ -135,7 +135,7 @@ func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [
 
 			pPadded[j].Set(&p[j])
 		}
-		if err := fs.InplaceFFT(pPadded, pEval, false); err != nil {
+		if err := fs.inplaceFFT(pPadded, pEval, false); err != nil {
 			return nil, err
 		}
 		for j := uint64(0); j < n; j++ {
@@ -143,7 +143,7 @@ func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [
 
 		}
 	}
-	if err := fs.InplaceFFT(mulEvalPs, dst, true); err != nil {
+	if err := fs.inplaceFFT(mulEvalPs, dst, true); err != nil {
 		return nil, err
 	}
 	return dst[:outDegree+1], nil
@@ -156,7 +156,7 @@ func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [
 // of direct multiplication (makeZeroPolyMulLeaf) and iterated multiplication via convolution (reduceLeaves)
 //
 // Also calculates the FFT (the "evaluation polynomial").
-func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length uint64) ([]fr.Element, []fr.Element, error) {
+func (fs *FFTSettings) zeroPolyViaMultiplication(missingIndices []uint64, length uint64) ([]fr.Element, []fr.Element, error) {
 	if len(missingIndices) == 0 {
 		return make([]fr.Element, length), make([]fr.Element, length), nil
 	}
@@ -269,7 +269,7 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 	return zeroEval, zeroPoly, nil
 }
 
-func EvalPolyAt(dst *fr.Element, coeffs []fr.Element, x *fr.Element) {
+func evalPolyAt(dst *fr.Element, coeffs []fr.Element, x *fr.Element) {
 	if len(coeffs) == 0 {
 
 		dst.SetZero()

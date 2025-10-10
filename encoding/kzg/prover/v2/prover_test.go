@@ -1,8 +1,8 @@
 package prover_test
 
 import (
-	cryptorand "crypto/rand"
 	"math/rand"
+	"runtime"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test/random"
 
 	"github.com/stretchr/testify/require"
 )
@@ -80,37 +81,44 @@ func TestEncoder(t *testing.T) {
 	require.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 }
 
-// Ballpark number for 400KiB blob encoding
-//
-// goos: darwin
-// goarch: arm64
-// pkg: github.com/Layr-Labs/eigenda/core/encoding
-// BenchmarkEncode-12    	       1	2421900583 ns/op
-func BenchmarkEncode(b *testing.B) {
-	harness := getTestHarness()
-	p, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+// This Benchmark is very high-level, since GetFrames does many things.
+// The benchmark itself is roughly always ~8-10seconds on M4 Macbook Pro.
+// But the print statements from the Encoder give a breakdown of the different steps:
+// eg: Multiproof Time Decomp total=9.478006875s preproc=33.987083ms msm=1.496717042s fft1=5.912448708s fft2=2.034854042s
+// Where fft1 and fft2 are on G1, and preproc contains an FFT on Fr elements.
+func BenchmarkGetFrame(b *testing.B) {
+	proverConfig := prover.KzgConfig{
+		G1Path:          "../../../../resources/srs/g1.point",
+		G2Path:          "../../../../resources/srs/g2.point",
+		G2TrailingPath:  "../../../../resources/srs/g2.trailing.point",
+		CacheDir:        "../../../../resources/srs/SRSTables",
+		SRSNumberToLoad: 1 << 19,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
+	}
+	p, err := prover.NewProver(&proverConfig, nil)
 	require.NoError(b, err)
 
+	// We only have 16MiBs of SRS points. Since we use blob_version=0's 8x coding 
+	// ratio, we create a blob of size 2MiB and 8x rs encode it up to 16MiB.
+	blobSize := uint64(1) << 21 // 2 MiB
 	params := encoding.EncodingParams{
-		ChunkLength: 512,
-		NumChunks:   256,
+		NumChunks:   8192,                     // blob_version=0
+		ChunkLength: max(1, blobSize*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
 	}
-	blobSize := 400 * 1024
-	numSamples := 30
-	blobs := make([][]byte, numSamples)
-	for i := 0; i < numSamples; i++ {
-		blob := make([]byte, blobSize)
-		_, _ = cryptorand.Read(blob)
-		blobs[i] = blob
+
+	rand := random.NewTestRandom()
+	blobBytes := rand.Bytes(int(blobSize))
+	for i := 0; i < len(blobBytes); i += 32 {
+		blobBytes[i] = 0 // to make them Fr elements
 	}
 
 	// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
-	_, err = p.GetFrames(blobs[0], params)
+	_, err = p.GetFrames(blobBytes, params)
 	require.NoError(b, err)
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
-		_, err = p.GetFrames(blobs[i%numSamples], params)
+	for b.Loop() {
+		_, err = p.GetFrames(blobBytes, params)
 		require.NoError(b, err)
 	}
 }

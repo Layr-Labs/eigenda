@@ -76,7 +76,6 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 
 	intermediate = time.Now()
 
-	// create Frames to group relevant info
 	frames, indices, err := encoder.makeFrames(polyEvals)
 	if err != nil {
 		return nil, nil, err
@@ -169,10 +168,7 @@ func (e *Encoder) Decode(
 
 	if missingIndices {
 		var err error
-		reconstructedData, err = g.Fs.RecoverPolyFromSamples(
-			samples,
-			g.Fs.ZeroPolyViaMultiplication,
-		)
+		reconstructedData, err = g.Fs.RecoverPolyFromSamples(samples)
 		if err != nil {
 			return nil, fmt.Errorf("recover polynomial from samples: %w", err)
 		}
@@ -222,34 +218,30 @@ func (e *Encoder) newEncoder(params encoding.EncodingParams) (*ParametrizedEncod
 
 	fs := e.createFFTSettings(params)
 
+	var encoderDevice EncoderDevice
 	switch e.Config.BackendType {
 	case encoding.GnarkBackend:
-		return e.createGnarkBackendEncoder(params, fs)
+		encoderDevice = &gnarkencoder.RsGnarkBackend{Fs: fs}
 	case encoding.IcicleBackend:
-		return e.createIcicleBackendEncoder(params, fs)
+		encoderDevice, err = createIcicleBackend(e.Config.GPUEnable)
+		if err != nil {
+			return nil, fmt.Errorf("create icicle backend: %w", err)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported backend type: %v", e.Config.BackendType)
 	}
+
+	fsChunkLen := fft.NewFFTSettings(uint8(math.Log2(float64(params.ChunkLength))))
+	return &ParametrizedEncoder{
+		Config:            e.Config,
+		Params:            params,
+		Fs:                fs,
+		FsChunkLen:        fsChunkLen,
+		RSEncoderComputer: encoderDevice,
+	}, nil
 }
 
 func (e *Encoder) createFFTSettings(params encoding.EncodingParams) *fft.FFTSettings {
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
 	return fft.NewFFTSettings(n)
-}
-
-func (e *Encoder) createGnarkBackendEncoder(params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
-	if e.Config.GPUEnable {
-		return nil, errors.New("GPU is not supported in gnark backend")
-	}
-
-	return &ParametrizedEncoder{
-		Config:            e.Config,
-		Params:            params,
-		Fs:                fs,
-		RSEncoderComputer: &gnarkencoder.RsGnarkBackend{Fs: fs},
-	}, nil
-}
-
-func (e *Encoder) createIcicleBackendEncoder(params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
-	return CreateIcicleBackendEncoder(e, params, fs)
 }

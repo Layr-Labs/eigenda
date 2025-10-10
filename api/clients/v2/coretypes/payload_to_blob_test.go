@@ -4,10 +4,31 @@ package coretypes
 import (
 	"encoding/hex"
 	"fmt"
+	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/stretchr/testify/require"
 )
+
+func BenchmarkPayloadToBlob(b *testing.B) {
+	for _, blobPower := range []uint8{17, 20, 21, 24} {
+		b.Run("PayloadToBlob_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
+			numSymbols := uint64(1<<blobPower) / 32
+			payloadBytesPerSymbols := uint64(encoding.BYTES_PER_SYMBOL - 1)
+			payloadBytes := make([]byte, numSymbols*payloadBytesPerSymbols)
+			for i := range numSymbols {
+				payloadBytes[i*payloadBytesPerSymbols] = byte(i + 1)
+			}
+			payload := Payload(payloadBytes)
+
+			for b.Loop() {
+				_, err := payload.ToBlob(codecs.PolynomialFormEval)
+				require.NoError(b, err)
+			}
+		})
+	}
+}
 
 // Example demonstrating the conversion process from a payload, to an encodedPayload interpreted as
 // evaluations of a polynomial, which is then IFFT'd to produce a Blob in coefficient form.
