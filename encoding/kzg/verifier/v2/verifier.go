@@ -23,7 +23,6 @@ import (
 
 type Verifier struct {
 	kzgConfig *KzgConfig
-	encoder   *rs.Encoder
 
 	G1SRS kzg.G1SRS
 
@@ -32,7 +31,7 @@ type Verifier struct {
 	ParametrizedVerifiers map[encoding.EncodingParams]*ParametrizedVerifier
 }
 
-func NewVerifier(config *KzgConfig, encoderConfig *encoding.Config) (*Verifier, error) {
+func NewVerifier(config *KzgConfig) (*Verifier, error) {
 	if config.SRSNumberToLoad > encoding.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
@@ -43,14 +42,8 @@ func NewVerifier(config *KzgConfig, encoderConfig *encoding.Config) (*Verifier, 
 		return nil, fmt.Errorf("failed to read %d G1 points from %s: %w", config.SRSNumberToLoad, config.G1Path, err)
 	}
 
-	encoder, err := rs.NewEncoder(encoderConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create encoder: %w", err)
-	}
-
 	encoderGroup := &Verifier{
 		kzgConfig:             config,
-		encoder:               encoder,
 		G1SRS:                 g1SRS,
 		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
 	}
@@ -159,28 +152,6 @@ func (v *Verifier) UniversalVerifySubBatch(
 	}
 
 	return v.universalVerify(params, samples, numBlobs)
-}
-
-// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
-// The result is trimmed to the given maxInputSize.
-// TODO(samlaf): this should probably not exist here, just call the encoder directly.
-func (v *Verifier) Decode(
-	chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64,
-) ([]byte, error) {
-	frames := make([]rs.FrameCoeffs, len(chunks))
-	for i := range chunks {
-		frames[i] = chunks[i].Coeffs
-	}
-
-	return v.encoder.Decode(frames, toUint64Array(indices), maxInputSize, params) //nolint:wrapcheck
-}
-
-func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
-	res := make([]uint64, len(chunkIndices))
-	for i, d := range chunkIndices {
-		res[i] = uint64(d)
-	}
-	return res
 }
 
 // Sample is the basic unit for a verification

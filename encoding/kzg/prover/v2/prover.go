@@ -110,12 +110,7 @@ func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, e
 	}
 
 	srs := kzg.NewSrs(s1, s2)
-
-	// Create RS encoder
-	rsEncoder, err := rs.NewEncoder(encoderConfig)
-	if err != nil {
-		return nil, fmt.Errorf("create rs encoder: %w", err)
-	}
+	rsEncoder := rs.NewEncoder(encoderConfig)
 
 	encoderGroup := &Prover{
 		Config:              encoderConfig,

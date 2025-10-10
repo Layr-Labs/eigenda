@@ -158,9 +158,7 @@ func runRandomCoefficientsTest(t *testing.T, client s3.Client) {
 	fragmentSize := int(chunkSize / 2)
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
-	encoder, err := rs.NewEncoder(cfg)
-	require.NoError(t, err, "failed to create encoder")
-	require.NotNil(t, encoder, "encoder should not be nil")
+	encoder := rs.NewEncoder(cfg)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, client, bucket)
@@ -218,9 +216,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
-	encoder, err := rs.NewEncoder(cfg)
-	require.NoError(t, err, "failed to create encoder")
-	require.NotNil(t, encoder, "encoder should not be nil")
+	encoder := rs.NewEncoder(cfg)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	ctx := t.Context()

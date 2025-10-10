@@ -47,6 +47,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -106,16 +107,16 @@ func BuildManagers(
 
 	if v2Enabled {
 		log.Info("Building EigenDA v2 storage backend")
-		// kzgVerifier is only needed when validator retrieval is enabled
+		// kzgVerifier and encoder are only needed when validator retrieval is enabled
 		var kzgVerifier *kzgverifierv2.Verifier
 		if slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
 			kzgConfig := kzgverifierv2.KzgConfigFromV1Config(&config.KzgConfig)
-			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig, nil)
+			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig)
 			if err != nil {
 				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 			}
 		}
-		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier, registry)
+		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, rs.NewEncoder(nil), kzgVerifier, registry)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
 		}
@@ -211,6 +212,7 @@ func buildEigenDAV2Backend(
 	log logging.Logger,
 	config Config,
 	secrets common.SecretConfigV2,
+	encoder *rs.Encoder,
 	kzgVerifier *kzgverifierv2.Verifier,
 	registry *prometheus.Registry,
 ) (common.EigenDAV2Store, error) {
@@ -344,7 +346,7 @@ func buildEigenDAV2Backend(
 			validatorPayloadRetriever, err := buildValidatorPayloadRetriever(
 				log, config.ClientConfigV2, ethClient,
 				operatorStateRetrieverAddr, eigenDAServiceManagerAddr,
-				kzgVerifier, kzgVerifier.G1SRS, retrievalMetrics)
+				encoder, kzgVerifier, kzgVerifier.G1SRS, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build validator payload retriever: %w", err)
 			}
@@ -547,6 +549,7 @@ func buildValidatorPayloadRetriever(
 	ethClient common_eigenda.EthClient,
 	operatorStateRetrieverAddr geth_common.Address,
 	eigenDAServiceManagerAddr geth_common.Address,
+	encoder *rs.Encoder,
 	kzgVerifier *kzgverifierv2.Verifier,
 	g1Srs []bn254.G1Affine,
 	metrics metrics_v2.RetrievalMetricer,
@@ -566,6 +569,7 @@ func buildValidatorPayloadRetriever(
 		log,
 		ethReader,
 		chainState,
+		encoder,
 		kzgVerifier,
 		client_validator.DefaultClientConfig(),
 		nil,

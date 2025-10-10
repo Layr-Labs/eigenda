@@ -52,7 +52,7 @@ func OperatorIDFromHex(s string) (OperatorID, error) {
 
 type OperatorIndex = uint
 
-type ChunkNumber = uint
+type ChunkNumber = uint64
 
 // AssignmentInfo contains the global information associated with a group of assignments, such as the total number of chunks
 type AssignmentInfo struct {
@@ -95,7 +95,7 @@ type AssignmentCoordinator interface {
 	// targetNumChunks is non-zero, then CalculateChunkLength will return the smaller of 1) the smallest chunk length which
 	// results in a number of chunks less than or equal to targetNumChunks and 2) the largest chunk length which satisfies
 	// the protocol constraints.
-	CalculateChunkLength(state *OperatorState, blobLength, targetNumChunks uint, param *SecurityParam) (uint, error)
+	CalculateChunkLength(state *OperatorState, blobLength uint, targetNumChunks ChunkNumber, param *SecurityParam) (uint, error)
 }
 
 type StdAssignmentCoordinator struct {
@@ -108,10 +108,10 @@ func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, blobLeng
 	quorum := info.QuorumID
 
 	numOperators := len(state.Operators[quorum])
-	chunksByOperator := make([]uint, numOperators)
+	chunksByOperator := make([]uint64, numOperators)
 
 	// Get NumPar
-	numChunks := uint(0)
+	numChunks := uint64(0)
 	totalStakes := state.Totals[quorum].Stake
 	for _, r := range state.Operators[quorum] {
 
@@ -131,11 +131,11 @@ func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, blobLeng
 		}
 		m := RoundUpDivideBig(num, denom)
 
-		numChunks += uint(m.Uint64())
-		chunksByOperator[r.Index] = uint(m.Uint64())
+		numChunks += m.Uint64()
+		chunksByOperator[r.Index] = m.Uint64()
 	}
 
-	currentIndex := uint(0)
+	currentIndex := uint64(0)
 	assignments := make([]Assignment, numOperators)
 	for operatorInd := range chunksByOperator {
 
@@ -227,7 +227,7 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 // doubling the chunk length (multiplicative binary search) until it is too large or we are beneath the targetNumChunks.
 // This will always give the largest acceptable chunk length. The loop will always stop because the chunk length will eventually be
 // too large for the constraint in ValidateChunkLength
-func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, blobLength, targetNumChunks uint, param *SecurityParam) (uint, error) {
+func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, blobLength uint, targetNumChunks ChunkNumber, param *SecurityParam) (uint, error) {
 
 	chunkLength := uint(MinChunkLength) * 2
 

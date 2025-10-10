@@ -65,7 +65,7 @@ type Config struct {
 
 	FinalizationBlockDelay uint
 
-	TargetNumChunks          uint
+	TargetNumChunks          core.ChunkNumber
 	MaxBlobsToFetchFromStore int
 }
 
