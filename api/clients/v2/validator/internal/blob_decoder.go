@@ -23,7 +23,7 @@ type BlobDecoder interface {
 
 // BlobDecoderFactory is a function that creates a new BlobDecoder instance.
 type BlobDecoderFactory func(
-	verifier *rs.Encoder,
+	encoder *rs.Encoder,
 ) BlobDecoder
 
 var _ BlobDecoder = &blobDecoder{}
