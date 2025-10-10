@@ -91,6 +91,23 @@ func (s *DispersalServerV2) disperseBlob(
 
 	blobKey, st := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
 	if st != nil && st.Code() != codes.OK {
+		if s.useControllerMediatedPayments {
+			// if StoreBlob failed, that means the request never arrived at validators. Therefore it's safe to revert
+			// the payment, so the user doesn't pay for the failure
+			refundRequest := &controller.RefundPaymentRequest{
+				BlobHeader: req.GetBlobHeader(),
+			}
+			_, refundErr := s.controllerClient.RefundPayment(ctx, refundRequest)
+			if refundErr != nil {
+				s.logger.Error("failed to refund payment after storage failure",
+					"accountID", blobHeader.PaymentMetadata.AccountID.Hex(),
+					"refundError", refundErr,
+					"storageError", st.Err())
+			} else {
+				s.logger.Debugf("successfully refunded payment after storage failure",
+					"accountID", blobHeader.PaymentMetadata.AccountID.Hex())
+			}
+		}
 		return nil, st
 	}
 	s.logger.Debug("stored blob", "blobKey", blobKey.Hex())

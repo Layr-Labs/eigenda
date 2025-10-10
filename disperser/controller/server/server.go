@@ -150,3 +150,42 @@ func (s *Server) AuthorizePayment(
 	success = true
 	return response, nil
 }
+
+// Handles a RefundPaymentRequest
+func (s *Server) RefundPayment(
+	ctx context.Context,
+	request *controller.RefundPaymentRequest,
+) (*controller.RefundPaymentResponse, error) {
+	if s.paymentAuthorizationHandler == nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf(
+			"payment authorization handler not configured, request=%s", request.String()))
+	}
+
+	success := false
+	defer func() {
+		if !success {
+			s.metrics.ReportRefundPaymentFailure()
+		}
+	}()
+
+	requestHash, err := hashing.HashRefundPaymentRequest(request)
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to hash request: %v, request=%s", err, request.String()))
+	}
+
+	timestamp := time.Unix(0, request.GetBlobHeader().GetPaymentHeader().GetTimestamp())
+	err = s.replayGuardian.VerifyRequest(requestHash, timestamp)
+	if err != nil {
+		s.metrics.ReportPaymentAuthReplayProtectionFailure()
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf(
+			"replay protection check failed: %v, request=%s", err, request.String()))
+	}
+
+	response, err := s.paymentAuthorizationHandler.RefundPayment(ctx, request.GetBlobHeader())
+	if err != nil {
+		return nil, err
+	}
+
+	success = true
+	return response, nil
+}

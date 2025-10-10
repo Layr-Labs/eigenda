@@ -22,6 +22,7 @@ type ServerMetrics struct {
 	paymentAuthorizationStageTimer *common.StageTimer
 	paymentAuthorizationFailures   prometheus.Counter
 	paymentAuthorizationReplays    prometheus.Counter
+	refundPaymentFailures          prometheus.Counter
 }
 
 func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *ServerMetrics {
@@ -53,6 +54,15 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 		},
 	)
 
+	refundPaymentFailures := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: Namespace,
+			Name:      "refund_payment_failure_count",
+			Subsystem: AuthorizePaymentsSubsystem,
+			Help:      "Number of RefundPayment RPC failures",
+		},
+	)
+
 	paymentAuthorizationStageTimer := common.NewStageTimer(registry, Namespace, "payment_authorization", false)
 
 	return &ServerMetrics{
@@ -61,6 +71,7 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 		paymentAuthorizationStageTimer: paymentAuthorizationStageTimer,
 		paymentAuthorizationFailures:   paymentAuthorizationFailures,
 		paymentAuthorizationReplays:    paymentAuthorizationReplays,
+		refundPaymentFailures:          refundPaymentFailures,
 	}
 }
 
@@ -89,6 +100,15 @@ func (m *ServerMetrics) ReportPaymentAuthReplayProtectionFailure() {
 	}
 
 	m.paymentAuthorizationReplays.Inc()
+}
+
+// Increments the refund failure counter for RefundPayment.
+func (m *ServerMetrics) ReportRefundPaymentFailure() {
+	if m == nil {
+		return
+	}
+
+	m.refundPaymentFailures.Inc()
 }
 
 // Creates a new SequenceProbe for tracking payment authorization stages.

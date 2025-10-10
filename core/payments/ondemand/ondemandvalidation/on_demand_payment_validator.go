@@ -76,3 +76,23 @@ func (pv *OnDemandPaymentValidator) Debit(
 	pv.metrics.IncrementUnexpectedErrors()
 	return err
 }
+
+// RevertDebit reverts a previous debit operation for an on-demand payment
+// This is used when a blob dispersal fails after payment authorization
+func (pv *OnDemandPaymentValidator) RevertDebit(
+	ctx context.Context,
+	accountID gethcommon.Address,
+	symbolCount uint32,
+) error {
+	ledger, err := pv.ledgerCache.GetOrCreate(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("get or create ledger: %w", err)
+	}
+
+	_, err = ledger.RevertDebit(ctx, symbolCount)
+	if err != nil {
+		return fmt.Errorf("revert debit: %w", err)
+	}
+
+	return nil
+}

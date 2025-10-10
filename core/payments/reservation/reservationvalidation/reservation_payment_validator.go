@@ -105,3 +105,24 @@ func (pv *ReservationPaymentValidator) Debit(
 	pv.metrics.IncrementUnexpectedErrors()
 	return false, err
 }
+
+// RevertDebit reverts a previous debit operation for a reservation payment
+// This is used when a blob dispersal fails after payment authorization
+func (pv *ReservationPaymentValidator) RevertDebit(
+	ctx context.Context,
+	accountID gethcommon.Address,
+	symbolCount uint32,
+) error {
+	ledger, err := pv.ledgerCache.GetOrCreate(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("get or create ledger: %w", err)
+	}
+
+	now := pv.timeSource()
+	_, err = ledger.RevertDebit(now, symbolCount)
+	if err != nil {
+		return fmt.Errorf("revert debit: %w", err)
+	}
+
+	return nil
+}

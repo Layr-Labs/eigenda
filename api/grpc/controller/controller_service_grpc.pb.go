@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	ControllerService_AuthorizePayment_FullMethodName = "/controller.ControllerService/AuthorizePayment"
+	ControllerService_RefundPayment_FullMethodName    = "/controller.ControllerService/RefundPayment"
 )
 
 // ControllerServiceClient is the client API for ControllerService service.
@@ -40,6 +41,15 @@ type ControllerServiceClient interface {
 	// able to waste user funds. They would only be able to attack the liveness of the Controller through high submission
 	// volume, which would be a vulnerability regardless of whether we had auth between the API server and the Controller.
 	AuthorizePayment(ctx context.Context, in *AuthorizePaymentRequest, opts ...grpc.CallOption) (*AuthorizePaymentResponse, error)
+	// RefundPayment reverts a previous payment authorization
+	//
+	// This is intended to be called by API server instances when a blob dispersal fails after payment authorization
+	// (e.g., storage failures). The controller will revert the accounting changes made during AuthorizePayment.
+	//
+	// Security characteristics:
+	// - Internal API protected by firewall rules
+	// - Replay protection ensures idempotent refund processing
+	RefundPayment(ctx context.Context, in *RefundPaymentRequest, opts ...grpc.CallOption) (*RefundPaymentResponse, error)
 }
 
 type controllerServiceClient struct {
@@ -53,6 +63,15 @@ func NewControllerServiceClient(cc grpc.ClientConnInterface) ControllerServiceCl
 func (c *controllerServiceClient) AuthorizePayment(ctx context.Context, in *AuthorizePaymentRequest, opts ...grpc.CallOption) (*AuthorizePaymentResponse, error) {
 	out := new(AuthorizePaymentResponse)
 	err := c.cc.Invoke(ctx, ControllerService_AuthorizePayment_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controllerServiceClient) RefundPayment(ctx context.Context, in *RefundPaymentRequest, opts ...grpc.CallOption) (*RefundPaymentResponse, error) {
+	out := new(RefundPaymentResponse)
+	err := c.cc.Invoke(ctx, ControllerService_RefundPayment_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -77,6 +96,15 @@ type ControllerServiceServer interface {
 	// able to waste user funds. They would only be able to attack the liveness of the Controller through high submission
 	// volume, which would be a vulnerability regardless of whether we had auth between the API server and the Controller.
 	AuthorizePayment(context.Context, *AuthorizePaymentRequest) (*AuthorizePaymentResponse, error)
+	// RefundPayment reverts a previous payment authorization
+	//
+	// This is intended to be called by API server instances when a blob dispersal fails after payment authorization
+	// (e.g., storage failures). The controller will revert the accounting changes made during AuthorizePayment.
+	//
+	// Security characteristics:
+	// - Internal API protected by firewall rules
+	// - Replay protection ensures idempotent refund processing
+	RefundPayment(context.Context, *RefundPaymentRequest) (*RefundPaymentResponse, error)
 	mustEmbedUnimplementedControllerServiceServer()
 }
 
@@ -86,6 +114,9 @@ type UnimplementedControllerServiceServer struct {
 
 func (UnimplementedControllerServiceServer) AuthorizePayment(context.Context, *AuthorizePaymentRequest) (*AuthorizePaymentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AuthorizePayment not implemented")
+}
+func (UnimplementedControllerServiceServer) RefundPayment(context.Context, *RefundPaymentRequest) (*RefundPaymentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RefundPayment not implemented")
 }
 func (UnimplementedControllerServiceServer) mustEmbedUnimplementedControllerServiceServer() {}
 
@@ -118,6 +149,24 @@ func _ControllerService_AuthorizePayment_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ControllerService_RefundPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefundPaymentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServiceServer).RefundPayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControllerService_RefundPayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServiceServer).RefundPayment(ctx, req.(*RefundPaymentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ControllerService_ServiceDesc is the grpc.ServiceDesc for ControllerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -128,6 +177,10 @@ var ControllerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AuthorizePayment",
 			Handler:    _ControllerService_AuthorizePayment_Handler,
+		},
+		{
+			MethodName: "RefundPayment",
+			Handler:    _ControllerService_RefundPayment_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

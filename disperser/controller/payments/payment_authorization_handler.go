@@ -203,3 +203,36 @@ func (h *PaymentAuthorizationHandler) authorizeReservationPayment(
 		"reservation payment validation failed for account %s, symbolCount: %d, quorums: %v, time: %s: %v",
 		accountID.Hex(), symbolCount, quorumNumbers, dispersalTime.Format(time.RFC3339), err))
 }
+
+// Reverts a previous payment authorization
+func (h *PaymentAuthorizationHandler) RefundPayment(
+	ctx context.Context,
+	blobHeader *grpccommon.BlobHeader,
+) (*controller.RefundPaymentResponse, error) {
+	coreHeader, err := core.BlobHeaderFromProtobuf(blobHeader)
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf(
+			"invalid blob header: %v, blobHeader: %s", err, blobHeader.String()))
+	}
+
+	symbolCount := uint32(coreHeader.BlobCommitments.Length)
+	accountID := coreHeader.PaymentMetadata.AccountID
+
+	if coreHeader.PaymentMetadata.IsOnDemand() {
+		err = h.onDemandValidator.RevertDebit(ctx, accountID, symbolCount)
+		if err != nil {
+			return nil, api.NewErrorInternal(fmt.Sprintf(
+				"on-demand payment refund failed for account %s, symbolCount: %d: %v",
+				accountID.Hex(), symbolCount, err))
+		}
+	} else {
+		err = h.reservationValidator.RevertDebit(ctx, accountID, symbolCount)
+		if err != nil {
+			return nil, api.NewErrorInternal(fmt.Sprintf(
+				"reservation payment refund failed for account %s, symbolCount: %d: %v",
+				accountID.Hex(), symbolCount, err))
+		}
+	}
+
+	return &controller.RefundPaymentResponse{}, nil
+}
