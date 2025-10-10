@@ -11,6 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -171,16 +172,18 @@ func (r *TestRandom) IOReader() io.Reader {
 	return &randIOReader{r}
 }
 
-// ECDSA generates a random ECDSA key. Note that the returned keys are not deterministic due to limitations
-// **intentionally** imposed by the Go standard libraries. (╯°□°)╯︵ ┻━┻
+// Generates and returns a random Ethereum address with corresponding private key.
+// Note that the returned keys are not deterministic due to limitations **intentionally** imposed by the
+// Go standard libraries. (╯°□°)╯︵ ┻━┻
 //
 // NOT CRYPTOGRAPHICALLY SECURE!!! FOR TESTING PURPOSES ONLY. DO NOT USE THESE KEYS FOR SECURITY PURPOSES.
-func (r *TestRandom) ECDSA() (*ecdsa.PublicKey, *ecdsa.PrivateKey, error) {
+func (r *TestRandom) EthAccount() (gethcommon.Address, *ecdsa.PrivateKey, error) {
 	key, err := ecdsa.GenerateKey(crypto.S256(), crand.Reader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate key: %w", err)
+		return gethcommon.Address{}, nil, fmt.Errorf("failed to generate key: %w", err)
 	}
-	return &key.PublicKey, key, nil
+	address := crypto.PubkeyToAddress(key.PublicKey)
+	return address, key, nil
 }
 
 // BLS generates a random BLS key pair.

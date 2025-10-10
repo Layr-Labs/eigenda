@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	wmock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/test/random"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,9 +19,8 @@ func TestValidRequest(t *testing.T) {
 
 	start := rand.Time()
 
-	publicKey, privateKey, err := rand.ECDSA()
+	disperserAddress, privateKey, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
 	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
@@ -55,9 +53,8 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 
 	start := rand.Time()
 
-	publicKey, privateKey, err := rand.ECDSA()
+	disperserAddress, privateKey, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
 	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
@@ -90,9 +87,8 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 
 	start := rand.Time()
 
-	publicKey, _, err := rand.ECDSA()
+	disperserAddress, _, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
 	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
@@ -109,7 +105,7 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 
-	_, differentPrivateKey, err := rand.ECDSA()
+	_, differentPrivateKey, err := rand.EthAccount()
 	require.NoError(t, err)
 	signature, err := SignStoreChunksRequest(differentPrivateKey, request)
 	require.NoError(t, err)
@@ -125,14 +121,12 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 
 	start := rand.Time()
 
-	publicKey0, privateKey0, err := rand.ECDSA()
+	disperserAddress0, privateKey0, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress0 := crypto.PubkeyToAddress(*publicKey0)
 
 	// This disperser will be loaded on chain (simulated), but will fail the valid disperser ID filter.
-	publicKey1, privateKey1, err := rand.ECDSA()
+	disperserAddress1, privateKey1, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress1 := crypto.PubkeyToAddress(*publicKey1)
 
 	chainReader := wmock.MockWriter{}
 	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress0, nil)
@@ -188,9 +182,8 @@ func TestKeyExpiry(t *testing.T) {
 
 	start := rand.Time()
 
-	publicKey, privateKey, err := rand.ECDSA()
+	disperserAddress, privateKey, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	mockChainReader := wmock.MockWriter{}
 	mockChainReader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
@@ -252,9 +245,8 @@ func TestKeyCacheSize(t *testing.T) {
 	mockChainReader := wmock.MockWriter{}
 	keyMap := make(map[uint32]*ecdsa.PrivateKey, cacheSize+1)
 	for i := 0; i < cacheSize+1; i++ {
-		publicKey, privateKey, err := rand.ECDSA()
+		disperserAddress, privateKey, err := rand.EthAccount()
 		require.NoError(t, err)
-		disperserAddress := crypto.PubkeyToAddress(*publicKey)
 		keyMap[uint32(i)] = privateKey
 
 		mockChainReader.Mock.On("GetDisperserAddress", uint32(i)).Return(disperserAddress, nil)

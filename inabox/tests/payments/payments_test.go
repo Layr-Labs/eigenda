@@ -141,10 +141,9 @@ func testReservationReduction(
 	reservationRequiredForRate := float32(minNumSymbols) * blobsPerSecond
 
 	testRandom := random.NewTestRandom()
-	publicKey, privateKey, err := testRandom.ECDSA()
+	accountID, privateKey, err := testRandom.EthAccount()
 	require.NoError(t, err)
 	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
-	accountID := crypto.PubkeyToAddress(*publicKey)
 
 	payloadDisperserConfig := integration.GetDefaultTestPayloadDisperserConfig()
 	payloadDisperserConfig.ClientLedgerMode = clientLedgerMode
@@ -218,10 +217,9 @@ func testReservationIncrease(
 	reservationRequiredForRate := float32(minNumSymbols) * blobsPerSecond
 
 	testRandom := random.NewTestRandom()
-	publicKey, privateKey, err := testRandom.ECDSA()
+	accountID, privateKey, err := testRandom.EthAccount()
 	require.NoError(t, err)
 	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
-	accountID := crypto.PubkeyToAddress(*publicKey)
 
 	payloadDisperserConfig := integration.GetDefaultTestPayloadDisperserConfig()
 	payloadDisperserConfig.ClientLedgerMode = clientLedgerMode
@@ -279,10 +277,9 @@ func testOnDemandOnly(
 	clientLedgerMode clientledger.ClientLedgerMode,
 ) {
 	testRandom := random.NewTestRandom()
-	publicKey, privateKey, err := testRandom.ECDSA()
+	accountID, privateKey, err := testRandom.EthAccount()
 	require.NoError(t, err)
 	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
-	accountID := crypto.PubkeyToAddress(*publicKey)
 
 	paymentVault := getPaymentVault(t, testHarness, logger)
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(t.Context())
@@ -347,10 +344,9 @@ func testReservationAndOnDemand(
 	clientLedgerMode clientledger.ClientLedgerMode,
 ) {
 	testRandom := random.NewTestRandom()
-	publicKey, privateKey, err := testRandom.ECDSA()
+	accountID, privateKey, err := testRandom.EthAccount()
 	require.NoError(t, err)
 	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
-	accountID := crypto.PubkeyToAddress(*publicKey)
 
 	paymentVault := getPaymentVault(t, testHarness, logger)
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(t.Context())
