@@ -51,6 +51,10 @@ func NewHeartbeatMonitor(
 	livenessChan <-chan HeartbeatMessage,
 	config HeartbeatMonitorConfig,
 ) error {
+	if err := config.Verify(); err != nil {
+		return fmt.Errorf("invalid config: %w", err)
+	}
+
 	// Create the heartbeat file if it doesn't exist
 	if _, err := os.Create(config.FilePath); err != nil {
 		return fmt.Errorf("failed to create heartbeat file: %w", err)
