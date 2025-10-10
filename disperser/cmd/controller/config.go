@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -104,7 +105,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 
 	reservationConfig, err := reservationvalidation.NewReservationLedgerCacheConfig(
 		ctx.GlobalInt(flags.ReservationPaymentsLedgerCacheSizeFlag.Name),
-		ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		75*time.Second,
 		// this doesn't need to be configurable. there are no plans to ever use a different value
 		ratelimit.OverfillOncePermitted,
 		paymentVaultUpdateInterval,
