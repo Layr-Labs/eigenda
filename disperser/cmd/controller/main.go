@@ -157,7 +157,7 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
-	encodingPool := workerpool.New(config.NumConcurrentEncodingRequests)
+	encodingPool := workerpool.New(config.EncodingManagerConfig.NumConcurrentRequests)
 	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		&config.EncodingManagerConfig,
@@ -178,7 +178,7 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create signature aggregator: %v", err)
 	}
-	dispatcherPool := workerpool.New(config.NumConcurrentDispersalRequests)
+	dispatcherPool := workerpool.New(config.DispatcherConfig.NumConcurrentRequests)
 	chainState := eth.NewChainState(chainReader, gethClient)
 	var ics core.IndexedChainState
 	if config.UseGraph {
@@ -203,7 +203,10 @@ func RunController(ctx *cli.Context) error {
 		}
 	}
 
-	nodeClientManager, err := controller.NewNodeClientManager(config.NodeClientCacheSize, requestSigner, logger)
+	nodeClientManager, err := controller.NewNodeClientManager(
+		config.DispatcherConfig.NodeClientCacheSize,
+		requestSigner,
+		logger)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
