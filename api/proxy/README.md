@@ -277,7 +277,7 @@ $ PRIVATE_KEY=$(jq -r '.[0].private_key' keypair.json | tail -c +3)
 ## If running with reservation, send us the ETH address for requesting a reservation: https://forms.gle/niMzQqj1JEzqHEny9
 
 ## Start the binary
-$ set -a; source ./.env && ./bin/eigenda-proxy
+$ set -a; source ./.env set +a && ./bin/eigenda-proxy
 ```
 
 ### Features and Configuration Options (flags/env vars)
