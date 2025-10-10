@@ -44,6 +44,7 @@ Features:
     - [Migration With Service Restart](#migration-with-service-restart)
   - [Deployment Against Real EigenDA Network](#deployment-against-real-eigenda-network)
   - [Features and Configuration Options (flags/env vars)](#features-and-configuration-options-flagsenv-vars)
+    - [Read Only Mode](#read-only-mode)
   - [Requirements / Dependencies](#requirements--dependencies)
     - [Authn/Authz/Payments](#authnauthzpayments)
     - [Ethereum Node](#ethereum-node)
@@ -53,7 +54,7 @@ Features:
 - [Contributor Guide](#contributor-guide)
   - [Testing](#testing)
     - [Unit](#unit)
-    - [Integration / E2E](#integration--e2e)
+    - [End-to-End (E2E) Tests](#end-to-end-e2e-tests)
     - [Fuzz](#fuzz)
 - [Repo Structure and Releases](#repo-structure-and-releases)
 
@@ -273,20 +274,21 @@ $ cast wallet new --json > keypair.json
 ## Extract keypair private key and remove 0x prefix
 $ PRIVATE_KEY=$(jq -r '.[0].private_key' keypair.json | tail -c +3)
 
-## If running V1 against testnet or mainnet, register the keypair ETH address and wait for approval: https://forms.gle/niMzQqj1JEzqHEny9
+## If running with on-demand, follow the steps to deposit ETH: https://docs.eigencloud.xyz/products/eigenda/integrations-guides/quick-start/v2/#on-demand-data-dispersal
+## If running with reservation, send us the ETH address for requesting a reservation: https://forms.gle/niMzQqj1JEzqHEny9
 
-## Run EigenDA Proxy with EigenDA V1 backend
-$ ./bin/eigenda-proxy \
-    --port 3100 \
-    --eigenda.disperser-rpc disperser-holesky.eigenda.xyz:443 \
-    --eigenda.signer-private-key-hex $PRIVATE_KEY \
-    --eigenda.eth-rpc https://ethereum-holesky-rpc.publicnode.com \
-    --eigenda.svc-manager-addr 0xD4A7E1Bd8015057293f0D0A557088c286942e84b
+## Start the binary
+$ set -a; source ./.env; set +a; ./bin/eigenda-proxy
 ```
 
 ### Features and Configuration Options (flags/env vars)
 
 Below is a list of the main high-level features offered for configuring the eigenda-proxy. These features are controlled via flags and/or env vars. To view the extensive list of available flags/env-vars to configure a given version of eigenda-proxy, run `eigenda-proxy --help`.
+
+#### Read Only Mode
+
+This feature is only available for EigenDA V2 backend. If `--eigenda.v2.signer-payment-key-hex` is not set, then the EigenDA V2 backend is started in read only mode,
+meaning that the POST routes will return 500 errors.
 
 #### Certificate verification <!-- omit from toc -->
 

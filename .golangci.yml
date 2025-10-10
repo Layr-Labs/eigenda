@@ -29,6 +29,9 @@ linters:
       # Reports when nesting complexity is >= this value (default is 5)
       # Setting to 8 allows complexity up to 7
       min-complexity: 8
+    staticcheck:
+      # Disable De Morgan's law simplification suggestions
+      checks: ["-QF1001"]
 
   exclusions:
     # Allow certain patterns to be ignored by lll (long lines)
