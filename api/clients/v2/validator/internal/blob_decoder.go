@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"fmt"
+
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -52,20 +54,15 @@ func (d *blobDecoder) DecodeBlob(
 		frames[i] = chunks[i].Coeffs
 	}
 
-	return d.encoder.Decode(
+	blob, err := d.encoder.Decode(
 		frames,
-		toUint64Array(indices),
+		indices,
 		uint64(blobCommitments.Length)*encoding.BYTES_PER_SYMBOL,
 		*encodingParams,
 	)
-}
-
-// TODO(samlaf): this is dumb, we shouldn't have to allocate like this just to fit into functions signatures...
-// we should standardize all uses of ChunkNumber to be uint64, not some places uint, others uint64.
-func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
-	res := make([]uint64, len(chunkIndices))
-	for i, d := range chunkIndices {
-		res[i] = uint64(d)
+	if err != nil {
+		return nil, fmt.Errorf("decode: %w", err)
 	}
-	return res
+
+	return blob, nil
 }

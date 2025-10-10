@@ -95,7 +95,8 @@ type AssignmentCoordinator interface {
 	// targetNumChunks is non-zero, then CalculateChunkLength will return the smaller of 1) the smallest chunk length which
 	// results in a number of chunks less than or equal to targetNumChunks and 2) the largest chunk length which satisfies
 	// the protocol constraints.
-	CalculateChunkLength(state *OperatorState, blobLength uint, targetNumChunks ChunkNumber, param *SecurityParam) (uint, error)
+	CalculateChunkLength(state *OperatorState, blobLength uint,
+		targetNumChunks ChunkNumber, param *SecurityParam) (uint, error)
 }
 
 type StdAssignmentCoordinator struct {
@@ -227,7 +228,9 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 // doubling the chunk length (multiplicative binary search) until it is too large or we are beneath the targetNumChunks.
 // This will always give the largest acceptable chunk length. The loop will always stop because the chunk length will eventually be
 // too large for the constraint in ValidateChunkLength
-func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, blobLength uint, targetNumChunks ChunkNumber, param *SecurityParam) (uint, error) {
+func (c *StdAssignmentCoordinator) CalculateChunkLength(
+	state *OperatorState, blobLength uint, targetNumChunks ChunkNumber, param *SecurityParam,
+) (uint, error) {
 
 	chunkLength := uint(MinChunkLength) * 2
 

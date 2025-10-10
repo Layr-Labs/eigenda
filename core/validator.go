@@ -137,7 +137,7 @@ func (v *shardValidator) ValidateBlobs(blobs []*BlobMessage, operatorState *Oper
 					samples[ind] = encoding.Sample{
 						Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
 						Chunk:           chunks[ind],
-						AssignmentIndex: uint64(indices[ind]),
+						AssignmentIndex: indices[ind],
 						BlobIndex:       blobIndex,
 					}
 				}
