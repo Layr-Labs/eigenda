@@ -302,13 +302,6 @@ var (
 		Value:    1024,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVATION_PAYMENTS_LEDGER_CACHE_SIZE"),
 	}
-	ReservationBucketCapacityPeriodFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "reservation-bucket-capacity-period"),
-		Usage:    "Duration used to calculate bucket capacity for reservations",
-		Required: false,
-		Value:    60 * time.Second,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVATION_BUCKET_CAPACITY_PERIOD"),
-	}
 	PaymentVaultUpdateIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "payment-vault-update-interval"),
 		Usage:    "Interval for checking payment vault updates",
@@ -364,7 +357,6 @@ var optionalFlags = []cli.Flag{
 	OnDemandPaymentsTableNameFlag,
 	OnDemandPaymentsLedgerCacheSizeFlag,
 	ReservationPaymentsLedgerCacheSizeFlag,
-	ReservationBucketCapacityPeriodFlag,
 	PaymentVaultUpdateIntervalFlag,
 }
 

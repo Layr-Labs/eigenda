@@ -129,7 +129,7 @@ func setup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+	params := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
 
 	commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
 	if err != nil {

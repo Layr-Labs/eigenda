@@ -19,8 +19,7 @@ func TestFrameCoeffsSliceSerialization(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(paddedPayload)))
 	cfg := encoding.DefaultConfig()
-	enc, err := rs.NewEncoder(cfg)
-	require.Nil(t, err)
+	enc := rs.NewEncoder(cfg)
 
 	coeffs, _, err := enc.EncodeBytes(paddedPayload, params)
 	require.NoError(t, err)
@@ -45,8 +44,7 @@ func TestSplitSerializedFrameCoeffs(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(paddedPayload)))
 	cfg := encoding.DefaultConfig()
-	enc, err := rs.NewEncoder(cfg)
-	require.Nil(t, err)
+	enc := rs.NewEncoder(cfg)
 
 	coeffs, _, err := enc.EncodeBytes(paddedPayload, params)
 	require.NoError(t, err)

@@ -145,7 +145,7 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 			samples[ind] = encoding.Sample{
 				Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
 				Chunk:           chunks[ind],
-				AssignmentIndex: uint(indices[ind]),
+				AssignmentIndex: uint64(indices[ind]),
 				BlobIndex:       blobIndex,
 			}
 		}

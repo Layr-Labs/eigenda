@@ -110,12 +110,7 @@ func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, e
 	}
 
 	srs := kzg.NewSrs(s1, s2)
-
-	// Create RS encoder
-	rsEncoder, err := rs.NewEncoder(encoderConfig)
-	if err != nil {
-		return nil, fmt.Errorf("create rs encoder: %w", err)
-	}
+	rsEncoder := rs.NewEncoder(encoderConfig)
 
 	encoderGroup := &Prover{
 		Config:              encoderConfig,
@@ -311,7 +306,8 @@ func getAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 	return tables, nil
 }
 
-// Helper methods for setup
+// Returns SRSTable SRS points, as well as its transpose.
+// fftPoints has size [l][2*dimE], and its transpose has size [2*dimE][l]
 func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
 	subTable, err := NewSRSTable(p.KzgConfig.CacheDir, p.Srs.G1, p.KzgConfig.NumWorker)
 	if err != nil {
@@ -323,6 +319,8 @@ func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Aff
 		return nil, nil, fmt.Errorf("failed to get sub tables: %w", err)
 	}
 
+	// TODO(samlaf): if we only use the transposed points in MultiProof,
+	// why didn't we store the SRSTables in transposed form?
 	fftPointsT := make([][]bn254.G1Affine, len(fftPoints[0]))
 	for i := range fftPointsT {
 		fftPointsT[i] = make([]bn254.G1Affine, len(fftPoints))

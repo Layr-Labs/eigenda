@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 )
@@ -34,6 +35,7 @@ type validatorClient struct {
 	logger           logging.Logger
 	blobParamsReader BlobParamsReader
 	chainState       core.ChainState
+	encoder          *rs.Encoder
 	verifier         *verifier.Verifier
 	config           *ValidatorClientConfig
 	connectionPool   *workerpool.WorkerPool
@@ -48,6 +50,7 @@ func NewValidatorClient(
 	logger logging.Logger,
 	blobParamsReader BlobParamsReader,
 	chainState core.ChainState,
+	encoder *rs.Encoder,
 	verifier *verifier.Verifier,
 	config *ValidatorClientConfig,
 	metrics *ValidatorClientMetrics,
@@ -83,6 +86,7 @@ func NewValidatorClient(
 		logger:           logger.With("component", "ValidatorClient"),
 		blobParamsReader: blobParamsReader,
 		chainState:       chainState,
+		encoder:          encoder,
 		verifier:         verifier,
 		config:           config,
 		connectionPool:   workerpool.New(config.ConnectionPoolSize),
@@ -156,7 +160,7 @@ func (c *validatorClient) GetBlob(
 		c.computePool,
 		c.config.UnsafeValidatorGRPCManagerFactory(c.logger, sockets),
 		c.config.UnsafeChunkDeserializerFactory(assignments, c.verifier),
-		c.config.UnsafeBlobDecoderFactory(c.verifier),
+		c.config.UnsafeBlobDecoderFactory(c.encoder),
 		assignments,
 		minimumChunkCount,
 		&encodingParams,
