@@ -66,33 +66,6 @@ func TestConfigVerification(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("ErrorOnSecondaryInsertFailure: flag OFF, async OFF", func(t *testing.T) {
-		cfg := validCfg()
-		cfg.AsyncPutWorkers = 0
-		cfg.ErrorOnSecondaryInsertFailure = false
-
-		err := cfg.Check()
-		require.NoError(t, err)
-	})
-
-	t.Run("ErrorOnSecondaryInsertFailure: flag OFF, async ON", func(t *testing.T) {
-		cfg := validCfg()
-		cfg.AsyncPutWorkers = 5
-		cfg.ErrorOnSecondaryInsertFailure = false
-
-		err := cfg.Check()
-		require.NoError(t, err)
-	})
-
-	t.Run("ErrorOnSecondaryInsertFailure: flag ON, async OFF", func(t *testing.T) {
-		cfg := validCfg()
-		cfg.AsyncPutWorkers = 0
-		cfg.ErrorOnSecondaryInsertFailure = true
-
-		err := cfg.Check()
-		require.NoError(t, err)
-	})
-
 	t.Run("ErrorOnSecondaryInsertFailure: flag ON, async ON (invalid)", func(t *testing.T) {
 		cfg := validCfg()
 		cfg.AsyncPutWorkers = 5

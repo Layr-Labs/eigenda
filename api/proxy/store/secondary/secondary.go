@@ -111,10 +111,14 @@ func (sm *SecondaryManager) ErrorOnInsertFailure() bool {
 	return sm.errorOnInsertFailure
 }
 
-// HandleRedundantWrites ... writes to both sets of backends (i.e, fallback, cache)
+// HandleRedundantWrites writes to both sets of backends (i.e, fallback, cache)
 // and returns an error based on the errorOnInsertFailure configuration:
-//   - If errorOnInsertFailure is false (default): returns error only if ALL writes fail
-//   - If errorOnInsertFailure is true: returns error if ANY write fails
+//   - If errorOnInsertFailure is false (default): Attempts all writes and returns error only if ALL writes fail.
+//     This provides best-effort redundancy - partial success is acceptable.
+//   - If errorOnInsertFailure is true: Returns immediately on the FIRST write failure (fail-fast behavior).
+//     This ensures strict consistency but reduces redundancy on failure.
+//
+// Each write is retried 5 times with exponential backoff before being considered failed.
 func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitment []byte, value []byte) error {
 	sources := sm.caches
 	sources = append(sources, sm.fallbacks...)
@@ -140,6 +144,12 @@ func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitmen
 			sm.log.Warn("Failed to write to redundant target", "backend", src.BackendType(), "err", err)
 			cb(Failed)
 			errs = append(errs, fmt.Errorf("write to %s failed: %w", src.BackendType(), err))
+
+			// If errorOnInsertFailure is enabled, fail fast on first error
+			if sm.errorOnInsertFailure {
+				return fmt.Errorf("write to %s failed (error-on-secondary-insert-failure=true, failing fast): %w",
+					src.BackendType(), err)
+			}
 		} else {
 			successes++
 			cb(Success)
@@ -149,12 +159,6 @@ func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitmen
 	// If no writes succeeded at all, always return error
 	if successes == 0 {
 		return fmt.Errorf("failed to write blob to any redundant targets: %w", errors.Join(errs...))
-	}
-
-	// If errorOnInsertFailure is enabled and any writes failed (partial success), return error
-	if sm.errorOnInsertFailure && len(errs) > 0 {
-		return fmt.Errorf("failed to write to %d of %d secondary targets (error-on-secondary-insert-failure=true): %w",
-			len(errs), len(sources), errors.Join(errs...))
 	}
 
 	return nil

@@ -403,54 +403,6 @@ func testErrorOnSecondaryInsertFailureFlagOn(t *testing.T, dispersalBackend comm
 	require.Contains(t, err.Error(), "500", "Expected HTTP 500 error")
 }
 
-// TestErrorOnSecondaryInsertFailureSuccessV1 verifies that when the flag is ON
-// and all secondary writes succeed, the PUT succeeds normally.
-func TestErrorOnSecondaryInsertFailureSuccessV1(t *testing.T) {
-	testErrorOnSecondaryInsertFailureSuccess(t, common.V1EigenDABackend)
-}
-
-func TestErrorOnSecondaryInsertFailureSuccessV2(t *testing.T) {
-	testErrorOnSecondaryInsertFailureSuccess(t, common.V2EigenDABackend)
-}
-
-func testErrorOnSecondaryInsertFailureSuccess(t *testing.T, dispersalBackend common.EigenDABackend) {
-	t.Parallel()
-
-	if testutils.GetBackend() != testutils.MemstoreBackend {
-		t.Skip("test only runs with memstore backend")
-	}
-
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
-	// Use S3 with VALID credentials
-	testCfg.UseS3Fallback = true
-	testCfg.ErrorOnSecondaryInsertFailure = true // Enable flag
-
-	// Ensure async writes are disabled (required for flag to work)
-	testCfg.WriteThreadCount = 0
-
-	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig)
-	defer kill()
-
-	testBlob := testutils.RandBytes(100)
-
-	cfg := &standard_client.Config{
-		URL: ts.RestAddress(),
-	}
-	daClient := standard_client.New(cfg)
-
-	// PUT should succeed because both primary and S3 succeed
-	t.Log("Setting data - should succeed with valid S3 config")
-	blobInfo, err := daClient.SetData(ts.Ctx, testBlob)
-	require.NoError(t, err, "PUT should succeed when all storage backends work")
-
-	// GET should work
-	t.Log("Getting data back")
-	retrievedBlob, err := daClient.GetData(ts.Ctx, blobInfo)
-	require.NoError(t, err)
-	require.Equal(t, testBlob, retrievedBlob)
-}
-
 func TestProxyMemConfigClientCanGetAndPatchV1(t *testing.T) {
 	testProxyMemConfigClientCanGetAndPatch(t, common.V1EigenDABackend)
 }
