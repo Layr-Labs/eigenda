@@ -15,7 +15,8 @@ func main() {
 
 	cfg, err := config.Bootstrap(
 		load.DefaultTrafficGeneratorConfig,
-		"TRAFFIC_GENERATOR_V2_SERVICE_PORT", // set automatically by kubernetes
+		"TRAFFIC_GENERATOR_V2_SERVICE_HOST", // set by kubernetes, ignore
+		"TRAFFIC_GENERATOR_V2_SERVICE_PORT", // set by kubernetes, ignore
 	)
 	if err != nil {
 		panic(fmt.Errorf("failed to bootstrap config: %w", err))
