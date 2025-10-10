@@ -22,8 +22,6 @@ import (
 )
 
 type Verifier struct {
-	kzgConfig *KzgConfig
-
 	G1SRS kzg.G1SRS
 
 	// mu protects access to ParametrizedVerifiers
@@ -43,7 +41,6 @@ func NewVerifier(config *KzgConfig) (*Verifier, error) {
 	}
 
 	encoderGroup := &Verifier{
-		kzgConfig:             config,
 		G1SRS:                 g1SRS,
 		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
 	}
@@ -294,8 +291,8 @@ func (v *Verifier) universalVerify(params encoding.EncodingParams, samples []Sam
 
 	D := params.ChunkLength
 
-	if D > v.kzgConfig.SRSNumberToLoad {
-		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v", D, v.kzgConfig.SRSNumberToLoad)
+	if D > uint64(len(v.G1SRS)) {
+		return fmt.Errorf("requested chunkLen %v is larger than Loaded G1SRS points %v", D, len(v.G1SRS))
 	}
 
 	n := len(samples)
