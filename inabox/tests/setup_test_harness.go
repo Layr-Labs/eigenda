@@ -27,6 +27,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -228,14 +229,15 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 	}
 
 	// Setup V2 retrieval clients
-	kzgVerifierV2, err := verifierv2.NewVerifier(verifierv2.KzgConfigFromV1Config(kzgConfig), nil)
+	encoder := rs.NewEncoder(nil)
+	kzgVerifierV2, err := verifierv2.NewVerifier(verifierv2.KzgConfigFromV1Config(kzgConfig))
 	if err != nil {
 		return fmt.Errorf("new verifier v2: %w", err)
 	}
 
 	clientConfig := validatorclientsv2.DefaultClientConfig()
 	retrievalClientV2 := validatorclientsv2.NewValidatorClient(
-		infraHarness.Logger, testHarness.ChainReader, cs, kzgVerifierV2, clientConfig, nil)
+		infraHarness.Logger, testHarness.ChainReader, cs, encoder, kzgVerifierV2, clientConfig, nil)
 
 	validatorPayloadRetrieverConfig := payloadretrieval.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),

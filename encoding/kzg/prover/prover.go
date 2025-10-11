@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"log/slog"
 	gomath "math"
 	"os"
 	"strconv"
@@ -107,11 +106,7 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 	srs := kzg.NewSrs(s1, s2)
 
 	// Create RS encoder
-	rsEncoder, err := rs.NewEncoder(encoderConfig)
-	if err != nil {
-		slog.Error("Could not create RS encoder", "err", err)
-		return nil, err
-	}
+	rsEncoder := rs.NewEncoder(encoderConfig)
 
 	encoderGroup := &Prover{
 		Config:              encoderConfig,
@@ -336,8 +331,8 @@ func GetAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 		}
 
 		params := encoding.EncodingParams{
-			NumChunks:   uint64(cosetSizeValue),
-			ChunkLength: uint64(dimEValue),
+			NumChunks:   uint64(dimEValue),
+			ChunkLength: uint64(cosetSizeValue),
 		}
 		tables = append(tables, params)
 	}

@@ -50,7 +50,7 @@ type StreamerConfig struct {
 	EncodingQueueLimit int
 
 	// TargetNumChunks is the target number of chunks per encoded blob
-	TargetNumChunks uint
+	TargetNumChunks uint64
 
 	// Maximum number of Blobs to fetch from store
 	MaxBlobsToFetchFromStore int
@@ -353,7 +353,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 			continue
 		}
 
-		params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+		params := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
 
 		err = encoding.ValidateEncodingParamsAndBlobLength(params, uint64(blobLength), uint64(e.SRSOrder))
 		if err != nil {

@@ -554,6 +554,8 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
 		MaxNumBlobsPerIteration:     5,
 		OnchainStateRefreshInterval: onchainRefreshInterval,
+		NumConcurrentRequests:       5,
+		EncoderAddress:              "localhost:50051", // Encoder is mocked in the test so this doesn't matter
 	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry(), blobSet, livenessChan)
 	assert.NoError(t, err)
 

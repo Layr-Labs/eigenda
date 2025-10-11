@@ -27,12 +27,6 @@ func TestGetLeadingCoset(t *testing.T) {
 }
 
 func TestToFrArrayAndToByteArray_AreInverses(t *testing.T) {
-
-	cfg := encoding.DefaultConfig()
-	enc, err := rs.NewEncoder(cfg)
-	assert.Nil(t, err)
-	require.NotNil(t, enc)
-
 	dataFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	require.Nil(t, err)
 	require.NotNil(t, dataFr)

@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 
 	"github.com/stretchr/testify/require"
@@ -40,8 +41,10 @@ func TestEncoder(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
+	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
 	require.NoError(t, err)
+
+	encoder := rs.NewEncoder(nil)
 
 	params := encoding.ParamsFromMins(5, 5)
 	commitments, err := c.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
@@ -60,7 +63,11 @@ func TestEncoder(t *testing.T) {
 	require.Error(t, err)
 
 	maxInputSize := uint64(len(harness.paddedGettysburgAddressBytes))
-	decoded, err := v.Decode(frames, indices, params, maxInputSize)
+	chunks := make([]rs.FrameCoeffs, len(frames))
+	for i, f := range frames {
+		chunks[i] = f.Coeffs
+	}
+	decoded, err := encoder.Decode(chunks, indices, maxInputSize, params)
 	require.NoError(t, err)
 	require.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 
@@ -75,7 +82,11 @@ func TestEncoder(t *testing.T) {
 	err = v.VerifyFrames(frames, indices, commitments, params)
 	require.NoError(t, err)
 
-	decoded, err = v.Decode(frames, indices, params, maxInputSize)
+	chunks = make([]rs.FrameCoeffs, len(frames))
+	for i, f := range frames {
+		chunks[i] = f.Coeffs
+	}
+	decoded, err = encoder.Decode(chunks, indices, maxInputSize, params)
 	require.NoError(t, err)
 	require.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 }
@@ -144,9 +155,12 @@ func FuzzOnlySystematic(f *testing.F) {
 		//sample the correct systematic frames
 		samples, indices := sampleFrames(frames, uint64(len(frames)))
 
-		v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
-		require.NoError(t, err)
-		data, err := v.Decode(samples, indices, params, uint64(len(input)))
+		encoder := rs.NewEncoder(nil)
+		chunks := make([]rs.FrameCoeffs, len(samples))
+		for i, f := range samples {
+			chunks[i] = f.Coeffs
+		}
+		data, err := encoder.Decode(chunks, indices, uint64(len(input)), params)
 		if err != nil {
 			t.Errorf("Error Decoding:\n Data:\n %q \n Err: %q", input, err)
 		}
