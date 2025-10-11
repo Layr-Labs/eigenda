@@ -16,8 +16,8 @@ import (
 
 const namespace = "eigenda_test_client"
 
-// testClientMetrics encapsulates the metrics for the test client.
-type testClientMetrics struct {
+// TestClientMetrics encapsulates the metrics for the test client.
+type TestClientMetrics struct {
 	logger   logging.Logger
 	server   *http.Server
 	registry *prometheus.Registry
@@ -39,8 +39,8 @@ type testClientMetrics struct {
 	gasCheckDACert         prometheus.Gauge
 }
 
-// newTestClientMetrics creates a new testClientMetrics.
-func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
+// NewTestClientMetrics creates a new testClientMetrics.
+func NewTestClientMetrics(logger logging.Logger, port int) *TestClientMetrics {
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
@@ -203,7 +203,7 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 		},
 	)
 
-	return &testClientMetrics{
+	return &TestClientMetrics{
 		logger:                 logger,
 		server:                 server,
 		registry:               registry,
@@ -224,8 +224,8 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 	}
 }
 
-// start starts the metrics server.
-func (m *testClientMetrics) start() {
+// Start starts the metrics server.
+func (m *TestClientMetrics) Start() {
 	if m == nil {
 		return
 	}
@@ -238,7 +238,7 @@ func (m *testClientMetrics) start() {
 }
 
 // stop stops the metrics server.
-func (m *testClientMetrics) stop() {
+func (m *TestClientMetrics) stop() {
 	if m == nil {
 		return
 	}
@@ -248,28 +248,28 @@ func (m *testClientMetrics) stop() {
 	}
 }
 
-func (m *testClientMetrics) reportDispersalTime(duration time.Duration) {
+func (m *TestClientMetrics) reportDispersalTime(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.dispersalTime.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *testClientMetrics) reportRelayReadTime(duration time.Duration, relayID uint32) {
+func (m *TestClientMetrics) reportRelayReadTime(duration time.Duration, relayID uint32) {
 	if m == nil {
 		return
 	}
 	m.relayReadTime.WithLabelValues(fmt.Sprintf("%d", relayID)).Observe(common.ToMilliseconds(duration))
 }
 
-func (m *testClientMetrics) reportValidatorReadTime(duration time.Duration) {
+func (m *TestClientMetrics) reportValidatorReadTime(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.validatorReadTime.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *testClientMetrics) reportProxyReadTime(duration time.Duration) {
+func (m *TestClientMetrics) reportProxyReadTime(duration time.Duration) {
 	if m == nil {
 		return
 	}
@@ -277,7 +277,7 @@ func (m *testClientMetrics) reportProxyReadTime(duration time.Duration) {
 }
 
 // startOperation should be called when starting the process of dispersing + verifying a blob
-func (m *testClientMetrics) startOperation(operation string) {
+func (m *TestClientMetrics) startOperation(operation string) {
 	if m == nil {
 		return
 	}
@@ -285,70 +285,70 @@ func (m *testClientMetrics) startOperation(operation string) {
 }
 
 // endOperation should be called when finishing the process of dispersing + verifying a blob
-func (m *testClientMetrics) endOperation(operation string) {
+func (m *TestClientMetrics) endOperation(operation string) {
 	if m == nil {
 		return
 	}
 	m.operationsInFlight.WithLabelValues(operation).Dec()
 }
 
-func (m *testClientMetrics) reportDispersalSuccess() {
+func (m *TestClientMetrics) reportDispersalSuccess() {
 	if m == nil {
 		return
 	}
 	m.dispersalSuccesses.WithLabelValues().Inc()
 }
 
-func (m *testClientMetrics) reportDispersalFailure() {
+func (m *TestClientMetrics) reportDispersalFailure() {
 	if m == nil {
 		return
 	}
 	m.dispersalFailures.WithLabelValues().Inc()
 }
 
-func (m *testClientMetrics) reportRelayReadSuccess() {
+func (m *TestClientMetrics) reportRelayReadSuccess() {
 	if m == nil {
 		return
 	}
 	m.relayReadSuccesses.WithLabelValues().Inc()
 }
 
-func (m *testClientMetrics) reportRelayReadFailure() {
+func (m *TestClientMetrics) reportRelayReadFailure() {
 	if m == nil {
 		return
 	}
 	m.relayReadFailures.WithLabelValues().Inc()
 }
 
-func (m *testClientMetrics) reportValidatorReadSuccess() {
+func (m *TestClientMetrics) reportValidatorReadSuccess() {
 	if m == nil {
 		return
 	}
 	m.validatorReadSuccesses.WithLabelValues().Inc()
 }
 
-func (m *testClientMetrics) reportValidatorReadFailure() {
+func (m *TestClientMetrics) reportValidatorReadFailure() {
 	if m == nil {
 		return
 	}
 	m.validatorReadFailures.WithLabelValues().Inc()
 }
 
-func (m *testClientMetrics) reportProxyReadSuccess() {
+func (m *TestClientMetrics) reportProxyReadSuccess() {
 	if m == nil {
 		return
 	}
 	m.proxyReadSuccesses.WithLabelValues().Inc()
 }
 
-func (m *testClientMetrics) reportProxyReadFailure() {
+func (m *TestClientMetrics) reportProxyReadFailure() {
 	if m == nil {
 		return
 	}
 	m.proxyReadFailures.WithLabelValues().Inc()
 }
 
-func (m *testClientMetrics) reportEstimateGasCheckDACert(gas uint64) {
+func (m *TestClientMetrics) reportEstimateGasCheckDACert(gas uint64) {
 	if m == nil {
 		return
 	}

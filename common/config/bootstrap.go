@@ -46,7 +46,13 @@ var (
 )
 
 // Reads command line arguments, loads configuration from files and environment variables as specified.
-func Bootstrap[T DocumentedConfig](constructor func() T) (T, error) {
+func Bootstrap[T DocumentedConfig](
+	// A function that returns a new instance of the config struct with default values set.
+	constructor func() T,
+	// A list of environment variables that should be ignored when sanity checking environment variables.
+	// Useful for situations where external systems set environment variables that would otherwise cause problems.
+	ignoredEnvVars ...string,
+) (T, error) {
 
 	// We need a logger before we have a logger config. Once we parse config, we can initialize the real logger.
 	bootstrapLogger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -55,7 +61,7 @@ func Bootstrap[T DocumentedConfig](constructor func() T) (T, error) {
 		return zero, fmt.Errorf("failed to create bootstrap logger: %w", err)
 	}
 
-	action, cfgChan := buildHandler(bootstrapLogger, constructor)
+	action, cfgChan := buildHandler(bootstrapLogger, constructor, ignoredEnvVars)
 
 	app := &cli.App{
 		Flags: []cli.Flag{
@@ -91,6 +97,7 @@ func Bootstrap[T DocumentedConfig](constructor func() T) (T, error) {
 func buildHandler[T DocumentedConfig](
 	logger logging.Logger,
 	constructor func() T,
+	ignoredEnvVars []string,
 ) (cli.ActionFunc, chan T) {
 
 	cfgChan := make(chan T, 1)
@@ -119,7 +126,7 @@ func buildHandler[T DocumentedConfig](
 			prefix = overrideEnvPrefix
 		}
 
-		cfg, err := ParseConfig(defaultConfig, prefix, configFiles...)
+		cfg, err := ParseConfig(logger, defaultConfig, prefix, ignoredEnvVars, configFiles...)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}

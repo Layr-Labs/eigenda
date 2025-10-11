@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -53,7 +54,7 @@ func emptyBlobDispersalTest(t *testing.T, environment string) {
 	var blobBytes []byte
 	quorums := []core.QuorumID{0, 1}
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 
@@ -79,7 +80,7 @@ func TestEmptyBlobDispersal(t *testing.T) {
 func emptyPayloadDispersalTest(t *testing.T, environment string) {
 	var payload []byte
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	err := testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
@@ -100,7 +101,7 @@ func TestEmptyPayloadDispersal(t *testing.T) {
 func testZeroPayloadDispersalTest(t *testing.T, environment string) {
 	payload := make([]byte, 1000)
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	err := testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
@@ -123,7 +124,7 @@ func zeroBlobDispersalTest(t *testing.T, environment string) {
 	blobBytes := make([]byte, 1000)
 	quorums := []core.QuorumID{0, 1}
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 
@@ -148,7 +149,7 @@ func TestZeroBlobDispersal(t *testing.T) {
 func microscopicBlobDispersalTest(t *testing.T, environment string) {
 	payload := []byte{1}
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	err := testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
@@ -169,7 +170,7 @@ func TestMicroscopicBlobDispersal(t *testing.T) {
 func microscopicBlobDispersalWithPadding(t *testing.T, environment string) {
 	payload := []byte{1}
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	err := testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
@@ -191,7 +192,7 @@ func smallBlobDispersalTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	err := testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
@@ -213,7 +214,7 @@ func mediumBlobDispersalTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(100*units.KiB, 200*units.KiB)
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	err := testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
@@ -234,13 +235,15 @@ func TestMediumBlobDispersal(t *testing.T) {
 func largeBlobDispersalTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 
-	config, err := client.GetConfig(environment)
+	logger := common.TestLogger(t)
+
+	config, err := client.GetConfig(logger, client.LiveTestPrefix, environment)
 	require.NoError(t, err)
 	maxBlobSize := int(config.MaxBlobSize)
 
 	payload := rand.VariableBytes(maxBlobSize/2, maxBlobSize*3/4)
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, logger, environment)
 
 	err = testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
@@ -262,7 +265,7 @@ func smallBlobDispersalAllQuorumsSetsTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	t.Run("0 1", func(t *testing.T) {
 		err := testBasicDispersal(t, c, payload)
@@ -296,7 +299,8 @@ func TestSmallBlobDispersalAllQuorumsSets(t *testing.T) {
 
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func maximumSizedBlobDispersalTest(t *testing.T, environment string) {
-	config, err := client.GetConfig(environment)
+	logger := common.TestLogger(t)
+	config, err := client.GetConfig(logger, client.LiveTestPrefix, environment)
 	require.NoError(t, err)
 
 	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(
@@ -306,7 +310,7 @@ func maximumSizedBlobDispersalTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 	payload := rand.Bytes(int(maxPermissibleDataLength))
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, logger, environment)
 
 	err = testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
@@ -325,7 +329,8 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 
 // Disperse a blob that is too large (>16MB after padding)
 func tooLargeBlobDispersalTest(t *testing.T, environment string) {
-	config, err := client.GetConfig(environment)
+	logger := common.TestLogger(t)
+	config, err := client.GetConfig(logger, client.LiveTestPrefix, environment)
 	require.NoError(t, err)
 
 	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)
@@ -334,7 +339,7 @@ func tooLargeBlobDispersalTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 	payload := rand.Bytes(int(maxPermissibleDataLength) + 1)
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, logger, environment)
 
 	err = testBasicDispersal(t, c, payload)
 	require.Error(t, err)
@@ -353,7 +358,7 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 
 func doubleDispersalTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
@@ -384,7 +389,7 @@ func TestDoubleDispersal(t *testing.T) {
 
 func unauthorizedGetChunksTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, common.TestLogger(t), environment)
 
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
@@ -431,7 +436,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	rand := random.NewTestRandom()
 	quorums := []core.QuorumID{0, 1}
 
-	c := client.GetTestClient(t, environment)
+	c := client.GetTestClient(t, logger, environment)
 
 	// Create a dispersal client with a random key
 	signer, err := auth.NewLocalBlobRequestSigner(fmt.Sprintf("%x", rand.Bytes(32)))
