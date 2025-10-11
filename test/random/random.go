@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -255,11 +256,37 @@ func (r *TestRandom) DurationRange(min time.Duration, max time.Duration) time.Du
 }
 
 // FrElements generates a slice of num random field elements.
+// FrElements will panic if some error happens with the random source.
+// TODO: this doesnt use TestRandom's source of randomness, fix that.
 func (r *TestRandom) FrElements(num uint64) []fr.Element {
 	elements := make([]fr.Element, num)
 	for i := range num {
-		b := r.Bytes(fr.Bytes)
-		_ = elements[i].SetBytes(b)
+		elements[i].MustSetRandom()
 	}
 	return elements
+}
+
+// G1Points generates a slice of num random G1 points.
+func (r *TestRandom) G1Points(num uint64) ([]bn254.G1Affine, error) {
+	points := make([]bn254.G1Affine, num)
+	var err error
+	for i := range num {
+		points[i], err = bn254.EncodeToG1(r.Bytes(fr.Bytes), []byte("random on g1"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return points, nil
+}
+
+func (r *TestRandom) G2Points(num uint64) ([]bn254.G2Affine, error) {
+	points := make([]bn254.G2Affine, num)
+	var err error
+	for i := range num {
+		points[i], err = bn254.EncodeToG2(r.Bytes(fr.Bytes), []byte("random on g2"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return points, nil
 }
