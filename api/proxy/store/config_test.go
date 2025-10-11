@@ -65,4 +65,14 @@ func TestConfigVerification(t *testing.T) {
 		err := cfg.Check()
 		require.Error(t, err)
 	})
+
+	t.Run("ErrorOnSecondaryInsertFailure: flag ON, async ON (invalid)", func(t *testing.T) {
+		cfg := validCfg()
+		cfg.AsyncPutWorkers = 5
+		cfg.ErrorOnSecondaryInsertFailure = true
+
+		err := cfg.Check()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "requires synchronous writes")
+	})
 }

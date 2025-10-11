@@ -9,12 +9,13 @@ import (
 )
 
 var (
-	BackendsToEnableFlagName = withFlagPrefix("backends-to-enable")
-	DispersalBackendFlagName = withFlagPrefix("dispersal-backend")
-	FallbackTargetsFlagName  = withFlagPrefix("fallback-targets")
-	CacheTargetsFlagName     = withFlagPrefix("cache-targets")
-	ConcurrentWriteThreads   = withFlagPrefix("concurrent-write-routines")
-	WriteOnCacheMissFlagName = withFlagPrefix("write-on-cache-miss")
+	BackendsToEnableFlagName              = withFlagPrefix("backends-to-enable")
+	DispersalBackendFlagName              = withFlagPrefix("dispersal-backend")
+	FallbackTargetsFlagName               = withFlagPrefix("fallback-targets")
+	CacheTargetsFlagName                  = withFlagPrefix("cache-targets")
+	ConcurrentWriteThreads                = withFlagPrefix("concurrent-write-routines")
+	WriteOnCacheMissFlagName              = withFlagPrefix("write-on-cache-miss")
+	ErrorOnSecondaryInsertFailureFlagName = withFlagPrefix("error-on-secondary-insert-failure")
 )
 
 func withFlagPrefix(s string) string {
@@ -28,7 +29,7 @@ func withEnvPrefix(envPrefix, s string) []string {
 // CLIFlags ... used for storage configuration
 // category is used to group the flags in the help output (see https://cli.urfave.org/v2/examples/flags/#grouping)
 func CLIFlags(envPrefix, category string) []cli.Flag {
-	return []cli.Flag{
+	flags := []cli.Flag{
 		&cli.StringSliceFlag{
 			Name:     BackendsToEnableFlagName,
 			Usage:    "Comma separated list of eigenDA backends to enable (e.g. V1,V2)",
@@ -73,7 +74,21 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "WRITE_ON_CACHE_MISS"),
 			Category: category,
 		},
+		&cli.BoolFlag{
+			Name: ErrorOnSecondaryInsertFailureFlagName,
+			Usage: "Return HTTP 500 if any secondary storage write fails. " +
+				"Uses fail-fast behavior: returns immediately on first write failure without attempting remaining backends. " +
+				"Cannot be used with concurrent-write-routines > 0. " +
+				"WARNING: Enabling this flag couples rollup batch poster liveness to secondary storage availability. " +
+				"If secondary storage becomes unavailable, batch posting will fail with HTTP 500, " +
+				"potentially causing the batch poster to enter an infinite retry loop.",
+			Value:    false,
+			EnvVars:  withEnvPrefix(envPrefix, "ERROR_ON_SECONDARY_INSERT_FAILURE"),
+			Category: category,
+		},
 	}
+
+	return flags
 }
 
 func ReadConfig(ctx *cli.Context) (Config, error) {
@@ -118,11 +133,12 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	return Config{
-		BackendsToEnable: backends,
-		DispersalBackend: dispersalBackend,
-		AsyncPutWorkers:  ctx.Int(ConcurrentWriteThreads),
-		FallbackTargets:  filteredFallbackTargets,
-		CacheTargets:     filteredCacheTargets,
-		WriteOnCacheMiss: ctx.Bool(WriteOnCacheMissFlagName),
+		BackendsToEnable:              backends,
+		DispersalBackend:              dispersalBackend,
+		AsyncPutWorkers:               ctx.Int(ConcurrentWriteThreads),
+		FallbackTargets:               filteredFallbackTargets,
+		CacheTargets:                  filteredCacheTargets,
+		WriteOnCacheMiss:              ctx.Bool(WriteOnCacheMissFlagName),
+		ErrorOnSecondaryInsertFailure: ctx.Bool(ErrorOnSecondaryInsertFailureFlagName),
 	}, nil
 }

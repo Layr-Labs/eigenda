@@ -150,7 +150,10 @@ func (m *EigenDAManager) getEigenDAV1(
 			return nil, fmt.Errorf("verify EigenDA V1 cert: %w", err)
 		}
 		if m.secondary.WriteOnCacheMissEnabled() {
-			m.backupToSecondary(ctx, versionedCert.SerializedCert, payload)
+			err = m.backupToSecondary(ctx, versionedCert.SerializedCert, payload)
+			if err != nil {
+				return nil, fmt.Errorf("backup to secondary on cache miss: %w", err)
+			}
 		}
 		return payload, nil
 	}
@@ -219,7 +222,10 @@ func (m *EigenDAManager) getEigenDAV2(
 		// since the secondary stores are currently hardcoded to store payloads only.
 		// TODO: we could consider also storing encoded payloads under separate keys?
 		if m.secondary.WriteOnCacheMissEnabled() && !opts.ReturnEncodedPayload {
-			m.backupToSecondary(ctx, versionedCert.SerializedCert, payloadOrEncodedPayload)
+			err = m.backupToSecondary(ctx, versionedCert.SerializedCert, payloadOrEncodedPayload)
+			if err != nil {
+				return nil, fmt.Errorf("backup to secondary on cache miss: %w", err)
+			}
 		}
 		return payloadOrEncodedPayload, nil
 	}
@@ -252,7 +258,10 @@ func (m *EigenDAManager) Put(ctx context.Context, value []byte) ([]byte, error) 
 
 	// 2 - Put blob into secondary storage backends
 	if m.secondary.Enabled() {
-		m.backupToSecondary(ctx, commit, value)
+		err = m.backupToSecondary(ctx, commit, value)
+		if err != nil {
+			return nil, fmt.Errorf("backup to secondary storage: %w", err)
+		}
 	}
 
 	return commit, nil
@@ -283,18 +292,32 @@ func (m *EigenDAManager) putToCorrectEigenDABackend(ctx context.Context, value [
 	return nil, fmt.Errorf("unsupported dispersal backend: %v", backend)
 }
 
-func (m *EigenDAManager) backupToSecondary(ctx context.Context, commitment []byte, value []byte) {
+// backupToSecondary writes data to secondary storage backends (caches and fallbacks).
+// When errorOnInsertFailure is enabled and writes are synchronous, errors are returned
+// to the caller to propagate as HTTP 500 responses. For async writes, errors are only logged.
+func (m *EigenDAManager) backupToSecondary(ctx context.Context, commitment []byte, value []byte) error {
 	if m.secondary.AsyncWriteEntry() { // publish put notification to secondary's subscription on PutNotify topic
 		m.log.Debug("Publishing data to async secondary stores", "commitment", commitment)
 		m.secondary.Topic() <- secondary.PutNotify{
 			Commitment: commitment,
 			Value:      value,
 		}
-	} else { // secondary is available only for synchronous writes
-		m.log.Debug("Publishing data to single threaded secondary stores")
-		err := m.secondary.HandleRedundantWrites(ctx, commitment, value)
-		if err != nil {
-			m.log.Error("Secondary insertions failed", "error", err.Error())
+		// Async writes cannot return errors to the client since they happen in background goroutines.
+		// The configuration validation ensures errorOnInsertFailure is disabled when async mode is enabled.
+		return nil
+	}
+
+	// Synchronous writes
+	m.log.Debug("Publishing data to single threaded secondary stores")
+	err := m.secondary.HandleRedundantWrites(ctx, commitment, value)
+	if err != nil {
+		m.log.Error("Secondary insertions failed", "error", err.Error())
+		// Only propagate the error if errorOnInsertFailure is enabled.
+		// This allows the caller to return HTTP 500 to the client.
+		if m.secondary.ErrorOnInsertFailure() {
+			return fmt.Errorf("a secondary storage write failed and error-on-secondary-insert-failure is enabled: %w", err)
 		}
 	}
+
+	return nil
 }
