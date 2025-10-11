@@ -273,19 +273,20 @@ func (r *TestRandom) G1Points(num uint64) ([]bn254.G1Affine, error) {
 	for i := range num {
 		points[i], err = bn254.EncodeToG1(r.Bytes(fr.Bytes), []byte("random on g1"))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("encode to g1: %w", err)
 		}
 	}
 	return points, nil
 }
 
+// G2Points generates a slice of num random G2 points.
 func (r *TestRandom) G2Points(num uint64) ([]bn254.G2Affine, error) {
 	points := make([]bn254.G2Affine, num)
 	var err error
 	for i := range num {
 		points[i], err = bn254.EncodeToG2(r.Bytes(fr.Bytes), []byte("random on g2"))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("encode to g2: %w", err)
 		}
 	}
 	return points, nil

@@ -60,7 +60,7 @@ func BenchmarkFFTG1(b *testing.B) {
 
 func BenchmarkGnarkParallelFFTG1(b *testing.B) {
 	for _, sizePowOf2 := range []uint8{13, 14} {
-		b.Run(fmt.Sprintf("2^%d_G1Points)", sizePowOf2), func(b *testing.B) {
+		b.Run(fmt.Sprintf("2^%d_G1Points", sizePowOf2), func(b *testing.B) {
 			numPoints := uint64(1) << sizePowOf2
 			rand := random.NewTestRandom(1337)
 			g1Points, err := rand.G1Points(numPoints)
@@ -85,7 +85,7 @@ func BenchmarkMSMG1(b *testing.B) {
 		g1Points, err := rand.G1Points(fs.MaxWidth)
 		require.NoError(b, err)
 
-		b.Run(fmt.Sprintf("2^%d_Points)", numG1PointsPowOf2), func(b *testing.B) {
+		b.Run(fmt.Sprintf("2^%d_Points", numG1PointsPowOf2), func(b *testing.B) {
 			for b.Loop() {
 				_, err := new(bn254.G1Affine).MultiExp(g1Points, frs, ecc.MultiExpConfig{})
 				require.NoError(b, err)
@@ -104,7 +104,7 @@ func BenchmarkMSMG2(b *testing.B) {
 		g2Points, err := rand.G2Points(fs.MaxWidth)
 		require.NoError(b, err)
 
-		b.Run(fmt.Sprintf("2^%d_Points)", numG2PointsPowOf2), func(b *testing.B) {
+		b.Run(fmt.Sprintf("2^%d_Points", numG2PointsPowOf2), func(b *testing.B) {
 			for b.Loop() {
 				_, err := new(bn254.G2Affine).MultiExp(g2Points, frs, ecc.MultiExpConfig{})
 				require.NoError(b, err)

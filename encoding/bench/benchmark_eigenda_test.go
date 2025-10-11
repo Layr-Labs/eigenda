@@ -16,7 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/test/random"
 )
 
-// This file contains benchmarks for the high-level math/crypto operations that are 
+// This file contains benchmarks for the high-level math/crypto operations that are
 // performed by different actors of the EigenDA network:
 // - Clients: PayloadToBlob conversion, Commitment generation
 // - Dispersers: Frame generation (RS encoding into chunks + KZG multiproof generation)
@@ -108,8 +108,8 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 // This is the most intensive part of the encoding process.
 //
 // This Benchmark is very high-level, since GetFrames does many things.
-// But the print statements from the Encoder give a breakdown of the different steps:
-// eg: Multiproof Time Decomp total=9.478006875s preproc=33.987083ms msm=1.496717042s fft1=5.912448708s fft2=2.034854042s
+// But the print statements from the Encoder give a breakdown of the different steps. E.g.:
+// Multiproof Time Decomp total=9.478006875s preproc=33.987083ms msm=1.496717042s fft1=5.912448708s fft2=2.034854042s
 // Where fft1 and fft2 are on G1, and preproc contains an FFT on Fr elements.
 func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 	proverConfig := prover.KzgConfig{

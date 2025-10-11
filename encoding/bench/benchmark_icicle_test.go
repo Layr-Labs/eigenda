@@ -147,7 +147,7 @@ func BenchmarkIcicleFFTG1(b *testing.B) {
 			for b.Loop() {
 				err := ecntt.ECNtt(pointsBn254, iciclecore.KForward, &cfgBn254, nttResultBn254)
 				require.Equal(b, icicleruntime.Success, err, fmt.Sprint("bn254 Ntt failed: ", err))
-				nttResultBn254Host := make(iciclecore.HostSlice[iciclebn254.ScalarField], numG1Points)
+				nttResultBn254Host := make(iciclecore.HostSlice[iciclebn254.Affine], numG1Points)
 				nttResultBn254Host.CopyFromDeviceAsync(&nttResultBn254, streamBn254)
 				icicleruntime.SynchronizeStream(streamBn254)
 			}
