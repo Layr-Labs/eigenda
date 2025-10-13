@@ -1,5 +1,5 @@
 //go:build icicle
-package bench
+package bench_test
 
 import (
 	"fmt"
