@@ -56,7 +56,7 @@ func parseFlags() Config {
 }
 
 var proverKzgConfig *proverv2.KzgConfig
-var verifierKzgConfig *verifierv2.KzgConfig
+var verifierKzgConfig *verifierv2.Config
 
 func main() {
 	config := parseFlags()
@@ -84,7 +84,7 @@ func main() {
 		log.Fatalf("Failed to create committer: %v", err)
 	}
 
-	verifierKzgConfig = &verifierv2.KzgConfig{
+	verifierKzgConfig = &verifierv2.Config{
 		G1Path:          "/home/ubuntu/eigenda/resources/srs/g1.point",
 		SRSNumberToLoad: 524288,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),

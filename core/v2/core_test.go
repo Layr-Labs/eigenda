@@ -79,7 +79,7 @@ func makeTestComponents() (*prover.Prover, *committer.Committer, *verifier.Verif
 		CacheDir:        "../../resources/srs/SRSTables",
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
-	verifierConfig := verifier.KzgConfigFromV2ProverConfig(proverConfig)
+	verifierConfig := verifier.ConfigFromProverV2Config(proverConfig)
 	committerConfig := committer.Config{
 		SRSNumberToLoad:   proverConfig.SRSNumberToLoad,
 		G1SRSPath:         proverConfig.G1Path,
