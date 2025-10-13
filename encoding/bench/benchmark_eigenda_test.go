@@ -125,25 +125,29 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 	require.NoError(b, err)
 
 	// We only have 16MiBs of SRS points. Since we use blob_version=0's 8x coding
-	// ratio, we create a blob of size 2MiB and 8x rs encode it up to 16MiB.
-	blobSize := uint64(1) << 21 // 2 MiB
-	params := encoding.EncodingParams{
-		NumChunks:   8192,                       // blob_version=0
-		ChunkLength: max(1, blobSize*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
-	}
+	// ratio, we can encode blobs of size at most 2MiB (2^21 bytes).
+	for _, blobPower := range []uint64{17, 20, 21} {
+		b.Run("Multiproof_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
+			blobSizeBytes := uint64(1) << blobPower
+			params := encoding.EncodingParams{
+				NumChunks:   8192,                            // blob_version=0
+				ChunkLength: max(1, blobSizeBytes*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
+			}
 
-	rand := random.NewTestRandom()
-	blobBytes := rand.Bytes(int(blobSize))
-	for i := 0; i < len(blobBytes); i += 32 {
-		blobBytes[i] = 0 // to make them Fr elements
-	}
+			rand := random.NewTestRandom()
+			blobBytes := rand.Bytes(int(blobSizeBytes))
+			for i := 0; i < len(blobBytes); i += 32 {
+				blobBytes[i] = 0 // to make them Fr elements
+			}
 
-	// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
-	_, err = p.GetFrames(blobBytes, params)
-	require.NoError(b, err)
+			// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
+			_, err = p.GetFrames(blobBytes, params)
+			require.NoError(b, err)
 
-	for b.Loop() {
-		_, err = p.GetFrames(blobBytes, params)
-		require.NoError(b, err)
+			for b.Loop() {
+				_, err = p.GetFrames(blobBytes, params)
+				require.NoError(b, err)
+			}
+		})
 	}
 }
