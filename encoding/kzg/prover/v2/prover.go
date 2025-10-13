@@ -49,7 +49,7 @@ func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, e
 
 	rsEncoder := rs.NewEncoder(encoderConfig)
 
-	encoderGroup := &Prover{
+	proverGroup := &Prover{
 		Config:              encoderConfig,
 		encoder:             rsEncoder,
 		KzgConfig:           kzgConfig,
@@ -64,13 +64,13 @@ func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, e
 			return nil, fmt.Errorf("make cache dir: %w", err)
 		}
 
-		err = encoderGroup.preloadAllEncoders()
+		err = proverGroup.preloadProversFromSRSTableCache()
 		if err != nil {
-			return nil, fmt.Errorf("preload all encoders: %w", err)
+			return nil, fmt.Errorf("preload all provers: %w", err)
 		}
 	}
 
-	return encoderGroup, nil
+	return proverGroup, nil
 }
 
 func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, error) {
@@ -79,12 +79,12 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 		return nil, fmt.Errorf("ToFrArray: %w", err)
 	}
 
-	enc, err := e.GetKzgProver(params)
+	prover, err := e.GetKzgProver(params)
 	if err != nil {
-		return nil, fmt.Errorf("get kzg encoder: %w", err)
+		return nil, fmt.Errorf("get kzg prover: %w", err)
 	}
 
-	kzgFrames, _, err := enc.GetFrames(symbols)
+	kzgFrames, _, err := prover.GetFrames(symbols)
 	if err != nil {
 		return nil, fmt.Errorf("get frames: %w", err)
 	}
@@ -178,7 +178,7 @@ func (p *Prover) createIcicleBackendProver(
 	return CreateIcicleBackendProver(p, params, fs)
 }
 
-func (g *Prover) preloadAllEncoders() error {
+func (g *Prover) preloadProversFromSRSTableCache() error {
 	paramsAll, err := getAllPrecomputedSrsMap(g.KzgConfig.CacheDir)
 	if err != nil {
 		return err
@@ -193,12 +193,11 @@ func (g *Prover) preloadAllEncoders() error {
 	}
 
 	for _, params := range paramsAll {
-		// get those encoders and store them
-		enc, err := g.GetKzgProver(params)
+		prover, err := g.GetKzgProver(params)
 		if err != nil {
 			return err
 		}
-		g.ParametrizedProvers[params] = enc
+		g.ParametrizedProvers[params] = prover
 	}
 
 	return nil

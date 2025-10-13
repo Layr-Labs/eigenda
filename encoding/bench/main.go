@@ -186,7 +186,7 @@ func benchmarkEncodeAndVerify(
 
 	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
 
-	enc, err := p.GetKzgProver(params)
+	prover, err := p.GetKzgProver(params)
 	if err != nil {
 		log.Fatalf("Failed to get KZG encoder: %v", err)
 	}
@@ -204,7 +204,7 @@ func benchmarkEncodeAndVerify(
 	}
 
 	start := time.Now()
-	frames, _, err := enc.GetFrames(inputFr)
+	frames, _, err := prover.GetFrames(inputFr)
 	if err != nil {
 		log.Fatal(err)
 	}

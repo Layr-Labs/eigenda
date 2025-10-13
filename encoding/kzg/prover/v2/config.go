@@ -15,9 +15,8 @@ type KzgConfig struct {
 	// G1Path is the path to the G1 SRS file.
 	G1Path string
 
-	// PreloadEncoder is only used by the prover to generate kzg multiproofs.
-	//
-	// If true, SRS tables are read from CacheDir during initialization.
+	// If true, SRS tables are read from CacheDir during initialization,
+	// and parametrizedProvers (fka encoders) are preloaded for all supported encoding params.
 	// Generating these on startup would take minutes otherwise.
 	PreloadEncoder bool
 	// Path to SRS Table directory. Always required even if PreloadEncoder is false,
