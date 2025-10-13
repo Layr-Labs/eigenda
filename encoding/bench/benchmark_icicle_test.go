@@ -26,7 +26,7 @@ import (
 // deviceType should be one of "CUDA", "METAL", "CPU".
 //
 // CPU:
-// Afaiu there is no point in using CPU device other than for testing the code witout a GPU.
+// Afaiu there is no point in using CPU device other than for testing the code wihout a GPU.
 // CPU icicle code will always be slower than gnark-crypto code running on CPU,
 // since it requires some data conversions (e.g. field elements are stored in montgomery form in
 // gnark-crypto, but not in icicle).
