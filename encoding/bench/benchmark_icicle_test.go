@@ -1,3 +1,4 @@
+//go:build icicle
 package bench
 
 import (
