@@ -34,10 +34,8 @@ func TestNewDispersalRequestSignerFromKMSConfig_AWS(t *testing.T) {
 func TestNewDispersalRequestSignerFromKMSConfig_OCI(t *testing.T) {
 	ctx := context.Background()
 	kmsConfig := common.KMSKeyConfig{
-		Provider:           "oci",
-		KeyOCID:            "ocid1.key.oc1.test",
-		KMSEndpoint:        "https://test.oci.com",
-		ManagementEndpoint: "https://management.test.oci.com",
+		Provider: "oci",
+		KeyID:    "ocid1.key.oc1.test",
 	}
 	region := "us-phoenix-1"
 	endpointURL := ""
@@ -120,15 +118,13 @@ func TestNewDispersalRequestSignerFromKMSConfig_AWSMissingRegion(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
-func TestNewDispersalRequestSignerFromKMSConfig_OCIMissingEndpoints(t *testing.T) {
+func TestNewDispersalRequestSignerFromKMSConfig_OCIMissingKeyID(t *testing.T) {
 	ctx := context.Background()
 	
-	// Test missing KMS endpoint
+	// Test missing key OCID
 	kmsConfig := common.KMSKeyConfig{
-		Provider:           "oci",
-		KeyOCID:            "ocid1.key.oc1.test",
-		KMSEndpoint:        "",
-		ManagementEndpoint: "https://management.test.oci.com",
+		Provider: "oci",
+		KeyID:    "", // Missing key ID
 	}
 	region := "us-phoenix-1"
 	endpointURL := ""
@@ -137,21 +133,7 @@ func TestNewDispersalRequestSignerFromKMSConfig_OCIMissingEndpoints(t *testing.T
 
 	assert.Nil(t, signer)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "OCI KMS key OCID, KMS endpoint, and management endpoint are required")
-
-	// Test missing management endpoint
-	kmsConfig = common.KMSKeyConfig{
-		Provider:           "oci",
-		KeyID:              "ocid1.key.oc1.test",
-		KMSEndpoint:        "https://test.oci.com",
-		ManagementEndpoint: "",
-	}
-
-	signer, err = NewDispersalRequestSignerFromKMSConfig(ctx, kmsConfig, region, endpointURL)
-
-	assert.Nil(t, signer)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "OCI KMS key OCID, KMS endpoint, and management endpoint are required")
+	assert.Contains(t, err.Error(), "OCI KMS key OCID is required")
 }
 
 
@@ -175,10 +157,8 @@ func TestValidateKMSConfig(t *testing.T) {
 		{
 			name: "valid OCI config",
 			kmsConfig: common.KMSKeyConfig{
-				Provider:           "oci",
-				KeyID:              "ocid1.key.oc1.test",
-				KMSEndpoint:        "https://test.oci.com",
-				ManagementEndpoint: "https://management.test.oci.com",
+				Provider: "oci",
+				KeyID:    "ocid1.key.oc1.test",
 			},
 			region: "us-phoenix-1",
 		},
@@ -238,12 +218,7 @@ func validateKMSConfig(kmsConfig common.KMSKeyConfig, region string) error {
 			return fmt.Errorf("AWS KMS region must be specified")
 		}
 	case "oci":
-		if kmsConfig.KMSEndpoint == "" {
-			return fmt.Errorf("OCI KMS endpoint must be specified")
-		}
-		if kmsConfig.ManagementEndpoint == "" {
-			return fmt.Errorf("OCI management endpoint must be specified")
-		}
+		// OCI endpoints are auto-discovered, no additional validation needed
 	default:
 		return fmt.Errorf("unsupported KMS provider: %s", kmsConfig.Provider)
 	}
