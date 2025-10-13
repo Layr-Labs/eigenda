@@ -7,6 +7,7 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"math/big"
@@ -78,13 +79,23 @@ func LoadPublicKeyKMS(
 }
 
 // ParsePublicKeyKMS parses the public key from OCI KMS format (PEM) into an ecdsa.PublicKey.
-func ParsePublicKeyKMS(pemBytes []byte) (*ecdsa.PublicKey, error) {
-	// Try to parse as ASN.1 DER format first (similar to AWS)
+func ParsePublicKeyKMS(keyBytes []byte) (*ecdsa.PublicKey, error) {
+	// First, try to decode as PEM (which is what OCI KMS typically returns)
+	block, _ := pem.Decode(keyBytes)
+	var derBytes []byte
+
+	if block != nil {
+		// Successfully decoded PEM, use the DER bytes
+		derBytes = block.Bytes
+	} else {
+		// Not PEM format, assume raw DER bytes
+		derBytes = keyBytes
+	}
+
+	// Parse the DER-encoded public key using ASN.1
 	var asn1pubk asn1EcPublicKey
-	_, err := asn1.Unmarshal(pemBytes, &asn1pubk)
+	_, err := asn1.Unmarshal(derBytes, &asn1pubk)
 	if err != nil {
-		// If ASN.1 parsing fails, the PEM format from OCI may need different handling
-		// For now, return an error indicating unsupported format
 		return nil, fmt.Errorf("failed to parse public key from OCI format: %w", err)
 	}
 
