@@ -37,8 +37,14 @@ func NewDispersalRequestSignerFromKMSConfig(
 		}
 		return NewOCIDispersalRequestSigner(ctx, kmsConfig.KeyID)
 
+	case "local":
+		if kmsConfig.PrivateKeyHex == "" {
+			return nil, fmt.Errorf("private key hex is required when using local provider")
+		}
+		return NewLocalDispersalRequestSignerFromHex(kmsConfig.PrivateKeyHex)
+
 	default:
-		return nil, fmt.Errorf("unsupported KMS provider: %s (supported: aws, oci)", kmsConfig.Provider)
+		return nil, fmt.Errorf("unsupported KMS provider: %s (supported: aws, oci, local)", kmsConfig.Provider)
 	}
 }
 

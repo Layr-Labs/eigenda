@@ -5,12 +5,15 @@ import (
 )
 
 type KMSKeyConfig struct {
-	// Provider specifies the KMS provider: "aws" or "oci"
+	// Provider specifies the KMS provider: "aws", "oci", or "local"
 	Provider string
 
 	// Shared fields
 	KeyID  string // AWS KMS key ID or OCI KMS key OCID
 	Region string // AWS region (not used for OCI)
+
+	// Local private key (used when Provider is "local")
+	PrivateKeyHex string // Hex-encoded private key (with or without 0x prefix)
 
 	Disable bool
 }
@@ -19,7 +22,7 @@ func KMSWalletCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 	return []cli.Flag{
 		cli.StringFlag{
 			Name:     PrefixFlag(flagPrefix, "kms-provider"),
-			Usage:    "KMS provider: 'aws' or 'oci' (defaults to 'aws' for backward compatibility)",
+			Usage:    "KMS provider: 'aws', 'oci', or 'local' (defaults to 'aws' for backward compatibility)",
 			Value:    "aws",
 			Required: false,
 			EnvVar:   PrefixEnvVar(envPrefix, "KMS_PROVIDER"),
@@ -37,6 +40,12 @@ func KMSWalletCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Required: false,
 			EnvVar:   PrefixEnvVar(envPrefix, "KMS_KEY_REGION"),
 		},
+		cli.StringFlag{
+			Name:     PrefixFlag(flagPrefix, "private-key"),
+			Usage:    "Private key in hex format (used when kms-provider is 'local')",
+			Required: false,
+			EnvVar:   PrefixEnvVar(envPrefix, "PRIVATE_KEY"),
+		},
 		cli.BoolFlag{
 			Name:     PrefixFlag(flagPrefix, "kms-key-disable"),
 			Usage:    "Disable KMS wallet",
@@ -48,9 +57,10 @@ func KMSWalletCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 
 func ReadKMSKeyConfig(ctx *cli.Context, flagPrefix string) KMSKeyConfig {
 	return KMSKeyConfig{
-		Provider: ctx.String(PrefixFlag(flagPrefix, "kms-provider")),
-		KeyID:    ctx.String(PrefixFlag(flagPrefix, "kms-key-id")),
-		Region:   ctx.String(PrefixFlag(flagPrefix, "kms-key-region")),
-		Disable:  ctx.Bool(PrefixFlag(flagPrefix, "kms-key-disable")),
+		Provider:      ctx.String(PrefixFlag(flagPrefix, "kms-provider")),
+		KeyID:         ctx.String(PrefixFlag(flagPrefix, "kms-key-id")),
+		Region:        ctx.String(PrefixFlag(flagPrefix, "kms-key-region")),
+		PrivateKeyHex: ctx.String(PrefixFlag(flagPrefix, "private-key")),
+		Disable:       ctx.Bool(PrefixFlag(flagPrefix, "kms-key-disable")),
 	}
 }
