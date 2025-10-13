@@ -80,7 +80,7 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 	cfg := encoding.DefaultConfig()
 	enc := rs.NewEncoder(cfg)
 
-	for _, blobPower := range []uint64{17, 20, 24} {
+	for _, blobPower := range []uint64{17, 20, 21, 24} {
 		b.Run("Encode_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
 			blobSizeBytes := uint64(1) << blobPower
 			params := encoding.EncodingParams{
