@@ -66,12 +66,9 @@ func main() {
 	// Setup phase
 	proverKzgConfig = &proverv2.KzgConfig{
 		G1Path:          "/home/ubuntu/eigenda/resources/srs/g1.point",
-		G2Path:          "/home/ubuntu/eigenda/resources/srs/g2.point",
-		G2TrailingPath:  "/home/ubuntu/eigenda/resources/srs/g2.trailing.point",
 		CacheDir:        "/home/ubuntu/eigenda/resources/srs/SRSTables",
 		SRSNumberToLoad: 524288,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
 		PreloadEncoder:  true,
 	}
 
@@ -189,7 +186,7 @@ func benchmarkEncodeAndVerify(
 
 	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
 
-	enc, err := p.GetKzgEncoder(params)
+	enc, err := p.GetKzgProver(params)
 	if err != nil {
 		log.Fatalf("Failed to get KZG encoder: %v", err)
 	}

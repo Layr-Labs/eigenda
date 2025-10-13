@@ -58,9 +58,15 @@ type Config struct {
 	// 2^19 field elements = 2^19 * 32 bytes = 16 MiB.
 	SRSNumberToLoad uint64
 	G1SRSPath       string
-	G2SRSPath       string
-	// G2TrailingSRSPath is optional and only needed if G2SRSPath does not
-	// point to the full SRS file (containing 2^28 points).
+	// There are 2 ways to configure G2 points:
+	// 1. Entire G2 SRS file (16GiB) is provided via G2SRSPath
+	// 2. G2SRSPath and G2TrailingSRSPath both contain at least SRSNumberToLoad points,
+	//    where G2SRSPath contains the first SRSNumberToLoad points of the full G2 SRS file,
+	//    and G2TrailingSRSPath contains the last SRSNumberToLoad points of the G2 SRS file.
+	// TODO(samlaf): to prevent misconfigurations and simplify the code, we should probably
+	// not multiplex G2SRSPath like this, and instead use a G2PrefixPath config.
+	// Then EITHER G2SRSPath is used, OR both G2PrefixSRSPath and G2TrailingSRSPath are used.
+	G2SRSPath         string
 	G2TrailingSRSPath string
 }
 

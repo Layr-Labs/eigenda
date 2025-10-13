@@ -1,6 +1,9 @@
 package verifier
 
-import "github.com/Layr-Labs/eigenda/encoding/kzg"
+import (
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+)
 
 // KzgConfig holds configuration for the V2 KZG verifier.
 type KzgConfig struct {
@@ -13,6 +16,16 @@ type KzgConfig struct {
 
 	// NumWorker is the number of goroutines used to read and parse the G1 SRS file.
 	NumWorker uint64
+}
+
+// The v2 verifier's KzgConfig is a strict subset of the prover's config,
+// since it doesn't need the SRSTable information which is only used for proving.
+func KzgConfigFromV2ProverConfig(v2Prover *prover.KzgConfig) *KzgConfig {
+	return &KzgConfig{
+		SRSNumberToLoad: v2Prover.SRSNumberToLoad,
+		G1Path:          v2Prover.G1Path,
+		NumWorker:       v2Prover.NumWorker,
+	}
 }
 
 // KzgConfigFromV1Config converts a v1 KzgConfig to a v2 verifier KzgConfig.
