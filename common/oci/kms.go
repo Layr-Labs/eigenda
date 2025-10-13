@@ -98,6 +98,13 @@ func ParsePublicKeyKMS(keyBytes []byte) (*ecdsa.PublicKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse public key from OCI format: %w", err)
 	}
+	
+	// Check if this is a secp256k1 key by examining the curve parameters OID
+	// secp256k1 OID is 1.3.132.0.10 = {1, 3, 132, 0, 10}
+	secp256k1OID := asn1.ObjectIdentifier{1, 3, 132, 0, 10}
+	if !asn1pubk.EcPublicKeyInfo.Parameters.Equal(secp256k1OID) {
+		return nil, fmt.Errorf("public key is not on secp256k1 curve, got curve OID: %v (expected secp256k1 OID: %v). Please ensure your OCI KMS key was created with the secp256k1 curve", asn1pubk.EcPublicKeyInfo.Parameters, secp256k1OID)
+	}
 
 	key, err := crypto.UnmarshalPubkey(asn1pubk.PublicKey.Bytes)
 	if err != nil {

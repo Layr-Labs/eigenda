@@ -17,7 +17,7 @@ func TestKMSWalletCLIFlags(t *testing.T) {
 	flags := KMSWalletCLIFlags(envVarPrefix, flagPrefix)
 
 	// Check that we have the expected number of flags
-	assert.Len(t, flags, 7) // provider, key-id, key-region, key-ocid, kms-endpoint, management-endpoint, disable
+	assert.Len(t, flags, 4) // provider, key-id, key-region, disable
 
 	flagNames := make(map[string]bool)
 	for _, flag := range flags {
@@ -37,9 +37,6 @@ func TestKMSWalletCLIFlags(t *testing.T) {
 		"test.kms-provider",
 		"test.kms-key-id",
 		"test.kms-key-region",
-		"test.kms-key-ocid",
-		"test.kms-endpoint",
-		"test.kms-management-endpoint",
 		"test.kms-key-disable",
 	}
 
@@ -78,24 +75,21 @@ func TestReadKMSKeyConfig(t *testing.T) {
 		{
 			name: "OCI provider config",
 			args: []string{"app",
-				"--test-kms-provider", "oci",
-				"--test-kms-key-id", "ocid1.key.oc1.test",
-				"--test-kms-endpoint", "https://test.oci.com",
-				"--test-kms-management-endpoint", "https://management.test.oci.com",
+				"--test.kms-provider", "oci",
+				"--test.kms-key-id", "ocid1.key.oc1.test",
 			},
 			expected: KMSKeyConfig{
-				Provider:           "oci",
-				KeyID:              "ocid1.key.oc1.test",
-				KMSEndpoint:        "https://test.oci.com",
-				ManagementEndpoint: "https://management.test.oci.com",
-				Disable:            false,
+				Provider: "oci",
+				KeyID:    "ocid1.key.oc1.test",
+				Disable:  false,
 			},
 		},
 		{
 			name: "disabled KMS",
-			args: []string{"app", "--test-kms-disable"},
+			args: []string{"app", "--test.kms-key-disable"},
 			expected: KMSKeyConfig{
-				Disable: true,
+				Provider: "aws", // Default value
+				Disable:  true,
 			},
 		},
 		{
@@ -127,8 +121,6 @@ func TestReadKMSKeyConfig(t *testing.T) {
 			assert.Equal(t, test.expected.Provider, config.Provider)
 			assert.Equal(t, test.expected.KeyID, config.KeyID)
 			assert.Equal(t, test.expected.Region, config.Region)
-			assert.Equal(t, test.expected.KMSEndpoint, config.KMSEndpoint)
-			assert.Equal(t, test.expected.ManagementEndpoint, config.ManagementEndpoint)
 			assert.Equal(t, test.expected.Disable, config.Disable)
 		})
 	}
@@ -137,11 +129,9 @@ func TestReadKMSKeyConfig(t *testing.T) {
 func TestReadKMSKeyConfig_WithEnvironmentVariables(t *testing.T) {
 	// Set environment variables
 	envVars := map[string]string{
-		"TEST_KMS_PROVIDER":             "oci",
-		"TEST_KMS_KEY_OCID":             "ocid1.key.oc1.env",
-		"TEST_KMS_ENDPOINT":             "https://env.oci.com",
-		"TEST_KMS_MANAGEMENT_ENDPOINT":  "https://management.env.oci.com",
-		"TEST_KMS_KEY_REGION":           "us-phoenix-1",
+		"TEST_KMS_PROVIDER":   "oci",
+		"TEST_KMS_KEY_ID":     "ocid1.key.oc1.env",
+		"TEST_KMS_KEY_REGION": "us-phoenix-1",
 	}
 
 	// Set environment variables
@@ -171,28 +161,22 @@ func TestReadKMSKeyConfig_WithEnvironmentVariables(t *testing.T) {
 	config := ReadKMSKeyConfig(ctx, flagPrefix)
 
 	assert.Equal(t, "oci", config.Provider)
-	assert.Equal(t, "ocid1.key.oc1.env", config.KeyOCID)
-	assert.Equal(t, "https://env.oci.com", config.KMSEndpoint)
-	assert.Equal(t, "https://management.env.oci.com", config.ManagementEndpoint)
+	assert.Equal(t, "ocid1.key.oc1.env", config.KeyID)
 	assert.Equal(t, "us-phoenix-1", config.Region)
 	assert.False(t, config.Disable)
 }
 
 func TestKMSKeyConfig_Struct(t *testing.T) {
 	config := KMSKeyConfig{
-		Provider:           "oci",
-		KeyID:              "test-key",
-		Region:             "us-west-1",
-		KMSEndpoint:        "https://kms.test.com",
-		ManagementEndpoint: "https://management.test.com",
-		Disable:            false,
+		Provider: "oci",
+		KeyID:    "test-key",
+		Region:   "us-west-1",
+		Disable:  false,
 	}
 
 	assert.Equal(t, "oci", config.Provider)
 	assert.Equal(t, "test-key", config.KeyID)
 	assert.Equal(t, "us-west-1", config.Region)
-	assert.Equal(t, "https://kms.test.com", config.KMSEndpoint)
-	assert.Equal(t, "https://management.test.com", config.ManagementEndpoint)
 	assert.False(t, config.Disable)
 }
 

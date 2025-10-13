@@ -1,8 +1,11 @@
 package oci
 
 import (
+	"encoding/asn1"
+	"encoding/pem"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,4 +76,96 @@ func TestOCIIntegrationWithoutCredentials(t *testing.T) {
 	// Test endpoint format validation
 	assert.Contains(t, kmsEndpoint, "https://")
 	assert.Contains(t, managementEndpoint, "https://")
+}
+
+func TestParsePublicKeyKMS(t *testing.T) {
+	// Generate a proper secp256k1 key pair for testing
+	privateKey, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	
+	// Convert the public key to the expected ASN.1 DER format
+	publicKeyBytes := crypto.FromECDSAPub(&privateKey.PublicKey)
+	
+	// Create the ASN.1 structure manually for secp256k1
+	secp256k1OID := asn1.ObjectIdentifier{1, 3, 132, 0, 10}  // secp256k1
+	ecPublicKeyOID := asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}  // ecPublicKey
+	
+	publicKeyInfo := asn1EcPublicKeyInfo{
+		Algorithm:  ecPublicKeyOID,
+		Parameters: secp256k1OID,
+	}
+	
+	publicKeyASN1 := asn1EcPublicKey{
+		EcPublicKeyInfo: publicKeyInfo,
+		PublicKey:       asn1.BitString{Bytes: publicKeyBytes, BitLength: len(publicKeyBytes) * 8},
+	}
+	
+	testKeyDER, err := asn1.Marshal(publicKeyASN1)
+	assert.NoError(t, err)
+	
+	// Create PEM version
+	pemBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: testKeyDER,
+	}
+	testKeyPEM := pem.EncodeToMemory(pemBlock)
+
+	tests := []struct {
+		name     string
+		keyBytes []byte
+		wantErr  bool
+	}{
+		{
+			name:     "Valid PEM key",
+			keyBytes: testKeyPEM,
+			wantErr:  false,
+		},
+		{
+			name:     "Valid DER key",
+			keyBytes: testKeyDER,
+			wantErr:  false,
+		},
+		{
+			name:     "Invalid key bytes",
+			keyBytes: []byte("invalid key data"),
+			wantErr:  true,
+		},
+		{
+			name:     "Empty key bytes",
+			keyBytes: []byte{},
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, err := ParsePublicKeyKMS(tt.keyBytes)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, key)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, key)
+				// Verify it's a valid secp256k1 key
+				assert.NotNil(t, key.X)
+				assert.NotNil(t, key.Y)
+				// Compare with the original key
+				assert.Equal(t, privateKey.PublicKey.X.Cmp(key.X), 0)
+				assert.Equal(t, privateKey.PublicKey.Y.Cmp(key.Y), 0)
+			}
+		})
+	}
+}
+
+func hexCharToInt(c byte) byte {
+	if c >= '0' && c <= '9' {
+		return c - '0'
+	}
+	if c >= 'a' && c <= 'f' {
+		return c - 'a' + 10
+	}
+	if c >= 'A' && c <= 'F' {
+		return c - 'A' + 10
+	}
+	return 0
 }
