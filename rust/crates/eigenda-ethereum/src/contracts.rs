@@ -14,7 +14,7 @@ pub const EIGENDA_DIRECTORY_SEPOLIA: Address =
     address!("0x9620dC4B3564198554e4D2b06dEFB7A369D90257");
 
 /// EigenDA relevant contracts. Addresses are retrieved from the the EigenDADirectory contract for
-/// the respective network (i.e. Mainnent, Sepolia)
+/// the respective network (i.e. Mainnet, Sepolia)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EigenDaContracts {
     /// # Ethereum description
