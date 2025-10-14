@@ -7,9 +7,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/config"
 )
 
-// The environment variable prefix to use for the ejector configuration.
-const EjectorConfigEnvPrefix = "EJECTOR"
-
 var _ config.DocumentedConfig = (*EjectorConfig)(nil)
 
 // Configuration for the ejector.

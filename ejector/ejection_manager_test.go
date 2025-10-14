@@ -1501,7 +1501,7 @@ func TestThrottlePreventsEjection(t *testing.T) {
 			// This should be allowed, since overfill is allowed and the bucket should not be completely full.
 			_, started := ejectionTransactor.inProgressEjections[validatorC]
 			require.False(t, started)
-			manager.BeginEjection(validatorC, stakes[validatorB])
+			manager.BeginEjection(validatorC, stakes[validatorC])
 
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, stakes[validatorC])
@@ -1690,7 +1690,7 @@ func TestFailureToStartRevertsThrottle(t *testing.T) {
 			// This should be allowed, since overfill is allowed and the bucket should not be completely full.
 			_, started := ejectionTransactor.inProgressEjections[validatorC]
 			require.False(t, started)
-			manager.BeginEjection(validatorC, stakes[validatorB])
+			manager.BeginEjection(validatorC, stakes[validatorC])
 
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, stakes[validatorC])
@@ -1863,7 +1863,7 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 			// This should be allowed, since overfill is allowed and the bucket should not be completely full.
 			_, started := ejectionTransactor.inProgressEjections[validatorC]
 			require.False(t, started)
-			manager.BeginEjection(validatorC, stakes[validatorB])
+			manager.BeginEjection(validatorC, stakes[validatorC])
 
 			// Ejecting twice shouldn't harm anything. It will log, but otherwise be a no-op.
 			manager.BeginEjection(validatorC, stakes[validatorC])

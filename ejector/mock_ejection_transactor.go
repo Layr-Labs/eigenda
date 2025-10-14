@@ -109,7 +109,7 @@ func (m mockEjectionTransactor) CompleteEjection(
 	m.completedEjections[addressToEject] = struct{}{}
 
 	// Once ejected, the validator should no longer be present in any quorum.
-	m.isValidatorPresentInAnyQuorumResponses[addressToEject] = true
+	m.isValidatorPresentInAnyQuorumResponses[addressToEject] = false
 
 	return nil
 }
