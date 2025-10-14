@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -25,26 +26,45 @@ import (
 
 var errNoBlobsToEncode = errors.New("no blobs to encode")
 
+// EncodingManagerConfig contains configuration parameters for the EncodingManager.
+// The EncodingManager is responsible for pulling queued blobs from the blob metadata store,
+// sending them to the encoder service for encoding, and creating blob certificates.
 type EncodingManagerConfig struct {
+	// PullInterval is how frequently the EncodingManager polls for new blobs to encode.
+	// Must be positive.
 	PullInterval time.Duration
 
+	// EncodingRequestTimeout is the maximum time to wait for a single encoding request to complete.
+	// Must be positive.
 	EncodingRequestTimeout time.Duration
-	StoreTimeout           time.Duration
-	// NumEncodingRetries defines how many times the encoding will be retried
+	// StoreTimeout is the maximum time to wait for blob metadata store operations.
+	// Must be positive.
+	StoreTimeout time.Duration
+	// NumEncodingRetries is the number of times to retry encoding a blob after the initial attempt fails.
+	// A value of 0 means no retries (only the initial attempt).
+	// Must be non-negative.
 	NumEncodingRetries int
-	// NumRelayAssignment defines how many relays will be assigned to a blob
+	// NumRelayAssignment is the number of relays to assign to each blob.
+	// Must be at least 1 and cannot exceed the length of AvailableRelays.
 	NumRelayAssignment uint16
-	// AvailableRelays is a list of available relays
+	// AvailableRelays is the list of relay keys that can be assigned to blobs.
+	// Must not be empty.
 	AvailableRelays []corev2.RelayKey
-	// EncoderAddress is the address of the encoder
+	// EncoderAddress is the network address of the encoder service (e.g., "localhost:50051").
+	// Must not be empty.
 	EncoderAddress string
-	// MaxNumBlobsPerIteration is the maximum number of blobs to encode per iteration
+	// MaxNumBlobsPerIteration is the maximum number of blobs to pull and encode in each iteration.
+	// Must be at least 1.
 	MaxNumBlobsPerIteration int32
-	// OnchainStateRefreshInterval is the interval at which the onchain state is refreshed
+	// OnchainStateRefreshInterval is how frequently the manager refreshes blob version parameters from the chain.
+	// Must be positive.
 	OnchainStateRefreshInterval time.Duration
-	// NumConcurrentRequests is the size of the worker pool for encoding requests
+	// NumConcurrentRequests is the size of the worker pool for processing encoding requests concurrently.
+	// Must be at least 1.
 	NumConcurrentRequests int
 }
+
+var _ config.VerifiableConfig = &EncodingManagerConfig{}
 
 func DefaultEncodingManagerConfig() *EncodingManagerConfig {
 	return &EncodingManagerConfig{
@@ -55,7 +75,47 @@ func DefaultEncodingManagerConfig() *EncodingManagerConfig {
 		MaxNumBlobsPerIteration:     128,
 		OnchainStateRefreshInterval: 1 * time.Hour,
 		NumConcurrentRequests:       250,
+		NumRelayAssignment:          1,
 	}
+}
+
+func (c *EncodingManagerConfig) Verify() error {
+	if c.PullInterval <= 0 {
+		return fmt.Errorf("PullInterval must be positive, got %v", c.PullInterval)
+	}
+	if c.EncodingRequestTimeout <= 0 {
+		return fmt.Errorf("EncodingRequestTimeout must be positive, got %v", c.EncodingRequestTimeout)
+	}
+	if c.StoreTimeout <= 0 {
+		return fmt.Errorf("StoreTimeout must be positive, got %v", c.StoreTimeout)
+	}
+	if c.NumEncodingRetries < 0 {
+		return fmt.Errorf("NumEncodingRetries must be non-negative, got %d", c.NumEncodingRetries)
+	}
+	if c.NumRelayAssignment < 1 {
+		return fmt.Errorf("NumRelayAssignment must be at least 1, got %d", c.NumRelayAssignment)
+	}
+	if len(c.AvailableRelays) == 0 {
+		return fmt.Errorf("AvailableRelays cannot be empty")
+	}
+	if int(c.NumRelayAssignment) > len(c.AvailableRelays) {
+		return fmt.Errorf(
+			"NumRelayAssignment (%d) cannot be greater than the number of available relays (%d)",
+			c.NumRelayAssignment, len(c.AvailableRelays))
+	}
+	if c.MaxNumBlobsPerIteration < 1 {
+		return fmt.Errorf("MaxNumBlobsPerIteration must be at least 1, got %d", c.MaxNumBlobsPerIteration)
+	}
+	if c.OnchainStateRefreshInterval <= 0 {
+		return fmt.Errorf("OnchainStateRefreshInterval must be positive, got %v", c.OnchainStateRefreshInterval)
+	}
+	if c.NumConcurrentRequests < 1 {
+		return fmt.Errorf("NumConcurrentRequests must be at least 1, got %d", c.NumConcurrentRequests)
+	}
+	if c.EncoderAddress == "" {
+		return fmt.Errorf("EncoderAddress cannot be empty")
+	}
+	return nil
 }
 
 // EncodingManager is responsible for pulling queued blobs from the blob
@@ -94,14 +154,10 @@ func NewEncodingManager(
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 ) (*EncodingManager, error) {
-	if config.NumRelayAssignment < 1 ||
-		len(config.AvailableRelays) == 0 ||
-		config.MaxNumBlobsPerIteration < 1 {
-		return nil, fmt.Errorf("invalid encoding manager config")
+	if err := config.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	if int(config.NumRelayAssignment) > len(config.AvailableRelays) {
-		return nil, fmt.Errorf("NumRelayAssignment (%d) cannot be greater than NumRelays (%d)", config.NumRelayAssignment, len(config.AvailableRelays))
-	}
+
 	return &EncodingManager{
 		EncodingManagerConfig:  config,
 		blobMetadataStore:      blobMetadataStore,

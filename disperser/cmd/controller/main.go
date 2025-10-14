@@ -42,8 +42,6 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
-
-	controllerMaxStallDuration = 240 * time.Second
 )
 
 func main() {
@@ -129,7 +127,53 @@ func RunController(cliCtx *cli.Context) error {
 		Handler: mux,
 	}
 
-	if !config.UseGraph {
+	baseBlobMetadataStore := blobstore.NewBlobMetadataStore(
+		dynamoClient,
+		logger,
+		config.DynamoDBTableName,
+	)
+	blobMetadataStore := blobstore.NewInstrumentedMetadataStore(baseBlobMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+		ServiceName: "controller",
+		Registry:    metricsRegistry,
+		Backend:     blobstore.BackendDynamoDB,
+	})
+
+	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
+
+	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
+	if err != nil {
+		return fmt.Errorf("failed to create encoder client: %v", err)
+	}
+	encodingPool := workerpool.New(config.EncodingManagerConfig.NumConcurrentRequests)
+	encodingManagerBlobSet := controller.NewBlobSet()
+	encodingManager, err := controller.NewEncodingManager(
+		&config.EncodingManagerConfig,
+		blobMetadataStore,
+		encodingPool,
+		encoderClient,
+		chainReader,
+		logger,
+		metricsRegistry,
+		encodingManagerBlobSet,
+		controllerLivenessChan,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create encoding manager: %v", err)
+	}
+
+	sigAgg, err := core.NewStdSignatureAggregator(logger, chainReader)
+	if err != nil {
+		return fmt.Errorf("failed to create signature aggregator: %v", err)
+	}
+	dispatcherPool := workerpool.New(config.DispatcherConfig.NumConcurrentRequests)
+	chainState := eth.NewChainState(chainReader, gethClient)
+	var ics core.IndexedChainState
+	if config.UseGraph {
+		logger.Info("Using graph node")
+
+		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
+		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+	} else {
 		return fmt.Errorf("built-in indexer is deprecated and will be removed soon, please use UseGraph=true")
 	}
 	logger.Info("Using graph node")
@@ -141,44 +185,17 @@ func RunController(cliCtx *cli.Context) error {
 	} else {
 		requestSigner, err = clients.NewDispersalRequestSigner(
 			context.Background(),
-			clients.DispersalRequestSignerConfig{
-				Region:   config.AwsClientConfig.Region,
-				Endpoint: config.AwsClientConfig.EndpointURL,
-				KeyID:    config.DisperserKMSKeyID,
-			})
+			config.DispersalRequestSignerConfig,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create request signer: %v", err)
 		}
 	}
 
-	ctx := context.Background()
-
-	// Create metadata store
-	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.DynamoDBTableName)
-	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
-		ServiceName: "controller",
-		Registry:    metricsRegistry,
-		Backend:     blobstore.BackendDynamoDB,
-	})
-
-	// Create chain reader
-	chainReader, err := eth.NewReader(
-		logger,
-		gethClient,
-		operatorStateRetrieverAddress.Hex(),
-		serviceManagerAddress.Hex())
-	if err != nil {
-		return fmt.Errorf("failed to create chain reader: %w", err)
-	}
-
-	// Create encoder client
-	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
-	if err != nil {
-		return fmt.Errorf("failed to create encoder client: %w", err)
-	}
-
-	// Create signature aggregator
-	sigAgg, err := core.NewStdSignatureAggregator(logger, chainReader)
+	nodeClientManager, err := controller.NewNodeClientManager(
+		config.DispatcherConfig.NodeClientCacheSize,
+		requestSigner,
+		logger)
 	if err != nil {
 		return fmt.Errorf("failed to create signature aggregator: %w", err)
 	}
@@ -250,17 +267,39 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to create controller: %w", err)
 	}
 
-	// Start controller
-	if err := c.Start(ctx, controller.StartOptions{
-		MetricsServer:      metricsServer,
-		ReadinessProbePath: config.ControllerReadinessProbePath,
-		HeartbeatMonitorConfig: healthcheck.HeartbeatMonitorConfig{
-			FilePath:         config.ControllerHealthProbePath,
-			MaxStallDuration: controllerMaxStallDuration,
-		},
-	}); err != nil {
-		return fmt.Errorf("failed to start controller: %w", err)
+		go func() {
+			logger.Info("Starting controller gRPC server", "port", config.ServerConfig.GrpcPort)
+			if err := grpcServer.Start(); err != nil {
+				panic(fmt.Sprintf("gRPC server failed: %v", err))
+			}
+		}()
+	} else {
+		logger.Info("Controller gRPC server disabled")
 	}
+
+	go func() {
+		err := metricsServer.ListenAndServe()
+		if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
+			logger.Errorf("metrics metricsServer error: %v", err)
+		}
+	}()
+
+	// Create readiness probe file once the controller starts successfully
+	if _, err := os.Create(config.ControllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to create readiness file", "error", err, "path", config.ControllerReadinessProbePath)
+	}
+
+	// Start heartbeat monitor
+	go func() {
+		err := healthcheck.NewHeartbeatMonitor(
+			logger,
+			controllerLivenessChan,
+			config.HeartbeatMonitorConfig,
+		)
+		if err != nil {
+			logger.Warn("Heartbeat monitor failed", "err", err)
+		}
+	}()
 
 	return nil
 }

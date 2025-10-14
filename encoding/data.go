@@ -167,7 +167,7 @@ type SubBatch struct {
 	NumBlobs int
 }
 
-type ChunkNumber = uint
+type ChunkNumber = uint64
 
 // FragmentInfo contains metadata about how chunk coefficients file is stored.
 type FragmentInfo struct {

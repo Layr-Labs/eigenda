@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -17,8 +18,18 @@ type HeartbeatMonitorConfig struct {
 	MaxStallDuration time.Duration
 }
 
+var _ config.VerifiableConfig = &HeartbeatMonitorConfig{}
+
+// GetDefaultHeartbeatMonitorConfig returns a HeartbeatMonitorConfig with sensible default values.
+func GetDefaultHeartbeatMonitorConfig() *HeartbeatMonitorConfig {
+	return &HeartbeatMonitorConfig{
+		FilePath:         "/tmp/controller-health",
+		MaxStallDuration: 4 * time.Minute,
+	}
+}
+
 // Validate checks that the configuration is valid, returning an error if it is not.
-func (c *HeartbeatMonitorConfig) Validate() error {
+func (c *HeartbeatMonitorConfig) Verify() error {
 	if c.FilePath == "" {
 		return fmt.Errorf("FilePath is required")
 	}
@@ -40,8 +51,13 @@ func NewHeartbeatMonitor(
 	livenessChan <-chan HeartbeatMessage,
 	config HeartbeatMonitorConfig,
 ) error {
-	if err := config.Validate(); err != nil {
+	if err := config.Verify(); err != nil {
 		return fmt.Errorf("invalid config: %w", err)
+	}
+
+	// Create the heartbeat file if it doesn't exist
+	if _, err := os.Create(config.FilePath); err != nil {
+		return fmt.Errorf("failed to create heartbeat file: %w", err)
 	}
 
 	// Map to keep track of last heartbeat per component

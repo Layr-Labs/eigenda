@@ -23,9 +23,9 @@ type DispersalRequestSigner interface {
 }
 
 type DispersalRequestSignerConfig struct {
-	// KeyID is the AWS KMS key identifier used for signing requests.
+	// KeyID is the AWS KMS key identifier used for signing requests. Required.
 	KeyID string
-	// Region is the AWS region where the KMS key is located (e.g., "us-east-1"). Default is "us-east-1".
+	// Region is the AWS region where the KMS key is located (e.g., "us-east-1"). Required.
 	Region string
 	// Endpoint is an optional custom AWS KMS endpoint URL. If empty, the standard AWS KMS endpoint is used.
 	// This is primarily useful for testing with LocalStack or other custom KMS implementations. Default is empty.
@@ -46,6 +46,9 @@ func (c *DispersalRequestSignerConfig) Verify() error {
 	if c.KeyID == "" {
 		return errors.New("KeyID is required")
 	}
+	if c.Region == "" {
+		return errors.New("Region is required")
+	}
 
 	return nil
 }
@@ -64,16 +67,7 @@ func NewDispersalRequestSigner(
 	config DispersalRequestSignerConfig,
 ) (DispersalRequestSigner, error) {
 	if err := config.Verify(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	// Load the AWS SDK configuration, which will automatically detect credentials
-	// from environment variables, IAM roles, or AWS config files
-	cfg, err := awsconfig.LoadDefaultConfig(ctx,
-		awsconfig.WithRegion(config.Region),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
 	var kmsClient *kms.Client
@@ -83,6 +77,14 @@ func NewDispersalRequestSigner(
 			BaseEndpoint: aws.String(config.Endpoint),
 		})
 	} else {
+		// Load the AWS SDK configuration, which will automatically detect credentials
+		// from environment variables, IAM roles, or AWS config files
+		cfg, err := awsconfig.LoadDefaultConfig(ctx,
+			awsconfig.WithRegion(config.Region),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		}
 		kmsClient = kms.NewFromConfig(cfg)
 	}
 

@@ -64,7 +64,7 @@ func makeBatch(
 			QuantizationFactor: batcher.QuantizationFactor,
 		}
 
-		params := encoding.ParamsFromMins(chunkLength, quorumInfo.Info.TotalChunks)
+		params := encoding.ParamsFromMins(uint64(chunkLength), quorumInfo.Info.TotalChunks)
 		t.Logf("Encoding params: ChunkLength: %d, NumChunks: %d", params.ChunkLength, params.NumChunks)
 		commits, chunks, err := p.EncodeAndProve(data, params)
 		assert.NoError(t, err)
