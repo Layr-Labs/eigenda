@@ -23,8 +23,7 @@ func TestEncodeDecode_InvertsWhenSamplingAllFrames(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
 	cfg := encoding.DefaultConfig()
-	enc, err := rs.NewEncoder(cfg)
-	assert.Nil(t, err)
+	enc := rs.NewEncoder(cfg)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
@@ -45,8 +44,7 @@ func TestEncodeDecode_InvertsWhenSamplingMissingFrame(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
 	cfg := encoding.DefaultConfig()
-	enc, err := rs.NewEncoder(cfg)
-	assert.Nil(t, err)
+	enc := rs.NewEncoder(cfg)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
@@ -69,8 +67,7 @@ func TestEncodeDecode_InvertsWithMissingAndDuplicateFrames(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
 	cfg := encoding.DefaultConfig()
-	enc, err := rs.NewEncoder(cfg)
-	assert.Nil(t, err)
+	enc := rs.NewEncoder(cfg)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
@@ -97,8 +94,7 @@ func TestEncodeDecode_InvertsWithMissingAndDuplicateFrames(t *testing.T) {
 func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	cfg := encoding.DefaultConfig()
-	enc, err := rs.NewEncoder(cfg)
-	assert.Nil(t, err)
+	enc := rs.NewEncoder(cfg)
 
 	fmt.Println("Num Chunks: ", params.NumChunks)
 
@@ -120,8 +116,7 @@ func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 func TestEncodeDecode_ErrorsWhenNotEnoughSampledFramesWithDuplicates(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	cfg := encoding.DefaultConfig()
-	enc, err := rs.NewEncoder(cfg)
-	assert.Nil(t, err)
+	enc := rs.NewEncoder(cfg)
 
 	fmt.Println("Num Chunks: ", params.NumChunks)
 
@@ -165,10 +160,7 @@ func FuzzOnlySystematic(f *testing.F) {
 
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
 		cfg := encoding.DefaultConfig()
-		enc, err := rs.NewEncoder(cfg)
-		if err != nil {
-			t.Errorf("Error making rs: %q", err)
-		}
+		enc := rs.NewEncoder(cfg)
 
 		//encode the data
 		frames, _, err := enc.EncodeBytes(input, params)

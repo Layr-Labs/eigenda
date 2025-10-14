@@ -13,7 +13,7 @@ run-payments-tests:
 		TestLegacyController \
 		TestNewController; do \
 		echo "Running $$test..."; \
-		if ! go test ./tests/payments -v -run "^$$test$$"; then \
+		if ! gotestsum --format pkgname-and-test-fails -- ./tests/payments -run "^$$test$$" -parallel=4; then \
 			echo "❌ TEST FAILED: $$test"; \
 			$(MAKE) -s stop-inabox; \
 			exit 1; \

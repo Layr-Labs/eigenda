@@ -145,9 +145,9 @@ func FuzzOperatorAssignments(f *testing.F) {
 
 		blobLength := uint(rand.Intn(100000))
 
-		targetNumChunks := uint(0)
+		targetNumChunks := uint64(0)
 		if useTargetNumChunks {
-			targetNumChunks = uint(rand.Intn(1000))
+			targetNumChunks = uint64(rand.Intn(1000))
 		}
 
 		fmt.Println("advThreshold", advThreshold, "quorumThreshold", quorumThreshold, "numOperators", numOperators, "blobLength", blobLength)
@@ -188,7 +188,10 @@ func FuzzOperatorAssignments(f *testing.F) {
 			totalStake := state.Totals[0].Stake
 			myStake := state.Operators[0][operatorID].Stake
 
-			valid := assignment.NumChunks*uint((quorumThreshold-advThreshold))*chunkLength*uint(totalStake.Uint64()) >= blobLength*uint(myStake.Uint64())
+			valid := assignment.NumChunks*
+				uint64((quorumThreshold-advThreshold))*
+				uint64(chunkLength)*totalStake.Uint64() >=
+				uint64(blobLength)*myStake.Uint64()
 			assert.True(t, valid)
 
 		}

@@ -23,7 +23,7 @@ type Encoder struct {
 }
 
 // NewEncoder creates a new encoder with the given options
-func NewEncoder(config *encoding.Config) (*Encoder, error) {
+func NewEncoder(config *encoding.Config) *Encoder {
 	if config == nil {
 		config = encoding.DefaultConfig()
 	}
@@ -34,7 +34,7 @@ func NewEncoder(config *encoding.Config) (*Encoder, error) {
 		ParametrizedEncoder: make(map[encoding.EncodingParams]*ParametrizedEncoder),
 	}
 
-	return e, nil
+	return e
 }
 
 // just a wrapper to take bytes not Fr Element
@@ -103,14 +103,19 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 // It first uses FFT to recover the whole polynomial. Then it extracts only the systematic chunks.
 // It takes a list of available frame, and return the original encoded data
 // storing the evaluation points, since it is where RS is applied. The input frame contains
-// the coefficient of the interpolating polynomina, hence interpolation is needed before
+// the coefficients of the interpolating polynomial, hence interpolation is needed before
 // recovery.
 //
 // maxInputSize is the upper bound of the original data size. This is needed because
 // the Frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
+//
+// TODO(samlaf): Many call sites have frames and need to convert to FrameCoeffs.
+// Would be nice to figure out a Decode interface that doesn't require creating allocations.
+// Perhaps Decode could take an iterator that produces one FrameCoeffs at a time?
+// That way we could pass either chunks (frameCoeffs) or frames.
 func (e *Encoder) Decode(
-	frames []FrameCoeffs, indices []uint64, maxInputSize uint64, params encoding.EncodingParams,
+	frames []FrameCoeffs, indices []encoding.ChunkNumber, maxInputSize uint64, params encoding.EncodingParams,
 ) ([]byte, error) {
 	// Get encoder
 	g, err := e.getRsEncoder(params)
@@ -123,7 +128,7 @@ func (e *Encoder) Decode(
 	}
 
 	// Remove duplicates
-	frameMap := make(map[uint64]FrameCoeffs, len(indices))
+	frameMap := make(map[encoding.ChunkNumber]FrameCoeffs, len(indices))
 	for i, frameIndex := range indices {
 		_, ok := frameMap[frameIndex]
 		if !ok {

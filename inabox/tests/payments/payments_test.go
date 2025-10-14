@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
@@ -26,12 +27,14 @@ import (
 // Once we figure out why resources aren't being freed, then these tests will be runnable the "normal" way.
 
 func TestLegacyController(t *testing.T) {
-	t.Skip("Manual test for now")
+	// manual test for now
+	test.SkipInCI(t)
 	testWithControllerMode(t, false)
 }
 
 func TestNewController(t *testing.T) {
-	t.Skip("Manual test for now")
+	// manual test for now
+	test.SkipInCI(t)
 	testWithControllerMode(t, true)
 }
 
@@ -103,6 +106,16 @@ func testWithControllerMode(t *testing.T, controllerUseNewPayments bool) {
 		t.Parallel()
 		testOnDemandOnly(t, infra.Logger, testHarness, clientledger.ClientLedgerModeOnDemandOnly)
 	})
+
+	t.Run("Reservation and on-demand: Old client payments", func(t *testing.T) {
+		t.Parallel()
+		testReservationAndOnDemand(t, infra.Logger, testHarness, clientledger.ClientLedgerModeLegacy)
+	})
+
+	t.Run("Reservation and on-demand: New client payments", func(t *testing.T) {
+		t.Parallel()
+		testReservationAndOnDemand(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationAndOnDemand)
+	})
 }
 
 // - Submit blobs at a rate that is supported by the reservation, and assert that all dispersals succeed
@@ -119,17 +132,18 @@ func testReservationReduction(
 	// long enough to approach expected averages
 	submissionDuration := 30 * time.Second
 	blobsPerSecond := float32(0.5)
-	// how large a reservation (in symbols / second) is required to submit 1 minimum size blob / second
-	// min billable blob size = 128KiB = 4096 symbols
-	minSizeBlobPerSecondReservationSize := 4096
+
+	paymentVault := getPaymentVault(t, testHarness, logger)
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(t.Context())
+	require.NoError(t, err)
+
 	// reservation required to exactly support blobsPerSecond
-	reservationRequiredForRate := float32(minSizeBlobPerSecondReservationSize) * blobsPerSecond
+	reservationRequiredForRate := float32(minNumSymbols) * blobsPerSecond
 
 	testRandom := random.NewTestRandom()
-	publicKey, privateKey, err := testRandom.ECDSA()
+	accountID, privateKey, err := testRandom.EthAccount()
 	require.NoError(t, err)
 	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
-	accountID := crypto.PubkeyToAddress(*publicKey)
 
 	payloadDisperserConfig := integration.GetDefaultTestPayloadDisperserConfig()
 	payloadDisperserConfig.ClientLedgerMode = clientLedgerMode
@@ -194,17 +208,18 @@ func testReservationIncrease(
 	// long enough to approach expected averages
 	submissionDuration := 30 * time.Second
 	blobsPerSecond := float32(0.5)
-	// how large a reservation (in symbols / second) is required to submit 1 minimum size blob / second
-	// min billable blob size = 128KiB = 4096 symbols
-	minSizeBlobPerSecondReservationSize := 4096
+
+	paymentVault := getPaymentVault(t, testHarness, logger)
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(t.Context())
+	require.NoError(t, err)
+
 	// reservation required to exactly support blobsPerSecond
-	reservationRequiredForRate := float32(minSizeBlobPerSecondReservationSize) * blobsPerSecond
+	reservationRequiredForRate := float32(minNumSymbols) * blobsPerSecond
 
 	testRandom := random.NewTestRandom()
-	publicKey, privateKey, err := testRandom.ECDSA()
+	accountID, privateKey, err := testRandom.EthAccount()
 	require.NoError(t, err)
 	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
-	accountID := crypto.PubkeyToAddress(*publicKey)
 
 	payloadDisperserConfig := integration.GetDefaultTestPayloadDisperserConfig()
 	payloadDisperserConfig.ClientLedgerMode = clientLedgerMode
@@ -262,15 +277,11 @@ func testOnDemandOnly(
 	clientLedgerMode clientledger.ClientLedgerMode,
 ) {
 	testRandom := random.NewTestRandom()
-	publicKey, privateKey, err := testRandom.ECDSA()
+	accountID, privateKey, err := testRandom.EthAccount()
 	require.NoError(t, err)
 	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
-	accountID := crypto.PubkeyToAddress(*publicKey)
 
-	paymentVaultAddress, err := testHarness.ContractDirectory.GetContractAddress(t.Context(), directory.PaymentVault)
-	require.NoError(t, err)
-	paymentVault, err := vault.NewPaymentVault(logger, testHarness.EthClient, paymentVaultAddress)
-	require.NoError(t, err)
+	paymentVault := getPaymentVault(t, testHarness, logger)
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(t.Context())
 	require.NoError(t, err)
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(t.Context())
@@ -326,6 +337,75 @@ func testOnDemandOnly(
 	require.Error(t, err)
 }
 
+func testReservationAndOnDemand(
+	t *testing.T,
+	logger logging.Logger,
+	testHarness *integration.TestHarness,
+	clientLedgerMode clientledger.ClientLedgerMode,
+) {
+	testRandom := random.NewTestRandom()
+	accountID, privateKey, err := testRandom.EthAccount()
+	require.NoError(t, err)
+	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
+
+	paymentVault := getPaymentVault(t, testHarness, logger)
+	pricePerSymbol, err := paymentVault.GetPricePerSymbol(t.Context())
+	require.NoError(t, err)
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(t.Context())
+	require.NoError(t, err)
+
+	payloadBytes := 1000
+	submissionDuration := 30 * time.Second
+	blobsPerSecond := float32(0.5)
+
+	// this is the total amount of billable symbols that are being dispersed
+	billableSymbolsPerSecond := uint64(blobsPerSecond * float32(minNumSymbols))
+
+	// Reservation covers 25% of the dispersal rate
+	clientReservation, err := reservation.NewReservation(
+		billableSymbolsPerSecond/4,
+		time.Now().Add(-1*time.Hour),
+		time.Now().Add(24*time.Hour),
+		[]core.QuorumID{0, 1},
+	)
+	require.NoError(t, err)
+	registerReservation(t, testHarness, clientReservation, accountID)
+
+	// deposit enough on-demand funds to cover one entire dispersal duration
+	onDemandDepositSymbols := billableSymbolsPerSecond * uint64(submissionDuration.Seconds())
+	onDemandDeposit := big.NewInt(int64(onDemandDepositSymbols * pricePerSymbol))
+	depositOnDemand(t, testHarness, onDemandDeposit, accountID)
+
+	payloadDisperserConfig := integration.GetDefaultTestPayloadDisperserConfig()
+	payloadDisperserConfig.ClientLedgerMode = clientLedgerMode
+	payloadDisperserConfig.PrivateKey = privateKeyHex
+
+	payloadDisperser, err := testHarness.CreatePayloadDisperser(t.Context(), logger, payloadDisperserConfig)
+	require.NoError(t, err)
+
+	// Phase 1: Since the reservation covers 25% of the dispersal rate, this is expected to use up 75% of the deposited
+	// on-demand funds, but there shouldn't be any failures.
+	resultChan := mustSubmitPayloads(
+		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 1.0, 0)
+	for range resultChan {
+	}
+
+	// Phase 2: 25% of the dispersals within this period are covered by the reservation. 25% are covered by remaining
+	// on-demand funds. So expected failure rate is 50%
+	resultChan = mustSubmitPayloads(
+		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 0.5, 0.25)
+	for range resultChan {
+	}
+
+	// Phase 3: This phase disperses at half the rate of the previous phases. Even with the decreased rate, only half
+	// of dispersals are covered by the reservation. There are no on-demand funds remaining, so failure rate should be
+	// 50%
+	resultChan = mustSubmitPayloads(
+		t, testRandom, payloadDisperser, blobsPerSecond/2, payloadBytes, submissionDuration, 0.5, 0.25)
+	for range resultChan {
+	}
+}
+
 // Registers a reservation on-chain, then sleeps for a short time to wait for the updated value to be picked up by
 // payment vault monitors
 func registerReservation(
@@ -351,4 +431,13 @@ func depositOnDemand(
 	require.NoError(t, err)
 	// the vault monitor checks every 1 second, so this should be plenty of time
 	time.Sleep(3 * time.Second)
+}
+
+func getPaymentVault(t *testing.T, testHarness *integration.TestHarness, logger logging.Logger) payments.PaymentVault {
+	paymentVaultAddress, err := testHarness.ContractDirectory.GetContractAddress(t.Context(), directory.PaymentVault)
+	require.NoError(t, err)
+	paymentVault, err := vault.NewPaymentVault(logger, testHarness.EthClient, paymentVaultAddress)
+	require.NoError(t, err)
+
+	return paymentVault
 }

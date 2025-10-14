@@ -98,7 +98,7 @@ func makeTestComponents() (*prover.Prover, *committer.Committer, *verifier.Verif
 		return nil, nil, nil, fmt.Errorf("new committer: %w", err)
 	}
 
-	v, err := verifier.NewVerifier(verifierConfig, nil)
+	v, err := verifier.NewVerifier(verifierConfig)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new verifier: %w", err)
 	}

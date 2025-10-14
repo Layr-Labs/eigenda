@@ -1,11 +1,10 @@
-package toeplitz_test
+package toeplitz
 
 import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +28,7 @@ func TestNewToeplitz(t *testing.T) {
 	v[6].SetInt64(int64(1))
 	fs := fft.NewFFTSettings(4)
 
-	toe, err := toeplitz.NewToeplitz(v, fs)
+	toe, err := NewToeplitz(v, fs)
 	require.Nil(t, err)
 
 	assert.Equal(t, v[0], toe.V[0])
@@ -46,7 +45,7 @@ func TestNewToeplitz_InvalidSize(t *testing.T) {
 	v[1].SetInt64(int64(2))
 	fs := fft.NewFFTSettings(4)
 
-	_, err := toeplitz.NewToeplitz(v, fs)
+	_, err := NewToeplitz(v, fs)
 	assert.EqualError(t, err, "num diagonal vector must be odd")
 }
 
@@ -65,10 +64,10 @@ func TestExtendCircularVec(t *testing.T) {
 	v[6].SetInt64(int64(1))
 
 	fs := fft.NewFFTSettings(4)
-	c, err := toeplitz.NewToeplitz(v, fs)
+	toep, err := NewToeplitz(v, fs)
 	require.Nil(t, err)
 
-	cVec := c.ExtendCircularVec()
+	cVec := toep.extendCirculantVec()
 	assert.Equal(t, cVec[0], v[0])
 	assert.Equal(t, cVec[1], v[6])
 	assert.Equal(t, cVec[2], v[5])
@@ -93,12 +92,11 @@ func TestFromColVToRowV(t *testing.T) {
 	v[6].SetInt64(int64(1))
 
 	fs := fft.NewFFTSettings(4)
-	c, err := toeplitz.NewToeplitz(v, fs)
+	toep, err := NewToeplitz(v, fs)
 	require.Nil(t, err)
 
-	cVec := c.ExtendCircularVec()
-	rVec := c.FromColVToRowV(cVec)
-
+	cVec := toep.extendCirculantVec()
+	rVec := toep.fromColVToRowV(cVec)
 	assert.Equal(t, rVec[0], v[0])
 	assert.Equal(t, rVec[1], v[1])
 	assert.Equal(t, rVec[2], v[2])
@@ -109,7 +107,7 @@ func TestFromColVToRowV(t *testing.T) {
 	assert.Equal(t, rVec[7], v[6])
 
 	// involutory
-	cVec = c.FromColVToRowV(rVec)
+	cVec = toep.fromColVToRowV(rVec)
 	assert.Equal(t, cVec[0], v[0])
 	assert.Equal(t, cVec[1], v[6])
 	assert.Equal(t, cVec[2], v[5])
@@ -118,44 +116,4 @@ func TestFromColVToRowV(t *testing.T) {
 	assert.Equal(t, cVec[5], v[3])
 	assert.Equal(t, cVec[6], v[2])
 	assert.Equal(t, cVec[7], v[1])
-}
-
-func TestMultiplyToeplitz(t *testing.T) {
-	v := make([]fr.Element, 7)
-	v[0].SetInt64(int64(7))
-	v[1].SetInt64(int64(11))
-	v[2].SetInt64(int64(5))
-	v[3].SetInt64(int64(6))
-	v[4].SetInt64(int64(3))
-	v[5].SetInt64(int64(8))
-	v[6].SetInt64(int64(1))
-
-	fs := fft.NewFFTSettings(4)
-	toe, err := toeplitz.NewToeplitz(v, fs)
-
-	require.Nil(t, err)
-
-	x := make([]fr.Element, 4)
-	x[0].SetInt64(int64(1))
-	x[1].SetInt64(int64(2))
-	x[2].SetInt64(int64(3))
-	x[3].SetInt64(int64(4))
-
-	b, err := toe.Multiply(x)
-	require.Nil(t, err)
-
-	p := make([]fr.Element, 4)
-	p[0].SetInt64(int64(68))
-	p[1].SetInt64(int64(68))
-	p[2].SetInt64(int64(75))
-	p[3].SetInt64(int64(50))
-
-	assert.Equal(t, b[0], p[0])
-	assert.Equal(t, b[1], p[1])
-	assert.Equal(t, b[2], p[2])
-	assert.Equal(t, b[3], p[3])
-
-	// Assert with direct multiplication
-	b2 := toe.DirectMultiply(x)
-	assert.Equal(t, b, b2)
 }

@@ -1,14 +1,14 @@
 package healthcheck_test
 
 import (
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +21,7 @@ func TestSignalHeartbeat(t *testing.T) {
 	assert.NoError(t, err)
 
 	start := time.Now()
-	healthcheck.SignalHeartbeat("dispatcher", ch, logger)
+	healthcheck.SignalHeartbeat(logger, "dispatcher", ch)
 
 	select {
 	case hb := <-ch:
@@ -48,7 +48,14 @@ func TestHeartbeatMonitor_WritesSummaryAndStops(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		// monitor will exit when channel is closed
-		err := healthcheck.HeartbeatMonitor(fpath, 50*time.Millisecond, ch, logger)
+		err := healthcheck.NewHeartbeatMonitor(
+			logger,
+			ch,
+			healthcheck.HeartbeatMonitorConfig{
+				FilePath:         fpath,
+				MaxStallDuration: 50 * time.Millisecond,
+			},
+		)
 		done <- err
 	}()
 
@@ -89,7 +96,14 @@ func TestHeartbeatMonitor_StallWarning(t *testing.T) {
 	ch := make(chan healthcheck.HeartbeatMessage)
 	done := make(chan error, 1)
 	go func() {
-		err := healthcheck.HeartbeatMonitor(fpath, 20*time.Millisecond, ch, logger)
+		err := healthcheck.NewHeartbeatMonitor(
+			logger,
+			ch,
+			healthcheck.HeartbeatMonitorConfig{
+				FilePath:         fpath,
+				MaxStallDuration: 20 * time.Millisecond,
+			},
+		)
 		done <- err
 	}()
 

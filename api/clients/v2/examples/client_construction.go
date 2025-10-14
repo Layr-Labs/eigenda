@@ -31,6 +31,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -219,6 +220,7 @@ func createValidatorPayloadRetriever(
 		logger,
 		ethReader,
 		chainState,
+		rs.NewEncoder(nil),
 		kzgVerifier,
 		clientConfig,
 		nil,
@@ -287,7 +289,7 @@ func createDisperserClient(
 func createKzgVerifier() (*verifier.Verifier, error) {
 	kzgConfigV1 := createKzgConfig()
 	kzgConfig := verifier.KzgConfigFromV1Config(&kzgConfigV1)
-	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	blobVerifier, err := verifier.NewVerifier(kzgConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create blob verifier: %w", err)
 	}

@@ -15,3 +15,6 @@ cpu_profile:
 
 mem_profile:
 	go tool pprof -http=:8080 mem.prof
+
+golang_benchmarks:
+	go test -bench=. -run=^$ ./...

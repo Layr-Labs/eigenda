@@ -529,7 +529,7 @@ func (w *retrievalWorker) decodeChunks() ([]byte, error) {
 	}
 
 	chunks := make([]*encoding.Frame, 0)
-	indices := make([]uint, 0)
+	indices := make([]encoding.ChunkNumber, 0)
 
 	for !w.verifiedChunksQueue.Empty() {
 		next, _ := w.verifiedChunksQueue.Dequeue()
@@ -538,14 +538,14 @@ func (w *retrievalWorker) decodeChunks() ([]byte, error) {
 
 		assignment := w.assignments[operatorID]
 		uint32Indices := assignment.GetIndices()
-		uintIndices := make([]uint, len(uint32Indices))
+		uint64Indices := make([]encoding.ChunkNumber, len(uint32Indices))
 
 		for i, index := range uint32Indices {
-			uintIndices[i] = uint(index)
+			uint64Indices[i] = encoding.ChunkNumber(index)
 		}
 
 		chunks = append(chunks, operatorChunks...)
-		indices = append(indices, uintIndices...)
+		indices = append(indices, uint64Indices...)
 	}
 
 	w.computePool.Submit(func() {
@@ -623,7 +623,7 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 }
 
 // decodeBlob decodes the blob from the chunks and indices.
-func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
+func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []encoding.ChunkNumber) {
 	if w.config.DetailedLogging {
 		w.logger.Debug("decoding blob", "blobKey", w.blobKey.Hex())
 	}
