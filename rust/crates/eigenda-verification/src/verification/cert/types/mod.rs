@@ -60,6 +60,7 @@ pub struct Storage {
     /// Historical individual operator stakes per quorum
     pub operator_stake_history: HashMap<B256, HashMap<QuorumNumber, History<Stake>>>,
     /// Security thresholds for confirmation and adversary limits
+    /// Each required_quorum_numbers must meet the confirmation threshold in order to be considered valid.
     pub security_thresholds: SecurityThresholds,
     /// Quorum numbers required to sign certificates
     pub required_quorum_numbers: alloy_primitives::Bytes,
