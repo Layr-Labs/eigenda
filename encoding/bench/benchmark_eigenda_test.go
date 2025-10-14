@@ -113,13 +113,11 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 // Where fft1 and fft2 are on G1, and preproc contains an FFT on Fr elements.
 func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 	proverConfig := prover.KzgConfig{
-		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
-		G2TrailingPath:  "../../resources/srs/g2.trailing.point",
-		CacheDir:        "../../resources/srs/SRSTables",
 		SRSNumberToLoad: 1 << 19,
+		G1Path:          "../../resources/srs/g1.point",
+		PreloadEncoder:  true,
+		CacheDir:        "../../resources/srs/SRSTables",
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
 	}
 	p, err := prover.NewProver(&proverConfig, nil)
 	require.NoError(b, err)

@@ -308,7 +308,7 @@ func NewTestClient(
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
 	}
-	verifierKzgConfig := verifier.KzgConfigFromV1Config(kzgConfig)
+	verifierKzgConfig := verifier.ConfigFromV1KzgConfig(kzgConfig)
 	encoder := rs.NewEncoder(nil)
 	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig)
 	if err != nil {

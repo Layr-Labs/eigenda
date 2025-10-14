@@ -24,9 +24,6 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, s1)
 
-	_, err = kzg.ReadG2Points(kzgConfig.G2Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
-	require.Nil(t, err)
-
 	subTable1, err := prover.NewSRSTable(kzgConfig.CacheDir, s1, kzgConfig.NumWorker)
 	require.Nil(t, err)
 	require.NotNil(t, subTable1)

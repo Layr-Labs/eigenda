@@ -49,7 +49,7 @@ func makeTestComponents() (*prover.Prover, *verifier.Verifier, error) {
 		return nil, nil, err
 	}
 
-	v, err := verifier.NewVerifier(verifier.KzgConfigFromV1Config(config))
+	v, err := verifier.NewVerifier(verifier.ConfigFromV1KzgConfig(config))
 	if err != nil {
 		return nil, nil, err
 	}

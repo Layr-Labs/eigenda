@@ -11,7 +11,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
@@ -22,9 +21,6 @@ import (
 type KzgMultiProofIcicleBackend struct {
 	Fs             *fft.FFTSettings
 	FlatFFTPointsT []iciclebn254.Affine
-	SRSIcicle      []iciclebn254.Affine
-	SFs            *fft.FFTSettings
-	Srs            kzg.SRS
 	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
 	Device         runtime.Device
