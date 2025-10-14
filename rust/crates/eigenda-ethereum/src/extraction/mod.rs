@@ -1,8 +1,8 @@
 use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
 use alloy_primitives::B256;
 use eigenda_verification::verification::cert::CertVerificationInputs;
-use eigenda_verification::verification::cert::types::Storage;
 use eigenda_verification::verification::cert::types::history::HistoryError;
+use eigenda_verification::verification::cert::types::{Staleness, Storage};
 use eigenda_verification::{cert::StandardCommitment, verification::cert::Cert};
 use reth_trie_common::AccountProof;
 use reth_trie_common::proof::ProofVerificationError;
@@ -11,14 +11,11 @@ use thiserror::Error;
 use tracing::instrument;
 
 use crate::extraction::extractor::{
-    ApkHistoryExtractor, DataDecoder, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
-    OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
-    SecurityThresholdsV2Extractor, TotalStakeHistoryExtractor, VersionedBlobParamsExtractor,
-};
-#[cfg(feature = "stale-stakes-forbidden")]
-use crate::extraction::extractor::{
-    MinWithdrawalDelayBlocksExtractor, QuorumUpdateBlockNumberExtractor,
-    StaleStakesForbiddenExtractor,
+    ApkHistoryExtractor, DataDecoder, MinWithdrawalDelayBlocksExtractor, NextBlobVersionExtractor,
+    OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor, QuorumCountExtractor,
+    QuorumNumbersRequiredV2Extractor, QuorumUpdateBlockNumberExtractor,
+    SecurityThresholdsV2Extractor, StaleStakesForbiddenExtractor, TotalStakeHistoryExtractor,
+    VersionedBlobParamsExtractor,
 };
 
 /// Contract-specific extraction logic and storage key generators.
@@ -55,13 +52,18 @@ pub enum CertExtractionError {
 
 /// Contains data needed to validate the certificate. It also contains proofs
 /// used to verify the data.
+///
+/// AccountProof values both verify storage proofs and carry the raw slots we later decode.
+/// Verification and data extraction happen on separate call paths, so we keep this struct as a
+/// standalone carrier instead of hiding it inside one helper function.
+/// Parsing up-front may be wasteful since proving does not need the data and failure would
+/// mean we parsed prematurely.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub struct CertStateData {
     /// Proof for threshold registry contract state.
     pub threshold_registry: AccountProof,
     /// Proof for registry coordinator contract state.
     pub registry_coordinator: AccountProof,
-    #[cfg(feature = "stale-stakes-forbidden")]
     /// Proof for service manager contract state.
     pub service_manager: AccountProof,
     /// Proof for BLS aggregate public key registry contract state.
@@ -70,7 +72,6 @@ pub struct CertStateData {
     pub stake_registry: AccountProof,
     /// Proof for certificate verifier contract state.
     pub cert_verifier: AccountProof,
-    #[cfg(feature = "stale-stakes-forbidden")]
     /// Proof for delegation manager contract state.
     pub delegation_manager: AccountProof,
 }
@@ -81,12 +82,10 @@ impl CertStateData {
     pub fn verify(&self, state_root: B256) -> Result<(), ProofVerificationError> {
         self.threshold_registry.verify(state_root)?;
         self.registry_coordinator.verify(state_root)?;
-        #[cfg(feature = "stale-stakes-forbidden")]
         self.service_manager.verify(state_root)?;
         self.bls_apk_registry.verify(state_root)?;
         self.stake_registry.verify(state_root)?;
         self.cert_verifier.verify(state_root)?;
-        #[cfg(feature = "stale-stakes-forbidden")]
         self.delegation_manager.verify(state_root)?;
 
         Ok(())
@@ -122,10 +121,7 @@ impl CertStateData {
         let next_blob_version = NextBlobVersionExtractor::new(cert)
             .decode_data(&self.threshold_registry.storage_proofs)?;
 
-        #[cfg(feature = "stale-stakes-forbidden")]
         let staleness = {
-            use eigenda_verification::verification::cert::types::Staleness;
-
             let stale_stakes_forbidden = StaleStakesForbiddenExtractor::new(cert)
                 .decode_data(&self.service_manager.storage_proofs)?;
 
@@ -159,7 +155,6 @@ impl CertStateData {
             next_blob_version,
             security_thresholds,
             required_quorum_numbers,
-            #[cfg(feature = "stale-stakes-forbidden")]
             staleness,
         };
 

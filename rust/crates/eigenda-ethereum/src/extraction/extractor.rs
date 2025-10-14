@@ -8,7 +8,6 @@ use eigenda_verification::verification::cert::types::history::History;
 use eigenda_verification::verification::cert::types::{QuorumNumber, Stake, Version};
 use hashbrown::HashMap;
 use reth_trie_common::StorageProof;
-#[cfg(feature = "stale-stakes-forbidden")]
 pub use stale_stakes_forbidden::*;
 use tracing::instrument;
 
@@ -908,7 +907,6 @@ mod tests {
     }
 }
 
-#[cfg(feature = "stale-stakes-forbidden")]
 mod stale_stakes_forbidden {
     use eigenda_verification::verification::cert::types::BlockNumber;
     use tracing::instrument;

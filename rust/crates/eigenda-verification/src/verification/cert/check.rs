@@ -128,7 +128,6 @@ pub fn non_signers_strictly_sorted_by_hash(
 ///
 /// # Errors
 /// Returns `StaleQuorum` if any quorum was last updated too long ago
-#[cfg(feature = "stale-stakes-forbidden")]
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn quorums_last_updated_after_most_recent_stale_block(
     signed_quorums: &[QuorumNumber],
@@ -544,7 +543,6 @@ mod test_equal_lengths_and_not_empty {
     }
 }
 
-#[cfg(feature = "stale-stakes-forbidden")]
 #[cfg(test)]
 mod test_non_signers_strictly_sorted_by_hash {
     use crate::verification::cert::check;
@@ -598,7 +596,6 @@ mod test_non_signers_strictly_sorted_by_hash {
     }
 }
 
-#[cfg(feature = "stale-stakes-forbidden")]
 #[cfg(test)]
 mod test_quorums_last_updated_after_most_recent_stale_block {
     use crate::verification::cert::check;

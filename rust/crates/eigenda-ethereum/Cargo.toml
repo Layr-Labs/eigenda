@@ -41,4 +41,3 @@ native = [
   "dep:rustls",
   "reth-trie-common/eip1186",
 ]
-stale-stakes-forbidden = ["eigenda-verification/stale-stakes-forbidden"]

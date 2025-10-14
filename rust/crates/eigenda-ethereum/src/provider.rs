@@ -183,7 +183,6 @@ impl EigenDaProvider {
             .number(block_height)
             .into_future();
 
-        #[cfg(feature = "stale-stakes-forbidden")]
         let service_manager_fut = {
             let keys = contract::ServiceManager::storage_keys(cert);
             self.ethereum
@@ -213,7 +212,6 @@ impl EigenDaProvider {
             .number(block_height)
             .into_future();
 
-        #[cfg(feature = "stale-stakes-forbidden")]
         let delegation_manager_fut = {
             let keys = contract::DelegationManager::storage_keys(cert);
             self.ethereum
@@ -225,17 +223,14 @@ impl EigenDaProvider {
         let responses = try_join_all([
             threshold_registry_fut,
             registry_coordinator_fut,
-            #[cfg(feature = "stale-stakes-forbidden")]
             service_manager_fut,
             bls_apk_registry_fut,
             stake_registry_fut,
             cert_verifier_fut,
-            #[cfg(feature = "stale-stakes-forbidden")]
             delegation_manager_fut,
         ])
         .await?;
 
-        #[cfg(feature = "stale-stakes-forbidden")]
         let [
             threshold_registry,
             registry_coordinator,
@@ -248,26 +243,13 @@ impl EigenDaProvider {
             .try_into()
             .expect("Expected correct number of elements");
 
-        #[cfg(not(feature = "stale-stakes-forbidden"))]
-        let [
-            threshold_registry,
-            registry_coordinator,
-            bls_apk_registry,
-            stake_registry,
-            cert_verifier,
-        ]: [EIP1186AccountProofResponse; 5] = responses
-            .try_into()
-            .expect("Expected correct number of elements");
-
         Ok(CertStateData {
             threshold_registry: AccountProof::from(threshold_registry),
             registry_coordinator: AccountProof::from(registry_coordinator),
-            #[cfg(feature = "stale-stakes-forbidden")]
             service_manager: AccountProof::from(service_manager),
             bls_apk_registry: AccountProof::from(bls_apk_registry),
             stake_registry: AccountProof::from(stake_registry),
             cert_verifier: AccountProof::from(cert_verifier),
-            #[cfg(feature = "stale-stakes-forbidden")]
             delegation_manager: AccountProof::from(delegation_manager),
         })
     }
@@ -284,12 +266,10 @@ impl EigenDaContracts {
                 .await?,
             registry_coordinator: get_address(ethereum, "REGISTRY_COORDINATOR", directory_address)
                 .await?,
-            #[cfg(feature = "stale-stakes-forbidden")]
             service_manager: get_address(ethereum, "SERVICE_MANAGER", directory_address).await?,
             bls_apk_registry: get_address(ethereum, "BLS_APK_REGISTRY", directory_address).await?,
             stake_registry: get_address(ethereum, "STAKE_REGISTRY", directory_address).await?,
             cert_verifier: get_address(ethereum, "CERT_VERIFIER", directory_address).await?,
-            #[cfg(feature = "stale-stakes-forbidden")]
             delegation_manager: get_address(ethereum, "DELEGATION_MANAGER", directory_address)
                 .await?,
         };

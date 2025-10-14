@@ -64,9 +64,7 @@ pub struct Storage {
     pub security_thresholds: SecurityThresholds,
     /// Quorum numbers required to sign certificates
     pub required_quorum_numbers: alloy_primitives::Bytes,
-    /// Historical on-chain storage data for verification
-    /// Stale stake prevention data (feature-gated)
-    #[cfg(feature = "stale-stakes-forbidden")]
+    /// Stale stake prevention data fetched from on-chain storage
     pub staleness: Staleness,
 }
 
@@ -75,7 +73,6 @@ pub struct Storage {
 /// This structure contains information used to prevent the use of outdated
 /// stake information in certificate verification, enhancing security by
 /// ensuring operators can't use stale state to their advantage.
-#[cfg(feature = "stale-stakes-forbidden")]
 #[derive(Default, Debug, Clone)]
 pub struct Staleness {
     /// Whether stale stakes are forbidden in the current configuration

@@ -1,5 +1,8 @@
 //! EigenDA certificate verification using BLS signature aggregation
 //!
+//! This logic should be kept in sync with on-chain `EigenDACertVerifier.checkDACert` implementation:
+//! <https://github.com/Layr-Labs/eigenda/blob/ba09cb2b28817f71a2a8fd824e38339e55dad075/contracts/src/integrations/cert/EigenDACertVerifier.sol#L103>
+//!
 //! This module implements comprehensive verification of EigenDA certificates,
 //! validating the cryptographic integrity and security properties of data
 //! availability certificates.
@@ -209,7 +212,6 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
         next_blob_version,
         security_thresholds,
         required_quorum_numbers,
-        #[cfg(feature = "stale-stakes-forbidden")]
         staleness,
     } = storage;
 
@@ -292,7 +294,6 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
 
     let signers_apk = signature::aggregation::aggregate(quorum_count, &non_signers, &quorums)?;
 
-    #[cfg(feature = "stale-stakes-forbidden")]
     if staleness.stale_stakes_forbidden {
         check::quorums_last_updated_after_most_recent_stale_block(
             &signed_quorum_numbers,
@@ -455,8 +456,8 @@ pub mod test_utils {
     };
     use crate::verification::cert::bitmap::Bitmap;
     use crate::verification::cert::hash::{HashExt, TruncHash, streaming_keccak256};
-    use crate::verification::cert::types::Storage;
     use crate::verification::cert::types::history::{History, Update};
+    use crate::verification::cert::types::{Staleness, Storage};
     use crate::verification::cert::{Cert, CertVerificationInputs, convert};
 
     /// Generate valid test inputs for certificate verification
@@ -624,10 +625,7 @@ pub mod test_utils {
 
         let next_blob_version = 43;
 
-        #[cfg(feature = "stale-stakes-forbidden")]
         let staleness = {
-            use crate::verification::cert::types::Staleness;
-
             let quorum_update_block_number = signed_quorum_numbers
                 .clone()
                 .into_iter()
@@ -654,7 +652,6 @@ pub mod test_utils {
             next_blob_version,
             security_thresholds,
             required_quorum_numbers,
-            #[cfg(feature = "stale-stakes-forbidden")]
             staleness,
         };
 
@@ -803,7 +800,6 @@ mod tests {
         assert_eq!(err, EmptyVec);
     }
 
-    #[cfg(feature = "stale-stakes-forbidden")]
     #[test]
     fn stale_stakes_forbidden() {
         let mut inputs = success_inputs();

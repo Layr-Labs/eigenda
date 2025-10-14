@@ -51,7 +51,6 @@ pub struct EigenDaContracts {
     /// # Details
     ///
     /// The staleStakesForbidden variable is read from it
-    #[cfg(feature = "stale-stakes-forbidden")]
     pub service_manager: Address,
 
     /// # Ethereum description
@@ -102,6 +101,5 @@ pub struct EigenDaContracts {
     /// # Details
     ///
     /// The minWithdrawalDelayBlocks variable is read from it
-    #[cfg(feature = "stale-stakes-forbidden")]
     pub delegation_manager: Address,
 }

@@ -173,7 +173,6 @@ match verify_cert_recency(inclusion_height, referenced_height, cert_recency_wind
 
 - `default`: Core verification functionality
 - `test-utils`: Additional utilities for testing and benchmarking
-- `stale-stakes-forbidden`: Enable staleness prevention checks
 - `arbitrary`: Support for property-based testing with `proptest`
 
 ## 📚 References

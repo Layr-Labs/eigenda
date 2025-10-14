@@ -26,8 +26,7 @@ pub enum CertVerificationError {
     #[error("Expected pubkeys to be sorted by their hashes")]
     NotStrictlySortedByHash,
 
-    /// Quorum state is stale and cannot be used for verification (feature-gated)
-    #[cfg(feature = "stale-stakes-forbidden")]
+    /// Quorum state is stale and cannot be used for verification
     #[error(
         "Stale quorum, last updated at block {last_updated_at_block} should be greater than most recent stale block {most_recent_stale_block}"
     )]

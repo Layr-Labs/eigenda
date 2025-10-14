@@ -5,16 +5,13 @@
 
 use alloy_primitives::StorageKey;
 use eigenda_verification::cert::StandardCommitment;
-#[cfg(feature = "stale-stakes-forbidden")]
 pub use stale_stakes_forbidden::*;
 
-#[cfg(feature = "stale-stakes-forbidden")]
-use crate::extraction::extractor::QuorumUpdateBlockNumberExtractor;
 use crate::extraction::extractor::{
     ApkHistoryExtractor, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
     OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
-    SecurityThresholdsV2Extractor, StorageKeyProvider, TotalStakeHistoryExtractor,
-    VersionedBlobParamsExtractor,
+    QuorumUpdateBlockNumberExtractor, SecurityThresholdsV2Extractor, StorageKeyProvider,
+    TotalStakeHistoryExtractor, VersionedBlobParamsExtractor,
 };
 
 /// Interface for the RegistryCoordinator contract
@@ -33,18 +30,16 @@ impl RegistryCoordinator {
     /// Vector of storage keys for:
     /// - Quorum count
     /// - Operator bitmap histories  
-    /// - Quorum update block numbers (if stale-stakes-forbidden feature is enabled)
+    /// - Quorum update block numbers
     pub fn storage_keys(certificate: &StandardCommitment) -> Vec<StorageKey> {
         let quorum_count = QuorumCountExtractor::new(certificate).storage_keys();
         let quorum_bitmap_history = OperatorBitmapHistoryExtractor::new(certificate).storage_keys();
-        #[cfg(feature = "stale-stakes-forbidden")]
         let quorum_update_block_number =
             QuorumUpdateBlockNumberExtractor::new(certificate).storage_keys();
 
         [
             quorum_count,
             quorum_bitmap_history,
-            #[cfg(feature = "stale-stakes-forbidden")]
             quorum_update_block_number,
         ]
         .into_iter()
@@ -154,16 +149,10 @@ impl EigenDaCertVerifier {
     }
 }
 
-#[cfg(feature = "stale-stakes-forbidden")]
 mod stale_stakes_forbidden {
     //! Additional contract interfaces for guarding against stale stakes
     //!
-    //! These interfaces are only available when the `stale-stakes-forbidden` feature is enabled.
-    //!
-    //! > **Note:** This functionality has been gated behind this flag because relevant
-    //! > EigenDA contracts are currently deployed having `staleStakesForbidden` set
-    //! > to `false`. Should that change in the future, the functionality can be
-    //! > activated by simply enabling this feature.
+    //! These interfaces expose EigenDA contract storage required for stale stake prevention.
 
     use alloy_primitives::StorageKey;
     use eigenda_verification::cert::StandardCommitment;
@@ -236,21 +225,15 @@ mod tests {
     use eigenda_verification::cert::StandardCommitment;
 
     use crate::extraction::contract::{
-        BlsApkRegistry, EigenDaCertVerifier, EigenDaThresholdRegistry, RegistryCoordinator,
-        StakeRegistry,
+        BlsApkRegistry, DelegationManager, EigenDaCertVerifier, EigenDaThresholdRegistry,
+        RegistryCoordinator, ServiceManager, StakeRegistry,
     };
-    #[cfg(feature = "stale-stakes-forbidden")]
-    use crate::extraction::contract::{DelegationManager, ServiceManager};
     use crate::extraction::extractor::{
-        ApkHistoryExtractor, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
-        OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
-        SecurityThresholdsV2Extractor, StorageKeyProvider, TotalStakeHistoryExtractor,
-        VersionedBlobParamsExtractor,
-    };
-    #[cfg(feature = "stale-stakes-forbidden")]
-    use crate::extraction::extractor::{
-        MinWithdrawalDelayBlocksExtractor, QuorumUpdateBlockNumberExtractor,
-        StaleStakesForbiddenExtractor,
+        ApkHistoryExtractor, MinWithdrawalDelayBlocksExtractor, NextBlobVersionExtractor,
+        OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor, QuorumCountExtractor,
+        QuorumNumbersRequiredV2Extractor, QuorumUpdateBlockNumberExtractor,
+        SecurityThresholdsV2Extractor, StaleStakesForbiddenExtractor, StorageKeyProvider,
+        TotalStakeHistoryExtractor, VersionedBlobParamsExtractor,
     };
 
     fn create_test_commitment() -> StandardCommitment {
@@ -276,29 +259,14 @@ mod tests {
         // Verify expected item count based on feature flags
         let quorum_count_keys = QuorumCountExtractor::new(&certificate).storage_keys();
         let quorum_bitmap_keys = OperatorBitmapHistoryExtractor::new(&certificate).storage_keys();
-
-        #[cfg(feature = "stale-stakes-forbidden")]
-        {
-            let quorum_update_keys =
-                QuorumUpdateBlockNumberExtractor::new(&certificate).storage_keys();
-            let expected_total =
-                quorum_count_keys.len() + quorum_bitmap_keys.len() + quorum_update_keys.len();
-            assert_eq!(
-                keys.len(),
-                expected_total,
-                "Should include all required data with stale-stakes-forbidden"
-            );
-        }
-
-        #[cfg(not(feature = "stale-stakes-forbidden"))]
-        {
-            let expected_total = quorum_count_keys.len() + quorum_bitmap_keys.len();
-            assert_eq!(
-                keys.len(),
-                expected_total,
-                "Should include non-feature-gated data only"
-            );
-        }
+        let quorum_update_keys = QuorumUpdateBlockNumberExtractor::new(&certificate).storage_keys();
+        let expected_total =
+            quorum_count_keys.len() + quorum_bitmap_keys.len() + quorum_update_keys.len();
+        assert_eq!(
+            keys.len(),
+            expected_total,
+            "Should include all required data"
+        );
     }
 
     #[test]
@@ -397,7 +365,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "stale-stakes-forbidden")]
     #[test]
     fn service_manager_storage_keys() {
         let certificate = create_test_commitment();
@@ -417,7 +384,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "stale-stakes-forbidden")]
     #[test]
     fn delegation_manager_storage_keys() {
         let certificate = create_test_commitment();

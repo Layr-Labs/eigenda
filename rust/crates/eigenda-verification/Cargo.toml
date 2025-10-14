@@ -40,7 +40,6 @@ wiremock = { workspace = true }
 [features]
 arbitrary = ["dep:proptest"]
 default = []
-stale-stakes-forbidden = []
 test-utils = []
 
 [[bench]]
