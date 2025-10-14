@@ -189,7 +189,7 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 		})
 	}
 
-	encodingParams := encoding.ParamsFromMins(quorumHeader.ChunkLength, info.TotalChunks)
+	encodingParams := encoding.ParamsFromMins(uint64(quorumHeader.ChunkLength), info.TotalChunks)
 
 	var chunks []*encoding.Frame
 	var indices []encoding.ChunkNumber

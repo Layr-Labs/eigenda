@@ -74,18 +74,17 @@ func TestMain(m *testing.M) {
 // makeTestComponents makes a prover and verifier currently using the only supported backend.
 func makeTestComponents() (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
 	proverConfig := &prover.KzgConfig{
+		SRSNumberToLoad: 8192,
 		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
-		G2TrailingPath:  "../../resources/srs/g2.trailing.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSNumberToLoad: 8192,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
 	}
-	verifierConfig := &verifier.KzgConfig{
-		SRSNumberToLoad: 8192,
-		G1Path:          "../../resources/srs/g1.point",
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	verifierConfig := verifier.ConfigFromProverV2Config(proverConfig)
+	committerConfig := committer.Config{
+		SRSNumberToLoad:   proverConfig.SRSNumberToLoad,
+		G1SRSPath:         proverConfig.G1Path,
+		G2SRSPath:         "../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../resources/srs/g2.trailing.point",
 	}
 
 	p, err := prover.NewProver(proverConfig, nil)
@@ -93,12 +92,12 @@ func makeTestComponents() (*prover.Prover, *committer.Committer, *verifier.Verif
 		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	c, err := committer.New(p.Srs.G1, p.Srs.G2, p.G2Trailing)
+	c, err := committer.NewFromConfig(committerConfig)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new committer: %w", err)
 	}
 
-	v, err := verifier.NewVerifier(verifierConfig, nil)
+	v, err := verifier.NewVerifier(verifierConfig)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new verifier: %w", err)
 	}

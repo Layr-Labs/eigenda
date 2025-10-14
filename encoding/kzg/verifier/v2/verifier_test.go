@@ -32,7 +32,7 @@ func TestVerifyFrames(t *testing.T) {
 	commitments, err := committer.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
 	require.Nil(t, err)
 
-	verifierGroup, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
+	verifierGroup, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
 	require.Nil(t, err)
 
 	indices := []encoding.ChunkNumber{}
@@ -52,11 +52,11 @@ func TestUniversalVerify(t *testing.T) {
 	committer, err := committer.NewFromConfig(*harness.committerConfig)
 	require.Nil(t, err)
 
-	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
+	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
 	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
-	enc, err := group.GetKzgEncoder(params)
+	prover, err := group.GetKzgProver(params)
 	require.Nil(t, err)
 
 	numBlob := 5
@@ -67,7 +67,7 @@ func TestUniversalVerify(t *testing.T) {
 
 		commit, _, _, err := committer.GetCommitments(inputFr)
 		require.Nil(t, err)
-		frames, fIndices, err := enc.GetFrames(inputFr)
+		frames, fIndices, err := prover.GetFrames(inputFr)
 		require.Nil(t, err)
 
 		// create samples
@@ -84,7 +84,7 @@ func TestUniversalVerify(t *testing.T) {
 				Commitment:      (*encoding.G1Commitment)(commit),
 				Chunk:           &f,
 				BlobIndex:       z,
-				AssignmentIndex: uint(i),
+				AssignmentIndex: encoding.ChunkNumber(i),
 			}
 			samples = append(samples, sample)
 		}
@@ -101,11 +101,11 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	committer, err := committer.NewFromConfig(*harness.committerConfig)
 	require.Nil(t, err)
 
-	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
+	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
-	enc, err := group.GetKzgEncoder(params)
+	prover, err := group.GetKzgProver(params)
 	require.NoError(t, err)
 
 	numBlob := 5
@@ -116,7 +116,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 
 		commit, _, _, err := committer.GetCommitments(inputFr)
 		require.Nil(t, err)
-		frames, fIndices, err := enc.GetFrames(inputFr)
+		frames, fIndices, err := prover.GetFrames(inputFr)
 		require.Nil(t, err)
 
 		// create samples
@@ -133,7 +133,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 				Commitment:      (*encoding.G1Commitment)(commit),
 				Chunk:           &f,
 				BlobIndex:       z,
-				AssignmentIndex: uint(i),
+				AssignmentIndex: encoding.ChunkNumber(i),
 			}
 			samples = append(samples, sample)
 		}
@@ -153,7 +153,7 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 	committer, err := committer.NewFromConfig(*harness.committerConfig)
 	require.Nil(t, err)
 
-	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
+	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
 	require.NoError(t, err)
 
 	chunkLengths := []uint64{64, 128, 256, 512, 1024, 2048, 4096, 8192}

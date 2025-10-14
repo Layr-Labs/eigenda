@@ -104,7 +104,7 @@ func getTestData(t *testing.T) (core.Blob, encoding.EncodingParams) {
 		log.Fatal(err)
 	}
 
-	testEncodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+	testEncodingParams := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
 
 	return testBlob, testEncodingParams
 }

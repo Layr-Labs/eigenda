@@ -345,7 +345,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	encodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+	encodingParams := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
 	require.NoError(t, err)
 	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_SYMBOL)
 	require.NoError(t, err)

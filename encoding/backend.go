@@ -22,7 +22,6 @@ type Config struct {
 	NumWorker   uint64
 	BackendType BackendType
 	GPUEnable   bool
-	Verbose     bool
 }
 
 // DefaultConfig returns a Config struct with default values
@@ -31,7 +30,6 @@ func DefaultConfig() *Config {
 		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 		BackendType: GnarkBackend,
 		GPUEnable:   false,
-		Verbose:     false,
 	}
 }
 
