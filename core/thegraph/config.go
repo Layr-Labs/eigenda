@@ -19,13 +19,6 @@ type Config struct {
 	MaxRetries   int           // The maximum number of retries to pull data from The Graph
 }
 
-func DefaultConfig() Config {
-	return Config{
-		PullInterval: 100 * time.Millisecond,
-		MaxRetries:   5,
-	}
-}
-
 func CLIFlags(envPrefix string) []cli.Flag {
 	return []cli.Flag{
 		cli.StringFlag{

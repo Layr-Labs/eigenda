@@ -505,7 +505,10 @@ func startController(
 	dispatcherConfig.BatchMetadataUpdatePeriod = 100 * time.Millisecond
 
 	// Chain state config
-	chainStateConfig := thegraph.DefaultConfig()
+	chainStateConfig := thegraph.Config{
+		PullInterval: 100 * time.Millisecond,
+		MaxRetries:   5,
+	}
 	chainStateConfig.Endpoint = operatorStateSubgraphURL
 
 	// Create metadata store
