@@ -251,7 +251,7 @@ func checkForInvalidEnvVars(
 		if len(parts) != 2 {
 			continue
 		}
-		
+
 		key := parts[0]
 		if !strings.HasPrefix(key, envPrefix+"_") {
 			continue

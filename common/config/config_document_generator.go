@@ -415,7 +415,6 @@ func gatherConfigFieldData(
 	return fields, nil
 }
 
-
 func generateMarkdownDoc(
 	componentName string,
 	fields []*configFieldData,
