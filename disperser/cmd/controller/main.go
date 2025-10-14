@@ -46,8 +46,6 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
-
-	controllerMaxStallDuration = 240 * time.Second
 )
 
 func main() {
@@ -159,7 +157,7 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
-	encodingPool := workerpool.New(config.NumConcurrentEncodingRequests)
+	encodingPool := workerpool.New(config.EncodingManagerConfig.NumConcurrentRequests)
 	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		&config.EncodingManagerConfig,
@@ -180,7 +178,7 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create signature aggregator: %v", err)
 	}
-	dispatcherPool := workerpool.New(config.NumConcurrentDispersalRequests)
+	dispatcherPool := workerpool.New(config.DispatcherConfig.NumConcurrentRequests)
 	chainState := eth.NewChainState(chainReader, gethClient)
 	var ics core.IndexedChainState
 	if config.UseGraph {
@@ -205,7 +203,10 @@ func RunController(ctx *cli.Context) error {
 		}
 	}
 
-	nodeClientManager, err := controller.NewNodeClientManager(config.NodeClientCacheSize, requestSigner, logger)
+	nodeClientManager, err := controller.NewNodeClientManager(
+		config.DispatcherConfig.NodeClientCacheSize,
+		requestSigner,
+		logger)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
@@ -317,20 +318,15 @@ func RunController(ctx *cli.Context) error {
 		logger.Warn("Failed to create readiness file", "error", err, "path", config.ControllerReadinessProbePath)
 	}
 
-	if _, err := os.Create(config.ControllerHealthProbePath); err != nil {
-		logger.Warn("Failed to create healthProbe file: %v", err)
-	}
-
 	// Start heartbeat monitor
 	go func() {
-		err := healthcheck.HeartbeatMonitor(
-			config.ControllerHealthProbePath,
-			controllerMaxStallDuration,
-			controllerLivenessChan,
+		err := healthcheck.NewHeartbeatMonitor(
 			logger,
+			controllerLivenessChan,
+			config.HeartbeatMonitorConfig,
 		)
 		if err != nil {
-			logger.Warn("Heartbeat monitor exited with error", "err", err)
+			logger.Warn("Heartbeat monitor failed", "err", err)
 		}
 	}()
 
