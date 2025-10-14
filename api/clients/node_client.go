@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -130,13 +131,10 @@ func (c client) GetChunks(
 			// For backward compatibility, we fallback the UNKNOWN to GOB
 			chunk, err = new(encoding.Frame).DeserializeGob(data)
 			if err != nil {
-				chunksChan <- RetrievedChunks{
-					OperatorID: opID,
-					Err:        errors.New("UNKNOWN chunk encoding format"),
-					Chunks:     nil,
-				}
-				return
+				err = errors.New("UNKNOWN chunk encoding format")
 			}
+		default:
+			err = fmt.Errorf("unsupported chunk encoding format: %v", reply.GetChunkEncodingFormat())
 		}
 		if err != nil {
 			chunksChan <- RetrievedChunks{
