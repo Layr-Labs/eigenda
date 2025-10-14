@@ -12,7 +12,7 @@ import (
 	geth "github.com/ethereum/go-ethereum/common"
 )
 
-// TODO add metrics
+// TODO(cody.littley) add metrics
 
 // EjectionManager manages and executes validator ejections.
 type EjectionManager interface {
