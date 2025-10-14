@@ -1,6 +1,7 @@
 package payments
 
 import (
+	"errors"
 	"math/big"
 	"os"
 	"testing"
@@ -320,11 +321,26 @@ func testReservationExpiration(
 	// Wait for reservation to expire
 	time.Sleep(reservationExpirationDelay)
 
-	// Client ledger panics when attempting to use expired reservation
-	require.Panics(t, func() {
-		payload := coretypes.Payload(testRandom.Bytes(payloadBytes))
-		_, _ = payloadDisperser.SendPayload(t.Context(), payload)
-	})
+	payload = coretypes.Payload(testRandom.Bytes(payloadBytes))
+
+	// Behavior differs based on client ledger mode:
+	// - ReservationOnly: returns TimeOutOfRangeError
+	// - ReservationAndOnDemand: panics to avoid inadvertently depleting on-demand funds
+	switch clientLedgerMode {
+	case clientledger.ClientLedgerModeReservationOnly:
+		_, err = payloadDisperser.SendPayload(t.Context(), payload)
+		require.Error(t, err, "dispersal should fail with expired reservation")
+		var timeOutOfRangeError *reservation.TimeOutOfRangeError
+		require.True(t, errors.As(err, &timeOutOfRangeError), "error should be TimeOutOfRangeError")
+	case clientledger.ClientLedgerModeReservationAndOnDemand:
+		require.Panics(t, func() {
+			_, _ = payloadDisperser.SendPayload(t.Context(), payload)
+		}, "dispersal should panic with expired reservation in ReservationAndOnDemand mode")
+	case clientledger.ClientLedgerModeOnDemandOnly:
+		panic("testReservationExpiration should not be called with ClientLedgerModeOnDemandOnly")
+	default:
+		panic("testReservationExpiration called with unexpected client ledger mode")
+	}
 
 	// Register a new valid reservation
 	clientReservation, err = reservation.NewReservation(
