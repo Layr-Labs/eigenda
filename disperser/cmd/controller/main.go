@@ -6,9 +6,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
@@ -17,15 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
@@ -33,8 +29,12 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	payments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli"
 )
 
@@ -80,6 +80,7 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create DynamoDB client: %w", err)
 	}
+
 	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
@@ -100,15 +101,26 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get OperatorStateRetriever address: %w", err)
 	}
+
 	serviceManagerAddress, err :=
 		contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
 	if err != nil {
 		return fmt.Errorf("failed to get ServiceManager address: %w", err)
 	}
+
 	registryCoordinatorAddress, err :=
 		contractDirectory.GetContractAddress(context.Background(), directory.RegistryCoordinator)
 	if err != nil {
 		return fmt.Errorf("failed to get registry coordinator address: %w", err)
+	}
+
+	chainReader, err := eth.NewReader(
+		logger,
+		gethClient,
+		operatorStateRetrieverAddress.Hex(),
+		serviceManagerAddress.Hex())
+	if err != nil {
+		return fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
 	metricsRegistry := prometheus.NewRegistry()
@@ -144,28 +156,12 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
-	encodingPool := workerpool.New(config.EncodingManagerConfig.NumConcurrentRequests)
-	encodingManagerBlobSet := controller.NewBlobSet()
-	encodingManager, err := controller.NewEncodingManager(
-		&config.EncodingManagerConfig,
-		blobMetadataStore,
-		encodingPool,
-		encoderClient,
-		chainReader,
-		logger,
-		metricsRegistry,
-		encodingManagerBlobSet,
-		controllerLivenessChan,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create encoding manager: %v", err)
-	}
 
 	sigAgg, err := core.NewStdSignatureAggregator(logger, chainReader)
 	if err != nil {
 		return fmt.Errorf("failed to create signature aggregator: %v", err)
 	}
-	dispatcherPool := workerpool.New(config.DispatcherConfig.NumConcurrentRequests)
+
 	chainState := eth.NewChainState(chainReader, gethClient)
 	var ics core.IndexedChainState
 	if config.UseGraph {
@@ -200,19 +196,7 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to create signature aggregator: %w", err)
 	}
 
-	// Create indexed chain state
-	chainState := eth.NewChainState(chainReader, gethClient)
-	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
-
-	// Create node client manager
-	nodeClientManager, err := controller.NewNodeClientManager(
-		config.DispatcherConfig.NodeClientCacheSize,
-		requestSigner,
-		logger,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create node client manager: %w", err)
-	}
+	ctx := context.Background()
 
 	// Create batch metadata manager
 	batchMetadataManager, err := metadata.NewBatchMetadataManager(
@@ -247,10 +231,10 @@ func RunController(cliCtx *cli.Context) error {
 		}
 	}
 
-	// Create controller
+	// Create a controller with all the required dependencies.
 	c, err := controller.NewController(
 		logger,
-		metadataStore,
+		blobMetadataStore,
 		chainReader,
 		encoderClient,
 		ics,
@@ -267,9 +251,10 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to create controller: %w", err)
 	}
 
+	if config.ServerConfig.EnableServer {
 		go func() {
 			logger.Info("Starting controller gRPC server", "port", config.ServerConfig.GrpcPort)
-			if err := grpcServer.Start(); err != nil {
+			if err := c.Server.Start(); err != nil {
 				panic(fmt.Sprintf("gRPC server failed: %v", err))
 			}
 		}()
