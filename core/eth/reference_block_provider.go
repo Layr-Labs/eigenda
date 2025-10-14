@@ -1,8 +1,9 @@
-package metadata
+package eth
 
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -76,4 +77,47 @@ func (r *referenceBlockProvider) GetReferenceBlockNumber(ctx context.Context) (u
 
 	r.previousReferenceBlockNumber = newReferenceBlockNumber
 	return newReferenceBlockNumber, nil
+}
+
+var _ ReferenceBlockProvider = (*periodicReferenceBlockProvider)(nil)
+
+// A ReferenceBlockProvider implementation that periodically updates the reference block number once in a while,
+// but otherwise just returns the last value it saw.
+type periodicReferenceBlockProvider struct {
+	base ReferenceBlockProvider
+
+	// The most recently fetched reference block number.
+	currentReferenceBlockNumber uint64
+
+	// The time between updates to the reference block number.
+	updatePeriod time.Duration
+
+	// The last time we updated the reference block number.
+	lastUpdate time.Time
+}
+
+// NewPeriodicReferenceBlockProvider creates a new ReferenceBlockProvider that wraps the given base
+// ReferenceBlockProvider. The returned implementation will only call the base provider once every updatePeriod, and
+// will return the last value it saw in between updates.
+func NewPeriodicReferenceBlockProvider(
+	base ReferenceBlockProvider,
+	updatePeriod time.Duration,
+) ReferenceBlockProvider {
+	return &periodicReferenceBlockProvider{
+		base:         base,
+		updatePeriod: updatePeriod,
+		lastUpdate:   time.Time{},
+	}
+}
+
+func (p *periodicReferenceBlockProvider) GetReferenceBlockNumber(ctx context.Context) (uint64, error) {
+	if time.Since(p.lastUpdate) >= p.updatePeriod {
+		rbn, err := p.base.GetReferenceBlockNumber(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get reference block number: %w", err)
+		}
+		p.currentReferenceBlockNumber = rbn
+		p.lastUpdate = time.Now()
+	}
+	return p.currentReferenceBlockNumber, nil
 }

@@ -5,8 +5,11 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"time"
 
 	contractEigenDAEjectionManager "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDAEjectionManager"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -32,19 +35,32 @@ var _ EjectionTransactor = &ejectionTransactor{}
 
 // ejectionTransactor is the production implementation of the EjectionTransactor interface.
 type ejectionTransactor struct {
+	// The address of this ejector instance.
+	selfAddress gethcommon.Address
+
 	// Used to execute eth reads
 	caller *contractEigenDAEjectionManager.ContractIEigenDAEjectionManagerCaller
+
 	// Used to execute eth writes
 	transactor *contractEigenDAEjectionManager.ContractIEigenDAEjectionManagerTransactor
+
 	// A function that can sign transactions from selfAddress.
 	signer bind.SignerFn
+
+	// A utility for getting the reference block number.
+	referenceBlockProvider eth.ReferenceBlockProvider
+
+	// A utility for getting a list of all quorums.
+	quorumScanner eth.QuorumScanner
 }
 
 // Create a new EjectionTransactor.
 func NewEjectionTransactor(
 	ctx context.Context,
+	logger logging.Logger,
 	client bind.ContractBackend,
 	ejectionContractAddress gethcommon.Address,
+	registryCoordinatorAddress gethcommon.Address,
 	selfAddress gethcommon.Address,
 	privateKey *ecdsa.PrivateKey,
 	chainID *big.Int,
@@ -75,12 +91,25 @@ func NewEjectionTransactor(
 		return nil, fmt.Errorf("failed to create transact opts: %w", err)
 	}
 
-	signer := transactOpts.Signer
+	referenceBlockProvider := eth.NewReferenceBlockProvider(logger, client, 0)                          // TODO config
+	referenceBlockProvider = eth.NewPeriodicReferenceBlockProvider(referenceBlockProvider, time.Minute) // TODO config
+
+	quorumScanner, err := eth.NewQuorumScanner(client, registryCoordinatorAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create quorum scanner: %w", err)
+	}
+	quorumScanner, err = eth.NewCachedQuorumScanner(quorumScanner, 1024)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cached quorum scanner: %w", err)
+	}
 
 	return &ejectionTransactor{
-		caller:     caller,
-		transactor: transactor,
-		signer:     signer,
+		selfAddress:            selfAddress,
+		caller:                 caller,
+		transactor:             transactor,
+		signer:                 transactOpts.Signer,
+		referenceBlockProvider: referenceBlockProvider,
+		quorumScanner:          quorumScanner,
 	}, nil
 }
 
@@ -89,7 +118,28 @@ func (e *ejectionTransactor) CompleteEjection(
 	ctx context.Context,
 	addressToEject gethcommon.Address,
 ) error {
-	panic("unimplemented")
+
+	rbn, err := e.referenceBlockProvider.GetReferenceBlockNumber(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get reference block number: %w", err)
+	}
+
+	quorums, err := e.quorumScanner.GetQuorums(ctx, rbn)
+	if err != nil {
+		return fmt.Errorf("failed to get quorums: %w", err)
+	}
+	quorumBytes := eth.QuorumListToBytes(quorums)
+
+	opts := &bind.TransactOpts{ // TODO make sure these are correct
+		From:   e.selfAddress,
+		Signer: e.signer,
+	}
+
+	_, err = e.transactor.CompleteEjection(opts, addressToEject, quorumBytes)
+	if err != nil {
+		return fmt.Errorf("failed to complete ejection: %w", err)
+	}
+	return nil
 }
 
 // IsEjectionInProgress implements EjectionTransactor.
@@ -97,7 +147,23 @@ func (e *ejectionTransactor) IsEjectionInProgress(
 	ctx context.Context,
 	addressToCheck gethcommon.Address,
 ) (bool, error) {
-	panic("unimplemented")
+
+	opts := &bind.CallOpts{ // TODO make sure these are correct
+		From:    e.selfAddress,
+		Context: ctx,
+	}
+
+	// This method returns the zero address if no ejection is in progress.
+	ejector, err := e.caller.GetEjector(opts, addressToCheck)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if ejection is in progress: %w", err)
+	}
+
+	var zeroAddress gethcommon.Address
+	if ejector != zeroAddress {
+		return true, nil
+	}
+	return false, nil
 }
 
 // IsValidatorPresentInAnyQuorum implements EjectionTransactor.
@@ -112,5 +178,26 @@ func (e *ejectionTransactor) IsValidatorPresentInAnyQuorum(
 func (e *ejectionTransactor) StartEjection(
 	ctx context.Context,
 	addressToEject gethcommon.Address) error {
-	panic("unimplemented")
+
+	rbn, err := e.referenceBlockProvider.GetReferenceBlockNumber(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get reference block number: %w", err)
+	}
+
+	quorums, err := e.quorumScanner.GetQuorums(ctx, rbn)
+	if err != nil {
+		return fmt.Errorf("failed to get quorums: %w", err)
+	}
+	quorumBytes := eth.QuorumListToBytes(quorums)
+
+	opts := &bind.TransactOpts{ // TODO make sure these are correct
+		From:   e.selfAddress,
+		Signer: e.signer,
+	}
+
+	_, err = e.transactor.StartEjection(opts, addressToEject, quorumBytes)
+	if err != nil {
+		return fmt.Errorf("failed to start ejection: %w", err)
+	}
+	return nil
 }
