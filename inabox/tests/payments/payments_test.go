@@ -336,8 +336,8 @@ func testReservationExpiration(
 		require.Panics(t, func() {
 			_, _ = payloadDisperser.SendPayload(t.Context(), payload)
 		}, "dispersal should panic with expired reservation in ReservationAndOnDemand mode")
-	case clientledger.ClientLedgerModeOnDemandOnly:
-		panic("testReservationExpiration should not be called with ClientLedgerModeOnDemandOnly")
+	case clientledger.ClientLedgerModeOnDemandOnly, clientledger.ClientLedgerModeLegacy:
+		panic("testReservationExpiration should not be called with OnDemandOnly or Legacy")
 	default:
 		panic("testReservationExpiration called with unexpected client ledger mode")
 	}
