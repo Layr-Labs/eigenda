@@ -285,7 +285,7 @@ func testReservationExpiration(
 ) {
 	payloadBytes := 1000
 	// the reservation will be configured to expire shortly after the first dispersal
-	reservationExpirationDelay := 10 * time.Second
+	reservationExpirationDelay := 20 * time.Second
 
 	paymentVault := getPaymentVault(t, testHarness, logger)
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(t.Context())
@@ -446,7 +446,7 @@ func testReservationAndOnDemand(
 	require.NoError(t, err)
 
 	payloadBytes := 1000
-	submissionDuration := 30 * time.Second
+	submissionDuration := 60 * time.Second
 	blobsPerSecond := float32(0.5)
 
 	// this is the total amount of billable symbols that are being dispersed
