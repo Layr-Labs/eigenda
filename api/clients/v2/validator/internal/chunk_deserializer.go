@@ -70,9 +70,9 @@ func (d *chunkDeserializer) DeserializeAndVerify(
 
 	assignment := d.assignments[operatorID]
 
-	assignmentIndices := make([]uint, len(assignment.GetIndices()))
+	assignmentIndices := make([]core.ChunkNumber, len(assignment.GetIndices()))
 	for i, index := range assignment.GetIndices() {
-		assignmentIndices[i] = uint(index)
+		assignmentIndices[i] = core.ChunkNumber(index)
 	}
 
 	err := d.verifier.VerifyFrames(chunks, assignmentIndices, *blobCommitments, *encodingParams)

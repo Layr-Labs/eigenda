@@ -33,7 +33,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 	frames, err := group.GetFrames(harness.paddedGettysburgAddressBytes, params)
 	require.Nil(t, err)
 
-	verifier, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
+	verifier, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
 	require.Nil(t, err)
 
 	indices := []encoding.ChunkNumber{}

@@ -91,7 +91,7 @@ func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 }
 
 // This function is used by user to get the leading coset for a frame, where i is frame index
-func GetLeadingCosetIndex(i uint64, numChunks uint64) (uint32, error) {
+func GetLeadingCosetIndex(i encoding.ChunkNumber, numChunks encoding.ChunkNumber) (uint32, error) {
 
 	if i < numChunks {
 		j := rb.ReverseBitsLimited(uint32(numChunks), uint32(i))

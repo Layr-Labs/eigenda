@@ -38,14 +38,9 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 		return nil, fmt.Errorf("failed to read %d G1 points from %s: %v", config.SRSNumberToLoad, config.G1Path, err)
 	}
 
-	encoder, err := rs.NewEncoder(encoderConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create encoder: %v", err)
-	}
-
 	encoderGroup := &Verifier{
 		kzgConfig:             config,
-		encoder:               encoder,
+		encoder:               rs.NewEncoder(encoderConfig),
 		G1SRS:                 g1SRS,
 		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
 	}
