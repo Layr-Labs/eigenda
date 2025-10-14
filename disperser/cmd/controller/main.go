@@ -172,8 +172,6 @@ func RunController(cliCtx *cli.Context) error {
 	} else {
 		return fmt.Errorf("built-in indexer is deprecated and will be removed soon, please use UseGraph=true")
 	}
-	logger.Info("Using graph node")
-	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
 
 	var requestSigner clients.DispersalRequestSigner
 	if config.DisperserStoreChunksSigningDisabled {
@@ -193,7 +191,7 @@ func RunController(cliCtx *cli.Context) error {
 		requestSigner,
 		logger)
 	if err != nil {
-		return fmt.Errorf("failed to create signature aggregator: %w", err)
+		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
 
 	ctx := context.Background()
