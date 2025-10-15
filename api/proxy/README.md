@@ -289,7 +289,7 @@ version of eigenda-proxy, run `eigenda-proxy --help`.
 
 #### Payment Mode Configuration
 
-When using EigenDA V2, the payment system can be configured using the `--eigenda.v2.client-ledger-mode` flag (or
+When using EigenDA V2, the payment system can be configured using the `--eigenda.v2.client-ledger-mode` flag (or the
 `EIGENDA_PROXY_EIGENDA_V2_CLIENT_LEDGER_MODE` environment variable). This flag determines which payment mechanisms are
 active for blob dispersals. For detailed information about the payment system, see the
 [payment system documentation](../../docs/spec/src/protocol/payments/payment_system.md).
@@ -297,16 +297,22 @@ active for blob dispersals. For detailed information about the payment system, s
 **Available Payment Modes:**
 
 1. **`legacy` (default)** - Uses the legacy bin-based payment system that handles both reservation and on-demand
-   payments. This mode is currently being deprecated and will be removed in a future release.
+   payments. This mode is in the process of being deprecated and will be removed in a future release.
+   
+> **IMPORTANT**: All clients should continue using this mode until the new payment system has officially shipped. The
+> other payment modes are documented below for awareness, but they aren't ready to be used in production environments.
 
 2. **`reservation-only`** - Uses pre-purchased bandwidth reservations that provide guaranteed throughput for a
-   specified time period. Bandwidth is managed using a leaky bucket algorithm.
+   specified time period. Bandwidth is managed using a leaky bucket algorithm. Dispersals will fail if a reservation
+   is temporarily exhausted.
 
 3. **`on-demand-only`** - Uses pay-per-dispersal payments from funds deposited in the PaymentVault contract.
-   Limited to quorums 0 (ETH) and 1 (EIGEN).
+   Limited to quorums 0 (ETH) and 1 (EIGEN). Dispersals will fail if on-demand funds are exhausted.
 
-4. **`reservation-and-on-demand`** - Enables both payment methods with intelligent fallback. Uses reservation bandwidth
-   when available, automatically switching to on-demand payments when reservation capacity is exhausted.
+4. **`reservation-and-on-demand`** - Enables both reservation and on-demand payment methods with intelligent fallback.
+   Uses reservation bandwidth when available, and automatically switches to on-demand payments when reservation
+   capacity is temporarily exhausted. If a reservation *expires*, this mode will prevent any dispersals from being made
+   to avoid inadvertent draining of on-demand funds due to an expired reservation.
 
 > **Note**: The payment mode should match your account's setup in the PaymentVault contract. Ensure you have an active
 > reservation (for `reservation-only` or `reservation-and-on-demand`) or sufficient deposits (for `on-demand-only` or
