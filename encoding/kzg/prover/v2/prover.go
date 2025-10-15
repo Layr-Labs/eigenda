@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	gnarkprover "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2/gnark"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	_ "go.uber.org/automaxprocs"
 )
@@ -21,6 +22,8 @@ import (
 // Prover is the main struct that is able to generate frames (chunks and their proofs).
 // TODO(samlaf): should we refactor prover to only generate proofs and keep encoding separate?
 type Prover struct {
+	logger logging.Logger
+
 	KzgConfig *KzgConfig
 	G1SRS     kzg.G1SRS
 
@@ -32,7 +35,7 @@ type Prover struct {
 	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
 }
 
-func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, error) {
+func NewProver(logger logging.Logger, kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, error) {
 	if encoderConfig == nil {
 		encoderConfig = encoding.DefaultConfig()
 	}
@@ -50,6 +53,7 @@ func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, e
 	rsEncoder := rs.NewEncoder(encoderConfig)
 
 	proverGroup := &Prover{
+		logger:              logger,
 		Config:              encoderConfig,
 		encoder:             rsEncoder,
 		KzgConfig:           kzgConfig,
@@ -183,10 +187,7 @@ func (g *Prover) preloadProversFromSRSTableCache() error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("detect %v srs maps\n", len(paramsAll))
-	for i := 0; i < len(paramsAll); i++ {
-		fmt.Printf(" %v. NumChunks: %v   ChunkLength: %v\n", i, paramsAll[i].NumChunks, paramsAll[i].ChunkLength)
-	}
+	g.logger.Info("Detected SRSTables from cache dir", "NumTables", len(paramsAll), "TableDetails", paramsAll)
 
 	if len(paramsAll) == 0 {
 		return nil
@@ -244,7 +245,7 @@ func getAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 // Returns SRSTable SRS points, as well as its transpose.
 // fftPoints has size [l][2*dimE], and its transpose has size [2*dimE][l]
 func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
-	subTable, err := NewSRSTable(p.KzgConfig.CacheDir, p.G1SRS, p.KzgConfig.NumWorker)
+	subTable, err := NewSRSTable(p.logger, p.KzgConfig.CacheDir, p.G1SRS, p.KzgConfig.NumWorker)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create SRS table: %w", err)
 	}

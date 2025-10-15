@@ -233,7 +233,7 @@ func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifi
 		return nil, nil, nil, fmt.Errorf("new committer from config: %w", err)
 	}
 
-	p, err := prover.NewProver(prover.KzgConfigFromV1Config(config), nil)
+	p, err := prover.NewProver(logger, prover.KzgConfigFromV1Config(config), nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}

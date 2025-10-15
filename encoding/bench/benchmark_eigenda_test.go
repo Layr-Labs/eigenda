@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
@@ -62,7 +63,7 @@ func BenchmarkCommittmentGeneration(b *testing.B) {
 	committer, err := committer.NewFromConfig(config)
 	require.NoError(b, err)
 
-	rand := random.NewTestRandom()
+	rand := random.NewTestRandomNoPrint(1337)
 	blob := rand.FrElements(blobLen)
 
 	for b.Loop() {
@@ -88,7 +89,7 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 				ChunkLength: max(1, blobSizeBytes*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
 			}
 
-			rand := random.NewTestRandom()
+			rand := random.NewTestRandomNoPrint(1337)
 			blobBytes := rand.Bytes(int(blobSizeBytes))
 			for i := 0; i < len(blobBytes); i += 32 {
 				blobBytes[i] = 0 // to make them Fr elements
@@ -115,11 +116,13 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 	proverConfig := prover.KzgConfig{
 		SRSNumberToLoad: 1 << 19,
 		G1Path:          "../../resources/srs/g1.point",
-		PreloadEncoder:  true,
-		CacheDir:        "../../resources/srs/SRSTables",
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		// we preload only the needed SRSTables right before b.Loop below.
+		PreloadEncoder: false,
+		CacheDir:       "../../resources/srs/SRSTables",
+		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
 	}
-	p, err := prover.NewProver(&proverConfig, nil)
+
+	p, err := prover.NewProver(common.SilentLogger(), &proverConfig, nil)
 	require.NoError(b, err)
 
 	// We only have 16MiBs of SRS points. Since we use blob_version=0's 8x coding
@@ -132,13 +135,13 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 				ChunkLength: max(1, blobSizeBytes*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
 			}
 
-			rand := random.NewTestRandom()
+			rand := random.NewTestRandomNoPrint(1337)
 			blobBytes := rand.Bytes(int(blobSizeBytes))
 			for i := 0; i < len(blobBytes); i += 32 {
 				blobBytes[i] = 0 // to make them Fr elements
 			}
 
-			// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
+			// Run this before entering the benchmark loop to preload the SRSTable for the params size.
 			_, err = p.GetFrames(blobBytes, params)
 			require.NoError(b, err)
 

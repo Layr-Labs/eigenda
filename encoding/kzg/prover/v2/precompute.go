@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"os"
 	"path"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
@@ -28,13 +28,14 @@ type TableParam struct {
 }
 
 type SRSTable struct {
+	logger    logging.Logger
 	Tables    map[TableParam]SubTable
 	TableDir  string
 	NumWorker uint64
 	s1        []bn254.G1Affine
 }
 
-func NewSRSTable(tableDir string, s1 []bn254.G1Affine, numWorker uint64) (*SRSTable, error) {
+func NewSRSTable(logger logging.Logger, tableDir string, s1 []bn254.G1Affine, numWorker uint64) (*SRSTable, error) {
 
 	err := os.MkdirAll(tableDir, os.ModePerm)
 	if err != nil {
@@ -71,6 +72,7 @@ func NewSRSTable(tableDir string, s1 []bn254.G1Affine, numWorker uint64) (*SRSTa
 	}
 
 	return &SRSTable{
+		logger:    logger,
 		Tables:    tables,
 		TableDir:  tableDir,
 		NumWorker: numWorker,
@@ -93,41 +95,40 @@ func (p *SRSTable) GetSubTables(
 		CosetSize: cosetSize,
 	}
 
-	start := time.Now()
-	table, ok := p.Tables[param]
-	if !ok {
-		log.Printf("Table with params: DimE=%v CosetSize=%v does not exist\n", dimE, cosetSize)
+	if table, ok := p.Tables[param]; !ok {
+		p.logger.Infof("Precomputed SRSTable not found. Generating...", "DimE", dimE, "CosetSize", cosetSize)
 
 		// Check if we have enough SRS points loaded for precomputation
 		// We need polynomial degree m < len(SRS)
 		// (Actually we only access up to index m-cosetSize, but this simpler check is safer)
 		if m >= uint64(len(p.s1)) {
-			return nil, fmt.Errorf("cannot precompute table: insufficient SRS points loaded (have %d, need at least %d). "+
+			return nil, fmt.Errorf("cannot precompute SRS table for params (DimE=%d, CosetSize=%d): "+
+				"insufficient SRS points loaded (have %d, need at least %d). "+
 				"Consider increasing loaded SRS points or using precomputed tables",
-				len(p.s1), m+1)
+				dimE, cosetSize, len(p.s1), m+1)
 		}
 
-		log.Printf("Generating the table. May take a while\n")
-		log.Printf("... ...\n")
 		filename := fmt.Sprintf("dimE%v.coset%v", dimE, cosetSize)
 		dstFilePath := path.Join(p.TableDir, filename)
-		fftPoints := p.Precompute(dim, dimE, cosetSize, m, dstFilePath, p.NumWorker)
 
+		start := time.Now()
+		// precompute can silently fail, and
+		fftPoints := p.precompute(dim, dimE, cosetSize, m, dstFilePath, p.NumWorker)
 		elapsed := time.Since(start)
-		log.Printf("    Precompute finishes using %v\n", elapsed)
 
+		p.logger.Info("Precomputed SRSTable generated", "DimE", dimE, "CosetSize", cosetSize, "FilePath", dstFilePath, "Elapsed", elapsed)
 		return fftPoints, nil
 	} else {
-		log.Printf("Detected Precomputed FFT sliced G1 table\n")
+		p.logger.Info("Precomputed SRSTable found. Loading...", "DimE", dimE, "CosetSize", cosetSize, "FilePath", table.FilePath)
+
+		start := time.Now()
 		fftPoints, err := p.TableReaderThreads(table.FilePath, dimE, cosetSize, p.NumWorker)
 		if err != nil {
-			log.Println("GetSubTables.ERR.0", err)
-			return nil, err
+			return nil, fmt.Errorf("read precomputed table from %s: %w", table.FilePath, err)
 		}
-
 		elapsed := time.Since(start)
-		log.Printf("    Loading Table uses %v\n", elapsed)
 
+		p.logger.Info("Precomputed SRSTable Loaded", "DimE", dimE, "CosetSize", cosetSize, "Elapsed", elapsed)
 		return fftPoints, nil
 	}
 }
@@ -139,7 +140,7 @@ type DispatchReturn struct {
 
 // m = len(poly) - 1, which is deg
 // Returns a slice of size [l][2*dimE]
-func (p *SRSTable) Precompute(dim, dimE, l, m uint64, filePath string, numWorker uint64) [][]bn254.G1Affine {
+func (p *SRSTable) precompute(dim, dimE, l, m uint64, filePath string, numWorker uint64) [][]bn254.G1Affine {
 	order := dimE * l
 	if l == 1 {
 		order = dimE * 2
@@ -160,6 +161,8 @@ func (p *SRSTable) Precompute(dim, dimE, l, m uint64, filePath string, numWorker
 	}
 
 	for j := uint64(0); j < l; j++ {
+		// TODO(samlaf): change precomputeWorkers to use an errgroup instead.
+		// workers currently silently fail on error, so this will just hang forever.
 		jobChan <- j
 	}
 	close(jobChan)
@@ -171,7 +174,8 @@ func (p *SRSTable) Precompute(dim, dimE, l, m uint64, filePath string, numWorker
 
 	err := p.TableWriter(fftPoints, dimE, filePath)
 	if err != nil {
-		log.Println("Precompute error:", err)
+		// We silently error because precomputation is just an optimization.
+		p.logger.Error("Precomputing SRSTable failed.", "DimE", dimE, "CosetSize", l, "err", err)
 	}
 	return fftPoints
 }
@@ -182,7 +186,9 @@ func (p *SRSTable) precomputeWorker(
 	for j := range jobChan {
 		dr, err := p.PrecomputeSubTable(fs, m, dim, dimE, j, l)
 		if err != nil {
-			log.Println("precomputeWorker.ERR.1", err)
+			// TODO(samlaf): handle this error better... if this errors then precompute will hang forever
+			// since it waits for an answer for all jobs.
+			p.logger.Error("PrecomputeSubTable failed", "DimE", dimE, "l", l, "j", j, "err", err)
 			return
 		}
 		results <- dr
@@ -288,9 +294,9 @@ func (p *SRSTable) readWorker(
 			g1 := buf[b.start+i*kzg.G1PointBytes : b.start+(i+1)*kzg.G1PointBytes]
 			_, err := slicePoints[i].SetBytes(g1[:]) //UnmarshalText(g1[:])
 			if err != nil {
-				log.Printf("Error. From %v to %v. %v", b.start, b.end, err)
-				log.Println()
-				log.Println("readWorker.ERR.0", err)
+				// TODO(samlaf): handle this error better... if this errors then TableReaderThreads will hang forever
+				p.logger.Error("read worker failed to deserialize g1 point",
+					"DimE", dimE, "sliceAt", b.sliceAt, "start", b.start, "end", b.end, "err", err)
 				return
 			}
 		}
