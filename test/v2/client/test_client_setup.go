@@ -22,7 +22,6 @@ var (
 	clientLock sync.Mutex
 	configMap  = make(map[string]*TestClientConfig)
 	clientMap  = make(map[string]*TestClient)
-	logger     logging.Logger
 	metrics    *TestClientMetrics
 )
 

@@ -120,10 +120,10 @@ func (c *TestClientConfig) Verify() error {
 	if c.MaxBlobSize == 0 {
 		return fmt.Errorf("MaxBlobSize must be set and greater than 0")
 	}
-	if c.ValidatorReadConnectionPoolSize == 0 {
+	if c.ValidatorReadConnectionPoolSize <= 0 {
 		return fmt.Errorf("ValidatorReadConnectionPoolSize must be set and greater than 0")
 	}
-	if c.ValidatorReadComputePoolSize == 0 {
+	if c.ValidatorReadComputePoolSize <= 0 {
 		return fmt.Errorf("ValidatorReadComputePoolSize must be set and greater than 0")
 	}
 	if c.RelayConnectionCount == 0 {
