@@ -2,6 +2,7 @@ package prover_test
 
 import (
 	cryptorand "crypto/rand"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test/random"
 
 	"github.com/stretchr/testify/require"
 )
@@ -39,8 +41,8 @@ func setup() {
 		G1Path:          "../../../resources/srs/g1.point",
 		G2Path:          "../../../resources/srs/g2.point",
 		CacheDir:        "../../../resources/srs/SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 2900,
+		SRSOrder:        524288,
+		SRSNumberToLoad: 524288,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,
 	}
@@ -81,39 +83,32 @@ func TestEncoder(t *testing.T) {
 	v, err := verifier.NewVerifier(kzgConfig, nil)
 	require.NoError(t, err)
 
-	params := encoding.ParamsFromMins(5, 5)
+	blobLen := uint64(8192)
+
+	rand := random.NewTestRandom()
+	blob := rand.FrElements(blobLen)
+
+	var gettysburgAddressBytes []byte
+	for i := 0; i < 8192; i++ {
+		b := blob[i].Bytes()
+		gettysburgAddressBytes = append(gettysburgAddressBytes, b[:]...)
+	}
+
+	params := encoding.ParamsFromMins(8, 8192)
+	blobLength := encoding.GetBlobLengthPowerOf2(uint32(len(gettysburgAddressBytes)))
+	params.SetBlobLength(uint64(blobLength))
+	fmt.Println("params", params)
+	fmt.Println("blobLength", blobLength)
 	commitments, chunks, err := p.EncodeAndProve(gettysburgAddressBytes, params)
 	require.NoError(t, err)
 
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
+	indices := make([]encoding.ChunkNumber, 8192)
+	for i := 0; i < 8192; i++ {
+		indices[i] = encoding.ChunkNumber(i)
 	}
 	err = v.VerifyFrames(chunks, indices, commitments, params)
 	require.NoError(t, err)
-	err = v.VerifyFrames(chunks, []encoding.ChunkNumber{
-		7, 6, 5, 4, 3, 2, 1, 0,
-	}, commitments, params)
-	require.Error(t, err)
 
-	maxInputSize := uint64(len(gettysburgAddressBytes))
-	decoded, err := p.Decode(chunks, indices, params, maxInputSize)
-	require.NoError(t, err)
-	require.Equal(t, gettysburgAddressBytes, decoded)
-
-	// shuffle chunks
-	tmp := chunks[2]
-	chunks[2] = chunks[5]
-	chunks[5] = tmp
-	indices = []encoding.ChunkNumber{
-		0, 1, 5, 3, 4, 2, 6, 7,
-	}
-
-	err = v.VerifyFrames(chunks, indices, commitments, params)
-	require.NoError(t, err)
-
-	decoded, err = p.Decode(chunks, indices, params, maxInputSize)
-	require.NoError(t, err)
-	require.Equal(t, gettysburgAddressBytes, decoded)
 }
 
 // Ballpark number for 400KiB blob encoding

@@ -442,7 +442,16 @@ func (p *Prover) SetupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Aff
 		return nil, nil, fmt.Errorf("failed to create SRS table: %w", err)
 	}
 
-	fftPoints, err := subTable.GetSubTables(params.NumChunks, params.ChunkLength)
+	blobLength, err := params.GetBlobLength()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	numSystem := blobLength / params.ChunkLength
+	fmt.Println("numSystem", numSystem)
+	fmt.Println("params.ChunkLength", params.ChunkLength)
+
+	fftPoints, err := subTable.GetSubTables(numSystem, params.ChunkLength)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get sub tables: %w", err)
 	}

@@ -25,23 +25,28 @@ type WorkerResult struct {
 	err error
 }
 
-func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+// assume polyFr must be power of 2
+func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProof(polyFr []fr.Element, numTotalChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
-	dimE := numChunks
+	// number of sysmatic symbols
+	numChunks := uint64(len(polyFr)) / chunkLen
 	l := chunkLen
+	fmt.Println("ComputeMultiFrameProof numChunks", numChunks)
+	fmt.Println("ComputeMultiFrameProof chunkLen", chunkLen)
+	fmt.Println("ComputeMultiFrameProof polyFr", len(polyFr))
 
 	// Pre-processing stage
-	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
+	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, numChunks)
 	if err != nil {
 		return nil, fmt.Errorf("coefficient computation error: %v", err)
 	}
 	preprocessDone := time.Now()
 
 	// compute proof by multi scaler multiplication
-	sumVec := make([]bn254.G1Affine, dimE*2)
-	msmErrors := make(chan error, dimE*2)
-	for i := uint64(0); i < dimE*2; i++ {
+	sumVec := make([]bn254.G1Affine, numChunks*2)
+	msmErrors := make(chan error, numChunks*2)
+	for i := uint64(0); i < numChunks*2; i++ {
 
 		go func(k uint64) {
 			_, err := sumVec[k].MultiExp(p.FFTPointsT[k], coeffStore[k], ecc.MultiExpConfig{})
@@ -50,7 +55,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProof(polyFr []fr.Element, 
 		}(i)
 	}
 
-	for i := uint64(0); i < dimE*2; i++ {
+	for i := uint64(0); i < numChunks*2; i++ {
 		err := <-msmErrors
 		if err != nil {
 			fmt.Println("Error. MSM while adding points", err)
@@ -68,8 +73,15 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProof(polyFr []fr.Element, 
 
 	firstECNttDone := time.Now()
 
+	infinity := bn254.G1Affine{}
+	infinity.SetInfinity()
+	paddedG1 := sumVecInv[:len(sumVecInv)/2]
+	for i := uint64(len(paddedG1)); i < numTotalChunks; i++ {
+		paddedG1 = append(paddedG1, infinity)
+	}
+
 	// outputs is out of order - buttefly
-	proofs, err := p.Fs.FFTG1(sumVecInv[:dimE], false)
+	proofs, err := p.Fs.FFTG1(paddedG1, false)
 	if err != nil {
 		return nil, err
 	}
