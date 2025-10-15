@@ -112,7 +112,6 @@ func (p *SRSTable) GetSubTables(
 		dstFilePath := path.Join(p.TableDir, filename)
 
 		start := time.Now()
-		// precompute can silently fail, and
 		fftPoints := p.precompute(dim, dimE, cosetSize, m, dstFilePath, p.NumWorker)
 		elapsed := time.Since(start)
 
@@ -174,7 +173,8 @@ func (p *SRSTable) precompute(dim, dimE, l, m uint64, filePath string, numWorker
 
 	err := p.TableWriter(fftPoints, dimE, filePath)
 	if err != nil {
-		// We silently error because precomputation is just an optimization.
+		// We just log the error but move on because the fftPoints are still correct,
+		// they just won't be saved to disk for the next run.
 		p.logger.Error("Precomputing SRSTable failed.", "DimE", dimE, "CosetSize", l, "err", err)
 	}
 	return fftPoints
