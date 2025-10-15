@@ -59,6 +59,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 	sumVec := make([]bn254.G1Affine, dimE*2)
 
 	g := new(errgroup.Group)
+	g.SetLimit(int(numWorker))
 	for i := uint64(0); i < dimE*2; i++ {
 		g.Go(func() error {
 			// eqn (3) u=y*v
