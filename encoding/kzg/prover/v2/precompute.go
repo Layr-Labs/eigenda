@@ -112,12 +112,10 @@ func (p *SRSTable) GetSubTables(
 		dstFilePath := path.Join(p.TableDir, filename)
 
 		start := time.Now()
-		fftPoints, err := p.precompute(dim, dimE, cosetSize, m, dstFilePath, p.NumWorker)
-		if err != nil {
-			return nil, fmt.Errorf("precompute: %w", err)
-		}
-
+		// precompute can silently fail, and
+		fftPoints := p.precompute(dim, dimE, cosetSize, m, dstFilePath, p.NumWorker)
 		elapsed := time.Since(start)
+
 		p.logger.Info("Precomputed SRSTable generated", "DimE", dimE, "CosetSize", cosetSize, "FilePath", dstFilePath, "Elapsed", elapsed)
 		return fftPoints, nil
 	} else {
@@ -142,7 +140,7 @@ type DispatchReturn struct {
 
 // m = len(poly) - 1, which is deg
 // Returns a slice of size [l][2*dimE]
-func (p *SRSTable) precompute(dim, dimE, l, m uint64, filePath string, numWorker uint64) ([][]bn254.G1Affine, error) {
+func (p *SRSTable) precompute(dim, dimE, l, m uint64, filePath string, numWorker uint64) [][]bn254.G1Affine {
 	order := dimE * l
 	if l == 1 {
 		order = dimE * 2
@@ -176,9 +174,10 @@ func (p *SRSTable) precompute(dim, dimE, l, m uint64, filePath string, numWorker
 
 	err := p.TableWriter(fftPoints, dimE, filePath)
 	if err != nil {
-		return nil, fmt.Errorf("write precomputed table to %s: %w", filePath, err)
+		// We silently error because precomputation is just an optimization.
+		p.logger.Error("Precomputing SRSTable failed.", "DimE", dimE, "CosetSize", l, "err", err)
 	}
-	return fftPoints, nil
+	return fftPoints
 }
 
 func (p *SRSTable) precomputeWorker(
