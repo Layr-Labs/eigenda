@@ -26,9 +26,6 @@ var _ QuorumScanner = (*quorumScanner)(nil)
 type quorumScanner struct {
 	// A handle for communicating with the registry coordinator contract.
 	registryCoordinator *regcoordinator.ContractEigenDARegistryCoordinator
-
-	// A cache from reference block number to list of quorums.
-	cache lru.Cache[uint64, []core.QuorumID]
 }
 
 // Create a new QuorumScanner instance. This instance is thread safe but not cached.
@@ -96,7 +93,7 @@ func (c *cachedQuorumScanner) GetQuorums(ctx context.Context, referenceBlockNumb
 
 	quorums, err := c.base.GetQuorums(ctx, referenceBlockNumber)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get quorums: %w", err)
 	}
 
 	c.cache.Add(referenceBlockNumber, quorums)
@@ -107,8 +104,6 @@ func (c *cachedQuorumScanner) GetQuorums(ctx context.Context, referenceBlockNumb
 // This is the format expected by many smart contract functions.
 func QuorumListToBytes(quorums []core.QuorumID) []byte {
 	result := make([]byte, len(quorums))
-	for i, q := range quorums {
-		result[i] = byte(q)
-	}
+	copy(result, quorums)
 	return result
 }

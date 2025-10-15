@@ -2,6 +2,7 @@ package eth
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/big"
 
@@ -53,7 +54,7 @@ func (v *validatorQuorumLookup) GetQuorumsForValidator(
 	// This method returns a bitmap as a big.Int, where the first 255 bits represent membership in quorums 0-254.
 	bigIntBitmap, err := v.registryCoordinator.GetCurrentQuorumBitmap(opts, validatorID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get quorum bitmap: %w", err)
 	}
 	bitmap := bigIntBitmap.Bytes()
 
@@ -114,7 +115,7 @@ func (c *cachedValidatorQuorumLookup) GetQuorumsForValidator(
 
 	quorums, err := c.base.GetQuorumsForValidator(ctx, validatorAddress, referenceBlockNumber)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get quorums for validator: %w", err)
 	}
 
 	c.cache.Add(validatorAddress, quorums)

@@ -256,13 +256,13 @@ func (r *TestRandom) DurationRange(min time.Duration, max time.Duration) time.Du
 }
 
 // Address generates a random Ethereum address.
-func (r *TestRandom) Address() geth.Address {
-	return geth.BytesToAddress(r.Bytes(20))
+func (r *TestRandom) Address() gethcommon.Address {
+	return gethcommon.BytesToAddress(r.Bytes(20))
 }
 
 // FrElements generates a slice of num random field elements.
 // FrElements will panic if some error happens with the random source.
-// TODO: this doesnt use TestRandom's source of randomness, fix that.
+// TODO: this doesn't use TestRandom's source of randomness, fix that.
 func (r *TestRandom) FrElements(num uint64) []fr.Element {
 	elements := make([]fr.Element, num)
 	for i := range num {

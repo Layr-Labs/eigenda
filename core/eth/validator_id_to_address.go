@@ -124,7 +124,7 @@ func (c *cachedValidatorIDToAddressConverter) ValidatorAddressToID(
 
 	id, err := c.base.ValidatorAddressToID(ctx, validatorAddress)
 	if err != nil {
-		return core.OperatorID{}, err
+		return core.OperatorID{}, fmt.Errorf("failed to get validator ID from address: %w", err)
 	}
 
 	c.addressToIDCache.Add(validatorAddress, id)
@@ -144,7 +144,7 @@ func (c *cachedValidatorIDToAddressConverter) ValidatorIDToAddress(
 
 	address, err := c.base.ValidatorIDToAddress(ctx, validatorID)
 	if err != nil {
-		return geth.Address{}, err
+		return geth.Address{}, fmt.Errorf("failed to get validator address from ID: %w", err)
 	}
 
 	c.idToAddressCache.Add(validatorID, address)
@@ -152,4 +152,3 @@ func (c *cachedValidatorIDToAddressConverter) ValidatorIDToAddress(
 
 	return address, nil
 }
-
