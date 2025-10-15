@@ -104,7 +104,6 @@ func (e *RootEjectorConfig) GetPackagePaths() []string {
 	}
 }
 
-// Verify implements config.DocumentedConfig.
 func (e *RootEjectorConfig) Verify() error {
 	err := e.Config.Verify()
 	if err != nil {

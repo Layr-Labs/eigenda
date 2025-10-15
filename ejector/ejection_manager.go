@@ -34,8 +34,8 @@ var _ EjectionManager = (*ejectionManager)(nil)
 type inProgressEjection struct {
 	// The time when the ejection can be finalized.
 	ejectionFinalizationTime time.Time
-	// For each quorum the validator is a member of, the validator's stake in that quorum as a fraction of 1.0.
-	stake map[core.QuorumID]float64
+	// For each quorum the validator is a member of, the validator's stakeFraction in that quorum as a fraction of 1.0.
+	stakeFraction map[core.QuorumID]float64
 }
 
 // A utility that manages ejections and the ejection lifecycle. An ejection manager is responsible for executing
@@ -142,7 +142,7 @@ func (em *ejectionManager) BeginEjection(
 	}
 
 	// Check to see if we are already in the process of ejecting this validator.
-	if _, inProgress := em.ejectionsInProgress[validatorAddress]; inProgress {
+	if _, ejectionAlreadyBeingTracked := em.ejectionsInProgress[validatorAddress]; ejectionAlreadyBeingTracked {
 		em.logger.Infof("ejection already in progress for validator %s, will not begin ejection",
 			validatorAddress.Hex())
 		return
@@ -156,14 +156,14 @@ func (em *ejectionManager) BeginEjection(
 	}
 
 	// Check to see if there is already an ejection in progress on-chain for this validator.
-	inProgress, err := em.transactor.IsEjectionInProgress(em.ctx, validatorAddress)
+	ejectionStartedOnchain, err := em.transactor.IsEjectionInProgress(em.ctx, validatorAddress)
 	if err != nil {
 		em.logger.Errorf("failed to check ejection status for validator %s, will not begin ejection: %v",
 			validatorAddress.Hex(), err)
 		return
 	}
-	if inProgress {
-		// An ejection is already in progress. Record it, and we can try to finalize it later.
+	if ejectionStartedOnchain {
+		// An ejection is already in progress onchain. Record it, and we can try to finalize it later.
 		em.logger.Infof("ejection already in progress on-chain for validator %s, "+
 			"will not begin ejection but will attempt to finalize",
 			validatorAddress.Hex())
@@ -200,7 +200,7 @@ func (em *ejectionManager) scheduleFutureEjectionFinalization(
 	em.recentEjectionTimes[validatorAddress] = em.timeSource()
 	em.ejectionsInProgress[validatorAddress] = &inProgressEjection{
 		ejectionFinalizationTime: em.timeSource().Add(em.config.EjectionFinalizationDelay),
-		stake:                    stakeFractions,
+		stakeFraction:            stakeFractions,
 	}
 }
 
@@ -240,7 +240,7 @@ func (em *ejectionManager) FinalizeEjections() {
 			ejected := em.finalizeEjection(address)
 
 			if !ejected {
-				em.cleanUpFailedEjection(address, ejection.stake)
+				em.cleanUpFailedEjection(address, ejection.stakeFraction)
 			}
 		}
 	}
