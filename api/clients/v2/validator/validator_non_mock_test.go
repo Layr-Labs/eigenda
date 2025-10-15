@@ -42,7 +42,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	// Set up KZG components (prover, committer and verifier)
 	p, c, v, err := makeTestEncodingComponents()
 	require.NoError(t, err)
-	encoder := rs.NewEncoder(nil)
+	encoder := rs.NewEncoder(logger, nil)
 
 	// Set up test environment
 	rand := testrandom.NewTestRandom()

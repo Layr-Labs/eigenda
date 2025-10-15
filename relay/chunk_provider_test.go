@@ -197,7 +197,7 @@ func TestParsingBundle(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(paddedPayload)))
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(cfg)
+	enc := rs.NewEncoder(logger, cfg)
 
 	// Build some random coefficients
 	coeffs, _, err := enc.EncodeBytes(paddedPayload, params)

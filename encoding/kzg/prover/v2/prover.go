@@ -50,7 +50,7 @@ func NewProver(logger logging.Logger, kzgConfig *KzgConfig, encoderConfig *encod
 		return nil, fmt.Errorf("failed to read G1 points: %w", err)
 	}
 
-	rsEncoder := rs.NewEncoder(encoderConfig)
+	rsEncoder := rs.NewEncoder(logger, encoderConfig)
 
 	proverGroup := &Prover{
 		logger:              logger,
@@ -162,12 +162,14 @@ func (p *Prover) createGnarkBackendProver(
 
 	// Set KZG Prover gnark backend
 	multiproofBackend := &gnarkprover.KzgMultiProofGnarkBackend{
+		Logger:     p.logger,
 		Fs:         fs,
 		FFTPointsT: fftPointsT,
 		SFs:        sfs,
 	}
 
 	return &ParametrizedProver{
+		logger:                     p.logger,
 		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
 		encodingParams:             params,
 		encoder:                    p.encoder,

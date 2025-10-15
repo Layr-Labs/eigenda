@@ -1,131 +1,21 @@
-2025/10/15 00:11:01 maxprocs: Leaving GOMAXPROCS=12: CPU quota undefined
+2025/10/15 15:18:26 maxprocs: Leaving GOMAXPROCS=12: CPU quota undefined
 goos: darwin
 goarch: arm64
 cpu: Apple M4 Pro
-BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^17_bytes-12         	     759	   1528102 ns/op	 1720474 B/op	      11 allocs/op
-BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^20_bytes-12         	      81	  14951175 ns/op	13648045 B/op	      12 allocs/op
-BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^21_bytes-12         	      37	  29197385 ns/op	27279535 B/op	      12 allocs/op
-BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^24_bytes-12         	       4	 332047479 ns/op	218120520 B/op	      15 allocs/op
-BenchmarkCommittmentGeneration-12                                         	       1	1079330042 ns/op	537981744 B/op	     376 allocs/op
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=579.042µs extension_duration=7.015167ms frames_duration=7.790667ms total_duration=15.385334ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=23.167µs extension_duration=7.288584ms frames_duration=7.258709ms total_duration=14.572875ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=22.875µs extension_duration=6.987375ms frames_duration=7.718125ms total_duration=14.728541ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=21.417µs extension_duration=6.63275ms frames_duration=8.234541ms total_duration=14.888791ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=25.875µs extension_duration=6.714083ms frames_duration=8.369416ms total_duration=15.109666ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=20.75µs extension_duration=6.60925ms frames_duration=8.022209ms total_duration=14.652417ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=57.791µs extension_duration=6.896708ms frames_duration=7.473583ms total_duration=14.428375ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=62.625µs extension_duration=7.075666ms frames_duration=7.551583ms total_duration=14.690083ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=75.333µs extension_duration=7.025167ms frames_duration=7.462125ms total_duration=14.562833ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=18.334µs extension_duration=6.638209ms frames_duration=8.00325ms total_duration=14.659917ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=24.458µs extension_duration=6.705042ms frames_duration=8.060167ms total_duration=14.789834ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=24.625µs extension_duration=6.663583ms frames_duration=7.292958ms total_duration=13.98125ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=107.458µs extension_duration=6.996ms frames_duration=7.632458ms total_duration=14.736125ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=43.583µs extension_duration=6.909583ms frames_duration=7.634208ms total_duration=14.587542ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=41.875µs extension_duration=6.855584ms frames_duration=7.869709ms total_duration=14.76725ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=42.25µs extension_duration=6.522375ms frames_duration=8.091625ms total_duration=14.6565ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=22.417µs extension_duration=6.596958ms frames_duration=7.874541ms total_duration=14.494167ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=23.791µs extension_duration=6.459ms frames_duration=7.107458ms total_duration=13.590417ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=94.167µs extension_duration=6.971459ms frames_duration=7.817125ms total_duration=14.882958ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=50.458µs extension_duration=6.945083ms frames_duration=7.736459ms total_duration=14.732209ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=54.917µs extension_duration=6.772875ms frames_duration=7.426333ms total_duration=14.25425ms
-2025/10/15 00:11:17 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=58.5µs extension_duration=6.479167ms frames_duration=8.047167ms total_duration=14.584958ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=56.5µs extension_duration=6.361792ms frames_duration=7.657958ms total_duration=14.0765ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=40.666µs extension_duration=6.326333ms frames_duration=7.408833ms total_duration=13.775958ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=96.667µs extension_duration=6.897958ms frames_duration=7.698375ms total_duration=14.693125ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=61.166µs extension_duration=6.89825ms frames_duration=7.42275ms total_duration=14.382417ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=81.5µs extension_duration=6.842625ms frames_duration=7.639417ms total_duration=14.563708ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=36µs extension_duration=6.682417ms frames_duration=8.497542ms total_duration=15.216083ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=22.625µs extension_duration=6.650667ms frames_duration=7.955667ms total_duration=14.629125ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=18.875µs extension_duration=6.5125ms frames_duration=7.292542ms total_duration=13.824084ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=37.791µs extension_duration=6.968583ms frames_duration=7.1375ms total_duration=14.143958ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=75.375µs extension_duration=6.935959ms frames_duration=7.37175ms total_duration=14.383375ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=41.084µs extension_duration=6.544375ms frames_duration=7.873292ms total_duration=14.458875ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=43.584µs extension_duration=6.5295ms frames_duration=7.899625ms total_duration=14.472958ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=24.875µs extension_duration=6.739583ms frames_duration=7.465417ms total_duration=14.23ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=65.458µs extension_duration=6.711167ms frames_duration=7.728458ms total_duration=14.50525ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=62.959µs extension_duration=6.884625ms frames_duration=7.586208ms total_duration=14.534083ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=72.583µs extension_duration=6.766917ms frames_duration=7.607208ms total_duration=14.446917ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=46.041µs extension_duration=6.722375ms frames_duration=7.82425ms total_duration=14.592791ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=24.417µs extension_duration=6.646208ms frames_duration=8.2235ms total_duration=14.894291ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=22.75µs extension_duration=6.608541ms frames_duration=7.239583ms total_duration=13.871042ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=33.667µs extension_duration=6.877291ms frames_duration=7.582333ms total_duration=14.493458ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=71µs extension_duration=6.84175ms frames_duration=7.411542ms total_duration=14.324375ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=33.75µs extension_duration=6.681041ms frames_duration=7.978459ms total_duration=14.693334ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=21.625µs extension_duration=6.484125ms frames_duration=7.905ms total_duration=14.410833ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=22.459µs extension_duration=6.590666ms frames_duration=7.470333ms total_duration=14.0835ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=19.375µs extension_duration=6.935042ms frames_duration=7.594708ms total_duration=14.549208ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=54.583µs extension_duration=6.91825ms frames_duration=7.32475ms total_duration=14.3005ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=23.833µs extension_duration=6.497542ms frames_duration=7.866625ms total_duration=14.38825ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=24.25µs extension_duration=6.449ms frames_duration=8.002541ms total_duration=14.475875ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=20.875µs extension_duration=6.50375ms frames_duration=7.773709ms total_duration=14.298584ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=18.833µs extension_duration=6.932875ms frames_duration=7.40125ms total_duration=14.353083ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=46.791µs extension_duration=6.825042ms frames_duration=7.513042ms total_duration=14.385042ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=22.541µs extension_duration=6.618625ms frames_duration=8.450042ms total_duration=15.091417ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=30.083µs extension_duration=6.576875ms frames_duration=7.790875ms total_duration=14.397917ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=25.375µs extension_duration=6.5715ms frames_duration=7.568542ms total_duration=14.165542ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=44.25µs extension_duration=6.772417ms frames_duration=7.615ms total_duration=14.431791ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=50.791µs extension_duration=6.831ms frames_duration=7.711042ms total_duration=14.592917ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=23.875µs extension_duration=6.590875ms frames_duration=7.880792ms total_duration=14.495625ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=22.334µs extension_duration=6.58375ms frames_duration=7.77375ms total_duration=14.379958ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=23.75µs extension_duration=6.486541ms frames_duration=7.539958ms total_duration=14.050417ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=38.125µs extension_duration=6.817208ms frames_duration=7.426459ms total_duration=14.282ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=49µs extension_duration=6.833292ms frames_duration=7.666209ms total_duration=14.548625ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=36.125µs extension_duration=6.490375ms frames_duration=7.643209ms total_duration=14.169958ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=18.625µs extension_duration=6.423208ms frames_duration=8.163209ms total_duration=14.60525ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=45.042µs extension_duration=6.475667ms frames_duration=7.429375ms total_duration=13.950208ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=67.875µs extension_duration=6.897375ms frames_duration=8.087833ms total_duration=15.05325ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=57.875µs extension_duration=6.745208ms frames_duration=7.735583ms total_duration=14.538833ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=24.917µs extension_duration=6.476375ms frames_duration=8.020083ms total_duration=14.5215ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=23.5µs extension_duration=6.543625ms frames_duration=7.606708ms total_duration=14.173875ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=21.208µs extension_duration=6.599542ms frames_duration=7.686666ms total_duration=14.307542ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=23.458µs extension_duration=6.968ms frames_duration=8.171459ms total_duration=15.163041ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=79.167µs extension_duration=6.88775ms frames_duration=8.322125ms total_duration=15.289208ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=22.042µs extension_duration=6.623458ms frames_duration=8.553916ms total_duration=15.1995ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=25.417µs extension_duration=6.51225ms frames_duration=8.193792ms total_duration=14.731709ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=107.375µs extension_duration=6.832625ms frames_duration=8.0425ms total_duration=14.982709ms
-BenchmarkBlobToChunksEncoding/Encode_size_2^17_bytes-12                   	      76	  14534746 ns/op	 5616906 B/op	   16448 allocs/op
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=5.619875ms extension_duration=73.409583ms frames_duration=14.242125ms total_duration=93.272084ms
-2025/10/15 00:11:18 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=151.875µs extension_duration=72.5135ms frames_duration=14.600208ms total_duration=87.266125ms
-2025/10/15 00:11:19 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=132.166µs extension_duration=71.440708ms frames_duration=14.550667ms total_duration=86.124292ms
-2025/10/15 00:11:19 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=156µs extension_duration=72.062042ms frames_duration=13.893583ms total_duration=86.112042ms
-2025/10/15 00:11:19 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=391.292µs extension_duration=71.617917ms frames_duration=14.158917ms total_duration=86.168292ms
-2025/10/15 00:11:19 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=150.75µs extension_duration=72.856166ms frames_duration=13.961125ms total_duration=86.968625ms
-2025/10/15 00:11:19 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=271.917µs extension_duration=74.612625ms frames_duration=14.488583ms total_duration=89.373167ms
-2025/10/15 00:11:19 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=134.667µs extension_duration=70.22775ms frames_duration=14.563166ms total_duration=84.925958ms
-2025/10/15 00:11:19 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=150.708µs extension_duration=71.4835ms frames_duration=14.045375ms total_duration=85.680209ms
-2025/10/15 00:11:19 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=154.25µs extension_duration=72.126583ms frames_duration=14.325583ms total_duration=86.6065ms
-2025/10/15 00:11:19 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=131.625µs extension_duration=72.240541ms frames_duration=14.138708ms total_duration=86.511542ms
-2025/10/15 00:11:19 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=150.25µs extension_duration=72.2275ms frames_duration=13.618917ms total_duration=85.99725ms
-BenchmarkBlobToChunksEncoding/Encode_size_2^20_bytes-12                   	      12	  87107024 ns/op	43688314 B/op	   16447 allocs/op
-2025/10/15 00:11:20 INFO RSEncode details input_size_bytes=2097152 num_chunks=8192 chunk_length=64 padding_duration=9.877625ms extension_duration=159.577791ms frames_duration=20.787792ms total_duration=190.24325ms
-2025/10/15 00:11:20 INFO RSEncode details input_size_bytes=2097152 num_chunks=8192 chunk_length=64 padding_duration=296.75µs extension_duration=168.409875ms frames_duration=20.865708ms total_duration=189.572417ms
-2025/10/15 00:11:20 INFO RSEncode details input_size_bytes=2097152 num_chunks=8192 chunk_length=64 padding_duration=288.375µs extension_duration=158.00625ms frames_duration=21.392166ms total_duration=179.687583ms
-2025/10/15 00:11:20 INFO RSEncode details input_size_bytes=2097152 num_chunks=8192 chunk_length=64 padding_duration=510.416µs extension_duration=158.341ms frames_duration=21.034333ms total_duration=179.886ms
-2025/10/15 00:11:20 INFO RSEncode details input_size_bytes=2097152 num_chunks=8192 chunk_length=64 padding_duration=270.709µs extension_duration=154.183167ms frames_duration=21.419375ms total_duration=175.873834ms
-2025/10/15 00:11:20 INFO RSEncode details input_size_bytes=2097152 num_chunks=8192 chunk_length=64 padding_duration=304.292µs extension_duration=160.699791ms frames_duration=21.750958ms total_duration=182.755709ms
-BenchmarkBlobToChunksEncoding/Encode_size_2^21_bytes-12                   	       6	 183028382 ns/op	89825738 B/op	   16443 allocs/op
-2025/10/15 00:11:22 INFO RSEncode details input_size_bytes=16777216 num_chunks=8192 chunk_length=512 padding_duration=80.125959ms extension_duration=1.635960959s frames_duration=172.355459ms total_duration=1.888444041s
-BenchmarkBlobToChunksEncoding/Encode_size_2^24_bytes-12                   	       1	1888474167 ns/op	939886808 B/op	   16459 allocs/op
-2025/10/15 00:11:23 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=529.75µs extension_duration=8.033ms frames_duration=211.918791ms total_duration=220.481708ms
-2025/10/15 00:11:31 INFO Multiproof Time Decomp total=8.456965s preproc=4.062583ms msm=517.377792ms fft1=5.8847635s fft2=2.050761125s
-2025/10/15 00:11:31 INFO Frame process details Input_size_bytes=131072 Num_chunks=8192 Chunk_length=4 Total_duration=8.4570445s RS_encode_duration=220.505125ms multiProof_duration=8.457035584s SRSOrder=268435456 SRSOrder_shift=268431360
-2025/10/15 00:11:32 INFO RSEncode details input_size_bytes=131072 num_chunks=8192 chunk_length=4 padding_duration=100.958µs extension_duration=7.117666ms frames_duration=455.509792ms total_duration=462.728834ms
-2025/10/15 00:11:40 INFO Multiproof Time Decomp total=8.488453125s preproc=6.003042ms msm=572.162958ms fft1=5.867709625s fft2=2.0425775s
-2025/10/15 00:11:40 INFO Frame process details Input_size_bytes=131072 Num_chunks=8192 Chunk_length=4 Total_duration=8.48866s RS_encode_duration=462.753167ms multiProof_duration=8.488648667s SRSOrder=268435456 SRSOrder_shift=268431360
-BenchmarkMultiproofFrameGeneration/Multiproof_size_2^17_bytes-12          	       1	8489016292 ns/op	592949792 B/op	 3808119 allocs/op
-2025/10/15 00:11:41 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=7.53425ms extension_duration=798.97525ms frames_duration=24.4395ms total_duration=830.950375ms
-2025/10/15 00:11:49 INFO Multiproof Time Decomp total=8.949676542s preproc=22.263625ms msm=1.005896208s fft1=5.866886959s fft2=2.05462975s
-2025/10/15 00:11:49 INFO Frame process details Input_size_bytes=1048576 Num_chunks=8192 Chunk_length=32 Total_duration=8.950734292s RS_encode_duration=830.974083ms multiProof_duration=8.950721417s SRSOrder=268435456 SRSOrder_shift=268402688
-2025/10/15 00:11:50 INFO RSEncode details input_size_bytes=1048576 num_chunks=8192 chunk_length=32 padding_duration=404.125µs extension_duration=991.1155ms frames_duration=28.696833ms total_duration=1.020217083s
-2025/10/15 00:11:58 INFO Multiproof Time Decomp total=8.879462333s preproc=16.978125ms msm=993.922042ms fft1=5.835285041s fft2=2.033277125s
-2025/10/15 00:11:58 INFO Frame process details Input_size_bytes=1048576 Num_chunks=8192 Chunk_length=32 Total_duration=8.880501041s RS_encode_duration=1.020239459s multiProof_duration=8.880490417s SRSOrder=268435456 SRSOrder_shift=268402688
-BenchmarkMultiproofFrameGeneration/Multiproof_size_2^20_bytes-12          	       1	8881303875 ns/op	763450656 B/op	 3926427 allocs/op
-2025/10/15 00:12:00 INFO RSEncode details input_size_bytes=2097152 num_chunks=8192 chunk_length=64 padding_duration=11.613042ms extension_duration=1.573360375s frames_duration=21.985708ms total_duration=1.606960584s
-2025/10/15 00:12:08 INFO Multiproof Time Decomp total=9.491682792s preproc=42.762542ms msm=1.494788125s fft1=5.865380833s fft2=2.088751292s
-2025/10/15 00:12:08 INFO Frame process details Input_size_bytes=2097152 Num_chunks=8192 Chunk_length=64 Total_duration=9.493193708s RS_encode_duration=1.606985625s multiProof_duration=9.493179s SRSOrder=268435456 SRSOrder_shift=268369920
-2025/10/15 00:12:09 INFO RSEncode details input_size_bytes=2097152 num_chunks=8192 chunk_length=64 padding_duration=1.085833ms extension_duration=1.476635417s frames_duration=21.739209ms total_duration=1.499461708s
-2025/10/15 00:12:17 INFO Multiproof Time Decomp total=9.351668708s preproc=41.682875ms msm=1.385933041s fft1=5.879809417s fft2=2.044243375s
-2025/10/15 00:12:17 INFO Frame process details Input_size_bytes=2097152 Num_chunks=8192 Chunk_length=64 Total_duration=9.353751166s RS_encode_duration=1.499485791s multiProof_duration=9.353741959s SRSOrder=268435456 SRSOrder_shift=268369920
-BenchmarkMultiproofFrameGeneration/Multiproof_size_2^21_bytes-12          	       1	9355151084 ns/op	838437616 B/op	 3478175 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^17_bytes-12         	     722	   1600042 ns/op	 1720483 B/op	      11 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^20_bytes-12         	      75	  14344391 ns/op	13648058 B/op	      12 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^21_bytes-12         	      33	  30752650 ns/op	27279546 B/op	      12 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^24_bytes-12         	       3	 338523431 ns/op	218120464 B/op	      14 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^17_bytes-12             	      56	  21127379 ns/op	  834764 B/op	     476 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^20_bytes-12             	      12	  94027549 ns/op	42898616 B/op	     336 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^21_bytes-12             	       6	 174494403 ns/op	82610336 B/op	     334 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^24_bytes-12             	       1	1041497167 ns/op	537948560 B/op	     298 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^17_bytes-12                   	      78	  14341698 ns/op	 5612857 B/op	   16444 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^20_bytes-12                   	      12	  87004580 ns/op	43685468 B/op	   16444 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^21_bytes-12                   	       6	 191573201 ns/op	89824028 B/op	   16443 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^24_bytes-12                   	       1	1933645625 ns/op	939883368 B/op	   16452 allocs/op
+BenchmarkMultiproofFrameGeneration/Multiproof_size_2^17_bytes-12          	       1	8483347042 ns/op	583194896 B/op	 3794671 allocs/op
+BenchmarkMultiproofFrameGeneration/Multiproof_size_2^20_bytes-12          	       1	8988746833 ns/op	772311088 B/op	 3944709 allocs/op
+BenchmarkMultiproofFrameGeneration/Multiproof_size_2^21_bytes-12          	       1	9539889334 ns/op	838424712 B/op	 3478075 allocs/op
 PASS
-ok  	command-line-arguments	76.824s
+ok  	command-line-arguments	80.323s
