@@ -62,7 +62,6 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 	}
 
 	return &ParametrizedProver{
-		logger:                p.logger,
 		EncodingParams:        params,
 		Encoder:               p.encoder,
 		KzgConfig:             p.KzgConfig,
