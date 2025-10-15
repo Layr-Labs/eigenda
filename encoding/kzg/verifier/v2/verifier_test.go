@@ -17,11 +17,11 @@ import (
 )
 
 func TestVerifyFrames(t *testing.T) {
-	harness := getTestHarness()
+	harness := getTestHarness(t)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
 
-	proverGroup, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	proverGroup, err := prover.NewProver(harness.logger, harness.proverV2KzgConfig, nil)
 	require.Nil(t, err)
 
 	committer, err := committer.NewFromConfig(*harness.committerConfig)
@@ -44,9 +44,9 @@ func TestVerifyFrames(t *testing.T) {
 }
 
 func TestUniversalVerify(t *testing.T) {
-	harness := getTestHarness()
+	harness := getTestHarness(t)
 
-	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	group, err := prover.NewProver(harness.logger, harness.proverV2KzgConfig, nil)
 	require.Nil(t, err)
 
 	committer, err := committer.NewFromConfig(*harness.committerConfig)
@@ -94,8 +94,8 @@ func TestUniversalVerify(t *testing.T) {
 }
 
 func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
-	harness := getTestHarness()
-	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	harness := getTestHarness(t)
+	group, err := prover.NewProver(harness.logger, harness.proverV2KzgConfig, nil)
 	require.Nil(t, err)
 
 	committer, err := committer.NewFromConfig(*harness.committerConfig)
@@ -145,9 +145,9 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 func TestBenchmarkVerifyChunks(t *testing.T) {
 	t.Skip("This test is meant to be run manually, not as part of the test suite")
 
-	harness := getTestHarness()
+	harness := getTestHarness(t)
 
-	p, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	p, err := prover.NewProver(harness.logger, harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
 	committer, err := committer.NewFromConfig(*harness.committerConfig)

@@ -50,7 +50,7 @@ func makeTestProver(numPoint uint64) (*prover.Prover, error) {
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
-	p, err := prover.NewProver(kzgConfig, nil)
+	p, err := prover.NewProver(logger, kzgConfig, nil)
 
 	return p, err
 }
