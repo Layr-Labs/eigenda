@@ -78,12 +78,17 @@ func (mh *MetricsHandler) GetThroughputTimeseries(ctx context.Context, startTime
 		throughputRateSecs = uint16(sevenDayThroughputRateSecs)
 	}
 
+	// Adjust start time to account for rate interval skipping
+	adjustedStartTime := startTime - int64(throughputRateSecs)
+
 	var result *PrometheusResult
 	var err error
 	if mh.version == V1 {
-		result, err = mh.promClient.QueryDisperserAvgThroughputBlobSizeBytes(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0), throughputRateSecs)
+		result, err = mh.promClient.QueryDisperserAvgThroughputBlobSizeBytes(
+			ctx, time.Unix(adjustedStartTime, 0), time.Unix(endTime, 0), throughputRateSecs)
 	} else {
-		result, err = mh.promClient.QueryDisperserAvgThroughputBlobSizeBytesV2(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0), throughputRateSecs)
+		result, err = mh.promClient.QueryDisperserAvgThroughputBlobSizeBytesV2(
+			ctx, time.Unix(adjustedStartTime, 0), time.Unix(endTime, 0), throughputRateSecs)
 	}
 
 	if err != nil {
