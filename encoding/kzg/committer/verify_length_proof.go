@@ -15,15 +15,18 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
-func VerifyBlobLength(commitments encoding.BlobCommitments) error {
-	return VerifyLengthProof(
+// VerifyLengthProof by itself is not sufficient to verify the length of a blob commitment!
+// It must be used in conjunction with VerifyCommitEquivalenceBatch to ensure that the
+// blob commitment on G1 and blob commitment on G2 (LengthCommitment) are equivalent.
+func VerifyLengthProof(commitments encoding.BlobCommitments) error {
+	return verifyLengthProof(
 		(*bn254.G2Affine)(commitments.LengthCommitment),
 		(*bn254.G2Affine)(commitments.LengthProof),
 		uint64(commitments.Length),
 	)
 }
 
-// VerifyLengthProof verifies the length proof (low degree proof).
+// verifyLengthProof verifies the length proof (low degree proof).
 // See https://layr-labs.github.io/eigenda/protocol/architecture/encoding.html#validation-via-kzg
 //
 // This function verifies a low degree proof against a poly commitment.
@@ -34,7 +37,7 @@ func VerifyBlobLength(commitments encoding.BlobCommitments) error {
 // by verifying the other pairing equation: e(blob_commitment,G2) = e(length_commitment,C2)
 // This is done in [VerifyCommitEquivalenceBatch].
 // TODO(samlaf): can we move combine the 2 pairings into a single function?
-func VerifyLengthProof(
+func verifyLengthProof(
 	lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, commitmentLength uint64,
 ) error {
 	// This also prevents commitmentLength=0.
@@ -64,6 +67,11 @@ type CommitmentPair struct {
 	LengthCommitment bn254.G2Affine
 }
 
+// VerifyCommitEquivalenceBath is conceptually part of VerifyLengthProof.
+// It's currently a separate function for historical reasons, from the times when we were batching.
+// Now that we no longer are batching, we could verify a single commitmentEquivalence at a time,
+// and do so as part of VerifyLengthProof.
+// TODO(samlaf): refactor into a single VerifyLengthProof function.
 func VerifyCommitEquivalenceBatch(commitments []encoding.BlobCommitments) error {
 	commitmentsPair := make([]CommitmentPair, len(commitments))
 
