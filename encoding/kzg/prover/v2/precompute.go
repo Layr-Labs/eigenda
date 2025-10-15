@@ -96,7 +96,7 @@ func (p *SRSTable) GetSubTables(
 	}
 
 	if table, ok := p.Tables[param]; !ok {
-		p.logger.Infof("Precomputed SRSTable not found. Generating...", "DimE", dimE, "CosetSize", cosetSize)
+		p.logger.Info("Precomputed SRSTable not found. Generating...", "DimE", dimE, "CosetSize", cosetSize)
 
 		// Check if we have enough SRS points loaded for precomputation
 		// We need polynomial degree m < len(SRS)
