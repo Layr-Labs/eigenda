@@ -82,16 +82,20 @@ func (fs *FFTSettings) _fftG1(vals []bn254.G1Affine, valsOffset uint64, valsStri
 	if stage < maxSplits {
 		chDone := make(chan struct{}, 1)
 		go func() {
-			fs._fftG1(vals, valsOffset, valsStride<<1, rootsOfUnity, rootsOfUnityStride<<1, out[:half], nextStage, maxSplits)
+			fs._fftG1(vals, valsOffset, valsStride<<1,
+				rootsOfUnity, rootsOfUnityStride<<1, out[:half], nextStage, maxSplits)
 			close(chDone)
 		}()
-		fs._fftG1(vals, valsOffset+valsStride, valsStride<<1, rootsOfUnity, rootsOfUnityStride<<1, out[half:], nextStage, maxSplits)
+		fs._fftG1(vals, valsOffset+valsStride, valsStride<<1,
+			rootsOfUnity, rootsOfUnityStride<<1, out[half:], nextStage, maxSplits)
 		<-chDone
 	} else {
 		// L will be the left half of out
-		fs._fftG1(vals, valsOffset, valsStride<<1, rootsOfUnity, rootsOfUnityStride<<1, out[:half], nextStage, maxSplits)
+		fs._fftG1(vals, valsOffset, valsStride<<1, rootsOfUnity,
+			rootsOfUnityStride<<1, out[:half], nextStage, maxSplits)
 		// R will be the right half of out
-		fs._fftG1(vals, valsOffset+valsStride, valsStride<<1, rootsOfUnity, rootsOfUnityStride<<1, out[half:], nextStage, maxSplits)
+		fs._fftG1(vals, valsOffset+valsStride, valsStride<<1,
+			rootsOfUnity, rootsOfUnityStride<<1, out[half:], nextStage, maxSplits)
 	}
 
 	var yTimesRoot bn254.G1Affine
