@@ -68,6 +68,15 @@ type EjectorConfig struct {
 
 	// The period at which to periodically attempt to finalize ejections that have been started.
 	EjectionFinalizationPeriod time.Duration
+
+	// The number of blocks to wait before using a reference block number for quorum.
+	ReferenceBlockNumberOffset uint64
+
+	// The interval at which to poll for a new reference block number.
+	ReferenceBlockNumberPollInterval time.Duration
+
+	// The size of the cache to use for Ethereum-related caching layers.
+	EthCacheSize int
 }
 
 // DefaultEjectorConfig returns a default configuration for the ejector.
@@ -85,6 +94,9 @@ func DefaultEjectorConfig() *EjectorConfig {
 		DataApiTimeout:                       60 * time.Second,
 		EthRpcRetryCount:                     3,
 		EthBlockConfirmations:                0,
+		ReferenceBlockNumberOffset:           10,
+		ReferenceBlockNumberPollInterval:     10 * time.Second,
+		EthCacheSize:                         1024,
 	}
 }
 

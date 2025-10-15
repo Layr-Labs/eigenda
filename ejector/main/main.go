@@ -101,6 +101,9 @@ func run(ctx context.Context) error {
 		senderAddress,
 		privateKey,
 		chainID,
+		cfg.ReferenceBlockNumberOffset,
+		cfg.ReferenceBlockNumberPollInterval,
+		cfg.EthCacheSize,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create ejection transactor: %w", err)

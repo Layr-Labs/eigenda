@@ -52,6 +52,12 @@ type ejectionTransactor struct {
 
 	// A utility for getting a list of all quorums.
 	quorumScanner eth.QuorumScanner
+
+	// A utility for looking up which quorums a given validator is a member of at a specific reference block number.
+	validatorQuorumLookup eth.ValidatorQuorumLookup
+
+	// A utility for converting between validator IDs and addresses.
+	validatorIDToAddressConverter eth.ValidatorIDToAddressConverter
 }
 
 // Create a new EjectionTransactor.
@@ -64,6 +70,9 @@ func NewEjectionTransactor(
 	selfAddress gethcommon.Address,
 	privateKey *ecdsa.PrivateKey,
 	chainID *big.Int,
+	referenceBlockNumberOffset uint64,
+	referenceBlockNumberPollInterval time.Duration,
+	ethCacheSize int,
 ) (EjectionTransactor, error) {
 
 	var zeroAddress gethcommon.Address
@@ -91,25 +100,49 @@ func NewEjectionTransactor(
 		return nil, fmt.Errorf("failed to create transact opts: %w", err)
 	}
 
-	referenceBlockProvider := eth.NewReferenceBlockProvider(logger, client, 0)                          // TODO config
-	referenceBlockProvider = eth.NewPeriodicReferenceBlockProvider(referenceBlockProvider, time.Minute) // TODO config
+	referenceBlockProvider := eth.NewReferenceBlockProvider(logger, client, referenceBlockNumberOffset)
+	referenceBlockProvider = eth.NewPeriodicReferenceBlockProvider(
+		referenceBlockProvider,
+		referenceBlockNumberPollInterval)
 
 	quorumScanner, err := eth.NewQuorumScanner(client, registryCoordinatorAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create quorum scanner: %w", err)
 	}
-	quorumScanner, err = eth.NewCachedQuorumScanner(quorumScanner, 1024)
+	quorumScanner, err = eth.NewCachedQuorumScanner(quorumScanner, ethCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cached quorum scanner: %w", err)
 	}
 
+	validatorQuorumLookup, err := eth.NewValidatorQuorumLookup(client, registryCoordinatorAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create validator quorum lookup: %w", err)
+	}
+	validatorQuorumLookup, err = eth.NewCachedValidatorQuorumLookup(validatorQuorumLookup, ethCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cached validator quorum lookup: %w", err)
+	}
+
+	validatorIDToAddressConverter, err := eth.NewValidatorIDToAddressConverter(client, registryCoordinatorAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create validator ID to address converter: %w", err)
+	}
+	validatorIDToAddressConverter, err = eth.NewCachedValidatorIDToAddressConverter(
+		validatorIDToAddressConverter,
+		ethCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cached validator ID to address converter: %w", err)
+	}
+
 	return &ejectionTransactor{
-		selfAddress:            selfAddress,
-		caller:                 caller,
-		transactor:             transactor,
-		signer:                 transactOpts.Signer,
-		referenceBlockProvider: referenceBlockProvider,
-		quorumScanner:          quorumScanner,
+		selfAddress:                   selfAddress,
+		caller:                        caller,
+		transactor:                    transactor,
+		signer:                        transactOpts.Signer,
+		referenceBlockProvider:        referenceBlockProvider,
+		quorumScanner:                 quorumScanner,
+		validatorQuorumLookup:         validatorQuorumLookup,
+		validatorIDToAddressConverter: validatorIDToAddressConverter,
 	}, nil
 }
 
@@ -171,7 +204,23 @@ func (e *ejectionTransactor) IsValidatorPresentInAnyQuorum(
 	ctx context.Context,
 	addressToCheck gethcommon.Address,
 ) (bool, error) {
-	panic("unimplemented")
+
+	rbn, err := e.referenceBlockProvider.GetReferenceBlockNumber(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get reference block number: %w", err)
+	}
+
+	validatorID, err := e.validatorIDToAddressConverter.ValidatorAddressToID(ctx, addressToCheck)
+	if err != nil {
+		return false, fmt.Errorf("failed to get validator ID from address: %w", err)
+	}
+
+	quorums, err := e.validatorQuorumLookup.GetQuorumsForValidator(ctx, validatorID, rbn)
+	if err != nil {
+		return false, fmt.Errorf("failed to get quorums for validator: %w", err)
+	}
+
+	return len(quorums) > 0, nil
 }
 
 // StartEjection implements EjectionTransactor.
