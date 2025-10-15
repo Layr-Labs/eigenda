@@ -5,13 +5,12 @@ package icicle
 import (
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
@@ -22,9 +21,6 @@ import (
 type KzgMultiProofIcicleBackend struct {
 	Fs             *fft.FFTSettings
 	FlatFFTPointsT []iciclebn254.Affine
-	SRSIcicle      []iciclebn254.Affine
-	SFs            *fft.FFTSettings
-	Srs            kzg.SRS
 	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
 	Device         runtime.Device
@@ -183,7 +179,7 @@ func (p *KzgMultiProofIcicleBackend) proofWorker(
 	results chan<- WorkerResult,
 ) {
 	for j := range jobChan {
-		coeffs, err := p.GetSlicesCoeff(polyFr, dimE, j, l)
+		coeffs, err := p.getSlicesCoeff(polyFr, dimE, j, l)
 		if err != nil {
 			results <- WorkerResult{
 				err: err,
@@ -203,29 +199,32 @@ func (p *KzgMultiProofIcicleBackend) proofWorker(
 	}
 }
 
-// output is in the form see primeField toeplitz
+// getSlicesCoeff computes step 2 of the FFT trick for computing h,
+// in proposition 2 of https://eprint.iacr.org/2023/033.pdf.
+// However, given that it's used in the multiple multiproofs scenario,
+// the indices used are more complex (eg. (m-j)/l below).
+// Those indices are from the matrix in section 3.1.1 of
+// https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf
+// Returned slice has len [2*dimE].
 //
-// phi ^ (coset size ) = 1
-//
-// implicitly pad slices to power of 2
-func (p *KzgMultiProofIcicleBackend) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
-	// there is a constant term
-	m := uint64(len(polyFr)) - 1
+// TODO(samlaf): better document/explain/refactor/rename this function,
+// to explain how it fits into the overall scheme.
+func (p *KzgMultiProofIcicleBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
+	toeplitzExtendedVec := make([]fr.Element, 2*dimE)
+
+	m := uint64(len(polyFr)) - 1 // there is a constant term
 	dim := (m - j) / l
-
-	// maximal number of unique values from a toeplitz matrix
-	tDim := 2*dimE - 1
-
-	toeV := make([]fr.Element, tDim)
-	for i := uint64(0); i < dim; i++ {
-
-		toeV[i].Set(&polyFr[m-(j+i*l)])
+	for i := range dim {
+		toeplitzExtendedVec[i].Set(&polyFr[m-(j+i*l)])
 	}
+	// We keep the first element as is, and reverse the rest of the slice.
+	// This is classic Toeplitz manipulations, as for example describe in
+	// https://alinush.github.io/2020/03/19/multiplying-a-vector-by-a-toeplitz-matrix.html
+	slices.Reverse(toeplitzExtendedVec[1:])
 
-	// use precompute table
-	tm, err := toeplitz.NewToeplitz(toeV, p.SFs)
+	out, err := p.Fs.FFT(toeplitzExtendedVec, false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fft: %w", err)
 	}
-	return tm.GetFFTCoeff()
+	return out, nil
 }

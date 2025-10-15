@@ -86,7 +86,7 @@ and otherwise is considered stale and verification will fail, and a 418 HTTP err
 This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA_PROXY_EIGENDA_V2_RBN_RECENCY_WINDOW_SIZE]
    --eigenda.v2.relay-connection-pool-size value  Number of gRPC connections to maintain to each relay. (default: 1) [$EIGENDA_PROXY_EIGENDA_V2_RELAY_CONNECTION_POOL_SIZE]
    --eigenda.v2.relay-timeout value               Timeout used when querying an individual relay for blob contents. (default: 10s) [$EIGENDA_PROXY_EIGENDA_V2_RELAY_TIMEOUT]
-   --eigenda.v2.signer-payment-key-hex value      Hex-encoded signer private key. Used for authorizing payments with EigenDA disperser. Should not be associated with an Ethereum address holding any funds. [$EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX]
+   --eigenda.v2.signer-payment-key-hex value      Optional hex-encoded signer private key. Used for authorizing payments with EigenDA disperser in PUT routes. If not provided, proxy will be started in read-only mode, and will not be able to submit blobs to EigenDA. Should not be associated with an Ethereum address holding any funds. [$EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX]
    --eigenda.v2.validator-timeout value           Timeout used when retrieving chunks directly from EigenDA validators. This is a secondary retrieval method, in case retrieval from the relay network fails. (default: 2m0s) [$EIGENDA_PROXY_EIGENDA_V2_VALIDATOR_TIMEOUT]
 
    Enabled APIs
@@ -140,6 +140,7 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
    --storage.cache-targets value [ --storage.cache-targets value ]            List of caching targets to use fast reads from EigenDA. [$EIGENDA_PROXY_STORAGE_CACHE_TARGETS]
    --storage.concurrent-write-routines value                                  Number of threads spun-up for async secondary storage insertions. (<=0) denotes single threaded insertions where (>0) indicates decoupled writes. (default: 0) [$EIGENDA_PROXY_STORAGE_CONCURRENT_WRITE_THREADS]
    --storage.dispersal-backend value                                          Target EigenDA backend version for blob dispersal (e.g. V1 or V2). (default: "V1") [$EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND]
+   --storage.error-on-secondary-insert-failure                                Return HTTP 500 if any secondary storage write fails. Uses fail-fast behavior: returns immediately on first write failure without attempting remaining backends. Cannot be used with concurrent-write-routines > 0. WARNING: Enabling this flag couples rollup batch poster liveness to secondary storage availability. If secondary storage becomes unavailable, batch posting will fail with HTTP 500, potentially causing the batch poster to enter an infinite retry loop. (default: false) [$EIGENDA_PROXY_STORAGE_ERROR_ON_SECONDARY_INSERT_FAILURE]
    --storage.fallback-targets value [ --storage.fallback-targets value ]      List of read fallback targets to rollover to if cert can't be read from EigenDA. [$EIGENDA_PROXY_STORAGE_FALLBACK_TARGETS]
    --storage.write-on-cache-miss                                              While doing a GET, write to the secondary storage if the cert/blob is not found in the cache but is found in EigenDA. (default: false) [$EIGENDA_PROXY_STORAGE_WRITE_ON_CACHE_MISS]
 

@@ -35,6 +35,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -307,8 +308,9 @@ func NewTestClient(
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
 	}
-	verifierKzgConfig := verifier.KzgConfigFromV1Config(kzgConfig)
-	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig, nil)
+	verifierKzgConfig := verifier.ConfigFromV1KzgConfig(kzgConfig)
+	encoder := rs.NewEncoder(nil)
+	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
 	}
@@ -353,6 +355,7 @@ func NewTestClient(
 		logger,
 		ethReader,
 		indexedChainState,
+		encoder,
 		blobVerifier,
 		clientConfig,
 		validatorClientMetrics)
@@ -381,6 +384,7 @@ func NewTestClient(
 		logger,
 		ethReader,
 		indexedChainState,
+		encoder,
 		blobVerifier,
 		onlyDownloadClientConfig,
 		validatorClientMetrics)

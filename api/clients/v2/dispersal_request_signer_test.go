@@ -79,6 +79,32 @@ func createTestKMSKey(
 	return keyID, publicAddress
 }
 
+func TestKMSSignatureVerificationWithEmptyKeyID(t *testing.T) {
+	ctx := t.Context()
+
+	// Try to create signer with empty KeyID - validation should catch it immediately
+	_, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:   region,
+		Endpoint: localstackHost,
+		KeyID:    "",
+	})
+
+	require.Error(t, err, "should fail to create signer with empty KeyID")
+}
+
+func TestKMSSignatureVerificationWithEmptyRegion(t *testing.T) {
+	ctx := t.Context()
+
+	// Try to create signer with empty Region - validation should catch it immediately
+	_, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:   "",
+		Endpoint: localstackHost,
+		KeyID:    "random_key_id",
+	})
+
+	require.Error(t, err, "should fail to create signer with empty Region")
+}
+
 func TestKMSSignatureVerification(t *testing.T) {
 	ctx := t.Context()
 	rand := random.NewTestRandom()
@@ -93,7 +119,11 @@ func TestKMSSignatureVerification(t *testing.T) {
 	keyID, publicAddress := createTestKMSKey(t, ctx, keyManager)
 
 	// Create signer and request for all test scenarios
-	signer, err := NewDispersalRequestSigner(ctx, region, localstackHost, keyID)
+	signer, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:   region,
+		Endpoint: localstackHost,
+		KeyID:    keyID,
+	})
 	require.NoError(t, err, "failed to create dispersal request signer")
 
 	request := auth.RandomStoreChunksRequest(rand)
@@ -191,7 +221,11 @@ func TestKMSSignatureVerification(t *testing.T) {
 	// Test with a different KMS key to ensure multiple keys work
 	t.Run("multiple_keys", func(t *testing.T) {
 		keyID2, publicAddress2 := createTestKMSKey(t, ctx, keyManager)
-		signer2, err := NewDispersalRequestSigner(ctx, region, localstackHost, keyID2)
+		signer2, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+			Region:   region,
+			Endpoint: localstackHost,
+			KeyID:    keyID2,
+		})
 		require.NoError(t, err, "failed to create second dispersal request signer")
 
 		request2 := auth.RandomStoreChunksRequest(rand)

@@ -393,7 +393,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	if paymentValidationEnabled {
 		reservationLedgerCacheConfig, err = reservationvalidation.NewReservationLedgerCacheConfig(
 			ctx.GlobalInt(flags.ReservationMaxLedgersFlag.Name),
-			ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
+			// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+			// instead of hardcoding. At that point, this field will be removed from the config struct
+			// entirely, and the value will be fetched dynamically at runtime.
+			90*time.Second,
 			// this is hardcoded: it's a parameter just in case, but it's never expected to change
 			ratelimit.OverfillOncePermitted,
 			ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),

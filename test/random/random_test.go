@@ -46,24 +46,24 @@ func TestReset(t *testing.T) {
 	require.Equal(t, d, random.Uint64())
 }
 
-func TestECDSAKeyGeneration(t *testing.T) {
+func TestEthAccountGeneration(t *testing.T) {
 	random := NewTestRandom()
 
 	// We should not get the same key pair twice in a row
-	public1, private1, err := random.ECDSA()
+	address1, private1, err := random.EthAccount()
 	require.NoError(t, err)
-	public2, private2, err := random.ECDSA()
+	address2, private2, err := random.EthAccount()
 	require.NoError(t, err)
 
-	assert.NotEqual(t, &public1, &public2)
-	assert.NotEqual(t, &private1, &private2)
+	assert.NotEqual(t, address1, address2)
+	assert.NotEqual(t, private1, private2)
 
 	// Getting keys should result in deterministic generator state.
 	generatorState := random.Uint64()
 	random.Reset()
-	_, _, err = random.ECDSA()
+	_, _, err = random.EthAccount()
 	require.NoError(t, err)
-	_, _, err = random.ECDSA()
+	_, _, err = random.EthAccount()
 	require.NoError(t, err)
 	require.Equal(t, generatorState, random.Uint64())
 
@@ -75,7 +75,8 @@ func TestECDSAKeyGeneration(t *testing.T) {
 
 	signingPublicKey, err := crypto.SigToPub(data, signature)
 	require.NoError(t, err)
-	require.Equal(t, &public1, &signingPublicKey)
+	recoveredAddress := crypto.PubkeyToAddress(*signingPublicKey)
+	require.Equal(t, address1, recoveredAddress)
 }
 
 func TestBLSKeyGeneration(t *testing.T) {

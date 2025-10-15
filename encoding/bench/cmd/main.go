@@ -8,13 +8,14 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -36,23 +37,26 @@ type Config struct {
 	NumRuns       uint64
 	CPUProfile    string
 	MemProfile    string
+	TraceFile     string
 	EnableVerify  bool
 }
 
 func parseFlags() Config {
 	config := Config{}
 	flag.StringVar(&config.OutputFile, "output", "benchmark_results.json", "Output file for results")
-	flag.Uint64Var(&config.MinBlobLength, "min-blob-length", 1024, "Minimum blob length (power of 2)")
-	flag.Uint64Var(&config.MaxBlobLength, "max-blob-length", 1048576, "Maximum blob length (power of 2)")
+	flag.Uint64Var(&config.MinBlobLength, "min-blob-length", 524288, "Minimum blob length (power of 2)")
+	flag.Uint64Var(&config.MaxBlobLength, "max-blob-length", 524288, "Maximum blob length (power of 2)")
 	flag.Uint64Var(&config.NumChunks, "num-chunks", 8192, "Minimum number of chunks (power of 2)")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
+	flag.StringVar(&config.TraceFile, "trace", "trace.out", "Write execution trace to file")
 	flag.BoolVar(&config.EnableVerify, "enable-verify", true, "Verify blobs after encoding")
 	flag.Parse()
 	return config
 }
 
-var kzgConfig = &kzg.KzgConfig{}
+var proverKzgConfig *proverv2.KzgConfig
+var verifierKzgConfig *verifierv2.Config
 
 func main() {
 	config := parseFlags()
@@ -60,24 +64,40 @@ func main() {
 	fmt.Println("Config output", config.OutputFile)
 
 	// Setup phase
-	kzgConfig = &kzg.KzgConfig{
-		G1Path:          "/home/ubuntu/resources/kzg/g1.point",
-		G2Path:          "/home/ubuntu/resources/kzg/g2.point",
-		CacheDir:        "/home/ubuntu/resources/kzg/SRSTables",
-		SRSOrder:        268435456,
-		SRSNumberToLoad: 1048576,
+	proverKzgConfig = &proverv2.KzgConfig{
+		G1Path:          "/home/ubuntu/eigenda/resources/srs/g1.point",
+		CacheDir:        "/home/ubuntu/eigenda/resources/srs/SRSTables",
+		SRSNumberToLoad: 524288,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
+		PreloadEncoder:  true,
+	}
+
+	// Create commiter
+	committerConfig := &committer.Config{
+		SRSNumberToLoad:   524288,
+		G1SRSPath:         "/home/ubuntu/eigenda/resources/srs/g1.point",
+		G2SRSPath:         "/home/ubuntu/eigenda/resources/srs/g2.point",
+		G2TrailingSRSPath: "/home/ubuntu/eigenda/resources/srs/g2.trailing.point",
+	}
+	committer, err := committer.NewFromConfig(*committerConfig)
+	if err != nil {
+		log.Fatalf("Failed to create committer: %v", err)
+	}
+
+	verifierKzgConfig = &verifierv2.Config{
+		G1Path:          "/home/ubuntu/eigenda/resources/srs/g1.point",
+		SRSNumberToLoad: 524288,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
 	fmt.Printf("* Task Starts\n")
 
 	cfg := &encoding.Config{
-		BackendType: encoding.IcicleBackend,
-		GPUEnable:   true,
+		BackendType: encoding.GnarkBackend,
+		GPUEnable:   false,
 		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 	}
-	p, err := prover.NewProver(kzgConfig, cfg)
+	p, err := proverv2.NewProver(proverKzgConfig, cfg)
 
 	if err != nil {
 		log.Fatalf("Failed to create prover: %v", err)
@@ -95,7 +115,19 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	results := runBenchmark(p, &config)
+	if config.TraceFile != "" {
+		f, err := os.Create(config.TraceFile)
+		if err != nil {
+			log.Fatal("could not create trace file: ", err)
+		}
+		defer core.CloseLogOnError(f, f.Name(), nil)
+		if err := trace.Start(f); err != nil {
+			log.Fatal("could not start trace: ", err)
+		}
+		defer trace.Stop()
+	}
+
+	results := runBenchmark(p, committer, &config)
 	if config.MemProfile != "" {
 		f, err := os.Create(config.MemProfile)
 		if err != nil {
@@ -122,7 +154,7 @@ func main() {
 	fmt.Printf("Benchmark results written to %s\n", config.OutputFile)
 }
 
-func runBenchmark(p *prover.Prover, config *Config) []BenchmarkResult {
+func runBenchmark(p *proverv2.Prover, committer *committer.Committer, config *Config) []BenchmarkResult {
 	var results []BenchmarkResult
 
 	// Fixed coding ratio of 8
@@ -133,13 +165,20 @@ func runBenchmark(p *prover.Prover, config *Config) []BenchmarkResult {
 		if chunkLen < 1 {
 			continue // Skip invalid configurations
 		}
-		result := benchmarkEncodeAndVerify(p, blobLength, config.NumChunks, chunkLen, config.EnableVerify)
+		result := benchmarkEncodeAndVerify(p, committer, blobLength, config.NumChunks, chunkLen, config.EnableVerify)
 		results = append(results, result)
 	}
 	return results
 }
 
-func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uint64, chunkLen uint64, verifyResults bool) BenchmarkResult {
+func benchmarkEncodeAndVerify(
+	p *proverv2.Prover,
+	committer *committer.Committer,
+	blobLength uint64,
+	numChunks uint64,
+	chunkLen uint64,
+	verifyResults bool,
+) BenchmarkResult {
 	params := encoding.EncodingParams{
 		NumChunks:   numChunks,
 		ChunkLength: chunkLen,
@@ -147,7 +186,7 @@ func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uin
 
 	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
 
-	enc, err := p.GetKzgEncoder(params)
+	prover, err := p.GetKzgProver(params)
 	if err != nil {
 		log.Fatalf("Failed to get KZG encoder: %v", err)
 	}
@@ -159,8 +198,13 @@ func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uin
 		inputFr[i].SetInt64(int64(i + 1))
 	}
 
+	commit, _, _, err := committer.GetCommitments(inputFr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	start := time.Now()
-	commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
+	frames, _, err := prover.GetFrames(inputFr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -170,21 +214,24 @@ func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uin
 	verifyStart := time.Now()
 
 	if verifyResults {
-		v, err := verifier.NewVerifier(kzgConfig, nil)
-		if err != nil {
-			log.Fatalf("Failed to create verifier: %v", err)
-		}
-		verifier, err := v.GetKzgVerifier(params)
+		v, err := verifierv2.NewVerifier(verifierKzgConfig)
 		if err != nil {
 			log.Fatalf("Failed to create verifier: %v", err)
 		}
 
-		for i := 0; i < len(frames); i++ {
-			err = verifier.VerifyFrame(&frames[i], uint64(fIndices[i]), commit, params.NumChunks)
-			if err != nil {
-				verifyResult = false
-				break
-			}
+		samples := []encoding.Sample{}
+		for i, frame := range frames {
+			samples = append(samples, encoding.Sample{
+				Commitment:      (*encoding.G1Commitment)(commit),
+				Chunk:           &frame,
+				AssignmentIndex: encoding.ChunkNumber(i),
+				BlobIndex:       0,
+			})
+		}
+
+		err = v.UniversalVerifySubBatch(params, samples, 1)
+		if err != nil {
+			log.Fatal("Wtf", err)
 		}
 	}
 

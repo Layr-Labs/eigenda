@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -41,6 +42,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	// Set up KZG components (prover, committer and verifier)
 	p, c, v, err := makeTestEncodingComponents()
 	require.NoError(t, err)
+	encoder := rs.NewEncoder(nil)
 
 	// Set up test environment
 	rand := testrandom.NewTestRandom()
@@ -154,8 +156,8 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 		}
 
 	originalBlobDecoderFactory := config.UnsafeBlobDecoderFactory
-	config.UnsafeBlobDecoderFactory = func(verifier *verifier.Verifier) internal.BlobDecoder {
-		realDecoder := originalBlobDecoderFactory(verifier)
+	config.UnsafeBlobDecoderFactory = func(encoder *rs.Encoder) internal.BlobDecoder {
+		realDecoder := originalBlobDecoderFactory(encoder)
 		return &instrumentedBlobDecoder{
 			t:                         t,
 			BlobDecoder:               realDecoder,
@@ -173,7 +175,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 		computePool,
 		grpcManager,
 		config.UnsafeChunkDeserializerFactory(assignments, v),
-		config.UnsafeBlobDecoderFactory(v),
+		config.UnsafeBlobDecoderFactory(encoder),
 		assignments,
 		minimumChunkCount,
 		&encodingParams,
@@ -236,7 +238,7 @@ func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifi
 		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	v, err := verifier.NewVerifier(verifier.KzgConfigFromV1Config(config), nil)
+	v, err := verifier.NewVerifier(verifier.ConfigFromV1KzgConfig(config))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new verifier: %w", err)
 	}
@@ -334,7 +336,7 @@ type instrumentedBlobDecoder struct {
 func (d *instrumentedBlobDecoder) DecodeBlob(
 	blobKey v2.BlobKey,
 	chunks []*encoding.Frame,
-	indices []uint,
+	indices []encoding.ChunkNumber,
 	encodingParams *encoding.EncodingParams,
 	blobCommitments *encoding.BlobCommitments,
 ) ([]byte, error) {
@@ -352,7 +354,7 @@ func (d *instrumentedBlobDecoder) DecodeBlob(
 	// Count the number of times the duplicated index was sent to decoding
 	duplicatedIndexCount := 0
 	for _, i := range indices {
-		if i == uint(duplicatedIndex) {
+		if i == encoding.ChunkNumber(duplicatedIndex) {
 			duplicatedIndexCount++
 		}
 	}
