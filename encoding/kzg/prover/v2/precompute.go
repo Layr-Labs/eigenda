@@ -118,7 +118,8 @@ func (p *SRSTable) GetSubTables(
 		p.logger.Info("Precomputed SRSTable generated", "DimE", dimE, "CosetSize", cosetSize, "FilePath", dstFilePath, "Elapsed", elapsed)
 		return fftPoints, nil
 	} else {
-		p.logger.Info("Precomputed SRSTable found. Loading...", "DimE", dimE, "CosetSize", cosetSize, "FilePath", table.FilePath)
+		p.logger.Info("Precomputed SRSTable found. Loading...",
+			"DimE", dimE, "CosetSize", cosetSize, "FilePath", table.FilePath)
 
 		start := time.Now()
 		fftPoints, err := p.TableReaderThreads(table.FilePath, dimE, cosetSize, p.NumWorker)
