@@ -283,7 +283,34 @@ $ set -a; source ./.env; set +a; ./bin/eigenda-proxy
 
 ### Features and Configuration Options (flags/env vars)
 
-Below is a list of the main high-level features offered for configuring the eigenda-proxy. These features are controlled via flags and/or env vars. To view the extensive list of available flags/env-vars to configure a given version of eigenda-proxy, run `eigenda-proxy --help`.
+Below is a list of the main high-level features offered for configuring the eigenda-proxy. These features are
+controlled via flags and/or env vars. To view the extensive list of available flags/env-vars to configure a given
+version of eigenda-proxy, run `eigenda-proxy --help`.
+
+#### Payment Mode Configuration
+
+When using EigenDA V2, the payment system can be configured using the `--eigenda.v2.client-ledger-mode` flag (or
+`EIGENDA_PROXY_EIGENDA_V2_CLIENT_LEDGER_MODE` environment variable). This flag determines which payment mechanisms are
+active for blob dispersals. For detailed information about the payment system, see the
+[payment system documentation](../../docs/spec/src/protocol/payments/payment_system.md).
+
+**Available Payment Modes:**
+
+1. **`legacy` (default)** - Uses the legacy bin-based payment system that handles both reservation and on-demand
+   payments. This mode is currently being deprecated and will be removed in a future release.
+
+2. **`reservation-only`** - Uses pre-purchased bandwidth reservations that provide guaranteed throughput for a
+   specified time period. Bandwidth is managed using a leaky bucket algorithm.
+
+3. **`on-demand-only`** - Uses pay-per-dispersal payments from funds deposited in the PaymentVault contract.
+   Limited to quorums 0 (ETH) and 1 (EIGEN).
+
+4. **`reservation-and-on-demand`** - Enables both payment methods with intelligent fallback. Uses reservation bandwidth
+   when available, automatically switching to on-demand payments when reservation capacity is exhausted.
+
+> **Note**: The payment mode should match your account's setup in the PaymentVault contract. Ensure you have an active
+> reservation (for `reservation-only` or `reservation-and-on-demand`) or sufficient deposits (for `on-demand-only` or
+> `reservation-and-on-demand`) before starting the proxy.
 
 #### Read Only Mode
 
