@@ -37,7 +37,7 @@ type KzgMultiProofGnarkBackend struct {
 // 2. https://eprint.iacr.org/2023/033.pdf (how to compute the single multiproof fast)
 // 3. https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf (fast multiple multiproofs)
 func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
-	polyFr []fr.Element, numChunks, chunkLen, numWorker uint64,
+	polyFr []fr.Element, numTotalChunks, chunkLen, numWorker uint64,
 ) ([]bn254.G1Affine, error) {
 	// We describe the steps in the computation by following section 2.2 of
 	// https://eprint.iacr.org/2023/033.pdf, generalized to the multiple multiproofs case.
@@ -45,6 +45,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
+	numChunks := uint64(len(polyFr)) / chunkLen
 	dimE := numChunks
 	l := chunkLen
 
@@ -84,7 +85,14 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 	firstECNttDone := time.Now()
 
 	// last step (5) "take first d elements of h^ as h"
-	h := sumVecInv[:dimE]
+	infinity := bn254.G1Affine{}
+	infinity.SetInfinity()
+	h := sumVecInv[:len(sumVecInv)/2]
+
+	// now extend h with padding to do erasure coding on the proof
+	for i := uint64(len(h)); i < numTotalChunks; i++ {
+		h = append(h, infinity)
+	}
 
 	// Now that we have h, we compute C_T = FFT(h).
 	// See https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf eqn 29.

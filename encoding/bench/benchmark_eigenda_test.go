@@ -124,13 +124,14 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 
 	// We only have 16MiBs of SRS points. Since we use blob_version=0's 8x coding
 	// ratio, we can encode blobs of size at most 2MiB (2^21 bytes).
-	for _, blobPower := range []uint64{17, 20, 21} {
+	for _, blobPower := range []uint64{17, 20, 21, 24} {
 		b.Run("Multiproof_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
 			blobSizeBytes := uint64(1) << blobPower
 			params := encoding.EncodingParams{
 				NumChunks:   8192,                            // blob_version=0
 				ChunkLength: max(1, blobSizeBytes*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
 			}
+			params.SetBlobLength(uint64(encoding.GetBlobLengthPowerOf2(uint32(blobSizeBytes))))
 
 			rand := random.NewTestRandom()
 			blobBytes := rand.Bytes(int(blobSizeBytes))

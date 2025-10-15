@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/hashicorp/go-multierror"
 
@@ -66,19 +67,13 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 
 	go func() {
 		start := time.Now()
-		// compute proofs
-		paddedCoeffs := make([]fr.Element, g.encodingParams.NumEvaluations())
-		// polyCoeffs has less points than paddedCoeffs in general due to erasure redundancy
+		// compute proofs to a polynomial that contains power of 2 symbols
+		// padding are 0 representing coefficients at higher monomials
+		paddedCoeffs := make([]fr.Element, math.NextPowOf2u64(uint64(len(inputFr))))
 		copy(paddedCoeffs, inputFr)
 
-		numBlob := 1
-		flatpaddedCoeffs := make([]fr.Element, 0, numBlob*len(paddedCoeffs))
-		for i := 0; i < numBlob; i++ {
-			flatpaddedCoeffs = append(flatpaddedCoeffs, paddedCoeffs...)
-		}
-
 		proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(
-			flatpaddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.computeMultiproofNumWorker)
+			paddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.computeMultiproofNumWorker)
 		proofChan <- proofsResult{
 			Proofs:   proofs,
 			Err:      err,

@@ -249,7 +249,20 @@ func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Aff
 		return nil, nil, fmt.Errorf("failed to create SRS table: %w", err)
 	}
 
-	fftPoints, err := subTable.GetSubTables(params.NumChunks, params.ChunkLength)
+	blobLength, err := params.GetBlobLength()
+	// the number of chunks together their number of contains matches the number of symbols in polynomial,
+	// which is also called systematic symbols in coding theory
+	var numSystemChunk uint64
+	if err != nil {
+		// if blob length is not set, use the default total number of chunk
+		// for compatibility to load all SRS Tables, without knowing the blob length
+		// ToDo(bx), it looks like a foot gun
+		numSystemChunk = params.NumChunks
+	} else {
+		numSystemChunk = blobLength / params.ChunkLength
+	}
+
+	fftPoints, err := subTable.GetSubTables(numSystemChunk, params.ChunkLength)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get sub tables: %w", err)
 	}
