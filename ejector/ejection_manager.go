@@ -167,6 +167,8 @@ func (em *ejectionManager) BeginEjection(
 		em.logger.Infof("ejection already in progress on-chain for validator %s, "+
 			"will not begin ejection but will attempt to finalize",
 			validatorAddress.Hex())
+
+		em.scheduleFutureEjectionFinalization(validatorAddress, stakeFractions)
 		return
 	}
 
@@ -187,6 +189,14 @@ func (em *ejectionManager) BeginEjection(
 	}
 	em.logger.Infof("started ejection proceedings against %s", validatorAddress.Hex())
 
+	em.scheduleFutureEjectionFinalization(validatorAddress, stakeFractions)
+}
+
+// Mark that an ejection has been started and must be finished in the future.
+func (em *ejectionManager) scheduleFutureEjectionFinalization(
+	validatorAddress geth.Address,
+	stakeFractions map[core.QuorumID]float64,
+) {
 	em.recentEjectionTimes[validatorAddress] = em.timeSource()
 	em.ejectionsInProgress[validatorAddress] = &inProgressEjection{
 		ejectionFinalizationTime: em.timeSource().Add(em.config.EjectionFinalizationDelay),
