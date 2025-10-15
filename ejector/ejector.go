@@ -34,7 +34,7 @@ type Ejector struct {
 	ejectionCriteriaTimeWindow time.Duration
 
 	// Used to convert validator IDs to validator addresses.
-	validatorIDToAddressCache *eth.ValidatorIDToAddressCache
+	validatorIDToAddressCache eth.ValidatorIDToAddressConverter
 }
 
 // NewEjector creates a new Ejector.
@@ -45,7 +45,7 @@ func NewEjector(
 	ejectionManager *ThreadedEjectionManager,
 	signingRateLookupV1 SigningRateLookup,
 	signingRateLookupV2 SigningRateLookup,
-	validatorIDToAddressCache *eth.ValidatorIDToAddressCache,
+	validatorIDToAddressCache eth.ValidatorIDToAddressConverter,
 ) *Ejector {
 	e := &Ejector{
 		ctx:                        ctx,
@@ -124,7 +124,7 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 	}
 
 	validatorID := core.OperatorID(signingRate.GetValidatorId()[:])
-	validatorAddress, err := e.validatorIDToAddressCache.GetValidatorAddress(e.ctx, validatorID)
+	validatorAddress, err := e.validatorIDToAddressCache.ValidatorIDToAddress(e.ctx, validatorID)
 	if err != nil {
 		e.logger.Error("error looking up validator address", "validatorID", signingRate.GetValidatorId(), "error", err)
 		return

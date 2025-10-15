@@ -82,6 +82,11 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("failed to get ejection manager address: %w", err)
 	}
 
+	registryCoordinatorAddress, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		return fmt.Errorf("failed to get registry coordinator address: %w", err)
+	}
+
 	chainID, err := gethClient.ChainID(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get chain ID: %w", err)
@@ -89,8 +94,10 @@ func run(ctx context.Context) error {
 
 	ejectionTransactor, err := ejector.NewEjectionTransactor(
 		ctx,
+		logger,
 		gethClient,
 		ejectionContractAddress,
+		registryCoordinatorAddress,
 		senderAddress,
 		privateKey,
 		chainID,
@@ -119,18 +126,15 @@ func run(ctx context.Context) error {
 		cfg.DataApiTimeout,
 	)
 
-	registryCoordinatorAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.RegistryCoordinator)
-	if err != nil {
-		return fmt.Errorf("failed to get RegistryCoordinator address: %w", err)
-	}
-
-	validatorIDCache, err := eth.NewValidatorIDToAddressCache(
+	validatorIDToAddressConverter, err := eth.NewValidatorIDToAddressConverter(
 		gethClient,
-		registryCoordinatorAddress,
-		1024)
+		registryCoordinatorAddress)
 	if err != nil {
-		return fmt.Errorf("failed to create validator ID to address cache: %w", err)
+		return fmt.Errorf("failed to create validator ID to address converter: %w", err)
+	}
+	validatorIDToAddressConverter, err = eth.NewCachedValidatorIDToAddressConverter(validatorIDToAddressConverter, 1024)
+	if err != nil {
+		return fmt.Errorf("failed to create cached validator ID to address converter: %w", err)
 	}
 
 	_ = ejector.NewEjector(
@@ -140,7 +144,7 @@ func run(ctx context.Context) error {
 		threadedEjectionManager,
 		dataApiSigningRateLookup,
 		dataApiSigningRateLookup,
-		validatorIDCache,
+		validatorIDToAddressConverter,
 	)
 	return nil
 }

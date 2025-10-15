@@ -11,23 +11,65 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
-// Given a validator ID, find the validator's corresponding Ethereum address.
-func ValidatorIDToAddress(
-	ctx context.Context,
+// A utility for converting back and forth between validator IDs and Ethereum addresses.
+type ValidatorIDToAddressConverter interface {
+	// Given a validator ID, find the validator's corresponding Ethereum address.
+	ValidatorIDToAddress(ctx context.Context, validatorID core.OperatorID) (geth.Address, error)
+
+	// Given a validator's Ethereum address, find the corresponding validator ID.
+	ValidatorAddressToID(ctx context.Context, validatorAddress geth.Address) (core.OperatorID, error)
+}
+
+var _ ValidatorIDToAddressConverter = (*validatorIDToAddressConverter)(nil)
+
+// A standard implementation of the ValidatorIDToAddressConverter interface.
+type validatorIDToAddressConverter struct {
+	registryCoordinator *regcoordinator.ContractEigenDARegistryCoordinator
+}
+
+func NewValidatorIDToAddressConverter(
 	contractBackend bind.ContractBackend,
 	registryCoordinatorAddress geth.Address,
-	validatorID core.OperatorID,
-) (geth.Address, error) {
+) (ValidatorIDToAddressConverter, error) {
 
 	registryCoordinator, err := regcoordinator.NewContractEigenDARegistryCoordinator(
 		registryCoordinatorAddress,
 		contractBackend)
 	if err != nil {
-		var zero geth.Address
-		return zero, fmt.Errorf("failed to create registry coordinator client: %w", err)
+		return nil, fmt.Errorf("failed to create registry coordinator client: %w", err)
 	}
 
-	address, err := registryCoordinator.GetOperatorFromId(&bind.CallOpts{Context: ctx}, validatorID)
+	return &validatorIDToAddressConverter{
+		registryCoordinator: registryCoordinator,
+	}, nil
+
+}
+
+func (v *validatorIDToAddressConverter) ValidatorAddressToID(
+	ctx context.Context,
+	validatorAddress geth.Address,
+) (core.OperatorID, error) {
+
+	operatorInfo, err := v.registryCoordinator.GetOperator(&bind.CallOpts{Context: ctx}, validatorAddress)
+	if err != nil {
+		return core.OperatorID{}, fmt.Errorf("failed to get operator ID from address: %w", err)
+	}
+	validatorID := operatorInfo.OperatorId
+
+	if validatorID == (core.OperatorID{}) {
+		return core.OperatorID{}, fmt.Errorf("no operator found with address %s", validatorAddress.Hex())
+	}
+
+	return validatorID, nil
+
+}
+
+func (v *validatorIDToAddressConverter) ValidatorIDToAddress(
+	ctx context.Context,
+	validatorID core.OperatorID,
+) (geth.Address, error) {
+
+	address, err := v.registryCoordinator.GetOperatorFromId(&bind.CallOpts{Context: ctx}, validatorID)
 	if err != nil {
 		var zero geth.Address
 		return zero, fmt.Errorf("failed to get operator address from ID: %w", err)
@@ -40,54 +82,74 @@ func ValidatorIDToAddress(
 	return address, nil
 }
 
-// A cache for validator ID to address mappings. Thread safe, but concurrent calls for the same validator ID
-// may result in multiple onchain calls.
-type ValidatorIDToAddressCache struct {
-	// The contract backend used for making calls to the blockchain.
-	contractBackend bind.ContractBackend
+var _ ValidatorIDToAddressConverter = (*cachedValidatorIDToAddressConverter)(nil)
 
-	// The address of the RegistryCoordinator contract.
-	registryCoordinatorAddress geth.Address
-
-	// A cache of previously looked up validator ID to address mappings.
-	cache *lru.Cache[core.OperatorID, geth.Address]
+// A cached version of ValidatorIDToAddressConverter.
+type cachedValidatorIDToAddressConverter struct {
+	base             ValidatorIDToAddressConverter
+	idToAddressCache *lru.Cache[core.OperatorID, geth.Address]
+	addressToIDCache *lru.Cache[geth.Address, core.OperatorID]
 }
 
-// NewValidatorIDToAddressCache creates a new ValidatorIDToAddressCache with the given cache size.
-func NewValidatorIDToAddressCache(
-	contractBackend bind.ContractBackend,
-	registryCoordinatorAddress geth.Address,
+func NewCachedValidatorIDToAddressConverter(
+	base ValidatorIDToAddressConverter,
 	cacheSize int,
-) (*ValidatorIDToAddressCache, error) {
+) (ValidatorIDToAddressConverter, error) {
 
-	cache, err := lru.New[core.OperatorID, geth.Address](cacheSize)
+	idToAddressCache, err := lru.New[core.OperatorID, geth.Address](cacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create validator ID to address cache: %w", err)
+		return nil, fmt.Errorf("failed to create ID to address cache: %w", err)
 	}
 
-	return &ValidatorIDToAddressCache{
-		contractBackend:            contractBackend,
-		registryCoordinatorAddress: registryCoordinatorAddress,
-		cache:                      cache,
+	addressToIDCache, err := lru.New[geth.Address, core.OperatorID](cacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create address to ID cache: %w", err)
+	}
+
+	return &cachedValidatorIDToAddressConverter{
+		base:             base,
+		idToAddressCache: idToAddressCache,
+		addressToIDCache: addressToIDCache,
 	}, nil
 }
 
-// GetValidatorAddress looks up the Ethereum address for the given validator ID, using the cache if possible.
-func (c *ValidatorIDToAddressCache) GetValidatorAddress(
+func (c *cachedValidatorIDToAddressConverter) ValidatorAddressToID(
+	ctx context.Context,
+	validatorAddress geth.Address,
+) (core.OperatorID, error) {
+
+	if id, ok := c.addressToIDCache.Get(validatorAddress); ok {
+		return id, nil
+	}
+
+	id, err := c.base.ValidatorAddressToID(ctx, validatorAddress)
+	if err != nil {
+		return core.OperatorID{}, err
+	}
+
+	c.addressToIDCache.Add(validatorAddress, id)
+	c.idToAddressCache.Add(id, validatorAddress)
+
+	return id, nil
+}
+
+func (c *cachedValidatorIDToAddressConverter) ValidatorIDToAddress(
 	ctx context.Context,
 	validatorID core.OperatorID,
 ) (geth.Address, error) {
 
-	if address, ok := c.cache.Get(validatorID); ok {
+	if address, ok := c.idToAddressCache.Get(validatorID); ok {
 		return address, nil
 	}
 
-	address, err := ValidatorIDToAddress(ctx, c.contractBackend, c.registryCoordinatorAddress, validatorID)
+	address, err := c.base.ValidatorIDToAddress(ctx, validatorID)
 	if err != nil {
 		return geth.Address{}, err
 	}
 
-	c.cache.Add(validatorID, address)
+	c.idToAddressCache.Add(validatorID, address)
+	c.addressToIDCache.Add(address, validatorID)
 
 	return address, nil
 }
+
