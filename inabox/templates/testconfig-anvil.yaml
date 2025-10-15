@@ -15,8 +15,8 @@ eigenda:
 
 blobVersions:
   - codingRate: 8
-    numChunks: 8192
-    maxNumOperators: 3537
+    numChunks: 16
+    maxNumOperators: 3
 
 privateKeys:
   ecdsaMap:
