@@ -277,7 +277,7 @@ func TestReservationOnly(t *testing.T) {
 		})
 	})
 
-	t.Run("time out of range panic", func(t *testing.T) {
+	t.Run("time out of range error", func(t *testing.T) {
 		clientLedger := NewClientLedger(
 			ctx,
 			test.GetLogger(),
@@ -292,9 +292,11 @@ func TestReservationOnly(t *testing.T) {
 		)
 		require.NotNil(t, clientLedger)
 
-		require.Panics(t, func() {
-			_, _ = clientLedger.Debit(ctx, 1, []core.QuorumID{0, 1})
-		}, "expired reservation should cause fatal panic")
+		paymentMetadata, err := clientLedger.Debit(ctx, 1, []core.QuorumID{0, 1})
+		require.Error(t, err, "time out of range should cause error")
+		require.Nil(t, paymentMetadata)
+		var timeOutOfRangeErr *reservation.TimeOutOfRangeError
+		require.ErrorAs(t, err, &timeOutOfRangeErr)
 	})
 }
 

@@ -56,7 +56,7 @@ func TestUniversalVerify(t *testing.T) {
 	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
-	enc, err := group.GetKzgEncoder(params)
+	prover, err := group.GetKzgProver(params)
 	require.Nil(t, err)
 
 	numBlob := 5
@@ -67,7 +67,7 @@ func TestUniversalVerify(t *testing.T) {
 
 		commit, _, _, err := committer.GetCommitments(inputFr)
 		require.Nil(t, err)
-		frames, fIndices, err := enc.GetFrames(inputFr)
+		frames, fIndices, err := prover.GetFrames(inputFr)
 		require.Nil(t, err)
 
 		// create samples
@@ -105,7 +105,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
-	enc, err := group.GetKzgEncoder(params)
+	prover, err := group.GetKzgProver(params)
 	require.NoError(t, err)
 
 	numBlob := 5
@@ -116,7 +116,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 
 		commit, _, _, err := committer.GetCommitments(inputFr)
 		require.Nil(t, err)
-		frames, fIndices, err := enc.GetFrames(inputFr)
+		frames, fIndices, err := prover.GetFrames(inputFr)
 		require.Nil(t, err)
 
 		// create samples

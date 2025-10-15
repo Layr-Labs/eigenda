@@ -1,6 +1,7 @@
 package payments
 
 import (
+	"errors"
 	"math/big"
 	"os"
 	"testing"
@@ -116,6 +117,19 @@ func testWithControllerMode(t *testing.T, controllerUseNewPayments bool) {
 		t.Parallel()
 		testReservationAndOnDemand(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationAndOnDemand)
 	})
+
+	// We don't run this test with old client payments, since they don't exhibit the panicky behavior being asserted
+	t.Run("Reservation only: New client payments with reservation expiration", func(t *testing.T) {
+		t.Parallel()
+		testReservationExpiration(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationOnly)
+	})
+
+	// We *do* test with ClientLedgerModeReservationAndOnDemand, since even clients that have on-demand payments
+	// configured should exhibit the same panicky behavior when a reservation expires
+	t.Run("Reservation and on-demand: New client payments with reservation expiration", func(t *testing.T) {
+		t.Parallel()
+		testReservationExpiration(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationAndOnDemand)
+	})
 }
 
 // - Submit blobs at a rate that is supported by the reservation, and assert that all dispersals succeed
@@ -163,11 +177,7 @@ func testReservationReduction(
 	require.NoError(t, err)
 
 	// Since we're dispersing at half the supported rate, assert no failures
-	resultChan := mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 1.0, 0)
-	// Drain the results channel. This test doesn't need the values.
-	for range resultChan {
-	}
+	mustSubmitPayloads(t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 1.0, 0)
 
 	clientReservation, err = reservation.NewReservation(
 		// reservation smaller than it needs to be
@@ -188,10 +198,7 @@ func testReservationReduction(
 	}
 
 	// Since we're dispersing at double the supported rate, assert ~50% success rate
-	resultChan = mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 0.5, 0.25)
-	for range resultChan {
-	}
+	mustSubmitPayloads(t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 0.5, 0.25)
 }
 
 // - Submit blobs at a rate that is larger than the reservation, and assert some dispersals fail
@@ -239,11 +246,7 @@ func testReservationIncrease(
 	require.NoError(t, err)
 
 	// Since we're dispersing at double the supported rate, assert ~50% success rate
-	resultChan := mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 0.5, 0.25)
-	// Drain the results channel. This test doesn't need the values.
-	for range resultChan {
-	}
+	mustSubmitPayloads(t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 0.5, 0.25)
 
 	clientReservation, err = reservation.NewReservation(
 		// reservation larger than it needs to be
@@ -264,10 +267,98 @@ func testReservationIncrease(
 	}
 
 	// Since we're dispersing at half the supported rate, assert no failures
-	resultChan = mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 1.0, 0)
-	for range resultChan {
+	mustSubmitPayloads(t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 1.0, 0)
+}
+
+// - Create a reservation that expires soon
+// - Submit a blob and assert success
+// - Sleep until reservation expires
+// - Assert next blob submission panics (client ledger panics on expired reservation)
+// - Register a new valid reservation
+// - Create a new payload disperser
+// - Submit a blob and assert success
+func testReservationExpiration(
+	t *testing.T,
+	logger logging.Logger,
+	testHarness *integration.TestHarness,
+	clientLedgerMode clientledger.ClientLedgerMode,
+) {
+	payloadBytes := 1000
+	// the reservation will be configured to expire shortly after the first dispersal
+	reservationExpirationDelay := 20 * time.Second
+
+	paymentVault := getPaymentVault(t, testHarness, logger)
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(t.Context())
+	require.NoError(t, err)
+
+	testRandom := random.NewTestRandom()
+	accountID, privateKey, err := testRandom.EthAccount()
+	require.NoError(t, err)
+	privateKeyHex := gethcommon.Bytes2Hex(crypto.FromECDSA(privateKey))
+
+	payloadDisperserConfig := integration.GetDefaultTestPayloadDisperserConfig()
+	payloadDisperserConfig.ClientLedgerMode = clientLedgerMode
+	payloadDisperserConfig.PrivateKey = privateKeyHex
+
+	clientReservation, err := reservation.NewReservation(
+		uint64(minNumSymbols)*100,
+		time.Now().Add(-1*time.Hour),
+		// expires soon
+		time.Now().Add(reservationExpirationDelay),
+		[]core.QuorumID{0, 1},
+	)
+	require.NoError(t, err)
+	registerReservation(t, testHarness, clientReservation, accountID)
+
+	payloadDisperser, err := testHarness.CreatePayloadDisperser(t.Context(), logger, payloadDisperserConfig)
+	require.NoError(t, err)
+
+	// Blob should succeed while reservation is active
+	payload := coretypes.Payload(testRandom.Bytes(payloadBytes))
+	_, err = payloadDisperser.SendPayload(t.Context(), payload)
+	require.NoError(t, err)
+
+	// Wait for reservation to expire
+	time.Sleep(reservationExpirationDelay)
+
+	payload = coretypes.Payload(testRandom.Bytes(payloadBytes))
+
+	// Behavior differs based on client ledger mode:
+	// - ReservationOnly: returns TimeOutOfRangeError
+	// - ReservationAndOnDemand: panics to avoid inadvertently depleting on-demand funds
+	switch clientLedgerMode {
+	case clientledger.ClientLedgerModeReservationOnly:
+		_, err = payloadDisperser.SendPayload(t.Context(), payload)
+		require.Error(t, err, "dispersal should fail with expired reservation")
+		var timeOutOfRangeError *reservation.TimeOutOfRangeError
+		require.True(t, errors.As(err, &timeOutOfRangeError), "error should be TimeOutOfRangeError")
+	case clientledger.ClientLedgerModeReservationAndOnDemand:
+		require.Panics(t, func() {
+			_, _ = payloadDisperser.SendPayload(t.Context(), payload)
+		}, "dispersal should panic with expired reservation in ReservationAndOnDemand mode")
+	case clientledger.ClientLedgerModeOnDemandOnly, clientledger.ClientLedgerModeLegacy:
+		panic("testReservationExpiration should not be called with OnDemandOnly or Legacy")
+	default:
+		panic("testReservationExpiration called with unexpected client ledger mode")
 	}
+
+	// Register a new valid reservation
+	clientReservation, err = reservation.NewReservation(
+		uint64(minNumSymbols)*100,
+		time.Now().Add(-reservationExpirationDelay),
+		time.Now().Add(24*time.Hour),
+		[]core.QuorumID{0, 1},
+	)
+	require.NoError(t, err)
+	registerReservation(t, testHarness, clientReservation, accountID)
+
+	payloadDisperser, err = testHarness.CreatePayloadDisperser(t.Context(), logger, payloadDisperserConfig)
+	require.NoError(t, err)
+
+	// Blob should succeed with the new valid reservation
+	payload = coretypes.Payload(testRandom.Bytes(payloadBytes))
+	_, err = payloadDisperser.SendPayload(t.Context(), payload)
+	require.NoError(t, err)
 }
 
 func testOnDemandOnly(
@@ -355,7 +446,7 @@ func testReservationAndOnDemand(
 	require.NoError(t, err)
 
 	payloadBytes := 1000
-	submissionDuration := 30 * time.Second
+	submissionDuration := 60 * time.Second
 	blobsPerSecond := float32(0.5)
 
 	// this is the total amount of billable symbols that are being dispersed
@@ -385,25 +476,16 @@ func testReservationAndOnDemand(
 
 	// Phase 1: Since the reservation covers 25% of the dispersal rate, this is expected to use up 75% of the deposited
 	// on-demand funds, but there shouldn't be any failures.
-	resultChan := mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 1.0, 0)
-	for range resultChan {
-	}
+	mustSubmitPayloads(t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 1.0, 0)
 
 	// Phase 2: 25% of the dispersals within this period are covered by the reservation. 25% are covered by remaining
 	// on-demand funds. So expected failure rate is 50%
-	resultChan = mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 0.5, 0.25)
-	for range resultChan {
-	}
+	mustSubmitPayloads(t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 0.5, 0.25)
 
 	// Phase 3: This phase disperses at half the rate of the previous phases. Even with the decreased rate, only half
 	// of dispersals are covered by the reservation. There are no on-demand funds remaining, so failure rate should be
 	// 50%
-	resultChan = mustSubmitPayloads(
-		t, testRandom, payloadDisperser, blobsPerSecond/2, payloadBytes, submissionDuration, 0.5, 0.25)
-	for range resultChan {
-	}
+	mustSubmitPayloads(t, testRandom, payloadDisperser, blobsPerSecond/2, payloadBytes, submissionDuration, 0.5, 0.25)
 }
 
 // Registers a reservation on-chain, then sleeps for a short time to wait for the updated value to be picked up by

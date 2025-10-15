@@ -18,16 +18,14 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
-// Prover is the main struct that is able to generate KZG commitments and proofs.
-// TODO(samlaf): we should split the kzg commitment functionality into its own struct/service.
-// In EigenDA V2, commitments are generated client side (or on the API server) and proofs are generated on the encoder.
-// It would make it a lot cleaner, as well as more explicit which exact SRS points are needed for which functionality.
+// Prover is the main struct that is able to generate frames (chunks and their proofs).
+// TODO(samlaf): should we refactor prover to only generate proofs and keep encoding separate?
 type Prover struct {
-	Config     *encoding.Config
-	KzgConfig  *KzgConfig
-	encoder    *rs.Encoder
-	Srs        kzg.SRS
-	G2Trailing []bn254.G2Affine
+	KzgConfig *KzgConfig
+	G1SRS     kzg.G1SRS
+
+	encoder *rs.Encoder
+	Config  *encoding.Config
 
 	// mu protects access to ParametrizedProvers
 	mu                  sync.Mutex
@@ -44,80 +42,18 @@ func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, e
 	}
 
 	// read the whole order, and treat it as entire SRS for low degree proof
-	s1, err := kzg.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
+	g1SRS, err := kzg.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read G1 points: %w", err)
 	}
 
-	s2 := make([]bn254.G2Affine, 0)
-	g2Trailing := make([]bn254.G2Affine, 0)
-
-	// PreloadEncoder is by default not used by operator node, PreloadEncoder
-	if kzgConfig.LoadG2Points { //nolint: nestif
-		if len(kzgConfig.G2Path) == 0 {
-			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
-		}
-
-		s2, err = kzg.ReadG2Points(kzgConfig.G2Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read G2 points: %w", err)
-		}
-
-		hasG2TrailingFile := len(kzgConfig.G2TrailingPath) != 0
-		if hasG2TrailingFile {
-			// TODO(samlaf): this function/check should probably be done in ReadG2PointSection
-			numG2point, err := kzg.NumberOfPointsInSRSFile(kzgConfig.G2TrailingPath, kzg.G2PointBytes)
-			if err != nil {
-				return nil, fmt.Errorf("number of points in srs file %v: %w", kzgConfig.G2TrailingPath, err)
-			}
-			if numG2point < kzgConfig.SRSNumberToLoad {
-				return nil, fmt.Errorf("kzgConfig.G2TrailingPath=%v contains %v G2 Points, "+
-					"which is < kzgConfig.SRSNumberToLoad=%v",
-					kzgConfig.G2TrailingPath, numG2point, kzgConfig.SRSNumberToLoad)
-			}
-
-			// use g2 trailing file
-			g2Trailing, err = kzg.ReadG2PointSection(
-				kzgConfig.G2TrailingPath,
-				numG2point-kzgConfig.SRSNumberToLoad,
-				numG2point, // last exclusive
-				kzgConfig.NumWorker,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read G2 trailing points (%v to %v) from file %v: %w",
-					numG2point-kzgConfig.SRSNumberToLoad, numG2point, kzgConfig.G2TrailingPath, err)
-			}
-		} else {
-			// require entire g2 srs be available on disk
-			numG2point, err := kzg.NumberOfPointsInSRSFile(kzgConfig.G2Path, kzg.G2PointBytes)
-			if err != nil {
-				return nil, fmt.Errorf("number of points in srs file: %w", err)
-			}
-			if numG2point < encoding.SRSOrder {
-				return nil, fmt.Errorf("no kzgConfig.G2TrailingPath was passed, yet the G2 SRS file %v is incomplete: contains %v < 2^28 G2 Points", kzgConfig.G2Path, numG2point)
-			}
-			g2Trailing, err = kzg.ReadG2PointSection(
-				kzgConfig.G2Path,
-				encoding.SRSOrder-kzgConfig.SRSNumberToLoad,
-				encoding.SRSOrder, // last exclusive
-				kzgConfig.NumWorker,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read G2 points (%v to %v) from file %v: %w",
-					encoding.SRSOrder-kzgConfig.SRSNumberToLoad, encoding.SRSOrder, kzgConfig.G2Path, err)
-			}
-		}
-	}
-
-	srs := kzg.NewSrs(s1, s2)
 	rsEncoder := rs.NewEncoder(encoderConfig)
 
-	encoderGroup := &Prover{
+	proverGroup := &Prover{
 		Config:              encoderConfig,
 		encoder:             rsEncoder,
 		KzgConfig:           kzgConfig,
-		Srs:                 srs,
-		G2Trailing:          g2Trailing,
+		G1SRS:               g1SRS,
 		ParametrizedProvers: make(map[encoding.EncodingParams]*ParametrizedProver),
 	}
 
@@ -128,13 +64,13 @@ func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, e
 			return nil, fmt.Errorf("make cache dir: %w", err)
 		}
 
-		err = encoderGroup.preloadAllEncoders()
+		err = proverGroup.preloadProversFromSRSTableCache()
 		if err != nil {
-			return nil, fmt.Errorf("preload all encoders: %w", err)
+			return nil, fmt.Errorf("preload all provers: %w", err)
 		}
 	}
 
-	return encoderGroup, nil
+	return proverGroup, nil
 }
 
 func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, error) {
@@ -143,12 +79,12 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 		return nil, fmt.Errorf("ToFrArray: %w", err)
 	}
 
-	enc, err := e.GetKzgEncoder(params)
+	prover, err := e.GetKzgProver(params)
 	if err != nil {
-		return nil, fmt.Errorf("get kzg encoder: %w", err)
+		return nil, fmt.Errorf("get kzg prover: %w", err)
 	}
 
-	kzgFrames, _, err := enc.GetFrames(symbols)
+	kzgFrames, _, err := prover.GetFrames(symbols)
 	if err != nil {
 		return nil, fmt.Errorf("get frames: %w", err)
 	}
@@ -164,7 +100,7 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	return chunks, nil
 }
 
-func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedProver, error) {
+func (g *Prover) GetKzgProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	enc, ok := g.ParametrizedProvers[params]
@@ -229,8 +165,8 @@ func (p *Prover) createGnarkBackendProver(
 
 	return &ParametrizedProver{
 		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
-		encoder:                    p.encoder,
 		encodingParams:             params,
+		encoder:                    p.encoder,
 		computeMultiproofNumWorker: p.KzgConfig.NumWorker,
 		kzgMultiProofBackend:       multiproofBackend,
 	}, nil
@@ -242,7 +178,7 @@ func (p *Prover) createIcicleBackendProver(
 	return CreateIcicleBackendProver(p, params, fs)
 }
 
-func (g *Prover) preloadAllEncoders() error {
+func (g *Prover) preloadProversFromSRSTableCache() error {
 	paramsAll, err := getAllPrecomputedSrsMap(g.KzgConfig.CacheDir)
 	if err != nil {
 		return err
@@ -257,12 +193,11 @@ func (g *Prover) preloadAllEncoders() error {
 	}
 
 	for _, params := range paramsAll {
-		// get those encoders and store them
-		enc, err := g.GetKzgEncoder(params)
+		prover, err := g.GetKzgProver(params)
 		if err != nil {
 			return err
 		}
-		g.ParametrizedProvers[params] = enc
+		g.ParametrizedProvers[params] = prover
 	}
 
 	return nil
@@ -309,7 +244,7 @@ func getAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 // Returns SRSTable SRS points, as well as its transpose.
 // fftPoints has size [l][2*dimE], and its transpose has size [2*dimE][l]
 func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
-	subTable, err := NewSRSTable(p.KzgConfig.CacheDir, p.Srs.G1, p.KzgConfig.NumWorker)
+	subTable, err := NewSRSTable(p.KzgConfig.CacheDir, p.G1SRS, p.KzgConfig.NumWorker)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create SRS table: %w", err)
 	}

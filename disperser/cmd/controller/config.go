@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
@@ -23,11 +24,8 @@ import (
 const MaxUint16 = ^uint16(0)
 
 type Config struct {
-	EncodingManagerConfig          controller.EncodingManagerConfig
-	DispatcherConfig               controller.DispatcherConfig
-	NumConcurrentEncodingRequests  int
-	NumConcurrentDispersalRequests int
-	NodeClientCacheSize            int
+	EncodingManagerConfig controller.EncodingManagerConfig
+	DispatcherConfig      controller.DispatcherConfig
 
 	DynamoDBTableName string
 
@@ -44,8 +42,8 @@ type Config struct {
 
 	MetricsPort                  int
 	ControllerReadinessProbePath string
-	ControllerHealthProbePath    string
 	ServerConfig                 server.Config
+	HeartbeatMonitorConfig       healthcheck.HeartbeatMonitorConfig
 
 	OnDemandConfig    ondemandvalidation.OnDemandLedgerCacheConfig
 	ReservationConfig reservationvalidation.ReservationLedgerCacheConfig
@@ -118,6 +116,14 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("create reservation config: %w", err)
 	}
 
+	heartbeatMonitorConfig := healthcheck.HeartbeatMonitorConfig{
+		FilePath:         ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
+		MaxStallDuration: ctx.GlobalDuration(flags.ControllerHeartbeatMaxStallDurationFlag.Name),
+	}
+	if err := heartbeatMonitorConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid heartbeat monitor config: %w", err)
+	}
+
 	awsClientConfig := aws.ReadClientConfig(ctx, flags.FlagPrefix)
 	config := Config{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
@@ -140,6 +146,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EncoderAddress:              ctx.GlobalString(flags.EncoderAddressFlag.Name),
 			MaxNumBlobsPerIteration:     int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
 			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
 		},
 		DispatcherConfig: controller.DispatcherConfig{
 			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
@@ -152,24 +159,30 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxBatchSize:                          int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
 			SignificantSigningThresholdPercentage: uint8(ctx.GlobalUint(flags.SignificantSigningThresholdPercentageFlag.Name)),
 			SignificantSigningMetricsThresholds:   ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
+			NumConcurrentRequests:                 ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
+			NodeClientCacheSize:                   ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 		},
-		NumConcurrentEncodingRequests:   ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-		NumConcurrentDispersalRequests:  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
-		NodeClientCacheSize:             ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),
 		UseGraph:                        ctx.GlobalBool(flags.UseGraphFlag.Name),
 		EigenDAContractDirectoryAddress: ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
 		MetricsPort:                     ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
-		ControllerHealthProbePath:       ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 		ServerConfig:                    serverConfig,
+		HeartbeatMonitorConfig:          heartbeatMonitorConfig,
 		OnDemandConfig:                  onDemandConfig,
 		ReservationConfig:               reservationConfig,
 	}
 
 	if err := config.DispersalRequestSignerConfig.Verify(); err != nil {
 		return Config{}, fmt.Errorf("invalid dispersal request signer config: %w", err)
+	}
+
+	if err := config.EncodingManagerConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid encoding manager config: %w", err)
+	}
+	if err := config.DispatcherConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid dispatcher config: %w", err)
 	}
 
 	return config, nil

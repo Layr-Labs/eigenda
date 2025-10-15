@@ -110,7 +110,7 @@ func BuildManagers(
 		// kzgVerifier and encoder are only needed when validator retrieval is enabled
 		var kzgVerifier *kzgverifierv2.Verifier
 		if slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
-			kzgConfig := kzgverifierv2.KzgConfigFromV1Config(&config.KzgConfig)
+			kzgConfig := kzgverifierv2.ConfigFromV1KzgConfig(&config.KzgConfig)
 			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig)
 			if err != nil {
 				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
@@ -124,7 +124,14 @@ func BuildManagers(
 
 	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store)
 	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store)
-	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks, config.StoreConfig.WriteOnCacheMiss)
+	secondary := secondary.NewSecondaryManager(
+		log,
+		metrics,
+		caches,
+		fallbacks,
+		config.StoreConfig.WriteOnCacheMiss,
+		config.StoreConfig.ErrorOnSecondaryInsertFailure,
+	)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
 		log.Info("Starting secondary write loop(s)", "count", config.StoreConfig.AsyncPutWorkers)
@@ -142,6 +149,7 @@ func BuildManagers(
 		"read_fallback", len(fallbacks) > 0,
 		"caching", len(caches) > 0,
 		"async_secondary_writes", (secondary.Enabled() && config.StoreConfig.AsyncPutWorkers > 0),
+		"error_on_secondary_insert_failure", config.StoreConfig.ErrorOnSecondaryInsertFailure,
 		"verify_v1_certs", config.VerifierConfigV1.VerifyCerts,
 	)
 
