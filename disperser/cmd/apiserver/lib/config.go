@@ -87,17 +87,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		G2TrailingSRSPath: ctx.GlobalString(kzg.G2TrailingPathFlagName),
 	}
 	if version == uint(V2) {
-		if kzgCommitterConfig.G1SRSPath == "" {
-			return Config{}, fmt.Errorf("G1Path must be specified for disperser version 2")
-		}
-		if kzgCommitterConfig.G2SRSPath == "" {
-			return Config{}, fmt.Errorf("G2Path must be specified for disperser version 2")
-		}
-		if kzgCommitterConfig.G2TrailingSRSPath == "" {
-			return Config{}, fmt.Errorf("G2TrailingPath must be specified for disperser version 2")
-		}
-		if kzgCommitterConfig.SRSNumberToLoad <= 0 {
-			return Config{}, fmt.Errorf("SRSNumberToLoad must be specified for disperser version 2")
+		if err := kzgCommitterConfig.Verify(); err != nil {
+			return Config{}, fmt.Errorf("disperser version 2: kzg committer config verify: %w", err)
 		}
 	}
 
