@@ -197,7 +197,7 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 	for i := 0; i < len(operators); i++ {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, fmt.Errorf("context done: %w", ctx.Err())
 		default:
 		}
 
