@@ -104,7 +104,7 @@ func (s *DispersalServerV2) disperseBlob(
 					"refundError", refundErr,
 					"storageError", st.Err())
 			} else {
-				s.logger.Debugf("successfully refunded payment after storage failure",
+				s.logger.Debug("successfully refunded payment after storage failure",
 					"accountID", blobHeader.PaymentMetadata.AccountID.Hex())
 			}
 		}
