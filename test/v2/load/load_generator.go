@@ -79,10 +79,10 @@ func NewLoadGenerator(
 	config *LoadGeneratorConfig,
 	client *client.TestClient) (*LoadGenerator, error) {
 
-	bytesPerSecond := config.MBPerSecond * units.MiB
+	bytesPerSecond := config.MbPerSecond * units.MiB
 
 	// The size of the blob we want to send.
-	targetBlobSize := uint64(config.BlobSizeMB * units.MiB)
+	targetBlobSize := uint64(config.BlobSizeMb * units.MiB)
 	// The target blob size must be a power of 2.
 	targetBlobSize = math.NextPowOf2u64(targetBlobSize)
 

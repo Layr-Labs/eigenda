@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/docker/go-units"
 )
 
+var _ config.VerifiableConfig = (*TestClientConfig)(nil)
+
 // TestClientConfig is the configuration for the test client.
 type TestClientConfig struct {
 	// The location where the SRS files can be found.
-	SRSPath string `docs:"required"`
+	SrsPath string `docs:"required"`
 	// The location where the test client's private key is stored. This is the key for the account that is
 	// paying for dispersals.
 	//
@@ -28,18 +31,18 @@ type TestClientConfig struct {
 	DisperserPort int `docs:"required"`
 	// The URL(s) to point the eth client to
 	//
-	// Either this or EthRPCURLsVar must be set. If both are set, EthRPCURLs is used.
-	EthRPCURLs []string `docs:"required"`
+	// Either this or EthRpcUrlsVar must be set. If both are set, EthRpcUrls is used.
+	EthRpcUrls []string `docs:"required"`
 	// The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.
 	//
-	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.
-	EthRPCUrlsVar string `docs:"required"`
+	// Either this or EthRpcUrls must be set. If both are set, EthRpcUrls is used.
+	EthRpcUrlsVar string `docs:"required"`
 	// The contract address for the EigenDA address directory, where all contract addresses are stored
 	ContractDirectoryAddress string `docs:"required"`
 	// The URL/IP of a subgraph to use for the chain state
-	SubgraphURL string `docs:"required"`
+	SubgraphUrl string `docs:"required"`
 	// The SRS order to use for the test
-	SRSOrder uint64
+	SrsOrder uint64
 	// The SRS number to load, increasing this beyond necessary can cause the client to take a long time to start
 	SRSNumberToLoad uint64
 	// The maximum blob size supported by the EigenDA network
@@ -68,7 +71,7 @@ func DefaultTestClientConfig() *TestClientConfig {
 	return &TestClientConfig{
 		DisperserPort:                   443,
 		MaxBlobSize:                     16 * units.MiB,
-		SRSOrder:                        268435456,
+		SrsOrder:                        268435456,
 		MetricsPort:                     9101,
 		ValidatorReadConnectionPoolSize: 100,
 		ValidatorReadComputePoolSize:    20,
@@ -81,9 +84,53 @@ func DefaultTestClientConfig() *TestClientConfig {
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.
 func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
-	root, err := util.SanitizePath(c.SRSPath)
+	root, err := util.SanitizePath(c.SrsPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to sanitize path: %w", err)
 	}
 	return path.Join(root, srsFile), nil
+}
+
+// Verify implements config.VerifiableConfig.
+func (c *TestClientConfig) Verify() error {
+	if c.SrsPath == "" {
+		return fmt.Errorf("SrsPath must be set")
+	}
+	if c.KeyPath == "" && c.KeyVar == "" {
+		return fmt.Errorf("either KeyPath or KeyVar must be set")
+	}
+	if c.DisperserHostname == "" {
+		return fmt.Errorf("DisperserHostname must be set")
+	}
+	if c.DisperserPort <= 0 || c.DisperserPort > 65535 {
+		return fmt.Errorf("DisperserPort must be a valid port number")
+	}
+	if len(c.EthRpcUrls) == 0 && c.EthRpcUrlsVar == "" {
+		return fmt.Errorf("either EthRpcUrls or EthRpcUrlsVar must be set")
+	}
+	if c.ContractDirectoryAddress == "" {
+		return fmt.Errorf("ContractDirectoryAddress must be set")
+	}
+	if c.SubgraphUrl == "" {
+		return fmt.Errorf("SubgraphUrl must be set")
+	}
+	if c.SrsOrder == 0 {
+		return fmt.Errorf("SrsOrder must be set and greater than 0")
+	}
+	if c.MaxBlobSize == 0 {
+		return fmt.Errorf("MaxBlobSize must be set and greater than 0")
+	}
+	if c.ValidatorReadConnectionPoolSize <= 0 {
+		return fmt.Errorf("ValidatorReadConnectionPoolSize must be set and greater than 0")
+	}
+	if c.ValidatorReadComputePoolSize <= 0 {
+		return fmt.Errorf("ValidatorReadComputePoolSize must be set and greater than 0")
+	}
+	if c.RelayConnectionCount == 0 {
+		return fmt.Errorf("RelayConnectionCount must be set and greater than 0")
+	}
+	if c.DisperserConnectionCount == 0 {
+		return fmt.Errorf("DisperserConnectionCount must be set and greater than 0")
+	}
+	return nil
 }
