@@ -82,6 +82,5 @@ jobs:
         run: |
           version="${{ github.event.inputs.version }}"
           git config --global user.name "releaser-bot"
-          git config --global user.email "releaser-bot@users.noreply.github.com"
           git checkout -b "release/$version"
           git push origin "release/$version"
