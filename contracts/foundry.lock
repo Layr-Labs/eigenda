@@ -1,0 +1,17 @@
+{
+  "lib/eigenlayer-middleware": {
+    "branch": {
+      "name": "m2-mainnet-fixes",
+      "rev": "2f7c93e38f56f292f247981a52bd3619a16b9918"
+    }
+  },
+  "lib/forge-std": {
+    "rev": "3b20d60d14b343ee4f908cb8079495c07f5e8981"
+  },
+  "lib/openzeppelin-contracts": {
+    "rev": "8c49ad74eae76ee389d038780d407cf90b4ae1de"
+  },
+  "lib/openzeppelin-contracts-upgradeable": {
+    "rev": "6b9807b0639e1dd75e07fa062e9432eb3f35dd8c"
+  }
+}
