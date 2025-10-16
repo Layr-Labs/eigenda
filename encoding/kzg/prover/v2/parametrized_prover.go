@@ -2,10 +2,10 @@ package prover
 
 import (
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -18,6 +18,7 @@ import (
 // Note that commitments are not dependent on the FFT setup.
 // TODO(samlaf): move the commitment functionality back to the prover, not parametrizedProver.
 type ParametrizedProver struct {
+	logger          logging.Logger
 	srsNumberToLoad uint64
 
 	encodingParams encoding.EncodingParams
@@ -94,16 +95,13 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 	}
 
 	totalProcessingTime := time.Since(encodeStart)
-	slog.Info("Frame process details",
+	g.logger.Info("Frame process details",
 		"Input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
 		"Num_chunks", g.encodingParams.NumChunks,
 		"Chunk_length", g.encodingParams.ChunkLength,
 		"Total_duration", totalProcessingTime,
 		"RS_encode_duration", rsResult.Duration,
 		"multiProof_duration", proofsResult.Duration,
-		"SRSOrder", encoding.SRSOrder,
-		// TODO(samlaf): should we take NextPowerOf2(len(inputFr)) instead?
-		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
 	)
 
 	// assemble frames

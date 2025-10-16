@@ -1,0 +1,21 @@
+2025/10/15 15:18:26 maxprocs: Leaving GOMAXPROCS=12: CPU quota undefined
+goos: darwin
+goarch: arm64
+cpu: Apple M4 Pro
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^17_bytes-12         	     722	   1600042 ns/op	 1720483 B/op	      11 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^20_bytes-12         	      75	  14344391 ns/op	13648058 B/op	      12 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^21_bytes-12         	      33	  30752650 ns/op	27279546 B/op	      12 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^24_bytes-12         	       3	 338523431 ns/op	218120464 B/op	      14 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^17_bytes-12             	      56	  21127379 ns/op	  834764 B/op	     476 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^20_bytes-12             	      12	  94027549 ns/op	42898616 B/op	     336 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^21_bytes-12             	       6	 174494403 ns/op	82610336 B/op	     334 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^24_bytes-12             	       1	1041497167 ns/op	537948560 B/op	     298 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^17_bytes-12                   	      78	  14341698 ns/op	 5612857 B/op	   16444 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^20_bytes-12                   	      12	  87004580 ns/op	43685468 B/op	   16444 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^21_bytes-12                   	       6	 191573201 ns/op	89824028 B/op	   16443 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^24_bytes-12                   	       1	1933645625 ns/op	939883368 B/op	   16452 allocs/op
+BenchmarkMultiproofFrameGeneration/Multiproof_size_2^17_bytes-12          	       1	8483347042 ns/op	583194896 B/op	 3794671 allocs/op
+BenchmarkMultiproofFrameGeneration/Multiproof_size_2^20_bytes-12          	       1	8988746833 ns/op	772311088 B/op	 3944709 allocs/op
+BenchmarkMultiproofFrameGeneration/Multiproof_size_2^21_bytes-12          	       1	9539889334 ns/op	838424712 B/op	 3478075 allocs/op
+PASS
+ok  	command-line-arguments	80.323s

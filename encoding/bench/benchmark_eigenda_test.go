@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
@@ -52,9 +53,8 @@ func BenchmarkPayloadToBlobConversion(b *testing.B) {
 // The committer package contains benchmarks for each individual commitment,
 // since those are private functions that we can't call from here.
 func BenchmarkCommittmentGeneration(b *testing.B) {
-	blobLen := uint64(1 << 19) // 2^19 = 524,288 field elements = 16 MiB
 	config := committer.Config{
-		SRSNumberToLoad:   blobLen,
+		SRSNumberToLoad:   1 << 19, // 2^19 = 524,288 field elements = 16 MiB
 		G1SRSPath:         "../../resources/srs/g1.point",
 		G2SRSPath:         "../../resources/srs/g2.point",
 		G2TrailingSRSPath: "../../resources/srs/g2.trailing.point",
@@ -62,12 +62,17 @@ func BenchmarkCommittmentGeneration(b *testing.B) {
 	committer, err := committer.NewFromConfig(config)
 	require.NoError(b, err)
 
-	rand := random.NewTestRandom()
-	blob := rand.FrElements(blobLen)
+	for _, blobPower := range []uint8{17, 20, 21, 24} {
+		b.Run("Commitments_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
+			blobLen := uint64(1 << blobPower / encoding.BYTES_PER_SYMBOL)
+			rand := random.NewTestRandomNoPrint(1337)
+			blob := rand.FrElements(blobLen)
 
-	for b.Loop() {
-		_, _, _, err := committer.GetCommitments(blob)
-		require.NoError(b, err)
+			for b.Loop() {
+				_, _, _, err := committer.GetCommitments(blob)
+				require.NoError(b, err)
+			}
+		})
 	}
 }
 
@@ -78,7 +83,7 @@ func BenchmarkCommittmentGeneration(b *testing.B) {
 // evaluates to the chunk's data at the chunk's coset indices.
 func BenchmarkBlobToChunksEncoding(b *testing.B) {
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(cfg)
+	enc := rs.NewEncoder(common.SilentLogger(), cfg)
 
 	for _, blobPower := range []uint64{17, 20, 21, 24} {
 		b.Run("Encode_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
@@ -88,7 +93,7 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 				ChunkLength: max(1, blobSizeBytes*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
 			}
 
-			rand := random.NewTestRandom()
+			rand := random.NewTestRandomNoPrint(1337)
 			blobBytes := rand.Bytes(int(blobSizeBytes))
 			for i := 0; i < len(blobBytes); i += 32 {
 				blobBytes[i] = 0 // to make them Fr elements
@@ -107,19 +112,25 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 // The encoder service on the disperser generates a multiproof for each chunk.
 // This is the most intensive part of the encoding process.
 //
-// This Benchmark is very high-level, since GetFrames does many things.
-// But the print statements from the Encoder give a breakdown of the different steps. E.g.:
+// This Benchmark is very high-level, since GetFrames does both RS encoding and multiproof generation.
+// TODO(samlaf): refactor Prover to only do multiproof generation and keep RS encoding separate.
+//
+// The benchmark uses a silent logger, but you can switch to a normal logger to see
+// the log lines giving a breakdown of the different proof steps. E.g.:
 // Multiproof Time Decomp total=9.478006875s preproc=33.987083ms msm=1.496717042s fft1=5.912448708s fft2=2.034854042s
 // Where fft1 and fft2 are on G1, and preproc contains an FFT on Fr elements.
 func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 	proverConfig := prover.KzgConfig{
 		SRSNumberToLoad: 1 << 19,
 		G1Path:          "../../resources/srs/g1.point",
-		PreloadEncoder:  true,
-		CacheDir:        "../../resources/srs/SRSTables",
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		// we preload only the needed SRSTables right before b.Loop below.
+		PreloadEncoder: false,
+		CacheDir:       "../../resources/srs/SRSTables",
+		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
 	}
-	p, err := prover.NewProver(&proverConfig, nil)
+
+	// use a non-silent logger to see the "Multiproof Time Decomp" log lines.
+	p, err := prover.NewProver(common.SilentLogger(), &proverConfig, nil)
 	require.NoError(b, err)
 
 	// We only have 16MiBs of SRS points. Since we use blob_version=0's 8x coding
@@ -132,13 +143,13 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 				ChunkLength: max(1, blobSizeBytes*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
 			}
 
-			rand := random.NewTestRandom()
+			rand := random.NewTestRandomNoPrint(1337)
 			blobBytes := rand.Bytes(int(blobSizeBytes))
 			for i := 0; i < len(blobBytes); i += 32 {
 				blobBytes[i] = 0 // to make them Fr elements
 			}
 
-			// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
+			// Run this before entering the benchmark loop to preload the SRSTable for the params size.
 			_, err = p.GetFrames(blobBytes, params)
 			require.NoError(b, err)
 

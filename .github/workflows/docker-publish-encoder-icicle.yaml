@@ -1,0 +1,81 @@
+
+# NOTE: encoder-icicle is built in a separate workflow (instead of being included in the main
+# docker-publish workflow) because:
+# 1. It uses a different Dockerfile (icicle.Dockerfile) with GPU-specific dependencies (ICICLE library)
+# 2. It's restricted to linux/amd64 platform only (ICICLE requires NVIDIA GPUs)
+# 3. We've seen OOM on action workflow when ran together with other builds
+name: docker-publish-encoder-icicle
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+env:
+  # TODO: Push to AWS CR at a later stage
+  REGISTRY: ghcr.io
+
+jobs:
+  build-encoder-icicle:
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 #v3.8.0
+        with:
+          install: true
+          driver-opts: >-
+            image=moby/buildkit:master
+
+      - name: Cache encoder-icicle image layers
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 #4.2.0
+        with:
+          path: /tmp/.buildx-cache-icicle
+          key: ${{ runner.os }}-buildx-icicle-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-icicle-
+
+      # Login against a Docker registry except on PR
+      # https://github.com/docker/login-action
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 #v3.3.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build And Push encoder-icicle Image
+      - name: Build encoder-icicle Docker image
+        run: docker buildx bake encoder-icicle
+      - name: Push encoder-icicle Docker image
+        if: github.ref == 'refs/heads/master'
+        run: BUILD_TAG=master docker buildx bake encoder-icicle --push
+
+      - name: Send GitHub Action trigger data to Slack workflow
+        if: ${{ failure() }}
+        id: slack
+        uses: slackapi/slack-github-action@e28cf165c92ffef168d23c5c9000cffc8a25e117 #1.24.0
+        with:
+          payload: |
+            {
+              "workflow": "${{ github.workflow }}",
+              "action_name": "${{ github.action }}",
+              "ref": "${{ github.ref_name }}",
+              "actor": "${{ github.triggering_actor }}",
+              "event_name": "${{ github.event_name }}",
+              "run_id": "https://github.com/Layr-Labs/eigenda/actions/runs/${{ github.run_id }}",
+              "commit_sha": "https://github.com/Layr-Labs/eigenda/commit/${{ github.sha }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
