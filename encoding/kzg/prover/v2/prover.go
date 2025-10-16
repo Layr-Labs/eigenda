@@ -261,7 +261,13 @@ func (p *Prover) setupFFTPoints(params encoding.EncodingParams, blobLength uint6
 	} else {
 		numSystemChunk = blobLength / params.ChunkLength
 	}
-	fmt.Println("numSystemChunk", numSystemChunk)
+
+	// special case when number of systematic chunks equals to 1, we have to artificially
+	// double the size, to create a proper matrix.
+	// See newProver, when chunkLen = 1, we need to double the size of numChunk
+	if numSystemChunk == 1 {
+		numSystemChunk = 2
+	}
 
 	fftPoints, err := subTable.GetSubTables(numSystemChunk, params.ChunkLength)
 	if err != nil {
