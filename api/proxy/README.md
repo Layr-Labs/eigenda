@@ -287,7 +287,18 @@ Below is a list of the main high-level features offered for configuring the eige
 controlled via flags and/or env vars. To view the extensive list of available flags/env-vars to configure a given
 version of eigenda-proxy, run `eigenda-proxy --help`.
 
-#### Payment Mode Configuration
+#### Payments
+
+> Note: Proxy only supports using a single authorization (v1) or payment (v2) key. For RaaS providers, we discourage
+sharing keys between rollups, and thus recommend running a single instance of the Proxy per Rollup.
+
+##### V1 Payments
+
+In order to disperse to the EigenDA V1 network in production, or at high throughput on testnet, please register your
+authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication
+keypair address should not be associated with any funds anywhere. 
+
+##### V2 Payments
 
 When using EigenDA V2, the payment system can be configured using the `--eigenda.v2.client-ledger-mode` flag (or the
 `EIGENDA_PROXY_EIGENDA_V2_CLIENT_LEDGER_MODE` environment variable). This flag determines which payment mechanisms are
@@ -297,8 +308,10 @@ active for blob dispersals. For detailed information about the payment system, s
 **Available Payment Modes:**
 
 1. **`legacy` (default)** - Uses the legacy bin-based payment system that handles both reservation and on-demand
-   payments. This mode is in the process of being deprecated and will be removed in a future release.
-   
+   payments. This mode is in the process of being deprecated and will be removed in a future release. For more
+   information about the `legacy` payment system, please see our
+   [payments](https://docs.eigencloud.xyz/products/eigenda/core-concepts/payments) doc.
+
 > **IMPORTANT**: All clients should continue using this mode until the new payment system has officially shipped. The
 > other payment modes are documented below for awareness, but they aren't ready to be used in production environments.
 
@@ -361,12 +374,6 @@ In the event that the EigenDA disperser or network is down, the proxy will retur
 This behavior is turned on by default, but configurable via the `--eigenda.confirmation-timeout` flag (set to 15 mins by default currently). If a blob is not confirmed within this time, the proxy will return a 503 status code. This should be set long enough to accomodate for the disperser's batching interval (typically 10 minutes), signature gathering, and onchain submission.
 
 ### Requirements / Dependencies
-
-#### Authn/Authz/Payments
-
-In order to disperse to the EigenDA V1 network in production, or at high throughput on testnet, please register your authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication keypair address should not be associated with any funds anywhere. For EigenDA V2, please see our [payments](https://docs.eigencloud.xyz/products/eigenda/core-concepts/payments) doc.
-
-> Note: Proxy only supports using a single authorization (v1) or payment (v2) key. For RaaS providers, we discourage sharing keys between rollups, and thus recommend running a single instance of the Proxy per Rollup.
 
 #### Ethereum Node
 
