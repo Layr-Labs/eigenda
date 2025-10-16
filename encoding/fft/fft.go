@@ -34,6 +34,13 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/fft"
 )
 
+// FFTSettings contains precomputed roots of unity and other settings for performing FFTs
+// and related operations: fft_fr, fft_g1, recover_from_samples, interpolate_poly_from_evals.
+// fft_fr is implemented using the gnark-crypto library, while fft_g1 is our own custom implementation.
+//
+// TODO(samlaf): I think a better architecture would be to consolidate consolidate this struct
+// by moving our FFT_G1 implementation to also use gnark-crypto (but see the comment on [FFTSettings.FFTG1]),
+// and split the recover/interpolate functions into their own high-level wrappers.
 type FFTSettings struct {
 	// Maximum number of points this FFTSettings can handle
 	MaxWidth uint64
@@ -43,8 +50,11 @@ type FFTSettings struct {
 	ExpandedRootsOfUnity []fr.Element
 	// reverse domain, same as inverse values of domain. Also starting and ending with 1.
 	ReverseRootsOfUnity []fr.Element
-	// Used for Fr FFTs using gnark-crypto library
-	// TODO: replace FFTSettings entirely with this
+	// Used for Fr FFTs using gnark-crypto library.
+	// One huge issue currently is that except for FFTFr, all other operations work on any input
+	// of length <= maxWidth. However, gnark-crypto's fft.Domain only works when the input exactly matches
+	// the domain size. This is a known issue that should get fixed eventually though, see:
+	// https://github.com/Consensys/gnark-crypto/issues/756
 	Domain *fft.Domain
 }
 

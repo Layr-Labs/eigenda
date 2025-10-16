@@ -20,6 +20,7 @@ type ParametrizedEncoder struct {
 	Fs     *fft.FFTSettings
 	// FsChunkLen is needed because it has smaller number of roots of unity than Fs.
 	// This is for computing interpolation polynomial within each chunk.
+	// This is only needed because of the gnark-crypto issue, see comment on [fft.FFTSettings.Domain].
 	FsChunkLen        *fft.FFTSettings
 	RSEncoderComputer EncoderDevice
 }
