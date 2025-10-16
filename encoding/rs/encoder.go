@@ -3,7 +3,6 @@ package rs
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"math"
 	"sync"
 	"time"
@@ -11,11 +10,13 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	gnarkencoder "github.com/Layr-Labs/eigenda/encoding/rs/gnark"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	_ "go.uber.org/automaxprocs"
 )
 
 type Encoder struct {
+	logger logging.Logger
 	Config *encoding.Config
 
 	mu                  sync.Mutex
@@ -23,12 +24,13 @@ type Encoder struct {
 }
 
 // NewEncoder creates a new encoder with the given options
-func NewEncoder(config *encoding.Config) *Encoder {
+func NewEncoder(logger logging.Logger, config *encoding.Config) *Encoder {
 	if config == nil {
 		config = encoding.DefaultConfig()
 	}
 
 	e := &Encoder{
+		logger:              logger,
 		Config:              config,
 		mu:                  sync.Mutex{},
 		ParametrizedEncoder: make(map[encoding.EncodingParams]*ParametrizedEncoder),
@@ -85,7 +87,7 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 	framesDuration := time.Since(intermediate)
 
 	// TODO(samlaf): use an injected logger instead.
-	slog.Info("RSEncode details",
+	g.logger.Info("RSEncode details",
 		"input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
 		"num_chunks", encoder.Params.NumChunks,
 		"chunk_length", encoder.Params.ChunkLength,

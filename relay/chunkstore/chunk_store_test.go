@@ -158,7 +158,7 @@ func runRandomCoefficientsTest(t *testing.T, client s3.Client) {
 	fragmentSize := int(chunkSize / 2)
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
-	encoder := rs.NewEncoder(cfg)
+	encoder := rs.NewEncoder(logger, cfg)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, client, bucket)
@@ -216,7 +216,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
-	encoder := rs.NewEncoder(cfg)
+	encoder := rs.NewEncoder(logger, cfg)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	ctx := t.Context()

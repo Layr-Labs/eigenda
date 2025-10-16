@@ -2,11 +2,11 @@ package gnark
 
 import (
 	"fmt"
-	"log/slog"
 	"slices"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -14,7 +14,8 @@ import (
 )
 
 type KzgMultiProofGnarkBackend struct {
-	Fs *fft.FFTSettings
+	Logger logging.Logger
+	Fs     *fft.FFTSettings
 	// FFTPointsT contains the transposed SRSTable points, of size [2*dimE][l]=[2*numChunks][chunkLen].
 	// See section 3.1.1 of https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf:
 	//   "Note that the vector multiplied by the matrix is independent from the polynomial coefficients,
@@ -59,6 +60,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 	sumVec := make([]bn254.G1Affine, dimE*2)
 
 	g := new(errgroup.Group)
+	g.SetLimit(int(numWorker))
 	for i := uint64(0); i < dimE*2; i++ {
 		g.Go(func() error {
 			// eqn (3) u=y*v
@@ -97,7 +99,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 
 	secondECNttDone := time.Now()
 
-	slog.Info("Multiproof Time Decomp",
+	p.Logger.Info("Multiproof Time Decomp",
 		"total", secondECNttDone.Sub(begin),
 		"preproc", preprocessDone.Sub(begin),
 		"msm", msmDone.Sub(preprocessDone),

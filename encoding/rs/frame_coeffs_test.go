@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -19,7 +20,7 @@ func TestFrameCoeffsSliceSerialization(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(paddedPayload)))
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(cfg)
+	enc := rs.NewEncoder(common.TestLogger(t), cfg)
 
 	coeffs, _, err := enc.EncodeBytes(paddedPayload, params)
 	require.NoError(t, err)
@@ -44,7 +45,7 @@ func TestSplitSerializedFrameCoeffs(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(paddedPayload)))
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(cfg)
+	enc := rs.NewEncoder(common.TestLogger(t), cfg)
 
 	coeffs, _, err := enc.EncodeBytes(paddedPayload, params)
 	require.NoError(t, err)

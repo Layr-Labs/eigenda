@@ -220,7 +220,7 @@ func createValidatorPayloadRetriever(
 		logger,
 		ethReader,
 		chainState,
-		rs.NewEncoder(nil),
+		rs.NewEncoder(logger, nil),
 		kzgVerifier,
 		clientConfig,
 		nil,

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -106,7 +107,11 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 	srs := kzg.NewSrs(s1, s2)
 
 	// Create RS encoder
-	rsEncoder := rs.NewEncoder(encoderConfig)
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return nil, fmt.Errorf("cannot create logger: %w", err)
+	}
+	rsEncoder := rs.NewEncoder(logger, encoderConfig)
 
 	encoderGroup := &Prover{
 		Config:              encoderConfig,
