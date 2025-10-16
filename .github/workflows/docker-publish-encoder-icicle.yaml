@@ -1,4 +1,11 @@
+
+# NOTE: encoder-icicle is built in a separate workflow (instead of being included in the main
+# docker-publish workflow) because:
+# 1. It uses a different Dockerfile (icicle.Dockerfile) with GPU-specific dependencies (ICICLE library)
+# 2. It's restricted to linux/amd64 platform only (ICICLE requires NVIDIA GPUs)
+# 3. We've seen OOM on action workflow when ran together with other builds
 name: docker-publish-encoder-icicle
+
 on:
   push:
     branches:
