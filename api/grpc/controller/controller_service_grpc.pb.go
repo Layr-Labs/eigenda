@@ -45,10 +45,6 @@ type ControllerServiceClient interface {
 	//
 	// This is intended to be called by API server instances when a blob dispersal fails after payment authorization
 	// (e.g., storage failures). The controller will revert the accounting changes made during AuthorizePayment.
-	//
-	// Security characteristics:
-	// - Internal API protected by firewall rules
-	// - Replay protection ensures idempotent refund processing
 	RefundPayment(ctx context.Context, in *RefundPaymentRequest, opts ...grpc.CallOption) (*RefundPaymentResponse, error)
 }
 
@@ -100,10 +96,6 @@ type ControllerServiceServer interface {
 	//
 	// This is intended to be called by API server instances when a blob dispersal fails after payment authorization
 	// (e.g., storage failures). The controller will revert the accounting changes made during AuthorizePayment.
-	//
-	// Security characteristics:
-	// - Internal API protected by firewall rules
-	// - Replay protection ensures idempotent refund processing
 	RefundPayment(context.Context, *RefundPaymentRequest) (*RefundPaymentResponse, error)
 	mustEmbedUnimplementedControllerServiceServer()
 }

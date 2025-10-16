@@ -29,10 +29,6 @@ service ControllerService {
   //
   // This is intended to be called by API server instances when a blob dispersal fails after payment authorization
   // (e.g., storage failures). The controller will revert the accounting changes made during AuthorizePayment.
-  //
-  // Security characteristics:
-  // - Internal API protected by firewall rules
-  // - Replay protection ensures idempotent refund processing
   rpc RefundPayment(RefundPaymentRequest) returns (RefundPaymentResponse) {}
 }
 

@@ -215,7 +215,7 @@ func (h *PaymentAuthorizationHandler) RefundPayment(
 			"invalid blob header: %v, blobHeader: %s", err, blobHeader.String()))
 	}
 
-	symbolCount := uint32(coreHeader.BlobCommitments.Length)
+	symbolCount := coreHeader.BlobCommitments.Length
 	accountID := coreHeader.PaymentMetadata.AccountID
 
 	if coreHeader.PaymentMetadata.IsOnDemand() {
