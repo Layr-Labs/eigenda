@@ -88,8 +88,9 @@ func (svr *Server) handleGetShared(
 	if !ok {
 		return proxyerrors.NewParsingError(fmt.Errorf("serializedDACert not found in path: %s", r.URL.Path))
 	}
-	if len(serializedCertHex) > MaxCertSizeBytes {
-		return proxyerrors.NewParsingError(fmt.Errorf("serializedCertHex cannot be larger than %d bytes", MaxCertSizeBytes))
+	// Check the size of the hex payload (in bytes) does not exceed MaxCertSizeBytes
+	if len(serializedCertHex)/2 > MaxCertSizeBytes {
+		return proxyerrors.NewParsingError(fmt.Errorf("%s can not exceed %d bytes", routingVarNamePayloadHex, MaxCertSizeBytes))
 	}
 	serializedCert, err := hex.DecodeString(serializedCertHex)
 	if err != nil {
