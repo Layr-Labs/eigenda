@@ -11,6 +11,7 @@ import (
 	"runtime/trace"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
@@ -56,7 +57,7 @@ func parseFlags() Config {
 }
 
 var proverKzgConfig *proverv2.KzgConfig
-var verifierKzgConfig *verifierv2.KzgConfig
+var verifierKzgConfig *verifierv2.Config
 
 func main() {
 	config := parseFlags()
@@ -66,12 +67,9 @@ func main() {
 	// Setup phase
 	proverKzgConfig = &proverv2.KzgConfig{
 		G1Path:          "/home/ubuntu/eigenda/resources/srs/g1.point",
-		G2Path:          "/home/ubuntu/eigenda/resources/srs/g2.point",
-		G2TrailingPath:  "/home/ubuntu/eigenda/resources/srs/g2.trailing.point",
 		CacheDir:        "/home/ubuntu/eigenda/resources/srs/SRSTables",
 		SRSNumberToLoad: 524288,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
 		PreloadEncoder:  true,
 	}
 
@@ -87,7 +85,7 @@ func main() {
 		log.Fatalf("Failed to create committer: %v", err)
 	}
 
-	verifierKzgConfig = &verifierv2.KzgConfig{
+	verifierKzgConfig = &verifierv2.Config{
 		G1Path:          "/home/ubuntu/eigenda/resources/srs/g1.point",
 		SRSNumberToLoad: 524288,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
@@ -95,12 +93,16 @@ func main() {
 
 	fmt.Printf("* Task Starts\n")
 
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		log.Fatalf("Failed to create logger: %v", err)
+	}
 	cfg := &encoding.Config{
 		BackendType: encoding.GnarkBackend,
 		GPUEnable:   false,
 		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 	}
-	p, err := proverv2.NewProver(proverKzgConfig, cfg)
+	p, err := proverv2.NewProver(logger, proverKzgConfig, cfg)
 
 	if err != nil {
 		log.Fatalf("Failed to create prover: %v", err)
@@ -189,7 +191,7 @@ func benchmarkEncodeAndVerify(
 
 	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
 
-	enc, err := p.GetKzgEncoder(params)
+	prover, err := p.GetKzgProver(params)
 	if err != nil {
 		log.Fatalf("Failed to get KZG encoder: %v", err)
 	}
@@ -207,7 +209,7 @@ func benchmarkEncodeAndVerify(
 	}
 
 	start := time.Now()
-	frames, _, err := enc.GetFrames(inputFr)
+	frames, _, err := prover.GetFrames(inputFr)
 	if err != nil {
 		log.Fatal(err)
 	}

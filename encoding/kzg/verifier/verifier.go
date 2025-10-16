@@ -6,6 +6,7 @@ import (
 	"math"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -38,9 +39,13 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 		return nil, fmt.Errorf("failed to read %d G1 points from %s: %v", config.SRSNumberToLoad, config.G1Path, err)
 	}
 
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return nil, fmt.Errorf("cannot create logger: %w", err)
+	}
 	encoderGroup := &Verifier{
 		kzgConfig:             config,
-		encoder:               rs.NewEncoder(encoderConfig),
+		encoder:               rs.NewEncoder(logger, encoderConfig),
 		G1SRS:                 g1SRS,
 		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
 	}

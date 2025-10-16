@@ -3,7 +3,6 @@
 package prover
 
 import (
-	"math"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -29,23 +28,16 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 		GPUEnable:  p.Config.GPUEnable,
 		NTTSize:    MAX_NTT_SIZE,
 		FFTPointsT: fftPointsT,
-		SRSG1:      p.Srs.G1[:p.KzgConfig.SRSNumberToLoad],
+		SRSG1:      p.G1SRS[:p.KzgConfig.SRSNumberToLoad],
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// Create subgroup FFT settings
-	t := uint8(math.Log2(float64(2 * params.NumChunks)))
-	sfs := fft.NewFFTSettings(t)
-
 	// Set up icicle multiproof backend
 	multiproofBackend := &icicleprover.KzgMultiProofIcicleBackend{
 		Fs:             fs,
 		FlatFFTPointsT: icicleDevice.FlatFFTPointsT,
-		SRSIcicle:      icicleDevice.SRSG1Icicle,
-		SFs:            sfs,
-		Srs:            p.Srs,
 		NttCfg:         icicleDevice.NttCfg,
 		MsmCfg:         icicleDevice.MsmCfg,
 		Device:         icicleDevice.Device,
@@ -54,6 +46,7 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 	}
 
 	return &ParametrizedProver{
+		logger:                     p.logger,
 		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
 		encodingParams:             params,
 		encoder:                    p.encoder,

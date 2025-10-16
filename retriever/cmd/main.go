@@ -129,8 +129,8 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 2 {
-		encoder := rs.NewEncoder(nil)
-		kzgConfig := verifierv2.KzgConfigFromV1Config(&config.EncoderConfig)
+		encoder := rs.NewEncoder(logger, nil)
+		kzgConfig := verifierv2.ConfigFromV1KzgConfig(&config.EncoderConfig)
 		verifier, err := verifierv2.NewVerifier(kzgConfig)
 		if err != nil {
 			log.Fatalln("new v2 verifier", err)

@@ -1,7 +1,6 @@
 package prover_test
 
 import (
-	cryptorand "crypto/rand"
 	"math/rand"
 	"testing"
 
@@ -29,22 +28,17 @@ func sampleFrames(frames []*encoding.Frame, num uint64) ([]*encoding.Frame, []en
 }
 
 func TestEncoder(t *testing.T) {
-	harness := getTestHarness()
-	p, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	harness := getTestHarness(t)
+	p, err := prover.NewProver(harness.logger, harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
-	c, err := committer.NewFromConfig(committer.Config{
-		SRSNumberToLoad:   harness.proverV2KzgConfig.SRSNumberToLoad,
-		G1SRSPath:         harness.proverV2KzgConfig.G1Path,
-		G2SRSPath:         harness.proverV2KzgConfig.G2Path,
-		G2TrailingSRSPath: harness.proverV2KzgConfig.G2TrailingPath,
-	})
+	c, err := committer.NewFromConfig(*harness.committerConfig)
 	require.NoError(t, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
 	require.NoError(t, err)
 
-	encoder := rs.NewEncoder(nil)
+	encoder := rs.NewEncoder(harness.logger, nil)
 
 	params := encoding.ParamsFromMins(5, 5)
 	commitments, err := c.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
@@ -91,43 +85,8 @@ func TestEncoder(t *testing.T) {
 	require.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 }
 
-// Ballpark number for 400KiB blob encoding
-//
-// goos: darwin
-// goarch: arm64
-// pkg: github.com/Layr-Labs/eigenda/core/encoding
-// BenchmarkEncode-12    	       1	2421900583 ns/op
-func BenchmarkEncode(b *testing.B) {
-	harness := getTestHarness()
-	p, err := prover.NewProver(harness.proverV2KzgConfig, nil)
-	require.NoError(b, err)
-
-	params := encoding.EncodingParams{
-		ChunkLength: 512,
-		NumChunks:   256,
-	}
-	blobSize := 400 * 1024
-	numSamples := 30
-	blobs := make([][]byte, numSamples)
-	for i := 0; i < numSamples; i++ {
-		blob := make([]byte, blobSize)
-		_, _ = cryptorand.Read(blob)
-		blobs[i] = blob
-	}
-
-	// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
-	_, err = p.GetFrames(blobs[0], params)
-	require.NoError(b, err)
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		_, err = p.GetFrames(blobs[i%numSamples], params)
-		require.NoError(b, err)
-	}
-}
-
 func FuzzOnlySystematic(f *testing.F) {
-	harness := getTestHarness()
+	harness := getTestHarness(f)
 
 	f.Add(harness.paddedGettysburgAddressBytes)
 	f.Add([]byte("Hello, World!"))
@@ -135,7 +94,7 @@ func FuzzOnlySystematic(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, input []byte) {
 		input = codec.ConvertByPaddingEmptyByte(input)
-		group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+		group, err := prover.NewProver(harness.logger, harness.proverV2KzgConfig, nil)
 		require.NoError(t, err)
 
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
@@ -155,7 +114,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		//sample the correct systematic frames
 		samples, indices := sampleFrames(frames, uint64(len(frames)))
 
-		encoder := rs.NewEncoder(nil)
+		encoder := rs.NewEncoder(harness.logger, nil)
 		chunks := make([]rs.FrameCoeffs, len(samples))
 		for i, f := range samples {
 			chunks[i] = f.Coeffs

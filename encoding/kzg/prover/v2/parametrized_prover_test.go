@@ -13,17 +13,12 @@ import (
 )
 
 func TestProveAllCosetThreads(t *testing.T) {
-	harness := getTestHarness()
+	harness := getTestHarness(t)
 
-	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	group, err := prover.NewProver(harness.logger, harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
-	c, err := committer.NewFromConfig(committer.Config{
-		SRSNumberToLoad:   harness.proverV2KzgConfig.SRSNumberToLoad,
-		G1SRSPath:         harness.proverV2KzgConfig.G1Path,
-		G2SRSPath:         harness.proverV2KzgConfig.G2Path,
-		G2TrailingSRSPath: harness.proverV2KzgConfig.G2TrailingPath,
-	})
+	c, err := committer.NewFromConfig(*harness.committerConfig)
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
@@ -45,14 +40,14 @@ func TestProveAllCosetThreads(t *testing.T) {
 }
 
 func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
-	harness := getTestHarness()
+	harness := getTestHarness(t)
 
-	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	group, err := prover.NewProver(harness.logger, harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
 
-	p, err := group.GetKzgEncoder(params)
+	p, err := group.GetKzgProver(params)
 
 	require.Nil(t, err)
 	require.NotNil(t, p)

@@ -46,13 +46,11 @@ func makeTestProver(numPoint uint64) (*prover.Prover, error) {
 	// We need the larger SRS for testing the encoder with 8192 chunks
 	kzgConfig := &prover.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
 		CacheDir:        "../../resources/srs/SRSTables",
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    false,
 	}
-	p, err := prover.NewProver(kzgConfig, nil)
+	p, err := prover.NewProver(logger, kzgConfig, nil)
 
 	return p, err
 }

@@ -42,7 +42,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	// Set up KZG components (prover, committer and verifier)
 	p, c, v, err := makeTestEncodingComponents()
 	require.NoError(t, err)
-	encoder := rs.NewEncoder(nil)
+	encoder := rs.NewEncoder(logger, nil)
 
 	// Set up test environment
 	rand := testrandom.NewTestRandom()
@@ -233,12 +233,12 @@ func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifi
 		return nil, nil, nil, fmt.Errorf("new committer from config: %w", err)
 	}
 
-	p, err := prover.NewProver(prover.KzgConfigFromV1Config(config), nil)
+	p, err := prover.NewProver(logger, prover.KzgConfigFromV1Config(config), nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	v, err := verifier.NewVerifier(verifier.KzgConfigFromV1Config(config))
+	v, err := verifier.NewVerifier(verifier.ConfigFromV1KzgConfig(config))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new verifier: %w", err)
 	}
