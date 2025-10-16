@@ -152,7 +152,6 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 			}
 
 			params := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
-			params.SetBlobLength(uint64(encoding.GetBlobLengthPowerOf2(uint32(blobSize))))
 
 			commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
 			if err != nil {

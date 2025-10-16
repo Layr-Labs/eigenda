@@ -43,8 +43,6 @@ func TestEncoder(t *testing.T) {
 
 	// chunkLen is 16, there are 8 chunks in total
 	params := encoding.ParamsFromMins(16, 8)
-	blobLength := encoding.GetBlobLengthPowerOf2(uint32(len(harness.paddedGettysburgAddressBytes)))
-	params.SetBlobLength(uint64(blobLength))
 
 	commitments, err := c.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
 	require.NoError(t, err)

@@ -131,7 +131,6 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 				NumChunks:   8192,                            // blob_version=0
 				ChunkLength: max(1, blobSizeBytes*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
 			}
-			params.SetBlobLength(uint64(encoding.GetBlobLengthPowerOf2(uint32(blobSizeBytes))))
 
 			rand := random.NewTestRandom()
 			blobBytes := rand.Bytes(int(blobSizeBytes))

@@ -14,19 +14,6 @@ type EncodingParams struct {
 	ChunkLength uint64
 	// number of total chunks (always a power of 2)
 	NumChunks uint64
-	// number of systematic chunk (always power of 2)
-	blobLength uint64
-}
-
-func (p *EncodingParams) SetBlobLength(blobLength uint64) {
-	p.blobLength = blobLength
-}
-
-func (p *EncodingParams) GetBlobLength() (uint64, error) {
-	if p.blobLength == 0 {
-		return 0, fmt.Errorf("Blob length is not set in EncodingParams")
-	}
-	return p.blobLength, nil
 }
 
 func (p EncodingParams) NumEvaluations() uint64 {

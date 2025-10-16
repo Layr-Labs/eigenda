@@ -49,6 +49,8 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 	dimE := numChunks
 	l := chunkLen
 
+	fmt.Println("numChunks", numChunks, "numTotalChunks", numTotalChunks)
+
 	// eqn (2) DFT_2d(c^)
 	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
 	if err != nil {

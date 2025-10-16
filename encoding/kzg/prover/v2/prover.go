@@ -79,7 +79,8 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 		return nil, fmt.Errorf("ToFrArray: %w", err)
 	}
 
-	prover, err := e.GetKzgProver(params)
+	blobLength := uint64(encoding.GetBlobLengthPowerOf2(uint32(len(data))))
+	prover, err := e.GetKzgProver(params, blobLength)
 	if err != nil {
 		return nil, fmt.Errorf("get kzg prover: %w", err)
 	}
@@ -100,7 +101,7 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	return chunks, nil
 }
 
-func (g *Prover) GetKzgProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
+func (g *Prover) GetKzgProver(params encoding.EncodingParams, blobLength uint64) (*ParametrizedProver, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	enc, ok := g.ParametrizedProvers[params]
@@ -108,7 +109,7 @@ func (g *Prover) GetKzgProver(params encoding.EncodingParams) (*ParametrizedProv
 		return enc, nil
 	}
 
-	enc, err := g.newProver(params)
+	enc, err := g.newProver(params, blobLength)
 	if err != nil {
 		return nil, fmt.Errorf("new prover: %w", err)
 	}
@@ -117,7 +118,7 @@ func (g *Prover) GetKzgProver(params encoding.EncodingParams) (*ParametrizedProv
 	return enc, nil
 }
 
-func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
+func (p *Prover) newProver(params encoding.EncodingParams, blobLength uint64) (*ParametrizedProver, error) {
 	if err := encoding.ValidateEncodingParams(params, encoding.SRSOrder); err != nil {
 		return nil, fmt.Errorf("validate encoding params: %w", err)
 	}
@@ -131,9 +132,9 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 
 	switch p.Config.BackendType {
 	case encoding.GnarkBackend:
-		return p.createGnarkBackendProver(params, fs)
+		return p.createGnarkBackendProver(params, fs, blobLength)
 	case encoding.IcicleBackend:
-		return p.createIcicleBackendProver(params, fs)
+		return p.createIcicleBackendProver(params, fs, blobLength)
 	default:
 		return nil, fmt.Errorf("unsupported backend type: %v", p.Config.BackendType)
 	}
@@ -141,13 +142,13 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 }
 
 func (p *Prover) createGnarkBackendProver(
-	params encoding.EncodingParams, fs *fft.FFTSettings,
+	params encoding.EncodingParams, fs *fft.FFTSettings, blobLength uint64,
 ) (*ParametrizedProver, error) {
 	if p.Config.GPUEnable {
 		return nil, errors.New("GPU is not supported in gnark backend")
 	}
 
-	_, fftPointsT, err := p.setupFFTPoints(params)
+	_, fftPointsT, err := p.setupFFTPoints(params, blobLength)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +174,7 @@ func (p *Prover) createGnarkBackendProver(
 }
 
 func (p *Prover) createIcicleBackendProver(
-	params encoding.EncodingParams, fs *fft.FFTSettings,
+	params encoding.EncodingParams, fs *fft.FFTSettings, blobLength uint64,
 ) (*ParametrizedProver, error) {
 	return CreateIcicleBackendProver(p, params, fs)
 }
@@ -193,7 +194,8 @@ func (g *Prover) preloadProversFromSRSTableCache() error {
 	}
 
 	for _, params := range paramsAll {
-		prover, err := g.GetKzgProver(params)
+		// blob length is set to 0 for loading all prover regardless of blob Length
+		prover, err := g.GetKzgProver(params, 0)
 		if err != nil {
 			return err
 		}
@@ -243,24 +245,23 @@ func getAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 
 // Returns SRSTable SRS points, as well as its transpose.
 // fftPoints has size [l][2*dimE], and its transpose has size [2*dimE][l]
-func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
+func (p *Prover) setupFFTPoints(params encoding.EncodingParams, blobLength uint64) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
 	subTable, err := NewSRSTable(p.KzgConfig.CacheDir, p.G1SRS, p.KzgConfig.NumWorker)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create SRS table: %w", err)
 	}
 
-	blobLength, err := params.GetBlobLength()
 	// the number of chunks together their number of contains matches the number of symbols in polynomial,
 	// which is also called systematic symbols in coding theory
 	var numSystemChunk uint64
-	if err != nil {
-		// if blob length is not set, use the default total number of chunk
+	if blobLength == 0 {
+		// if blob length is 0, which is theoretically infeasible for eigenda, use the default total number of chunk
 		// for compatibility to load all SRS Tables, without knowing the blob length
-		// ToDo(bx), it looks like a foot gun
 		numSystemChunk = params.NumChunks
 	} else {
 		numSystemChunk = blobLength / params.ChunkLength
 	}
+	fmt.Println("numSystemChunk", numSystemChunk)
 
 	fftPoints, err := subTable.GetSubTables(numSystemChunk, params.ChunkLength)
 	if err != nil {

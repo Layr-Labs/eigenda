@@ -56,7 +56,8 @@ func TestUniversalVerify(t *testing.T) {
 	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
-	prover, err := group.GetKzgProver(params)
+	blobLength := uint64(encoding.GetBlobLengthPowerOf2(uint32(len(harness.paddedGettysburgAddressBytes))))
+	prover, err := group.GetKzgProver(params, blobLength)
 	require.Nil(t, err)
 
 	numBlob := 5
@@ -105,7 +106,8 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
-	prover, err := group.GetKzgProver(params)
+	blobLength := uint64(encoding.GetBlobLengthPowerOf2(uint32(len(harness.paddedGettysburgAddressBytes))))
+	prover, err := group.GetKzgProver(params, blobLength)
 	require.NoError(t, err)
 
 	numBlob := 5

@@ -47,7 +47,8 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
 
-	p, err := group.GetKzgProver(params)
+	blobLength := uint64(encoding.GetBlobLengthPowerOf2(uint32(len(harness.paddedGettysburgAddressBytes))))
+	p, err := group.GetKzgProver(params, blobLength)
 
 	require.Nil(t, err)
 	require.NotNil(t, p)
