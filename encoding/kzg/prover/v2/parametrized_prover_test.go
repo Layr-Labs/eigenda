@@ -13,9 +13,9 @@ import (
 )
 
 func TestProveAllCosetThreads(t *testing.T) {
-	harness := getTestHarness()
+	harness := getTestHarness(t)
 
-	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	group, err := prover.NewProver(harness.logger, harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
 	c, err := committer.NewFromConfig(*harness.committerConfig)
@@ -40,9 +40,9 @@ func TestProveAllCosetThreads(t *testing.T) {
 }
 
 func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
-	harness := getTestHarness()
+	harness := getTestHarness(t)
 
-	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
+	group, err := prover.NewProver(harness.logger, harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))

@@ -97,6 +97,7 @@ func (c client) GetChunks(
 		}
 		return
 	}
+	defer core.CloseLogOnError(conn, "connection to node client", nil)
 
 	n := grpcnode.NewRetrievalClient(conn)
 	nodeCtx, cancel := context.WithTimeout(ctx, c.timeout)

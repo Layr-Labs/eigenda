@@ -116,7 +116,7 @@ func BuildManagers(
 				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 			}
 		}
-		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, rs.NewEncoder(nil), kzgVerifier, registry)
+		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, rs.NewEncoder(log, nil), kzgVerifier, registry)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
 		}
