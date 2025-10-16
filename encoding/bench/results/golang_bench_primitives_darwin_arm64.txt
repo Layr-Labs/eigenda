@@ -1,20 +1,20 @@
-2025/10/14 22:56:12 maxprocs: Leaving GOMAXPROCS=12: CPU quota undefined
+2025/10/15 23:14:58 maxprocs: Leaving GOMAXPROCS=12: CPU quota undefined
 goos: darwin
 goarch: arm64
 cpu: Apple M4 Pro
-BenchmarkFFTFr/2^9_elements-12    	   22846	     49192 ns/op	   32769 B/op	       2 allocs/op
-BenchmarkFFTFr/2^14_elements-12   	     369	   3197136 ns/op	 1048586 B/op	       2 allocs/op
-BenchmarkFFTFr/2^19_elements-12   	       7	 173029905 ns/op	33554480 B/op	       3 allocs/op
-BenchmarkFFTFr/2^22_elements-12   	       1	1621707458 ns/op	268435792 B/op	       7 allocs/op
-BenchmarkFFTG1/2^13_Points-12     	       1	2434898167 ns/op	34358000 B/op	  430101 allocs/op
-BenchmarkFFTG1/2^14_Points-12     	       1	5201993416 ns/op	72647792 B/op	  909341 allocs/op
-BenchmarkGnarkParallelFFTG1/2^13_G1Points-12         	       4	 261406969 ns/op	24004770 B/op	  276156 allocs/op
-BenchmarkGnarkParallelFFTG1/2^14_G1Points-12         	       2	 548890792 ns/op	51314852 B/op	  592543 allocs/op
-BenchmarkMSMG1/2^12_Points-12                        	     411	   2792766 ns/op	  271451 B/op	     155 allocs/op
-BenchmarkMSMG1/2^15_Points-12                        	      79	  14675716 ns/op	 6957324 B/op	      98 allocs/op
-BenchmarkMSMG1/2^19_Points-12                        	       6	 183403111 ns/op	114302808 B/op	      98 allocs/op
-BenchmarkMSMG2/2^12_Points-12                        	     123	  10128017 ns/op	  279670 B/op	     155 allocs/op
-BenchmarkMSMG2/2^15_Points-12                        	      24	  52473868 ns/op	17970560 B/op	     120 allocs/op
-BenchmarkMSMG2/2^19_Points-12                        	       3	 469094444 ns/op	211822688 B/op	      98 allocs/op
+BenchmarkFFTFr/2^9_elements-12     	   39246	     30517 ns/op	   17302 B/op	      17 allocs/op
+BenchmarkFFTFr/2^14_elements-12    	    3291	    392898 ns/op	  530945 B/op	      89 allocs/op
+BenchmarkFFTFr/2^19_elements-12    	     100	  11709478 ns/op	16783926 B/op	      89 allocs/op
+BenchmarkFFTFr/2^22_elements-12    	      12	  96658590 ns/op	134224412 B/op	      89 allocs/op
+BenchmarkFFTG1/2^13_Points-12      	       2	 564881020 ns/op	34423480 B/op	  430608 allocs/op
+BenchmarkFFTG1/2^14_Points-12      	       1	1171259542 ns/op	72714032 B/op	  909855 allocs/op
+BenchmarkGnarkParallelIFFTG1/2^13_G1Points-12         	       4	 278118990 ns/op	23974990 B/op	  276066 allocs/op
+BenchmarkGnarkParallelIFFTG1/2^14_G1Points-12         	       2	 525838166 ns/op	51295348 B/op	  592490 allocs/op
+BenchmarkMSMG1/2^12_Points-12                         	     450	   2684209 ns/op	  271282 B/op	     155 allocs/op
+BenchmarkMSMG1/2^15_Points-12                         	      82	  14552145 ns/op	 6957311 B/op	      98 allocs/op
+BenchmarkMSMG1/2^19_Points-12                         	       7	 160616173 ns/op	114302786 B/op	      98 allocs/op
+BenchmarkMSMG2/2^12_Points-12                         	     127	   9341981 ns/op	  279669 B/op	     155 allocs/op
+BenchmarkMSMG2/2^15_Points-12                         	      31	  40460208 ns/op	17970548 B/op	     120 allocs/op
+BenchmarkMSMG2/2^19_Points-12                         	       3	 446886736 ns/op	211822672 B/op	      98 allocs/op
 PASS
-ok  	command-line-arguments	84.278s
+ok  	command-line-arguments	78.358s

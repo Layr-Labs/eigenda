@@ -32,6 +32,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestEquivalenceFFTAndInplaceFFT(t *testing.T) {
+	fs := NewFFTSettings(4)
+	data := make([]fr.Element, fs.MaxWidth)
+	for i := uint64(0); i < fs.MaxWidth; i++ {
+		data[i].SetInt64(int64(i))
+	}
+
+	res1 := make([]fr.Element, len(data))
+	err := fs.InplaceFFT(data, res1, true)
+	require.NoError(t, err)
+
+	res2, err := fs.FFT(data, true)
+	require.NoError(t, err)
+
+	for i := range res1 {
+		assert.True(t, res1[i].Equal(&res2[i]), "mismatch at index %d: %s != %s", i, res1[i].String(), res2[i].String())
+	}
+}
+
 func TestFFTRoundtrip(t *testing.T) {
 	fs := NewFFTSettings(4)
 	data := make([]fr.Element, fs.MaxWidth)

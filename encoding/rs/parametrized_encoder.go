@@ -16,8 +16,11 @@ type EncoderDevice interface {
 
 type ParametrizedEncoder struct {
 	*encoding.Config
-	Params            encoding.EncodingParams
-	Fs                *fft.FFTSettings
+	Params encoding.EncodingParams
+	Fs     *fft.FFTSettings
+	// FsChunkLen is needed because it has smaller number of roots of unity than Fs.
+	// This is for computing interpolation polynomial within each chunk.
+	FsChunkLen        *fft.FFTSettings
 	RSEncoderComputer EncoderDevice
 }
 
@@ -182,7 +185,7 @@ func (g *ParametrizedEncoder) getInterpolationPolyEval(
 		wPow.Mul(&wPow, &w)
 	}
 
-	err := g.Fs.InplaceFFT(shiftedInterpolationPoly, evals, false)
+	err := g.FsChunkLen.InplaceFFT(shiftedInterpolationPoly, evals, false)
 	if err != nil {
 		return nil, fmt.Errorf("fft on shifted interpolation poly: %w", err)
 	}
@@ -193,7 +196,7 @@ func (g *ParametrizedEncoder) getInterpolationPolyEval(
 func (g *ParametrizedEncoder) getInterpolationPolyCoeff(chunk []fr.Element, k uint32) ([]fr.Element, error) {
 	coeffs := make([]fr.Element, g.Params.ChunkLength)
 	shiftedInterpolationPoly := make([]fr.Element, len(chunk))
-	err := g.Fs.InplaceFFT(chunk, shiftedInterpolationPoly, true)
+	err := g.FsChunkLen.InplaceFFT(chunk, shiftedInterpolationPoly, true)
 	if err != nil {
 		return coeffs, fmt.Errorf("ifft on shifted interpolation poly: %w", err)
 	}
