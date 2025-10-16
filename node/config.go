@@ -259,8 +259,11 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	if pubIPCheckInterval > 0 && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" || ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
 		return nil, fmt.Errorf("%s and %s are required if %s is > 0", flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name, flags.PubIPCheckIntervalFlag.Name)
 	}
-	if ejectionDefenseEnabled && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" || ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
-		return nil, fmt.Errorf("%s and %s are required if %s is enabled", flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name, flags.EjectionDefenseEnabledFlag.Name)
+	if ejectionDefenseEnabled && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" ||
+		ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
+		return nil, fmt.Errorf("%s and %s are required if %s is enabled",
+			flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name,
+			flags.EjectionDefenseEnabledFlag.Name)
 	}
 
 	var ethClientConfig geth.EthClientConfig
