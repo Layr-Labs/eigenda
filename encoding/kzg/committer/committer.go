@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -59,10 +60,11 @@ type Config struct {
 	SRSNumberToLoad uint64
 	G1SRSPath       string
 	// There are 2 ways to configure G2 points:
-	// 1. Entire G2 SRS file (16GiB) is provided via G2SRSPath
+	// 1. Entire G2 SRS file (16GiB) is provided via G2SRSPath (G2TrailingSRSPath is not used).
 	// 2. G2SRSPath and G2TrailingSRSPath both contain at least SRSNumberToLoad points,
 	//    where G2SRSPath contains the first SRSNumberToLoad points of the full G2 SRS file,
 	//    and G2TrailingSRSPath contains the last SRSNumberToLoad points of the G2 SRS file.
+	//
 	// TODO(samlaf): to prevent misconfigurations and simplify the code, we should probably
 	// not multiplex G2SRSPath like this, and instead use a G2PrefixPath config.
 	// Then EITHER G2SRSPath is used, OR both G2PrefixSRSPath and G2TrailingSRSPath are used.
@@ -70,12 +72,26 @@ type Config struct {
 	G2TrailingSRSPath string
 }
 
-func NewFromConfig(config Config) (*Committer, error) {
-	if config.G1SRSPath == "" {
-		return nil, fmt.Errorf("G1SRSPath is empty")
+var _ config.VerifiableConfig = (*Config)(nil)
+
+func (c *Config) Verify() error {
+	if c.SRSNumberToLoad <= 0 {
+		return fmt.Errorf("SRSNumberToLoad must be specified for disperser version 2")
 	}
-	if config.G2SRSPath == "" {
-		return nil, fmt.Errorf("G2SRSPath is empty")
+	if c.G1SRSPath == "" {
+		return fmt.Errorf("G1SRSPath must be specified for disperser version 2")
+	}
+	if c.G2SRSPath == "" {
+		return fmt.Errorf("G2SRSPath must be specified for disperser version 2")
+	}
+	// G2TrailingSRSPath is optional but its need depends on the content of G2SRSPath
+	// so we can't check it here. It is checked inside [NewFromConfig].
+	return nil
+}
+
+func NewFromConfig(config Config) (*Committer, error) {
+	if err := config.Verify(); err != nil {
+		return nil, fmt.Errorf("config verify: %w", err)
 	}
 
 	// ReadG1/G2Points is CPU bound, the actual reading is very fast, but the parsing is slow.

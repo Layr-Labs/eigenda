@@ -30,10 +30,14 @@ func main() {
 
 // Run the ejector. This method is split from main() so we only have to use panic() once.
 func run(ctx context.Context) error {
-	cfg, err := config.Bootstrap(ejector.DefaultEjectorConfig)
+	cfg, err := config.Bootstrap(ejector.DefaultRootEjectorConfig)
 	if err != nil {
 		return fmt.Errorf("failed to bootstrap config: %w", err)
 	}
+	secretConfig := cfg.Secret
+	ejectorConfig := cfg.Config
+	// Ensure we don't accidentally use cfg after this point.
+	cfg = nil
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	if err != nil {
@@ -41,7 +45,7 @@ func run(ctx context.Context) error {
 	}
 
 	var privateKey *ecdsa.PrivateKey
-	privateKey, err = crypto.HexToECDSA(cfg.PrivateKey)
+	privateKey, err = crypto.HexToECDSA(secretConfig.PrivateKey)
 	if err != nil {
 		return fmt.Errorf("failed to parse private key: %w", err)
 	}
@@ -56,10 +60,10 @@ func run(ctx context.Context) error {
 
 	gethClient, err := geth.NewMultiHomingClient(
 		geth.EthClientConfig{
-			RPCURLs:          cfg.EthRpcUrls,
-			PrivateKeyString: cfg.PrivateKey,
-			NumConfirmations: cfg.EthBlockConfirmations,
-			NumRetries:       cfg.EthRpcRetryCount,
+			RPCURLs:          secretConfig.EthRpcUrls,
+			PrivateKeyString: secretConfig.PrivateKey,
+			NumConfirmations: ejectorConfig.EthBlockConfirmations,
+			NumRetries:       ejectorConfig.EthRpcRetryCount,
 		},
 		senderAddress,
 		logger)
@@ -72,7 +76,7 @@ func run(ctx context.Context) error {
 		context.Background(),
 		logger,
 		gethClient,
-		gethcommon.HexToAddress(cfg.ContractDirectoryAddress))
+		gethcommon.HexToAddress(ejectorConfig.ContractDirectoryAddress))
 	if err != nil {
 		return fmt.Errorf("failed to create contract directory: %w", err)
 	}
@@ -101,9 +105,9 @@ func run(ctx context.Context) error {
 		senderAddress,
 		privateKey,
 		chainID,
-		cfg.ReferenceBlockNumberOffset,
-		cfg.ReferenceBlockNumberPollInterval,
-		cfg.EthCacheSize,
+		ejectorConfig.ReferenceBlockNumberOffset,
+		ejectorConfig.ReferenceBlockNumberPollInterval,
+		ejectorConfig.EthCacheSize,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create ejection transactor: %w", err)
@@ -112,7 +116,7 @@ func run(ctx context.Context) error {
 	ejectionManager, err := ejector.NewEjectionManager(
 		ctx,
 		logger,
-		cfg,
+		ejectorConfig,
 		time.Now,
 		ejectionTransactor,
 	)
@@ -120,13 +124,13 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("failed to create ejection manager: %w", err)
 	}
 
-	threadedEjectionManager := ejector.NewThreadedEjectionManager(ctx, logger, ejectionManager, cfg)
+	threadedEjectionManager := ejector.NewThreadedEjectionManager(ctx, logger, ejectionManager, ejectorConfig)
 
 	// Currently used for both v1 and v2 signing rate lookups. Eventually, v2 will poll the controller for this info.
 	dataApiSigningRateLookup := ejector.NewDataApiSigningRateLookup(
 		logger,
-		cfg.DataApiUrl,
-		cfg.DataApiTimeout,
+		ejectorConfig.DataApiUrl,
+		ejectorConfig.DataApiTimeout,
 	)
 
 	validatorIDToAddressConverter, err := eth.NewValidatorIDToAddressConverter(
@@ -143,7 +147,7 @@ func run(ctx context.Context) error {
 	_ = ejector.NewEjector(
 		ctx,
 		logger,
-		cfg,
+		ejectorConfig,
 		threadedEjectionManager,
 		dataApiSigningRateLookup,
 		dataApiSigningRateLookup,

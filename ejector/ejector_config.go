@@ -81,7 +81,7 @@ type EjectorConfig struct {
 }
 
 // Create a new root ejector config with default values.
-func NewRootEjectorConfig() *RootEjectorConfig {
+func DefaultRootEjectorConfig() *RootEjectorConfig {
 	return &RootEjectorConfig{
 		Config: DefaultEjectorConfig(),
 		Secret: &EjectorSecretConfig{},

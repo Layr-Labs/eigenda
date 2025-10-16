@@ -11,6 +11,7 @@ import (
 	"runtime/trace"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
@@ -92,12 +93,16 @@ func main() {
 
 	fmt.Printf("* Task Starts\n")
 
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		log.Fatalf("Failed to create logger: %v", err)
+	}
 	cfg := &encoding.Config{
 		BackendType: encoding.GnarkBackend,
 		GPUEnable:   false,
 		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 	}
-	p, err := proverv2.NewProver(proverKzgConfig, cfg)
+	p, err := proverv2.NewProver(logger, proverKzgConfig, cfg)
 
 	if err != nil {
 		log.Fatalf("Failed to create prover: %v", err)
