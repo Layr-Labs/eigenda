@@ -90,7 +90,8 @@ func (svr *Server) handleGetShared(
 	}
 	// Check the size of the hex payload (in bytes) does not exceed MaxCertSizeBytes
 	if len(serializedCertHex)/2 > MaxCertSizeBytes {
-		return proxyerrors.NewParsingError(fmt.Errorf("%s can not exceed %d bytes", routingVarNamePayloadHex, MaxCertSizeBytes))
+		return proxyerrors.NewParsingError(
+			fmt.Errorf("%s can not exceed %d bytes", routingVarNamePayloadHex, MaxCertSizeBytes))
 	}
 	serializedCert, err := hex.DecodeString(serializedCertHex)
 	if err != nil {
