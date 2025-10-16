@@ -79,10 +79,10 @@ func (c *Config) Verify() error {
 		return fmt.Errorf("SRSNumberToLoad must be specified for disperser version 2")
 	}
 	if c.G1SRSPath == "" {
-		return fmt.Errorf("G1Path must be specified for disperser version 2")
+		return fmt.Errorf("G1SRSPath must be specified for disperser version 2")
 	}
 	if c.G2SRSPath == "" {
-		return fmt.Errorf("G2Path must be specified for disperser version 2")
+		return fmt.Errorf("G2SRSPath must be specified for disperser version 2")
 	}
 	// G2TrailingSRSPath is optional but its need depends on the content of G2SRSPath
 	// so we can't check it here. It is checked inside [NewFromConfig].
