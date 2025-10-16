@@ -34,7 +34,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		"/"+
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
-			"{"+routingVarNameKeccakCommitmentHex+"}",
+			"{"+routingVarNameKeccakCommitmentHex+":[0-9a-fA-F]{64}}",
 		middleware.WithCertMiddlewares(
 			svr.handleGetOPKeccakCommitment,
 			svr.log,
