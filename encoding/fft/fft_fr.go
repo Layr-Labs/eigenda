@@ -44,9 +44,10 @@ var (
 // provided in the FFTSettings.
 //
 // The input values does not have to be a power of two, because we pad them to the next power of two.
+// It's power of two must be equal to the max width of the FFTSettings.
 //
 // It outputs a newly allocated slice of field elements, which is the transformed values.
-// To perform the FFT in-place, use [FFTSettings.inplaceFFT] instead.
+// To perform the FFT in-place, use [FFTSettings.InplaceFFT] instead.
 //
 // The only error returned is if the FFTSettings does not have enough roots of unity
 // to perform the FFT on the input values.

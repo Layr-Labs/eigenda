@@ -231,6 +231,9 @@ func (e *Encoder) newEncoder(params encoding.EncodingParams) (*ParametrizedEncod
 	var encoderDevice EncoderDevice
 	switch e.Config.BackendType {
 	case encoding.GnarkBackend:
+		if e.Config.GPUEnable {
+			return nil, errors.New("GPU is not supported in gnark backend")
+		}
 		encoderDevice = &gnarkencoder.RsGnarkBackend{Fs: fs}
 	case encoding.IcicleBackend:
 		encoderDevice, err = createIcicleBackend(e.Config.GPUEnable)
@@ -241,6 +244,8 @@ func (e *Encoder) newEncoder(params encoding.EncodingParams) (*ParametrizedEncod
 		return nil, fmt.Errorf("unsupported backend type: %v", e.Config.BackendType)
 	}
 
+	// TODO(samlaf): we assume that ChunkLength is a power of 2 here. This is always true in EigenDA V2,
+	// is it always true for V1? Do we need to validate this?
 	fsChunkLen := fft.NewFFTSettings(uint8(math.Log2(float64(params.ChunkLength))))
 	return &ParametrizedEncoder{
 		Config:            e.Config,
