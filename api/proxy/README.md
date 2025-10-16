@@ -313,7 +313,8 @@ active for blob dispersals. For detailed information about the payment system, s
    [payments](https://docs.eigencloud.xyz/products/eigenda/core-concepts/payments) doc.
 
 > **IMPORTANT**: All clients should continue using this mode until the new payment system has officially shipped. The
-> other payment modes are documented below for awareness, but they aren't ready to be used in production environments.
+> other payment modes are documented below for awareness, but the dispersers currently deployed are incompatible with
+> these configurations.
 
 2. **`reservation-only`** - Uses pre-purchased bandwidth reservations that provide guaranteed throughput for a
    specified time period. Bandwidth is managed using a leaky bucket algorithm. Dispersals will fail if a reservation
