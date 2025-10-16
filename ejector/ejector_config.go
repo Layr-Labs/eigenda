@@ -7,22 +7,23 @@ import (
 	"github.com/Layr-Labs/eigenda/common/config"
 )
 
-// The environment variable prefix to use for the ejector configuration.
-const EjectorConfigEnvPrefix = "EJECTOR"
+var _ config.DocumentedConfig = (*RootEjectorConfig)(nil)
 
-var _ config.DocumentedConfig = (*EjectorConfig)(nil)
+// The root configuration for the ejector service. This config should be discarded after parsing
+// and only the sub-configs should be used. This is a safety mechanism to make it harder to
+// accidentally print/log the secret config.
+type RootEjectorConfig struct {
+	Config *EjectorConfig
+	Secret *EjectorSecretConfig
+}
+
+var _ config.VerifiableConfig = (*EjectorConfig)(nil)
 
 // Configuration for the ejector.
 type EjectorConfig struct {
 
 	// The address of the contract directory contract.
 	ContractDirectoryAddress string `docs:"required"`
-
-	// The Ethereum RPC URL(s) to use for connecting to the blockchain.
-	EthRpcUrls []string `docs:"required"`
-
-	// The private key to use for signing ejection transactions.
-	PrivateKey string `docs:"required"`
 
 	// The URL of the Eigenda Data API to use for looking up signing rates.
 	DataApiUrl string `docs:"required"`
@@ -79,6 +80,61 @@ type EjectorConfig struct {
 	EthCacheSize int
 }
 
+// Create a new root ejector config with default values.
+func NewRootEjectorConfig() *RootEjectorConfig {
+	return &RootEjectorConfig{
+		Config: DefaultEjectorConfig(),
+		Secret: &EjectorSecretConfig{},
+	}
+}
+
+func (e *RootEjectorConfig) GetEnvVarPrefix() string {
+	return "EJECTOR"
+}
+
+func (e *RootEjectorConfig) GetName() string {
+	return "Ejector"
+}
+
+func (e *RootEjectorConfig) GetPackagePaths() []string {
+	return []string{
+		"github.com/Layr-Labs/eigenda/ejector",
+	}
+}
+
+func (e *RootEjectorConfig) Verify() error {
+	err := e.Config.Verify()
+	if err != nil {
+		return fmt.Errorf("invalid ejector config: %w", err)
+	}
+	err = e.Secret.Verify()
+	if err != nil {
+		return fmt.Errorf("invalid ejector secret config: %w", err)
+	}
+	return nil
+}
+
+var _ config.VerifiableConfig = (*EjectorSecretConfig)(nil)
+
+// Configuration for secrets used by the ejector.
+type EjectorSecretConfig struct {
+	// The Ethereum RPC URL(s) to use for connecting to the blockchain.
+	EthRpcUrls []string `docs:"required"`
+
+	// The private key to use for signing ejection transactions.
+	PrivateKey string `docs:"required"`
+}
+
+func (c *EjectorSecretConfig) Verify() error {
+	if len(c.EthRpcUrls) == 0 {
+		return fmt.Errorf("invalid Ethereum RPC URLs: must provide at least one URL")
+	}
+	if c.PrivateKey == "" {
+		return fmt.Errorf("invalid private key")
+	}
+	return nil
+}
+
 // DefaultEjectorConfig returns a default configuration for the ejector.
 func DefaultEjectorConfig() *EjectorConfig {
 	return &EjectorConfig{
@@ -100,21 +156,6 @@ func DefaultEjectorConfig() *EjectorConfig {
 	}
 }
 
-func (c *EjectorConfig) GetEnvVarPrefix() string {
-	return "EJECTOR"
-}
-
-func (c *EjectorConfig) GetName() string {
-	return "Ejector"
-}
-
-func (c *EjectorConfig) GetPackagePaths() []string {
-	return []string{
-		"github.com/Layr-Labs/eigenda/ejector",
-	}
-}
-
-// Verify checks that the configuration is valid.
 func (c *EjectorConfig) Verify() error {
 	if c.EjectionPeriod <= 0 {
 		return fmt.Errorf("invalid ejection period: %s", c.EjectionPeriod)
@@ -148,12 +189,7 @@ func (c *EjectorConfig) Verify() error {
 	if c.EjectionThrottleTimePeriod <= 0 {
 		return fmt.Errorf("invalid ejection throttle time period: %s", c.EjectionThrottleTimePeriod)
 	}
-	if len(c.EthRpcUrls) == 0 {
-		return fmt.Errorf("invalid Ethereum RPC URLs: must provide at least one URL")
-	}
-	if c.PrivateKey == "" {
-		return fmt.Errorf("invalid private key")
-	}
+
 	if c.DataApiUrl == "" {
 		return fmt.Errorf("invalid data API URL: %s", c.DataApiUrl)
 	}

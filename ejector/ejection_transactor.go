@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
