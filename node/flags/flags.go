@@ -557,7 +557,7 @@ var (
 	}
 	// TODO(cody.littley): this needs to be enabled by default prior to allowing third parties to eject.
 	//  In the immediate term, leave it disabled by default to give operators time to adjust to the idea.
-	EjectionDefenseEnabledFlag = cli.BoolTFlag{
+	EjectionDefenseEnabledFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "ejection-defense-enabled"),
 		Usage:    "Whether to enable the ejection defense mechanism.",
 		Required: false,
