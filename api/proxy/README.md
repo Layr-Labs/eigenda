@@ -317,10 +317,10 @@ active for blob dispersals. For detailed information about the payment system, s
 > these configurations.
 
 2. **`reservation-only`** - Uses pre-purchased bandwidth reservations that provide guaranteed throughput for a
-   specified time period. Bandwidth is managed using a leaky bucket algorithm. Dispersals will fail if a reservation
-   is temporarily exhausted.
+   specified time period. Reservations are tracked in the `PaymentVault` contract, and bandwidth is managed using a
+   leaky bucket algorithm. Dispersals will fail if a reservation is temporarily exhausted.
 
-3. **`on-demand-only`** - Uses pay-per-dispersal payments from funds deposited in the PaymentVault contract.
+3. **`on-demand-only`** - Uses pay-per-dispersal payments from funds deposited in the `PaymentVault` contract.
    Limited to quorums 0 (ETH) and 1 (EIGEN). Dispersals will fail if on-demand funds are exhausted.
 
 4. **`reservation-and-on-demand`** - Enables both reservation and on-demand payment methods with intelligent fallback.
@@ -328,7 +328,7 @@ active for blob dispersals. For detailed information about the payment system, s
    capacity is temporarily exhausted. If a reservation *expires*, this mode will prevent any dispersals from being made
    to avoid inadvertent draining of on-demand funds due to an expired reservation.
 
-> **Note**: The payment mode should match your account's setup in the PaymentVault contract. Ensure you have an active
+> **Note**: The payment mode should match your account's setup in the `PaymentVault` contract. Ensure you have an active
 > reservation (for `reservation-only` or `reservation-and-on-demand`) or sufficient deposits (for `on-demand-only` or
 > `reservation-and-on-demand`) before starting the proxy.
 
