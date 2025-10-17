@@ -26,7 +26,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -293,7 +293,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			WaitForFinalization:  false,
 			MaxBlobSizeBytes:     maxBlobLengthBytes,
 		},
-		KzgConfig: kzg.KzgConfig{
+		KzgConfig: kzgconfig.Config{
 			G1Path:          "../../resources/g1.point",
 			G2Path:          "../../resources/g2.point",
 			G2TrailingPath:  "../../resources/g2.trailing.point",

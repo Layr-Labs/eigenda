@@ -10,10 +10,10 @@ import (
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/retriever"
 	"github.com/Layr-Labs/eigenda/retriever/mock"
 	"github.com/Layr-Labs/eigenda/test"
@@ -32,7 +32,7 @@ var (
 )
 
 func makeTestComponents() (*prover.Prover, *verifier.Verifier, error) {
-	config := &kzg.KzgConfig{
+	config := &kzgconfig.Config{
 		G1Path:          "../resources/srs/g1.point",
 		G2Path:          "../resources/srs/g2.point",
 		CacheDir:        "../resources/srs/SRSTables",

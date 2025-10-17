@@ -6,13 +6,13 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	"github.com/urfave/cli"
 )
 
 type Config struct {
-	EncoderConfig   kzg.KzgConfig
+	EncoderConfig   kzgconfig.Config
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    common.LoggerConfig
 	MetricsConfig   MetricsConfig
@@ -38,7 +38,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	return &Config{
 		LoggerConfig:    *loggerConfig,
-		EncoderConfig:   kzg.ReadCLIConfig(ctx),
+		EncoderConfig:   kzgconfig.ReadCLIConfig(ctx),
 		EthClientConfig: geth.ReadEthClientConfig(ctx),
 		MetricsConfig: MetricsConfig{
 			HTTPPort: ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),

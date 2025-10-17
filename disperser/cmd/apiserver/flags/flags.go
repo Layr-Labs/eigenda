@@ -9,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/urfave/cli"
 )
 
@@ -228,25 +228,25 @@ var (
 // These flags are only used in V2 disperser.
 var kzgCommitterFlags = []cli.Flag{
 	cli.StringFlag{
-		Name:     kzg.G1PathFlagName,
+		Name:     kzgconfig.G1PathFlagName,
 		Usage:    "Path to G1 SRS",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G1_PATH"),
 	},
 	cli.StringFlag{
-		Name:     kzg.G2PathFlagName,
+		Name:     kzgconfig.G2PathFlagName,
 		Usage:    "Path to G2 SRS. Either this flag or G2_POWER_OF_2_PATH needs to be specified. For operator node, if both are specified, the node uses G2_POWER_OF_2_PATH first, if failed then tries to G2_PATH",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G2_PATH"),
 	},
 	cli.StringFlag{
-		Name:     kzg.G2TrailingPathFlagName,
+		Name:     kzgconfig.G2TrailingPathFlagName,
 		Usage:    "Path to trailing G2 SRS file. Its intended purpose is to allow local generation the blob length proof. If you already downloaded the entire G2 SRS file which contains 268435456 G2 points with total size 16GiB, this flag is not needed. With this G2TrailingPathFlag, user can use a smaller file that contains only the trailing end of the whole G2 SRS file. Ignoring this flag, the program assumes the entire G2 SRS file is provided. With this flag, the size of the provided file must be at least SRSLoadingNumberFlagName * 64 Bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G2_TRAILING_PATH"),
 	},
 	cli.Uint64Flag{
-		Name:     kzg.SRSLoadingNumberFlagName,
+		Name:     kzgconfig.SRSLoadingNumberFlagName,
 		Usage:    "Number of SRS points to load into memory",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SRS_LOAD"),

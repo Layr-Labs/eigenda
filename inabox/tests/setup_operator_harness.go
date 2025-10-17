@@ -19,7 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/grpc"
@@ -259,7 +259,7 @@ func (oh *OperatorHarness) startOperator(
 			SignerType: blssignerTypes.PrivateKey,
 			PrivateKey: strings.TrimPrefix(blsKey.PrivateKey, "0x"),
 		},
-		EncoderConfig: kzg.KzgConfig{
+		KzgConfig: kzgconfig.Config{
 			G1Path:          oh.srsG1Path,
 			G2Path:          oh.srsG2Path,
 			CacheDir:        fmt.Sprintf("testdata/%s/cache/operator_%d", oh.testName, operatorIndex),

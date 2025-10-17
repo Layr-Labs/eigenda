@@ -5,7 +5,7 @@ import (
 
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 )
 
 // BlobDecoder is responsible for decoding blobs from chunk data.

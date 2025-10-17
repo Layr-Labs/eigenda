@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/stretchr/testify/assert"
 )
 

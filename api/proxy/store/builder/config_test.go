@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,7 +47,7 @@ func validCfg() Config {
 			RPCURL:               "http://localhost:8545",
 			EthConfirmationDepth: 12,
 		},
-		KzgConfig: kzg.KzgConfig{
+		KzgConfig: kzgconfig.Config{
 			G1Path:         "path/to/g1",
 			G2Path:         "path/to/g2",
 			G2TrailingPath: "path/to/trailing/g2",

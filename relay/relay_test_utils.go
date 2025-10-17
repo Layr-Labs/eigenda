@@ -21,10 +21,10 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	kzgcommitter "github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
@@ -41,7 +41,8 @@ var (
 	localstackContainer *testbed.LocalStackContainer
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
-	prover              *p.Prover
+	prover              *proverv2.Prover
+	committer           *kzgcommitter.Committer
 	bucketName          = fmt.Sprintf("test-bucket-%v", UUID)
 )
 
@@ -71,17 +72,24 @@ func setup(t *testing.T) {
 
 	// Only set up the prover once, it's expensive
 	if prover == nil {
-		config := &kzg.KzgConfig{
+		config := &proverv2.KzgConfig{
 			G1Path:          "../resources/srs/g1.point",
-			G2Path:          "../resources/srs/g2.point",
 			CacheDir:        "../resources/srs/SRSTables",
-			SRSOrder:        8192,
 			SRSNumberToLoad: 8192,
 			NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-			LoadG2Points:    true,
 		}
 		var err error
-		prover, err = p.NewProver(config, nil)
+		prover, err = proverv2.NewProver(logger, config, nil)
+		require.NoError(t, err)
+	}
+	if committer == nil {
+		var err error
+		committer, err = kzgcommitter.NewFromConfig(kzgcommitter.Config{
+			SRSNumberToLoad:   8192,
+			G1SRSPath:         "../resources/srs/g1.point",
+			G2SRSPath:         "../resources/srs/g2.point",
+			G2TrailingSRSPath: "../resources/srs/g2.trailing.path",
+		})
 		require.NoError(t, err)
 	}
 }
@@ -215,7 +223,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 	data := random.RandomBytes(225)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	commitments, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	require.NoError(t, err)
 	commitmentProto, err := commitments.ToProtobuf()
@@ -242,7 +250,7 @@ func randomBlobChunks(t *testing.T) (*v2.BlobHeader, []byte, []*encoding.Frame) 
 	header, data := randomBlob(t)
 
 	params := encoding.ParamsFromMins(16, 16)
-	_, frames, err := prover.EncodeAndProve(data, params)
+	frames, err := prover.GetFrames(data, params)
 	require.NoError(t, err)
 
 	return header, data, frames

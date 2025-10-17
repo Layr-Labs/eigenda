@@ -17,12 +17,12 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
@@ -212,7 +212,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 // makeTestEncodingComponents makes a KZG prover, committer and verifier
 func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
-	config := &kzg.KzgConfig{
+	config := &kzgconfig.Config{
 		G1Path:          "../../../../resources/srs/g1.point",
 		G2Path:          "../../../../resources/srs/g2.point",
 		G2TrailingPath:  "../../../../resources/srs/g2.trailing.point",
