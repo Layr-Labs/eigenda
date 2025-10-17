@@ -1,7 +1,7 @@
 // toeplitz package is outdated, and only kept around for v1 prover.
 // prover v2 replaces this implementation with an inlined version
 // that does a lot less needless allocations and copies.
-// See getSlicesCoeff in encoding/kzg/prover/v2/gnark/multiframe_proof.go
+// See getSlicesCoeff in encoding/v2/kzg/prover/gnark/multiframe_proof.go
 package toeplitz
 
 import (

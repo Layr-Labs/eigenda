@@ -1,6 +1,6 @@
 // The V1 kzg/prover does both KZG commitment generation and multiproof generation.
 // For V2, we split off the committer functionality into this package,
-// and kzg/prover/v2 only does multiproof generation.
+// and encoding/v2/kzg/prover only does multiproof generation.
 package committer
 
 import (
