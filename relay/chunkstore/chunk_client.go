@@ -33,6 +33,7 @@ func NewChunkClient(
 	region string,
 	accessKey string,
 	secretAccessKey string,
+	bucket string,
 ) (*ChunkClient, error) {
 
 	customResolver := aws.EndpointResolverWithOptionsFunc(

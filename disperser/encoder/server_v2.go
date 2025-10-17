@@ -33,7 +33,7 @@ type EncoderServerV2 struct {
 
 	config      ServerConfig
 	blobStore   *blobstore.BlobStore
-	chunkWriter chunkstore.ChunkWriter
+	chunkClient *chunkstore.ChunkClient
 	logger      logging.Logger
 	prover      *prover.Prover
 	metrics     *Metrics
@@ -56,7 +56,7 @@ type EncoderServerV2 struct {
 func NewEncoderServerV2(
 	config ServerConfig,
 	blobStore *blobstore.BlobStore,
-	chunkWriter chunkstore.ChunkWriter,
+	chunkClient *chunkstore.ChunkClient,
 	logger logging.Logger,
 	prover *prover.Prover,
 	metrics *Metrics,
@@ -67,7 +67,7 @@ func NewEncoderServerV2(
 	return &EncoderServerV2{
 		config:             config,
 		blobStore:          blobStore,
-		chunkWriter:        chunkWriter,
+		chunkClient:        chunkClient,
 		logger:             logger.With("component", "EncoderServerV2"),
 		prover:             prover,
 		metrics:            metrics,
@@ -152,19 +152,20 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams) (*pb.EncodeBlobReply, error) {
 	s.logger.Info("Preparing to encode", "blobKey", blobKey.Hex(), "encodingParams", encodingParams)
 
+	// TODO: either fix it or delete it before merging, not sure if this is a necessary optimization
 	// Check if the blob has already been encoded
-	if s.config.PreventReencoding && s.chunkWriter.ProofExists(ctx, blobKey) {
-		coefExist, fragmentInfo := s.chunkWriter.CoefficientsExists(ctx, blobKey)
-		if coefExist {
-			s.logger.Info("blob already encoded", "blobKey", blobKey.Hex())
-			return &pb.EncodeBlobReply{
-				FragmentInfo: &pb.FragmentInfo{
-					TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-					FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
-				},
-			}, nil
-		}
-	}
+	// if s.config.PreventReencoding && s.chunkWriter.ProofExists(ctx, blobKey) {
+	// 	coefExist, fragmentInfo := s.chunkWriter.CoefficientsExists(ctx, blobKey)
+	// 	if coefExist {
+	// 		s.logger.Info("blob already encoded", "blobKey", blobKey.Hex())
+	// 		return &pb.EncodeBlobReply{
+	// 			FragmentInfo: &pb.FragmentInfo{
+	// 				TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
+	// 				FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+	// 			},
+	// 		}, nil
+	// 	}
+	// }
 
 	// Fetch blob data
 	fetchStart := time.Now()
@@ -307,7 +308,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	}()
 
 	proofs, coeffs := extractProofsAndCoeffs(frames)
-	if err := s.chunkWriter.PutFrameProofs(ctx, blobKey, proofs); err != nil {
+	if err := s.chunkClient.PutFrameProofs(ctx, blobKey, proofs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk proofs: %v", err)
 	}
 	s.metrics.ObserveLatency("s3_upload_proofs", time.Since(storeStart))
@@ -315,7 +316,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 
 	// Store coefficients
 	coeffStart := time.Now()
-	fragmentInfo, err := s.chunkWriter.PutFrameCoefficients(ctx, blobKey, coeffs)
+	err := s.chunkClient.PutFrameCoefficients(ctx, blobKey, coeffs)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk coefficients: %v", err)
 	}
@@ -324,8 +325,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 
 	return &pb.EncodeBlobReply{
 		FragmentInfo: &pb.FragmentInfo{
-			TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-			FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+			ElementCount: uint32(len(frames[0].Coeffs)),
 		},
 	}, nil
 }

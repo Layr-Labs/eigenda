@@ -171,8 +171,6 @@ type ChunkNumber = uint64
 
 // FragmentInfo contains metadata about how chunk coefficients file is stored.
 type FragmentInfo struct {
-	// TotalChunkSizeBytes is the total size of the file containing all chunk coefficients for the blob.
-	TotalChunkSizeBytes uint32
-	// FragmentSizeBytes is the maximum fragment size used to store the chunk coefficients.
-	FragmentSizeBytes uint32
+	// The number of symbols in each frame.
+	ElementCount uint32
 }

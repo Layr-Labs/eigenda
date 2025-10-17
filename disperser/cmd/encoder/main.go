@@ -105,9 +105,12 @@ func RunEncoderServer(ctx *cli.Context) error {
 		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, s3Client, logger)
 		logger.Info("Blob store", "bucket", blobStoreBucketName)
 
-		chunkStoreBucketName := config.ChunkStoreConfig.BucketName
-		chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, DefaultFragmentSizeBytes)
-		logger.Info("Chunk store writer", "bucket", blobStoreBucketName)
+		chunkWriter, err := chunkstore.NewChunkClient(
+			config.AwsClientConfig.EndpointURL,
+			config.AwsClientConfig.Region,
+			config.AwsClientConfig.AccessKey,
+			config.AwsClientConfig.SecretAccessKey,
+			config.ChunkStoreConfig.BucketName)
 
 		server := encoder.NewEncoderServerV2(
 			*config.ServerConfig,
