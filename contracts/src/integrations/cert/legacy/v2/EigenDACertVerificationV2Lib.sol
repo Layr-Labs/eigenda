@@ -33,18 +33,10 @@ library EigenDACertVerificationV2Lib {
     error InvalidInclusionProof(uint256 blobIndex, bytes32 blobHash, bytes32 rootHash);
 
     /// @notice Thrown when security assumptions are not met
-    /// @param confirmationThreshold The confirmation threshold percentage
-    /// @param adversaryThreshold The adversary threshold percentage
-    /// @param codingRate The coding rate for the blob
-    /// @param numChunks The number of chunks in the blob
-    /// @param maxNumOperators The maximum number of operators
-    error SecurityAssumptionsNotMet(
-        uint8 confirmationThreshold,
-        uint8 adversaryThreshold,
-        uint8 codingRate,
-        uint32 numChunks,
-        uint32 maxNumOperators
-    );
+    /// @param gamma The difference between confirmation and adversary thresholds
+    /// @param n The calculated security parameter
+    /// @param minRequired The minimum required value for n
+    error SecurityAssumptionsNotMet(uint256 gamma, uint256 n, uint256 minRequired);
 
     /// @notice Thrown when blob quorums are not a subset of confirmed quorums
     /// @param blobQuorumsBitmap The bitmap of blob quorums
@@ -221,13 +213,7 @@ library EigenDACertVerificationV2Lib {
         if (n >= minRequired) {
             return (StatusCode.SUCCESS, "");
         } else {
-            return (StatusCode.SECURITY_ASSUMPTIONS_NOT_MET, abi.encode(
-                securityThresholds.confirmationThreshold,
-                securityThresholds.adversaryThreshold,
-                blobParams.codingRate,
-                blobParams.numChunks,
-                blobParams.maxNumOperators
-            ));
+            return (StatusCode.SECURITY_ASSUMPTIONS_NOT_MET, abi.encode(gamma, n, minRequired));
         }
     }
 
@@ -373,9 +359,8 @@ library EigenDACertVerificationV2Lib {
             (uint256 blobIndex, bytes32 blobHash, bytes32 rootHash) = abi.decode(errParams, (uint256, bytes32, bytes32));
             revert InvalidInclusionProof(blobIndex, blobHash, rootHash);
         } else if (err == StatusCode.SECURITY_ASSUMPTIONS_NOT_MET) {
-            (uint8 confirmationThreshold, uint8 adversaryThreshold, uint8 codingRate, uint32 numChunks, uint32 maxNumOperators) =
-                abi.decode(errParams, (uint8, uint8, uint8, uint32, uint32));
-            revert SecurityAssumptionsNotMet(confirmationThreshold, adversaryThreshold, codingRate, numChunks, maxNumOperators);
+            (uint256 gamma, uint256 n, uint256 minRequired) = abi.decode(errParams, (uint256, uint256, uint256));
+            revert SecurityAssumptionsNotMet(gamma, n, minRequired);
         } else if (err == StatusCode.BLOB_QUORUMS_NOT_SUBSET) {
             (uint256 blobQuorumsBitmap, uint256 confirmedQuorumsBitmap) = abi.decode(errParams, (uint256, uint256));
             revert BlobQuorumsNotSubset(blobQuorumsBitmap, confirmedQuorumsBitmap);
