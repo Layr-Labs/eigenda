@@ -196,7 +196,8 @@ library EigenDACertVerificationLib {
             );
         }
 
-        uint256 lhs = blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators) * (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold);
+        uint256 lhs = blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators)
+            * (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold);
         uint256 rhs = 100 * blobParams.numChunks;
 
         if (!(lhs >= rhs)) {
