@@ -151,30 +151,22 @@ For example, `securityThresholds.confirmationThreshold = 55` means `Confirmation
 
 **1. Safety Threshold**
 
-The check for the inequality (1) above is implemented as follows ([see in code](https://github.com/Layr-Labs/eigenda/blob/6cd192ecbe5f0abfe73fc08df306cf00e32ef010/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L188)).
+The check for the inequality (1) above is implemented as follows ([see in code](https://github.com/Layr-Labs/eigenda/blob/b06b0bf50917bb6aa1967d1dc12d5b7de815562f/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L163)).
 
 ```solidity
 // Check for potential underflow: maxNumOperators must not exceed numChunks
-        if (blobParams.maxNumOperators > blobParams.numChunks) {
-            revert SecurityAssumptionsNotMet(
-                securityThresholds.confirmationThreshold,
-                securityThresholds.adversaryThreshold,
-                blobParams.codingRate,
-                blobParams.numChunks,
-                blobParams.maxNumOperators
-            );
-        }
+if (blobParams.maxNumOperators > blobParams.numChunks) {
+    revert SecurityAssumptionsNotMet(
+        ...
+    );
+}
 
 uint256 lhs = blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators) * (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold);
 uint256 rhs = 100 * blobParams.numChunks;
 
 if (!(lhs >= rhs)) {
     revert SecurityAssumptionsNotMet(
-        securityThresholds.confirmationThreshold,
-        securityThresholds.adversaryThreshold,
-        blobParams.codingRate,
-        blobParams.numChunks,
-        blobParams.maxNumOperators
+        ...
     );
 }
 ```

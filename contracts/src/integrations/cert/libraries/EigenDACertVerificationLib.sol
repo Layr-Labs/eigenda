@@ -173,8 +173,13 @@ library EigenDACertVerificationLib {
         }
         DATypesV1.VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobVersion);
 
-        // Check for potential underflow: maxNumOperators must not exceed numChunks
-        if (blobParams.maxNumOperators > blobParams.numChunks) {
+        // Check for potential underflow:
+        // maxNumOperators must not exceed numChunks
+        //
+        if (
+            blobParams.maxNumOperators > blobParams.numChunks
+                || securityThresholds.confirmationThreshold < securityThresholds.adversaryThreshold
+        ) {
             revert SecurityAssumptionsNotMet(
                 securityThresholds.confirmationThreshold,
                 securityThresholds.adversaryThreshold,
