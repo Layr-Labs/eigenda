@@ -169,8 +169,6 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 
 	// parallelize subBatch verification
 	for params, subBatch := range subBatchMap {
-		params := params
-		subBatch := subBatch
 		pool.Submit(func() {
 			v.universalVerifyWorker(params, subBatch, out)
 		})
@@ -178,7 +176,6 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 
 	// parallelize length proof verification
 	for _, blobCommitments := range blobCommitmentList {
-		blobCommitments := blobCommitments
 		pool.Submit(func() {
 			v.verifyBlobLengthWorker(blobCommitments, out)
 		})
@@ -211,7 +208,7 @@ func (v *shardValidator) universalVerifyWorker(params encoding.EncodingParams, s
 }
 
 func (v *shardValidator) verifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
-	err := committer.VerifyBlobLength(blobCommitments)
+	err := committer.VerifyLengthProof(blobCommitments)
 	if err != nil {
 		out <- err
 		return

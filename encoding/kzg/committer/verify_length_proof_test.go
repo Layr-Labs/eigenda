@@ -77,14 +77,13 @@ func TestLengthProof(t *testing.T) {
 			require.Nil(t, err)
 			require.Equal(t, uint64(len(inputFr)), numSymbols)
 
-			_, lengthCommitment, lengthProof, err := committer.GetCommitments(inputFr)
+			commitments, err := committer.GetCommitmentsForPaddedLength(inputBytes)
 			require.Nil(t, err)
 
-			require.NoError(t, kzgcommitment.VerifyLengthProof(lengthCommitment, lengthProof, numSymbols),
-				"low degree verification failed\n")
+			require.NoError(t, kzgcommitment.VerifyLengthProof(commitments), "low degree verification failed\n")
 
-			require.Error(t, kzgcommitment.VerifyLengthProof(lengthCommitment, lengthProof, numSymbols*2),
-				"low degree verification failed\n")
+			commitments.Length *= 2
+			require.Error(t, kzgcommitment.VerifyLengthProof(commitments), "low degree verification failed\n")
 		})
 	}
 }
@@ -113,7 +112,7 @@ func BenchmarkVerifyBlob(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		err = kzgcommitment.VerifyBlobLength(commitments)
+		err = kzgcommitment.VerifyLengthProof(commitments)
 		require.NoError(b, err)
 	}
 }
