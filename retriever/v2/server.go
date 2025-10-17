@@ -10,7 +10,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/retriever"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
