@@ -20,9 +20,9 @@ func TestBatchEquivalence(t *testing.T) {
 
 	committer, err := kzgcommitment.NewFromConfig(kzgcommitment.Config{
 		SRSNumberToLoad:   4096,
-		G1SRSPath:         "../../../resources/srs/g1.point",
-		G2SRSPath:         "../../../resources/srs/g2.point",
-		G2TrailingSRSPath: "../../../resources/srs/g2.trailing.point",
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
 	})
 	require.NoError(t, err)
 
@@ -61,9 +61,9 @@ func TestLengthProof(t *testing.T) {
 
 	committer, err := kzgcommitment.NewFromConfig(kzgcommitment.Config{
 		SRSNumberToLoad:   maxNumSymbols,
-		G1SRSPath:         "../../../resources/srs/g1.point",
-		G2SRSPath:         "../../../resources/srs/g2.point",
-		G2TrailingSRSPath: "../../../resources/srs/g2.trailing.point",
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
 	})
 	require.Nil(t, err)
 
@@ -92,9 +92,9 @@ func TestLengthProof(t *testing.T) {
 func BenchmarkVerifyBlob(b *testing.B) {
 	committer, err := kzgcommitment.NewFromConfig(kzgcommitment.Config{
 		SRSNumberToLoad:   4096,
-		G1SRSPath:         "../../../resources/srs/g1.point",
-		G2SRSPath:         "../../../resources/srs/g2.point",
-		G2TrailingSRSPath: "../../../resources/srs/g2.trailing.point",
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
 	})
 	require.NoError(b, err)
 
