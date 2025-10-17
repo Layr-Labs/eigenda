@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
-	icicleprover "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2/icicle"
+	icicleprover "github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/icicle"
 )
 
 const (
