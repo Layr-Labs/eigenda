@@ -35,6 +35,9 @@ type EjectionTransactor interface {
 var _ EjectionTransactor = &ejectionTransactor{}
 
 // ejectionTransactor is the production implementation of the EjectionTransactor interface.
+//
+// The ejection transactor is thread safe, although parallel calls may result in duplicate work (i.e. two calls might
+// end up putting the same data in a cache).
 type ejectionTransactor struct {
 	// The address of this ejector instance.
 	selfAddress gethcommon.Address
@@ -63,7 +66,6 @@ type ejectionTransactor struct {
 
 // Create a new EjectionTransactor.
 func NewEjectionTransactor(
-	ctx context.Context,
 	logger logging.Logger,
 	client bind.ContractBackend,
 	ejectionContractAddress gethcommon.Address,
@@ -102,9 +104,12 @@ func NewEjectionTransactor(
 	}
 
 	referenceBlockProvider := eth.NewReferenceBlockProvider(logger, client, referenceBlockNumberOffset)
-	referenceBlockProvider = eth.NewPeriodicReferenceBlockProvider(
+	referenceBlockProvider, err = eth.NewPeriodicReferenceBlockProvider(
 		referenceBlockProvider,
 		referenceBlockNumberPollInterval)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create periodic reference block provider: %w", err)
+	}
 
 	quorumScanner, err := eth.NewQuorumScanner(client, registryCoordinatorAddress)
 	if err != nil {
@@ -147,7 +152,6 @@ func NewEjectionTransactor(
 	}, nil
 }
 
-// CompleteEjection implements EjectionTransactor.
 func (e *ejectionTransactor) CompleteEjection(
 	ctx context.Context,
 	addressToEject gethcommon.Address,
@@ -165,8 +169,9 @@ func (e *ejectionTransactor) CompleteEjection(
 	quorumBytes := eth.QuorumListToBytes(quorums)
 
 	opts := &bind.TransactOpts{
-		From:   e.selfAddress,
-		Signer: e.signer,
+		Context: ctx,
+		From:    e.selfAddress,
+		Signer:  e.signer,
 	}
 
 	_, err = e.transactor.CompleteEjection(opts, addressToEject, quorumBytes)
@@ -176,15 +181,14 @@ func (e *ejectionTransactor) CompleteEjection(
 	return nil
 }
 
-// IsEjectionInProgress implements EjectionTransactor.
 func (e *ejectionTransactor) IsEjectionInProgress(
 	ctx context.Context,
 	addressToCheck gethcommon.Address,
 ) (bool, error) {
 
 	opts := &bind.CallOpts{
-		From:    e.selfAddress,
 		Context: ctx,
+		From:    e.selfAddress,
 	}
 
 	// This method returns the zero address if no ejection is in progress.
@@ -200,7 +204,6 @@ func (e *ejectionTransactor) IsEjectionInProgress(
 	return false, nil
 }
 
-// IsValidatorPresentInAnyQuorum implements EjectionTransactor.
 func (e *ejectionTransactor) IsValidatorPresentInAnyQuorum(
 	ctx context.Context,
 	addressToCheck gethcommon.Address,
@@ -224,7 +227,6 @@ func (e *ejectionTransactor) IsValidatorPresentInAnyQuorum(
 	return len(quorums) > 0, nil
 }
 
-// StartEjection implements EjectionTransactor.
 func (e *ejectionTransactor) StartEjection(
 	ctx context.Context,
 	addressToEject gethcommon.Address) error {
@@ -241,8 +243,9 @@ func (e *ejectionTransactor) StartEjection(
 	quorumBytes := eth.QuorumListToBytes(quorums)
 
 	opts := &bind.TransactOpts{
-		From:   e.selfAddress,
-		Signer: e.signer,
+		Context: ctx,
+		From:    e.selfAddress,
+		Signer:  e.signer,
 	}
 
 	_, err = e.transactor.StartEjection(opts, addressToEject, quorumBytes)

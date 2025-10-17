@@ -2,6 +2,7 @@ package ejector
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -27,7 +28,7 @@ type Ejector struct {
 	// Used for looking up signing rates for V2.
 	signingRateLookupV2 SigningRateLookup
 
-	// The freqeuency with which to evaluate validators for ejection.
+	// The frequency with which to evaluate validators for ejection.
 	period time.Duration
 
 	// Defines the time window over which to evaluate signing metrics when deciding whether to eject a validator.
@@ -52,6 +53,8 @@ func NewEjector(
 	signingRateLookupV1 SigningRateLookup,
 	signingRateLookupV2 SigningRateLookup,
 	validatorIDToAddressCache eth.ValidatorIDToAddressConverter,
+	referenceBlockProvider eth.ReferenceBlockProvider,
+	operatorStateCache operatorstate.OperatorStateCache,
 ) *Ejector {
 	e := &Ejector{
 		ctx:                        ctx,
@@ -62,6 +65,8 @@ func NewEjector(
 		period:                     config.EjectionPeriod,
 		ejectionCriteriaTimeWindow: config.EjectionCriteriaTimeWindow,
 		validatorIDToAddressCache:  validatorIDToAddressCache,
+		referenceBlockProvider:     referenceBlockProvider,
+		operatorStateCache:         operatorStateCache,
 	}
 
 	go e.mainLoop()
@@ -80,60 +85,69 @@ func (e *Ejector) mainLoop() {
 			e.logger.Info("ejector shutting down")
 			return
 		case <-ticker.C:
-			e.evaluateValidators()
+			err := e.evaluateValidators()
+			if err != nil {
+				e.logger.Error("error evaluating validators", "error", err)
+			}
 		}
 	}
 }
 
 // evaluateValidators looks up signing rates and evaluates which validators should be ejected.
-func (e *Ejector) evaluateValidators() {
+func (e *Ejector) evaluateValidators() error {
 
 	v1SigningRates, err := e.signingRateLookupV1.GetSigningRates(
 		e.ejectionCriteriaTimeWindow,
 		nil, // all quorums
 		ProtocolVersionV1,
-		true, // omit perfect signers if possible
+		true, // omit perfect signers if possible (data API has inconsistent behavior across v1 and v2)
 	)
 	if err != nil {
-		e.logger.Error("error looking up v1 signing rates", "error", err)
-		return
+		return fmt.Errorf("error looking up v1 signing rates: %w", err)
 	}
 
 	v2SigningRates, err := e.signingRateLookupV2.GetSigningRates(
 		e.ejectionCriteriaTimeWindow,
 		nil, // all quorums
 		ProtocolVersionV2,
-		true, // omit perfect signers if possible
+		true, // omit perfect signers if possible (data API has inconsistent behavior across v1 and v2)
 	)
 	if err != nil {
-		e.logger.Error("error looking up v2 signing rates", "error", err)
-		return
+		return fmt.Errorf("error looking up v2 signing rates: %w", err)
 	}
 
 	// Combine data from v1 and v2 lookups, since the validator is likely to cancel ejection if it is active in either.
 	signingRates, err := combineSigningRateSlices(v1SigningRates, v2SigningRates)
 	if err != nil {
-		e.logger.Error("error combining signing rates", "error", err)
-		return
+		return fmt.Errorf("error combining signing rates: %w", err)
 	}
 	sortByUnsignedBytesDescending(signingRates)
 
 	for _, signingRate := range signingRates {
-		e.evaluateValidator(signingRate)
+		err := e.evaluateValidator(signingRate)
+		if err != nil {
+			e.logger.Error("error evaluating validator", "validatorID", signingRate.GetValidatorId(), "error", err)
+		}
 	}
+
+	return nil
 }
 
 // evaluateValidator evaluates a single validator's signing rate and decides whether to eject it.
-func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate) {
-	if !IsEjectable(signingRate) {
-		return
+func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate) error {
+	isEjectable := signingRate.GetSignedBatches() == 0 && signingRate.GetUnsignedBatches() > 0
+	if !isEjectable {
+		return nil
+	}
+
+	if len(signingRate.GetValidatorId()) != 32 {
+		return fmt.Errorf("invalid validator ID length: %d", len(signingRate.GetValidatorId()))
 	}
 
 	validatorID := core.OperatorID(signingRate.GetValidatorId()[:])
 	validatorAddress, err := e.validatorIDToAddressCache.ValidatorIDToAddress(e.ctx, validatorID)
 	if err != nil {
-		e.logger.Error("error looking up validator address", "validatorID", signingRate.GetValidatorId(), "error", err)
-		return
+		return fmt.Errorf("error converting validator ID to address: %w", err)
 	}
 
 	e.logger.Info("Validator is eligible for ejection",
@@ -145,10 +159,9 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 		"unsignedBytes", signingRate.GetUnsignedBytes(),
 	)
 
-	rbn, error := e.referenceBlockProvider.GetReferenceBlockNumber(e.ctx)
-	if error != nil {
-		e.logger.Error("error looking up latest reference block number", "error", error)
-		return
+	rbn, err := e.referenceBlockProvider.GetReferenceBlockNumber(e.ctx)
+	if err != nil {
+		return fmt.Errorf("error looking up latest reference block number: %w", err)
 	}
 
 	operatorState, err := e.operatorStateCache.GetOperatorState(
@@ -157,19 +170,22 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 		nil, // all quorums
 	)
 	if err != nil {
-		e.logger.Error("error looking up operator state", "error", err)
-		return
+		return fmt.Errorf("error looking up operator state: %w", err)
 	}
 
 	stakeFractions, err := getStakeFractionMap(validatorID, operatorState)
 	if err != nil {
-		e.logger.Error("error calculating stake fractions", "validatorID", signingRate.GetValidatorId(), "error", err)
-		return
+		return fmt.Errorf("error calculating stake fractions: %w", err)
 	}
 
 	// The ejection manager is responsible for deduplicating ejection requests, and deciding if
 	// there are other factors that may prevent ejection (e.g. too many ejection attempts, etc.).
-	_ = e.ejectionManager.EjectValidator(validatorAddress, stakeFractions)
+	err = e.ejectionManager.EjectValidator(validatorAddress, stakeFractions)
+	if err != nil {
+		return fmt.Errorf("error requesting ejection: %w", err)
+	}
+
+	return nil
 }
 
 // Get the stake fraction map for a given validator.

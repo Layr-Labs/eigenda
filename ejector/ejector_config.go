@@ -70,14 +70,17 @@ type EjectorConfig struct {
 	// The period at which to periodically attempt to finalize ejections that have been started.
 	EjectionFinalizationPeriod time.Duration
 
-	// The number of blocks to wait before using a reference block number for quorum.
+	// The number of blocks to wait before using a reference block number for quorum. That is to say, do not always
+	// use the latest block number we know about, but rather use the block number that is sufficiently old as to make
+	// choosing the wrong fork unlikely. If this config value is X, and we know about block 100, we will use a RBN
+	// 100-X.
 	ReferenceBlockNumberOffset uint64
 
 	// The interval at which to poll for a new reference block number.
 	ReferenceBlockNumberPollInterval time.Duration
 
-	// The size of the cache to use for Ethereum-related caching layers.
-	EthCacheSize int
+	// The size for the caches for on-chain data.
+	ChainDataCacheSize uint64
 }
 
 // Create a new root ejector config with default values.
@@ -152,7 +155,7 @@ func DefaultEjectorConfig() *EjectorConfig {
 		EthBlockConfirmations:                0,
 		ReferenceBlockNumberOffset:           10,
 		ReferenceBlockNumberPollInterval:     10 * time.Second,
-		EthCacheSize:                         1024,
+		ChainDataCacheSize:                   1024,
 	}
 }
 
@@ -192,6 +195,22 @@ func (c *EjectorConfig) Verify() error {
 
 	if c.DataApiUrl == "" {
 		return fmt.Errorf("invalid data API URL: %s", c.DataApiUrl)
+	}
+
+	if c.DataApiTimeout <= 0 {
+		return fmt.Errorf("invalid data API timeout: %s", c.DataApiTimeout)
+	}
+
+	if c.EjectionFinalizationPeriod <= 0 {
+		return fmt.Errorf("invalid ejection finalization period: %s", c.EjectionFinalizationPeriod)
+	}
+
+	if c.ReferenceBlockNumberPollInterval <= 0 {
+		return fmt.Errorf("invalid reference block number poll interval: %s", c.ReferenceBlockNumberPollInterval)
+	}
+
+	if c.ChainDataCacheSize <= 0 {
+		return fmt.Errorf("invalid chain data cache size: %d", c.ChainDataCacheSize)
 	}
 
 	return nil

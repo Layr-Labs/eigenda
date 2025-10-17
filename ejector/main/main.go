@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/ejector"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -68,12 +69,11 @@ func run(ctx context.Context) error {
 		senderAddress,
 		logger)
 	if err != nil {
-		logger.Error("Cannot create chain.Client", "err", err)
 		return fmt.Errorf("failed to create geth client: %w", err)
 	}
 
 	contractDirectory, err := directory.NewContractDirectory(
-		context.Background(),
+		ctx,
 		logger,
 		gethClient,
 		gethcommon.HexToAddress(ejectorConfig.ContractDirectoryAddress))
@@ -97,7 +97,6 @@ func run(ctx context.Context) error {
 	}
 
 	ejectionTransactor, err := ejector.NewEjectionTransactor(
-		ctx,
 		logger,
 		gethClient,
 		ejectionContractAddress,
@@ -107,7 +106,7 @@ func run(ctx context.Context) error {
 		chainID,
 		ejectorConfig.ReferenceBlockNumberOffset,
 		ejectorConfig.ReferenceBlockNumberPollInterval,
-		ejectorConfig.EthCacheSize,
+		int(ejectorConfig.ChainDataCacheSize),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create ejection transactor: %w", err)
@@ -144,6 +143,27 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("failed to create cached validator ID to address converter: %w", err)
 	}
 
+	referenceBlockProvider := eth.NewReferenceBlockProvider(
+		logger,
+		gethClient,
+		ejectorConfig.ReferenceBlockNumberOffset,
+	)
+
+	chainState, err := nil, nil // TODO
+	if err != nil {
+		return fmt.Errorf("failed to create chain state: %w", err)
+	}
+
+	operatorStateCache, err := operatorstate.NewOperatorStateCache(
+		gethClient,
+		chainState,
+		registryCoordinatorAddress,
+		ejectorConfig.ChainDataCacheSize,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create operator state cache: %w", err)
+	}
+
 	_ = ejector.NewEjector(
 		ctx,
 		logger,
@@ -152,6 +172,8 @@ func run(ctx context.Context) error {
 		dataApiSigningRateLookup,
 		dataApiSigningRateLookup,
 		validatorIDToAddressConverter,
+		referenceBlockProvider,
+		operatorStateCache,
 	)
 	return nil
 }

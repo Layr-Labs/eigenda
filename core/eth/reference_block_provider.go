@@ -102,12 +102,17 @@ type periodicReferenceBlockProvider struct {
 func NewPeriodicReferenceBlockProvider(
 	base ReferenceBlockProvider,
 	updatePeriod time.Duration,
-) ReferenceBlockProvider {
+) (ReferenceBlockProvider, error) {
+
+	if updatePeriod < 0 {
+		return nil, fmt.Errorf("updatePeriod must be positive")
+	}
+
 	return &periodicReferenceBlockProvider{
 		base:         base,
 		updatePeriod: updatePeriod,
 		lastUpdate:   time.Time{},
-	}
+	}, nil
 }
 
 func (p *periodicReferenceBlockProvider) GetReferenceBlockNumber(ctx context.Context) (uint64, error) {
