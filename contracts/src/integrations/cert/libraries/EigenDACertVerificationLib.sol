@@ -173,18 +173,6 @@ library EigenDACertVerificationLib {
         }
         DATypesV1.VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobVersion);
 
-        // In order to prevent divide by 0 panic, we need gamma > 0 and codingRate > 0.
-        // We assume here that the CertVerifier constructor checked that confirmationThreshold > adversaryThreshold.
-        // We also checked above that the blobParams are from a valid version.
-        // Thus, dividing by codingRate below will only panic if codingRate of a proper initialized version is 0,
-        // which is either a configuration bug, or a malicious attack. In both cases, we cannot tell whether the
-        // cert is valid or invalid, so it is ok to panic and let social consensus intervene (put a human debugger in the loop).
-
-        // old code
-        // uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
-        // uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
-        // uint256 minRequired = blobParams.maxNumOperators * 10000;
-
         // Check for potential underflow: maxNumOperators must not exceed numChunks
         if (blobParams.maxNumOperators > blobParams.numChunks) {
             revert SecurityAssumptionsNotMet(
