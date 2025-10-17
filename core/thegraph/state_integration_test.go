@@ -5,15 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	inaboxtests "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/Layr-Labs/eigenda/test"
-	"github.com/Layr-Labs/eigensdk-go/logging"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/require"
 )
@@ -43,10 +38,11 @@ func setupTest(t *testing.T) *inaboxtests.InfrastructureHarness {
 
 	// Setup infrastructure using the centralized function
 	config := &inaboxtests.InfrastructureConfig{
-		TemplateName: templateName,
-		TestName:     testName,
-		Logger:       logger,
-		RootPath:     "../../",
+		TemplateName:     templateName,
+		TestName:         testName,
+		Logger:           logger,
+		RootPath:         "../../",
+		DisableDisperser: true,
 	}
 
 	// Start all the necessary infrastructure like anvil, graph node, and eigenda components
@@ -71,11 +67,16 @@ func setupTest(t *testing.T) *inaboxtests.InfrastructureHarness {
 func TestIndexerIntegration(t *testing.T) {
 	ctx := t.Context()
 	infraHarness := setupTest(t)
-	testConfig := infraHarness.TestConfig
 
-	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
+	client := infraHarness.ChainHarness.EthClient
 	tx, err := eth.NewWriter(
-		logger, client, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
+		// TODO(dmanc): Expose the operator state retriever and service manager addresses in the infrastructure harness
+		// or use the contract directory. Then we can remove the dependency on the test config.
+		logger,
+		client,
+		infraHarness.TestConfig.EigenDA.OperatorStateRetriever,
+		infraHarness.TestConfig.EigenDA.ServiceManager,
+	)
 	require.NoError(t, err, "failed to create eth writer")
 
 	cs := thegraph.NewIndexedChainState(eth.NewChainState(tx, client), graphql.NewClient(graphUrl, nil), logger)
@@ -89,23 +90,10 @@ func TestIndexerIntegration(t *testing.T) {
 
 	state, err := cs.GetIndexedOperatorState(ctx, headerNum, testQuorums)
 	require.NoError(t, err, "failed to get indexed operator state")
-	require.Equal(t, len(testConfig.Operators), len(state.IndexedOperators), "operator count mismatch")
-}
-
-func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, logger logging.Logger) common.EthClient {
-	t.Helper()
-
-	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
-	require.True(t, ok, "failed to get deployer")
-
-	config := geth.EthClientConfig{
-		RPCURLs:          []string{deployer.RPC},
-		PrivateKeyString: privateKey,
-		NumConfirmations: 0,
-		NumRetries:       0,
-	}
-
-	client, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
-	require.NoError(t, err, "failed to create eth client")
-	return client
+	require.Equal(
+		t,
+		len(infraHarness.OperatorHarness.Servers),
+		len(state.IndexedOperators),
+		"operator count mismatch",
+	)
 }
