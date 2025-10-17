@@ -67,7 +67,7 @@ type CommitmentPair struct {
 	LengthCommitment bn254.G2Affine
 }
 
-// VerifyCommitEquivalenceBath is conceptually part of VerifyLengthProof.
+// VerifyCommitEquivalenceBatch is conceptually part of VerifyLengthProof.
 // It's currently a separate function for historical reasons, from the times when we were batching.
 // Now that we no longer are batching, we could verify a single commitmentEquivalence at a time,
 // and do so as part of VerifyLengthProof.
