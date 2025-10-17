@@ -5,8 +5,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"

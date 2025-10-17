@@ -3,7 +3,7 @@
 package prover
 
 import (
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2/gnark"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/gnark"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )

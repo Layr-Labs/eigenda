@@ -2,7 +2,7 @@ package verifier
 
 import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 )
 
 // Config holds configuration for the V2 KZG verifier.
