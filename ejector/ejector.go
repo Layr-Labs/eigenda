@@ -2,15 +2,15 @@ package ejector
 
 import (
 	"context"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
-
-// TODO this should be the top level logic, should periodically loop over validators and decide which ones to eject
 
 // Ejector is responsible for periodically evaluating validators and deciding which ones to eject.
 type Ejector struct {
@@ -35,6 +35,12 @@ type Ejector struct {
 
 	// Used to convert validator IDs to validator addresses.
 	validatorIDToAddressCache eth.ValidatorIDToAddressConverter
+
+	// Used to look up the latest reference number.
+	referenceBlockProvider eth.ReferenceBlockProvider
+
+	// Used to fetch operator state.
+	operatorStateCache operatorstate.OperatorStateCache
 }
 
 // NewEjector creates a new Ejector.
@@ -139,7 +145,61 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 		"unsignedBytes", signingRate.GetUnsignedBytes(),
 	)
 
+	rbn, error := e.referenceBlockProvider.GetReferenceBlockNumber(e.ctx)
+	if error != nil {
+		e.logger.Error("error looking up latest reference block number", "error", error)
+		return
+	}
+
+	operatorState, err := e.operatorStateCache.GetOperatorState(
+		e.ctx,
+		rbn,
+		nil, // all quorums
+	)
+	if err != nil {
+		e.logger.Error("error looking up operator state", "error", err)
+		return
+	}
+
+	stakeFractions, err := getStakeFractionMap(validatorID, operatorState)
+	if err != nil {
+		e.logger.Error("error calculating stake fractions", "validatorID", signingRate.GetValidatorId(), "error", err)
+		return
+	}
+
 	// The ejection manager is responsible for deduplicating ejection requests, and deciding if
 	// there are other factors that may prevent ejection (e.g. too many ejection attempts, etc.).
-	_ = e.ejectionManager.EjectValidator(validatorAddress)
+	_ = e.ejectionManager.EjectValidator(validatorAddress, stakeFractions)
+}
+
+// Get the stake fraction map for a given validator.
+func getStakeFractionMap(
+	validatorID core.OperatorID,
+	operatorState *core.OperatorState,
+) (map[core.QuorumID]float64, error) {
+	stakeFractions := make(map[core.QuorumID]float64)
+
+	for quorumID, operators := range operatorState.Operators {
+		quorumStake := big.NewInt(0)
+		for _, operatorInfo := range operators {
+			quorumStake.Add(quorumStake, operatorInfo.Stake)
+		}
+
+		if quorumStake.Cmp(big.NewInt(0)) == 0 {
+			// Ignore quorums with zero total stake to avoid division by zero
+			continue
+		}
+
+		validatorInfo, ok := operators[validatorID]
+		if !ok {
+			// Validator is not part of this quorum.
+			continue
+		}
+
+		stakeFraction := new(big.Rat).SetFrac(validatorInfo.Stake, quorumStake)
+		floatStakeFraction, _ := stakeFraction.Float64()
+		stakeFractions[quorumID] = floatStakeFraction
+	}
+
+	return stakeFractions, nil
 }

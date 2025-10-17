@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	geth "github.com/ethereum/go-ethereum/common"
 )
@@ -18,10 +19,18 @@ type ThreadedEjectionManager struct {
 	ejectionManager EjectionManager
 
 	// Channel for receiving ejection requests.
-	ejectionRequestChan chan geth.Address
+	ejectionRequestChan chan *startEjectionRequest
 
 	// The period between the background checks for ejection progress.
 	period time.Duration
+}
+
+// A request to start an ejection for a given validator address.
+type startEjectionRequest struct {
+	// The address of the validator to eject.
+	validatorAddress geth.Address
+	// The stake fractions of the validator in each quorum.
+	stakeFractions map[core.QuorumID]float64
 }
 
 // Creates a new ThreadedEjectionManager that wraps the given EjectionManager. Runs a background goroutine
@@ -36,7 +45,7 @@ func NewThreadedEjectionManager(
 		ctx:                 ctx,
 		logger:              logger,
 		ejectionManager:     ejectionManager,
-		ejectionRequestChan: make(chan geth.Address),
+		ejectionRequestChan: make(chan *startEjectionRequest),
 		period:              config.EjectionPeriod,
 	}
 	go tem.mainLoop()
@@ -49,11 +58,17 @@ func NewThreadedEjectionManager(
 //   - There is already an ongoing ejection for the validator.
 //   - The validator is in the ejection blacklist (i.e. validators we will never attempt to eject).
 //   - A previous attempt at ejecting the validator was made too recently.
-func (tem *ThreadedEjectionManager) EjectValidator(validatorAddress geth.Address) error {
+func (tem *ThreadedEjectionManager) EjectValidator(
+	validatorAddress geth.Address,
+	stakeFractions map[core.QuorumID]float64,
+) error {
 	select {
 	case <-tem.ctx.Done():
 		return fmt.Errorf("context closed: %w", tem.ctx.Err())
-	case tem.ejectionRequestChan <- validatorAddress:
+	case tem.ejectionRequestChan <- &startEjectionRequest{
+		validatorAddress: validatorAddress,
+		stakeFractions:   stakeFractions,
+	}:
 		return nil
 	}
 }
@@ -69,7 +84,7 @@ func (tem *ThreadedEjectionManager) mainLoop() {
 			tem.logger.Info("Ejection manager shutting down")
 			return
 		case request := <-tem.ejectionRequestChan:
-			tem.ejectionManager.BeginEjection(request, nil) // TODO
+			tem.ejectionManager.BeginEjection(request.validatorAddress, request.stakeFractions)
 		case <-ticker.C:
 			tem.ejectionManager.FinalizeEjections()
 		}

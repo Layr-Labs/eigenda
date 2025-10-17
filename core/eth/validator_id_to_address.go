@@ -91,6 +91,7 @@ type cachedValidatorIDToAddressConverter struct {
 	addressToIDCache *lru.Cache[geth.Address, core.OperatorID]
 }
 
+// Create a new cached ValidatorIDToAddressConverter by wrapping a base converter with LRU caches of the given size.
 func NewCachedValidatorIDToAddressConverter(
 	base ValidatorIDToAddressConverter,
 	cacheSize int,

@@ -164,7 +164,7 @@ func (e *ejectionTransactor) CompleteEjection(
 	}
 	quorumBytes := eth.QuorumListToBytes(quorums)
 
-	opts := &bind.TransactOpts{ // TODO make sure these are correct
+	opts := &bind.TransactOpts{
 		From:   e.selfAddress,
 		Signer: e.signer,
 	}
@@ -182,7 +182,7 @@ func (e *ejectionTransactor) IsEjectionInProgress(
 	addressToCheck gethcommon.Address,
 ) (bool, error) {
 
-	opts := &bind.CallOpts{ // TODO make sure these are correct
+	opts := &bind.CallOpts{
 		From:    e.selfAddress,
 		Context: ctx,
 	}
@@ -240,7 +240,7 @@ func (e *ejectionTransactor) StartEjection(
 	}
 	quorumBytes := eth.QuorumListToBytes(quorums)
 
-	opts := &bind.TransactOpts{ // TODO make sure these are correct
+	opts := &bind.TransactOpts{
 		From:   e.selfAddress,
 		Signer: e.signer,
 	}
