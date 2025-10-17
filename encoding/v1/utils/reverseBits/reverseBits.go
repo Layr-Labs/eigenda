@@ -14,7 +14,6 @@ const (
 	mask2
 	mask3
 	mask4
-	//mask5
 )
 
 const (
@@ -23,7 +22,6 @@ const (
 	bit2
 	bit3
 	bit4
-	//bit5
 )
 
 var ErrRBOInvalidLength = errors.New("length must be power of 2 for RBO")
@@ -39,10 +37,6 @@ func bitIndex(v uint32) (out uint8) {
 	if v == 0 {
 		return 0
 	}
-	//if v&mask5 != 0 {
-	//	v >>= bit5
-	//	out |= bit5
-	//}
 	if v&mask4 != 0 {
 		v >>= bit4
 		out |= bit4
