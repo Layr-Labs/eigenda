@@ -4,10 +4,10 @@ import (
 	"runtime"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )

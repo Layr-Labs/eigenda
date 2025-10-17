@@ -7,8 +7,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
