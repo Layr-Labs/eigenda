@@ -52,6 +52,7 @@ interface IEigenDAConfigRegistry {
     /// @param activationKey The activation key for the configuration entry.
     ///                      This is an arbitrary key defined by the caller to indicate when the configuration should become active.
     /// @param value The 32 byte configuration value.
+    /// @dev The activationKey must be strictly greater than the last activationKey for the same name.
     function addConfigBytes32(string memory name, uint256 activationKey, bytes32 value) external;
 
     /// @notice Adds a variable length byte configuration value to the configuration registry.
@@ -59,6 +60,7 @@ interface IEigenDAConfigRegistry {
     /// @param activationKey The activation key for the configuration entry.
     ///                      This is an arbitrary key defined by the caller to indicate when the configuration should become active.
     /// @param value The variable length byte configuration value.
+    /// @dev The activationKey must be strictly greater than the last activationKey for the same name.
     function addConfigBytes(string memory name, uint256 activationKey, bytes memory value) external;
 
     /// @notice Gets the number of checkpoints for a 32 byte configuration entry.
