@@ -5,8 +5,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )

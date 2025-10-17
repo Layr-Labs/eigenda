@@ -13,11 +13,12 @@ import (
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
@@ -62,7 +63,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	p, c, v, err = makeTestComponents()
+	p, c, v, err = makeTestComponents(logger)
 	if err != nil {
 		panic("failed to start localstack container: " + err.Error())
 	}
@@ -72,7 +73,7 @@ func TestMain(m *testing.M) {
 }
 
 // makeTestComponents makes a prover and verifier currently using the only supported backend.
-func makeTestComponents() (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
+func makeTestComponents(logger logging.Logger) (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
 	proverConfig := &prover.KzgConfig{
 		SRSNumberToLoad: 8192,
 		G1Path:          "../../resources/srs/g1.point",
@@ -87,7 +88,7 @@ func makeTestComponents() (*prover.Prover, *committer.Committer, *verifier.Verif
 		G2TrailingSRSPath: "../../resources/srs/g2.trailing.point",
 	}
 
-	p, err := prover.NewProver(proverConfig, nil)
+	p, err := prover.NewProver(logger, proverConfig, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}

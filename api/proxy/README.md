@@ -44,9 +44,11 @@ Features:
     - [Migration With Service Restart](#migration-with-service-restart)
   - [Deployment Against Real EigenDA Network](#deployment-against-real-eigenda-network)
   - [Features and Configuration Options (flags/env vars)](#features-and-configuration-options-flagsenv-vars)
+    - [Payments](#payments)
+      - [V1 Payments](#v1-payments)
+      - [V2 Payments](#v2-payments)
     - [Read Only Mode](#read-only-mode)
   - [Requirements / Dependencies](#requirements--dependencies)
-    - [Authn/Authz/Payments](#authnauthzpayments)
     - [Ethereum Node](#ethereum-node)
     - [SRS Points](#srs-points)
     - [Hardware Recommendation](#hardware-recommendation)
@@ -283,7 +285,54 @@ $ set -a; source ./.env; set +a; ./bin/eigenda-proxy
 
 ### Features and Configuration Options (flags/env vars)
 
-Below is a list of the main high-level features offered for configuring the eigenda-proxy. These features are controlled via flags and/or env vars. To view the extensive list of available flags/env-vars to configure a given version of eigenda-proxy, run `eigenda-proxy --help`.
+Below is a list of the main high-level features offered for configuring the eigenda-proxy. These features are
+controlled via flags and/or env vars. To view the extensive list of available flags/env-vars to configure a given
+version of eigenda-proxy, run `eigenda-proxy --help`.
+
+#### Payments
+
+> Note: Proxy only supports using a single authorization (v1) or payment (v2) key. For RaaS providers, we discourage
+sharing keys between rollups, and thus recommend running a single instance of the Proxy per Rollup.
+
+##### V1 Payments
+
+In order to disperse to the EigenDA V1 network in production, or at high throughput on testnet, please register your
+authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication
+keypair address should not be associated with any funds anywhere. 
+
+##### V2 Payments
+
+When using EigenDA V2, the payment system can be configured using the `--eigenda.v2.client-ledger-mode` flag (or the
+`EIGENDA_PROXY_EIGENDA_V2_CLIENT_LEDGER_MODE` environment variable). This flag determines which payment mechanisms are
+active for blob dispersals. For detailed information about the payment system, see the
+[payment system documentation](../../docs/spec/src/protocol/payments/payment_system.md).
+
+**Available Payment Modes:**
+
+1. **`legacy` (default)** - Uses the legacy bin-based payment system that handles both reservation and on-demand
+   payments. This mode is in the process of being deprecated and will be removed in a future release. For more
+   information about the `legacy` payment system, please see our
+   [payments](https://docs.eigencloud.xyz/products/eigenda/core-concepts/payments) doc.
+
+> **IMPORTANT**: All clients should continue using this mode until the new payment system has officially shipped. The
+> other payment modes are documented below for awareness, but the dispersers currently deployed are incompatible with
+> these configurations.
+
+2. **`reservation-only`** - Uses pre-purchased bandwidth reservations that provide guaranteed throughput for a
+   specified time period. Reservations are tracked in the `PaymentVault` contract, and bandwidth is managed using a
+   leaky bucket algorithm. Dispersals will fail if a reservation is temporarily exhausted.
+
+3. **`on-demand-only`** - Uses pay-per-dispersal payments from funds deposited in the `PaymentVault` contract.
+   Limited to quorums 0 (ETH) and 1 (EIGEN). Dispersals will fail if on-demand funds are exhausted.
+
+4. **`reservation-and-on-demand`** - Enables both reservation and on-demand payment methods with intelligent fallback.
+   Uses reservation bandwidth when available, and automatically switches to on-demand payments when reservation
+   capacity is temporarily exhausted. If a reservation *expires*, this mode will prevent any dispersals from being made
+   to avoid inadvertent draining of on-demand funds due to an expired reservation.
+
+> **Note**: The payment mode should match your account's setup in the `PaymentVault` contract. Ensure you have an active
+> reservation (for `reservation-only` or `reservation-and-on-demand`) or sufficient deposits (for `on-demand-only` or
+> `reservation-and-on-demand`) before starting the proxy.
 
 #### Read Only Mode
 
@@ -328,12 +377,6 @@ In the event that the EigenDA disperser or network is down, the proxy will retur
 This behavior is turned on by default, but configurable via the `--eigenda.confirmation-timeout` flag (set to 15 mins by default currently). If a blob is not confirmed within this time, the proxy will return a 503 status code. This should be set long enough to accomodate for the disperser's batching interval (typically 10 minutes), signature gathering, and onchain submission.
 
 ### Requirements / Dependencies
-
-#### Authn/Authz/Payments
-
-In order to disperse to the EigenDA V1 network in production, or at high throughput on testnet, please register your authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication keypair address should not be associated with any funds anywhere. For EigenDA V2, please see our [payments](https://docs.eigencloud.xyz/products/eigenda/core-concepts/payments) doc.
-
-> Note: Proxy only supports using a single authorization (v1) or payment (v2) key. For RaaS providers, we discourage sharing keys between rollups, and thus recommend running a single instance of the Proxy per Rollup.
 
 #### Ethereum Node
 

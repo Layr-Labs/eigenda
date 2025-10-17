@@ -27,7 +27,7 @@ func BenchmarkFFTFr(b *testing.B) {
 	for _, numFrsPowerOf2 := range []uint8{9, 14, 19, 22} {
 		b.Run(fmt.Sprintf("2^%d_elements", numFrsPowerOf2), func(b *testing.B) {
 			fs := fft.NewFFTSettings(numFrsPowerOf2)
-			rand := random.NewTestRandom(1337)
+			rand := random.NewTestRandomNoPrint(1337)
 			frs := rand.FrElements(fs.MaxWidth)
 
 			for b.Loop() {
@@ -46,7 +46,7 @@ func BenchmarkFFTG1(b *testing.B) {
 	for _, sizePowOf2 := range []uint8{13, 14} {
 		b.Run(fmt.Sprintf("2^%d_Points", sizePowOf2), func(b *testing.B) {
 			fs := fft.NewFFTSettings(sizePowOf2)
-			rand := random.NewTestRandom(1337)
+			rand := random.NewTestRandomNoPrint(1337)
 			g1Points, err := rand.G1Points(fs.MaxWidth)
 			require.NoError(b, err)
 
@@ -58,11 +58,16 @@ func BenchmarkFFTG1(b *testing.B) {
 	}
 }
 
-func BenchmarkGnarkParallelFFTG1(b *testing.B) {
+// On macbook pro M4, this is ~2x faster than our FFTG1 implementation.
+// However, gnark-crypto doesn't currently have an exposed ECFFT function exposed.
+// It only has an implementation of ECIFFT (no forward direction) via the ToLagrangeG1 function.
+// See https://github.com/Consensys/gnark-crypto/issues/755
+// TODO(samlaf): upstream PR to gnark-crypto to expose ECFFT function, then use it here.
+func BenchmarkGnarkParallelIFFTG1(b *testing.B) {
 	for _, sizePowOf2 := range []uint8{13, 14} {
 		b.Run(fmt.Sprintf("2^%d_G1Points", sizePowOf2), func(b *testing.B) {
 			numPoints := uint64(1) << sizePowOf2
-			rand := random.NewTestRandom(1337)
+			rand := random.NewTestRandomNoPrint(1337)
 			g1Points, err := rand.G1Points(numPoints)
 			require.NoError(b, err)
 
@@ -80,7 +85,7 @@ func BenchmarkGnarkParallelFFTG1(b *testing.B) {
 func BenchmarkMSMG1(b *testing.B) {
 	for _, numG1PointsPowOf2 := range []uint8{12, 15, 19} {
 		fs := fft.NewFFTSettings(numG1PointsPowOf2)
-		rand := random.NewTestRandom(1337)
+		rand := random.NewTestRandomNoPrint(1337)
 		frs := rand.FrElements(fs.MaxWidth)
 		g1Points, err := rand.G1Points(fs.MaxWidth)
 		require.NoError(b, err)
@@ -99,7 +104,7 @@ func BenchmarkMSMG1(b *testing.B) {
 func BenchmarkMSMG2(b *testing.B) {
 	for _, numG2PointsPowOf2 := range []uint8{12, 15, 19} {
 		fs := fft.NewFFTSettings(numG2PointsPowOf2)
-		rand := random.NewTestRandom(1337)
+		rand := random.NewTestRandomNoPrint(1337)
 		frs := rand.FrElements(fs.MaxWidth)
 		g2Points, err := rand.G2Points(fs.MaxWidth)
 		require.NoError(b, err)

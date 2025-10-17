@@ -25,6 +25,7 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 		return nil, err
 	}
 	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
+		Logger:     p.logger,
 		GPUEnable:  p.Config.GPUEnable,
 		NTTSize:    MAX_NTT_SIZE,
 		FFTPointsT: fftPointsT,
@@ -36,6 +37,7 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 
 	// Set up icicle multiproof backend
 	multiproofBackend := &icicleprover.KzgMultiProofIcicleBackend{
+		Logger:         p.logger,
 		Fs:             fs,
 		FlatFFTPointsT: icicleDevice.FlatFFTPointsT,
 		NttCfg:         icicleDevice.NttCfg,
@@ -46,6 +48,7 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 	}
 
 	return &ParametrizedProver{
+		logger:                     p.logger,
 		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
 		encodingParams:             params,
 		encoder:                    p.encoder,

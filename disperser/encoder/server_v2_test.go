@@ -16,8 +16,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -50,7 +50,7 @@ func makeTestProver(numPoint uint64) (*prover.Prover, error) {
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
-	p, err := prover.NewProver(kzgConfig, nil)
+	p, err := prover.NewProver(logger, kzgConfig, nil)
 
 	return p, err
 }

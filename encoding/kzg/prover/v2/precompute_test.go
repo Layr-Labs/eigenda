@@ -13,7 +13,7 @@ import (
 )
 
 func TestNewSRSTable_PreComputeWorks(t *testing.T) {
-	harness := getTestHarness()
+	harness := getTestHarness(t)
 
 	kzgConfig := harness.proverV2KzgConfig
 	kzgConfig.CacheDir = "./data/SRSTable"

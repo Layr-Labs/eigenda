@@ -17,12 +17,12 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
@@ -42,7 +42,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	// Set up KZG components (prover, committer and verifier)
 	p, c, v, err := makeTestEncodingComponents()
 	require.NoError(t, err)
-	encoder := rs.NewEncoder(nil)
+	encoder := rs.NewEncoder(logger, nil)
 
 	// Set up test environment
 	rand := testrandom.NewTestRandom()
@@ -233,7 +233,7 @@ func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifi
 		return nil, nil, nil, fmt.Errorf("new committer from config: %w", err)
 	}
 
-	p, err := prover.NewProver(prover.KzgConfigFromV1Config(config), nil)
+	p, err := prover.NewProver(logger, prover.KzgConfigFromV1Config(config), nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}

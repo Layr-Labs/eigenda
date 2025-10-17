@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	kzgcommitment "github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test/random"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
