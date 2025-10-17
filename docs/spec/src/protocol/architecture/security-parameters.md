@@ -171,7 +171,7 @@ Specifically, the code above implements a check for the following inequality:
 
 `blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators) * (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold) >= 100 * blobParams.numChunks`
 
-The inqueality above can be be rewritten as:
+The inequality above can be be rewritten as:
 `(blobParams.numChunks - blobParams.maxNumOperators) / 100 >= blobParams.numChunks / (blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators))`
 
 By substituting the variables using the notation mapping shown at the beginning of this section and simplifying, we get:  
