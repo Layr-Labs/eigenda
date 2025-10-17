@@ -1,7 +1,11 @@
 package kzg
 
 import (
+	"fmt"
+
+	"github.com/Layr-Labs/eigenda/encoding/kzgflags"
 	_ "github.com/Layr-Labs/eigenda/resources/srs"
+	"github.com/urfave/cli"
 )
 
 // KzgConfig holds configuration for KZG prover and verifier.
@@ -52,4 +56,25 @@ type KzgConfig struct {
 	// TODO(samlaf): split into separate configs only specified for prover or verifier, where needed.
 	NumWorker uint64
 	Verbose   bool
+}
+
+func ReadCLIConfig(ctx *cli.Context) KzgConfig {
+	cfg := KzgConfig{}
+	cfg.G1Path = ctx.GlobalString(kzgflags.G1PathFlagName)
+	cfg.G2Path = ctx.GlobalString(kzgflags.G2PathFlagName)
+	cfg.G2TrailingPath = ctx.GlobalString(kzgflags.G2TrailingPathFlagName)
+	cfg.CacheDir = ctx.GlobalString(kzgflags.CachePathFlagName)
+	cfg.SRSOrder = ctx.GlobalUint64(kzgflags.SRSOrderFlagName)
+	cfg.SRSNumberToLoad = ctx.GlobalUint64(kzgflags.SRSLoadingNumberFlagName)
+	cfg.NumWorker = ctx.GlobalUint64(kzgflags.NumWorkerFlagName)
+	cfg.Verbose = ctx.GlobalBool(kzgflags.VerboseFlagName)
+	cfg.PreloadEncoder = ctx.GlobalBool(kzgflags.PreloadEncoderFlagName)
+
+	if ctx.GlobalString(kzgflags.DeprecatedG2PowerOf2PathFlagName) != "" {
+		fmt.Printf("Warning: --%s is deprecated. "+
+			"The g2.point.powerOf2 file is now embedded in the binary, so this flag is no longer needed.\n",
+			kzgflags.DeprecatedG2PowerOf2PathFlagName)
+	}
+
+	return cfg
 }
