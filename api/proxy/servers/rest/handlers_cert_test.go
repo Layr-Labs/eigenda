@@ -5,6 +5,7 @@ package rest
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/mocks"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
@@ -56,6 +58,10 @@ func TestHandlerGet(t *testing.T) {
 	defer ctrl.Finish()
 	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
+	// generate large payloads to test MaxCertSizeBytes
+	random := random.NewTestRandom()
+	testUpperBoundMaxCertSize := hex.EncodeToString(random.Bytes(MaxCertSizeBytes))
+	testExceedMaxCertSize := hex.EncodeToString(random.Bytes(MaxCertSizeBytes + 1))
 
 	tests := []struct {
 		name         string
@@ -118,6 +124,24 @@ func TestHandlerGet(t *testing.T) {
 			},
 			expectedCode: http.StatusOK,
 			expectedBody: testCommitStr,
+		},
+		{
+			name:         "Failure - OP Alt-DA with payload size exceeding MaxCertSizeBytes",
+			url:          fmt.Sprintf("/get/0x010000%s", testExceedMaxCertSize),
+			mockBehavior: func() {},
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "",
+		},
+		{
+			name: "Success - OP Alt-DA with payload size equal to MaxCertSizeBytes",
+			url:  fmt.Sprintf("/get/0x010000%s", testUpperBoundMaxCertSize),
+			mockBehavior: func() {
+				mockEigenDAManager.EXPECT().
+					Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return([]byte(testUpperBoundMaxCertSize), nil)
+			},
+			expectedCode: http.StatusOK,
+			expectedBody: testUpperBoundMaxCertSize,
 		},
 	}
 

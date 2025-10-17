@@ -13,6 +13,12 @@ const (
 
 	DeprecatedAPIsEnabledFlagName = "api-enabled"
 	DeprecatedAdminAPIType        = "admin"
+
+	// MaxCertSizeBytes is used as an upper bound for validating a payload hex's length
+	// to harden the rest server against memory exhaustion attacks. It is NOT enforced on
+	// the protocol level. If we are expecting an increase in cert size (e.g: a significant
+	// increase in operators) this value needs to be updated accordingly.
+	MaxCertSizeBytes int = 21000
 )
 
 // We don't add any _SERVER_ middlefix to the env vars like we do for other categories
