@@ -9,12 +9,12 @@
 // 1. Local (chunks) availability: validator attests to having received and being able to serve its chunks
 // 2. Global (blob) availability: validator attests to the entire blob being available in the network.
 //
-// Because of the sharded nature of EigenDA, each validator only receives a subset of the blob's content.
+// Because of the sharded nature of EigenDA, each validator only receives a subset of each blob's content.
 // In order to attest to global availability, it thus needs to know how many chunks there are in total,
 // and to make sure that the chunks it receives are actually proportional to its stake. This is why
 // BlobCommitments contains a length field, as well as a proof of this length (LengthCommitment + LengthProof).
 //
-// Here's an example scenario which shows that EigenDA could go wrong without this Length.
+// Here's an example scenario which shows that EigenDA could go wrong without this length.
 // In the extreme case, a malicious disperser could just tell the validators that the blob size is 1,
 // and ask all validators except for one to sign off on the commitment. For a slightly more involved but
 // analogous scenario, assume a network of 8 DA nodes with uniform stake distribution, and coding ratio 1/2.
@@ -32,7 +32,7 @@
 // - G1 and G2: generators of the bn254 curve groups
 // - BL: blob length (power of 2)
 // - BC_G1: blob commitment; [p(x)]_1 := p(s)G1 (this is the same as our [encoding.BlobCommitments].Commitment)
-// - LC_G1: len commitment; q(x) = x^(2^28-BL)*p(x)
+// - LC_G1: len commitment; [q(x)]_1=q(s)*G1 where q(x) := x^(2^28-BL)*p(x)
 // Verification is simply e(BC_G1, s^(2^28-BL)*G2) = e(LC_G1, G2)
 //
 // Unfortunately, this simple strategy does not work, due to our (unfortunate) choice of SRS ceremony,
@@ -51,19 +51,21 @@
 // - FLC_G1: fake length commitment to q'(x) = x^(2^28-BL/2)*p(x)
 // Note that if there were only 2^28 G1 points, then the malicious client/disperser would not be able to generate
 // the commitment FLC_G1, because it has degree 2^28-BL/2+BL = 2^28+BL/2 > 2^28
-// - Verification works: e(BC_G1, s^{2^28-BL/2}G2) = e(FLC_G1, G2)
+// - Verification works: e(BC_G1, s^(2^28-BL/2)G2) = e(FLC_G1, G2)
 //
 // So our actual implementation is as follows:
-// - C1 (G1): blob commitment
-// - C2 (G2): len commitment to p(x)
-// - P2 (G2): len proof to q(x) = x^{2^28-bloblen}p(x)
-// - Verify e(s^{2^28-bloblen}, C2) = e(G1, P2)
+// - BC_G1: blob commitment
+// - LC_G2: len commitment to p(x)
+// - LP_G2: len proof; commitment to q(x) = x^(2^28-BL)p(x)
+// - Verify e(s^(2^28-BL), LC_G2) = e(G1, LP_G2)
 // Note there is no C1 in above pairing, which is why we verify a second pairing e(C1,G2) = e(G1,C2)
-// in [VerifyCommitEquivalenceBatch]!
+// in [VerifyCommitEquivalenceBatch]! Also note that despite calling LP_G2 a "proof", it is actually
+// it is by itself no more of a proof than LC_G2; both are commitments which together allow verifying the length claim.
 //
 // Note that we actually missed a simpler scheme when initially implementing this,
-// whose proofs are two (smaller) G1 points instead of two G2 points:
-// - shift = 2^28 - bloblen
+// whose proofs are two (smaller) G1 points instead of two G2 points.
+// A future protocol upgrade could switch to this scheme if desired:
+// - shift = 2^28 - BL
 // - proof1 = [s^(shift/2) * p(s)]_1
 // - proof2 = [s^shift * p(s)]_1
 // - verifier pairing1: e([p(s)]_1, [s^(shift/2)]_2) = e(proof1, [1]_2)
