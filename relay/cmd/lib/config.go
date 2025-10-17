@@ -23,8 +23,14 @@ type Config struct {
 	// Configuration for the AWS client. Default is aws.DefaultClientConfig().
 	AWS aws.ClientConfig
 
-	// BucketName is the name of the S3 bucket that stores blobs. Default is "relay".
+	// BucketName is the name of the bucket that stores blobs (S3 or OCI). Default is "relay".
 	BucketName string
+
+	// ObjectStorageBackend is the backend to use for object storage (s3 or oci). Default is "s3".
+	ObjectStorageBackend string
+
+	// OCINamespace is the OCI namespace (optional).
+	OCINamespace string
 
 	// MetadataTableName is the name of the DynamoDB table that stores metadata. Default is "metadata".
 	MetadataTableName string
@@ -52,10 +58,12 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	config := Config{
-		Log:               *loggerConfig,
-		AWS:               awsClientConfig,
-		BucketName:        ctx.String(flags.BucketNameFlag.Name),
-		MetadataTableName: ctx.String(flags.MetadataTableNameFlag.Name),
+		Log:                  *loggerConfig,
+		AWS:                  awsClientConfig,
+		BucketName:           ctx.String(flags.BucketNameFlag.Name),
+		ObjectStorageBackend: ctx.String(flags.ObjectStorageBackendFlag.Name),
+		OCINamespace:         ctx.String(flags.OCINamespaceFlag.Name),
+		MetadataTableName:    ctx.String(flags.MetadataTableNameFlag.Name),
 		RelayConfig: relay.Config{
 			RelayKeys:                  make([]core.RelayKey, len(relayKeys)),
 			GRPCPort:                   ctx.Int(flags.GRPCPortFlag.Name),

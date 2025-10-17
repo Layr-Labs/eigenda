@@ -46,9 +46,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		BlobStoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			Backend:    blobstore.ObjectStorageBackend(ctx.GlobalString(flags.ObjectStorageBackendFlag.Name)),
 		},
 		ChunkStoreConfig: chunkstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			Backend:    ctx.GlobalString(flags.ObjectStorageBackendFlag.Name),
 		},
 		EncoderConfig: kzg.ReadCLIConfig(ctx),
 		LoggerConfig:  *loggerConfig,

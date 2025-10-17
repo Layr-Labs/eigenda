@@ -25,9 +25,22 @@ var (
 	}
 	BucketNameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bucket-name"),
-		Usage:    "Name of the s3 bucket to store blobs",
+		Usage:    "Name of the bucket to store blobs (S3 or OCI)",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BUCKET_NAME"),
+	}
+	ObjectStorageBackendFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "object-storage-backend"),
+		Usage:    "Object storage backend to use (s3 or oci)",
+		Required: false,
+		Value:    "s3",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OBJECT_STORAGE_BACKEND"),
+	}
+	OCINamespaceFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-namespace"),
+		Usage:    "OCI Object Storage namespace",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_NAMESPACE"),
 	}
 	MetadataTableNameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metadata-table-name"),
@@ -363,6 +376,8 @@ var requiredFlags = []cli.Flag{
 }
 
 var optionalFlags = []cli.Flag{
+	ObjectStorageBackendFlag,
+	OCINamespaceFlag,
 	MaxGRPCMessageSizeFlag,
 	MetadataCacheSizeFlag,
 	MetadataMaxConcurrencyFlag,
