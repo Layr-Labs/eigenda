@@ -177,7 +177,7 @@ The inqueality above can be be rewritten as:
 By substituting the variables using the notation mapping shown at the beginning of this section and simplifying, we get:  
 `(ConfirmationThreshold - SafetyThreshold) >= (c / (c - n)) * γ`, 
 Recall that `ReconstructionThreshold = (c / (c - n)) * γ`.
-Thereofre, the inqueality above is exactly inequality (1) shown in the previous subsection.  
+Thereofre, the inequality above is exactly inequality (1) shown in the previous subsection.  
 
 **2. Liveness Threshold**
 
