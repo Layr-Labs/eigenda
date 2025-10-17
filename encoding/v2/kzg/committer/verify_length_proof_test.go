@@ -7,8 +7,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
-	kzgcommitment "github.com/Layr-Labs/eigenda/encoding/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	kzgcommitment "github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/test/random"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -20,9 +20,9 @@ func TestBatchEquivalence(t *testing.T) {
 
 	committer, err := kzgcommitment.NewFromConfig(kzgcommitment.Config{
 		SRSNumberToLoad:   4096,
-		G1SRSPath:         "../../../resources/srs/g1.point",
-		G2SRSPath:         "../../../resources/srs/g2.point",
-		G2TrailingSRSPath: "../../../resources/srs/g2.trailing.point",
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
 	})
 	require.NoError(t, err)
 
@@ -61,9 +61,9 @@ func TestLengthProof(t *testing.T) {
 
 	committer, err := kzgcommitment.NewFromConfig(kzgcommitment.Config{
 		SRSNumberToLoad:   maxNumSymbols,
-		G1SRSPath:         "../../../resources/srs/g1.point",
-		G2SRSPath:         "../../../resources/srs/g2.point",
-		G2TrailingSRSPath: "../../../resources/srs/g2.trailing.point",
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
 	})
 	require.Nil(t, err)
 
@@ -92,9 +92,9 @@ func TestLengthProof(t *testing.T) {
 func BenchmarkVerifyBlob(b *testing.B) {
 	committer, err := kzgcommitment.NewFromConfig(kzgcommitment.Config{
 		SRSNumberToLoad:   4096,
-		G1SRSPath:         "../../../resources/srs/g1.point",
-		G2SRSPath:         "../../../resources/srs/g2.point",
-		G2TrailingSRSPath: "../../../resources/srs/g2.trailing.point",
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
 	})
 	require.NoError(b, err)
 

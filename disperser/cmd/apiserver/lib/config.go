@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/urfave/cli"
 )
 
