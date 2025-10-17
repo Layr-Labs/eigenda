@@ -184,6 +184,18 @@ library EigenDACertVerificationLib {
         // uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
         // uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
         // uint256 minRequired = blobParams.maxNumOperators * 10000;
+
+        // Check for potential underflow: maxNumOperators must not exceed numChunks
+        if (blobParams.maxNumOperators > blobParams.numChunks) {
+            revert SecurityAssumptionsNotMet(
+                securityThresholds.confirmationThreshold,
+                securityThresholds.adversaryThreshold,
+                blobParams.codingRate,
+                blobParams.numChunks,
+                blobParams.maxNumOperators
+            );
+        }
+
         uint256 lhs = blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators) * (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold);
         uint256 rhs = 100 * blobParams.numChunks;
 
