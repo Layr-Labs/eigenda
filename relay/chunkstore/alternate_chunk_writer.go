@@ -13,8 +13,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/docker/go-units"
 )
 
 // A wrapper around an S3 client for reading and writing chunks/proofs to/from S3.
@@ -180,57 +182,98 @@ func (c *ChunkClient) GetBinaryChunkProofs(
 	blobKey corev2.BlobKey,
 	firstIndex uint32,
 	count uint32,
-) ([][]byte, error) {
+) ([][]byte, bool, error) {
 
-	// bytes, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedProofKey(blobKey))
-	// if err != nil {
-	// 	r.logger.Error("failed to download proofs from S3", "blob", blobKey.Hex(), "error", err)
-	// 	return nil, fmt.Errorf("failed to download proofs from S3 for blob %s: %w", blobKey.Hex(), err)
-	// }
+	firstByteIndex := firstIndex * encoding.SerializedProofLength
+	size := count * encoding.SerializedProofLength
 
-	// proofs, err := encoding.SplitSerializedFrameProofs(bytes)
-	// if err != nil {
-	// 	r.logger.Error("failed to split proofs", "blob", blobKey.Hex(), "error", err)
-	// 	return nil, fmt.Errorf("failed to split proofs for blob %s: %w", blobKey.Hex(), err)
-	// }
+	s3Key := eigens3.ScopedProofKey(blobKey)
 
-	// return proofs, nil
+	buffer := manager.NewWriteAtBuffer(make([]byte, 0, size))
 
-	return nil, nil // TODO
+	downloader := manager.NewDownloader(c.s3Client, func(d *manager.Downloader) {
+		d.PartSize = units.MiB // TODO config
+		d.Concurrency = 3      // TODO config
+	})
+
+	// Calculate the end byte index (inclusive)
+	endByteIndex := firstByteIndex + size - 1
+	rangeHeader := fmt.Sprintf("bytes=%d-%d", firstByteIndex, endByteIndex)
+
+	_, err := downloader.Download(ctx, buffer, &s3.GetObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(s3Key),
+		Range:  aws.String(rangeHeader),
+	})
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to download proofs from S3 for blob %s: %w", blobKey.Hex(), err)
+	}
+
+	if buffer == nil || len(buffer.Bytes()) == 0 {
+		return nil, false, nil
+	}
+
+	proofs, err := encoding.SplitSerializedFrameProofs(buffer.Bytes())
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to split proofs for blob %s: %w", blobKey.Hex(), err)
+	}
+
+	return proofs, true, nil
 }
 
 // Read frame coefficients from S3, returning them in serialized form.
 func (c *ChunkClient) GetBinaryChunkCoefficients(
 	ctx context.Context,
+	// The blob key to read coefficients for
 	blobKey corev2.BlobKey,
+	// The index of the first frame to read
 	firstIndex uint32,
+	// The number of frames to read
 	count uint32,
-) ([][]byte, error) {
+	// The number of symbols per frame
+	elementCount uint32,
+) ([][]byte, bool, error) {
 
-	// bytes, err := r.client.FragmentedDownloadObject(
-	// 	ctx,
-	// 	r.bucket,
-	// 	s3.ScopedChunkKey(blobKey),
-	// 	int(fragmentInfo.TotalChunkSizeBytes),
-	// 	int(fragmentInfo.FragmentSizeBytes))
+	bytesPerFrame := encoding.BYTES_PER_SYMBOL * elementCount
+	firstByteIndex := firstIndex * uint32(bytesPerFrame)
+	size := count * uint32(bytesPerFrame)
 
-	// if err != nil {
-	// 	r.logger.Error("failed to download coefficients from S3",
-	// 		"blob", blobKey.Hex(),
-	// 		"totalSize", fragmentInfo.TotalChunkSizeBytes,
-	// 		"fragmentSize", fragmentInfo.FragmentSizeBytes,
-	// 		"error", err)
-	// 	return 0, nil, fmt.Errorf("failed to download coefficients from S3 for blob %s (total size: %d, fragment size: %d): %w",
-	// 		blobKey.Hex(), fragmentInfo.TotalChunkSizeBytes, fragmentInfo.FragmentSizeBytes, err)
-	// }
+	s3Key := eigens3.ScopedChunkKey(blobKey)
 
-	// elementCount, frames, err := rs.SplitSerializedFrameCoeffs(bytes)
-	// if err != nil {
-	// 	r.logger.Error("failed to split coefficient frames", "blob", blobKey.Hex(), "error", err)
-	// 	return 0, nil, fmt.Errorf("failed to split coefficient frames for blob %s: %w", blobKey.Hex(), err)
-	// }
+	buffer := manager.NewWriteAtBuffer(make([]byte, 0, size))
 
-	// return elementCount, frames, nil
+	downloader := manager.NewDownloader(c.s3Client, func(d *manager.Downloader) {
+		d.PartSize = units.MiB // TODO config
+		d.Concurrency = 3      // TODO config
+	})
 
-	return nil, nil
+	// Calculate the end byte index (inclusive)
+	endByteIndex := firstByteIndex + size - 1
+	rangeHeader := fmt.Sprintf("bytes=%d-%d", firstByteIndex, endByteIndex)
+
+	_, err := downloader.Download(ctx, buffer, &s3.GetObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(s3Key),
+		Range:  aws.String(rangeHeader),
+	})
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to download coefficients from S3 for blob %s: %w", blobKey.Hex(), err)
+	}
+
+	if buffer == nil || len(buffer.Bytes()) == 0 {
+		return nil, false, nil
+	}
+
+	// Deserialize the frames
+	observedElementCount, frames, err := rs.SplitSerializedFrameCoeffs(buffer.Bytes())
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to split coefficient frames for blob %s: %w", blobKey.Hex(), err)
+	}
+
+	if observedElementCount != elementCount {
+		return nil, false, fmt.Errorf("mismatched element count: expected %d, got %d",
+			elementCount, observedElementCount)
+	}
+
+	return frames, true, nil
 }
