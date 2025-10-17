@@ -55,9 +55,9 @@ func BenchmarkPayloadToBlobConversion(b *testing.B) {
 func BenchmarkCommittmentGeneration(b *testing.B) {
 	config := committer.Config{
 		SRSNumberToLoad:   1 << 19, // 2^19 = 524,288 field elements = 16 MiB
-		G1SRSPath:         "../../resources/srs/g1.point",
-		G2SRSPath:         "../../resources/srs/g2.point",
-		G2TrailingSRSPath: "../../resources/srs/g2.trailing.point",
+		G1SRSPath:         "../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../resources/srs/g2.trailing.point",
 	}
 	committer, err := committer.NewFromConfig(config)
 	require.NoError(b, err)
@@ -122,10 +122,10 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 	proverConfig := prover.KzgConfig{
 		SRSNumberToLoad: 1 << 19,
-		G1Path:          "../../resources/srs/g1.point",
+		G1Path:          "../../../resources/srs/g1.point",
 		// we preload only the needed SRSTables right before b.Loop below.
 		PreloadEncoder: false,
-		CacheDir:       "../../resources/srs/SRSTables",
+		CacheDir:       "../../../resources/srs/SRSTables",
 		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
 	}
 
