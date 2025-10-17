@@ -195,6 +195,12 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 	var indices []encoding.ChunkNumber
 	// TODO(ian-shim): if we gathered enough chunks, cancel remaining RPC calls
 	for i := 0; i < len(operators); i++ {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context done: %w", ctx.Err())
+		default:
+		}
+
 		reply := <-chunksChan
 		if reply.Err != nil {
 			r.logger.Warn("failed to get chunks from operator", "operator", reply.OperatorID.Hex(), "err", reply.Err)
