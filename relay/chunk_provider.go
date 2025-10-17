@@ -24,8 +24,8 @@ type chunkProvider struct {
 	// storing the frames in their parsed form. These frames can be deserialized via rs.DeserializeBinaryFrame().
 	frameCache cache.CacheAccessor[blobKeyWithMetadata, *core.ChunksData]
 
-	// chunkReader is used to read chunks from the chunk store.
-	chunkReader chunkstore.ChunkReader
+	// used to read chunks from the chunk store.
+	chunkClient *chunkstore.ChunkClient
 
 	// fetchTimeout is the maximum time to wait for a chunk proof fetch operation to complete.
 	proofFetchTimeout time.Duration
@@ -48,7 +48,7 @@ func (m *blobKeyWithMetadata) Compare(other *blobKeyWithMetadata) int {
 func newChunkProvider(
 	ctx context.Context,
 	logger logging.Logger,
-	chunkReader chunkstore.ChunkReader,
+	chunkClient *chunkstore.ChunkClient,
 	cacheSize uint64,
 	maxIOConcurrency int,
 	proofFetchTimeout time.Duration,
@@ -58,7 +58,7 @@ func newChunkProvider(
 	server := &chunkProvider{
 		ctx:                     ctx,
 		logger:                  logger,
-		chunkReader:             chunkReader,
+		chunkClient:             chunkClient,
 		proofFetchTimeout:       proofFetchTimeout,
 		coefficientFetchTimeout: coefficientFetchTimeout,
 	}
@@ -158,7 +158,7 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 			cancel()
 		}()
 
-		proofs, proofsErr = s.chunkReader.GetBinaryChunkProofs(ctx, key.blobKey)
+		proofs, proofsErr = s.chunkClient.GetBinaryChunkProofs(ctx, key.blobKey)
 	}()
 
 	fragmentInfo := &encoding.FragmentInfo{

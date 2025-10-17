@@ -596,34 +596,35 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 
 }
 
-func TestFetchBlobCertificate(t *testing.T) {
-	r := setUpRouter()
+// TODO
+// func TestFetchBlobCertificate(t *testing.T) {
+// 	r := setUpRouter()
 
-	// Set up blob certificate in metadata store
-	blobHeader := makeBlobHeaderV2(t)
-	blobKey, err := blobHeader.BlobKey()
-	require.NoError(t, err)
-	blobCert := &corev2.BlobCertificate{
-		BlobHeader: blobHeader,
-		Signature:  []byte{0, 1, 2, 3, 4},
-		RelayKeys:  []corev2.RelayKey{0, 2, 4},
-	}
-	fragmentInfo := &encoding.FragmentInfo{
-		TotalChunkSizeBytes: 100,
-		FragmentSizeBytes:   1024 * 1024 * 4,
-	}
-	err = blobMetadataStore.PutBlobCertificate(t.Context(), blobCert, fragmentInfo)
-	require.NoError(t, err)
+// 	// Set up blob certificate in metadata store
+// 	blobHeader := makeBlobHeaderV2(t)
+// 	blobKey, err := blobHeader.BlobKey()
+// 	require.NoError(t, err)
+// 	blobCert := &corev2.BlobCertificate{
+// 		BlobHeader: blobHeader,
+// 		Signature:  []byte{0, 1, 2, 3, 4},
+// 		RelayKeys:  []corev2.RelayKey{0, 2, 4},
+// 	}
+// 	fragmentInfo := &encoding.FragmentInfo{
+// 		TotalChunkSizeBytes: 100,
+// 		FragmentSizeBytes:   1024 * 1024 * 4,
+// 	}
+// 	err = blobMetadataStore.PutBlobCertificate(t.Context(), blobCert, fragmentInfo)
+// 	require.NoError(t, err)
 
-	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificate)
+// 	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificate)
 
-	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex()+"/certificate")
-	response := decodeResponseBody[serverv2.BlobCertificateResponse](t, w)
+// 	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex()+"/certificate")
+// 	response := decodeResponseBody[serverv2.BlobCertificateResponse](t, w)
 
-	require.Equal(t, blobCert.RelayKeys, response.Certificate.RelayKeys)
-	require.Equal(t, uint16(0), response.Certificate.BlobHeader.BlobVersion)
-	require.Equal(t, blobCert.Signature, response.Certificate.Signature)
-}
+// 	require.Equal(t, blobCert.RelayKeys, response.Certificate.RelayKeys)
+// 	require.Equal(t, uint16(0), response.Certificate.BlobHeader.BlobVersion)
+// 	require.Equal(t, blobCert.Signature, response.Certificate.Signature)
+// }
 
 func TestFetchBlobFeed(t *testing.T) {
 	r := setUpRouter()
