@@ -26,9 +26,6 @@ func CreateObjectStorageClient(
 		return client, nil
 	case OCIBackend:
 		ociConfig := oci.ObjectStorageConfig{
-			Namespace:                   config.OCINamespace,
-			Region:                      config.OCIRegion,
-			CompartmentID:               config.OCICompartmentID,
 			BucketName:                  config.BucketName,
 			FragmentParallelismConstant: awsConfig.FragmentParallelismConstant,
 			FragmentParallelismFactor:   awsConfig.FragmentParallelismFactor,

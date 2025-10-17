@@ -58,11 +58,6 @@ type Config struct {
 	BucketName string
 	TableName  string
 	Backend    ObjectStorageBackend
-
-	// OCI specific configuration
-	OCINamespace     string
-	OCIRegion        string
-	OCICompartmentID string
 }
 
 // This represents the s3 fetch result for a blob.

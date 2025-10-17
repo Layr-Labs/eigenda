@@ -229,24 +229,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_CONTROLLER_MEDIATED_PAYMENTS"),
 	}
-	OCINamespaceFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "oci-namespace"),
-		Usage:    "OCI Object Storage namespace",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_NAMESPACE"),
-	}
-	OCIRegionFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "oci-region"),
-		Usage:    "OCI region",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_REGION"),
-	}
-	OCICompartmentIDFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "oci-compartment-id"),
-		Usage:    "OCI compartment ID",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_COMPARTMENT_ID"),
-	}
 )
 
 // Flags needed for computing kzg commitments.
@@ -287,9 +269,6 @@ var requiredFlags = []cli.Flag{
 
 var optionalFlags = []cli.Flag{
 	ObjectStorageBackendFlag,
-	OCINamespaceFlag,
-	OCIRegionFlag,
-	OCICompartmentIDFlag,
 	DisperserVersionFlag,
 	MetricsHTTPPort,
 	EnableMetrics,

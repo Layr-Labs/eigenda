@@ -55,12 +55,9 @@ func TestCreateObjectStorageClient_S3Backend(t *testing.T) {
 func TestCreateObjectStorageClient_OCIBackend(t *testing.T) {
 	ctx := context.Background()
 	config := Config{
-		Backend:          OCIBackend,
-		BucketName:       "test-bucket",
-		TableName:        "test-table",
-		OCINamespace:     "test-namespace",
-		OCIRegion:        "us-phoenix-1",
-		OCICompartmentID: "test-compartment",
+		Backend:    OCIBackend,
+		BucketName: "test-bucket",
+		TableName:  "test-table",
 	}
 	awsConfig := aws.ClientConfig{
 		Region:                      "us-east-1",
@@ -122,12 +119,9 @@ func TestCreateObjectStorageClient_EmptyBackend(t *testing.T) {
 func TestCreateObjectStorageClient_OCIWithFragmentParallelismFactor(t *testing.T) {
 	ctx := context.Background()
 	config := Config{
-		Backend:          OCIBackend,
-		BucketName:       "test-bucket",
-		TableName:        "test-table",
-		OCINamespace:     "test-namespace",
-		OCIRegion:        "us-phoenix-1",
-		OCICompartmentID: "test-compartment",
+		Backend:    OCIBackend,
+		BucketName: "test-bucket",
+		TableName:  "test-table",
 	}
 	awsConfig := aws.ClientConfig{
 		Region:                    "us-east-1",
@@ -153,31 +147,22 @@ func TestObjectStorageBackend_Constants(t *testing.T) {
 
 func TestConfig_Struct(t *testing.T) {
 	config := Config{
-		BucketName:       "test-bucket",
-		TableName:        "test-table",
-		Backend:          S3Backend,
-		OCINamespace:     "test-namespace",
-		OCIRegion:        "us-phoenix-1",
-		OCICompartmentID: "test-compartment",
+		BucketName: "test-bucket",
+		TableName:  "test-table",
+		Backend:    S3Backend,
 	}
 
 	assert.Equal(t, "test-bucket", config.BucketName)
 	assert.Equal(t, "test-table", config.TableName)
 	assert.Equal(t, S3Backend, config.Backend)
-	assert.Equal(t, "test-namespace", config.OCINamespace)
-	assert.Equal(t, "us-phoenix-1", config.OCIRegion)
-	assert.Equal(t, "test-compartment", config.OCICompartmentID)
 }
 
 func TestCreateObjectStorageClient_OCIMinimalConfig(t *testing.T) {
 	ctx := context.Background()
 	config := Config{
-		Backend:          OCIBackend,
-		BucketName:       "test-bucket",
-		TableName:        "test-table",
-		OCINamespace:     "test-namespace",
-		OCIRegion:        "us-phoenix-1",
-		OCICompartmentID: "test-compartment",
+		Backend:    OCIBackend,
+		BucketName: "test-bucket",
+		TableName:  "test-table",
 	}
 	awsConfig := aws.ClientConfig{
 		// Minimal AWS config for OCI (only fragment settings used)

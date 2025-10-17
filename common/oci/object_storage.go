@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"sort"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	oraclecommon "github.com/oracle/oci-go-sdk/v65/common"
+	"github.com/oracle/oci-go-sdk/v65/common/auth"
 	"github.com/oracle/oci-go-sdk/v65/objectstorage"
 )
 
@@ -49,8 +51,11 @@ func NewObjectStorageClient(
 	cfg ObjectStorageConfig,
 	logger logging.Logger) (s3.Client, error) {
 
-	// Create OCI configuration provider
-	configProvider := oraclecommon.DefaultConfigProvider()
+	// Create OCI configuration provider using workload identity
+	configProvider, err := auth.OkeWorkloadIdentityConfigurationProvider()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI workload identity provider: %w", err)
+	}
 
 	// Create Object Storage client
 	objectStorageClient, err := objectstorage.NewObjectStorageClientWithConfigurationProvider(configProvider)
@@ -58,9 +63,36 @@ func NewObjectStorageClient(
 		return nil, fmt.Errorf("failed to create OCI Object Storage client: %w", err)
 	}
 
+	// Fall back to standard OCI environment variables if application config is empty
+	finalCfg := cfg
+	if finalCfg.Region == "" {
+		if region := os.Getenv("OCI_REGION"); region != "" {
+			finalCfg.Region = region
+		}
+	}
+	if finalCfg.CompartmentID == "" {
+		if compartmentID := os.Getenv("OCI_COMPARTMENT_ID"); compartmentID != "" {
+			finalCfg.CompartmentID = compartmentID
+		}
+	}
+	if finalCfg.Namespace == "" {
+		if namespace := os.Getenv("OCI_NAMESPACE"); namespace != "" {
+			finalCfg.Namespace = namespace
+		} else {
+			// Get namespace dynamically if not provided (like in the working example)
+			namespaceReq := objectstorage.GetNamespaceRequest{}
+			namespaceResp, err := objectStorageClient.GetNamespace(ctx, namespaceReq)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get OCI namespace: %w", err)
+			}
+			finalCfg.Namespace = *namespaceResp.Value
+			logger.Info("Retrieved OCI namespace dynamically", "namespace", finalCfg.Namespace)
+		}
+	}
+
 	// Set region
-	if cfg.Region != "" {
-		objectStorageClient.SetRegion(cfg.Region)
+	if finalCfg.Region != "" {
+		objectStorageClient.SetRegion(finalCfg.Region)
 	}
 
 	// Calculate workers for concurrency
@@ -77,7 +109,7 @@ func NewObjectStorageClient(
 	}
 
 	return &ociClient{
-		cfg:                 &cfg,
+		cfg:                 &finalCfg,
 		objectStorageClient: objectStorageClient,
 		concurrencyLimiter:  make(chan struct{}, workers),
 		logger:              logger.With("component", "OCIObjectStorageClient"),

@@ -49,12 +49,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
-			BucketName:       ctx.GlobalString(flags.S3BucketNameFlag.Name),
-			TableName:        ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
-			Backend:          blobstore.ObjectStorageBackend(ctx.GlobalString(flags.ObjectStorageBackendFlag.Name)),
-			OCINamespace:     ctx.GlobalString(flags.OCINamespaceFlag.Name),
-			OCIRegion:        ctx.GlobalString(flags.OCIRegionFlag.Name),
-			OCICompartmentID: ctx.GlobalString(flags.OCICompartmentIDFlag.Name),
+			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			Backend:    blobstore.ObjectStorageBackend(ctx.GlobalString(flags.ObjectStorageBackendFlag.Name)),
 		},
 		EthClientConfig: ethClientConfig,
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
