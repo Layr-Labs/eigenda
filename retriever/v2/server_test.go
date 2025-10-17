@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	retriever "github.com/Layr-Labs/eigenda/retriever/v2"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigensdk-go/logging"

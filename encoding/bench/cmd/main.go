@@ -15,8 +15,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
