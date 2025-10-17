@@ -12,8 +12,8 @@ import (
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	proverv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -123,7 +123,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 	}
 
 	config.EncoderConfig.LoadG2Points = true
-	prover, err := prover.NewProver(&config.EncoderConfig, encodingConfig)
+	prover, err := proverv1.NewProver(&config.EncoderConfig, encodingConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder: %w", err)
 	}

@@ -20,7 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"

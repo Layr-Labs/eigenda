@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/urfave/cli/v2"
 )
 
@@ -25,7 +25,7 @@ type Config struct {
 	// main storage configs
 	ClientConfigV1   common.ClientConfigV1
 	VerifierConfigV1 verify.Config
-	KzgConfig        kzg.KzgConfig
+	KzgConfig        kzgconfig.Config
 	ClientConfigV2   common.ClientConfigV2
 
 	MemstoreConfig  *memconfig.SafeConfig

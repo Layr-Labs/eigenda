@@ -32,10 +32,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -298,8 +298,8 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
-	kzgConfig := &kzg.KzgConfig{
-		LoadG2Points:    true,
+	encoder := rs.NewEncoder(logger, nil)
+	kzgConfig := &kzgconfig.Config{
 		G1Path:          g1Path,
 		G2Path:          g2Path,
 		G2TrailingPath:  g2TrailingPath,
@@ -308,9 +308,7 @@ func NewTestClient(
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
 	}
-	verifierKzgConfig := verifier.ConfigFromV1KzgConfig(kzgConfig)
-	encoder := rs.NewEncoder(logger, nil)
-	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig)
+	blobVerifier, err := verifier.NewVerifier(verifier.ConfigFromV1KzgConfig(kzgConfig))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
 	}

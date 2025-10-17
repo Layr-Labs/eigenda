@@ -11,14 +11,13 @@ import (
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/wealdtech/go-merkletree/v2"
@@ -182,7 +181,7 @@ func setup(t *testing.T) {
 func mustMakeTestComponents(t *testing.T) (*prover.Prover, *verifier.Verifier) {
 	t.Helper()
 
-	config := &kzg.KzgConfig{
+	config := &kzgconfig.Config{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
 		CacheDir:        "../../resources/srs/SRSTables",
@@ -257,7 +256,7 @@ func TestInvalidBlobHeader(t *testing.T) {
 	indexer.On("GetObject", mock.Anything, 1).Return(operatorSocket, nil).Once()
 
 	_, err := retrievalClient.RetrieveBlob(ctx, batchHeaderHash, 0, 0, batchRoot, 0)
-	assert.ErrorContains(t, err, "failed to get blob header from all operators")
+	require.ErrorContains(t, err, "failed to get blob header from all operators")
 
 }
 
@@ -279,11 +278,11 @@ func TestValidBlobHeader(t *testing.T) {
 	indexer.On("GetObject", mock.Anything, 1).Return(operatorSocket, nil).Once()
 
 	data, err := retrievalClient.RetrieveBlob(ctx, batchHeaderHash, 0, 0, batchRoot, 0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	restored := codec.RemoveEmptyByteFromPaddedBytes(data)
-	assert.Len(t, restored, 1488) // 48*31
+	require.Len(t, restored, 1488) // 48*31
 	restored = bytes.TrimRight(restored, "\x00")
-	assert.Equal(t, gettysburgAddressBytes, restored[:len(gettysburgAddressBytes)])
+	require.Equal(t, gettysburgAddressBytes, restored[:len(gettysburgAddressBytes)])
 
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/Layr-Labs/eigenda/node/flags"
 	"github.com/docker/go-units"
 
@@ -83,7 +83,7 @@ type Config struct {
 
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    common.LoggerConfig
-	EncoderConfig   kzg.KzgConfig
+	KzgConfig       kzgconfig.Config
 
 	EnableV1 bool
 	EnableV2 bool
@@ -440,7 +440,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		QuorumIDList:                        ids,
 		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),
 		EthClientConfig:                     ethClientConfig,
-		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
+		KzgConfig:                           kzgconfig.ReadCLIConfig(ctx),
 		LoggerConfig:                        *loggerConfig,
 		EigenDADirectory:                    ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),

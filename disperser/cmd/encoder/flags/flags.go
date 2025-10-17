@@ -4,7 +4,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/urfave/cli"
 )
 
@@ -135,6 +135,6 @@ var Flags []cli.Flag
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
-	Flags = append(Flags, kzg.CLIFlags(envVarPrefix)...)
+	Flags = append(Flags, kzgconfig.CLIFlags(envVarPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
 }

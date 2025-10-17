@@ -8,7 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/urfave/cli"
 )
 
@@ -742,7 +742,7 @@ var optionalFlags = []cli.Flag{
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
-	Flags = append(Flags, kzg.CLIFlags(EnvVarPrefix)...)
+	Flags = append(Flags, kzgconfig.CLIFlags(EnvVarPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(EnvVarPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(EnvVarPrefix, FlagPrefix)...)
 }

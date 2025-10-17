@@ -9,8 +9,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 

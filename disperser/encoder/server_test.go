@@ -16,9 +16,9 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	encmock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -31,7 +31,7 @@ var (
 )
 
 func makeTestProverV1(numPoint uint64) (*prover.Prover, encoder.ServerConfig) {
-	kzgConfig := &kzg.KzgConfig{
+	kzgConfig := &kzgconfig.Config{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
 		CacheDir:        "../../resources/srs/SRSTables",

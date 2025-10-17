@@ -7,8 +7,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +35,7 @@ func TestGetSet(t *testing.T) {
 		VerifyCerts: false,
 	}
 
-	kzgConfig := kzg.KzgConfig{
+	kzgConfig := kzgconfig.Config{
 		G1Path:          "../../../resources/g1.point",
 		G2Path:          "../../../resources/g2.point",
 		G2TrailingPath:  "../../../resources/g2.trailing.point",

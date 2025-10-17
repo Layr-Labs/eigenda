@@ -6,7 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/urfave/cli/v2"
 )
 
@@ -112,8 +112,8 @@ func KZGCLIFlags(envPrefix, category string) []cli.Flag {
 	}
 }
 
-func ReadKzgConfig(ctx *cli.Context, maxBlobSizeBytes uint64) kzg.KzgConfig {
-	return kzg.KzgConfig{
+func ReadKzgConfig(ctx *cli.Context, maxBlobSizeBytes uint64) kzgconfig.Config {
+	return kzgconfig.Config{
 		G1Path:          ctx.String(G1PathFlagName),
 		G2Path:          ctx.String(G2PathFlagName),
 		G2TrailingPath:  ctx.String(G2TrailingPathFlagName),

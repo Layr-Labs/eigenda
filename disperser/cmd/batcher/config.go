@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
@@ -19,7 +19,7 @@ type Config struct {
 	BlobstoreConfig  blobstore.Config
 	EthClientConfig  geth.EthClientConfig
 	AwsClientConfig  aws.ClientConfig
-	EncoderConfig    kzg.KzgConfig
+	EncoderConfig    kzgconfig.Config
 	LoggerConfig     common.LoggerConfig
 	MetricsConfig    batcher.MetricsConfig
 	IndexerConfig    indexer.Config
@@ -54,7 +54,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		EthClientConfig: ethClientConfig,
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
-		EncoderConfig:   kzg.ReadCLIConfig(ctx),
+		EncoderConfig:   kzgconfig.ReadCLIConfig(ctx),
 		LoggerConfig:    *loggerConfig,
 		BatcherConfig: batcher.Config{
 			PullInterval:             ctx.GlobalDuration(flags.PullIntervalFlag.Name),

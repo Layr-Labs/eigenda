@@ -9,9 +9,9 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpccommon "github.com/Layr-Labs/eigenda/api/grpc/common"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/rs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,7 +31,7 @@ func TestCommitmentVerification(t *testing.T) {
 		Y: y,
 	}
 
-	kzgConfig := kzg.KzgConfig{
+	kzgConfig := kzgconfig.Config{
 		G1Path:          "../../../../resources/g1.point",
 		G2Path:          "../../../../resources/g2.point",
 		G2TrailingPath:  "../../../../resources/g2.trailing.point",
@@ -73,7 +73,7 @@ func TestCommitmentWithTooLargeBlob(t *testing.T) {
 	require.NoError(t, err)
 	data := dataRand[:]
 
-	kzgConfig := kzg.KzgConfig{
+	kzgConfig := kzgconfig.Config{
 		G1Path:          "../../../../resources/g1.point",
 		G2Path:          "../../../../resources/g2.point",
 		G2TrailingPath:  "../../../../resources/g2.trailing.point",

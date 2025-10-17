@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/urfave/cli"
 )
@@ -25,7 +25,7 @@ type Config struct {
 	AwsClientConfig  aws.ClientConfig
 	BlobStoreConfig  blobstore.Config
 	ChunkStoreConfig chunkstore.Config
-	EncoderConfig    kzg.KzgConfig
+	EncoderConfig    kzgconfig.Config
 	LoggerConfig     common.LoggerConfig
 	ServerConfig     *encoder.ServerConfig
 	MetricsConfig    *encoder.MetricsConfig
@@ -50,7 +50,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChunkStoreConfig: chunkstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 		},
-		EncoderConfig: kzg.ReadCLIConfig(ctx),
+		EncoderConfig: kzgconfig.ReadCLIConfig(ctx),
 		LoggerConfig:  *loggerConfig,
 		ServerConfig: &encoder.ServerConfig{
 			GrpcPort:                 ctx.GlobalString(flags.GrpcPortFlag.Name),

@@ -24,10 +24,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgconfig"
+	verifierv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -196,7 +196,7 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 		return fmt.Errorf("failed to parse SRS order: %w", err)
 	}
 
-	kzgConfig := &kzg.KzgConfig{
+	kzgConfig := &kzgconfig.Config{
 		G1Path:          infraHarness.TestConfig.Retriever.RETRIEVER_G1_PATH,
 		G2Path:          infraHarness.TestConfig.Retriever.RETRIEVER_G2_PATH,
 		CacheDir:        infraHarness.TestConfig.Retriever.RETRIEVER_CACHE_PATH,
@@ -207,7 +207,7 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 		LoadG2Points:    true,
 	}
 
-	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	kzgVerifier, err := verifierv1.NewVerifier(kzgConfig, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create kzg verifier: %w", err)
 	}
