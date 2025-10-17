@@ -1,4 +1,5 @@
 //go:build icicle
+
 package bench_test
 
 import (

@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // For a target trigger time, determine if it is time to trigger. Time to trigger is defined as the first
 // timestamp that appears after the target time (which means that the previous time is before the target time).
 func isTriggerTime(now time.Time, previousTime time.Time, target time.Time) bool {
