@@ -11,7 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	gnarkprover "github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/gnark"
 	"github.com/Layr-Labs/eigensdk-go/logging"

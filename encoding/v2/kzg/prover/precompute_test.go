@@ -6,9 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
@@ -24,7 +25,7 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, s1)
 
-	subTable1, err := prover.NewSRSTable(kzgConfig.CacheDir, s1, kzgConfig.NumWorker)
+	subTable1, err := prover.NewSRSTable(harness.logger, kzgConfig.CacheDir, s1, kzgConfig.NumWorker)
 	require.Nil(t, err)
 	require.NotNil(t, subTable1)
 
@@ -32,7 +33,7 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, fftPoints1)
 
-	subTable2, err := prover.NewSRSTable(kzgConfig.CacheDir, s1, kzgConfig.NumWorker)
+	subTable2, err := prover.NewSRSTable(harness.logger, kzgConfig.CacheDir, s1, kzgConfig.NumWorker)
 	require.Nil(t, err)
 	require.NotNil(t, subTable2)
 
@@ -67,7 +68,7 @@ func TestSRSTable_InsufficientSRSPoints_NoPanic(t *testing.T) {
 
 	// Create SRSTable with limited SRS points
 	tempDir := t.TempDir()
-	srsTable, err := prover.NewSRSTable(tempDir, limitedSRS, 1)
+	srsTable, err := prover.NewSRSTable(common.TestLogger(t), tempDir, limitedSRS, 1)
 	require.NoError(t, err)
 
 	// Try to create subtables with the following parameters

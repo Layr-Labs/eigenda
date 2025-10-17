@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 

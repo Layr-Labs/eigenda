@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"

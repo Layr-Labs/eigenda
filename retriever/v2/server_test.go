@@ -12,7 +12,7 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	retriever "github.com/Layr-Labs/eigenda/retriever/v2"
@@ -34,7 +34,7 @@ var (
 )
 
 func makeTestComponents(logger logging.Logger) (*prover.Prover, *verifier.Verifier, error) {
-	config := &kzg.KzgConfig{
+	config := &kzgv1.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
 		G2TrailingPath:  "../../resources/srs/g2.trailing.point",

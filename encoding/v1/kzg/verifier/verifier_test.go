@@ -1,19 +1,20 @@
-package prover_test
+package verifier_test
 
 import (
-	cryptorand "crypto/rand"
+	"crypto/rand"
+	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"runtime"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,98 +53,99 @@ func setup() {
 }
 
 func teardown() {
-	log.Println("Tearing down suite")
-
-	// Some test may want to create a new SRS table so this should clean it up.
+	log.Println("Tearing down")
 	err := os.RemoveAll("./data")
 	if err != nil {
 		log.Printf("Error removing data directory ./data: %v", err)
 	}
 }
 
-func sampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint64) {
-	samples := make([]encoding.Frame, num)
-	indices := rand.Perm(len(frames))
-	indices = indices[:num]
+// var control interface{ Stop() }
 
-	frameIndices := make([]uint64, num)
-	for i, j := range indices {
-		samples[i] = frames[j]
-		frameIndices[i] = uint64(j)
-	}
-	return samples, frameIndices
-}
-
-func TestEncoder(t *testing.T) {
+func TestBenchmarkVerifyChunks(t *testing.T) {
+	t.Skip("This test is meant to be run manually, not as part of the test suite")
 	p, err := prover.NewProver(kzgConfig, nil)
 	require.NoError(t, err)
 
 	v, err := verifier.NewVerifier(kzgConfig, nil)
 	require.NoError(t, err)
 
-	params := encoding.ParamsFromMins(5, 5)
-	commitments, chunks, err := p.EncodeAndProve(gettysburgAddressBytes, params)
-	require.NoError(t, err)
+	chunkLengths := []uint64{64, 128, 256, 512, 1024, 2048, 4096, 8192}
+	chunkCounts := []int{4, 8, 16}
 
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
+	file, err := os.Create("benchmark_results.csv")
+	if err != nil {
+		t.Fatalf("Failed to open file for writing: %v", err)
 	}
-	err = v.VerifyFrames(chunks, indices, commitments, params)
-	require.NoError(t, err)
-	err = v.VerifyFrames(chunks, []encoding.ChunkNumber{
-		7, 6, 5, 4, 3, 2, 1, 0,
-	}, commitments, params)
-	require.Error(t, err)
+	defer core.CloseLogOnError(file, file.Name(), nil)
 
-	maxInputSize := uint64(len(gettysburgAddressBytes))
-	decoded, err := p.Decode(chunks, indices, params, maxInputSize)
-	require.NoError(t, err)
-	require.Equal(t, gettysburgAddressBytes, decoded)
+	_, _ = fmt.Fprintln(file, "numChunks,chunkLength,ns/op,allocs/op")
 
-	// shuffle chunks
-	tmp := chunks[2]
-	chunks[2] = chunks[5]
-	chunks[5] = tmp
-	indices = []encoding.ChunkNumber{
-		0, 1, 5, 3, 4, 2, 6, 7,
+	for _, chunkLength := range chunkLengths {
+
+		blobSize := chunkLength * 32 * 2
+		params := encoding.EncodingParams{
+			ChunkLength: chunkLength,
+			NumChunks:   16,
+		}
+		blob := make([]byte, blobSize)
+		_, err = rand.Read(blob)
+		assert.NoError(t, err)
+
+		commitments, chunks, err := p.EncodeAndProve(blob, params)
+		assert.NoError(t, err)
+
+		indices := make([]encoding.ChunkNumber, params.NumChunks)
+		for i := range indices {
+			indices[i] = encoding.ChunkNumber(i)
+		}
+
+		for _, numChunks := range chunkCounts {
+
+			result := testing.Benchmark(func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					// control = profile.Start(profile.ProfilePath("."))
+					err := v.VerifyFrames(chunks[:numChunks], indices[:numChunks], commitments, params)
+					assert.NoError(t, err)
+					// control.Stop()
+				}
+			})
+			// Print results in CSV format
+			_, _ = fmt.Fprintf(file, "%d,%d,%d,%d\n", numChunks, chunkLength, result.NsPerOp(), result.AllocsPerOp())
+
+		}
 	}
 
-	err = v.VerifyFrames(chunks, indices, commitments, params)
-	require.NoError(t, err)
-
-	decoded, err = p.Decode(chunks, indices, params, maxInputSize)
-	require.NoError(t, err)
-	require.Equal(t, gettysburgAddressBytes, decoded)
 }
 
-// Ballpark number for 400KiB blob encoding
-//
-// goos: darwin
-// goarch: arm64
-// pkg: github.com/Layr-Labs/eigenda/core/encoding
-// BenchmarkEncode-12    	       1	2421900583 ns/op
-func BenchmarkEncode(b *testing.B) {
+func BenchmarkVerifyBlob(b *testing.B) {
 	p, err := prover.NewProver(kzgConfig, nil)
 	require.NoError(b, err)
 
+	v, err := verifier.NewVerifier(kzgConfig, nil)
+	require.NoError(b, err)
+
 	params := encoding.EncodingParams{
-		ChunkLength: 512,
-		NumChunks:   256,
+		ChunkLength: 256,
+		NumChunks:   8,
 	}
-	blobSize := 400 * 1024
+	blobSize := 8 * 256
 	numSamples := 30
 	blobs := make([][]byte, numSamples)
 	for i := 0; i < numSamples; i++ {
 		blob := make([]byte, blobSize)
-		_, _ = cryptorand.Read(blob)
+		_, _ = rand.Read(blob)
 		blobs[i] = blob
 	}
 
-	// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
-	_, _, _ = p.EncodeAndProve(blobs[0], params)
+	commitments, _, err := p.EncodeAndProve(blobs[0], params)
+	assert.NoError(b, err)
+
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, _, _ = p.EncodeAndProve(blobs[i%numSamples], params)
+		err = v.VerifyBlobLength(commitments)
+		assert.NoError(b, err)
 	}
+
 }

@@ -1,8 +1,8 @@
 package prover
 
 import (
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzgflags"
+	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/urfave/cli"
 )
 
@@ -34,7 +34,7 @@ type KzgConfig struct {
 // The V1 KzgConfig is used all over the place in multiple different structs,
 // making it very hard to update, optimize, change, or remove unused fields.
 // The V2 prover has its own KzgConfig, which is a subset of the V1 KzgConfig.
-func KzgConfigFromV1Config(v1 *kzg.KzgConfig) *KzgConfig {
+func KzgConfigFromV1Config(v1 *kzgv1.KzgConfig) *KzgConfig {
 	return &KzgConfig{
 		SRSNumberToLoad: v1.SRSNumberToLoad,
 		G1Path:          v1.G1Path,

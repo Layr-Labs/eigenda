@@ -4,34 +4,38 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestProveAllCosetThreads(t *testing.T) {
+func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	group, err := prover.NewProver(kzgConfig, nil)
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
-	enc, err := group.GetKzgEncoder(params)
-	require.Nil(t, err)
 
+	p, err := group.GetKzgEncoder(params)
+
+	require.Nil(t, err)
+	require.NotNil(t, p)
+
+	// Convert to inputFr
 	inputFr, err := rs.ToFrArray(gettysburgAddressBytes)
-	assert.Nil(t, err)
-
-	commit, _, _, frames, _, err := enc.Encode(inputFr)
 	require.Nil(t, err)
 
-	verifierGroup, err := verifier.NewVerifier(kzgConfig, nil)
+	frames, _, err := p.GetFrames(inputFr)
 	require.Nil(t, err)
-	verifier, err := verifierGroup.GetKzgVerifier(params)
-	require.Nil(t, err)
+	require.NotNil(t, frames, err)
 
-	for i, frame := range frames {
-		err = verifier.VerifyFrame(&frame, uint64(i), commit, params.NumChunks)
-		require.Nil(t, err)
-	}
+	b, err := frames[0].SerializeGob()
+	require.Nil(t, err)
+	require.NotNil(t, b)
+
+	frame, err := new(encoding.Frame).DeserializeGob(b)
+	require.Nil(t, err)
+	require.NotNil(t, frame)
+
+	assert.Equal(t, *frame, frames[0])
 }

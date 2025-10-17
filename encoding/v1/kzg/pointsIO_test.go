@@ -7,15 +7,15 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	G1PointsFilePath         = "../../resources/srs/g1.point"
-	G2PointsFilePath         = "../../resources/srs/g2.point"
-	G2TrailingPointsFilePath = "../../resources/srs/g2.trailing.point"
+	G1PointsFilePath         = "../../../resources/srs/g1.point"
+	G2PointsFilePath         = "../../../resources/srs/g2.point"
+	G2TrailingPointsFilePath = "../../../resources/srs/g2.trailing.point"
 )
 
 func TestDeserializePoints(t *testing.T) {
@@ -158,7 +158,7 @@ func TestUncompressedPointsFilesEquivalence(t *testing.T) {
 func createUncompressedFile[T bn254.G1Affine | bn254.G2Affine](points []T, filename string) error {
 	file, err := os.Create(filename)
 	if err != nil {
-		return err
+		return fmt.Errorf("create file %s: %w", filename, err)
 	}
 	defer core.CloseLogOnError(file, filename, nil)
 
@@ -168,12 +168,12 @@ func createUncompressedFile[T bn254.G1Affine | bn254.G2Affine](points []T, filen
 		case *bn254.G1Affine:
 			data := p.RawBytes()
 			if _, err := file.Write(data[:]); err != nil {
-				return err
+				return fmt.Errorf("write G1 point to file: %w", err)
 			}
 		case *bn254.G2Affine:
 			data := p.RawBytes()
 			if _, err := file.Write(data[:]); err != nil {
-				return err
+				return fmt.Errorf("write G2 point to file: %w", err)
 			}
 		default:
 			return fmt.Errorf("unsupported point type: %T", p)
