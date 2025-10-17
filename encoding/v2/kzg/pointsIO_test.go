@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	G1PointsFilePath         = "../../resources/srs/g1.point"
-	G2PointsFilePath         = "../../resources/srs/g2.point"
-	G2TrailingPointsFilePath = "../../resources/srs/g2.trailing.point"
+	G1PointsFilePath         = "../../../resources/srs/g1.point"
+	G2PointsFilePath         = "../../../resources/srs/g2.point"
+	G2TrailingPointsFilePath = "../../../resources/srs/g2.trailing.point"
 )
 
 func TestDeserializePoints(t *testing.T) {
