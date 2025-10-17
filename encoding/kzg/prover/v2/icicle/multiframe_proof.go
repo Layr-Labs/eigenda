@@ -4,13 +4,13 @@ package icicle
 
 import (
 	"fmt"
-	"log/slog"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
@@ -19,6 +19,7 @@ import (
 )
 
 type KzgMultiProofIcicleBackend struct {
+	Logger         logging.Logger
 	Fs             *fft.FFTSettings
 	FlatFFTPointsT []iciclebn254.Affine
 	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
@@ -124,7 +125,7 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProofV2(polyFr []fr.Elemen
 
 	end := time.Now()
 
-	slog.Info("Multiproof Time Decomp",
+	p.Logger.Info("Multiproof Time Decomp",
 		"total", end.Sub(begin),
 		"preproc", preprocessDone.Sub(begin),
 		"msm", msmDone.Sub(preprocessDone),
