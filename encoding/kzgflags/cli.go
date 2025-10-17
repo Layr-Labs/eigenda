@@ -1,7 +1,6 @@
-package kzg
+package kzgflags
 
 import (
-	"fmt"
 	"runtime"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -97,23 +96,4 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Hidden:   true, // deprecated so we hide it from help output
 		},
 	}
-}
-
-func ReadCLIConfig(ctx *cli.Context) KzgConfig {
-	cfg := KzgConfig{}
-	cfg.G1Path = ctx.GlobalString(G1PathFlagName)
-	cfg.G2Path = ctx.GlobalString(G2PathFlagName)
-	cfg.G2TrailingPath = ctx.GlobalString(G2TrailingPathFlagName)
-	cfg.CacheDir = ctx.GlobalString(CachePathFlagName)
-	cfg.SRSOrder = ctx.GlobalUint64(SRSOrderFlagName)
-	cfg.SRSNumberToLoad = ctx.GlobalUint64(SRSLoadingNumberFlagName)
-	cfg.NumWorker = ctx.GlobalUint64(NumWorkerFlagName)
-	cfg.Verbose = ctx.GlobalBool(VerboseFlagName)
-	cfg.PreloadEncoder = ctx.GlobalBool(PreloadEncoderFlagName)
-
-	if ctx.GlobalString(DeprecatedG2PowerOf2PathFlagName) != "" {
-		fmt.Printf("Warning: --%s is deprecated. The g2.point.powerOf2 file is now embedded in the binary, so this flag is no longer needed.\n", DeprecatedG2PowerOf2PathFlagName)
-	}
-
-	return cfg
 }

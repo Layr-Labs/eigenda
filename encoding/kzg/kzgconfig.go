@@ -1,12 +1,16 @@
 package kzg
 
 import (
+	"fmt"
+
+	"github.com/Layr-Labs/eigenda/encoding/kzgflags"
 	_ "github.com/Layr-Labs/eigenda/resources/srs"
+	"github.com/urfave/cli"
 )
 
-// KzgConfig holds configuration for KZG prover and verifier.
+// KzgConfig holds configuration for KZG prover and verifier V1.
 // Some of the configurations only apply to the prover or verifier.
-// TODO(samlaf): split into separate Prover and Verifier configs.
+// V2 prover, verifier, and committer each have their own config structs.
 type KzgConfig struct {
 	// SRSOrder is the total size of SRS.
 	// TODO(samlaf): this should always be 2^28. Get rid of this field and replace with hardcoded constant.
@@ -52,4 +56,29 @@ type KzgConfig struct {
 	// TODO(samlaf): split into separate configs only specified for prover or verifier, where needed.
 	NumWorker uint64
 	Verbose   bool
+}
+
+// Populates a [KzgConfig] from urfave flags.
+// Note that this function does not populate [KzgConfig.LoadG2Points],
+// which must be set to true manually by the V1 prover.
+func ReadCLIConfig(ctx *cli.Context) KzgConfig {
+	cfg := KzgConfig{
+		SRSOrder:        ctx.GlobalUint64(kzgflags.SRSOrderFlagName),
+		SRSNumberToLoad: ctx.GlobalUint64(kzgflags.SRSLoadingNumberFlagName),
+		G1Path:          ctx.GlobalString(kzgflags.G1PathFlagName),
+		G2Path:          ctx.GlobalString(kzgflags.G2PathFlagName),
+		G2TrailingPath:  ctx.GlobalString(kzgflags.G2TrailingPathFlagName),
+		CacheDir:        ctx.GlobalString(kzgflags.CachePathFlagName),
+		NumWorker:       ctx.GlobalUint64(kzgflags.NumWorkerFlagName),
+		Verbose:         ctx.GlobalBool(kzgflags.VerboseFlagName),
+		PreloadEncoder:  ctx.GlobalBool(kzgflags.PreloadEncoderFlagName),
+	}
+
+	if ctx.GlobalString(kzgflags.DeprecatedG2PowerOf2PathFlagName) != "" {
+		fmt.Printf("Warning: --%s is deprecated. "+
+			"The g2.point.powerOf2 file is now embedded in the binary, so this flag is no longer needed.\n",
+			kzgflags.DeprecatedG2PowerOf2PathFlagName)
+	}
+
+	return cfg
 }

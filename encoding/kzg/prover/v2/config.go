@@ -2,6 +2,7 @@ package prover
 
 import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgflags"
 	"github.com/urfave/cli"
 )
 
@@ -45,11 +46,11 @@ func KzgConfigFromV1Config(v1 *kzg.KzgConfig) *KzgConfig {
 
 func ReadCLIConfig(ctx *cli.Context) KzgConfig {
 	cfg := KzgConfig{
-		SRSNumberToLoad: ctx.GlobalUint64(kzg.SRSLoadingNumberFlagName),
-		G1Path:          ctx.GlobalString(kzg.G1PathFlagName),
-		CacheDir:        ctx.GlobalString(kzg.CachePathFlagName),
-		NumWorker:       ctx.GlobalUint64(kzg.NumWorkerFlagName),
-		PreloadEncoder:  ctx.GlobalBool(kzg.PreloadEncoderFlagName),
+		SRSNumberToLoad: ctx.GlobalUint64(kzgflags.SRSLoadingNumberFlagName),
+		G1Path:          ctx.GlobalString(kzgflags.G1PathFlagName),
+		CacheDir:        ctx.GlobalString(kzgflags.CachePathFlagName),
+		NumWorker:       ctx.GlobalUint64(kzgflags.NumWorkerFlagName),
+		PreloadEncoder:  ctx.GlobalBool(kzgflags.PreloadEncoderFlagName),
 	}
 	return cfg
 }
