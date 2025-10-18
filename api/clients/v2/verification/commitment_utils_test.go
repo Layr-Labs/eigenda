@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding/codec"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )

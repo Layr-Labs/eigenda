@@ -26,7 +26,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node/ejection"
 	"github.com/prometheus/client_golang/prometheus"

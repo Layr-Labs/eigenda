@@ -5,7 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
@@ -25,7 +25,7 @@ type testHarness struct {
 }
 
 func getTestHarness(t require.TestingT) *testHarness {
-	kzgConfig := &kzg.KzgConfig{
+	kzgConfig := &kzgv1.KzgConfig{
 		G1Path:          "../../../../resources/srs/g1.point",
 		G2Path:          "../../../../resources/srs/g2.point",
 		G2TrailingPath:  "../../../../resources/srs/g2.trailing.point",

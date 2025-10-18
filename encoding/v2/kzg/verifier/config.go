@@ -1,7 +1,7 @@
 package verifier
 
 import (
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 )
 
@@ -32,7 +32,7 @@ func ConfigFromProverV2Config(v2Prover *prover.KzgConfig) *Config {
 // The V1 KzgConfig is used all over the place in multiple different structs,
 // making it very hard to update, optimize, change, or remove unused fields.
 // The V2 verifier has its own KzgConfig, which is a very small subset of the V1 KzgConfig.
-func ConfigFromV1KzgConfig(v1 *kzg.KzgConfig) *Config {
+func ConfigFromV1KzgConfig(v1 *kzgv1.KzgConfig) *Config {
 	return &Config{
 		SRSNumberToLoad: v1.SRSNumberToLoad,
 		G1Path:          v1.G1Path,

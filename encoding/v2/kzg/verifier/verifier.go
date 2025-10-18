@@ -14,8 +14,8 @@ import (
 	eigenbn254 "github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
 	"github.com/Layr-Labs/eigenda/resources/srs"
 
 	_ "go.uber.org/automaxprocs"

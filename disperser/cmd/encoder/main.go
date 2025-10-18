@@ -12,7 +12,7 @@ import (
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
 	proverv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
