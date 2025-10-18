@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestArbCustomDAIsValidHeaderByte(t *testing.T) {
+func TestArbCustomDAGetSupportedHeaderBytesMethod(t *testing.T) {
 	t.Parallel()
 
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
@@ -30,18 +30,15 @@ func TestArbCustomDAIsValidHeaderByte(t *testing.T) {
 	rpcClient, err := rpc.Dial(testSuite.ArbAddress())
 	require.NoError(t, err)
 
-	var validHeaderByteResult *arbitrum_altda.IsValidHeaderByteResult
-	err = rpcClient.Call(&validHeaderByteResult,
-		arbitrum_altda.MethodIsValidHeaderByte, arbitrum_altda.EigenDAV2MessageHeaderByte)
+	var supportedHeaderBytesResult *arbitrum_altda.SupportedHeaderBytesResult
+	err = rpcClient.Call(&supportedHeaderBytesResult,
+		arbitrum_altda.MethodGetSupportedHeaderBytes)
 	require.NoError(t, err)
-
-	var validHeaderByteFalseResult *arbitrum_altda.IsValidHeaderByteResult
-	err = rpcClient.Call(&validHeaderByteFalseResult, arbitrum_altda.MethodIsValidHeaderByte, 0x69)
-	require.NoError(t, err)
+	require.Equal(t, supportedHeaderBytesResult.HeaderBytes[0], arbitrum_altda.EigenDAV2MessageHeaderByte)
 
 }
 
-func TestArbCustomDAStoreAndRecoverPayloadFromBatch(t *testing.T) {
+func TestArbCustomDAStoreAndRecoverMethods(t *testing.T) {
 	t.Parallel()
 
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
@@ -69,18 +66,14 @@ func TestArbCustomDAStoreAndRecoverPayloadFromBatch(t *testing.T) {
 		disableFallbackStoreDataOnChain)
 	require.NoError(t, err)
 
-	var recoverPayloadResult *arbitrum_altda.RecoverPayloadFromBatchResult
+	var recoverPayloadResult *arbitrum_altda.PayloadResult
 	batchNum := hexutil.Uint(0)
 	batchBlockHash := gethcommon.HexToHash("0x43")
-	preimageMap := new(arbitrum_altda.PreimagesMap)
-	validateSeqMsg := false
 
-	err = rpcClient.Call(&recoverPayloadResult, arbitrum_altda.MethodRecoverBatchFromPayload,
+	err = rpcClient.Call(&recoverPayloadResult, arbitrum_altda.MethodRecoverPayload,
 		batchNum,
 		batchBlockHash,
 		storeResult.SerializedDACert,
-		preimageMap,
-		validateSeqMsg,
 	)
 	require.NoError(t, err)
 
