@@ -14,6 +14,6 @@ func main() {
 	err := config.DocumentConfig(load.DefaultTrafficGeneratorConfig, configDocsDir, true)
 	enforce.NilError(err, "failed to generate docs for the traffic generator config")
 
-	err = config.DocumentConfig(ejector.NewRootEjectorConfig, configDocsDir, true)
+	err = config.DocumentConfig(ejector.DefaultRootEjectorConfig, configDocsDir, true)
 	enforce.NilError(err, "failed to generate docs for the ejector config")
 }
