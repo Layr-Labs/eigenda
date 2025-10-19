@@ -846,7 +846,7 @@ mod test_cert_apks_equal_storage_apks {
         )
         .unwrap_err();
 
-        assert_eq!(err, WrapHistoryError(MissingHistoryEntry(0)));
+        assert_eq!(err, HistoryError(MissingHistoryEntry(0)));
     }
 
     #[test]
@@ -874,7 +874,7 @@ mod test_cert_apks_equal_storage_apks {
 
         assert_eq!(
             err,
-            WrapHistoryError(ElementNotInInterval("41".into(), "[42, 43)".into()))
+            HistoryError(ElementNotInInterval("41".into(), "[42, 43)".into()))
         );
     }
 }
@@ -1178,7 +1178,7 @@ mod test_confirmed_quorums_contains_blob_quorums {
         )
         .unwrap_err();
 
-        assert_eq!(err, WrapBitmapError(IndicesNotSorted));
+        assert_eq!(err, BitmapError(IndicesNotSorted));
     }
 }
 
@@ -1217,7 +1217,7 @@ mod test_blob_quorums_contains_required_quorums {
         let err = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums)
             .unwrap_err();
 
-        assert_eq!(err, WrapBitmapError(IndicesNotSorted));
+        assert_eq!(err, BitmapError(IndicesNotSorted));
     }
 
     #[test]
@@ -1228,7 +1228,7 @@ mod test_blob_quorums_contains_required_quorums {
         let err = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums)
             .unwrap_err();
 
-        assert_eq!(err, WrapBitmapError(IndicesNotSorted));
+        assert_eq!(err, BitmapError(IndicesNotSorted));
     }
 }
 

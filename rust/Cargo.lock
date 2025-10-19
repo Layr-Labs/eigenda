@@ -2252,15 +2252,11 @@ dependencies = [
  "anyhow",
  "eigenda-verification",
  "futures",
- "hashbrown 0.15.5",
- "hex",
  "reth-trie-common",
  "rustls",
  "schemars 0.8.22",
  "serde",
  "testcontainers",
- "thiserror 2.0.16",
- "tracing",
 ]
 
 [[package]]
@@ -2304,6 +2300,7 @@ dependencies = [
 name = "eigenda-verification"
 version = "0.1.0"
 dependencies = [
+ "alloy-consensus",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-sol-types",
@@ -2323,6 +2320,7 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "reltester",
+ "reth-trie-common",
  "risc0-zkvm",
  "rust-kzg-bn254-primitives",
  "rust-kzg-bn254-prover",
@@ -3820,6 +3818,7 @@ version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77e878c846a8abae00dd069496dbe8751b16ac1c3d6bd2a7283a938e8228f90d"
 dependencies = [
+ "proc-macro-crate",
  "proc-macro2",
  "quote",
  "syn 2.0.106",
@@ -4672,6 +4671,7 @@ dependencies = [
  "revm-state",
  "secp256k1",
  "serde",
+ "serde_with",
  "thiserror 2.0.16",
 ]
 
@@ -4694,6 +4694,7 @@ dependencies = [
  "reth-primitives-traits",
  "revm-database",
  "serde",
+ "serde_with",
 ]
 
 [[package]]

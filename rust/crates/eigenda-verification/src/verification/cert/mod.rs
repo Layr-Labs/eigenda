@@ -847,7 +847,7 @@ mod tests {
 
         let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, WrapHistoryError(MissingHistoryEntry(42)));
+        assert_eq!(err, HistoryError(MissingHistoryEntry(42)));
     }
 
     #[test]
@@ -866,7 +866,7 @@ mod tests {
 
         assert_eq!(
             err,
-            WrapHistoryError(ElementNotInInterval("42".into(), "[141, 143)".into()))
+            HistoryError(ElementNotInInterval("42".into(), "[141, 143)".into()))
         );
     }
 
@@ -907,7 +907,7 @@ mod tests {
 
         let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, WrapHistoryError(MissingHistoryEntry(0)));
+        assert_eq!(err, HistoryError(MissingHistoryEntry(0)));
     }
 
     #[test]
@@ -926,7 +926,7 @@ mod tests {
 
         assert_eq!(
             err,
-            WrapHistoryError(ElementNotInInterval("42".into(), "[141, 143)".into()))
+            HistoryError(ElementNotInInterval("42".into(), "[141, 143)".into()))
         );
     }
 
@@ -968,7 +968,7 @@ mod tests {
 
         let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, WrapHistoryError(MissingHistoryEntry(0)));
+        assert_eq!(err, HistoryError(MissingHistoryEntry(0)));
     }
 
     #[test]
@@ -987,7 +987,7 @@ mod tests {
 
         assert_eq!(
             err,
-            WrapHistoryError(ElementNotInInterval("42".into(), "[141, 143)".into()))
+            HistoryError(ElementNotInInterval("42".into(), "[141, 143)".into()))
         );
     }
 
@@ -1016,7 +1016,7 @@ mod tests {
 
         let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, WrapBitmapError(IndexThanOrEqualToUpperBound));
+        assert_eq!(err, BitmapError(IndexThanOrEqualToUpperBound));
     }
 
     #[test]

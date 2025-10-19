@@ -18,14 +18,10 @@ alloy-sol-types = { workspace = true }
 alloy-transport = { workspace = true }
 eigenda-verification = { path = "../eigenda-verification" }
 futures = { workspace = true }
-hashbrown = { workspace = true, features = ["default-hasher"] }
-hex = { workspace = true }
 reth-trie-common = { workspace = true, features = ["serde"] }
 rustls = { workspace = true, features = ["aws-lc-rs"], optional = true }
 schemars = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["alloc", "derive"] }
-thiserror = { workspace = true }
-tracing = { workspace = true }
 
 [dev-dependencies]
 alloy-rpc-types = { workspace = true }

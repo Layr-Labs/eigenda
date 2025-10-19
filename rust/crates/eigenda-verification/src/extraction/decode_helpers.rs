@@ -5,10 +5,10 @@
 //! validate EigenDA certificates.
 
 use alloy_primitives::StorageKey;
-use eigenda_verification::verification::cert::types::history::{HistoryError, Update};
 use reth_trie_common::StorageProof;
 
 use crate::extraction::CertExtractionError;
+use crate::verification::cert::types::history::{HistoryError, Update};
 
 /// Find a storage proof by key and return error if missing
 ///
@@ -80,11 +80,11 @@ pub fn create_update<T: Copy + std::fmt::Debug>(
 #[cfg(test)]
 mod tests {
     use alloy_primitives::{B256, StorageKey, U256};
-    use eigenda_verification::verification::cert::types::history::HistoryError;
     use reth_trie_common::StorageProof;
 
     use super::{create_update, find_required_proof};
     use crate::extraction::CertExtractionError;
+    use crate::verification::cert::types::history::HistoryError;
 
     fn create_test_storage_proof(key: StorageKey, value: U256) -> StorageProof {
         StorageProof {

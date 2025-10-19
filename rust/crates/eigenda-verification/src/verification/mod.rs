@@ -64,14 +64,57 @@
 //! - [EigenDA Integration Specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html)
 //! - [Sovereign SDK Documentation](https://docs.sovereign.xyz/)
 
+use alloy_consensus::{EthereumTxEnvelope, Header, Transaction, TxEip4844};
+use alloy_primitives::B256;
+use bytes::Bytes;
 use tracing::instrument;
 
 use crate::cert::StandardCommitment;
+use crate::error::EigenDaVerificationError;
+use crate::extraction::CertStateData;
+use crate::verification::blob::codec::decode_encoded_payload;
 use crate::verification::blob::error::BlobVerificationError;
-use crate::verification::cert::error::CertVerificationError;
 
 pub mod blob;
 pub mod cert;
+
+/// Extracts an EigenDA certificate from an EIP-4844 transaction.
+pub fn extract_certificate(
+    tx: &EthereumTxEnvelope<TxEip4844>,
+) -> Result<StandardCommitment, EigenDaVerificationError> {
+    use EigenDaVerificationError::*;
+
+    let signed_tx = tx.as_eip1559().ok_or_else(|| TxNotEip1559(*tx.hash()))?;
+    let rlp_bytes = signed_tx.input();
+    let cert = StandardCommitment::from_rlp_bytes(rlp_bytes)?;
+    Ok(cert)
+}
+
+/// Verifies an EigenDA certificate and extracts the blob data.
+#[allow(clippy::too_many_arguments)]
+pub fn verify_and_extract_blob(
+    tx: B256,
+    cert: &StandardCommitment,
+    cert_state: &Option<CertStateData>,
+    cert_state_header: &Header,
+    inclusion_height: u64,
+    referenced_height: u64,
+    cert_recency_window: u64,
+    encoded_payload: &Option<Bytes>,
+) -> Result<Bytes, EigenDaVerificationError> {
+    use EigenDaVerificationError::*;
+
+    verify_cert_recency(inclusion_height, referenced_height, cert_recency_window)?;
+    let cert_state = cert_state.as_ref().ok_or_else(|| MissingCertState(tx))?;
+    cert_state.verify(cert_state_header.state_root)?;
+    let current_block = inclusion_height as u32;
+    let inputs = cert_state.extract(cert, current_block)?;
+    cert::verify(inputs)?;
+    let encoded_payload = encoded_payload.as_ref().ok_or_else(|| MissingBlob(tx))?;
+    verify_blob(cert, encoded_payload)?;
+    let blob = decode_encoded_payload(encoded_payload)?;
+    Ok(Bytes::from(blob))
+}
 
 /// Validate certificate recency to prevent stale certificate attacks
 ///
@@ -97,13 +140,12 @@ pub fn verify_cert_recency(
     inclusion_height: u64,
     referenced_height: u64,
     cert_recency_window: u64,
-) -> Result<(), CertVerificationError> {
+) -> Result<(), EigenDaVerificationError> {
+    use EigenDaVerificationError::*;
+
     let recency_height = referenced_height + cert_recency_window;
     if inclusion_height > recency_height {
-        return Err(CertVerificationError::RecencyWindowMissed(
-            inclusion_height,
-            recency_height,
-        ));
+        return Err(RecencyWindowMissed(inclusion_height, recency_height));
     }
 
     Ok(())
@@ -146,7 +188,7 @@ pub fn verify_blob(
 #[cfg(test)]
 mod tests {
     // use alloy_consensus::Header;
-    use crate::verification::cert::error::CertVerificationError;
+    use crate::error::EigenDaVerificationError;
     use crate::verification::verify_cert_recency;
 
     #[test]
@@ -185,7 +227,7 @@ mod tests {
 
             assert_eq!(
                 err,
-                CertVerificationError::RecencyWindowMissed(
+                EigenDaVerificationError::RecencyWindowMissed(
                     inclusion_height,
                     referenced_height + cert_recency_window
                 ),

@@ -11,6 +11,7 @@ use alloy_sol_types::{SolCall, sol};
 use alloy_transport::layers::RetryBackoffLayer;
 use alloy_transport::{RpcError, TransportErrorKind};
 use eigenda_verification::cert::StandardCommitment;
+use eigenda_verification::extraction::{CertStateData, contract};
 use futures::future::try_join_all;
 use reth_trie_common::AccountProof;
 use rustls::crypto::{CryptoProvider, aws_lc_rs};
@@ -21,7 +22,6 @@ use crate::contracts::{
     EIGENDA_DIRECTORY_HOLESKY, EIGENDA_DIRECTORY_MAINNET, EIGENDA_DIRECTORY_SEPOLIA,
     EigenDaContracts,
 };
-use crate::extraction::{CertStateData, contract};
 use crate::provider::IEigenDADirectory::getAddressCall;
 
 sol! {

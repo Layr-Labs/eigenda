@@ -4,6 +4,11 @@ name = "eigenda-verification"
 version = "0.1.0"
 
 [dependencies]
+alloy-consensus = { workspace = true, features = [
+  "serde",
+  "serde-bincode-compat",
+  "k256",
+] }
 alloy-primitives = { workspace = true, features = ["serde"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
 alloy-sol-types = { workspace = true }
@@ -17,6 +22,7 @@ eigenda-srs-data = { path = "../eigenda-srs-data" }
 hashbrown = { workspace = true, features = ["default-hasher"] }
 hex = { workspace = true }
 proptest = { workspace = true, features = ["alloc", "std"], optional = true }
+reth-trie-common = { workspace = true, features = ["serde", "std"] }
 rust-kzg-bn254-primitives = { git = "https://github.com/Layr-Labs/rust-kzg-bn254.git", rev = "60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6", default-features = false }
 rust-kzg-bn254-prover = { workspace = true }
 serde = { workspace = true, features = ["alloc", "derive"] }

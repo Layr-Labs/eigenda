@@ -1,15 +1,11 @@
-use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
 use alloy_primitives::B256;
-use eigenda_verification::verification::cert::CertVerificationInputs;
-use eigenda_verification::verification::cert::types::history::HistoryError;
-use eigenda_verification::verification::cert::types::{Staleness, Storage};
-use eigenda_verification::{cert::StandardCommitment, verification::cert::Cert};
 use reth_trie_common::AccountProof;
 use reth_trie_common::proof::ProofVerificationError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::instrument;
 
+use crate::cert::StandardCommitment;
 use crate::extraction::extractor::{
     ApkHistoryExtractor, DataDecoder, MinWithdrawalDelayBlocksExtractor, NextBlobVersionExtractor,
     OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor, QuorumCountExtractor,
@@ -17,6 +13,9 @@ use crate::extraction::extractor::{
     SecurityThresholdsV2Extractor, StaleStakesForbiddenExtractor, TotalStakeHistoryExtractor,
     VersionedBlobParamsExtractor,
 };
+use crate::verification::cert::types::history::HistoryError;
+use crate::verification::cert::types::{Staleness, Storage};
+use crate::verification::cert::{Cert, CertVerificationInputs};
 
 /// Contract-specific extraction logic and storage key generators.
 pub mod contract;
@@ -39,11 +38,11 @@ pub enum CertExtractionError {
 
     /// Error from history data processing
     #[error(transparent)]
-    WrapHistoryError(#[from] HistoryError),
+    HistoryError(#[from] HistoryError),
 
     /// Error from Alloy Solidity types decoding
     #[error(transparent)]
-    WrapAlloySolTypesError(#[from] alloy_sol_types::Error),
+    AlloySolTypesError(#[from] alloy_sol_types::Error),
 
     /// Error for when Ethereum Bytes are expected to be encoded in short form but long form is found instead
     #[error("Unexpected ethereum bytes long form")]
@@ -169,12 +168,4 @@ impl CertStateData {
 
         Ok(inputs)
     }
-}
-
-/// Extract certificate from the transaction. Return None if no parsable
-/// certificate exists.
-#[instrument(skip_all)]
-pub fn extract_certificate(tx: &EthereumTxEnvelope<TxEip4844>) -> Option<StandardCommitment> {
-    let raw_cert = tx.as_eip1559()?.input();
-    StandardCommitment::from_rlp_bytes(raw_cert).ok()
 }

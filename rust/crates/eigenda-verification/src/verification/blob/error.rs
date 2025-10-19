@@ -38,21 +38,13 @@ pub enum BlobVerificationError {
     #[error("Commitment length ({0}) not power of two")]
     CommitmentLengthNotPowerOfTwo(u32),
 
-    /// Payload length exceeds the theoretical maximum for the commitment size
-    #[error("Payload length ({0}) larger than upper bound ({1})")]
-    PayloadLengthLargerThanUpperBound(u32, u32),
-
-    /// Blob contains non-zero bytes in padding areas
-    #[error("Blob's trailing bytes should all be 0x0")]
-    NonZeroTrailingBytes,
-
     /// KZG commitment verification failed (computed ≠ claimed commitment)
     #[error("Invalid kzg commitment")]
     InvalidKzgCommitment,
 
     /// Underlying KZG cryptographic library error
     #[error("Kzg error: {0}")]
-    WrapKzgError(#[from] KzgError),
+    KzgError(#[from] KzgError),
 
     /// Arithmetic overflow occurred during payload processing
     #[error("Arithmetic overflow during payload processing")]

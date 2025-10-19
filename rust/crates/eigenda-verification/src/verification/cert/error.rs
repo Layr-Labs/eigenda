@@ -14,10 +14,6 @@ use crate::verification::cert::types::history::HistoryError;
 /// Errors that can occur during certificate verification
 #[derive(Error, Debug, PartialEq)]
 pub enum CertVerificationError {
-    /// Certificate is too old relative to the current block (recency validation failure)
-    #[error("The recency window was missed, inclusion_height ({0}), recency height ({1})")]
-    RecencyWindowMissed(u64, u64),
-
     /// Certificate's reference block is not before the current block (temporal ordering violation)
     #[error("Reference block {0} must precede current block {1}")]
     ReferenceBlockDoesNotPrecedeCurrentBlock(u32, u32),
@@ -117,11 +113,11 @@ pub enum CertVerificationError {
 
     /// Error occurred during historical data processing (invalid block ranges, etc.)
     #[error(transparent)]
-    WrapHistoryError(#[from] HistoryError),
+    HistoryError(#[from] HistoryError),
 
     /// Error occurred during quorum bitmap operations (invalid bitmap format)
     #[error(transparent)]
-    WrapBitmapError(#[from] BitmapError),
+    BitmapError(#[from] BitmapError),
 
     /// Certificate blob version is invalid or unsupported
     #[error(

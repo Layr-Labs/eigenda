@@ -299,6 +299,7 @@ impl StandardCommitment {
 pub enum EigenDAVersionedCert {
     /// Version 2 certificate
     V2(EigenDACertV2),
+
     /// Version 3 certificate
     V3(EigenDACertV3),
 }
@@ -537,7 +538,7 @@ pub struct NonSignerStakesAndSignature {
 }
 
 /// Errors that can occur when parsing a `StandardCommitment` from bytes.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum StandardCommitmentParseError {
     /// Empty commitment data (tx calldata contains 0 bytes)
     #[error("Empty commitment data")]

@@ -30,9 +30,6 @@
 #[cfg(feature = "native")]
 pub mod contracts;
 
-/// Certificate extraction logic and state data processing.
-pub mod extraction;
-
 /// Ethereum provider utilities and helper functions.
 #[cfg(feature = "native")]
 pub mod provider;

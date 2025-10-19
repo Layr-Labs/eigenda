@@ -1,17 +1,17 @@
 use alloy_primitives::aliases::{U96, U192};
 use alloy_primitives::{B256, Bytes, StorageKey, U256};
-use eigenda_verification::cert::StandardCommitment;
-use eigenda_verification::cert::solidity::{SecurityThresholds, StakeUpdate, VersionedBlobParams};
-use eigenda_verification::verification::cert::bitmap::Bitmap;
-use eigenda_verification::verification::cert::hash::TruncHash;
-use eigenda_verification::verification::cert::types::history::History;
-use eigenda_verification::verification::cert::types::{QuorumNumber, Stake, Version};
 use hashbrown::HashMap;
 use reth_trie_common::StorageProof;
 pub use stale_stakes_forbidden::*;
 use tracing::instrument;
 
+use crate::cert::StandardCommitment;
+use crate::cert::solidity::{SecurityThresholds, StakeUpdate, VersionedBlobParams};
 use crate::extraction::{CertExtractionError, decode_helpers, storage_key_helpers};
+use crate::verification::cert::bitmap::Bitmap;
+use crate::verification::cert::hash::TruncHash;
+use crate::verification::cert::types::history::History;
+use crate::verification::cert::types::{QuorumNumber, Stake, Version};
 
 // Storage slot constants for EigenDA contract variables
 // These correspond to specific storage slots in the deployed contracts
@@ -908,10 +908,10 @@ mod tests {
 }
 
 mod stale_stakes_forbidden {
-    use eigenda_verification::verification::cert::types::BlockNumber;
     use tracing::instrument;
 
     use super::*;
+    use crate::verification::cert::types::BlockNumber;
 
     const QUORUM_UPDATE_BLOCK_NUMBER_MAPPING_SLOT: u64 = 155;
     const STALE_STAKES_FORBIDDEN_VARIABLE_SLOT: u64 = 201;

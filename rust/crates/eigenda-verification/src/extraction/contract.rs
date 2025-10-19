@@ -4,9 +4,9 @@
 //! aggregating the storage keys needed for certificate verification.
 
 use alloy_primitives::StorageKey;
-use eigenda_verification::cert::StandardCommitment;
 pub use stale_stakes_forbidden::*;
 
+use crate::cert::StandardCommitment;
 use crate::extraction::extractor::{
     ApkHistoryExtractor, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
     OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
@@ -155,8 +155,8 @@ mod stale_stakes_forbidden {
     //! These interfaces expose EigenDA contract storage required for stale stake prevention.
 
     use alloy_primitives::StorageKey;
-    use eigenda_verification::cert::StandardCommitment;
 
+    use crate::cert::StandardCommitment;
     use crate::extraction::extractor::{
         MinWithdrawalDelayBlocksExtractor, StaleStakesForbiddenExtractor, StorageKeyProvider,
     };
@@ -222,8 +222,7 @@ mod stale_stakes_forbidden {
 mod tests {
     use std::collections::HashSet;
 
-    use eigenda_verification::cert::StandardCommitment;
-
+    use crate::cert::StandardCommitment;
     use crate::extraction::contract::{
         BlsApkRegistry, DelegationManager, EigenDaCertVerifier, EigenDaThresholdRegistry,
         RegistryCoordinator, ServiceManager, StakeRegistry,
