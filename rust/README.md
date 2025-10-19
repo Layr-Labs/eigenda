@@ -1,19 +1,18 @@
-# Sovereign EigenDA Adapter
+# EigenDA-Sovereign SDK DA Adapter Backend
 
 [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-A production-ready adapter that integrates [EigenDA](https://docs.eigencloud.xyz/products/eigenda/core-concepts/overview) with the Sovereign SDK, enabling rollups to use EigenDA as their data availability layer with full cryptographic verification.
+Implements the necessary [EigenDA](https://docs.eigencloud.xyz/products/eigenda/core-concepts/overview) backend infrastructure to support the implementation of a Data Availability Adapter for Sovereign SDK based on EigenLayer's EigenDA, enabling rollups to use it as their data availability layer with full cryptographic verification.
 
 ## 🏗️ Architecture
 
-The adapter is built using a modular architecture with specialized crates:
+The project is built using a modular architecture with specialized crates:
 
 ### Core Crates
 
 | Crate | Purpose | Key Features |
 |-------|---------|--------------|
-| **`sov-eigenda-adapter`** | Main adapter implementing Sovereign SDK DA traits | `DaService` and `DaVerifier` implementations |
 | **`eigenda-ethereum`** | Ethereum contract interaction | Provider utilities, contract bindings |
 | **`eigenda-proxy`** | EigenDA proxy service communication | Blob retrieval, certificate generation, retry logic |
 | **`eigenda-verification`** | Cryptographic verification, validation, and state extraction | Certificate parsing, storage proofs, operator stake extraction, BLS signatures, commitment proofs |
@@ -28,8 +27,8 @@ The adapter is built using a modular architecture with specialized crates:
 
 ```bash
 # Clone the repository
-git clone https://github.com/eiger-co/sov-eigenda-adapter.git
-cd sov-eigenda-adapter
+git clone https://github.com/Layr-Labs/eigenda.git
+cd eigenda/rust
 
 # Build all crates
 cargo build --release
@@ -40,48 +39,38 @@ cargo test
 
 ## ⚙️ Configuration
 
-The adapter requires configuration for both Ethereum and EigenDA connections:
+The crates provide modular components for EigenDA integration that can be composed based on your rollup's needs. Key configuration points include:
 
-```rust
-use sov_eigenda_adapter::EigenDaConfig;
-
-let config = EigenDaConfig {
-    ethereum_rpc_url: "https://mainnet.infura.io/v3/your-key".to_string(),
-    eigenda_proxy_url: "http://localhost:3100".to_string(),
-    rollup_namespace: "your-rollup-namespace".to_string(),
-    // Additional configuration options...
-};
-```
+- **Ethereum RPC endpoint** for contract interaction
+- **EigenDA Proxy URL** for blob operations
+- **Rollup namespace** for transaction filtering
 
 ## 🔧 How It Works
 
-The adapter implements two core Sovereign SDK traits:
+These crates provide the foundational components needed to integrate EigenDA with Sovereign SDK rollups:
 
-### [`DaService`](https://github.com/Sovereign-Labs/sovereign-sdk/blob/nightly/crates/rollup-interface/src/node/da.rs#L112)
+### Core Capabilities
 
-Handles communication with the DA layer:
+**Ethereum Integration** (`eigenda-ethereum`)
+- Contract interaction and state queries
+- Ethereum block monitoring
+- State proof generation
 
-1. **Ethereum Monitoring** - Watches Ethereum blocks for rollup transactions
-2. **Certificate Extraction** - Identifies and extracts EigenDA certificates from transactions
-3. **Blob Retrieval** - Fetches blob data from EigenDA proxy using certificates
-4. **State Proof Generation** - Gathers Ethereum state proofs for verification
-5. **Data Packaging** - Prepares completeness and inclusion proofs for the verifier
+**Proxy Communication** (`eigenda-proxy`)
+- Blob submission and retrieval
+- Certificate management
+- Retry logic and error handling
 
-### [`DaVerifier`](https://github.com/Sovereign-Labs/sovereign-sdk/blob/nightly/crates/rollup-interface/src/state_machine/da.rs#L56)
-
-Cryptographically verifies DA data integrity:
-
-#### Completeness Verification
-- ✅ Transaction root verification against Ethereum block
-- ✅ Namespace filtering for rollup-specific transactions
-- ✅ Certificate state validation
-
-#### Inclusion Verification  
-- ✅ EigenDA certificate validation against Ethereum state
-- ✅ Certificate recency within punctuality window
-- ✅ Blob commitment verification using KZG proofs
+**Cryptographic Verification** (`eigenda-verification`)
+- ✅ EigenDA certificate validation
 - ✅ BLS aggregate signature verification
-- ✅ State proof verification against block state roots
+- ✅ KZG commitment proof validation
+- ✅ Ethereum state proof verification
+- ✅ Operator stake extraction and validation
+
+**SRS Data** (`eigenda-srs-data`)
+- BN254 curve parameters for KZG operations
+- Structured reference string management
 
 ## 🧪 Testing
 
@@ -105,26 +94,18 @@ cargo bench
 - **Property Tests** - Fuzz testing for edge cases
 - **Performance Tests** - Benchmarking verification operations
 
-## 📊 Examples
-
-Explore the [`examples/`](examples/) directory for complete implementations:
-
-- **[Demo Rollup](examples/demo-rollup/)** - Full rollup implementation using EigenDA
 
 ## 🛠️ Development
 
 ### Project Structure
 
 ```
-sov-eigenda-adapter/
+eigenda/rust/
 ├── crates/
-│   ├── sov-eigenda-adapter/     # Main adapter implementation
 │   ├── eigenda-ethereum/        # Ethereum contract utilities
 │   ├── eigenda-proxy/           # EigenDA proxy client
 │   ├── eigenda-verification/    # Cryptographic verification
 │   └── eigenda-srs-data/        # Structured reference string data
-├── examples/                    # Example implementations
-│   ├── demo-rollup/            # Complete rollup example
 ```
 
 ### Building from Source

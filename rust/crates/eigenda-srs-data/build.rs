@@ -14,7 +14,7 @@ const POINTS_TO_LOAD: u32 = 16 * 1024 * 1024 / 32;
 fn main() {
     println!("cargo:rerun-if-changed=resources/g1.point");
 
-    let path = "resources/g1.point";
+    let path = "../../../resources/srs/g1.point";
 
     let order = POINTS_TO_LOAD * 32;
     let srs = SRS::new(path, order, POINTS_TO_LOAD).expect("Failed to create SRS");

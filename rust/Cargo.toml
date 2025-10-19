@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "crates/sov-eigenda-adapter",
   "crates/eigenda-ethereum",
   "crates/eigenda-verification",
   "crates/eigenda-srs-data",
