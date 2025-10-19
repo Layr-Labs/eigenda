@@ -4,6 +4,7 @@
 //! the EigenDA certificate verification process, including on-chain state
 //! representations and verification context.
 
+/// Type conversions between certificate formats and internal representations.
 pub mod conversions;
 /// Historical data tracking for operator state changes.
 ///

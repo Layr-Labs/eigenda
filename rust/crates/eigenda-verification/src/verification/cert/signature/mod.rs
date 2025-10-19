@@ -16,7 +16,9 @@
 //! Multiple operators can sign the same message, and their signatures can be combined into
 //! a single aggregate signature that can be verified against an aggregate public key.
 
+/// BLS public key aggregation logic for combining operator keys.
 pub mod aggregation;
+/// BLS signature verification using bilinear pairings.
 pub mod verification;
 
 #[cfg(test)]

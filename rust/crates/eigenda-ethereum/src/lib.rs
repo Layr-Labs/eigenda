@@ -1,30 +1,21 @@
-//! EigenDA data extraction from Ethereum contract storage
+//! Ethereum integration utilities for EigenDA
 //!
-//! Provides utilities for extracting and decoding data from EigenDA
-//! protocol smart contracts deployed on Ethereum. It enables verification of
-//! blob certificates by fetching the necessary on-chain state data.
-//!
-//! ## Architecture
-//!
-//! The extraction system follows a trait-based approach:
-//! - [`StorageKeyProvider`]: Generates storage keys for contract data
-//! - [`DataDecoder`]: Decodes storage proofs into typed data structures
+//! Provides utilities for interacting with EigenDA smart contracts deployed on Ethereum.
+//! This crate focuses on contract bindings and provider functionality for fetching
+//! blockchain data.
 //!
 //! ## Key Components
 //!
-//! - **Extractors**: Specialized types for extracting specific data from contracts
-//! - **Contract Interfaces**: High-level interfaces for each EigenDA contract
-//! - **Storage Helpers**: Utilities for generating Ethereum storage keys
-//! - **Decode Helpers**: Utilities for parsing storage proofs
+//! - **[`contracts`]** - Smart contract interfaces and data structures for EigenDA contracts
+//! - **[`provider`]** - Ethereum provider utilities and helper functions for fetching state
 //!
-//! ## Contract Data Extracted
+//! ## Architecture Notes
 //!
-//! - Quorum configurations and counts
-//! - Operator stake histories and bitmap histories  
-//! - Aggregated public key (APK) histories
-//! - Blob versioning parameters
-//! - Security thresholds and required quorum numbers
-//! - Stale stake prevention settings (feature-gated)
+//! This crate handles the Ethereum interaction layer. For certificate state extraction
+//! and verification, see the `eigenda-verification` crate which contains:
+//! - Contract storage proof extraction
+//! - State data decoding
+//! - Cryptographic verification
 
 /// Smart contract interfaces and data structures for EigenDA contracts.
 #[cfg(feature = "native")]

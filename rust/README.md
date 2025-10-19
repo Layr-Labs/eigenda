@@ -14,9 +14,9 @@ The adapter is built using a modular architecture with specialized crates:
 | Crate | Purpose | Key Features |
 |-------|---------|--------------|
 | **`sov-eigenda-adapter`** | Main adapter implementing Sovereign SDK DA traits | `DaService` and `DaVerifier` implementations |
-| **`eigenda-ethereum`** | Ethereum contract interaction and state extraction | Storage proofs, operator stake extraction, APK histories |
+| **`eigenda-ethereum`** | Ethereum contract interaction | Provider utilities, contract bindings |
 | **`eigenda-proxy`** | EigenDA proxy service communication | Blob retrieval, certificate generation, retry logic |
-| **`eigenda-verification`** | Cryptographic verification and validation | Certificate parsing, BLS signatures, commitment proofs |
+| **`eigenda-verification`** | Cryptographic verification, validation, and state extraction | Certificate parsing, storage proofs, operator stake extraction, BLS signatures, commitment proofs |
 | **`eigenda-srs-data`** | Structured reference string data | BN254 curve parameters for KZG commitments |
 
 ## 🚀 Quick Start

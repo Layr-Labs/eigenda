@@ -43,12 +43,17 @@
 //!
 //! Based on the [EigenDA Solidity implementation](https://github.com/Layr-Labs/eigenda/blob/60d438705b30e899777736cdffcc478ded08cc76/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L125)
 
+/// Quorum bitmap operations for operator participation tracking.
 pub mod bitmap;
 mod check;
+/// Type conversion utilities for certificate data structures.
 pub mod convert;
+/// Error types for certificate verification operations.
 pub mod error;
+/// Cryptographic hashing functions for certificate components.
 pub mod hash;
 mod signature;
+/// Type definitions and structures for certificate verification.
 pub mod types;
 
 use alloy_primitives::{B256, Bytes};

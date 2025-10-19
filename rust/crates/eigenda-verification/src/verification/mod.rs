@@ -6,7 +6,7 @@
 //!
 //! ## Module Structure
 //!
-//! This crate contains the core verification primitives:
+//! This module contains the core verification primitives:
 //!
 //! - **[`cert`]** - Certificate cryptographic verification
 //!   - BLS signature aggregation and verification
@@ -18,49 +18,31 @@
 //!   - KZG polynomial commitment verification
 //!   - Blob encoding validation
 //!
-//! ## Architecture
+//! ## High-Level API
 //!
-//! This module focuses on the cryptographic core of EigenDA verification and does
-//! not handle:
-//! - Ethereum state extraction and proof verification
-//! - Rollup-specific integration logic
-//! - Certificate recency validation (handled by higher-level adapters)
+//! This module provides convenient high-level functions for common verification workflows:
 //!
-//! The verification functions expect pre-validated inputs and focus purely on
-//! cryptographic correctness.
+//! - **[`extract_certificate`]** - Extracts an EigenDA certificate from an EIP-4844 transaction
+//! - **[`verify_and_extract_blob`]** - All-in-one verification: recency, certificate, and blob extraction
+//! - **[`verify_cert_recency`]** - Certificate recency validation to prevent stale certificate attacks
+//! - **[`verify_blob`]** - Blob commitment verification using KZG proofs
+//!
+//! ## Low-Level API
+//!
+//! For fine-grained control, use the submodules directly:
+//! - [`cert::verify`] - Certificate-only verification with extracted state data
+//! - [`blob::verify_blob`] - Blob-only verification
+//!
+//! ## Integration with Other Modules
+//!
+//! This module works together with:
+//! - [`crate::extraction`] - For extracting and verifying Ethereum contract state
+//! - [`crate::error`] - For unified error handling across verification operations
 //!
 //! ## References
 //!
 //! - [EigenDA Protocol Specification](https://docs.eigenlayer.xyz/eigenda/overview/)
 //! - [Certificate Verification Reference](https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol)
-//!
-//! ## Verification Functions
-//!
-//! This module provides two key verification utilities:
-//!
-//! 1. **[`verify_cert_recency`]** - Certificate recency validation
-//! 2. **[`verify_blob`]** - Blob commitment verification
-//!
-//! ### Certificate Recency Validation
-//!
-//! [`verify_cert_recency`] ensures certificates are used within an acceptable time window to prevent
-//! stale certificate attacks. It validates that the certificate's reference block
-//! is recent enough relative to the current inclusion block according to rollup parameters.
-//!
-//! ### Blob Verification
-//!
-//! [`verify_blob`] validates that blob data matches the cryptographic commitment in the certificate
-//! using KZG polynomial commitments. This function serves as a convenient wrapper around
-//! the core blob verification primitives.
-//!
-//! ## Integration with Other Crates
-//!
-//! This crate works together with:
-//! - `eigenda_ethereum` for extracting Ethereum state data needed for verification
-//! - `sov_eigenda_adapter` for rollup-specific integration logic
-//!
-//! ## References
-//!
 //! - [EigenDA Integration Specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html)
 //! - [Sovereign SDK Documentation](https://docs.sovereign.xyz/)
 
@@ -75,10 +57,24 @@ use crate::extraction::CertStateData;
 use crate::verification::blob::codec::decode_encoded_payload;
 use crate::verification::blob::error::BlobVerificationError;
 
+/// Blob integrity verification using KZG polynomial commitments.
 pub mod blob;
+/// Certificate cryptographic verification using BLS signatures.
 pub mod cert;
 
 /// Extracts an EigenDA certificate from an EIP-4844 transaction.
+///
+/// Parses the transaction input data to extract a [`StandardCommitment`] certificate.
+///
+/// # Arguments
+/// * `tx` - EIP-4844 transaction envelope containing the certificate
+///
+/// # Returns
+/// The parsed [`StandardCommitment`] certificate
+///
+/// # Errors
+/// - [`EigenDaVerificationError::TxNotEip1559`] if transaction is not EIP-1559 format
+/// - [`EigenDaVerificationError::StandardCommitmentParseError`] if certificate parsing fails
 pub fn extract_certificate(
     tx: &EthereumTxEnvelope<TxEip4844>,
 ) -> Result<StandardCommitment, EigenDaVerificationError> {
@@ -91,6 +87,35 @@ pub fn extract_certificate(
 }
 
 /// Verifies an EigenDA certificate and extracts the blob data.
+///
+/// This is a high-level convenience function that performs the complete verification workflow:
+/// 1. Validates certificate recency
+/// 2. Verifies contract state proofs against the state root
+/// 3. Extracts verification inputs from proven state
+/// 4. Verifies certificate cryptographically (BLS signatures, quorum stakes, thresholds)
+/// 5. Verifies blob data matches the certificate commitment (KZG proof)
+/// 6. Decodes and returns the blob payload
+///
+/// # Arguments
+/// * `tx` - Transaction hash (for error reporting)
+/// * `cert` - The certificate to verify
+/// * `cert_state` - Optional contract state data with proofs
+/// * `cert_state_header` - Block header containing the state root for verification
+/// * `inclusion_height` - Block height where certificate is included
+/// * `referenced_height` - Block height referenced by the certificate
+/// * `cert_recency_window` - Maximum allowed certificate age in blocks
+/// * `encoded_payload` - Optional encoded blob payload to verify
+///
+/// # Returns
+/// Decoded blob data as [`Bytes`]
+///
+/// # Errors
+/// - [`EigenDaVerificationError::RecencyWindowMissed`] if certificate is too old
+/// - [`EigenDaVerificationError::MissingCertState`] if cert_state is None
+/// - [`EigenDaVerificationError::ProofVerificationError`] if state proofs are invalid
+/// - [`EigenDaVerificationError::CertVerificationError`] if certificate verification fails
+/// - [`EigenDaVerificationError::MissingBlob`] if encoded_payload is None
+/// - [`EigenDaVerificationError::BlobVerificationError`] if blob verification fails
 #[allow(clippy::too_many_arguments)]
 pub fn verify_and_extract_blob(
     tx: B256,
@@ -123,7 +148,7 @@ pub fn verify_and_extract_blob(
 /// with outdated operator sets.
 ///
 /// # Arguments
-/// * `header` - Ethereum block header where the certificate is being included
+/// * `inclusion_height` - Block height where the certificate is being included
 /// * `referenced_height` - Block height referenced by the certificate
 /// * `cert_recency_window` - Maximum allowed age of the certificate in blocks
 ///
@@ -131,7 +156,7 @@ pub fn verify_and_extract_blob(
 /// `Ok(())` if the certificate is within the recency window
 ///
 /// # Errors
-/// Returns [`CertVerificationError::RecencyWindowMissed`] if the certificate
+/// Returns [`EigenDaVerificationError::RecencyWindowMissed`] if the certificate
 /// is too old relative to the inclusion block.
 ///
 /// # Reference

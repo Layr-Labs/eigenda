@@ -32,7 +32,15 @@ eigenda-verification/
 │   ├── cert/                   # Certificate data structures
 │   │   ├── mod.rs              # Core certificate types
 │   │   └── solidity.rs         # Solidity contract types
+│   ├── error.rs                # Unified verification errors
+│   ├── extraction/             # Certificate state extraction
+│   │   ├── mod.rs              # Main extraction logic
+│   │   ├── contract.rs         # Contract-specific extraction
+│   │   ├── extractor.rs        # Core extraction traits
+│   │   ├── decode_helpers.rs   # Decoding utilities
+│   │   └── storage_key_helpers.rs # Storage key generation
 │   └── verification/           # Verification algorithms
+│       ├── mod.rs              # High-level verification API
 │       ├── cert/               # Certificate verification
 │       │   ├── mod.rs          # Main verification logic
 │       │   ├── check.rs        # Validation checks
@@ -43,7 +51,7 @@ eigenda-verification/
 │       │   ├── signature/      # BLS signature verification
 │       │   │   ├── aggregation.rs
 │       │   │   └── verification.rs
-│       │   └── types/          
+│       │   └── types/
 │       │       ├── history.rs
 │       │       ├── conversions.rs
 │       │       └── mod.rs
@@ -118,56 +126,6 @@ The blob verification process ensures data integrity through KZG commitments:
 - Recomputes commitment from blob data using SRS
 - Compares computed vs. claimed commitment
 - Uses structured reference string for BN254 curve operations
-
-## 🚀 Usage
-
-### Certificate Verification
-
-```rust
-use eigenda_verification::verification::cert::{verify, CertVerificationInputs};
-
-// Prepare verification inputs with all required data
-let inputs = CertVerificationInputs {
-    batch_header,
-    blob_inclusion_info,
-    non_signer_stakes_and_signature,
-    security_thresholds,
-    required_quorum_numbers,
-    signed_quorum_numbers,
-    storage, // Historical on-chain state
-};
-
-// Perform comprehensive verification
-match verify(inputs) {
-    Ok(()) => println!("Certificate is valid!"),
-    Err(e) => println!("Verification failed: {}", e),
-}
-```
-
-### Blob Verification
-
-```rust
-use eigenda_verification::verification::verify_blob;
-use eigenda_verification::cert::StandardCommitment;
-
-// Verify blob data matches certificate commitment
-match verify_blob(&certificate, &encoded_payload) {
-    Ok(()) => println!("Blob is valid!"),
-    Err(e) => println!("Blob verification failed: {}", e),
-}
-```
-
-### Certificate Recency Validation
-
-```rust
-use eigenda_verification::verification::verify_cert_recency;
-
-// Prevent stale certificate attacks
-match verify_cert_recency(inclusion_height, referenced_height, cert_recency_window) {
-    Ok(()) => println!("Certificate is recent enough!"),
-    Err(e) => println!("Certificate too old: {}", e),
-}
-```
 
 ## 🎯 Features
 

@@ -90,9 +90,27 @@ impl CertStateData {
         Ok(())
     }
 
+    /// Extract certificate verification inputs from contract state data.
     ///
-    /// NOTE: The data extracted is not verified. To verify the data, ensure
-    /// that the [`CertStateData::verify`] is called.
+    /// Decodes all required contract storage data from the proofs to construct
+    /// verification inputs for certificate validation.
+    ///
+    /// # Arguments
+    /// * `cert` - The certificate to extract data for
+    /// * `current_block` - Current block height for verification context
+    ///
+    /// # Returns
+    /// [`CertVerificationInputs`] containing all data needed for certificate verification
+    ///
+    /// # Errors
+    /// Returns [`CertExtractionError`] if:
+    /// - Storage proofs are missing for required contract variables
+    /// - Data decoding fails
+    /// - Historical data is inconsistent
+    ///
+    /// # Safety
+    /// The data extracted is not cryptographically verified. To verify the data,
+    /// ensure that [`CertStateData::verify`] is called before extraction.
     #[instrument(skip_all)]
     pub fn extract(
         &self,

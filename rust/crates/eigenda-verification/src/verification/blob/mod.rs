@@ -47,7 +47,9 @@
 //! - Compares computed commitment with claimed commitment
 //! - Uses precomputed SRS (Structured Reference String)
 
+/// Blob encoding and decoding utilities for EigenDA payload format.
 pub mod codec;
+/// Error types for blob verification operations.
 pub mod error;
 
 use ark_bn254::G1Affine;
