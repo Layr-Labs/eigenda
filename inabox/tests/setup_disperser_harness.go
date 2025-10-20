@@ -15,11 +15,14 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
+	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay"
@@ -574,6 +577,69 @@ func startController(
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
+	// Build server config and payment authorization handler if needed
+	var serverConfig *server.Config
+	var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
+	if config.TestConfig.UseControllerMediatedPayments {
+		controllerLogger.Info("UseControllerMediatedPayments enabled - building server config and payment handler")
+
+		// Create server config
+		grpcServerConfig, err := common.NewGRPCServerConfig(
+			true,
+			30000, // TODO(dmanc): inject listener instead
+			1024*1024,
+			5*time.Minute,
+			5*time.Minute,
+			3*time.Minute,
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to create gRPC server config: %w", err)
+		}
+
+		serverCfg, err := server.NewConfig(
+			grpcServerConfig,
+			true, // EnablePaymentAuthentication
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to create server config: %w", err)
+		}
+		serverConfig = &serverCfg
+
+		// Create contract directory
+		contractDirectory, err := directory.NewContractDirectory(
+			ctx,
+			controllerLogger,
+			ethClient,
+			gethcommon.HexToAddress(config.TestConfig.EigenDA.EigenDADirectory),
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to create contract directory: %w", err)
+		}
+
+		// Build payment authorization handler
+		paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
+		paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
+			ctx,
+			controllerLogger,
+			paymentAuthConfig,
+			contractDirectory,
+			ethClient,
+			dynamoClient.GetAwsClient(),
+			metricsRegistry,
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to build payment authorization handler: %w", err)
+		}
+
+		controllerLogger.Info("Payment authentication handler built successfully")
+	} else {
+		controllerLogger.Info("UseControllerMediatedPayments disabled - controller will not have server or payment handler")
+	}
+
 	// Create controller
 	controllerInstance, err := controller.NewController(
 		controllerLogger,
@@ -587,8 +653,8 @@ func startController(
 		metricsRegistry,
 		encodingManagerConfig,
 		dispatcherConfig,
-		nil, // No server config for tests
-		nil, // No payment authorization handler for tests
+		serverConfig,
+		paymentAuthorizationHandler,
 	)
 	if err != nil {
 		_ = logFile.Close()

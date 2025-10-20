@@ -17,20 +17,14 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
-	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
-	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	payments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -214,11 +208,19 @@ func RunController(cliCtx *cli.Context) error {
 	var paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
 	if config.ServerConfig.EnableServer && config.ServerConfig.EnablePaymentAuthentication {
 		logger.Info("Payment authentication ENABLED - building payment authorization handler")
-		paymentAuthorizationHandler, err = buildPaymentAuthorizationHandler(
+
+		// Build config from CLI flags
+		paymentAuthConfig := controller.PaymentAuthorizationConfig{
+			OnDemandTableName:          config.OnDemandConfig.OnDemandTableName,
+			OnDemandMaxLedgers:         config.OnDemandConfig.MaxLedgers,
+			ReservationMaxLedgers:      config.ReservationConfig.MaxLedgers,
+			PaymentVaultUpdateInterval: config.OnDemandConfig.UpdateInterval,
+		}
+
+		paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
 			ctx,
 			logger,
-			config.OnDemandConfig,
-			config.ReservationConfig,
+			paymentAuthConfig,
 			contractDirectory,
 			gethClient,
 			dynamoClient.GetAwsClient(),
@@ -285,94 +287,4 @@ func RunController(cliCtx *cli.Context) error {
 	}()
 
 	return nil
-}
-
-func buildPaymentAuthorizationHandler(
-	ctx context.Context,
-	logger logging.Logger,
-	onDemandConfig ondemandvalidation.OnDemandLedgerCacheConfig,
-	reservationConfig reservationvalidation.ReservationLedgerCacheConfig,
-	contractDirectory *directory.ContractDirectory,
-	ethClient common.EthClient,
-	awsDynamoClient *awsdynamodb.Client,
-	metricsRegistry *prometheus.Registry,
-) (*payments.PaymentAuthorizationHandler, error) {
-	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
-	if err != nil {
-		return nil, fmt.Errorf("get PaymentVault address: %w", err)
-	}
-
-	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddress)
-	if err != nil {
-		return nil, fmt.Errorf("create payment vault: %w", err)
-	}
-
-	globalSymbolsPerSecond, err := paymentVault.GetGlobalSymbolsPerSecond(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get global symbols per second: %w", err)
-	}
-
-	globalRatePeriodInterval, err := paymentVault.GetGlobalRatePeriodInterval(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get global rate period interval: %w", err)
-	}
-
-	onDemandMeterer := meterer.NewOnDemandMeterer(
-		globalSymbolsPerSecond,
-		globalRatePeriodInterval,
-		time.Now,
-		meterer.NewOnDemandMetererMetrics(
-			metricsRegistry,
-			metrics.Namespace,
-			metrics.AuthorizePaymentsSubsystem,
-		),
-	)
-
-	onDemandValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
-		ctx,
-		logger,
-		onDemandConfig,
-		paymentVault,
-		awsDynamoClient,
-		ondemandvalidation.NewOnDemandValidatorMetrics(
-			metricsRegistry,
-			metrics.Namespace,
-			metrics.AuthorizePaymentsSubsystem,
-		),
-		ondemandvalidation.NewOnDemandCacheMetrics(
-			metricsRegistry,
-			metrics.Namespace,
-			metrics.AuthorizePaymentsSubsystem,
-		),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create on-demand payment validator: %w", err)
-	}
-
-	reservationValidator, err := reservationvalidation.NewReservationPaymentValidator(
-		ctx,
-		logger,
-		reservationConfig,
-		paymentVault,
-		time.Now,
-		reservationvalidation.NewReservationValidatorMetrics(
-			metricsRegistry,
-			metrics.Namespace,
-			metrics.AuthorizePaymentsSubsystem,
-		),
-		reservationvalidation.NewReservationCacheMetrics(
-			metricsRegistry,
-			metrics.Namespace,
-			metrics.AuthorizePaymentsSubsystem,
-		),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create reservation payment validator: %w", err)
-	}
-
-	return payments.NewPaymentAuthorizationHandler(
-		onDemandMeterer,
-		onDemandValidator,
-		reservationValidator,
-	), nil
 }
