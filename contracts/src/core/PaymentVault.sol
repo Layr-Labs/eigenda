@@ -104,7 +104,7 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
     }
 
     function withdrawERC20(IERC20 _token, uint256 _amount) external onlyOwner {
-        _token.transfer(owner(), _amount);
+        require(_token.transfer(owner(), _amount), "ERC20 transfer failed");
     }
 
     function _checkQuorumSplit(bytes memory _quorumNumbers, bytes memory _quorumSplits) internal pure {

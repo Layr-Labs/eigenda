@@ -26,9 +26,8 @@ contract EigenDADirectory is IEigenDADirectory {
 
     modifier onlyOwner() {
         require(
-            IAccessControl(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey().getAddress()).hasRole(
-                AccessControlConstants.OWNER_ROLE, msg.sender
-            ),
+            IAccessControl(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey().getAddress())
+                .hasRole(AccessControlConstants.OWNER_ROLE, msg.sender),
             "Caller is not the owner"
         );
         _;
