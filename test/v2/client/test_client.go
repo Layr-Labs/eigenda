@@ -32,10 +32,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -72,14 +72,14 @@ type TestClient struct {
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
-	metrics                     *testClientMetrics
+	metrics                     *TestClientMetrics
 }
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(
 	ctx context.Context,
 	logger logging.Logger,
-	metrics *testClientMetrics,
+	metrics *TestClientMetrics,
 	config *TestClientConfig) (*TestClient, error) {
 
 	if config.SRSNumberToLoad == 0 {
@@ -163,7 +163,7 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to populate accountant: %w", err)
 	}
 
-	ethRPCUrls, err := loadEthRPCURLs(config.EthRPCURLs, config.EthRPCUrlsVar)
+	ethRPCUrls, err := loadEthRPCURLs(config.EthRpcUrls, config.EthRpcUrlsVar)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load Ethereum RPC URLs: %w", err)
 	}
@@ -298,18 +298,18 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
-	kzgConfig := &kzg.KzgConfig{
+	kzgConfig := &kzgv1.KzgConfig{
 		LoadG2Points:    true,
 		G1Path:          g1Path,
 		G2Path:          g2Path,
 		G2TrailingPath:  g2TrailingPath,
 		CacheDir:        srsTablesPath,
-		SRSOrder:        config.SRSOrder,
+		SRSOrder:        config.SrsOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
 	}
-	verifierKzgConfig := verifier.KzgConfigFromV1Config(kzgConfig)
-	encoder := rs.NewEncoder(nil)
+	verifierKzgConfig := verifier.ConfigFromV1KzgConfig(kzgConfig)
+	encoder := rs.NewEncoder(logger, nil)
 	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
@@ -335,7 +335,7 @@ func NewTestClient(
 
 	chainState := eth.NewChainState(ethReader, ethClient)
 	icsConfig := thegraph.Config{
-		Endpoint:     config.SubgraphURL,
+		Endpoint:     config.SubgraphUrl,
 		PullInterval: 100 * time.Millisecond,
 		MaxRetries:   5,
 	}

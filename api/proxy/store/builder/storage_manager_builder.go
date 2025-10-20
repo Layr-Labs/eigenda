@@ -44,10 +44,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	rsv2 "github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -110,13 +110,14 @@ func BuildManagers(
 		// kzgVerifier and encoder are only needed when validator retrieval is enabled
 		var kzgVerifier *kzgverifierv2.Verifier
 		if slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
-			kzgConfig := kzgverifierv2.KzgConfigFromV1Config(&config.KzgConfig)
+			kzgConfig := kzgverifierv2.ConfigFromV1KzgConfig(&config.KzgConfig)
 			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig)
 			if err != nil {
 				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 			}
 		}
-		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, rs.NewEncoder(nil), kzgVerifier, registry)
+		eigenDAV2Store, err = buildEigenDAV2Backend(
+			ctx, log, config, secrets, rsv2.NewEncoder(log, nil), kzgVerifier, registry)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
 		}
@@ -124,7 +125,14 @@ func BuildManagers(
 
 	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store)
 	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store)
-	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks, config.StoreConfig.WriteOnCacheMiss)
+	secondary := secondary.NewSecondaryManager(
+		log,
+		metrics,
+		caches,
+		fallbacks,
+		config.StoreConfig.WriteOnCacheMiss,
+		config.StoreConfig.ErrorOnSecondaryInsertFailure,
+	)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
 		log.Info("Starting secondary write loop(s)", "count", config.StoreConfig.AsyncPutWorkers)
@@ -142,6 +150,7 @@ func BuildManagers(
 		"read_fallback", len(fallbacks) > 0,
 		"caching", len(caches) > 0,
 		"async_secondary_writes", (secondary.Enabled() && config.StoreConfig.AsyncPutWorkers > 0),
+		"error_on_secondary_insert_failure", config.StoreConfig.ErrorOnSecondaryInsertFailure,
 		"verify_v1_certs", config.VerifierConfigV1.VerifyCerts,
 	)
 
@@ -212,7 +221,7 @@ func buildEigenDAV2Backend(
 	log logging.Logger,
 	config Config,
 	secrets common.SecretConfigV2,
-	encoder *rs.Encoder,
+	encoder *rsv2.Encoder,
 	kzgVerifier *kzgverifierv2.Verifier,
 	registry *prometheus.Registry,
 ) (common.EigenDAV2Store, error) {
@@ -549,7 +558,7 @@ func buildValidatorPayloadRetriever(
 	ethClient common_eigenda.EthClient,
 	operatorStateRetrieverAddr geth_common.Address,
 	eigenDAServiceManagerAddr geth_common.Address,
-	encoder *rs.Encoder,
+	encoder *rsv2.Encoder,
 	kzgVerifier *kzgverifierv2.Verifier,
 	g1Srs []bn254.G1Affine,
 	metrics metrics_v2.RetrievalMetricer,

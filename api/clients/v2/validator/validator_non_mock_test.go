@@ -17,12 +17,11 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
@@ -42,7 +41,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	// Set up KZG components (prover, committer and verifier)
 	p, c, v, err := makeTestEncodingComponents()
 	require.NoError(t, err)
-	encoder := rs.NewEncoder(nil)
+	encoder := rs.NewEncoder(logger, nil)
 
 	// Set up test environment
 	rand := testrandom.NewTestRandom()
@@ -212,33 +211,29 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 // makeTestEncodingComponents makes a KZG prover, committer and verifier
 func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
-	config := &kzg.KzgConfig{
-		G1Path:          "../../../../resources/srs/g1.point",
-		G2Path:          "../../../../resources/srs/g2.point",
-		G2TrailingPath:  "../../../../resources/srs/g2.trailing.point",
-		CacheDir:        "../../../../resources/srs/SRSTables",
-		SRSOrder:        8192,
-		SRSNumberToLoad: 8192,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
-	}
-
 	c, err := committer.NewFromConfig(committer.Config{
-		SRSNumberToLoad:   config.SRSNumberToLoad,
-		G1SRSPath:         config.G1Path,
-		G2SRSPath:         config.G2Path,
-		G2TrailingSRSPath: config.G2TrailingPath,
+		SRSNumberToLoad:   8192,
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
 	})
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new committer from config: %w", err)
 	}
 
-	p, err := prover.NewProver(prover.KzgConfigFromV1Config(config), nil)
+	proverConfig := &prover.KzgConfig{
+		SRSNumberToLoad: 8192,
+		G1Path:          "../../../../resources/srs/g1.point",
+		PreloadEncoder:  false,
+		CacheDir:        "../../../../resources/srs/SRSTables",
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	}
+	p, err := prover.NewProver(logger, proverConfig, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	v, err := verifier.NewVerifier(verifier.KzgConfigFromV1Config(config))
+	v, err := verifier.NewVerifier(verifier.ConfigFromProverV2Config(proverConfig))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new verifier: %w", err)
 	}

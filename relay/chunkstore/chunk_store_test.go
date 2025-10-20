@@ -12,8 +12,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigenda/test/testbed"
@@ -158,7 +158,7 @@ func runRandomCoefficientsTest(t *testing.T, client s3.Client) {
 	fragmentSize := int(chunkSize / 2)
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
-	encoder := rs.NewEncoder(cfg)
+	encoder := rs.NewEncoder(logger, cfg)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, client, bucket)
@@ -216,7 +216,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
-	encoder := rs.NewEncoder(cfg)
+	encoder := rs.NewEncoder(logger, cfg)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	ctx := t.Context()

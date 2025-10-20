@@ -9,9 +9,9 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpccommon "github.com/Layr-Labs/eigenda/api/grpc/common"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/rs"
 	"github.com/stretchr/testify/require"
 )
 

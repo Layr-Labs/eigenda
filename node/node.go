@@ -26,8 +26,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node/ejection"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
@@ -208,7 +208,7 @@ func NewNode(
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
 
-	verifierV2Config := verifierv2.KzgConfigFromV1Config(&config.EncoderConfig)
+	verifierV2Config := verifierv2.ConfigFromV1KzgConfig(&config.EncoderConfig)
 	verifierV2, err := verifierv2.NewVerifier(verifierV2Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create verifier: %w", err)
