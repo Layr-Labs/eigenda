@@ -31,7 +31,10 @@
 // - s: secret SRS value
 // - p: polynomial represented by the blob
 // - blob: list of field elements, representing the coefficients of p(x)
-// - [x]_1: KZG commitment of polynomial x in G1
+// - [x]_1: KZG commitment of field element x in G1
+// - [x]_2: KZG commitment of field element x in G2
+// - [p]_1: KZG commitment of polynomial p in G1
+// - [p]_2: KZG commitment of polynomial p in G2
 // - See https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html for math background.
 //
 // In theory, proving an upper bound on the actual blob length is very simple (assuming knowledge of pairings),
@@ -39,7 +42,7 @@
 // - G1 and G2: generators of the bn254 curve groups
 // - BL: blob length (power of 2)
 // - BC_G1: blob commitment; [p]_1 := p(s)G1 (this is the same as our [encoding.BlobCommitments].Commitment)
-// - LC_G1: len commitment; [q(x)]_1=q(s)*G1 where q(x) := x^(2^28-BL)*p(x)
+// - LC_G1: len commitment; [q]_1=q(s)*G1 where q(x) := x^(2^28-BL)*p(x)
 // Verification is simply e(BC_G1, s^(2^28-BL)*G2) = e(LC_G1, G2)
 //
 // Unfortunately, this simple strategy does not work, due to our (unfortunate) choice of SRS ceremony,
