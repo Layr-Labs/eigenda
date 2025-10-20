@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/v1/rs"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/rs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
