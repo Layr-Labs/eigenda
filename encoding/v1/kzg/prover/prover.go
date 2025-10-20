@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/v1/fft"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	gnarkprover "github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover/gnark"
 	"github.com/Layr-Labs/eigenda/encoding/v1/rs"

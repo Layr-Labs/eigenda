@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
+	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
 	rsicicle "github.com/Layr-Labs/eigenda/encoding/v2/rs/icicle"
 )
 

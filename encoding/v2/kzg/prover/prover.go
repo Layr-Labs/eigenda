@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
 	gnarkprover "github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/gnark"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"

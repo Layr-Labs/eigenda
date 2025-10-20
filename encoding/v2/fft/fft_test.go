@@ -3,7 +3,7 @@ package fft_test
 import (
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
 	"github.com/stretchr/testify/require"
 )
 
