@@ -156,7 +156,9 @@ func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [
 // of direct multiplication (makeZeroPolyMulLeaf) and iterated multiplication via convolution (reduceLeaves)
 //
 // Also calculates the FFT (the "evaluation polynomial").
-func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length uint64) ([]fr.Element, []fr.Element, error) {
+func (fs *FFTSettings) ZeroPolyViaMultiplication(
+	missingIndices []uint64, length uint64,
+) ([]fr.Element, []fr.Element, error) {
 	if len(missingIndices) == 0 {
 		return make([]fr.Element, length), make([]fr.Element, length), nil
 	}

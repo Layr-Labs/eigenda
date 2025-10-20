@@ -146,7 +146,8 @@ func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element, zeroPolyFn 
 
 	for i, s := range samples {
 		if s != nil && !reconstructedData[i].Equal(s) {
-			return nil, fmt.Errorf("failed to reconstruct data correctly, changed value at index %d. Expected: %s, got: %s", i, s.String(), reconstructedData[i].String())
+			return nil, fmt.Errorf("failed to reconstruct data correctly, changed value at index %d. "+
+				"Expected: %s, got: %s", i, s.String(), reconstructedData[i].String())
 		}
 	}
 	return reconstructedData, nil

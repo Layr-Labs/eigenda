@@ -38,7 +38,10 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-func (fs *FFTSettings) simpleFTG1(vals []bn254.G1Affine, valsOffset uint64, valsStride uint64, rootsOfUnity []fr.Element, rootsOfUnityStride uint64, out []bn254.G1Affine) {
+func (fs *FFTSettings) simpleFTG1(
+	vals []bn254.G1Affine, valsOffset uint64, valsStride uint64,
+	rootsOfUnity []fr.Element, rootsOfUnityStride uint64, out []bn254.G1Affine,
+) {
 	l := uint64(len(out))
 	var v bn254.G1Affine
 	var tmp bn254.G1Affine
@@ -72,7 +75,9 @@ func (fs *FFTSettings) _fftG1(vals []bn254.G1Affine, valsOffset uint64, valsStri
 	rootsOfUnity []fr.Element, rootsOfUnityStride uint64, out []bn254.G1Affine,
 	stage, maxSplits int, // concurrency control
 ) {
-	if len(out) <= 4 { // if the value count is small, run the unoptimized version instead. // TODO tune threshold. (can be different for G1)
+	// if the value count is small, run the unoptimized version instead.
+	// TODO tune threshold. (can be different for G1)
+	if len(out) <= 4 {
 		fs.simpleFTG1(vals, valsOffset, valsStride, rootsOfUnity, rootsOfUnityStride, out)
 		return
 	}

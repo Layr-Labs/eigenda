@@ -63,7 +63,10 @@ var (
 	ErrNotPowerOfTwo = &InputNotPowerOfTwoError{inputLen: 0}
 )
 
-func (fs *FFTSettings) simpleFT(vals []fr.Element, valsOffset uint64, valsStride uint64, rootsOfUnity []fr.Element, rootsOfUnityStride uint64, out []fr.Element) {
+func (fs *FFTSettings) simpleFT(
+	vals []fr.Element, valsOffset uint64, valsStride uint64,
+	rootsOfUnity []fr.Element, rootsOfUnityStride uint64, out []fr.Element,
+) {
 	l := uint64(len(out))
 	var v fr.Element
 	var tmp fr.Element
@@ -85,7 +88,10 @@ func (fs *FFTSettings) simpleFT(vals []fr.Element, valsOffset uint64, valsStride
 	}
 }
 
-func (fs *FFTSettings) _fft(vals []fr.Element, valsOffset uint64, valsStride uint64, rootsOfUnity []fr.Element, rootsOfUnityStride uint64, out []fr.Element) {
+func (fs *FFTSettings) _fft(
+	vals []fr.Element, valsOffset uint64, valsStride uint64,
+	rootsOfUnity []fr.Element, rootsOfUnityStride uint64, out []fr.Element,
+) {
 	if len(out) <= 4 { // if the value count is small, run the unoptimized version instead. // TODO tune threshold.
 		fs.simpleFT(vals, valsOffset, valsStride, rootsOfUnity, rootsOfUnityStride, out)
 		return
@@ -95,7 +101,7 @@ func (fs *FFTSettings) _fft(vals []fr.Element, valsOffset uint64, valsStride uin
 	// L will be the left half of out
 	fs._fft(vals, valsOffset, valsStride<<1, rootsOfUnity, rootsOfUnityStride<<1, out[:half])
 	// R will be the right half of out
-	fs._fft(vals, valsOffset+valsStride, valsStride<<1, rootsOfUnity, rootsOfUnityStride<<1, out[half:]) // just take even again
+	fs._fft(vals, valsOffset+valsStride, valsStride<<1, rootsOfUnity, rootsOfUnityStride<<1, out[half:])
 
 	var yTimesRoot fr.Element
 	var x, y fr.Element
