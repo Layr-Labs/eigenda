@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
-	rsicicle "github.com/Layr-Labs/eigenda/encoding/rs/icicle"
+	rsicicle "github.com/Layr-Labs/eigenda/encoding/v1/rs/icicle"
 )
 
 const (
