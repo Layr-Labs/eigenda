@@ -9,7 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
-	gnarkencoder "github.com/Layr-Labs/eigenda/encoding/rs/gnark"
+	gnarkencoder "github.com/Layr-Labs/eigenda/encoding/v1/rs/gnark"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	_ "go.uber.org/automaxprocs"
