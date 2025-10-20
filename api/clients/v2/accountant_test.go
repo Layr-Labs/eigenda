@@ -1179,6 +1179,41 @@ func TestSetPaymentState(t *testing.T) {
 				periodRecords:     []PeriodRecord{},
 			},
 		},
+		{
+			name: "error if ReservationWindow is set to 0",
+			state: &disperser_rpc.GetPaymentStateReply{
+				PaymentGlobalParams: &disperser_rpc.PaymentGlobalParams{
+					MinNumSymbols:     100,
+					PricePerSymbol:    50,
+					ReservationWindow: 0,
+				},
+				OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+				CumulativePayment:        big.NewInt(500).Bytes(),
+				Reservation: &disperser_rpc.Reservation{
+					SymbolsPerSecond: 300,
+					StartTimestamp:   100,
+					EndTimestamp:     200,
+					QuorumNumbers:    []uint32{0},
+					QuorumSplits:     []uint32{100},
+				},
+				PeriodRecords: []*disperser_rpc.PeriodRecord{
+					{
+						Index: 1,
+						Usage: 150,
+					},
+					{
+						Index: 0,
+						Usage: 0,
+					},
+					{
+						Index: 0,
+						Usage: 0,
+					},
+				},
+			},
+			expectError:  true,
+			errorMessage: "reservationWindow cannot be 0",
+		},
 	}
 
 	for _, tt := range tests {
