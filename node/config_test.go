@@ -126,18 +126,18 @@ func TestECDSAKeyValidationErrors(t *testing.T) {
 			// Test the validation logic directly by simulating the conditions
 			needECDSAKey := tt.registerAtStart || tt.pubIPCheckInterval > 0 || tt.ejectionDefenseEnabled
 			assert.True(t, needECDSAKey, "All test cases should require ECDSA key")
-			
+
 			// Test the specific validation logic for each case
 			if tt.registerAtStart && (tt.ecdsaKeyFile == "" || tt.ecdsaKeyPassword == "") {
 				// This would trigger the registerAtStart error
 				assert.Contains(t, tt.expectedErrorContains, "register-at-node-start")
 			}
-			
+
 			if tt.pubIPCheckInterval > 0 && (tt.ecdsaKeyFile == "" || tt.ecdsaKeyPassword == "") {
-				// This would trigger the pubIPCheckInterval error  
+				// This would trigger the pubIPCheckInterval error
 				assert.Contains(t, tt.expectedErrorContains, "pub-ip-check-interval")
 			}
-			
+
 			if tt.ejectionDefenseEnabled && (tt.ecdsaKeyFile == "" || tt.ecdsaKeyPassword == "") {
 				// This would trigger the ejectionDefenseEnabled error
 				assert.Contains(t, tt.expectedErrorContains, "ejection-defense-enabled")
@@ -185,18 +185,18 @@ func TestECDSAKeyValidationSuccess(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			needECDSAKey := tt.registerAtStart || tt.pubIPCheckInterval > 0 || tt.ejectionDefenseEnabled
-			
+
 			// If ECDSA key is needed, validate that we have both file and password
 			if needECDSAKey {
-				assert.True(t, tt.ecdsaKeyFile != "" && tt.ecdsaKeyPassword != "", 
+				assert.True(t, tt.ecdsaKeyFile != "" && tt.ecdsaKeyPassword != "",
 					"Valid configurations should provide both key file and password when needed")
 			}
-			
+
 			// Test that each individual validation would pass
 			registerAtStartValid := !tt.registerAtStart || (tt.ecdsaKeyFile != "" && tt.ecdsaKeyPassword != "")
 			pubIPCheckValid := tt.pubIPCheckInterval == 0 || (tt.ecdsaKeyFile != "" && tt.ecdsaKeyPassword != "")
 			ejectionDefenseValid := !tt.ejectionDefenseEnabled || (tt.ecdsaKeyFile != "" && tt.ecdsaKeyPassword != "")
-			
+
 			assert.True(t, registerAtStartValid, "Register at start validation should pass")
 			assert.True(t, pubIPCheckValid, "Pub IP check validation should pass")
 			assert.True(t, ejectionDefenseValid, "Ejection defense validation should pass")

@@ -14,8 +14,8 @@ import (
 
 	grpccommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 )
 
 const (
