@@ -237,7 +237,7 @@ func largeBlobDispersalTest(t *testing.T, environment string) {
 
 	logger := common.TestLogger(t)
 
-	config, err := client.GetConfig(logger, client.LiveTestPrefix, environment)
+	config, err := client.GetConfig(t, logger, client.LiveTestPrefix, environment)
 	require.NoError(t, err)
 	maxBlobSize := int(config.MaxBlobSize)
 
@@ -300,7 +300,7 @@ func TestSmallBlobDispersalAllQuorumsSets(t *testing.T) {
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func maximumSizedBlobDispersalTest(t *testing.T, environment string) {
 	logger := common.TestLogger(t)
-	config, err := client.GetConfig(logger, client.LiveTestPrefix, environment)
+	config, err := client.GetConfig(t, logger, client.LiveTestPrefix, environment)
 	require.NoError(t, err)
 
 	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(
@@ -330,7 +330,7 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 // Disperse a blob that is too large (>16MB after padding)
 func tooLargeBlobDispersalTest(t *testing.T, environment string) {
 	logger := common.TestLogger(t)
-	config, err := client.GetConfig(logger, client.LiveTestPrefix, environment)
+	config, err := client.GetConfig(t, logger, client.LiveTestPrefix, environment)
 	require.NoError(t, err)
 
 	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)
