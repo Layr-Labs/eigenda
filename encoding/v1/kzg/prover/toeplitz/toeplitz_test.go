@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/v1/fft"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/stretchr/testify/assert"

@@ -6,9 +6,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
+	"github.com/Layr-Labs/eigenda/encoding/v1/fft"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover/toeplitz"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"

@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
 )
 
 func CreateIcicleBackendProver(

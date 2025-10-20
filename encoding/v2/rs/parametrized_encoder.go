@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	rb "github.com/Layr-Labs/eigenda/encoding/utils/reverseBits"
+	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 

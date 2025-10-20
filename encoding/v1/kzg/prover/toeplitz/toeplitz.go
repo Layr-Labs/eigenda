@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/v1/fft"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
