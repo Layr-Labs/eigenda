@@ -27,11 +27,18 @@
 //
 // ----- Length Commitment + Length Proof Explanation -----
 //
+// Notation:
+// - s: secret SRS value
+// - p: polynomial represented by the blob
+// - blob: list of field elements, representing the coefficients of p(x)
+// - [x]_1: KZG commitment of polynomial x in G1
+// - See https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html for math background.
+//
 // In theory, proving an upper bound on the actual blob length is very simple (assuming knowledge of pairings),
 // and would require only a LengthCommitment (no LengthProof needed).
 // - G1 and G2: generators of the bn254 curve groups
 // - BL: blob length (power of 2)
-// - BC_G1: blob commitment; [p(x)]_1 := p(s)G1 (this is the same as our [encoding.BlobCommitments].Commitment)
+// - BC_G1: blob commitment; [p]_1 := p(s)G1 (this is the same as our [encoding.BlobCommitments].Commitment)
 // - LC_G1: len commitment; [q(x)]_1=q(s)*G1 where q(x) := x^(2^28-BL)*p(x)
 // Verification is simply e(BC_G1, s^(2^28-BL)*G2) = e(LC_G1, G2)
 //
@@ -59,10 +66,10 @@
 // - LP_G2: len proof; commitment to q(x) = x^(2^28-BL)p(x)
 // - Verify e(s^(2^28-BL), LC_G2) = e(G1, LP_G2)
 // Note there is no C1 in above pairing, which is why we verify a second pairing e(C1,G2) = e(G1,C2)
-// in [VerifyCommitEquivalenceBatch]! Also note that despite calling LP_G2 a "proof", it is actually
-// it is by itself no more of a proof than LC_G2; both are commitments which together allow verifying the length claim.
+// in [VerifyCommitEquivalenceBatch]! Also note that despite calling LP_G2 a "proof", it is by itself
+// no more of a proof than LC_G2; both are commitments which together allow verifying the length claim.
 //
-// Note that we actually missed a simpler scheme when initially implementing this,
+// As a side note, we missed a simpler scheme when initially implementing this,
 // whose proofs are two (smaller) G1 points instead of two G2 points.
 // A future protocol upgrade could switch to this scheme if desired:
 // - shift = 2^28 - BL
