@@ -32,7 +32,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"

@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v1/rs"
 	"github.com/stretchr/testify/mock"
 )
 

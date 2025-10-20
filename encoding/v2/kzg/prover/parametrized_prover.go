@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )

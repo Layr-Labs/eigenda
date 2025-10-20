@@ -22,7 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	p "github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"

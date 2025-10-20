@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v1/rs"
 )
 
 func TestGetEncodingParams(t *testing.T) {
