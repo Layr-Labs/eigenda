@@ -145,10 +145,6 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 		return proxyerrors.NewParsingError(
 			fmt.Errorf("failed to decode hex keccak commitment %s: %w", keccakCommitmentHex, err))
 	}
-	if len(keccakCommitment) != 32 {
-		return proxyerrors.NewParsingError(
-			fmt.Errorf("keccak commitment must be 32 bytes, got %d bytes", len(keccakCommitment)))
-	}
 
 	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, common.MaxServerPOSTRequestBodySize))
 	if err != nil {
