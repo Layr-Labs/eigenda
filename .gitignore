@@ -30,3 +30,6 @@ icicle/*
 .DS_Store
 
 **/logs/**
+
+# Rust
+**/target/

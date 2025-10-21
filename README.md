@@ -24,6 +24,10 @@ The EigenDA public API is documented [here](https://docs.eigencloud.xyz/products
 
 If you want to be an EigenDA operator and run a node, please clone [Operator Setup Guide](https://github.com/Layr-Labs/eigenda-operator-setup) GitHub repo and follow the instructions there.
 
+## Repository Structure
+
+- **`./rust`** - Sovereign SDK EigenDA adapter: A data availability adapter implementation for [Sovereign SDK](https://github.com/Sovereign-Labs/sovereign-sdk) rollups that enables them to use EigenDA as their data availability layer.
+
 ## Contributing
 We welcome all contributions! There are many ways to contribute to the project, including but not limited to:
 
