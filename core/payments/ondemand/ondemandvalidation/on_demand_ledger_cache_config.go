@@ -2,6 +2,7 @@ package ondemandvalidation
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -45,7 +46,7 @@ func NewOnDemandLedgerCacheConfig(
 	}
 
 	if err := config.Verify(); err != nil {
-		return OnDemandLedgerCacheConfig{}, err
+		return OnDemandLedgerCacheConfig{}, fmt.Errorf("failed to verify on-demand ledger cache config: %w", err)
 	}
 
 	return config, nil

@@ -2,6 +2,7 @@ package reservationvalidation
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
@@ -60,7 +61,7 @@ func NewReservationLedgerCacheConfig(
 	}
 
 	if err := config.Verify(); err != nil {
-		return ReservationLedgerCacheConfig{}, err
+		return ReservationLedgerCacheConfig{}, fmt.Errorf("failed to verify reservation ledger cache config: %w", err)
 	}
 
 	return config, nil
