@@ -138,9 +138,12 @@ pub fn verify_and_extract_payload(
         return Some(Err(ProofVerificationError(err)));
     }
 
-    // if certificate extraction fails: ignore
     let current_block = inclusion_height as u32;
-    let inputs = cert_state.extract(cert, current_block).ok()?;
+    let inputs = match cert_state.extract(cert, current_block) {
+        Ok(inputs) => inputs,
+        Err(err) => return Some(Err(CertExtractionError(err))),
+    };
+
 
     // if certificate verification fails: ignore
     cert::verify(inputs).ok()?;
