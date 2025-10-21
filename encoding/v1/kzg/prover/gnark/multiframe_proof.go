@@ -3,7 +3,6 @@ package gnark
 import (
 	"fmt"
 	"log/slog"
-	"math"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/v1/fft"
@@ -175,12 +174,4 @@ func (p *KzgMultiProofGnarkBackend) GetSlicesCoeff(polyFr []fr.Element, dimE, j,
 		return nil, err
 	}
 	return tm.GetFFTCoeff()
-}
-
-/*
-returns the power of 2 which is immediately bigger than the input
-*/
-func CeilIntPowerOf2Num(d uint64) uint64 {
-	nextPower := math.Ceil(math.Log2(float64(d)))
-	return uint64(math.Pow(2.0, nextPower))
 }
