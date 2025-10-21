@@ -51,7 +51,12 @@ var (
 	mockSubgraphApi        = &subgraphmock.MockSubgraphApi{}
 	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
 
-	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
+	config = dataapi.Config{
+		ServerMode:        "test",
+		SocketAddr:        ":8080",
+		AllowOrigins:      []string{"*"},
+		DisperserHostname: "localhost:32007",
+	}
 
 	serverVersion     = uint(1)
 	mockTx            = &coremock.MockWriter{}
@@ -650,44 +655,6 @@ func TestFetchDisperserServiceAvailabilityHandler(t *testing.T) {
 
 	serviceData := response.Data[0]
 	assert.Equal(t, "Disperser", serviceData.ServiceName)
-	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), serviceData.ServiceStatus)
-}
-
-func TestChurnerServiceAvailabilityHandler(t *testing.T) {
-	r := setUpRouter()
-
-	mockHealthCheckService := NewMockHealthCheckService()
-	mockHealthCheckService.AddResponse("Churner", &grpc_health_v1.HealthCheckResponse{
-		Status: grpc_health_v1.HealthCheckResponse_SERVING,
-	})
-
-	testDataApiServer, _ = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockIndexedChainState, mockLogger, metrics, &MockGRPCConnection{}, mockHealthCheckService, nil)
-
-	r.GET("/v1/metrics/churner-service-availability", testDataApiServer.FetchChurnerServiceAvailability)
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/churner-service-availability", nil)
-	r.ServeHTTP(w, req)
-
-	res := w.Result()
-	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
-
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
-
-	var response dataapi.ServiceAvailabilityResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
-
-	fmt.Printf("Response: %v\n", response)
-
-	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.Equal(t, 1, response.Meta.Size)
-	assert.Equal(t, 1, len(response.Data))
-
-	serviceData := response.Data[0]
-	assert.Equal(t, "Churner", serviceData.ServiceName)
 	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), serviceData.ServiceStatus)
 }
 

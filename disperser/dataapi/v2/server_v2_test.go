@@ -78,7 +78,12 @@ var (
 	mockSubgraphApi   = &subgraphmock.MockSubgraphApi{}
 	subgraphClient    = dataapi.NewSubgraphClient(mockSubgraphApi, logger)
 
-	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
+	config = dataapi.Config{
+		ServerMode:        "test",
+		SocketAddr:        ":8080",
+		AllowOrigins:      []string{"*"},
+		DisperserHostname: "localhost:32007",
+	}
 
 	mockTx            = &coremock.MockWriter{}
 	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")

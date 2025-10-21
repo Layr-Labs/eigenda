@@ -14,7 +14,6 @@ dataSources:
       apiVersion: 0.0.7
       language: wasm/assemblyscript
       entities:
-        - ChurnApproverUpdated
         - Initialized
         - OperatorDeregistered
         - OperatorRegistered
@@ -24,8 +23,6 @@ dataSources:
         - name: RegistryCoordinator
           file: ./abis/RegistryCoordinator.json
       eventHandlers:
-        - event: ChurnApproverUpdated(address,address)
-          handler: handleChurnApproverUpdated
         - event: OperatorDeregistered(indexed address,indexed bytes32)
           handler: handleOperatorDeregistered
         - event: OperatorRegistered(indexed address,indexed bytes32)

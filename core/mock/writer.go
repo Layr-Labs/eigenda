@@ -174,19 +174,6 @@ func (t *MockWriter) WeightOfOperatorForQuorum(ctx context.Context, quorumID cor
 	return result.(*big.Int), args.Error(1)
 }
 
-func (t *MockWriter) CalculateOperatorChurnApprovalDigestHash(
-	ctx context.Context,
-	operatorAddress gethcommon.Address,
-	operatorId core.OperatorID,
-	operatorsToChurn []core.OperatorToChurn,
-	salt [32]byte,
-	expiry *big.Int,
-) ([32]byte, error) {
-	args := t.Called()
-	result := args.Get(0)
-	return result.([32]byte), args.Error(1)
-}
-
 func (t *MockWriter) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
 	args := t.Called()
 	result := args.Get(0)

@@ -15,13 +15,6 @@ FROM base-builder AS common-builder
 WORKDIR /app
 COPY . .
 
-# Churner build stage
-FROM common-builder AS churner-builder
-WORKDIR /app/operators
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    go build -o ./bin/churner ./churner/cmd
-
 # Encoder build stage
 FROM common-builder AS encoder-builder
 WORKDIR /app/disperser
@@ -124,10 +117,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -o ./bin/eigenda-proxy ./cmd/server
 
 # Final stages for each component
-FROM alpine:3.22 AS churner
-COPY --from=churner-builder /app/operators/bin/churner /usr/local/bin
-ENTRYPOINT ["churner"]
-
 FROM alpine:3.22 AS encoder
 COPY --from=encoder-builder /app/disperser/bin/encoder /usr/local/bin
 ENTRYPOINT ["encoder"]

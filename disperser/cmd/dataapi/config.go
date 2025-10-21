@@ -37,7 +37,6 @@ type Config struct {
 	EigenDAServiceManagerAddr  string
 
 	DisperserHostname  string
-	ChurnerHostname    string
 	BatcherHealthEndpt string
 }
 
@@ -83,7 +82,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetricsFlag.Name),
 		},
 		DisperserHostname:  ctx.GlobalString(flags.DisperserHostnameFlag.Name),
-		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
 		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
 	}

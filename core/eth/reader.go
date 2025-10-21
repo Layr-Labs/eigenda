@@ -691,39 +691,6 @@ func (t *Reader) WeightOfOperatorForQuorum(ctx context.Context, quorumID core.Qu
 	}, quorumID, operator)
 }
 
-func (t *Reader) CalculateOperatorChurnApprovalDigestHash(
-	ctx context.Context,
-	operatorAddress gethcommon.Address,
-	operatorId core.OperatorID,
-	operatorsToChurn []core.OperatorToChurn,
-	salt [32]byte,
-	expiry *big.Int,
-) ([32]byte, error) {
-	opKickParams := make([]regcoordinator.IRegistryCoordinatorOperatorKickParam, len(operatorsToChurn))
-	for i := range operatorsToChurn {
-
-		opKickParams[i] = regcoordinator.IRegistryCoordinatorOperatorKickParam{
-			QuorumNumber: operatorsToChurn[i].QuorumId,
-			Operator:     operatorsToChurn[i].Operator,
-		}
-	}
-	return t.bindings.RegistryCoordinator.CalculateOperatorChurnApprovalDigestHash(&bind.CallOpts{
-		Context: ctx,
-	}, operatorAddress, operatorId, opKickParams, salt, expiry)
-}
-
-func (t *Reader) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
-	bn, err := t.ethClient.BlockNumber(ctx)
-	return uint32(bn), err
-}
-
-func (t *Reader) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
-	return t.bindings.RegistryCoordinator.QuorumCount(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	})
-}
-
 func (t *Reader) GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]core.SecurityParam, error) {
 	adversaryThresholdPercentegesBytes, err := t.bindings.EigenDAServiceManager.QuorumAdversaryThresholdPercentages(&bind.CallOpts{
 		Context:     ctx,

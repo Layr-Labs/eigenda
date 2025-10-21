@@ -5,7 +5,6 @@ type Config struct {
 	ServerMode         string
 	AllowOrigins       []string
 	DisperserHostname  string
-	ChurnerHostname    string
 	BatcherHealthEndpt string
 }
 

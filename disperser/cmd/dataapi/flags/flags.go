@@ -116,21 +116,14 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
-	// EigenDA Disperser and Churner Hostnames to check Server Availability
+	// EigenDA Disperser Hostname to check Server Availability
 	// ex:
 	// disperser-goerli.eigenda.eigenops.xyz,
-	// churner-goerli.eigenda.eigenops.xyz
 	DisperserHostnameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-disperser-hostname"),
 		Usage:    "HostName of EigenDA Disperser",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DISPERSER_HOSTNAME"),
-	}
-	ChurnerHostnameFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-churner-hostname"),
-		Usage:    "HostName of EigenDA Churner",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CHURNER_HOSTNAME"),
 	}
 	BatcherHealthEndptFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-batcher-health-endpoint"),
@@ -169,7 +162,6 @@ var requiredFlags = []cli.Flag{
 	AllowOriginsFlag,
 	EnableMetricsFlag,
 	DisperserHostnameFlag,
-	ChurnerHostnameFlag,
 	BatcherHealthEndptFlag,
 }
 

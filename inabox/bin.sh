@@ -19,11 +19,6 @@ function kill_processes {
 function start_trap {
     trap kill_processes SIGINT
 
-    set -a
-    source $testpath/envs/churner.env
-    set +a
-    ../operators/churner/bin/server &
-
     pid="$!"
     pids="$pids $pid"
 
@@ -115,16 +110,8 @@ function start_detached {
 
     mkdir -p $testpath/logs
 
-    set -a
-    source $testpath/envs/churner.env
-    set +a
-    ../operators/churner/bin/server > $testpath/logs/churner.log 2>&1 &
-
     pid="$!"
     pids="$pids $pid"
-
-    ./wait-for 0.0.0.0:${CHURNER_GRPC_PORT} -- echo "Churner up" &
-    waiters="$waiters $!"
 
     for FILE in $(ls $testpath/envs/dis*.env); do
         set -a
@@ -240,7 +227,7 @@ function start_detached {
     done
 }
 
-# Start binaries for tests (without churner and operators which run as goroutines)
+# Start binaries for tests (without operators which run as goroutines)
 function start_detached_for_tests {
 
     pids=""
@@ -253,8 +240,6 @@ function start_detached_for_tests {
     fi
 
     mkdir -p $testpath/logs
-
-    echo "Skipping churner startup (running as goroutine in tests)"
 
     for FILE in $(ls $testpath/envs/dis*.env); do
         set -a
@@ -350,7 +335,6 @@ function stop_detached {
 
 function force_stop {
     echo "Force stopping all EigenDA processes..."
-    pkill -9 -f "churner/bin/server" || true
     pkill -9 -f "disperser/bin/server" || true
     pkill -9 -f "disperser/bin/encoder" || true
     pkill -9 -f "disperser/bin/batcher" || true
@@ -368,7 +352,7 @@ help() {
     echo "Commands:"
     echo "  start                      Start all services in the foreground with trap on SIGINT"
     echo "  start-detached             Start all services in the background and log output to files"
-    echo "  start-detached-for-tests   Start services for tests (churner and operators run as goroutines)"
+    echo "  start-detached-for-tests   Start services for tests (operators run as goroutines)"
     echo "  stop-detached              Stop all background services started with start-detached"
     echo "  force-stop                 Force kill all EigenDA related processes"
     echo ""

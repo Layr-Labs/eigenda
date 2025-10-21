@@ -21,12 +21,6 @@ type OperatorStakeWithSocket struct {
 	Socket     OperatorSocket
 }
 
-type OperatorToChurn struct {
-	QuorumId QuorumID
-	Operator gethcommon.Address
-	Pubkey   *G1Point
-}
-
 type OperatorSetParam struct {
 	MaxOperatorCount         uint32
 	ChurnBIPsOfOperatorStake uint16
@@ -94,16 +88,6 @@ type Reader interface {
 
 	// WeightOfOperatorForQuorum returns the weight of the operator for the quorum view.
 	WeightOfOperatorForQuorum(ctx context.Context, quorumID QuorumID, operator gethcommon.Address) (*big.Int, error)
-
-	// CalculateOperatorChurnApprovalDigestHash returns calculated operator churn approval digest hash.
-	CalculateOperatorChurnApprovalDigestHash(
-		ctx context.Context,
-		operatorAddress gethcommon.Address,
-		operatorId OperatorID,
-		operatorsToChurn []OperatorToChurn,
-		salt [32]byte,
-		expiry *big.Int,
-	) ([32]byte, error)
 
 	// GetCurrentBlockNumber returns the current block number.
 	GetCurrentBlockNumber(ctx context.Context) (uint32, error)

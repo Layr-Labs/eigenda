@@ -1,4 +1,4 @@
-.PHONY: compile-el compile-dl clean protoc mdbook-serve lint build unit-tests integration-tests integration-tests-churner integration-tests-indexer integration-tests-node-plugin integration-tests-eigenda-client integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer integration-tests-dataapi check-fmt
+.PHONY: compile-el compile-dl clean protoc mdbook-serve lint build unit-tests integration-tests integration-tests-indexer integration-tests-node-plugin integration-tests-eigenda-client integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer integration-tests-dataapi check-fmt
 
 ifeq ($(wildcard .git/*),)
 $(warning semver disabled - building from release zip)
@@ -33,7 +33,6 @@ export GOFLAGS := -buildvcs=false
 $(warning Detected git worktree - disabling VCS stamping)
 endif
 build: protoc contract-bindings
-	$(MAKE) -C operators/churner build
 	$(MAKE) -C disperser build
 	$(MAKE) -C node build
 	$(MAKE) -C retriever build
@@ -45,7 +44,6 @@ build: protoc contract-bindings
 
 clean:
 	$(MAKE) -C api clean
-	$(MAKE) -C operators/churner clean
 	$(MAKE) -C disperser clean
 	$(MAKE) -C node clean
 	$(MAKE) -C retriever clean
@@ -121,7 +119,6 @@ fuzz-tests:
 
 # Integration tests use mocks
 integration-tests:
-	go test -v ./operators/churner/tests
 	go test -v ./core/indexer
 	go test -v ./node/plugin/tests
 	go test -v ./disperser/dataapi

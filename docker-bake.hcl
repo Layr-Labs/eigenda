@@ -48,7 +48,6 @@ group "all" {
     "disperser",
     "encoder",
     "retriever",
-    "churner",
     "dataapi",
     "traffic-generator",
     "traffic-generator-v2",
@@ -74,7 +73,6 @@ group "internal-release" {
     "encoder-internal",
     "encoder-icicle-internal",
     "retriever-internal",
-    "churner-internal",
     "dataapi-internal",
     "traffic-generator-internal",
     "traffic-generator-v2-internal",
@@ -165,22 +163,6 @@ target "retriever-internal" {
     "${REGISTRY}/eigenda-retriever:${BUILD_TAG}",
     "${REGISTRY}/eigenda-retriever:${GIT_SHA}",
     "${REGISTRY}/eigenda-retriever:sha-${GIT_SHORT_SHA}"
-  ]
-}
-
-target "churner" {
-  context    = "."
-  dockerfile = "./Dockerfile"
-  target     = "churner"
-  tags       = ["${REGISTRY}/${REPO}/churner:${BUILD_TAG}"]
-}
-
-target "churner-internal" {
-  inherits = ["churner"]
-  tags     = [
-    "${REGISTRY}/eigenda-churner:${BUILD_TAG}",
-    "${REGISTRY}/eigenda-churner:${GIT_SHA}",
-    "${REGISTRY}/eigenda-churner:sha-${GIT_SHORT_SHA}"
   ]
 }
 

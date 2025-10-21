@@ -49,7 +49,6 @@ const (
 	maxFeedBlobsAge                     = 10
 	maxFeedBlobAge                      = 300 // this is completely static
 	maxDisperserAvailabilityAge         = 3
-	maxChurnerAvailabilityAge           = 3
 	maxBatcherAvailabilityAge           = 3
 	maxOperatorsStakeAge                = 300 // not expect the stake change to happen frequently
 )
@@ -217,7 +216,6 @@ type (
 
 		metrics                   *Metrics
 		disperserHostName         string
-		churnerHostName           string
 		batcherHealthEndpt        string
 		eigenDAGRPCServiceChecker EigenDAGRPCServiceChecker
 		eigenDAHttpServiceChecker EigenDAHttpServiceChecker
@@ -253,7 +251,7 @@ func NewServer(
 	}
 
 	if eigenDAGRPCServiceChecker == nil {
-		eigenDAGRPCServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
+		eigenDAGRPCServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname)
 	}
 
 	if eigenDAHttpServiceChecker == nil {
@@ -280,7 +278,6 @@ func NewServer(
 		indexedChainState:         indexedChainState,
 		metrics:                   metrics,
 		disperserHostName:         config.DisperserHostname,
-		churnerHostName:           config.ChurnerHostname,
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
 		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
 		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
@@ -323,7 +320,6 @@ func (s *server) Start() error {
 			metrics.GET("/non-signers", s.FetchNonSigners)
 			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
 			metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
-			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
 			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
 		}
 		swagger := v1.Group("/swagger")
@@ -1035,60 +1031,6 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 	}
 
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDisperserAvailabilityAge))
-	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: Meta{
-			Size: len(availabilityStatuses),
-		},
-		Data: availabilityStatuses,
-	})
-}
-
-// FetchChurnerServiceAvailability godoc
-//
-//	@Summary	Get status of EigenDA churner service.
-//	@Tags		Churner ServiceAvailability
-//	@Produce	json
-//	@Success	200	{object}	ServiceAvailabilityResponse
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/churner-service-availability [get]
-func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
-	handlerStart := time.Now()
-	defer func() {
-		s.metrics.ObserveLatency("FetchChurnerServiceAvailability", time.Since(handlerStart))
-	}()
-
-	// Check Disperser
-	services := []string{"Churner"}
-
-	s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
-
-	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchChurnerServiceAvailability")
-		errorResponse(c, err)
-		return
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("FetchChurnerServiceAvailability")
-
-	// Set the status code to 503 if any of the services are not serving
-	availabilityStatus := http.StatusOK
-	for _, status := range availabilityStatuses {
-		if status.ServiceStatus == "NOT_SERVING" {
-			availabilityStatus = http.StatusServiceUnavailable
-			break
-		}
-
-		if status.ServiceStatus == "UNKNOWN" {
-			availabilityStatus = http.StatusInternalServerError
-			break
-		}
-
-	}
-
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxChurnerAvailabilityAge))
 	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
 		Meta: Meta{
 			Size: len(availabilityStatuses),
