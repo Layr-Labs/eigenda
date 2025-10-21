@@ -63,13 +63,11 @@ type Config struct {
 	EigenDADirectory                string
 	PubIPProviders                  []string
 	PubIPCheckInterval              time.Duration
-	ChurnerUrl                      string
 	DataApiUrl                      string
 	NumBatchValidators              int
 	NumBatchDeserializationWorkers  int
 	EnableGnarkBundleEncoding       bool
 	ClientIPHeader                  string
-	ChurnerUseSecureGrpc            bool
 	RelayUseSecureGrpc              bool
 	RelayMaxMessageSize             uint
 	// The number of connections to establish with each relay node.
@@ -445,13 +443,11 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EigenDADirectory:                    ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:                  pubIPCheckInterval,
-		ChurnerUrl:                          ctx.GlobalString(flags.ChurnerUrlFlag.Name),
 		DataApiUrl:                          ctx.GlobalString(flags.DataApiUrlFlag.Name),
 		NumBatchValidators:                  ctx.GlobalInt(flags.NumBatchValidatorsFlag.Name),
 		NumBatchDeserializationWorkers:      ctx.GlobalInt(flags.NumBatchDeserializationWorkersFlag.Name),
 		EnableGnarkBundleEncoding:           ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 		ClientIPHeader:                      ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
-		ChurnerUseSecureGrpc:                ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
 		RelayUseSecureGrpc:                  ctx.GlobalBoolT(flags.RelayUseSecureGRPC.Name),
 		RelayMaxMessageSize:                 uint(ctx.GlobalInt(flags.RelayMaxGRPCMessageSizeFlag.Name)),
 		RelayConnectionPoolSize:             ctx.GlobalUint(flags.RelayConnectionPoolSizeFlag.Name),

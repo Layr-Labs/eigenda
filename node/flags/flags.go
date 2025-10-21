@@ -162,18 +162,6 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
 	}
-	ChurnerUrlFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "churner-url"),
-		Usage:    "URL of the Churner",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_URL"),
-	}
-	ChurnerUseSecureGRPC = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "churner-use-secure-grpc"),
-		Usage:    "Whether to use secure GRPC connection to Churner",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_USE_SECURE_GRPC"),
-	}
 	RelayUseSecureGRPC = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "relay-use-secure-grpc"),
 		Usage:    "Whether to use secure GRPC connection to Relay (defaults to true)",
@@ -665,7 +653,6 @@ var requiredFlags = []cli.Flag{
 	BlsKeyPasswordFlag,
 	PubIPProviderFlag,
 	PubIPCheckIntervalFlag,
-	ChurnerUrlFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -683,7 +670,6 @@ var optionalFlags = []cli.Flag{
 	InternalV2DispersalPortFlag,
 	InternalV2RetrievalPortFlag,
 	ClientIPHeaderFlag,
-	ChurnerUseSecureGRPC,
 	RelayUseSecureGRPC,
 	EcdsaKeyFileFlag,
 	EcdsaKeyPasswordFlag,

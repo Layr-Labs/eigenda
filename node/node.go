@@ -266,7 +266,6 @@ func NewNode(
 		"internalRetrievalPort", config.InternalRetrievalPort,
 		"v2RetrievalPort", config.V2RetrievalPort,
 		"internalV2RetrievalPort", config.InternalV2RetrievalPort,
-		"churnerUrl", config.ChurnerUrl,
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), //nolint:staticcheck // QF1010
 		"registerNodeAtStart", config.RegisterNodeAtStart,
 		"pubIPCheckInterval", config.PubIPCheckInterval,
@@ -597,7 +596,6 @@ func (n *Node) registerValidator(socket string) error {
 		"v2DispersalPort", n.Config.V2DispersalPort,
 		"retrievalPort", n.Config.RetrievalPort,
 		"v2RetrievalPort", n.Config.V2RetrievalPort,
-		"churnerUrl", n.Config.ChurnerUrl,
 		"quorumIds", fmt.Sprintf("%v", n.Config.QuorumIDList))
 	privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
 	if err != nil {

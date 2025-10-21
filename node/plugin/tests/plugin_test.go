@@ -49,7 +49,6 @@ type OperatorConfig struct {
 	NODE_EIGENDA_DIRECTORY           string
 	NODE_BLS_OPERATOR_STATE_RETRIVER string
 	NODE_EIGENDA_SERVICE_MANAGER     string
-	NODE_CHURNER_URL                 string
 }
 
 // TestMain sets up the test environment once for all tests
@@ -145,7 +144,6 @@ func setupTestOperator() {
 		NODE_EIGENDA_DIRECTORY:           deployResult.EigenDA.EigenDADirectory,
 		NODE_BLS_OPERATOR_STATE_RETRIVER: deployResult.EigenDA.OperatorStateRetriever,
 		NODE_EIGENDA_SERVICE_MANAGER:     deployResult.EigenDA.ServiceManager,
-		NODE_CHURNER_URL:                 "",
 	}
 	testOperator = operator
 }
@@ -365,7 +363,6 @@ func runNodePlugin(t *testing.T, operation string, operator OperatorConfig) {
 		"--quorum-id-list", operator.NODE_QUORUM_ID_LIST,
 		"--chain-rpc", operator.NODE_CHAIN_RPC,
 		"--eigenda-directory", operator.NODE_EIGENDA_DIRECTORY,
-		"--churner-url", operator.NODE_CHURNER_URL,
 		"--num-confirmations", "0",
 	)
 

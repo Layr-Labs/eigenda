@@ -60,38 +60,3 @@ func TestRegisterOperator(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "quorums to register must be not registered yet"))
 }
-
-func TestRegisterOperatorWithChurn(t *testing.T) {
-	ctx := t.Context()
-	logger := test.GetLogger()
-	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
-	keyPair, err := core.GenRandomBlsKeys()
-	assert.NoError(t, err)
-	signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
-		PrivateKey: keyPair.PrivKey.String(),
-		SignerType: blssignerTypes.PrivateKey,
-	})
-	assert.NoError(t, err)
-	// Create a new operator
-	operator := &node.Operator{
-		Address:    "0xB7Ad27737D88B07De48CDc2f379917109E993Be4",
-		Socket:     "localhost:50051",
-		Timeout:    10 * time.Second,
-		Signer:     signer,
-		PrivKey:    nil,
-		OperatorId: operatorID,
-		QuorumIDs:  []core.QuorumID{1},
-	}
-	tx := &coremock.MockWriter{}
-	tx.On("GetRegisteredQuorumIdsForOperator").Return([]uint8{2}, nil)
-	tx.On("GetOperatorSetParams", mock.Anything, mock.Anything).Return(&core.OperatorSetParam{
-		MaxOperatorCount:         1,
-		ChurnBIPsOfOperatorStake: 20,
-		ChurnBIPsOfTotalStake:    20000,
-	}, nil)
-	tx.On("GetNumberOfRegisteredOperatorForQuorum").Return(uint32(1), nil)
-	tx.On("RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	err = node.RegisterOperator(ctx, operator, tx, logger)
-	assert.NoError(t, err)
-	tx.AssertCalled(t, "RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, []core.QuorumID{1}, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-}
