@@ -19,7 +19,37 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
+	"go.opentelemetry.io/otel/trace"
 )
+
+var tracer = otel.Tracer("github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal")
+
+// withClientSpan wraps an external call with a client span for better observability.
+// It automatically handles span creation, error recording, and status setting.
+func withClientSpan[T any](
+	ctx context.Context,
+	name string,
+	fn func(context.Context) (T, error),
+	attrs ...attribute.KeyValue,
+) (T, error) {
+	ctx, span := tracer.Start(ctx, name,
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(attrs...))
+	defer span.End()
+
+	result, err := fn(ctx)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	} else {
+		span.SetStatus(codes.Ok, "ok")
+	}
+	return result, err
+}
 
 // PayloadDisperser provides the ability to disperse payloads to EigenDA via a Disperser grpc service.
 //
@@ -89,19 +119,31 @@ func (pd *PayloadDisperser) SendPayload(
 	// payload is the raw data to be stored on eigenDA
 	payload coretypes.Payload,
 ) (coretypes.EigenDACert, error) {
+	ctx, span := tracer.Start(ctx, "PayloadDisperser.SendPayload",
+		trace.WithAttributes(
+			attribute.Int("payload_size_bytes", len(payload)),
+			attribute.Int("blob_version", int(pd.config.BlobVersion)),
+			attribute.Int("payload_form", int(pd.config.PayloadPolynomialForm)),
+			attribute.Bool("payment.new_ledger", pd.clientLedger != nil),
+		))
+	defer span.End()
 
 	probe := pd.stageTimer.NewSequence()
 	defer probe.End()
 	probe.SetStage("convert_to_blob")
+	span.AddEvent("stage", trace.WithAttributes(attribute.String("status", "convert_to_blob")))
 
 	// convert the payload into an EigenDA blob by interpreting the payload in polynomial form,
 	// which means the encoded payload will need to be IFFT'd since EigenDA blobs are in coefficient form.
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to convert payload to blob")
 		return nil, fmt.Errorf("failed to convert payload to blob: %w", err)
 	}
 
 	probe.SetStage("get_quorums")
+	span.AddEvent("stage", trace.WithAttributes(attribute.String("status", "get_quorums")))
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
@@ -110,20 +152,48 @@ func (pd *PayloadDisperser) SendPayload(
 	//       to a newly added immutable CertVerifier under the Router contract design. Resulting in
 	//       potentially a few failed dispersals until the RBN advances; guaranteeing eventual consistency.
 	//       This is a known issue and will be addressed with future enhancements.
-	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx)
+	requiredQuorums, err := withClientSpan(timeoutCtx, "CertVerifier.GetQuorumNumbersRequired",
+		func(c context.Context) ([]core.QuorumID, error) {
+			return pd.certVerifier.GetQuorumNumbersRequired(c)
+		},
+		semconv.RPCSystemKey.String("jsonrpc"),
+		attribute.String("component", "certVerifier"),
+	)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "get quorum numbers required failed")
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
 
+	span.SetAttributes(attribute.IntSlice("quorums", intSliceFromQuorums(requiredQuorums)))
+
 	symbolCount := blob.LenSymbols()
+	span.SetAttributes(attribute.Int("symbol_count", int(symbolCount)))
 
 	var paymentMetadata *core.PaymentMetadata
 	if pd.clientLedger != nil {
 		// we are using the new payment system if clientLedger is non nil
 		probe.SetStage("debit")
-		paymentMetadata, err = pd.clientLedger.Debit(ctx, symbolCount, requiredQuorums)
+		span.AddEvent("stage", trace.WithAttributes(attribute.String("status", "debit")))
+
+		paymentMetadata, err = withClientSpan(ctx, "ClientLedger.Debit",
+			func(c context.Context) (*core.PaymentMetadata, error) {
+				return pd.clientLedger.Debit(c, symbolCount, requiredQuorums)
+			},
+			attribute.String("component", "clientLedger"),
+			attribute.Int("symbol_count", int(symbolCount)),
+		)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "debit failed")
 			return nil, fmt.Errorf("debit: %w", err)
+		}
+
+		if paymentMetadata != nil {
+			span.SetAttributes(
+				attribute.String("payment.account_id", paymentMetadata.AccountID.Hex()),
+				attribute.Int64("payment.timestamp", paymentMetadata.Timestamp),
+			)
 		}
 	}
 
@@ -143,23 +213,45 @@ func (pd *PayloadDisperser) SendPayload(
 		paymentMetadata)
 	if err != nil {
 		if pd.clientLedger != nil {
-			revertErr := pd.clientLedger.RevertDebit(ctx, paymentMetadata, symbolCount)
+			_, revertErr := withClientSpan(ctx, "ClientLedger.RevertDebit",
+				func(c context.Context) (struct{}, error) {
+					return struct{}{}, pd.clientLedger.RevertDebit(c, paymentMetadata, symbolCount)
+				},
+				attribute.String("component", "clientLedger"),
+			)
 			if revertErr != nil {
+				span.RecordError(errors.Join(err, revertErr))
+				span.SetStatus(codes.Error, "disperse blob and revert debit failed")
 				return nil, fmt.Errorf("disperse blob and revert debit: %w", errors.Join(err, revertErr))
 			}
 		}
 
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "disperse blob failed")
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}
 
 	probe.SetStage("verify_blob_key")
+	span.AddEvent("stage", trace.WithAttributes(attribute.String("status", "verify_blob_key")))
 
 	blobKey, err := verifyReceivedBlobKey(blobHeader, reply)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "verify received blob key failed")
 		return nil, fmt.Errorf("verify received blob key: %w", err)
 	}
 
-	return pd.buildEigenDACert(ctx, reply.GetResult(), blobKey, probe)
+	span.SetAttributes(attribute.String("blob_key", blobKey.Hex()))
+
+	cert, err := pd.buildEigenDACert(ctx, reply.GetResult(), blobKey, probe)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "build EigenDA cert failed")
+		return nil, err
+	}
+
+	span.SetStatus(codes.Ok, "payload sent successfully")
+	return cert, nil
 }
 
 // Waits for a blob to be signed, and builds the EigenDA cert with the operator signatures
@@ -171,8 +263,15 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	blobKey corev2.BlobKey,
 	probe *common.SequenceProbe,
 ) (coretypes.EigenDACert, error) {
+	ctx, span := tracer.Start(ctx, "PayloadDisperser.buildEigenDACert",
+		trace.WithAttributes(
+			attribute.String("blob_key", blobKey.Hex()),
+			attribute.String("initial_status", initialBlobStatus.String()),
+		))
+	defer span.End()
 
 	probe.SetStage("QUEUED")
+	span.AddEvent("stage", trace.WithAttributes(attribute.String("status", "QUEUED")))
 
 	// poll the disperser for the status of the blob until it's received adequate signatures in regards to
 	// confirmation thresholds, a terminal error, or a timeout
@@ -180,56 +279,101 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	defer cancel()
 	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, initialBlobStatus, probe)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "poll blob status until signed failed")
 		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
 
 	pd.logSigningPercentages(blobKey, blobStatusReply)
+	addSigningPercentagesToSpan(span, blobStatusReply)
+
+	rbn := blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber()
+	span.SetAttributes(attribute.Int64("reference_block_number", int64(rbn)))
 
 	probe.SetStage("wait_for_block_number")
+	span.AddEvent("stage", trace.WithAttributes(attribute.String("status", "wait_for_block_number")))
 	// TODO: given the repeated context timeout declaration in this method we should consider creating some
 	// generic function or helper to enhance DRY
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	err = pd.blockMonitor.WaitForBlockNumber(
-		timeoutCtx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
-	if err != nil {
-		return nil, fmt.Errorf("wait for block number: %w", err)
+	_, waitErr := withClientSpan(timeoutCtx, "BlockMonitor.WaitForBlockNumber",
+		func(c context.Context) (struct{}, error) {
+			return struct{}{}, pd.blockMonitor.WaitForBlockNumber(c, rbn)
+		},
+		attribute.String("component", "blockMonitor"),
+		attribute.Int64("block_number", int64(rbn)),
+	)
+	if waitErr != nil {
+		span.RecordError(waitErr)
+		span.SetStatus(codes.Error, "wait for block number failed")
+		return nil, fmt.Errorf("wait for block number: %w", waitErr)
 	}
 
-	certVersion, err := pd.certVerifier.GetCertVersion(
-		ctx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
+	certVersion, err := withClientSpan(ctx, "CertVerifier.GetCertVersion",
+		func(c context.Context) (coretypes.CertificateVersion, error) {
+			return pd.certVerifier.GetCertVersion(c, rbn)
+		},
+		semconv.RPCSystemKey.String("jsonrpc"),
+		attribute.String("component", "certVerifier"),
+		attribute.Int64("block_number", int64(rbn)),
+	)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "get certificate version failed")
 		return nil, fmt.Errorf("get certificate version: %w", err)
 	}
 
+	span.SetAttributes(attribute.Int("cert_version", int(certVersion)))
+
 	probe.SetStage("build_cert")
+	span.AddEvent("stage", trace.WithAttributes(attribute.String("status", "build_cert")))
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	eigenDACert, err := pd.certBuilder.BuildCert(timeoutCtx, certVersion, blobStatusReply)
+	eigenDACert, err := withClientSpan(timeoutCtx, "CertBuilder.BuildCert",
+		func(c context.Context) (coretypes.EigenDACert, error) {
+			return pd.certBuilder.BuildCert(c, certVersion, blobStatusReply)
+		},
+		attribute.String("component", "certBuilder"),
+		attribute.Int("cert_version", int(certVersion)),
+	)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "build cert failed")
 		return nil, fmt.Errorf("build cert: %w", err)
 	}
 	pd.logger.Debug("EigenDACert built", "blobKey", blobKey.Hex(), "certVersion", certVersion)
 
 	probe.SetStage("verify_cert")
+	span.AddEvent("stage", trace.WithAttributes(attribute.String("status", "verify_cert")))
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 
-	err = pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert)
-	if err != nil {
+	_, checkErr := withClientSpan(timeoutCtx, "CertVerifier.CheckDACert",
+		func(c context.Context) (struct{}, error) {
+			return struct{}{}, pd.certVerifier.CheckDACert(c, eigenDACert)
+		},
+		semconv.RPCSystemKey.String("jsonrpc"),
+		attribute.String("component", "certVerifier"),
+	)
+	if checkErr != nil {
 		var errInvalidCert *verification.CertVerifierInvalidCertError
-		if errors.As(err, &errInvalidCert) {
+		if errors.As(checkErr, &errInvalidCert) {
 			// Regardless of whether the cert is invalid (400) or certVerifier contract has a bug (500),
 			// we send a failover signal. If we can't construct a valid cert after retrying a few times (proxy retry
 			// policy), then its safer for the rollup to failover to another DA layer.
-			return nil, api.NewErrorFailover(fmt.Errorf("checkDACert failed with blobKey %v: %w", blobKey.Hex(), err))
+			span.RecordError(checkErr)
+			span.SetStatus(codes.Error, "check DA cert invalid")
+			return nil, api.NewErrorFailover(fmt.Errorf("checkDACert failed with blobKey %v: %w", blobKey.Hex(), checkErr))
 		}
-		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
+		span.RecordError(checkErr)
+		span.SetStatus(codes.Error, "verify cert failed")
+		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), checkErr)
 	}
 
 	pd.logger.Debug("EigenDACert verified", "blobKey", blobKey.Hex())
 
+	span.SetStatus(codes.Ok, "cert built and verified successfully")
 	return eigenDACert, nil
 }
 
@@ -255,6 +399,21 @@ func (pd *PayloadDisperser) logSigningPercentages(blobKey corev2.BlobKey, blobSt
 
 	pd.logger.Debug("Blob signed",
 		"blobKey", blobKey.Hex(), "quorumPercentages", quorumPercentagesBuilder.String())
+}
+
+// addSigningPercentagesToSpan adds the signing percentages of each quorum to the span attributes
+func addSigningPercentagesToSpan(span trace.Span, blobStatusReply *dispgrpc.BlobStatusReply) {
+	attestation := blobStatusReply.GetSignedBatch().GetAttestation()
+	if len(attestation.GetQuorumNumbers()) != len(attestation.GetQuorumSignedPercentages()) {
+		return
+	}
+
+	for index, quorumNumber := range attestation.GetQuorumNumbers() {
+		span.SetAttributes(attribute.Int(
+			fmt.Sprintf("signing.q%d_pct", quorumNumber),
+			int(attestation.GetQuorumSignedPercentages()[index]),
+		))
+	}
 }
 
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
@@ -283,6 +442,12 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	initialStatus dispgrpc.BlobStatus,
 	probe *common.SequenceProbe,
 ) (*dispgrpc.BlobStatusReply, error) {
+	ctx, span := tracer.Start(ctx, "PayloadDisperser.pollBlobStatusUntilSigned",
+		trace.WithAttributes(
+			attribute.String("blob_key", blobKey.Hex()),
+			attribute.String("initial_status", initialStatus.String()),
+		))
+	defer span.End()
 
 	previousStatus := initialStatus
 
@@ -293,11 +458,14 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 		select {
 		case <-ctx.Done():
 			// Failover to another DA layer because EigenDA is not completing its signing duty in time.
-			return nil, api.NewErrorFailover(fmt.Errorf(
+			err := api.NewErrorFailover(fmt.Errorf(
 				"timed out waiting for %v blob status, final status was %v: %w",
 				dispgrpc.BlobStatus_COMPLETE.String(),
 				previousStatus.String(),
 				ctx.Err()))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "timeout waiting for blob status")
+			return nil, err
 		case <-ticker.C:
 			// This call to the disperser doesn't have a dedicated timeout configured.
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
@@ -315,6 +483,10 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 					"blob key", blobKey.Hex(),
 					"previous status", previousStatus.String(),
 					"new status", newStatus.String())
+				span.AddEvent("status_change", trace.WithAttributes(
+					attribute.String("previous_status", previousStatus.String()),
+					attribute.String("new_status", newStatus.String()),
+				))
 				previousStatus = newStatus
 			}
 
@@ -328,19 +500,27 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 					// for networking reasons, which we don't want to failover to eth for!
 					var thresholdNotMetErr *thresholdNotMetError
 					if errors.As(err, &thresholdNotMetErr) {
+						span.RecordError(err)
+						span.SetStatus(codes.Error, "threshold not met")
 						return nil, api.NewErrorFailover(fmt.Errorf("check thresholds: %w", err))
 					}
+					span.RecordError(err)
+					span.SetStatus(codes.Error, "check thresholds failed")
 					return nil, fmt.Errorf("check thresholds: %w", err)
 				}
 
+				span.SetAttributes(attribute.String("final_status", newStatus.String()))
+				span.SetStatus(codes.Ok, "blob signed successfully")
 				return blobStatusReply, nil
 			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED:
 				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
 				probe.SetStage(newStatus.String())
+				span.AddEvent("stage", trace.WithAttributes(attribute.String("status", newStatus.String())))
 				continue
 			case dispgrpc.BlobStatus_GATHERING_SIGNATURES:
 				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
 				probe.SetStage(newStatus.String())
+				span.AddEvent("stage", trace.WithAttributes(attribute.String("status", newStatus.String())))
 
 				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
 				if err == nil {
@@ -358,10 +538,13 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 				continue
 			default:
 				// Failover to another DA layer because something is wrong with EigenDA.
-				return nil, api.NewErrorFailover(
+				err := api.NewErrorFailover(
 					fmt.Errorf("terminal dispersal failure for blobKey %v. blob status: %v",
 						blobKey.Hex(),
 						newStatus.String()))
+				span.RecordError(err)
+				span.SetStatus(codes.Error, "terminal dispersal failure")
+				return nil, err
 			}
 		}
 	}
@@ -397,4 +580,13 @@ func verifyReceivedBlobKey(
 	}
 
 	return blobKeyFromDisperser, nil
+}
+
+// intSliceFromQuorums converts a slice of QuorumIDs to a slice of ints for tracing attributes
+func intSliceFromQuorums(quorums []core.QuorumID) []int {
+	result := make([]int, len(quorums))
+	for i, q := range quorums {
+		result[i] = int(q)
+	}
+	return result
 }

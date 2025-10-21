@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
+	"github.com/Layr-Labs/eigenda/api/proxy/telemetry"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli/v2"
@@ -43,6 +44,34 @@ func StartProxyService(cliCtx *cli.Context) error {
 	if err := cfg.Check(); err != nil {
 		return err
 	}
+
+	// Initialize OpenTelemetry tracing
+	telemetryCfg := telemetry.ReadConfig(cliCtx)
+	if err := telemetryCfg.Verify(); err != nil {
+		return fmt.Errorf("invalid telemetry config: %w", err)
+	}
+
+	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
+	defer ctxCancel()
+
+	shutdownTracer, err := telemetry.InitTracer(ctx, telemetryCfg)
+	if err != nil {
+		return fmt.Errorf("initialize tracer: %w", err)
+	}
+	defer func() {
+		if err := shutdownTracer(context.Background()); err != nil {
+			log.Error("failed to shutdown tracer", "err", err)
+		} else if telemetryCfg.Enabled {
+			log.Info("Successfully shutdown OpenTelemetry tracer")
+		}
+	}()
+
+	if telemetryCfg.Enabled {
+		log.Info("OpenTelemetry tracing enabled",
+			"service", telemetryCfg.ServiceName,
+			"endpoint", telemetryCfg.ExporterEndpoint,
+			"sample_rate", telemetryCfg.TraceSampleRate)
+	}
 	configString, err := cfg.StoreBuilderConfig.ToString()
 	if err != nil {
 		return fmt.Errorf("convert config json to string: %w", err)
@@ -52,9 +81,6 @@ func StartProxyService(cliCtx *cli.Context) error {
 
 	registry := prometheus.NewRegistry()
 	metrics := proxy_metrics.NewMetrics(registry)
-
-	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
-	defer ctxCancel()
 
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
