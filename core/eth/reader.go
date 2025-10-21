@@ -691,6 +691,18 @@ func (t *Reader) WeightOfOperatorForQuorum(ctx context.Context, quorumID core.Qu
 	}, quorumID, operator)
 }
 
+func (t *Reader) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
+	bn, err := t.ethClient.BlockNumber(ctx)
+	return uint32(bn), err
+}
+
+func (t *Reader) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
+	return t.bindings.RegistryCoordinator.QuorumCount(&bind.CallOpts{
+		Context:     ctx,
+		BlockNumber: big.NewInt(int64(blockNumber)),
+	})
+}
+
 func (t *Reader) GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]core.SecurityParam, error) {
 	adversaryThresholdPercentegesBytes, err := t.bindings.EigenDAServiceManager.QuorumAdversaryThresholdPercentages(&bind.CallOpts{
 		Context:     ctx,
