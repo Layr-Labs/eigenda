@@ -91,19 +91,19 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 		return nil, nil, fmt.Errorf("get kzg prover: %w", err)
 	}
 
-	type encodeCResult struct {
+	type encodeChanResult struct {
 		chunks   []rs.FrameCoeffs
 		indices  []uint32
 		duration time.Duration
 		err      error
 	}
-	encodeChan := make(chan encodeCResult, 1)
+	encodeChan := make(chan encodeChanResult, 1)
 	go func() {
 		defer close(encodeChan)
 		encodeStart := time.Now()
 		frames, indices, err := e.encoder.Encode(symbols, params)
 		encodingDuration := time.Since(encodeStart)
-		encodeChan <- encodeCResult{
+		encodeChan <- encodeChanResult{
 			chunks:   frames,
 			indices:  indices,
 			duration: encodingDuration,
@@ -116,31 +116,31 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	getProofsDuration := time.Since(getProofsStart)
 
 	// Wait for both chunks and frames to have finished generating
-	encodeRes := <-encodeChan
-	if err != nil || encodeRes.err != nil {
-		return nil, nil, fmt.Errorf("get frames: %w", errors.Join(err, encodeRes.err))
+	encodeResult := <-encodeChan
+	if err != nil || encodeResult.err != nil {
+		return nil, nil, fmt.Errorf("get frames: %w", errors.Join(err, encodeResult.err))
 	}
-	if len(encodeRes.chunks) != len(proofs) {
+	if len(encodeResult.chunks) != len(proofs) {
 		return nil, nil, fmt.Errorf("number of chunks %v and proofs %v do not match",
-			len(encodeRes.chunks), len(proofs))
+			len(encodeResult.chunks), len(proofs))
 	}
 
 	e.logger.Info("Frame process details",
 		"input_size_bytes", len(symbols)*encoding.BYTES_PER_SYMBOL,
 		"num_chunks", params.NumChunks,
 		"chunk_length", params.ChunkLength,
-		"rs_encode_duration", encodeRes.duration,
+		"rs_encode_duration", encodeResult.duration,
 		"multi_proof_duration", getProofsDuration,
 	)
 
 	frames := make([]*encoding.Frame, len(proofs))
 	for ind, frame := range proofs {
 		frames[ind] = &encoding.Frame{
-			Coeffs: encodeRes.chunks[ind],
+			Coeffs: encodeResult.chunks[ind],
 			Proof:  frame,
 		}
 	}
-	return frames, encodeRes.indices, nil
+	return frames, encodeResult.indices, nil
 }
 
 func (g *Prover) GetKzgProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
