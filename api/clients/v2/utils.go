@@ -9,11 +9,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// GetGrpcDialOptions builds the gRPC dial options based on the useSecureGrpcFlag and maxMessageSize.
-func GetGrpcDialOptions(useSecureGrpcFlag bool, maxMessageSize uint) []grpc.DialOption {
-	options := []grpc.DialOption{
-		// Automatic OpenTelemetry tracing for all gRPC calls
-		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+// GetGrpcDialOptions builds the gRPC dial options based on the useSecureGrpcFlag, maxMessageSize, and tracingEnabled.
+func GetGrpcDialOptions(useSecureGrpcFlag bool, maxMessageSize uint, tracingEnabled bool) []grpc.DialOption {
+	options := []grpc.DialOption{}
+
+	// Only add OpenTelemetry tracing interceptor if tracing is enabled
+	if tracingEnabled {
+		options = append(options, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	}
 	if useSecureGrpcFlag {
 		options = append(options, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))

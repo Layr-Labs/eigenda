@@ -77,6 +77,7 @@ func NewDisperserClient(
 	committer *committer.Committer,
 	accountant *Accountant,
 	metrics metrics.DispersalMetricer,
+	tracingEnabled bool,
 ) (*DisperserClient, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config must be provided")
@@ -103,7 +104,7 @@ func NewDisperserClient(
 	}
 
 	addr := fmt.Sprintf("%v:%v", config.Hostname, config.Port)
-	dialOptions := GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB)
+	dialOptions := GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB, tracingEnabled)
 	clientPool, err := common.NewGRPCClientPool(
 		logger,
 		disperser_rpc.NewDisperserClient,

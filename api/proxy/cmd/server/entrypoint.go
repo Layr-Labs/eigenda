@@ -89,6 +89,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 		cfg.StoreBuilderConfig,
 		cfg.SecretConfig,
 		registry,
+		telemetryCfg.Enabled,
 	)
 	if err != nil {
 		return fmt.Errorf("build storage managers: %w", err)
