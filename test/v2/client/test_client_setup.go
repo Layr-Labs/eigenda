@@ -58,7 +58,15 @@ func GetEnvironmentConfigPaths() ([]string, error) {
 }
 
 // GetConfig returns a TestClientConfig instance parsed from the config file.
-func GetConfig(logger logging.Logger, prefix string, configPath string) (*TestClientConfig, error) {
+func GetConfig(
+	t *testing.T,
+	logger logging.Logger,
+	prefix string,
+	configPath string,
+) (*TestClientConfig, error) {
+
+	skipInCI(t)
+
 	configLock.Lock()
 	defer configLock.Unlock()
 
@@ -89,7 +97,7 @@ func GetConfig(logger logging.Logger, prefix string, configPath string) (*TestCl
 // to ensure that the test is not running in a CI environment.
 func GetTestClient(t *testing.T, logger logging.Logger, configPath string) *TestClient {
 	skipInCI(t)
-	c, err := GetClient(logger, configPath)
+	c, err := GetClient(t, logger, configPath)
 	require.NoError(t, err)
 	return c
 }
@@ -97,7 +105,7 @@ func GetTestClient(t *testing.T, logger logging.Logger, configPath string) *Test
 // GetClient returns a TestClient instance, creating one if it does not exist.
 // This uses a global static client... this is icky, but it takes a long time
 // to read the SRS points, so it's the lesser of two evils to keep it around.
-func GetClient(logger logging.Logger, configPath string) (*TestClient, error) {
+func GetClient(t *testing.T, logger logging.Logger, configPath string) (*TestClient, error) {
 	clientLock.Lock()
 	defer clientLock.Unlock()
 
@@ -105,7 +113,7 @@ func GetClient(logger logging.Logger, configPath string) (*TestClient, error) {
 		return client, nil
 	}
 
-	testConfig, err := GetConfig(logger, LiveTestPrefix, configPath)
+	testConfig, err := GetConfig(t, logger, LiveTestPrefix, configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get config: %w", err)
 	}
