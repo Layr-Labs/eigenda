@@ -12,8 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/urfave/cli"
 )
 
@@ -80,12 +79,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 
-	kzgCommitterConfig := committer.Config{
-		SRSNumberToLoad:   ctx.GlobalUint64(kzg.SRSLoadingNumberFlagName),
-		G1SRSPath:         ctx.GlobalString(kzg.G1PathFlagName),
-		G2SRSPath:         ctx.GlobalString(kzg.G2PathFlagName),
-		G2TrailingSRSPath: ctx.GlobalString(kzg.G2TrailingPathFlagName),
-	}
+	kzgCommitterConfig := committer.ReadCLIConfig(ctx)
 	if version == uint(V2) {
 		if err := kzgCommitterConfig.Verify(); err != nil {
 			return Config{}, fmt.Errorf("disperser version 2: kzg committer config verify: %w", err)
