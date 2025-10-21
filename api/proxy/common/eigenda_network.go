@@ -89,7 +89,8 @@ func EigenDANetworkFromString(inputString string) (EigenDANetwork, error) {
 	network := EigenDANetwork(inputString)
 
 	switch network {
-	case HoleskyTestnetEigenDANetwork, HoleskyPreprodEigenDANetwork, SepoliaTestnetEigenDANetwork, HoodiTestnetEigenDANetwork, MainnetEigenDANetwork:
+	case HoleskyTestnetEigenDANetwork, HoleskyPreprodEigenDANetwork, SepoliaTestnetEigenDANetwork,
+		HoodiTestnetEigenDANetwork, MainnetEigenDANetwork:
 		return network, nil
 	default:
 		allowedNetworks := []string{
