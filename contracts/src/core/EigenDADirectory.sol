@@ -14,8 +14,9 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {InitializableLib} from "src/core/libraries/v3/initializable/InitializableLib.sol";
 import {ConfigRegistryLib} from "src/core/libraries/v3/config-registry/ConfigRegistryLib.sol";
 import {ConfigRegistryTypes} from "src/core/libraries/v3/config-registry/ConfigRegistryTypes.sol";
+import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
 
-contract EigenDADirectory is IEigenDADirectory {
+contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     using AddressDirectoryLib for string;
     using AddressDirectoryLib for bytes32;
 
@@ -198,5 +199,12 @@ contract EigenDADirectory is IEigenDADirectory {
     /// @inheritdoc IEigenDAConfigRegistry
     function getAllConfigNamesBytes() external view returns (string[] memory) {
         return ConfigRegistryLib.getNameListBytes();
+    }
+
+    /// @inheritdoc IEigenDASemVer
+    function semver() external pure returns (uint8 major, uint8 minor, uint8 patch) {
+        major = 1;
+        minor = 1;
+        patch = 0;
     }
 }
