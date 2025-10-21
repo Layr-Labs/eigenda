@@ -29,7 +29,7 @@ const (
 	MAX_NTT_SIZE = 25
 )
 
-type KzgMultiProofIcicleBackend struct {
+type KzgMultiProofBackend struct {
 	Logger         logging.Logger
 	Fs             *fft.FFTSettings
 	FlatFFTPointsT []iciclebn254.Affine
@@ -43,7 +43,7 @@ type KzgMultiProofIcicleBackend struct {
 func NewMultiProofBackend(logger logging.Logger,
 	fs *fft.FFTSettings, fftPointsT [][]bn254.G1Affine,
 	gpuEnabled bool, numWorker uint64,
-) (*KzgMultiProofIcicleBackend, error) {
+) (*KzgMultiProofBackend, error) {
 	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
 		Logger:     logger,
 		GPUEnable:  gpuEnabled,
@@ -55,7 +55,7 @@ func NewMultiProofBackend(logger logging.Logger,
 	}
 
 	// Set up icicle multiproof backend
-	return &KzgMultiProofIcicleBackend{
+	return &KzgMultiProofBackend{
 		Logger:         logger,
 		Fs:             fs,
 		FlatFFTPointsT: icicleDevice.FlatFFTPointsT,
@@ -73,7 +73,7 @@ type WorkerResult struct {
 
 // This function supports batching over multiple blobs.
 // All blobs must have same size and concatenated passed as polyFr
-func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 
 	dimE := numChunks
@@ -175,7 +175,7 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProofV2(polyFr []fr.Elemen
 }
 
 // Modify the function signature to return a flat array
-func (p *KzgMultiProofIcicleBackend) computeCoeffStore(polyFr []fr.Element, numWorker, l, dimE uint64) ([]fr.Element, error) {
+func (p *KzgMultiProofBackend) computeCoeffStore(polyFr []fr.Element, numWorker, l, dimE uint64) ([]fr.Element, error) {
 	totalSize := dimE * 2 * l // Total size of the flattened array
 	coeffStore := make([]fr.Element, totalSize)
 
@@ -209,7 +209,7 @@ func (p *KzgMultiProofIcicleBackend) computeCoeffStore(polyFr []fr.Element, numW
 }
 
 // Modified worker function to write directly to the flat array
-func (p *KzgMultiProofIcicleBackend) proofWorker(
+func (p *KzgMultiProofBackend) proofWorker(
 	polyFr []fr.Element,
 	jobChan <-chan uint64,
 	l uint64,
@@ -248,7 +248,7 @@ func (p *KzgMultiProofIcicleBackend) proofWorker(
 //
 // TODO(samlaf): better document/explain/refactor/rename this function,
 // to explain how it fits into the overall scheme.
-func (p *KzgMultiProofIcicleBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
+func (p *KzgMultiProofBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
 	toeplitzExtendedVec := make([]fr.Element, 2*dimE)
 
 	m := uint64(len(polyFr)) - 1 // there is a constant term
@@ -270,7 +270,7 @@ func (p *KzgMultiProofIcicleBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j
 
 // MsmBatchOnDevice function supports batch across blobs.
 // totalSize is the number of output points, which equals to numPoly * 2 * dimE , dimE is number of chunks
-func (c *KzgMultiProofIcicleBackend) msmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlice, rowsG1Icicle []iciclebn254.Affine, totalSize int) (core.DeviceSlice, error) {
+func (c *KzgMultiProofBackend) msmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlice, rowsG1Icicle []iciclebn254.Affine, totalSize int) (core.DeviceSlice, error) {
 	rowsG1IcicleCopy := core.HostSliceFromElements[iciclebn254.Affine](rowsG1Icicle)
 
 	var p iciclebn254.Projective
@@ -289,7 +289,7 @@ func (c *KzgMultiProofIcicleBackend) msmBatchOnDevice(rowsFrIcicleCopy core.Devi
 	return out, nil
 }
 
-func (c *KzgMultiProofIcicleBackend) ecnttOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
+func (c *KzgMultiProofBackend) ecnttOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
 	var p iciclebn254.Projective
 	var out core.DeviceSlice
 
