@@ -46,16 +46,13 @@ rand = { version = "0.8" }
 reltester = { version = "2.0.0" }
 reqwest = { version = "0.12.22" }
 reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.7.0", default-features = false }
-# Pinned so that it's same as in https://github.com/Sovereign-Labs/sovereign-sdk/blob/b486610bbad3e39d5785b6009c5d9ca9ab9dec9e/Cargo.toml
 risc0-zkvm = { version = "2.1", default-features = false }
 rust-kzg-bn254-prover = { git = "https://github.com/Layr-Labs/rust-kzg-bn254.git", rev = "60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6", default-features = false }
 rustls = { version = "0.23.31" }
-# Pinned so that it's same as in https://github.com/Sovereign-Labs/sovereign-sdk/blob/b486610bbad3e39d5785b6009c5d9ca9ab9dec9e/Cargo.toml
 schemars = { version = "0.8.21", default-features = false }
 serde = { version = "1.0.219", default-features = false }
 serde_json = { version = "1.0.141" }
 serde_with = { version = "3.14.0" }
-sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
 test-strategy = { version = "0.4.3" }
 testcontainers = "0.25.0"
 thiserror = { version = "2.0.12", default-features = false }

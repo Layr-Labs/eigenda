@@ -12,10 +12,6 @@
 //! - [`BlobInclusionInfo`] - Information about blob inclusion in batches
 //! - [`BatchHeaderV2`] - Batch header containing batch root and reference block
 //! - [`G1Point`]/[`G2Point`] - Elliptic curve points for cryptographic operations
-//!
-//! ## Notes
-//!
-//! - Due to sovereign-sdk compatibility constraints these types could not be imported from [rust-eigenda-v2-common](https://crates.io/crates/rust-eigenda-v2-common)
 
 /// Solidity type definitions for contract interactions.
 ///

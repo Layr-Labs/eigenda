@@ -14,21 +14,12 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true }
 url = { version = "2.5.4" }
-# Pinned so that it's same as in https://github.com/Sovereign-Labs/sovereign-sdk/blob/b486610bbad3e39d5785b6009c5d9ca9ab9dec9e/Cargo.toml
-schemars = { workspace = true, features = [
-  "derive",
-] }
+schemars = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
-alloy-consensus = { workspace = true, features = [
-  "arbitrary",
-] }
-alloy-provider = { workspace = true, features = [
-  "anvil-api",
-] }
-alloy-rpc-types = { workspace = true, features = [
-  "anvil",
-] }
+alloy-consensus = { workspace = true, features = ["arbitrary"] }
+alloy-provider = { workspace = true, features = ["anvil-api"] }
+alloy-rpc-types = { workspace = true, features = ["anvil"] }
 arbitrary = { workspace = true }
 bincode = { workspace = true, features = ["derive", "serde", "std"] }
 hex = { workspace = true }

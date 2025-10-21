@@ -44,7 +44,6 @@
 //! - [EigenDA Protocol Specification](https://docs.eigenlayer.xyz/eigenda/overview/)
 //! - [Certificate Verification Reference](https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol)
 //! - [EigenDA Integration Specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html)
-//! - [Sovereign SDK Documentation](https://docs.sovereign.xyz/)
 
 use alloy_consensus::{EthereumTxEnvelope, Header, Transaction, TxEip4844};
 use alloy_primitives::B256;

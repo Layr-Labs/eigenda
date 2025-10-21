@@ -37,7 +37,6 @@ hex = { workspace = true }
 jsonschema = { workspace = true }
 rand = { workspace = true }
 reltester = { workspace = true }
-# Pinned so that it's same as in https://github.com/Sovereign-Labs/sovereign-sdk/blob/b486610bbad3e39d5785b6009c5d9ca9ab9dec9e/Cargo.toml
 risc0-zkvm = { workspace = true, features = ["std"] }
 test-strategy = { workspace = true }
 testcontainers = { workspace = true }

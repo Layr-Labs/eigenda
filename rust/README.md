@@ -1,9 +1,9 @@
-# EigenDA-Sovereign SDK DA Adapter Backend
+# EigenDA Proving SDK for Modular Rollups
 
 [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-Implements the necessary [EigenDA](https://docs.eigencloud.xyz/products/eigenda/core-concepts/overview) backend infrastructure to support the implementation of a Data Availability Adapter for Sovereign SDK based on EigenLayer's EigenDA, enabling rollups to use it as their data availability layer with full cryptographic verification.
+Implements the necessary [EigenDA](https://docs.eigencloud.xyz/products/eigenda/core-concepts/overview) proving and verifying infrastructure to facilitate rollups creating trustless integrations with EigenDA.
 
 ## 🏗️ Architecture
 
@@ -17,6 +17,12 @@ The project is built using a modular architecture with specialized crates:
 | **`eigenda-proxy`** | EigenDA proxy service communication | Blob retrieval, certificate generation, retry logic |
 | **`eigenda-verification`** | Cryptographic verification, validation, and state extraction | Certificate parsing, storage proofs, operator stake extraction, BLS signatures, commitment proofs |
 | **`eigenda-srs-data`** | Structured reference string data | BN254 curve parameters for KZG commitments |
+
+## 🎯 Usage
+
+This SDK provides framework-agnostic components for integrating EigenDA with any rollup infrastructure. The first production deployment is the [Sovereign SDK](https://github.com/Sovereign-Labs/sovereign-sdk) data availability adapter, which leverages these crates to enable trustless EigenDA integration for Sovereign rollups.
+
+While initially developed to support Sovereign SDK, these crates are designed as general-purpose building blocks that can be adopted by other rollup frameworks seeking to integrate with EigenDA.
 
 ## 🚀 Quick Start
 
@@ -47,7 +53,7 @@ The crates provide modular components for EigenDA integration that can be compos
 
 ## 🔧 How It Works
 
-These crates provide the foundational components needed to integrate EigenDA with Sovereign SDK rollups:
+These crates provide the foundational components needed to trustless EigenDA integrations with various rollup frameworks:
 
 ### Core Capabilities
 

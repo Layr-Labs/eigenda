@@ -14,53 +14,31 @@ allow = [
   "Zlib",
   "BSD-3-Clause",
   "CC0-1.0",
-  "ISC",
-  "OpenSSL",
-  "LicenseRef-Private",
-  "LicenseRef-Sovereign",
 ]
 
 [licenses.private]
 ignore = true
 
 [[licenses.clarify]]
-crate = "eigenda"
-expression = "LicenseRef-Private"
-license-files = []
-
-[[licenses.clarify]]
-crate = "sov-eigenda-adapter"
-expression = "LicenseRef-Private"
-license-files = []
-
-[[licenses.clarify]]
-crate = "sov-rollup-interface"
-expression = "LicenseRef-Sovereign"
-license-files = []
-
-[[licenses.clarify]]
 crate = "eigenda-srs-data"
-expression = "LicenseRef-Private"
+expression = "MIT"
 license-files = []
 
 [[licenses.clarify]]
 crate = "eigenda-ethereum"
-expression = "LicenseRef-Private"
+expression = "MIT"
 license-files = []
 
 [[licenses.clarify]]
 crate = "eigenda-proxy"
-expression = "LicenseRef-Private"
+expression = "MIT"
 license-files = []
 
 [[licenses.clarify]]
 crate = "eigenda-verification"
-expression = "LicenseRef-Private"
+expression = "MIT"
 license-files = []
 
 [sources]
-allow-git = [
-  "https://github.com/paradigmxyz/reth.git",
-  "https://github.com/Sovereign-Labs/sovereign-sdk.git",
-]
+allow-git = ["https://github.com/paradigmxyz/reth.git"]
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
