@@ -134,10 +134,12 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	)
 
 	frames := make([]*encoding.Frame, len(proofs))
-	for ind, frame := range proofs {
-		frames[ind] = &encoding.Frame{
-			Coeffs: encodeResult.chunks[ind],
-			Proof:  frame,
+	for i, index := range encodeResult.indices {
+		frames[i] = &encoding.Frame{
+			Coeffs: encodeResult.chunks[i],
+			// Coeffs are returned according to indices order, but proofs are not
+			// TODO(samlaf): we should be consistent about this.
+			Proof: proofs[index],
 		}
 	}
 	return frames, encodeResult.indices, nil
