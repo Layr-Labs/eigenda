@@ -1,5 +1,14 @@
 ## BLSRegistryCoordinatorWithIndices
 
+type ChurnApproverUpdated @entity(immutable: true) {
+  id: Bytes!
+  prevChurnApprover: Bytes! # address
+  newChurnApprover: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
 type OperatorDeregistered @entity(immutable: true) {
   id: Bytes!
   operator: Bytes! # address
