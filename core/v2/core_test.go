@@ -168,7 +168,7 @@ func prepareBlobs(
 
 		params, err := corev2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
 		require.NoError(t, err)
-		chunks, err := p.GetFrames(blob, params)
+		frames, _, err := p.GetFrames(blob, params)
 		require.NoError(t, err)
 		state, err := cst.GetOperatorState(ctx, uint(referenceBlockNumber), header.QuorumNumbers)
 
@@ -188,7 +188,7 @@ func prepareBlobs(
 				Bundle:          make([]*encoding.Frame, assignment.NumChunks()),
 			}
 			for i := uint32(0); i < assignment.NumChunks(); i++ {
-				shard.Bundle[i] = chunks[assignment.Indices[i]]
+				shard.Bundle[i] = frames[assignment.Indices[i]]
 			}
 
 			blobsMap[opID] = append(blobsMap[opID], shard)

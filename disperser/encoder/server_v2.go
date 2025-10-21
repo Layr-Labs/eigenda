@@ -184,7 +184,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKe
 
 	// Encode the data
 	encodingStart := time.Now()
-	frames, err := s.prover.GetFrames(data, encodingParams)
+	frames, _, err := s.prover.GetFrames(data, encodingParams)
 	if err != nil {
 		s.logger.Error("failed to encode frames", "error", err)
 		return nil, status.Errorf(codes.Internal, "encoding failed: %v", err)

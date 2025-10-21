@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
@@ -79,31 +80,67 @@ func NewProver(logger logging.Logger, kzgConfig *KzgConfig, encoderConfig *encod
 	return proverGroup, nil
 }
 
-func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, error) {
+func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, []uint32, error) {
 	symbols, err := rs.ToFrArray(data)
 	if err != nil {
-		return nil, fmt.Errorf("ToFrArray: %w", err)
+		return nil, nil, fmt.Errorf("ToFrArray: %w", err)
 	}
 
 	prover, err := e.GetKzgProver(params)
 	if err != nil {
-		return nil, fmt.Errorf("get kzg prover: %w", err)
+		return nil, nil, fmt.Errorf("get kzg prover: %w", err)
 	}
 
-	kzgFrames, _, err := prover.GetFrames(symbols)
-	if err != nil {
-		return nil, fmt.Errorf("get frames: %w", err)
+	type encodeCResult struct {
+		chunks   []rs.FrameCoeffs
+		indices  []uint32
+		duration time.Duration
+		err      error
+	}
+	encodeChan := make(chan encodeCResult, 1)
+	go func() {
+		defer close(encodeChan)
+		encodeStart := time.Now()
+		frames, indices, err := e.encoder.Encode(symbols, params)
+		encodingDuration := time.Since(encodeStart)
+		encodeChan <- encodeCResult{
+			chunks:   frames,
+			indices:  indices,
+			duration: encodingDuration,
+			err:      err,
+		}
+	}()
+
+	getProofsStart := time.Now()
+	proofs, err := prover.GetProofs(symbols)
+	getProofsDuration := time.Since(getProofsStart)
+
+	// Wait for both chunks and frames to have finished generating
+	encodeRes := <-encodeChan
+	if err != nil || encodeRes.err != nil {
+		return nil, nil, fmt.Errorf("get frames: %w", errors.Join(err, encodeRes.err))
+	}
+	if len(encodeRes.chunks) != len(proofs) {
+		return nil, nil, fmt.Errorf("number of chunks %v and proofs %v do not match",
+			len(encodeRes.chunks), len(proofs))
 	}
 
-	chunks := make([]*encoding.Frame, len(kzgFrames))
-	for ind, frame := range kzgFrames {
-		chunks[ind] = &encoding.Frame{
-			Coeffs: frame.Coeffs,
-			Proof:  frame.Proof,
+	e.logger.Info("Frame process details",
+		"input_size_bytes", len(symbols)*encoding.BYTES_PER_SYMBOL,
+		"num_chunks", params.NumChunks,
+		"chunk_length", params.ChunkLength,
+		"rs_encode_duration", encodeRes.duration,
+		"multi_proof_duration", getProofsDuration,
+	)
+
+	frames := make([]*encoding.Frame, len(proofs))
+	for ind, frame := range proofs {
+		frames[ind] = &encoding.Frame{
+			Coeffs: encodeRes.chunks[ind],
+			Proof:  frame,
 		}
 	}
-
-	return chunks, nil
+	return frames, encodeRes.indices, nil
 }
 
 func (g *Prover) GetKzgProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
@@ -158,10 +195,8 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 
 	return &ParametrizedProver{
-		logger:                     p.logger,
 		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
 		encodingParams:             params,
-		encoder:                    p.encoder,
 		computeMultiproofNumWorker: p.KzgConfig.NumWorker,
 		kzgMultiProofBackend:       multiproofsBackend,
 	}, nil
