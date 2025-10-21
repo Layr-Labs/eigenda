@@ -71,3 +71,5 @@ lint:
 breaking:
   use:
     - FILE
+  ignore:
+    - proto/churner
