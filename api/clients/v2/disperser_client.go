@@ -127,20 +127,31 @@ func NewDisperserClient(
 
 // PopulateAccountant populates the accountant with the payment state from the disperser.
 func (c *DisperserClient) PopulateAccountant(ctx context.Context) error {
+	ctx, span := tracer.Start(ctx, "DisperserClient.PopulateAccountant")
+	defer span.End()
+
 	if c.accountant == nil {
-		return fmt.Errorf("accountant is nil")
+		err := fmt.Errorf("accountant is nil")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "accountant is nil")
+		return err
 	}
 
 	paymentState, err := c.GetPaymentState(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "error getting payment state")
 		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
 	}
 
 	err = c.accountant.SetPaymentState(paymentState)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "error setting payment state")
 		return fmt.Errorf("error setting payment state for accountant: %w", err)
 	}
 
+	span.SetStatus(codes.Ok, "accountant populated successfully")
 	return nil
 }
 
