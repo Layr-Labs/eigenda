@@ -20,6 +20,31 @@ type ReservationLedgerCacheConfig struct {
 	UpdateInterval time.Duration
 }
 
+// Verify validates the ReservationLedgerCacheConfig
+func (c *ReservationLedgerCacheConfig) Verify() error {
+	if c.MaxLedgers <= 0 {
+		return errors.New("max ledgers must be > 0")
+	}
+
+	if c.MaxLedgers > maxReservationLRUCacheSize {
+		return errors.New("max ledgers exceeds maximum allowed cache size")
+	}
+
+	if c.BucketCapacityPeriod <= 0 {
+		return errors.New("bucket capacity period must be > 0")
+	}
+
+	if c.UpdateInterval <= 0 {
+		return errors.New("update interval must be > 0")
+	}
+
+	if c.OverfillBehavior != ratelimit.OverfillNotPermitted && c.OverfillBehavior != ratelimit.OverfillOncePermitted {
+		return errors.New("invalid overfill behavior")
+	}
+
+	return nil
+}
+
 // Creates a new config with validation
 func NewReservationLedgerCacheConfig(
 	maxLedgers int,
@@ -27,30 +52,16 @@ func NewReservationLedgerCacheConfig(
 	overfillBehavior ratelimit.OverfillBehavior,
 	updateInterval time.Duration,
 ) (ReservationLedgerCacheConfig, error) {
-	if maxLedgers <= 0 {
-		return ReservationLedgerCacheConfig{}, errors.New("max ledgers must be > 0")
-	}
-
-	if maxLedgers > maxReservationLRUCacheSize {
-		return ReservationLedgerCacheConfig{}, errors.New("max ledgers exceeds maximum allowed cache size")
-	}
-
-	if bucketCapacityPeriod <= 0 {
-		return ReservationLedgerCacheConfig{}, errors.New("bucket capacity period must be > 0")
-	}
-
-	if updateInterval <= 0 {
-		return ReservationLedgerCacheConfig{}, errors.New("update interval must be > 0")
-	}
-
-	if overfillBehavior != ratelimit.OverfillNotPermitted && overfillBehavior != ratelimit.OverfillOncePermitted {
-		return ReservationLedgerCacheConfig{}, errors.New("invalid overfill behavior")
-	}
-
-	return ReservationLedgerCacheConfig{
+	config := ReservationLedgerCacheConfig{
 		MaxLedgers:           maxLedgers,
 		BucketCapacityPeriod: bucketCapacityPeriod,
 		OverfillBehavior:     overfillBehavior,
 		UpdateInterval:       updateInterval,
-	}, nil
+	}
+
+	if err := config.Verify(); err != nil {
+		return ReservationLedgerCacheConfig{}, err
+	}
+
+	return config, nil
 }
