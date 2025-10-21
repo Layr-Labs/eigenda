@@ -37,18 +37,18 @@ func (c *PaymentAuthorizationConfig) Verify() error {
 
 // DefaultPaymentAuthorizationConfig returns a new PaymentAuthorizationConfig with default values
 func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
-	onDemandConfig, _ := ondemandvalidation.NewOnDemandLedgerCacheConfig(
-		1024,
-		"",
-		30*time.Second,
-	)
+	onDemandConfig := ondemandvalidation.OnDemandLedgerCacheConfig{
+		MaxLedgers:        1024,
+		OnDemandTableName: "",
+		UpdateInterval:    30 * time.Second,
+	}
 
-	reservationConfig, _ := reservationvalidation.NewReservationLedgerCacheConfig(
-		1024,
-		75*time.Second,
-		ratelimit.OverfillOncePermitted,
-		30*time.Second,
-	)
+	reservationConfig := reservationvalidation.ReservationLedgerCacheConfig{
+		MaxLedgers:           1024,
+		BucketCapacityPeriod: 75 * time.Second,
+		OverfillBehavior:     ratelimit.OverfillOncePermitted,
+		UpdateInterval:       30 * time.Second,
+	}
 
 	return &PaymentAuthorizationConfig{
 		OnDemandConfig:    onDemandConfig,
