@@ -29,6 +29,6 @@ func GetDefaultTestPayloadDisperserConfig() TestPayloadDisperserConfig {
 	return TestPayloadDisperserConfig{
 		ClientLedgerMode: clientledger.ClientLedgerModeLegacy,
 		PrivateKey:       "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded",
-		APIServerPort:    32005,
+		APIServerPort:    32003,
 	}
 }

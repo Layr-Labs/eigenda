@@ -33,7 +33,7 @@ func TestEndToEndScenario(t *testing.T) {
 
 	disp, err := clients.NewDisperserClient(&clients.Config{
 		Hostname: "localhost",
-		Port:     "32003",
+		Port:     "32001",
 		Timeout:  10 * time.Second,
 	}, signer)
 	require.NoError(t, err)
