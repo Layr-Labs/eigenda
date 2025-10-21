@@ -3,13 +3,11 @@ package ejector
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -40,8 +38,11 @@ type Ejector struct {
 	// Used to look up the latest reference number.
 	referenceBlockProvider eth.ReferenceBlockProvider
 
-	// Used to fetch operator state.
-	operatorStateCache operatorstate.OperatorStateCache
+	// Used to look up which quorums a validator is a member of.
+	validatorQuorumLookup eth.ValidatorQuorumLookup
+
+	// Used to look up validator stake fractions.
+	validatorStakeLookup eth.ValidatorStakeLookup
 }
 
 // NewEjector creates a new Ejector.
@@ -54,7 +55,8 @@ func NewEjector(
 	signingRateLookupV2 SigningRateLookup,
 	validatorIDToAddressCache eth.ValidatorIDToAddressConverter,
 	referenceBlockProvider eth.ReferenceBlockProvider,
-	operatorStateCache operatorstate.OperatorStateCache,
+	validatorQuorumLookup eth.ValidatorQuorumLookup,
+	validatorStakeLookup eth.ValidatorStakeLookup,
 ) *Ejector {
 	e := &Ejector{
 		ctx:                        ctx,
@@ -66,7 +68,8 @@ func NewEjector(
 		ejectionCriteriaTimeWindow: config.EjectionCriteriaTimeWindow,
 		validatorIDToAddressCache:  validatorIDToAddressCache,
 		referenceBlockProvider:     referenceBlockProvider,
-		operatorStateCache:         operatorStateCache,
+		validatorQuorumLookup:      validatorQuorumLookup,
+		validatorStakeLookup:       validatorStakeLookup,
 	}
 
 	go e.mainLoop()
@@ -159,21 +162,7 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 		"unsignedBytes", signingRate.GetUnsignedBytes(),
 	)
 
-	rbn, err := e.referenceBlockProvider.GetReferenceBlockNumber(e.ctx)
-	if err != nil {
-		return fmt.Errorf("error looking up latest reference block number: %w", err)
-	}
-
-	operatorState, err := e.operatorStateCache.GetOperatorState(
-		e.ctx,
-		rbn,
-		nil, // all quorums
-	)
-	if err != nil {
-		return fmt.Errorf("error looking up operator state: %w", err)
-	}
-
-	stakeFractions, err := getStakeFractionMap(validatorID, operatorState)
+	stakeFractions, err := e.getStakeFractionMap(validatorID)
 	if err != nil {
 		return fmt.Errorf("error calculating stake fractions: %w", err)
 	}
@@ -189,32 +178,36 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 }
 
 // Get the stake fraction map for a given validator.
-func getStakeFractionMap(
-	validatorID core.OperatorID,
-	operatorState *core.OperatorState,
-) (map[core.QuorumID]float64, error) {
-	stakeFractions := make(map[core.QuorumID]float64)
+func (e *Ejector) getStakeFractionMap(validatorID core.OperatorID) (map[core.QuorumID]float64, error) {
 
-	for quorumID, operators := range operatorState.Operators {
-		quorumStake := big.NewInt(0)
-		for _, operatorInfo := range operators {
-			quorumStake.Add(quorumStake, operatorInfo.Stake)
+	rbn, err := e.referenceBlockProvider.GetReferenceBlockNumber(e.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error looking up latest reference block number: %w", err)
+	}
+
+	quorums, err := e.validatorQuorumLookup.GetQuorumsForValidator(
+		e.ctx,
+		validatorID,
+		rbn,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error looking up quorums for validator: %w", err)
+	}
+
+	stakeFractions := make(map[core.QuorumID]float64, len(quorums))
+
+	for _, quorumID := range quorums {
+		stakeFraction, err := e.validatorStakeLookup.GetValidatorStakeFraction(
+			e.ctx,
+			quorumID,
+			validatorID,
+			rbn,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error looking up stake fraction for validator %x in quorum %d: %w",
+				validatorID, quorumID, err)
 		}
-
-		if quorumStake.Cmp(big.NewInt(0)) == 0 {
-			// Ignore quorums with zero total stake to avoid division by zero
-			continue
-		}
-
-		validatorInfo, ok := operators[validatorID]
-		if !ok {
-			// Validator is not part of this quorum.
-			continue
-		}
-
-		stakeFraction := new(big.Rat).SetFrac(validatorInfo.Stake, quorumStake)
-		floatStakeFraction, _ := stakeFraction.Float64()
-		stakeFractions[quorumID] = floatStakeFraction
+		stakeFractions[quorumID] = stakeFraction
 	}
 
 	return stakeFractions, nil

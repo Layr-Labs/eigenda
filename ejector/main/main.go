@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
-	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/ejector"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -149,19 +148,30 @@ func run(ctx context.Context) error {
 		ejectorConfig.ReferenceBlockNumberOffset,
 	)
 
-	chainState, err := nil, nil // TODO
-	if err != nil {
-		return fmt.Errorf("failed to create chain state: %w", err)
-	}
-
-	operatorStateCache, err := operatorstate.NewOperatorStateCache(
+	validatorQuorumLookup, err := eth.NewValidatorQuorumLookup(
 		gethClient,
-		chainState,
 		registryCoordinatorAddress,
-		ejectorConfig.ChainDataCacheSize,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create operator state cache: %w", err)
+		return fmt.Errorf("failed to create validator quorum lookup: %w", err)
+	}
+	validatorQuorumLookup, err = eth.NewCachedValidatorQuorumLookup(validatorQuorumLookup, 1024)
+	if err != nil {
+		return fmt.Errorf("failed to create cached validator quorum lookup: %w", err)
+	}
+
+	stakeRegistryAddress, err := contractDirectory.GetContractAddress(ctx, directory.StakeRegistry)
+	if err != nil {
+		return fmt.Errorf("failed to get stake registry address: %w", err)
+	}
+
+	validatorStakeLookup, err := eth.NewValidatorStakeLookup(gethClient, stakeRegistryAddress)
+	if err != nil {
+		return fmt.Errorf("failed to create validator stake lookup: %w", err)
+	}
+	validatorStakeLookup, err = eth.NewCachedValidatorStakeLookup(validatorStakeLookup, 1024)
+	if err != nil {
+		return fmt.Errorf("failed to create cached validator stake lookup: %w", err)
 	}
 
 	_ = ejector.NewEjector(
@@ -173,7 +183,8 @@ func run(ctx context.Context) error {
 		dataApiSigningRateLookup,
 		validatorIDToAddressConverter,
 		referenceBlockProvider,
-		operatorStateCache,
+		validatorQuorumLookup,
+		validatorStakeLookup,
 	)
 	return nil
 }

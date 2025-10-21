@@ -48,6 +48,8 @@ func NewValidatorQuorumLookup(
 	}, nil
 }
 
+// TODO test this by hand to verify behavior.
+
 func (v *validatorQuorumLookup) GetQuorumsForValidator(
 	ctx context.Context,
 	validatorID core.OperatorID,
