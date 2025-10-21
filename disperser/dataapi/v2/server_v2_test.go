@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -267,13 +268,48 @@ func setUpRouter() *gin.Engine {
 	return gin.Default()
 }
 
+const (
+	maxRetries = 3
+	retryDelay = 100 * time.Millisecond
+)
+
 func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httptest.ResponseRecorder {
 	t.Helper()
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(method, url, nil)
-	router.ServeHTTP(w, req)
-	require.Equal(t, http.StatusOK, w.Code)
-	return w
+	
+	var lastResponse *httptest.ResponseRecorder
+	
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(method, url, nil)
+		router.ServeHTTP(w, req)
+		
+		if w.Code == http.StatusOK {
+			return w
+		}
+		
+		lastResponse = w
+		
+		// Retry only on specific network-related 500 errors from localstack
+		if w.Code == http.StatusInternalServerError && isLocalstackNetworkError(w) {
+			if attempt < maxRetries-1 {
+				t.Logf("Localstack connectivity issue on attempt %d, retrying...", attempt+1)
+				time.Sleep(retryDelay)
+				continue
+			}
+		}
+		
+		// Non-retryable error or final attempt
+		break
+	}
+	
+	require.Equal(t, http.StatusOK, lastResponse.Code, 
+		"Request failed after %d attempts. Response: %s", maxRetries, lastResponse.Body.String())
+	return lastResponse
+}
+
+func isLocalstackNetworkError(w *httptest.ResponseRecorder) bool {
+	body := w.Body.String()
+	return strings.Contains(body, "use of closed network connection")
 }
 
 func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {
