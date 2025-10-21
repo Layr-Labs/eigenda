@@ -248,14 +248,14 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		// For example, when churnBIPsOfTotalStake=1001, the operator to be churned out
 		// (i.e. the lowest-stake operator) needs to have less than 10.01% of the total
 		// stake.
-		if new(big.Int).Mul(lowestStake, bipMultiplier).Cmp(new(big.Int).Mul(totalStake, churnBIPsOfTotalStake)) >= 0 {
-			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToChurn)
-			msg := "operator to churn out must have less than %f%% of the total stake. " +
-				"Block number used for this decision: %d, operatorId of the operator " +
-				"to churn: %x, stake of the operator to churn: %d, total stake in " +
-				"quorum: %d, quorum ID: %d"
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0, currentBlockNumber, lowestStakeOperatorId.Hex(), lowestStake, totalStake, quorumID))
-		}
+		// if new(big.Int).Mul(lowestStake, bipMultiplier).Cmp(new(big.Int).Mul(totalStake, churnBIPsOfTotalStake)) >= 0 {
+		// 	c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToChurn)
+		// 	msg := "operator to churn out must have less than %f%% of the total stake. " +
+		// 		"Block number used for this decision: %d, operatorId of the operator " +
+		// 		"to churn: %x, stake of the operator to churn: %d, total stake in " +
+		// 		"quorum: %d, quorum ID: %d"
+		// 	return nil, api.NewErrorInvalidArg(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0, currentBlockNumber, lowestStakeOperatorId.Hex(), lowestStake, totalStake, quorumID))
+		// }
 
 		operatorToChurnAddress, err := c.Transactor.OperatorIDToAddress(ctx, lowestStakeOperatorId)
 		if err != nil {
