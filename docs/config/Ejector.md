@@ -15,6 +15,7 @@
 
 | Name | Type<br>Default | Description |
 |------|--------------|-------------|
+| $${\color{red}\texttt{Config.ChainDataCacheSize}}$$<br>`EJECTOR_CONFIG_CHAIN_DATA_CACHE_SIZE` | `uint64`<br>`1024` | The size for the caches for on-chain data. |
 | $${\color{red}\texttt{Config.DataApiTimeout}}$$<br>`EJECTOR_CONFIG_DATA_API_TIMEOUT` | `time.Duration`<br>`1m0s` | The timeout to use when making requests to the Data API. |
 | $${\color{red}\texttt{Config.DoNotEjectTheseValidators}}$$<br>`EJECTOR_CONFIG_DO_NOT_EJECT_THESE_VALIDATORS` | `[]string`<br>`[]` | A list of validator addresses that we should never attempt to eject, even if they otherwise meet the ejection criteria. |
 | $${\color{red}\texttt{Config.EjectionCriteriaTimeWindow}}$$<br>`EJECTOR_CONFIG_EJECTION_CRITERIA_TIME_WINDOW` | `time.Duration`<br>`10m0s` | The time window over which to evaluate signing metrics when deciding whether to eject a validator. |
@@ -25,10 +26,9 @@
 | $${\color{red}\texttt{Config.EjectionThrottle}}$$<br>`EJECTOR_CONFIG_EJECTION_THROTTLE` | `float64`<br>`0.05` | The maximum fraction of stake (out of 1.0) that can be ejected during an ejection time period. |
 | $${\color{red}\texttt{Config.EjectionThrottleTimePeriod}}$$<br>`EJECTOR_CONFIG_EJECTION_THROTTLE_TIME_PERIOD` | `time.Duration`<br>`24h0m0s` | The time period over which the ejection rate limit is calculated. The ejection manager will be allowed to eject ejectionRateLimit fraction of stake every EjectionThrottleTimePeriod. |
 | $${\color{red}\texttt{Config.EthBlockConfirmations}}$$<br>`EJECTOR_CONFIG_ETH_BLOCK_CONFIRMATIONS` | `int`<br>`0` | The number of block confirmations to wait for before considering an ejection transaction to be confirmed. |
-| $${\color{red}\texttt{Config.EthCacheSize}}$$<br>`EJECTOR_CONFIG_ETH_CACHE_SIZE` | `int`<br>`1024` | The size of the cache to use for Ethereum-related caching layers. |
 | $${\color{red}\texttt{Config.EthRpcRetryCount}}$$<br>`EJECTOR_CONFIG_ETH_RPC_RETRY_COUNT` | `int`<br>`3` | The number of times to retry a failed Ethereum RPC call. |
 | $${\color{red}\texttt{Config.MaxConsecutiveFailedEjectionAttempts}}$$<br>`EJECTOR_CONFIG_MAX_CONSECUTIVE_FAILED_EJECTION_ATTEMPTS` | `uint32`<br>`5` | The maximum number of consecutive failed ejection attempts before giving up on ejecting a validator. |
-| $${\color{red}\texttt{Config.ReferenceBlockNumberOffset}}$$<br>`EJECTOR_CONFIG_REFERENCE_BLOCK_NUMBER_OFFSET` | `uint64`<br>`10` | The number of blocks to wait before using a reference block number for quorum. |
+| $${\color{red}\texttt{Config.ReferenceBlockNumberOffset}}$$<br>`EJECTOR_CONFIG_REFERENCE_BLOCK_NUMBER_OFFSET` | `uint64`<br>`10` | The number of blocks to wait before using a reference block number for quorum. That is to say, do not always use the latest block number we know about, but rather use the block number that is sufficiently old as to make choosing the wrong fork unlikely. If this config value is X, and we know about block 100, we will use a RBN 100-X. |
 | $${\color{red}\texttt{Config.ReferenceBlockNumberPollInterval}}$$<br>`EJECTOR_CONFIG_REFERENCE_BLOCK_NUMBER_POLL_INTERVAL` | `time.Duration`<br>`10s` | The interval at which to poll for a new reference block number. |
 | $${\color{red}\texttt{Config.StartEjectionThrottleFull}}$$<br>`EJECTOR_CONFIG_START_EJECTION_THROTTLE_FULL` | `bool`<br>`false` | If true, then the ejection manager will immediately be able to eject ejectionRateLimit fraction of stake when it starts up. If false, then the ejection manager will need to wait before it has this capacity. |
 
