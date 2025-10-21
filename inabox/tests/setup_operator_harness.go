@@ -98,10 +98,6 @@ func (oh *OperatorHarness) StartOperators(ctx context.Context, logger logging.Lo
 		return fmt.Errorf("AnvilContainer is not initialized")
 	}
 
-	if oh.chainHarness.Churner.URL == "" {
-		return fmt.Errorf("churner has not been started (ChurnerURL is empty)")
-	}
-
 	// Count how many operator configs exist
 	operatorCount := 0
 	for {
@@ -236,7 +232,6 @@ func (oh *OperatorHarness) startOperator(
 		EnableV2:                       true,
 		DbPath:                         fmt.Sprintf("testdata/%s/db/operator_%d", oh.testName, operatorIndex),
 		LogPath:                        logFilePath,
-		ChurnerUrl:                     oh.chainHarness.Churner.URL,
 		EnableTestMode:                 true,
 		NumBatchValidators:             1,
 		QuorumIDList:                   []core.QuorumID{0, 1},

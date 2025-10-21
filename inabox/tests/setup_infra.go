@@ -30,7 +30,7 @@ type InfrastructureConfig struct {
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
-// This includes containers for Anvil, LocalStack, GraphNode, and the Churner server.
+// This includes containers for Anvil, LocalStack, and GraphNode.
 func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*InfrastructureHarness, error) {
 	if config.MetadataTableName == "" {
 		config.MetadataTableName = "test-BlobMetadata"
@@ -90,7 +90,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		Cancel:         infraCancel,
 	}
 
-	// Setup Chain Harness first (Anvil, Graph Node, Contracts, Churner)
+	// Setup Chain Harness first (Anvil, Graph Node, Contracts)
 	chainHarnessConfig := &ChainHarnessConfig{
 		TestConfig: testConfig,
 		TestName:   testName,
@@ -162,7 +162,7 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	// Clean up disperser harness (graph node and localstack)
 	infra.DisperserHarness.Cleanup(cleanupCtx, infra.Logger)
 
-	// Clean up chain harness (churner and anvil)
+	// Clean up chain harness (anvil and graph node)
 	infra.ChainHarness.Cleanup(cleanupCtx, infra.Logger)
 
 	// Clean up the shared Docker network last since multiple harnesses use it

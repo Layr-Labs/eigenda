@@ -118,12 +118,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "EIGENDA_DIRECTORY"),
 	}
-	ChurnerUrlFlag = cli.StringFlag{
-		Name:     "churner-url",
-		Usage:    "URL of the Churner",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "CHURNER_URL"),
-	}
 	NumConfirmationsFlag = cli.IntFlag{
 		Name:     "num-confirmations",
 		Usage:    "Number of confirmations to wait for",
@@ -164,7 +158,6 @@ type Config struct {
 	QuorumIDList       []core.QuorumID
 	ChainRpcUrl        string
 	EigenDADirectory   string
-	ChurnerUrl         string
 	NumConfirmations   int
 	BLSSignerAPIKey    string
 }
@@ -216,7 +209,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		QuorumIDList:       ids,
 		ChainRpcUrl:        ctx.GlobalString(ChainRpcUrlFlag.Name),
 		EigenDADirectory:   ctx.GlobalString(EigenDADirectoryFlag.Name),
-		ChurnerUrl:         ctx.GlobalString(ChurnerUrlFlag.Name),
 		NumConfirmations:   ctx.GlobalInt(NumConfirmationsFlag.Name),
 		BLSSignerAPIKey:    ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
 	}, nil

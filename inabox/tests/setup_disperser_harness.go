@@ -174,7 +174,7 @@ func SetupDisperserHarness(
 		if err != nil {
 			return nil, fmt.Errorf("could not generate environment variables: %w", err)
 		}
-		config.TestConfig.StartBinaries(true) // true = for tests, will skip churner and operators
+		config.TestConfig.StartBinaries(true) // true = for tests, will skip operators
 	}
 
 	return harness, nil

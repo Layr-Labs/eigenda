@@ -7,7 +7,6 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"strings"
 
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
@@ -118,32 +117,6 @@ func (env *Config) applyDefaults(c any, prefix, stub string, ind int) {
 		}
 	}
 
-}
-
-// Generates churner .env
-func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort string) ChurnerVars {
-	v := ChurnerVars{
-		CHURNER_LOG_FORMAT:                  "text",
-		CHURNER_HOSTNAME:                    "",
-		CHURNER_GRPC_PORT:                   grpcPort,
-		CHURNER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
-		CHURNER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
-		CHURNER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-
-		CHURNER_CHAIN_RPC:   "",
-		CHURNER_PRIVATE_KEY: strings.TrimPrefix(env.Pks.EcdsaMap[env.EigenDA.Deployer].PrivateKey, "0x"),
-
-		CHURNER_GRAPH_URL:             graphUrl,
-		CHURNER_INDEXER_PULL_INTERVAL: "1s",
-
-		CHURNER_ENABLE_METRICS:          "true",
-		CHURNER_METRICS_HTTP_PORT:       "9095",
-		CHURNER_CHURN_APPROVAL_INTERVAL: "900s",
-	}
-
-	env.applyDefaults(&v, "CHURNER", "churner", ind)
-
-	return v
 }
 
 // Generates disperser .env
@@ -432,7 +405,11 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 }
 
 // Generates DA node .env
-func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, metricsPort, nodeApiPort string) OperatorVars {
+func (env *Config) generateOperatorVars(
+	ind int,
+	name, key, logPath, dbPath string,
+	dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, metricsPort, nodeApiPort string,
+) OperatorVars {
 
 	max, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 	// max.Exp(big.NewInt(2), big.NewInt(130), nil).Sub(max, big.NewInt(1))
@@ -476,8 +453,6 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_ECDSA_KEY_PASSWORD:               ecdsaPassword,
 		NODE_EIGENDA_DIRECTORY:                env.EigenDA.EigenDADirectory,
 		NODE_REGISTER_AT_NODE_START:           "true",
-		NODE_CHURNER_URL:                      churnerUrl,
-		NODE_CHURNER_USE_SECURE_GRPC:          "false",
 		NODE_RELAY_USE_SECURE_GRPC:            "false",
 		NODE_EXPIRATION_POLL_INTERVAL:         "10",
 		NODE_G1_PATH:                          "",
@@ -590,23 +565,12 @@ func (env *Config) GenerateAllVariables() error {
 	// Create participants
 	port := env.Services.BasePort
 
-	// Generate churners
-	name := "churner"
-	port += 2
-	logPath, _, _, envFile := env.getPaths(name)
-	churnerConfig := env.generateChurnerVars(0, graphUrl, logPath, fmt.Sprint(port))
-	if err := writeEnv(churnerConfig.getEnvMap(), envFile); err != nil {
-		return fmt.Errorf("failed to write env file: %w", err)
-	}
-	env.Churner = churnerConfig
-	churnerUrl := fmt.Sprintf("%s:%s", churnerConfig.CHURNER_HOSTNAME, churnerConfig.CHURNER_GRPC_PORT)
-
 	// Generate disperser nodes
 
 	grpcPort := fmt.Sprint(port + 1)
 	port += 2
 
-	name = "dis0"
+	name := "dis0"
 	logPath, dbPath, _, envFile := env.getPaths(name)
 	disperserConfig := env.generateDisperserVars(0, logPath, dbPath, grpcPort)
 	if err := writeEnv(disperserConfig.getEnvMap(), envFile); err != nil {
@@ -646,7 +610,11 @@ func (env *Config) GenerateAllVariables() error {
 
 		// Convert key to address
 
-		operatorConfig := env.generateOperatorVars(i, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, fmt.Sprint(metricsPort), nodeApiPort)
+		operatorConfig := env.generateOperatorVars(
+			i, name, key, logPath, dbPath,
+			dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort,
+			fmt.Sprint(metricsPort), nodeApiPort,
+		)
 		if err := writeEnv(operatorConfig.getEnvMap(), envFile); err != nil {
 			return fmt.Errorf("failed to write env file: %w", err)
 		}

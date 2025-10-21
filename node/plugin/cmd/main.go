@@ -34,7 +34,6 @@ func main() {
 		plugin.QuorumIDListFlag,
 		plugin.ChainRpcUrlFlag,
 		plugin.EigenDADirectoryFlag,
-		plugin.ChurnerUrlFlag,
 		plugin.NumConfirmationsFlag,
 		plugin.PubIPProviderFlag,
 		plugin.BLSRemoteSignerUrlFlag,
@@ -184,11 +183,10 @@ func pluginOps(ctx *cli.Context) {
 		QuorumIDs:           config.QuorumIDList,
 		RegisterNodeAtStart: false,
 	}
-	churnerClient := node.NewChurnerClient(config.ChurnerUrl, true, operator.Timeout, logger)
 	switch config.Operation {
 	case plugin.OperationOptIn:
 		log.Printf("Info: Operator with Operator Address: %x is opting in to EigenDA", sk.Address)
-		err = node.RegisterOperator(context.Background(), operator, tx, churnerClient, logger.With("component", "NodeOperator"))
+		err = node.RegisterOperator(context.Background(), operator, tx, logger.With("component", "NodeOperator"))
 		if err != nil {
 			log.Printf("Error: failed to opt-in EigenDA Node Network for operator ID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
 			return

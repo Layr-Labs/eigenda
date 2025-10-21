@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/node"
-	nodemock "github.com/Layr-Labs/eigenda/node/mock"
 	"github.com/Layr-Labs/eigenda/test"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
@@ -53,13 +52,11 @@ func TestRegisterOperator(t *testing.T) {
 
 	}
 	tx1 := createMockTx([]uint8{2})
-	churnerClient := &nodemock.ChurnerClient{}
-	churnerClient.On("Churn").Return(nil, nil)
-	err = node.RegisterOperator(ctx, operator, tx1, churnerClient, logger)
+	err = node.RegisterOperator(ctx, operator, tx1, logger)
 	assert.NoError(t, err)
 	// Try to register with a quorum that's already registered
 	tx2 := createMockTx([]uint8{0})
-	err = node.RegisterOperator(ctx, operator, tx2, churnerClient, logger)
+	err = node.RegisterOperator(ctx, operator, tx2, logger)
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "quorums to register must be not registered yet"))
 }
@@ -94,9 +91,7 @@ func TestRegisterOperatorWithChurn(t *testing.T) {
 	}, nil)
 	tx.On("GetNumberOfRegisteredOperatorForQuorum").Return(uint32(1), nil)
 	tx.On("RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	churnerClient := &nodemock.ChurnerClient{}
-	churnerClient.On("Churn").Return(nil, nil)
-	err = node.RegisterOperator(ctx, operator, tx, churnerClient, logger)
+	err = node.RegisterOperator(ctx, operator, tx, logger)
 	assert.NoError(t, err)
 	tx.AssertCalled(t, "RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, []core.QuorumID{1}, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }

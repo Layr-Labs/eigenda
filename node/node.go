@@ -613,12 +613,7 @@ func (n *Node) registerValidator(socket string) error {
 		QuorumIDs:           n.Config.QuorumIDList,
 		RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
 	}
-	churnerClient := NewChurnerClient(
-		n.Config.ChurnerUrl,
-		n.Config.ChurnerUseSecureGrpc,
-		n.Config.Timeout,
-		n.Logger)
-	err = RegisterOperator(n.CTX, operator, n.Transactor, churnerClient, n.Logger)
+	err = RegisterOperator(n.CTX, operator, n.Transactor, n.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to register the operator: %w", err)
 	}

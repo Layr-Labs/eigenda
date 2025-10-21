@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -157,19 +156,6 @@ type Writer interface {
 		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
 		operatorToAvsRegistrationSigSalt [32]byte,
 		operatorToAvsRegistrationSigExpiry *big.Int,
-	) error
-
-	// RegisterOperatorWithChurn registers a new operator with the given public key and socket with the provided quorum ids
-	// with the provided signature from the churner
-	RegisterOperatorWithChurn(
-		ctx context.Context,
-		signer blssigner.Signer,
-		socket string,
-		quorumIds []QuorumID,
-		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
-		operatorToAvsRegistrationSigSalt [32]byte,
-		operatorToAvsRegistrationSigExpiry *big.Int,
-		churnReply *churner.ChurnReply,
 	) error
 
 	// DeregisterOperator deregisters an operator with the given public key from the all the quorums that it is

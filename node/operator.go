@@ -28,7 +28,7 @@ type Operator struct {
 }
 
 // RegisterOperator operator registers the operator with the given public key for the given quorum IDs.
-func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Writer, churnerClient ChurnerClient, logger logging.Logger) error {
+func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Writer, logger logging.Logger) error {
 	if len(operator.QuorumIDs) > 1+core.MaxQuorumID {
 		return fmt.Errorf("cannot provide more than %d quorums", 1+core.MaxQuorumID)
 	}
@@ -48,29 +48,6 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.W
 
 	logger.Info("Quorums to register for", "quorums", fmt.Sprint(quorumsToRegister)) //nolint:staticcheck // printing byte slices is fine here
 
-	// register for quorums
-	shouldCallChurner := false
-	// check if one of the quorums to register for is full
-	for _, quorumID := range quorumsToRegister {
-		operatorSetParams, err := transactor.GetOperatorSetParams(ctx, quorumID)
-		if err != nil {
-			return err
-		}
-
-		numberOfRegisteredOperators, err := transactor.GetNumberOfRegisteredOperatorForQuorum(ctx, quorumID)
-		if err != nil {
-			return err
-		}
-
-		// if the quorum is full, we need to call the churner
-		if operatorSetParams.MaxOperatorCount == numberOfRegisteredOperators {
-			shouldCallChurner = true
-			break
-		}
-	}
-
-	logger.Info("Should call churner", "shouldCallChurner", shouldCallChurner)
-
 	// Generate salt and expiry
 	bytes := make([]byte, 32)
 	_, err = rand.Read(bytes)
@@ -83,18 +60,18 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.W
 	// Get the current block number
 	expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
 
-	// if we should call the churner, call it
-	if shouldCallChurner {
-		churnReply, err := churnerClient.Churn(ctx, operator.Address, operator.Signer, quorumsToRegister)
-		if err != nil {
-			return fmt.Errorf("failed to request churn approval: %w", err)
-		}
-
-		return transactor.RegisterOperatorWithChurn(ctx, operator.Signer, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry, churnReply)
-	} else {
-		// other wise just register normally
-		return transactor.RegisterOperator(ctx, operator.Signer, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry)
+	err = transactor.RegisterOperator(
+		ctx,
+		operator.Signer,
+		operator.Socket,
+		quorumsToRegister,
+		operator.PrivKey,
+		salt,
+		expiry)
+	if err != nil {
+		return fmt.Errorf("failed to register operator: %w", err)
 	}
+	return nil
 }
 
 // DeregisterOperator deregisters the operator with the given public key from the specified quorums that it is registered with at the supplied block number.

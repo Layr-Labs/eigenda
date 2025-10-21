@@ -1,5 +1,5 @@
 // THIS FILE IS AUTO-GENERATED. DO NOT EDIT.
-// TO REGENERATE RUN inabox/deploy/codegen/bin.sh.
+// TO REGENERATE RUN inabox/deploy/codegen/gen.sh.
 package deploy
 
 import "reflect"
@@ -133,21 +133,7 @@ type DisperserVars struct {
 
 	DISPERSER_SERVER_G2_TRAILING_PATH string
 
-	DISPERSER_SERVER_CACHE_PATH string
-
-	DISPERSER_SERVER_SRS_ORDER string
-
 	DISPERSER_SERVER_SRS_LOAD string
-
-	DISPERSER_SERVER_NUM_WORKERS string
-
-	DISPERSER_SERVER_VERBOSE string
-
-	DISPERSER_SERVER_CACHE_ENCODED_BLOBS string
-
-	DISPERSER_SERVER_PRELOAD_ENCODER string
-
-	DISPERSER_SERVER_G2_POWER_OF_2_PATH string
 }
 
 func (vars DisperserVars) getEnvMap() map[string]string {
@@ -534,8 +520,6 @@ type OperatorVars struct {
 
 	NODE_RESERVATION_MAX_LEDGERS string
 
-	NODE_RESERVATION_BUCKET_CAPACITY_PERIOD string
-
 	NODE_PAYMENT_VAULT_UPDATE_INTERVAL string
 
 	NODE_G1_PATH string
@@ -653,59 +637,6 @@ func (vars RetrieverVars) getEnvMap() map[string]string {
 	return envMap
 }
 
-type ChurnerVars struct {
-	CHURNER_HOSTNAME string
-
-	CHURNER_GRPC_PORT string
-
-	CHURNER_ENABLE_METRICS string
-
-	CHURNER_PER_PUBLIC_KEY_RATE_LIMIT string
-
-	CHURNER_METRICS_HTTP_PORT string
-
-	CHURNER_CHURN_APPROVAL_INTERVAL string
-
-	CHURNER_EIGENDA_DIRECTORY string
-
-	CHURNER_BLS_OPERATOR_STATE_RETRIVER string
-
-	CHURNER_EIGENDA_SERVICE_MANAGER string
-
-	CHURNER_CHAIN_RPC string
-
-	CHURNER_CHAIN_RPC_FALLBACK string
-
-	CHURNER_PRIVATE_KEY string
-
-	CHURNER_NUM_CONFIRMATIONS string
-
-	CHURNER_NUM_RETRIES string
-
-	CHURNER_LOG_LEVEL string
-
-	CHURNER_LOG_PATH string
-
-	CHURNER_LOG_FORMAT string
-
-	CHURNER_INDEXER_PULL_INTERVAL string
-
-	CHURNER_GRAPH_URL string
-
-	CHURNER_GRAPH_BACKOFF string
-
-	CHURNER_GRAPH_MAX_RETRIES string
-}
-
-func (vars ChurnerVars) getEnvMap() map[string]string {
-	v := reflect.ValueOf(vars)
-	envMap := make(map[string]string)
-	for i := 0; i < v.NumField(); i++ {
-		envMap[v.Type().Field(i).Name] = v.Field(i).String()
-	}
-	return envMap
-}
-
 type ControllerVars struct {
 	CONTROLLER_DYNAMODB_TABLE_NAME string
 
@@ -761,6 +692,8 @@ type ControllerVars struct {
 
 	CONTROLLER_CONTROLLER_HEALTH_PROBE_PATH string
 
+	CONTROLLER_HEARTBEAT_MAX_STALL_DURATION string
+
 	CONTROLLER_SIGNIFICANT_SIGNING_THRESHOLD_PERCENTAGE string
 
 	CONTROLLER_SIGNIFICANT_SIGNING_METRICS_THRESHOLDS string
@@ -788,8 +721,6 @@ type ControllerVars struct {
 	CONTROLLER_ONDEMAND_PAYMENTS_LEDGER_CACHE_SIZE string
 
 	CONTROLLER_RESERVATION_PAYMENTS_LEDGER_CACHE_SIZE string
-
-	CONTROLLER_RESERVATION_BUCKET_CAPACITY_PERIOD string
 
 	CONTROLLER_PAYMENT_VAULT_UPDATE_INTERVAL string
 
@@ -1102,6 +1033,8 @@ type ProxyVars struct {
 	EIGENDA_PROXY_STORAGE_CONCURRENT_WRITE_THREADS string
 
 	EIGENDA_PROXY_STORAGE_WRITE_ON_CACHE_MISS string
+
+	EIGENDA_PROXY_STORAGE_ERROR_ON_SECONDARY_INSERT_FAILURE string
 
 	EIGENDA_PROXY_S3_ENDPOINT string
 

@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/core"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -47,19 +46,6 @@ func (t *MockWriter) RegisterOperator(
 	operatorToAvsRegistrationSigExpiry *big.Int,
 ) error {
 	args := t.Called(ctx, signer, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
-	return args.Error(0)
-}
-
-func (t *MockWriter) RegisterOperatorWithChurn(
-	ctx context.Context,
-	signer blssigner.Signer,
-	socket string,
-	quorumIds []core.QuorumID,
-	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
-	operatorToAvsRegistrationSigSalt [32]byte,
-	operatorToAvsRegistrationSigExpiry *big.Int,
-	churnReply *churner.ChurnReply) error {
-	args := t.Called(ctx, signer, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry, churnReply)
 	return args.Error(0)
 }
 

@@ -175,7 +175,6 @@ type Config struct {
 
 	Telemetry TelemetryConfig `yaml:"telemetry"`
 
-	Churner    ChurnerVars
 	Dispersers []DisperserVars
 	Batcher    []BatcherVars
 	Encoder    []EncoderVars

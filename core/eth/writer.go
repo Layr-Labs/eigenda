@@ -12,9 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 
-	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
-	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -88,76 +86,6 @@ func (t *Writer) RegisterOperator(
 	}
 
 	_, err = t.ethClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "RegisterOperatorWithCoordinator1", nil)
-	if err != nil {
-		t.logger.Error("Failed to estimate gas price and limit", "err", err)
-		return err
-	}
-	return nil
-}
-
-// RegisterOperatorWithChurn registers a new operator with the given public key and socket with the provided quorum ids
-// with the provided signature from the churner
-func (t *Writer) RegisterOperatorWithChurn(
-	ctx context.Context,
-	signer blssigner.Signer,
-	socket string,
-	quorumIds []core.QuorumID,
-	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
-	operatorToAvsRegistrationSigSalt [32]byte,
-	operatorToAvsRegistrationSigExpiry *big.Int,
-	churnReply *churner.ChurnReply,
-) error {
-
-	params, operatorSignature, err := t.getRegistrationParams(ctx, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
-	if err != nil {
-		t.logger.Error("Failed to get registration params", "err", err)
-		return err
-	}
-
-	quorumNumbers := quorumIDsToQuorumNumbers(quorumIds)
-
-	operatorsToChurn := make([]regcoordinator.IRegistryCoordinatorOperatorKickParam, len(churnReply.GetOperatorsToChurn()))
-	for i := range churnReply.GetOperatorsToChurn() {
-		if churnReply.GetOperatorsToChurn()[i].GetQuorumId() >= core.MaxQuorumID {
-			return errors.New("quorum id is out of range")
-		}
-
-		operatorsToChurn[i] = regcoordinator.IRegistryCoordinatorOperatorKickParam{
-			QuorumNumber: uint8(churnReply.GetOperatorsToChurn()[i].GetQuorumId()),
-			Operator:     gethcommon.BytesToAddress(churnReply.GetOperatorsToChurn()[i].GetOperator()),
-		}
-	}
-
-	var salt [32]byte
-	copy(salt[:], churnReply.GetSignatureWithSaltAndExpiry().GetSalt()[:])
-	churnApproverSignature := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{
-		Signature: churnReply.GetSignatureWithSaltAndExpiry().GetSignature(),
-		Salt:      salt,
-		Expiry:    new(big.Int).SetInt64(churnReply.GetSignatureWithSaltAndExpiry().GetExpiry()),
-	}
-
-	opts, err := t.ethClient.GetNoSendTransactOpts()
-	if err != nil {
-		t.logger.Error("Failed to generate transact opts", "err", err)
-		return err
-	}
-
-	tx, err := t.bindings.RegistryCoordinator.RegisterOperatorWithChurn(
-		opts,
-		quorumNumbers,
-		socket,
-		*params,
-		operatorsToChurn,
-		churnApproverSignature,
-		*operatorSignature,
-	)
-
-	if err != nil {
-		t.logger.Error("Failed to register operator with churn", "err", err)
-		return err
-	}
-
-	_, err = t.ethClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "RegisterOperatorWithCoordinatorWithChurn", nil)
 	if err != nil {
 		t.logger.Error("Failed to estimate gas price and limit", "err", err)
 		return err
