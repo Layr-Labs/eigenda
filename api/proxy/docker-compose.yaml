@@ -28,9 +28,7 @@ services:
   eigenda_proxy:
     depends_on:
       - minio-init
-    build:
-      context: ../..
-      dockerfile: api/proxy/Dockerfile
+    image: ghcr.io/layr-labs/eigenda-proxy:dev
     container_name: eigenda-proxy
     environment:
       - EIGENDA_PROXY_LOG_LEVEL=debug
