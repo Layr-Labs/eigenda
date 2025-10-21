@@ -144,7 +144,6 @@ pub fn verify_and_extract_payload(
         Err(err) => return Some(Err(CertExtractionError(err))),
     };
 
-
     // if certificate verification fails: ignore
     cert::verify(inputs).ok()?;
 
