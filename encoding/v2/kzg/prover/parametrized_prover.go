@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/backend"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -25,7 +26,7 @@ type ParametrizedProver struct {
 	encoder        *rs.Encoder
 
 	computeMultiproofNumWorker uint64
-	kzgMultiProofBackend       KzgMultiProofsBackendV2
+	kzgMultiProofBackend       backend.KzgMultiProofsBackendV2
 }
 
 type rsEncodeResult struct {

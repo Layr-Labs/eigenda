@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type KzgMultiProofGnarkBackend struct {
+type KzgMultiProofBackend struct {
 	Logger logging.Logger
 	Fs     *fft.FFTSettings
 	// FFTPointsT contains the transposed SRSTable points, of size [2*dimE][l]=[2*numChunks][chunkLen].
@@ -21,7 +21,16 @@ type KzgMultiProofGnarkBackend struct {
 	//   "Note that the vector multiplied by the matrix is independent from the polynomial coefficients,
 	//   so its Fourier transform can be precomputed"
 	FFTPointsT [][]bn254.G1Affine
-	SFs        *fft.FFTSettings
+}
+
+func NewMultiProofBackend(
+	logger logging.Logger, fs *fft.FFTSettings, fftPointsT [][]bn254.G1Affine,
+) *KzgMultiProofBackend {
+	return &KzgMultiProofBackend{
+		Logger:     logger,
+		Fs:         fs,
+		FFTPointsT: fftPointsT,
+	}
 }
 
 // Computes a KZG multi-reveal proof for chunks containing in each frame.
@@ -37,7 +46,7 @@ type KzgMultiProofGnarkBackend struct {
 // 1. https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html (single multiproof theory)
 // 2. https://eprint.iacr.org/2023/033.pdf (how to compute the single multiproof fast)
 // 3. https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf (fast multiple multiproofs)
-func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
+func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(
 	polyFr []fr.Element, numChunks, chunkLen, numWorker uint64,
 ) ([]bn254.G1Affine, error) {
 	// We describe the steps in the computation by following section 2.2 of
@@ -112,7 +121,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
 
 // Helper function to handle coefficient computation.
 // Returns a [2*dimE][l] slice.
-func (p *KzgMultiProofGnarkBackend) computeCoeffStore(
+func (p *KzgMultiProofBackend) computeCoeffStore(
 	polyFr []fr.Element, numWorker, l, dimE uint64,
 ) ([][]fr.Element, error) {
 	coeffStore := make([][]fr.Element, dimE*2)
@@ -152,7 +161,7 @@ func (p *KzgMultiProofGnarkBackend) computeCoeffStore(
 //
 // TODO(samlaf): better document/explain/refactor/rename this function,
 // to explain how it fits into the overall scheme.
-func (p *KzgMultiProofGnarkBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
+func (p *KzgMultiProofBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
 	toeplitzExtendedVec := make([]fr.Element, 2*dimE)
 
 	m := uint64(len(polyFr)) - 1 // there is a constant term

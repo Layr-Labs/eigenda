@@ -13,9 +13,20 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
 	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ecntt"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/msm"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
+)
+
+const (
+	// MAX_NTT_SIZE is the maximum NTT domain size needed to compute FFTs for the
+	// largest supported blobs. Assuming a coding ratio of 1/8 and symbol size of 32 bytes:
+	// - Encoded size: 2^{MAX_NTT_SIZE} * 32 bytes ≈ 1 GB
+	// - Original blob size: 2^{MAX_NTT_SIZE} * 32 / 8 = 2^{MAX_NTT_SIZE + 2} ≈ 128 MB
+	MAX_NTT_SIZE = 25
 )
 
 type KzgMultiProofIcicleBackend struct {
@@ -27,6 +38,33 @@ type KzgMultiProofIcicleBackend struct {
 	Device         runtime.Device
 	GpuLock        sync.Mutex
 	NumWorker      uint64
+}
+
+func NewMultiProofBackend(logger logging.Logger,
+	fs *fft.FFTSettings, fftPointsT [][]bn254.G1Affine,
+	gpuEnabled bool, numWorker uint64,
+) (*KzgMultiProofIcicleBackend, error) {
+	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
+		Logger:     logger,
+		GPUEnable:  gpuEnabled,
+		NTTSize:    MAX_NTT_SIZE,
+		FFTPointsT: fftPointsT,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("configure icicle device: %w", err)
+	}
+
+	// Set up icicle multiproof backend
+	return &KzgMultiProofIcicleBackend{
+		Logger:         logger,
+		Fs:             fs,
+		FlatFFTPointsT: icicleDevice.FlatFFTPointsT,
+		NttCfg:         icicleDevice.NttCfg,
+		MsmCfg:         icicleDevice.MsmCfg,
+		Device:         icicleDevice.Device,
+		GpuLock:        sync.Mutex{},
+		NumWorker:      numWorker,
+	}, nil
 }
 
 type WorkerResult struct {
@@ -75,7 +113,7 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProofV2(polyFr []fr.Elemen
 		var flattenStoreCopyToDevice core.DeviceSlice
 		flattenCoeffStoreCopy.CopyToDevice(&flattenStoreCopyToDevice, true)
 
-		sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
+		sumVec, err := p.msmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
 		if err != nil {
 			icicleErr = fmt.Errorf("msm error: %w", err)
 			return
@@ -88,7 +126,7 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProofV2(polyFr []fr.Elemen
 
 		// Compute the first ecntt, and set new batch size for ntt
 		p.NttCfg.BatchSize = int32(numPoly)
-		sumVecInv, err := p.ECNttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
+		sumVecInv, err := p.ecnttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
 		if err != nil {
 			icicleErr = fmt.Errorf("first ECNtt error: %w", err)
 			return
@@ -101,7 +139,7 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProofV2(polyFr []fr.Elemen
 		prunedSumVecInv := sumVecInv.Range(0, int(dimE), false)
 
 		// Compute the second ecntt on the reduced size array
-		flatProofsBatch, err := p.ECNttToGnarkOnDevice(prunedSumVecInv, false, int(numPoly)*int(dimE))
+		flatProofsBatch, err := p.ecnttOnDevice(prunedSumVecInv, false, int(numPoly)*int(dimE))
 		if err != nil {
 			icicleErr = fmt.Errorf("second ECNtt error: %w", err)
 			return
@@ -228,4 +266,49 @@ func (p *KzgMultiProofIcicleBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j
 		return nil, fmt.Errorf("fft: %w", err)
 	}
 	return out, nil
+}
+
+// MsmBatchOnDevice function supports batch across blobs.
+// totalSize is the number of output points, which equals to numPoly * 2 * dimE , dimE is number of chunks
+func (c *KzgMultiProofIcicleBackend) msmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlice, rowsG1Icicle []iciclebn254.Affine, totalSize int) (core.DeviceSlice, error) {
+	rowsG1IcicleCopy := core.HostSliceFromElements[iciclebn254.Affine](rowsG1Icicle)
+
+	var p iciclebn254.Projective
+	var out core.DeviceSlice
+
+	_, err := out.Malloc(p.Size(), totalSize)
+	if err != runtime.Success {
+		return out, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
+	}
+
+	err = msm.Msm(rowsFrIcicleCopy, rowsG1IcicleCopy, &c.MsmCfg, out)
+	if err != runtime.Success {
+		return out, fmt.Errorf("msm error: %v", err.AsString())
+	}
+
+	return out, nil
+}
+
+func (c *KzgMultiProofIcicleBackend) ecnttOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
+	var p iciclebn254.Projective
+	var out core.DeviceSlice
+
+	output, err := out.Malloc(p.Size(), totalSize)
+	if err != runtime.Success {
+		return out, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
+	}
+
+	if isInverse {
+		err := ecntt.ECNtt(batchPoints, core.KInverse, &c.NttCfg, output)
+		if err != runtime.Success {
+			return out, fmt.Errorf("inverse ecntt failed: %v", err.AsString())
+		}
+	} else {
+		err := ecntt.ECNtt(batchPoints, core.KForward, &c.NttCfg, output)
+		if err != runtime.Success {
+			return out, fmt.Errorf("forward ecntt failed: %v", err.AsString())
+		}
+	}
+
+	return output, nil
 }

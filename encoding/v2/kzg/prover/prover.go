@@ -12,7 +12,9 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
-	gnarkprover "github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/gnark"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/backend"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/backend/gnark"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/backend/icicle"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -133,39 +135,26 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 	fs := fft.NewFFTSettings(n)
 
-	switch p.Config.BackendType {
-	case encoding.GnarkBackend:
-		return p.createGnarkBackendProver(params, fs)
-	case encoding.IcicleBackend:
-		return p.createIcicleBackendProver(params, fs)
-	default:
-		return nil, fmt.Errorf("unsupported backend type: %v", p.Config.BackendType)
-	}
-
-}
-
-func (p *Prover) createGnarkBackendProver(
-	params encoding.EncodingParams, fs *fft.FFTSettings,
-) (*ParametrizedProver, error) {
-	if p.Config.GPUEnable {
-		return nil, errors.New("GPU is not supported in gnark backend")
-	}
-
 	_, fftPointsT, err := p.setupFFTPoints(params)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("setup fft points: %w", err)
 	}
 
-	// Create subgroup FFT settings
-	t := uint8(gomath.Log2(float64(2 * params.NumChunks)))
-	sfs := fft.NewFFTSettings(t)
-
-	// Set KZG Prover gnark backend
-	multiproofBackend := &gnarkprover.KzgMultiProofGnarkBackend{
-		Logger:     p.logger,
-		Fs:         fs,
-		FFTPointsT: fftPointsT,
-		SFs:        sfs,
+	var multiproofsBackend backend.KzgMultiProofsBackendV2
+	switch p.Config.BackendType {
+	case encoding.GnarkBackend:
+		if p.Config.GPUEnable {
+			return nil, errors.New("GPU is not supported in gnark backend")
+		}
+		multiproofsBackend = gnark.NewMultiProofBackend(p.logger, fs, fftPointsT)
+	case encoding.IcicleBackend:
+		multiproofsBackend, err = icicle.NewMultiProofBackend(
+			p.logger, fs, fftPointsT, p.Config.GPUEnable, p.KzgConfig.NumWorker)
+		if err != nil {
+			return nil, fmt.Errorf("create icicle backend prover: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported backend type: %v", p.Config.BackendType)
 	}
 
 	return &ParametrizedProver{
@@ -174,14 +163,9 @@ func (p *Prover) createGnarkBackendProver(
 		encodingParams:             params,
 		encoder:                    p.encoder,
 		computeMultiproofNumWorker: p.KzgConfig.NumWorker,
-		kzgMultiProofBackend:       multiproofBackend,
+		kzgMultiProofBackend:       multiproofsBackend,
 	}, nil
-}
 
-func (p *Prover) createIcicleBackendProver(
-	params encoding.EncodingParams, fs *fft.FFTSettings,
-) (*ParametrizedProver, error) {
-	return CreateIcicleBackendProver(p, params, fs)
 }
 
 func (g *Prover) preloadProversFromSRSTableCache() error {
