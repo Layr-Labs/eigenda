@@ -110,14 +110,12 @@ pub fn extract_certificate(
 /// Decoded blob data as [`Bytes`]
 ///
 /// # Errors
-/// - [`EigenDaVerificationError::RecencyWindowMissed`] if certificate is too old
 /// - [`EigenDaVerificationError::MissingCertState`] if cert_state is None
 /// - [`EigenDaVerificationError::ProofVerificationError`] if state proofs are invalid
-/// - [`EigenDaVerificationError::CertVerificationError`] if certificate verification fails
 /// - [`EigenDaVerificationError::MissingBlob`] if encoded_payload is None
 /// - [`EigenDaVerificationError::BlobVerificationError`] if blob verification fails
 #[allow(clippy::too_many_arguments)]
-pub fn verify_and_extract_blob(
+pub fn verify_and_extract_payload(
     tx: B256,
     cert: &StandardCommitment,
     cert_state: &Option<CertStateData>,
@@ -126,19 +124,41 @@ pub fn verify_and_extract_blob(
     referenced_height: u64,
     cert_recency_window: u64,
     encoded_payload: &Option<Bytes>,
-) -> Result<Bytes, EigenDaVerificationError> {
+) -> Option<Result<Bytes, EigenDaVerificationError>> {
     use EigenDaVerificationError::*;
 
-    verify_cert_recency(inclusion_height, referenced_height, cert_recency_window)?;
-    let cert_state = cert_state.as_ref().ok_or_else(|| MissingCertState(tx))?;
-    cert_state.verify(cert_state_header.state_root)?;
+    // if certificate recency verification fails: ignore
+    verify_cert_recency(inclusion_height, referenced_height, cert_recency_window).ok()?;
+
+    let cert_state = match cert_state.as_ref() {
+        Some(cert_state) => cert_state,
+        None => return Some(Err(MissingCertState(tx))),
+    };
+
+    if let Err(err) = cert_state.verify(cert_state_header.state_root) {
+        return Some(Err(ProofVerificationError(err)));
+    }
+
+    // if certificate extraction fails: ignore
     let current_block = inclusion_height as u32;
-    let inputs = cert_state.extract(cert, current_block)?;
-    cert::verify(inputs)?;
-    let encoded_payload = encoded_payload.as_ref().ok_or_else(|| MissingBlob(tx))?;
-    verify_blob(cert, encoded_payload)?;
-    let blob = decode_encoded_payload(encoded_payload)?;
-    Ok(Bytes::from(blob))
+    let inputs = cert_state.extract(cert, current_block).ok()?;
+
+    // if certificate verification fails: ignore
+    cert::verify(inputs).ok()?;
+
+    let encoded_payload = match encoded_payload.as_ref() {
+        Some(encoded_payload) => encoded_payload,
+        None => return Some(Err(MissingBlob(tx))),
+    };
+
+    if let Err(err) = verify_blob(cert, encoded_payload) {
+        return Some(Err(BlobVerificationError(err)));
+    }
+
+    // if encoded_payload decode fails: ignore
+    let payload = decode_encoded_payload(encoded_payload).ok()?;
+
+    Some(Ok(Bytes::from(payload)))
 }
 
 /// Validate certificate recency to prevent stale certificate attacks
