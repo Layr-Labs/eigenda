@@ -275,20 +275,20 @@ const (
 
 func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httptest.ResponseRecorder {
 	t.Helper()
-	
+
 	var lastResponse *httptest.ResponseRecorder
-	
+
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(method, url, nil)
 		router.ServeHTTP(w, req)
-		
+
 		if w.Code == http.StatusOK {
 			return w
 		}
-		
+
 		lastResponse = w
-		
+
 		// Retry only on specific network-related 500 errors from localstack
 		if w.Code == http.StatusInternalServerError && isLocalstackNetworkError(w) {
 			if attempt < maxRetries-1 {
@@ -297,12 +297,12 @@ func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httpt
 				continue
 			}
 		}
-		
+
 		// Non-retryable error or final attempt
 		break
 	}
-	
-	require.Equal(t, http.StatusOK, lastResponse.Code, 
+
+	require.Equal(t, http.StatusOK, lastResponse.Code,
 		"Request failed after %d attempts. Response: %s", maxRetries, lastResponse.Body.String())
 	return lastResponse
 }
