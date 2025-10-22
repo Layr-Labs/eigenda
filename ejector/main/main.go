@@ -39,7 +39,11 @@ func run(ctx context.Context) error {
 	// Ensure we don't accidentally use cfg after this point.
 	cfg = nil
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	loggerConfig.Format = common.LogFormat(ejectorConfig.LogOutputType)
+	loggerConfig.HandlerOpts.NoColor = !ejectorConfig.LogColor
+
+	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}

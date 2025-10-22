@@ -79,6 +79,8 @@ func NewEjector(
 
 // The main loop periodically evaluates validators for ejection.
 func (e *Ejector) mainLoop() {
+	e.logger.Debugf("ejector started, evaluating validators for ejection every %s", e.period.String())
+
 	ticker := time.NewTicker(e.period)
 	defer ticker.Stop()
 
@@ -98,6 +100,8 @@ func (e *Ejector) mainLoop() {
 
 // evaluateValidators looks up signing rates and evaluates which validators should be ejected.
 func (e *Ejector) evaluateValidators() error {
+
+	e.logger.Debug("evaluating validators for ejection")
 
 	v1SigningRates, err := e.signingRateLookupV1.GetSigningRates(
 		e.ejectionCriteriaTimeWindow,
@@ -153,6 +157,11 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 		return fmt.Errorf("error converting validator ID to address: %w", err)
 	}
 
+	stakeFractions, err := e.getStakeFractionMap(validatorID)
+	if err != nil {
+		return fmt.Errorf("error calculating stake fractions: %w", err)
+	}
+
 	e.logger.Info("Validator is eligible for ejection",
 		"validatorID", signingRate.GetValidatorId(),
 		"validatorAddress", validatorAddress.Hex(),
@@ -160,12 +169,8 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 		"unsignedBatches", signingRate.GetUnsignedBatches(),
 		"signedBytes", signingRate.GetSignedBytes(),
 		"unsignedBytes", signingRate.GetUnsignedBytes(),
+		"stakeFractions", stakeFractions,
 	)
-
-	stakeFractions, err := e.getStakeFractionMap(validatorID)
-	if err != nil {
-		return fmt.Errorf("error calculating stake fractions: %w", err)
-	}
 
 	// The ejection manager is responsible for deduplicating ejection requests, and deciding if
 	// there are other factors that may prevent ejection (e.g. too many ejection attempts, etc.).

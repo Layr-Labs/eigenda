@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
 )
 
@@ -81,6 +82,12 @@ type EjectorConfig struct {
 
 	// The size for the caches for on-chain data.
 	ChainDataCacheSize uint64
+
+	// The output type for logs, must be "json" or "text".
+	LogOutputType string
+
+	// Whether to enable color in log output (only applies to text output).
+	LogColor bool
 }
 
 // Create a new root ejector config with default values.
@@ -124,7 +131,8 @@ type EjectorSecretConfig struct {
 	// The Ethereum RPC URL(s) to use for connecting to the blockchain.
 	EthRpcUrls []string `docs:"required"`
 
-	// The private key to use for signing ejection transactions.
+	// The private key to use for signing ejection transactions, in hex.
+	// Do not include the '0x' prefix.
 	PrivateKey string `docs:"required"`
 }
 
@@ -156,6 +164,8 @@ func DefaultEjectorConfig() *EjectorConfig {
 		ReferenceBlockNumberOffset:           10,
 		ReferenceBlockNumberPollInterval:     10 * time.Second,
 		ChainDataCacheSize:                   1024,
+		LogOutputType:                        string(common.JSONLogFormat),
+		LogColor:                             false,
 	}
 }
 
