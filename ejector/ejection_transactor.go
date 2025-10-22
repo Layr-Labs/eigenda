@@ -39,6 +39,8 @@ var _ EjectionTransactor = &ejectionTransactor{}
 // The ejection transactor is thread safe, although parallel calls may result in duplicate work (i.e. two calls might
 // end up putting the same data in a cache).
 type ejectionTransactor struct {
+	logger logging.Logger
+
 	// The address of this ejector instance.
 	selfAddress gethcommon.Address
 
@@ -53,9 +55,6 @@ type ejectionTransactor struct {
 
 	// A utility for getting the reference block number.
 	referenceBlockProvider eth.ReferenceBlockProvider
-
-	// A utility for getting a list of all quorums.
-	quorumScanner eth.QuorumScanner
 
 	// A utility for looking up which quorums a given validator is a member of at a specific reference block number.
 	validatorQuorumLookup eth.ValidatorQuorumLookup
@@ -111,15 +110,6 @@ func NewEjectionTransactor(
 		return nil, fmt.Errorf("failed to create periodic reference block provider: %w", err)
 	}
 
-	quorumScanner, err := eth.NewQuorumScanner(client, registryCoordinatorAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create quorum scanner: %w", err)
-	}
-	quorumScanner, err = eth.NewCachedQuorumScanner(quorumScanner, ethCacheSize)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cached quorum scanner: %w", err)
-	}
-
 	validatorQuorumLookup, err := eth.NewValidatorQuorumLookup(client, registryCoordinatorAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create validator quorum lookup: %w", err)
@@ -141,12 +131,12 @@ func NewEjectionTransactor(
 	}
 
 	return &ejectionTransactor{
+		logger:                        logger,
 		selfAddress:                   selfAddress,
 		caller:                        caller,
 		transactor:                    transactor,
 		signer:                        transactOpts.Signer,
 		referenceBlockProvider:        referenceBlockProvider,
-		quorumScanner:                 quorumScanner,
 		validatorQuorumLookup:         validatorQuorumLookup,
 		validatorIDToAddressConverter: validatorIDToAddressConverter,
 	}, nil
@@ -162,9 +152,14 @@ func (e *ejectionTransactor) CompleteEjection(
 		return fmt.Errorf("failed to get reference block number: %w", err)
 	}
 
-	quorums, err := e.quorumScanner.GetQuorums(ctx, rbn)
+	idToEject, err := e.validatorIDToAddressConverter.ValidatorAddressToID(ctx, addressToEject)
 	if err != nil {
-		return fmt.Errorf("failed to get quorums: %w", err)
+		return fmt.Errorf("failed to get validator ID from address: %w", err)
+	}
+
+	quorums, err := e.validatorQuorumLookup.GetQuorumsForValidator(ctx, idToEject, rbn)
+	if err != nil {
+		return fmt.Errorf("failed to get quorums for validator: %w", err)
 	}
 	quorumBytes := eth.QuorumListToBytes(quorums)
 
@@ -174,10 +169,19 @@ func (e *ejectionTransactor) CompleteEjection(
 		Signer:  e.signer,
 	}
 
-	_, err = e.transactor.CompleteEjection(opts, addressToEject, quorumBytes)
+	txn, err := e.transactor.CompleteEjection(opts, addressToEject, quorumBytes)
 	if err != nil {
 		return fmt.Errorf("failed to complete ejection: %w", err)
 	}
+
+	e.logger.Debug("submitted CompleteEjection transaction",
+		"transaction hash", txn.Hash().Hex(),
+		"validator ID", idToEject.Hex(),
+		"validator address", addressToEject.Hex(),
+		"quorums", quorums,
+		"reference block number", rbn,
+	)
+
 	return nil
 }
 
@@ -236,9 +240,14 @@ func (e *ejectionTransactor) StartEjection(
 		return fmt.Errorf("failed to get reference block number: %w", err)
 	}
 
-	quorums, err := e.quorumScanner.GetQuorums(ctx, rbn)
+	idToEject, err := e.validatorIDToAddressConverter.ValidatorAddressToID(ctx, addressToEject)
 	if err != nil {
-		return fmt.Errorf("failed to get quorums: %w", err)
+		return fmt.Errorf("failed to get validator ID from address: %w", err)
+	}
+
+	quorums, err := e.validatorQuorumLookup.GetQuorumsForValidator(ctx, idToEject, rbn)
+	if err != nil {
+		return fmt.Errorf("failed to get quorums for validator: %w", err)
 	}
 	quorumBytes := eth.QuorumListToBytes(quorums)
 
@@ -248,9 +257,18 @@ func (e *ejectionTransactor) StartEjection(
 		Signer:  e.signer,
 	}
 
-	_, err = e.transactor.StartEjection(opts, addressToEject, quorumBytes)
+	txn, err := e.transactor.StartEjection(opts, addressToEject, quorumBytes)
 	if err != nil {
 		return fmt.Errorf("failed to start ejection: %w", err)
 	}
+
+	e.logger.Debug("submitted StartEjection transaction",
+		"transaction hash", txn.Hash().Hex(),
+		"validator ID", idToEject.Hex(),
+		"validator address", addressToEject.Hex(),
+		"quorums", quorums,
+		"reference block number", rbn,
+	)
+
 	return nil
 }
