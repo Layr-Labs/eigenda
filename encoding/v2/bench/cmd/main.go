@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	proverv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -191,11 +192,6 @@ func benchmarkEncodeAndVerify(
 
 	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
 
-	prover, err := p.GetKzgProver(params)
-	if err != nil {
-		log.Fatalf("Failed to get KZG encoder: %v", err)
-	}
-
 	// Create polynomial
 	inputSize := blobLength
 	inputFr := make([]fr.Element, inputSize)
@@ -209,7 +205,7 @@ func benchmarkEncodeAndVerify(
 	}
 
 	start := time.Now()
-	frames, _, err := prover.GetFrames(inputFr)
+	frames, _, err := p.GetFrames(rs.SerializeFieldElements(inputFr), params)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -228,7 +224,7 @@ func benchmarkEncodeAndVerify(
 		for i, frame := range frames {
 			samples = append(samples, encoding.Sample{
 				Commitment:      (*encoding.G1Commitment)(commit),
-				Chunk:           &frame,
+				Chunk:           frame,
 				AssignmentIndex: encoding.ChunkNumber(i),
 				BlobIndex:       0,
 			})
