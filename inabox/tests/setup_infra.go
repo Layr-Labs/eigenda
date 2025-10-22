@@ -116,7 +116,8 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	// 	MetadataTableNameV2: config.MetadataTableNameV2,
 	// 	RelayCount:          config.RelayCount,
 	// }
-	// disperserHarness, err := SetupDisperserHarness(infraCtx, logger, infra.ChainHarness.EthClient, *disperserHarnessConfig)
+	// disperserHarness, err := 
+	// SetupDisperserHarness(infraCtx, logger, infra.ChainHarness.EthClient, *disperserHarnessConfig)
 	// if err != nil {
 	// 	setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
 	// 	return nil, setupErr

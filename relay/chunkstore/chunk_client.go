@@ -9,7 +9,7 @@ import (
 	eigens3 "github.com/Layr-Labs/eigenda/common/aws/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -86,7 +86,7 @@ func (c *ChunkClient) PutFrameProofs(
 
 	serialized, err := encoding.SerializeFrameProofs(proofs)
 	if err != nil {
-		return fmt.Errorf("failed to encode proofs: %v", err)
+		return fmt.Errorf("failed to encode proofs: %w", err)
 	}
 
 	_, err = c.s3Client.PutObject(ctx,
@@ -97,7 +97,7 @@ func (c *ChunkClient) PutFrameProofs(
 		})
 
 	if err != nil {
-		return fmt.Errorf("failed to upload chunk proofs to S3: %v", err)
+		return fmt.Errorf("failed to upload chunk proofs to S3: %w", err)
 	}
 
 	return nil
@@ -113,7 +113,7 @@ func (c *ChunkClient) PutFrameCoefficients(
 
 	serialized, err := rs.SerializeFrameCoeffsSlice(frames)
 	if err != nil {
-		return fmt.Errorf("failed to encode proofs: %v", err)
+		return fmt.Errorf("failed to encode proofs: %w", err)
 	}
 
 	_, err = c.s3Client.PutObject(ctx,
@@ -124,7 +124,7 @@ func (c *ChunkClient) PutFrameCoefficients(
 		})
 
 	if err != nil {
-		return fmt.Errorf("failed to upload chunks to S3: %v", err)
+		return fmt.Errorf("failed to upload chunks to S3: %w", err)
 	}
 
 	return nil
@@ -147,7 +147,7 @@ func (c *ChunkClient) ProofExists(
 		if ok := errors.As(err, &notFound); ok {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to head object in S3: %v", err)
+		return false, fmt.Errorf("failed to head object in S3: %w", err)
 	}
 
 	return true, nil
@@ -171,7 +171,7 @@ func (c *ChunkClient) CoefficientsExists(
 		if ok := errors.As(err, &notFound); ok {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to head object in S3: %v", err)
+		return false, fmt.Errorf("failed to head object in S3: %w", err)
 	}
 
 	return true, nil
@@ -236,8 +236,8 @@ func (c *ChunkClient) GetBinaryChunkCoefficients(
 ) ([][]byte, bool, error) {
 
 	bytesPerFrame := encoding.BYTES_PER_SYMBOL * elementCount
-	firstByteIndex := firstIndex * uint32(bytesPerFrame)
-	size := count * uint32(bytesPerFrame)
+	firstByteIndex := firstIndex * bytesPerFrame
+	size := count * bytesPerFrame
 
 	s3Key := eigens3.ScopedChunkKey(blobKey)
 

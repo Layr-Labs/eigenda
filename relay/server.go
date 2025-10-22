@@ -355,8 +355,10 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	bytesToSend, err := s.downloadChunkData(ctx, request, mMap)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
+			// nolint:wrapcheck
 			return nil, api.NewErrorNotFound(fmt.Sprintf("chunk data not found: %v", err))
 		}
+		// nolint:wrapcheck
 		return nil, api.NewErrorInternal(fmt.Sprintf("error downloading chunk data: %v", err))
 	}
 
@@ -386,7 +388,7 @@ func (s *Server) downloadChunkData(
 		requestByRange := chunkRequest.GetByRange()
 		blobKey, err := v2.BytesToBlobKey(requestByRange.GetBlobKey())
 		if err != nil {
-			return nil, fmt.Errorf("invalid blob key: %v", err)
+			return nil, fmt.Errorf("invalid blob key: %w", err)
 		}
 
 		firstIndex := requestByRange.GetStartIndex()
@@ -411,7 +413,7 @@ func (s *Server) downloadChunkData(
 				metadata.elementCount,
 			)
 			if err != nil {
-				errChan <- fmt.Errorf("error getting chunk data for blob %s: %v", blobKey.Hex(), err)
+				errChan <- fmt.Errorf("error getting chunk data for blob %s: %w", blobKey.Hex(), err)
 				return
 			}
 			if !found {
@@ -429,7 +431,7 @@ func (s *Server) downloadChunkData(
 			count,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error getting chunk proofs for blob %s: %v", blobKey.Hex(), err)
+			return nil, fmt.Errorf("error getting chunk proofs for blob %s: %w", blobKey.Hex(), err)
 		}
 		if !found {
 			return nil, fmt.Errorf("chunk proofs not found for blob %s", blobKey.Hex())
@@ -437,7 +439,7 @@ func (s *Server) downloadChunkData(
 
 		err = <-errChan
 		if err != nil {
-			return nil, fmt.Errorf("error getting chunk coefficients for blob %s: %v", blobKey.Hex(), err)
+			return nil, fmt.Errorf("error getting chunk coefficients for blob %s: %w", blobKey.Hex(), err)
 		}
 
 		// TODO before merge: rename elementCount to symbolsPerFrame

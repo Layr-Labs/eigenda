@@ -2,7 +2,6 @@ package encoder_test
 
 import (
 	"math/big"
-	"runtime"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
@@ -10,7 +9,6 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -29,20 +27,20 @@ type testComponents struct {
 	dynamoDBClient *mock.MockDynamoDBClient
 }
 
-func makeTestProver(numPoint uint64) (*prover.Prover, error) {
-	// We need the larger SRS for testing the encoder with 8192 chunks
-	kzgConfig := &prover.KzgConfig{
-		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
-		CacheDir:        "../../resources/srs/SRSTables",
-		SRSNumberToLoad: numPoint,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    false,
-	}
-	p, err := prover.NewProver(kzgConfig, nil)
+// func makeTestProver(numPoint uint64) (*prover.Prover, error) {
+// 	// We need the larger SRS for testing the encoder with 8192 chunks
+// 	kzgConfig := &prover.KzgConfig{
+// 		G1Path:          "../../resources/srs/g1.point",
+// 		G2Path:          "../../resources/srs/g2.point",
+// 		CacheDir:        "../../resources/srs/SRSTables",
+// 		SRSNumberToLoad: numPoint,
+// 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+// 		LoadG2Points:    false,
+// 	}
+// 	p, err := prover.NewProver(kzgConfig, nil)
 
-	return p, err
-}
+// 	return p, err
+// }
 
 // func TestEncodeBlob(t *testing.T) {
 // 	const (
@@ -99,7 +97,7 @@ func makeTestProver(numPoint uint64) (*prover.Prover, error) {
 // 		t.FailNow()
 // 	}
 
-// 	// Verify storage succeded
+// 	// Verify storage succeeded
 // 	t.Run("Verify Blob Storage", func(t *testing.T) {
 // 		storedData, err := c.blobStore.GetBlob(ctx, blobKey)
 // 		assert.NoError(t, err, "Failed to get stored blob")

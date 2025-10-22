@@ -111,6 +111,9 @@ func RunEncoderServer(ctx *cli.Context) error {
 			config.AwsClientConfig.AccessKey,
 			config.AwsClientConfig.SecretAccessKey,
 			config.ChunkStoreConfig.BucketName)
+		if err != nil {
+			return fmt.Errorf("failed to create chunk client: %w", err)
+		}
 
 		server := encoder.NewEncoderServerV2(
 			*config.ServerConfig,

@@ -245,7 +245,8 @@ package integration
 // 	config DisperserHarnessConfig,
 // ) (*relay.Server, error) {
 // 	// Create logs directory
-// 	// TODO(dmanc): If possible we should have a centralized place for creating loggers and injecting them into the config.
+// 	// TODO(dmanc): If possible we should have a centralized place for 
+// creating loggers and injecting them into the config.
 // 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
 // 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 // 		return nil, fmt.Errorf("failed to create logs directory: %w", err)
@@ -297,7 +298,8 @@ package integration
 
 // 	// Create metadata store
 // 	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.MetadataTableNameV2)
-// 	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+// 	metadataStore := 
+// blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
 // 		ServiceName: "relay",
 // 		Registry:    metricsRegistry,
 // 		Backend:     blobstore.BackendDynamoDB,
@@ -352,7 +354,8 @@ package integration
 // 	}()
 
 // 	// TODO(dmanc): Replace with proper health check endpoint
-// 	logger.Info("Relay server started successfully", "port", listener.Addr().(*net.TCPAddr).Port, "logFile", logFilePath)
+// 	logger.Info("Relay server started successfully", 
+// "port", listener.Addr().(*net.TCPAddr).Port, "logFile", logFilePath)
 
 // 	return server, nil
 // }

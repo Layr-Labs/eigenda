@@ -60,6 +60,6 @@ func (c *clientV2) EncodeBlob(
 
 	// Extract and return fragment info
 	return &encoding.FragmentInfo{
-		ElementCount: reply.FragmentInfo.ElementCount,
+		ElementCount: reply.GetFragmentInfo().GetElementCount(),
 	}, nil
 }
