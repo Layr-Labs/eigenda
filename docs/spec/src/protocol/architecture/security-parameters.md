@@ -42,7 +42,7 @@ In this section, we prove that, with our [chunk assignment algorithm](./assignme
 $$
 r = \frac{c}{c-n} \gamma 
 $$
-
+, where $c > n$.
 In other words, we want to prove that any subset of validators with $\frac{c}{c-n} \gamma$ of total stake collectively own enough chunks to reconstruct the original blob. 
 Formally, we need to show that for any set of validators $H$ with total stake $\sum_{i \in H} \eta_i \geq \frac{c}{c-n} \gamma$, the chunks assigned to $H$ satisfy $\sum_{i \in H} c_i \geq \gamma c$. 
 
@@ -138,41 +138,50 @@ A table of the security thresholds is given below for the reader's reference, as
 In our code, we use slightly different names for the security thresholds compared to the notation in this document.  
 Here is the mapping from the notations in this doc to the variable names in the code:  
 
-- `ConfirmationThreshold` → `securityThresholds.confirmationThreshold`  
-- `SafetyThreshold` → `securityThresholds.adversaryThreshold`
+- `ConfirmationThreshold` → `securityThresholds.confirmationThreshold` (in percent)
+- `SafetyThreshold` → `securityThresholds.adversaryThreshold` (in percent)
 - $c$ → `blobParams.numChunks`
 - $n$ → `blobParams.maxNumOperators`
 - $\gamma$ → 1 / `blobParams.codingRate`
 
 Note that `SafetyThreshold` is called `adversaryThreshold` in the code.
 
+Also, `securityThresholds.confirmationThreshold` and `securityThresholds.adversaryThreshold` are expressed in percent where the stored integer equals the required percentage. 
+For example, `securityThresholds.confirmationThreshold = 55` means `ConfirmationThreshold = 55%`.
+
 **1. Safety Threshold**
 
-The check for the inequality (1) above is implemented as follows ([see in code](https://github.com/Layr-Labs/eigenda/blob/6cd192ecbe5f0abfe73fc08df306cf00e32ef010/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L188)).
+The check for the inequality (1) above is implemented as follows ([see in code](https://github.com/Layr-Labs/eigenda/blob/b06b0bf50917bb6aa1967d1dc12d5b7de815562f/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L163)).
 
 ```solidity
-function checkSecurityParams(
-    DATypesV1.VersionedBlobParams memory blobParams,
-    DATypesV1.SecurityThresholds memory securityThresholds
-) internal pure returns (StatusCode err, bytes memory errParams) {
-    uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
-    uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
-    uint256 minRequired = blobParams.maxNumOperators * 10000;
+// Check for potential underflow: maxNumOperators must not exceed numChunks
+if (blobParams.maxNumOperators > blobParams.numChunks) {
+    revert SecurityAssumptionsNotMet(
+        ...
+    );
+}
 
-    if (n >= minRequired) {
-        return (StatusCode.SUCCESS, "");
-    } else {
-        return (StatusCode.SECURITY_ASSUMPTIONS_NOT_MET, abi.encode(gamma, n, minRequired));
-    }
+uint256 lhs = blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators) * (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold);
+uint256 rhs = 100 * blobParams.numChunks;
+
+if (!(lhs >= rhs)) {
+    revert SecurityAssumptionsNotMet(
+        ...
+    );
 }
 ```
-Specifically, the code above implements a check for the following inequality:  
+First, the code confirms that the total number of chunks is greater than the total number of validators $(c > n)$ so that `ReconstructionThreshold` is meaningful. Next, it validates the following inequality:  
 
-`(10000 - ((1_000_000 / (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold)) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks) >= blobParams.maxNumOperators * 10000`  
+`blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators) * (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold) >= 100 * blobParams.numChunks`
+
+The inequality above can be be rewritten as:
+`(blobParams.numChunks - blobParams.maxNumOperators) / 100 >= blobParams.numChunks / (blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators))`
 
 By substituting the variables using the notation mapping shown at the beginning of this section and simplifying, we get:  
-`ConfirmationThreshold - SafetyThreshold >= (c / (c - n)) * γ = ReconstructionThreshold`, 
-which is exactly inequality (1) shown in the previous subsection.  
+`(ConfirmationThreshold - SafetyThreshold) >= (c / (c - n)) * γ`.
+
+Recall that `ReconstructionThreshold = (c / (c - n)) * γ, (c > n)`(see more details in [Reconstruction Threshold](#reconstruction-threshold)).
+Therefore, the inequality above is exactly inequality (1) shown in the previous subsection.  
 
 **2. Liveness Threshold**
 
