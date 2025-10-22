@@ -17,7 +17,7 @@ import (
 type KzgMultiProofBackend struct{}
 
 func (*KzgMultiProofBackend) ComputeMultiFrameProofV2(
-	blobFr []fr.Element, numChunks, chunkLen, numWorker uint64,
+	blobFr []fr.Element, numChunks, toeplitzMatrixLen, chunkLen, numWorker uint64,
 ) ([]bn254.G1Affine, error) {
 	// Not supported
 	return nil, errors.New("icicle backend called without icicle build tag")

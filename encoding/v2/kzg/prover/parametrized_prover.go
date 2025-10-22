@@ -20,17 +20,23 @@ type ParametrizedProver struct {
 	kzgMultiProofBackend       backend.KzgMultiProofsBackendV2
 }
 
-func (g *ParametrizedProver) GetProofs(inputFr []fr.Element) ([]encoding.Proof, error) {
+// inputFr not necessarily has power of 2 field of elements at this point
+func (g *ParametrizedProver) GetProofs(inputFr []fr.Element, provingParams ProvingParams) ([]encoding.Proof, error) {
 	if err := g.validateInput(inputFr); err != nil {
 		return nil, err
 	}
 
-	// pad inputFr to NumEvaluations(), which encodes the RS redundancy
-	paddedCoeffs := make([]fr.Element, g.encodingParams.NumEvaluations())
+	// pad inputFr to BlobLength if it is not power of 2, which encodes the RS redundancy
+	paddedCoeffs := make([]fr.Element, provingParams.BlobLength())
 	copy(paddedCoeffs, inputFr)
 
 	proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(
-		paddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.computeMultiproofNumWorker)
+		paddedCoeffs,
+		g.encodingParams.NumChunks,
+		provingParams.ToeplitzMatrixLength,
+		g.encodingParams.ChunkLength,
+		g.computeMultiproofNumWorker,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("compute multi frame proof: %w", err)
 	}
