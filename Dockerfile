@@ -170,7 +170,7 @@ ENTRYPOINT ["generator"]
 
 FROM alpine:3.22 AS generator2
 COPY --from=generator2-builder /app/test/v2/bin/load /usr/local/bin
-ENTRYPOINT ["load", "-", "-"]
+ENTRYPOINT ["load"]
 
 FROM alpine:3.22 AS blobapi
 COPY --from=blobapi-builder /app/disperser/bin/blobapi /usr/local/bin

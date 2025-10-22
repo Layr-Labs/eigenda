@@ -155,6 +155,32 @@
       "startBlock": 1367721
     }
   },
+  "preprod-hoodi": {
+    "BLSApkRegistry": {
+      "address": "0xf2b91361f20040a0f1c2663B49bCAE6CD5ED5B98",
+      "startBlock": 1274205
+    },
+    "BLSApkRegistry_Operator": {
+      "address": "0xf2b91361f20040a0f1c2663B49bCAE6CD5ED5B98",
+      "startBlock": 1274205
+    },
+    "BLSApkRegistry_QuorumApkUpdates": {
+      "address": "0xf2b91361f20040a0f1c2663B49bCAE6CD5ED5B98",
+      "startBlock": 1274205
+    },
+    "EjectionManager": {
+      "address": "0xe397F202D271d73EAB6444d634F68278B6274830",
+      "startBlock": 1274229
+    },
+    "RegistryCoordinator": {
+      "address": "0xec03e7038Ca95cB7706a8b129CDE36635CBAF9df",
+      "startBlock": 1274216
+    },
+    "RegistryCoordinator_Operator": {
+      "address": "0xec03e7038Ca95cB7706a8b129CDE36635CBAF9df",
+      "startBlock": 1274216
+    }
+  },
   "hoodi": {
     "BLSApkRegistry": {
       "address": "0xe175Eae102Dda253c00d921fd49657CdA94AC003",

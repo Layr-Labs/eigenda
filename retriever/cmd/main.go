@@ -17,9 +17,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	rsv2 "github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
@@ -129,8 +129,8 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 2 {
-		encoder := rs.NewEncoder(nil)
-		kzgConfig := verifierv2.KzgConfigFromV1Config(&config.EncoderConfig)
+		encoder := rsv2.NewEncoder(logger, nil)
+		kzgConfig := verifierv2.ConfigFromV1KzgConfig(&config.EncoderConfig)
 		verifier, err := verifierv2.NewVerifier(kzgConfig)
 		if err != nil {
 			log.Fatalln("new v2 verifier", err)

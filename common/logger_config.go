@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"testing"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpclogging "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -84,6 +83,16 @@ func DefaultTextLoggerConfig() *LoggerConfig {
 	}
 }
 
+// DefaultSilentLoggerConfig returns a LoggerConfig that discards all log messages.
+// This is useful in tests where you want to suppress log output.
+func DefaultSilentLoggerConfig() *LoggerConfig {
+	return &LoggerConfig{
+		// Still set the log format so that we can call NewLogger without error.
+		Format:       TextLogFormat,
+		OutputWriter: io.Discard,
+	}
+}
+
 // DefaultConsoleLoggerConfig returns a LoggerConfig with the default settings
 // for logging to a console (i.e. with human eyeballs). Adds color, and so should
 // not be used when logs are captured in a file.
@@ -140,9 +149,19 @@ func NewLogger(cfg *LoggerConfig) (logging.Logger, error) {
 }
 
 // Test-only utility for getting a logger instance.
-func TestLogger(t *testing.T) logging.Logger {
+func TestLogger(t require.TestingT) logging.Logger {
 	logger, err := NewLogger(DefaultTextLoggerConfig())
 	require.NoError(t, err)
+	return logger
+}
+
+// SilentLogger returns a logging.Logger that discards all log messages.
+func SilentLogger() logging.Logger {
+	logger, err := NewLogger(DefaultSilentLoggerConfig())
+	if err != nil {
+		// This should never happen, since DefaultSilentLoggerConfig always returns a valid config.
+		panic("failed to create silent logger: " + err.Error())
+	}
 	return logger
 }
 

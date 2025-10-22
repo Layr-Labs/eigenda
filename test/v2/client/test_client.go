@@ -32,11 +32,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/litt/util"
+	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
@@ -72,14 +71,14 @@ type TestClient struct {
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
-	metrics                     *testClientMetrics
+	metrics                     *TestClientMetrics
 }
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(
 	ctx context.Context,
 	logger logging.Logger,
-	metrics *testClientMetrics,
+	metrics *TestClientMetrics,
 	config *TestClientConfig) (*TestClient, error) {
 
 	if config.SRSNumberToLoad == 0 {
@@ -88,12 +87,7 @@ func NewTestClient(
 
 	// Construct the disperser client
 
-	privateKey, err := loadPrivateKey(config.KeyPath, config.KeyVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load private key: %w", err)
-	}
-
-	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
+	signer, err := auth.NewLocalBlobRequestSigner(config.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
@@ -163,14 +157,9 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to populate accountant: %w", err)
 	}
 
-	ethRPCUrls, err := loadEthRPCURLs(config.EthRPCURLs, config.EthRPCUrlsVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load Ethereum RPC URLs: %w", err)
-	}
-
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          ethRPCUrls,
-		PrivateKeyString: privateKey,
+		RPCURLs:          config.EthRpcUrls,
+		PrivateKeyString: config.PrivateKey,
 		NumConfirmations: 0,
 		NumRetries:       3,
 	}
@@ -298,18 +287,18 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
-	kzgConfig := &kzg.KzgConfig{
+	kzgConfig := &kzgv1.KzgConfig{
 		LoadG2Points:    true,
 		G1Path:          g1Path,
 		G2Path:          g2Path,
 		G2TrailingPath:  g2TrailingPath,
 		CacheDir:        srsTablesPath,
-		SRSOrder:        config.SRSOrder,
+		SRSOrder:        config.SrsOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
 	}
-	verifierKzgConfig := verifier.KzgConfigFromV1Config(kzgConfig)
-	encoder := rs.NewEncoder(nil)
+	verifierKzgConfig := verifier.ConfigFromV1KzgConfig(kzgConfig)
+	encoder := rs.NewEncoder(logger, nil)
 	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
@@ -335,7 +324,7 @@ func NewTestClient(
 
 	chainState := eth.NewChainState(ethReader, ethClient)
 	icsConfig := thegraph.Config{
-		Endpoint:     config.SubgraphURL,
+		Endpoint:     config.SubgraphUrl,
 		PullInterval: 100 * time.Millisecond,
 		MaxRetries:   5,
 	}
@@ -392,8 +381,8 @@ func NewTestClient(
 	proxyWrapper, err := NewProxyWrapper(ctx, logger,
 		&proxyconfig.AppConfig{
 			SecretConfig: proxycommon.SecretConfigV2{
-				SignerPaymentKey: privateKey,
-				EthRPCURL:        ethRPCUrls[0],
+				SignerPaymentKey: config.PrivateKey,
+				EthRPCURL:        config.EthRpcUrls[0],
 			},
 			EnabledServersConfig: &enablement.EnabledServersConfig{
 				Metric:      false,
@@ -472,64 +461,11 @@ func NewTestClient(
 		certBuilder:                 certBuilder,
 		onlyDownloadValidatorClient: onlyDownloadValidatorClient,
 		certVerifier:                certVerifier,
-		privateKey:                  privateKey,
+		privateKey:                  config.PrivateKey,
 		metricsRegistry:             registry,
 		metrics:                     metrics,
 		proxyWrapper:                proxyWrapper,
 	}, nil
-}
-
-// loadPrivateKey loads the private key from the file/env var specified in the config.
-func loadPrivateKey(keyPath string, keyVar string) (string, error) {
-	var privateKey string
-	if keyPath != "" {
-		privateKeyFile, err := util.SanitizePath(keyPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to sanitize path: %w", err)
-		}
-
-		exists, err := util.Exists(privateKeyFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to check if private key file exists: %w", err)
-		}
-		if exists {
-			privateKeyBytes, err := os.ReadFile(privateKeyFile)
-			if err != nil {
-				return "", fmt.Errorf("failed to read private key file: %w", err)
-			}
-			privateKey = string(privateKeyBytes)
-		}
-	}
-
-	if privateKey == "" {
-		if keyVar == "" {
-			return "", fmt.Errorf("either KeyPath must reference a valid key file or KeyVar must be set")
-		}
-		privateKey = os.Getenv(keyVar)
-		if privateKey == "" {
-			return "", fmt.Errorf("key not found in environment variable %s", keyVar)
-		}
-	}
-
-	return formatPrivateKey(privateKey), nil
-}
-
-// loadEthRPCURLs loads the Ethereum RPC URLs from the file/env var specified in the config.
-func loadEthRPCURLs(urls []string, urlsVar string) ([]string, error) {
-	if len(urls) > 0 {
-		return urls, nil
-	}
-
-	if urlsVar == "" {
-		return nil, fmt.Errorf("either EthRPCURLs or EthRPCUrlsVar must be set")
-	}
-
-	ethRPCURLs := os.Getenv(urlsVar)
-	if ethRPCURLs == "" {
-		return nil, fmt.Errorf("URLs not found in environment variable %s", urlsVar)
-	}
-
-	return strings.Split(ethRPCURLs, ","), nil
 }
 
 // formatPrivateKey formats the private key by removing leading/trailing whitespace and "0x" prefix.

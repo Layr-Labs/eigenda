@@ -9,6 +9,7 @@ library ConfigRegistryLib {
     event ConfigBytesSet(bytes32 nameDigest, uint256 activationKey, bytes value);
 
     error NameDigestNotRegistered(bytes32 nameDigest);
+    error NotIncreasingActivationKey(uint256 previousActivationKey, uint256 newActivationKey);
 
     function getNameDigest(string memory name) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(name));
@@ -52,12 +53,24 @@ library ConfigRegistryLib {
 
     function addConfigBytes32(bytes32 nameDigest, uint256 activationKey, bytes32 value) internal {
         T.Bytes32Cfg storage cfg = S.layout().bytes32Config;
+        if (cfg.values[nameDigest].length > 0) {
+            uint256 lastActivationKey = cfg.values[nameDigest][cfg.values[nameDigest].length - 1].activationKey;
+            if (activationKey <= lastActivationKey) {
+                revert NotIncreasingActivationKey(lastActivationKey, activationKey);
+            }
+        }
         cfg.values[nameDigest].push(T.Bytes32Checkpoint({value: value, activationKey: activationKey}));
         emit ConfigBytes32Set(nameDigest, activationKey, value);
     }
 
     function addConfigBytes(bytes32 nameDigest, uint256 activationKey, bytes memory value) internal {
         T.BytesCfg storage cfg = S.layout().bytesConfig;
+        if (cfg.values[nameDigest].length > 0) {
+            uint256 lastActivationKey = cfg.values[nameDigest][cfg.values[nameDigest].length - 1].activationKey;
+            if (activationKey <= lastActivationKey) {
+                revert NotIncreasingActivationKey(lastActivationKey, activationKey);
+            }
+        }
         cfg.values[nameDigest].push(T.BytesCheckpoint({value: value, activationKey: activationKey}));
         emit ConfigBytesSet(nameDigest, activationKey, value);
     }

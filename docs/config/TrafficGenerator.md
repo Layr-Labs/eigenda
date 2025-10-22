@@ -9,12 +9,10 @@
 | $${\color{red}\texttt{Environment.ContractDirectoryAddress}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_CONTRACT_DIRECTORY_ADDRESS` | `string` | The contract address for the EigenDA address directory, where all contract addresses are stored |
 | $${\color{red}\texttt{Environment.DisperserHostname}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSER_HOSTNAME` | `string` | The disperser's hostname (url or IP address) |
 | $${\color{red}\texttt{Environment.DisperserPort}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSER_PORT` | `int` | The disperser's port |
-| $${\color{red}\texttt{Environment.EthRPCURLs}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_ETH_RPCURLS` | `[]string` | The URL(s) to point the eth client to<br><br>Either this or EthRPCURLsVar must be set. If both are set, EthRPCURLs is used. |
-| $${\color{red}\texttt{Environment.EthRPCUrlsVar}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_ETH_RPC_URLS_VAR` | `string` | The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.<br><br>Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used. |
-| $${\color{red}\texttt{Environment.KeyPath}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_KEY_PATH` | `string` | The location where the test client's private key is stored. This is the key for the account that is paying for dispersals.<br><br>Either this or KeyVar must be set. If both are set, KeyPath is used. |
-| $${\color{red}\texttt{Environment.KeyVar}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_KEY_VAR` | `string` | The environment variable that contains the private key for the account that is paying for dispersals.<br><br>This is used if KeyPath is not set. |
-| $${\color{red}\texttt{Environment.SRSPath}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_SRS_PATH` | `string` | The location where the SRS files can be found. |
-| $${\color{red}\texttt{Environment.SubgraphURL}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_SUBGRAPH_URL` | `string` | The URL/IP of a subgraph to use for the chain state |
+| $${\color{red}\texttt{Environment.EthRpcUrls}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_ETH_RPC_URLS` | `[]string` | The URL(s) to point the eth client to<br><br>Either this or EthRpcUrlsVar must be set. If both are set, EthRpcUrls is used. |
+| $${\color{red}\texttt{Environment.PrivateKey}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_PRIVATE_KEY` | `string` | The private key for the account that is paying for dispersals, in hex format (0x...) |
+| $${\color{red}\texttt{Environment.SrsPath}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_SRS_PATH` | `string` | The location where the SRS files can be found. |
+| $${\color{red}\texttt{Environment.SubgraphUrl}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_SUBGRAPH_URL` | `string` | The URL/IP of a subgraph to use for the chain state |
 
 ## Optional Fields
 
@@ -28,16 +26,16 @@
 | $${\color{red}\texttt{Environment.ProxyPort}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_PROXY_PORT` | `int`<br>`1234` | The port to use for the proxy. |
 | $${\color{red}\texttt{Environment.RelayConnectionCount}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_RELAY_CONNECTION_COUNT` | `uint`<br>`8` | The number of connections to open for each relay. |
 | $${\color{red}\texttt{Environment.SRSNumberToLoad}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_SRS_NUMBER_TO_LOAD` | `uint64`<br>`0` | The SRS number to load, increasing this beyond necessary can cause the client to take a long time to start |
-| $${\color{red}\texttt{Environment.SRSOrder}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_SRS_ORDER` | `uint64`<br>`268435456` | The SRS order to use for the test |
+| $${\color{red}\texttt{Environment.SrsOrder}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_SRS_ORDER` | `uint64`<br>`268435456` | The SRS order to use for the test |
 | $${\color{red}\texttt{Environment.ValidatorReadComputePoolSize}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATOR_READ_COMPUTE_POOL_SIZE` | `int`<br>`20` | The size of the thread pool for CPU heavy operations. |
 | $${\color{red}\texttt{Environment.ValidatorReadConnectionPoolSize}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_VALIDATOR_READ_CONNECTION_POOL_SIZE` | `int`<br>`100` | The size of the thread pool for read operations. |
-| $${\color{red}\texttt{Load.BlobSizeMB}}$$<br>`TRAFFIC_GENERATOR_LOAD_BLOB_SIZE_MB` | `float64`<br>`2` | The size of the blobs to write, in megabytes. |
+| $${\color{red}\texttt{Load.BlobSizeMb}}$$<br>`TRAFFIC_GENERATOR_LOAD_BLOB_SIZE_MB` | `float64`<br>`2` | The size of the blobs to write, in megabytes. |
 | $${\color{red}\texttt{Load.DispersalTimeout}}$$<br>`TRAFFIC_GENERATOR_LOAD_DISPERSAL_TIMEOUT` | `uint32`<br>`600` | The timeout for each blob dispersal, in seconds. |
 | $${\color{red}\texttt{Load.EnablePprof}}$$<br>`TRAFFIC_GENERATOR_LOAD_ENABLE_PPROF` | `bool`<br>`false` | EnablePprof enables the pprof HTTP server for profiling |
 | $${\color{red}\texttt{Load.FrequencyAcceleration}}$$<br>`TRAFFIC_GENERATOR_LOAD_FREQUENCY_ACCELERATION` | `float64`<br>`0.0025` | FrequencyAcceleration determines the speed at which the frequency of blob submissions accelerates at startup time, in HZ/s. Frequency will start at 0 and accelerate to the target frequency at this rate. If 0, then the frequency will immediately be set to the target frequency. |
 | $${\color{red}\texttt{Load.GasEstimationParallelism}}$$<br>`TRAFFIC_GENERATOR_LOAD_GAS_ESTIMATION_PARALLELISM` | `uint64`<br>`300` | The maximum number of parallel gas estimation operations in flight. |
 | $${\color{red}\texttt{Load.GasEstimationTimeout}}$$<br>`TRAFFIC_GENERATOR_LOAD_GAS_ESTIMATION_TIMEOUT` | `uint32`<br>`15` | The timeout for gas estimation operations, in seconds. |
-| $${\color{red}\texttt{Load.MBPerSecond}}$$<br>`TRAFFIC_GENERATOR_LOAD_MB_PER_SECOND` | `float64`<br>`0.5` | The desired number of megabytes bytes per second to write. |
+| $${\color{red}\texttt{Load.MbPerSecond}}$$<br>`TRAFFIC_GENERATOR_LOAD_MB_PER_SECOND` | `float64`<br>`0.5` | The desired number of megabytes bytes per second to write. |
 | $${\color{red}\texttt{Load.PprofHttpPort}}$$<br>`TRAFFIC_GENERATOR_LOAD_PPROF_HTTP_PORT` | `int`<br>`6060` | PprofHttpPort is the port that the pprof HTTP server listens on |
 | $${\color{red}\texttt{Load.RelayReadAmplification}}$$<br>`TRAFFIC_GENERATOR_LOAD_RELAY_READ_AMPLIFICATION` | `float64`<br>`1` | By default, this utility reads each blob back from each relay once. The number of reads per relay is multiplied by this factor. For example, If this is set to 3, then each blob is read back from each relay 3 times. If less than 1, then this value is treated as a probability. For example, if this is set to 0.5, then each blob is read back from each relay with a 50% chance. If running with the proxy, this value is used to determine how many times to read each blob back from the proxy (since in the normal case, proxy reads translate to relay reads). |
 | $${\color{red}\texttt{Load.RelayReadParallelism}}$$<br>`TRAFFIC_GENERATOR_LOAD_RELAY_READ_PARALLELISM` | `uint64`<br>`300` | The maximum number of parallel blob relay read operations in flight. |
