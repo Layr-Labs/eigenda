@@ -20,13 +20,13 @@ type ParametrizedProver struct {
 	kzgMultiProofBackend       backend.KzgMultiProofsBackendV2
 }
 
-func (g *ParametrizedProver) GetProofs(inputFr []fr.Element) ([]encoding.Proof, error) {
+func (g *ParametrizedProver) GetProofs(inputFr []fr.Element, provingParams ProvingParams) ([]encoding.Proof, error) {
 	if err := g.validateInput(inputFr); err != nil {
 		return nil, err
 	}
 
-	// pad inputFr to NumEvaluations(), which encodes the RS redundancy
-	paddedCoeffs := make([]fr.Element, g.encodingParams.NumEvaluations())
+	// pad inputFr to BlobLength if it is not power of 2, which encodes the RS redundancy
+	paddedCoeffs := make([]fr.Element, provingParams.BlobLength())
 	copy(paddedCoeffs, inputFr)
 
 	proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(

@@ -118,6 +118,8 @@ func makeTestBlob(
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
+	fmt.Println("data", len(data))
+
 	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
@@ -167,6 +169,7 @@ func prepareBlobs(
 		header := cert.BlobHeader
 
 		params, err := corev2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
+		fmt.Println("params ChunkLength", params.ChunkLength, "params NumChunks", params.NumChunks)
 		require.NoError(t, err)
 		frames, _, err := p.GetFrames(blob, params)
 		require.NoError(t, err)

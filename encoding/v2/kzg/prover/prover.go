@@ -22,6 +22,35 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
+// ProverMapKey is solely to cache known provers. EncodingParams does not serve the purpose because
+// for all blobLength dividing the coding ratio that is smaller than NumChunk, they all would have
+// the same number of NumChunk configured by the blob parameters, and ChunkLength to be 1. However,
+// each of them has its own SRS Tables that is power of 2 but less than globally configured NumChunk.
+// In the core of the multi-reveal prover, what matters is the dimension of the matrix, that id
+// determined by blobLength / ChunkLength. They can be considered as the systematic chunks. The NumChunk
+// basically specify the erasure coded result of the systematic chunks.
+// Both ChunkLength and SquareMatrixLength determines the dimension of SRS table.
+type ProvingParams struct {
+	ChunkLength        uint64
+	SquareMatrixLength uint64
+}
+
+func (p *ProvingParams) BlobLength() uint64 {
+	return p.ChunkLength * p.SquareMatrixLength
+}
+
+// blobLength assumes to be power of 2
+func BuildProvingParamsFromEncodingParams(params encoding.EncodingParams, blobLength uint64) (ProvingParams, error) {
+	if blobLength < params.ChunkLength {
+		return ProvingParams{}, fmt.Errorf("blob length should at least equal to the chunk length")
+	}
+
+	return ProvingParams{
+		ChunkLength:        params.ChunkLength,
+		SquareMatrixLength: blobLength / params.ChunkLength,
+	}, nil
+}
+
 // Prover is the main struct that is able to generate frames (chunks and their proofs).
 // TODO(samlaf): should we refactor prover to only generate proofs and keep encoding separate?
 type Prover struct {
@@ -35,7 +64,8 @@ type Prover struct {
 
 	// mu protects access to ParametrizedProvers
 	mu                  sync.Mutex
-	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
+	ParametrizedProvers map[ProvingParams]*ParametrizedProver
+	SRSTables           map[ProvingParams][][]bn254.G1Affine
 }
 
 func NewProver(logger logging.Logger, kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, error) {
@@ -61,7 +91,8 @@ func NewProver(logger logging.Logger, kzgConfig *KzgConfig, encoderConfig *encod
 		encoder:             rsEncoder,
 		KzgConfig:           kzgConfig,
 		G1SRS:               g1SRS,
-		ParametrizedProvers: make(map[encoding.EncodingParams]*ParametrizedProver),
+		ParametrizedProvers: make(map[ProvingParams]*ParametrizedProver),
+		SRSTables:           make(map[ProvingParams][][]bn254.G1Affine),
 	}
 
 	if kzgConfig.PreloadEncoder {
@@ -71,7 +102,7 @@ func NewProver(logger logging.Logger, kzgConfig *KzgConfig, encoderConfig *encod
 			return nil, fmt.Errorf("make cache dir: %w", err)
 		}
 
-		err = proverGroup.preloadProversFromSRSTableCache()
+		err = proverGroup.preloadSRSTableCache()
 		if err != nil {
 			return nil, fmt.Errorf("preload all provers: %w", err)
 		}
@@ -86,7 +117,15 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 		return nil, nil, fmt.Errorf("ToFrArray: %w", err)
 	}
 
-	prover, err := e.GetKzgProver(params)
+	blobLength := uint64(encoding.GetBlobLengthPowerOf2(uint32(len(data))))
+	provingParams, err := BuildProvingParamsFromEncodingParams(params, blobLength)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get proving params: %w", err)
+	}
+
+	fmt.Println("provingParams", provingParams, "params", params)
+
+	prover, err := e.GetKzgProver(params, provingParams)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get kzg prover: %w", err)
 	}
@@ -112,7 +151,7 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	}()
 
 	getProofsStart := time.Now()
-	proofs, err := prover.GetProofs(symbols)
+	proofs, err := prover.GetProofs(symbols, provingParams)
 	getProofsDuration := time.Since(getProofsStart)
 
 	// Wait for both chunks and frames to have finished generating
@@ -145,27 +184,63 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	return frames, encodeResult.indices, nil
 }
 
-func (g *Prover) GetKzgProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
+// blobLength needs to be power of 2
+func (g *Prover) GetKzgProver(
+	params encoding.EncodingParams,
+	provingParams ProvingParams,
+) (*ParametrizedProver, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	enc, ok := g.ParametrizedProvers[params]
+
+	enc, ok := g.ParametrizedProvers[provingParams]
 	if ok {
 		return enc, nil
 	}
 
-	enc, err := g.newProver(params)
+	enc, err := g.newProver(params, provingParams)
 	if err != nil {
 		return nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	g.ParametrizedProvers[params] = enc
+	g.ParametrizedProvers[provingParams] = enc
 	return enc, nil
 }
 
-func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
+func ValidateProvingParams(params ProvingParams, srsOrder uint64) error {
+	if params.SquareMatrixLength == 0 {
+		return errors.New("number of chunks must be greater than 0")
+	}
+	if params.ChunkLength == 0 {
+		return errors.New("chunk length must be greater than 0")
+	}
+
+	if params.SquareMatrixLength > gomath.MaxUint64/params.ChunkLength {
+		return fmt.Errorf("multiplication overflow: ChunkLength: %d, NumChunks: %d",
+			params.ChunkLength, params.SquareMatrixLength)
+	}
+
+	// Check that the parameters are valid with respect to the SRS. The precomputed terms of the amortized KZG
+	// prover use up to order params.ChunkLen*params.SquareMatrixLength-1 for the SRS, so we must have
+	// params.ChunkLen*params.SquareMatrixLength-1 <= g.SRSOrder. The condition below could technically
+	// be relaxed to params.ChunkLen*params.SquareMatrixLength > g.SRSOrder+1, but because all of the parameters are
+	// powers of 2, the stricter condition is equivalent.
+	if params.ChunkLength*params.SquareMatrixLength > srsOrder {
+		return fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.SquareMatrixLength, srsOrder)
+	}
+
+	return nil
+}
+
+func (p *Prover) newProver(params encoding.EncodingParams, provingParams ProvingParams) (*ParametrizedProver, error) {
 	if err := encoding.ValidateEncodingParams(params, encoding.SRSOrder); err != nil {
 		return nil, fmt.Errorf("validate encoding params: %w", err)
 	}
+
+	if err := ValidateProvingParams(provingParams, encoding.SRSOrder); err != nil {
+		return nil, fmt.Errorf("validate proving params: %w", err)
+	}
+
+	fmt.Println("params", params, "provingParams", provingParams)
 
 	// Create FFT settings based on params
 	n := uint8(gomath.Log2(float64(params.NumEvaluations())))
@@ -174,9 +249,13 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 	fs := fft.NewFFTSettings(n)
 
-	_, fftPointsT, err := p.setupFFTPoints(params)
-	if err != nil {
-		return nil, fmt.Errorf("setup fft points: %w", err)
+	fftPointsT, ok := p.SRSTables[provingParams]
+	if !ok {
+		var err error
+		_, fftPointsT, err = p.setupFFTPoints(provingParams)
+		if err != nil {
+			return nil, fmt.Errorf("setup fft points: %w", err)
+		}
 	}
 
 	var multiproofsBackend backend.KzgMultiProofsBackendV2
@@ -187,6 +266,7 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		}
 		multiproofsBackend = gnark.NewMultiProofBackend(p.logger, fs, fftPointsT)
 	case encoding.IcicleBackend:
+		var err error
 		multiproofsBackend, err = icicle.NewMultiProofBackend(
 			p.logger, fs, fftPointsT, p.G1SRS, p.Config.GPUEnable, p.KzgConfig.NumWorker)
 		if err != nil {
@@ -205,23 +285,26 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 
 }
 
-func (g *Prover) preloadProversFromSRSTableCache() error {
-	paramsAll, err := getAllPrecomputedSrsMap(g.KzgConfig.CacheDir)
+func (g *Prover) preloadSRSTableCache() error {
+	provingParamsAll, err := getAllPrecomputedSrsMap(g.KzgConfig.CacheDir)
 	if err != nil {
 		return err
 	}
-	g.logger.Info("Detected SRSTables from cache dir", "NumTables", len(paramsAll), "TableDetails", paramsAll)
+	g.logger.Info("Detected SRSTables from cache dir", "NumTables",
+		len(provingParamsAll), "TableDetails", provingParamsAll)
 
-	if len(paramsAll) == 0 {
+	if len(provingParamsAll) == 0 {
 		return nil
 	}
 
-	for _, params := range paramsAll {
-		prover, err := g.GetKzgProver(params)
+	// since
+	for _, provingParams := range provingParamsAll {
+		_, fftPointsT, err := g.setupFFTPoints(provingParams)
 		if err != nil {
 			return err
 		}
-		g.ParametrizedProvers[params] = prover
+
+		g.SRSTables[provingParams] = fftPointsT
 	}
 
 	return nil
@@ -235,13 +318,13 @@ func (g *Prover) preloadProversFromSRSTableCache() error {
 // where the first * specifies the dimension of the matrix which
 // equals to the number of chunks
 // where the second & specifies the length of each chunk
-func getAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error) {
+func getAllPrecomputedSrsMap(tableDir string) ([]ProvingParams, error) {
 	files, err := os.ReadDir(tableDir)
 	if err != nil {
 		return nil, fmt.Errorf("read srs table dir: %w", err)
 	}
 
-	tables := make([]encoding.EncodingParams, 0)
+	tables := make([]ProvingParams, 0)
 	for _, file := range files {
 		filename := file.Name()
 
@@ -256,9 +339,9 @@ func getAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 			return nil, fmt.Errorf("parse coset size part of the table: %w", err)
 		}
 
-		params := encoding.EncodingParams{
-			NumChunks:   uint64(dimEValue),
-			ChunkLength: uint64(cosetSizeValue),
+		params := ProvingParams{
+			SquareMatrixLength: uint64(dimEValue),
+			ChunkLength:        uint64(cosetSizeValue),
 		}
 		tables = append(tables, params)
 	}
@@ -267,13 +350,13 @@ func getAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 
 // Returns SRSTable SRS points, as well as its transpose.
 // fftPoints has size [l][2*dimE], and its transpose has size [2*dimE][l]
-func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
+func (p *Prover) setupFFTPoints(provingParams ProvingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
 	subTable, err := NewSRSTable(p.logger, p.KzgConfig.CacheDir, p.G1SRS, p.KzgConfig.NumWorker)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create SRS table: %w", err)
 	}
 
-	fftPoints, err := subTable.GetSubTables(params.NumChunks, params.ChunkLength)
+	fftPoints, err := subTable.GetSubTables(provingParams.SquareMatrixLength, provingParams.ChunkLength)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get sub tables: %w", err)
 	}
@@ -283,7 +366,7 @@ func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Aff
 	fftPointsT := make([][]bn254.G1Affine, len(fftPoints[0]))
 	for i := range fftPointsT {
 		fftPointsT[i] = make([]bn254.G1Affine, len(fftPoints))
-		for j := uint64(0); j < params.ChunkLength; j++ {
+		for j := uint64(0); j < provingParams.ChunkLength; j++ {
 			fftPointsT[i][j] = fftPoints[j][i]
 		}
 	}
