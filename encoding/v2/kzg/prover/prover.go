@@ -153,8 +153,6 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 		return nil, nil, fmt.Errorf("get proving params: %w", err)
 	}
 
-	fmt.Println("ToeplitzMatrixLength", provingParams.ToeplitzMatrixLength, "ChunkLength", provingParams.ChunkLength, "params", params)
-
 	prover, err := e.GetKzgProver(params, provingParams)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get kzg prover: %w", err)
