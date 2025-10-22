@@ -88,6 +88,9 @@ type EjectorConfig struct {
 
 	// Whether to enable color in log output (only applies to text output).
 	LogColor bool
+
+	// If non-zero, this value will be used as the gas limit for transactions, overriding the gas estimation.
+	MaxGasOverride uint64
 }
 
 // Create a new root ejector config with default values.
@@ -166,6 +169,7 @@ func DefaultEjectorConfig() *EjectorConfig {
 		ChainDataCacheSize:                   1024,
 		LogOutputType:                        string(common.JSONLogFormat),
 		LogColor:                             false,
+		MaxGasOverride:                       10_000_000,
 	}
 }
 

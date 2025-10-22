@@ -61,6 +61,9 @@ type ejectionTransactor struct {
 
 	// A utility for converting between validator IDs and addresses.
 	validatorIDToAddressConverter eth.ValidatorIDToAddressConverter
+
+	// The maximum gas limit to use for transactions.
+	maxGasOverride uint64
 }
 
 // Create a new EjectionTransactor.
@@ -75,6 +78,7 @@ func NewEjectionTransactor(
 	referenceBlockNumberOffset uint64,
 	referenceBlockNumberPollInterval time.Duration,
 	ethCacheSize int,
+	maxGasOverride uint64,
 ) (EjectionTransactor, error) {
 
 	var zeroAddress gethcommon.Address
@@ -139,6 +143,7 @@ func NewEjectionTransactor(
 		referenceBlockProvider:        referenceBlockProvider,
 		validatorQuorumLookup:         validatorQuorumLookup,
 		validatorIDToAddressConverter: validatorIDToAddressConverter,
+		maxGasOverride:                maxGasOverride,
 	}, nil
 }
 
@@ -167,6 +172,10 @@ func (e *ejectionTransactor) CompleteEjection(
 		Context: ctx,
 		From:    e.selfAddress,
 		Signer:  e.signer,
+	}
+
+	if e.maxGasOverride != 0 {
+		opts.GasLimit = e.maxGasOverride
 	}
 
 	txn, err := e.transactor.CompleteEjection(opts, addressToEject, quorumBytes)
@@ -255,6 +264,10 @@ func (e *ejectionTransactor) StartEjection(
 		Context: ctx,
 		From:    e.selfAddress,
 		Signer:  e.signer,
+	}
+
+	if e.maxGasOverride != 0 {
+		opts.GasLimit = e.maxGasOverride
 	}
 
 	txn, err := e.transactor.StartEjection(opts, addressToEject, quorumBytes)

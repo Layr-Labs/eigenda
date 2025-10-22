@@ -9,7 +9,7 @@
 | $${\color{red}\texttt{Config.ContractDirectoryAddress}}$$<br>`EJECTOR_CONFIG_CONTRACT_DIRECTORY_ADDRESS` | `string` | The address of the contract directory contract. |
 | $${\color{red}\texttt{Config.DataApiUrl}}$$<br>`EJECTOR_CONFIG_DATA_API_URL` | `string` | The URL of the Eigenda Data API to use for looking up signing rates. |
 | $${\color{red}\texttt{Secret.EthRpcUrls}}$$<br>`EJECTOR_SECRET_ETH_RPC_URLS` | `[]string` | The Ethereum RPC URL(s) to use for connecting to the blockchain. |
-| $${\color{red}\texttt{Secret.PrivateKey}}$$<br>`EJECTOR_SECRET_PRIVATE_KEY` | `string` | The private key to use for signing ejection transactions. |
+| $${\color{red}\texttt{Secret.PrivateKey}}$$<br>`EJECTOR_SECRET_PRIVATE_KEY` | `string` | The private key to use for signing ejection transactions, in hex. Do not include the '0x' prefix. |
 
 ## Optional Fields
 
@@ -27,7 +27,10 @@
 | $${\color{red}\texttt{Config.EjectionThrottleTimePeriod}}$$<br>`EJECTOR_CONFIG_EJECTION_THROTTLE_TIME_PERIOD` | `time.Duration`<br>`24h0m0s` | The time period over which the ejection rate limit is calculated. The ejection manager will be allowed to eject ejectionRateLimit fraction of stake every EjectionThrottleTimePeriod. |
 | $${\color{red}\texttt{Config.EthBlockConfirmations}}$$<br>`EJECTOR_CONFIG_ETH_BLOCK_CONFIRMATIONS` | `int`<br>`0` | The number of block confirmations to wait for before considering an ejection transaction to be confirmed. |
 | $${\color{red}\texttt{Config.EthRpcRetryCount}}$$<br>`EJECTOR_CONFIG_ETH_RPC_RETRY_COUNT` | `int`<br>`3` | The number of times to retry a failed Ethereum RPC call. |
+| $${\color{red}\texttt{Config.LogColor}}$$<br>`EJECTOR_CONFIG_LOG_COLOR` | `bool`<br>`false` | Whether to enable color in log output (only applies to text output). |
+| $${\color{red}\texttt{Config.LogOutputType}}$$<br>`EJECTOR_CONFIG_LOG_OUTPUT_TYPE` | `string`<br>`"json"` | The output type for logs, must be "json" or "text". |
 | $${\color{red}\texttt{Config.MaxConsecutiveFailedEjectionAttempts}}$$<br>`EJECTOR_CONFIG_MAX_CONSECUTIVE_FAILED_EJECTION_ATTEMPTS` | `uint32`<br>`5` | The maximum number of consecutive failed ejection attempts before giving up on ejecting a validator. |
+| $${\color{red}\texttt{Config.MaxGasOverride}}$$<br>`EJECTOR_CONFIG_MAX_GAS_OVERRIDE` | `uint64`<br>`10000000` | If non-zero, this value will be used as the gas limit for transactions, overriding the gas estimation. |
 | $${\color{red}\texttt{Config.ReferenceBlockNumberOffset}}$$<br>`EJECTOR_CONFIG_REFERENCE_BLOCK_NUMBER_OFFSET` | `uint64`<br>`10` | The number of blocks to wait before using a reference block number for quorum. That is to say, do not always use the latest block number we know about, but rather use the block number that is sufficiently old as to make choosing the wrong fork unlikely. If this config value is X, and we know about block 100, we will use a RBN 100-X. |
 | $${\color{red}\texttt{Config.ReferenceBlockNumberPollInterval}}$$<br>`EJECTOR_CONFIG_REFERENCE_BLOCK_NUMBER_POLL_INTERVAL` | `time.Duration`<br>`10s` | The interval at which to poll for a new reference block number. |
 | $${\color{red}\texttt{Config.StartEjectionThrottleFull}}$$<br>`EJECTOR_CONFIG_START_EJECTION_THROTTLE_FULL` | `bool`<br>`false` | If true, then the ejection manager will immediately be able to eject ejectionRateLimit fraction of stake when it starts up. If false, then the ejection manager will need to wait before it has this capacity. |

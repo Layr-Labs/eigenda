@@ -110,6 +110,7 @@ func run(ctx context.Context) error {
 		ejectorConfig.ReferenceBlockNumberOffset,
 		ejectorConfig.ReferenceBlockNumberPollInterval,
 		int(ejectorConfig.ChainDataCacheSize),
+		ejectorConfig.MaxGasOverride,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create ejection transactor: %w", err)
