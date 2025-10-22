@@ -10,9 +10,7 @@
 | $${\color{red}\texttt{Environment.DisperserHostname}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSER_HOSTNAME` | `string` | The disperser's hostname (url or IP address) |
 | $${\color{red}\texttt{Environment.DisperserPort}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSER_PORT` | `int` | The disperser's port |
 | $${\color{red}\texttt{Environment.EthRpcUrls}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_ETH_RPC_URLS` | `[]string` | The URL(s) to point the eth client to<br><br>Either this or EthRpcUrlsVar must be set. If both are set, EthRpcUrls is used. |
-| $${\color{red}\texttt{Environment.EthRpcUrlsVar}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_ETH_RPC_URLS_VAR` | `string` | The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.<br><br>Either this or EthRpcUrls must be set. If both are set, EthRpcUrls is used. |
-| $${\color{red}\texttt{Environment.KeyPath}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_KEY_PATH` | `string` | The location where the test client's private key is stored. This is the key for the account that is paying for dispersals.<br><br>Either this or KeyVar must be set. If both are set, KeyPath is used. |
-| $${\color{red}\texttt{Environment.KeyVar}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_KEY_VAR` | `string` | The environment variable that contains the private key for the account that is paying for dispersals.<br><br>This is used if KeyPath is not set. |
+| $${\color{red}\texttt{Environment.PrivateKey}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_PRIVATE_KEY` | `string` | The private key for the account that is paying for dispersals, in hex format (0x...) |
 | $${\color{red}\texttt{Environment.SrsPath}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_SRS_PATH` | `string` | The location where the SRS files can be found. |
 | $${\color{red}\texttt{Environment.SubgraphUrl}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_SUBGRAPH_URL` | `string` | The URL/IP of a subgraph to use for the chain state |
 

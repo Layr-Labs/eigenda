@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 )
 
 // Useful for converting back and forth between 4844 padded base64 representations of

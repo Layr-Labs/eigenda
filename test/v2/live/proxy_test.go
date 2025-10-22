@@ -5,7 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
@@ -78,7 +78,7 @@ func TestSmallBlobProxyDispersal(t *testing.T) {
 
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func maximumSizedBlobProxyDispersalTest(t *testing.T, environment string) {
-	config, err := client.GetConfig(common.TestLogger(t), "LIVE_TEST", environment)
+	config, err := client.GetConfig(t, common.TestLogger(t), "LIVE_TEST", environment)
 	require.NoError(t, err)
 
 	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(
