@@ -24,7 +24,7 @@ func (*KzgMultiProofBackend) ComputeMultiFrameProofV2(
 }
 
 func NewMultiProofBackend(logger logging.Logger,
-	fs *fft.FFTSettings, fftPointsT [][]bn254.G1Affine,
+	fs *fft.FFTSettings, fftPointsT [][]bn254.G1Affine, g1SRS []bn254.G1Affine,
 	gpuEnabled bool, numWorker uint64,
 ) (*KzgMultiProofBackend, error) {
 	// Not supported

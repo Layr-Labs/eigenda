@@ -188,7 +188,7 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		multiproofsBackend = gnark.NewMultiProofBackend(p.logger, fs, fftPointsT)
 	case encoding.IcicleBackend:
 		multiproofsBackend, err = icicle.NewMultiProofBackend(
-			p.logger, fs, fftPointsT, p.Config.GPUEnable, p.KzgConfig.NumWorker)
+			p.logger, fs, fftPointsT, p.G1SRS, p.Config.GPUEnable, p.KzgConfig.NumWorker)
 		if err != nil {
 			return nil, fmt.Errorf("create icicle backend prover: %w", err)
 		}
