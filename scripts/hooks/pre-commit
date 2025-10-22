@@ -21,16 +21,22 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 # Change to the repository root
 cd "$REPO_ROOT"
 
-# Ensure mise tools are available
-if ! command -v mise &> /dev/null; then
-    echo -e "${RED}Error: mise is not installed or not in PATH${NC}"
-    echo "Please install mise to ensure all development tools are available."
+# Check that required tools are available
+if ! command -v golangci-lint &> /dev/null; then
+    echo -e "${RED}Error: golangci-lint is not installed or not in PATH${NC}"
+    echo "Please ensure your mise environment is properly configured."
+    echo "Run: mise install && mise activate"
     echo "See: https://mise.jdx.dev/"
     exit 1
 fi
 
-# Activate mise environment to ensure tools like golangci-lint are available
-eval "$(mise env -s bash)"
+if ! command -v go &> /dev/null; then
+    echo -e "${RED}Error: go is not installed or not in PATH${NC}"
+    echo "Please ensure your mise environment is properly configured."
+    echo "Run: mise install && mise activate"
+    echo "See: https://mise.jdx.dev/"
+    exit 1
+fi
 
 # Run make lint (includes golangci-lint and go mod tidy check)
 echo -e "\n${YELLOW}Running 'make lint'...${NC}"
