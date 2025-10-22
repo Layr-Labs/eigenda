@@ -16,7 +16,7 @@ import (
 type KzgMultiProofBackend struct {
 	Logger logging.Logger
 	Fs     *fft.FFTSettings
-	// FFTPointsT contains the transposed SRSTable points, of size [2*dimE][l]=[2*numChunks][chunkLen].
+	// FFTPointsT contains the transposed SRSTable points, of size [2*toeplitzMatrixLen][l]=[2*numChunks][chunkLen].
 	// See section 3.1.1 of https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf:
 	//   "Note that the vector multiplied by the matrix is independent from the polynomial coefficients,
 	//   so its Fourier transform can be precomputed"
@@ -47,7 +47,7 @@ func NewMultiProofBackend(
 // 2. https://eprint.iacr.org/2023/033.pdf (how to compute the single multiproof fast)
 // 3. https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf (fast multiple multiproofs)
 func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(
-	polyFr []fr.Element, numChunks, chunkLen, numWorker uint64,
+	polyFr []fr.Element, numTotalChunks, toeplitzMatrixLen, chunkLen, numWorker uint64,
 ) ([]bn254.G1Affine, error) {
 	// We describe the steps in the computation by following section 2.2 of
 	// https://eprint.iacr.org/2023/033.pdf, generalized to the multiple multiproofs case.
@@ -55,22 +55,21 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(
 
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
-	dimE := numChunks
 	l := chunkLen
 
 	// eqn (2) DFT_2d(c^)
-	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
+	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, toeplitzMatrixLen)
 	if err != nil {
 		return nil, fmt.Errorf("coefficient computation error: %w", err)
 	}
 	preprocessDone := time.Now()
 
 	// compute proof by multi scaler multiplication
-	sumVec := make([]bn254.G1Affine, dimE*2)
+	sumVec := make([]bn254.G1Affine, toeplitzMatrixLen*2)
 
 	g := new(errgroup.Group)
 	g.SetLimit(int(numWorker))
-	for i := uint64(0); i < dimE*2; i++ {
+	for i := uint64(0); i < toeplitzMatrixLen*2; i++ {
 		g.Go(func() error {
 			// eqn (3) u=y*v
 			_, err := sumVec[i].MultiExp(p.FFTPointsT[i], coeffStore[i], ecc.MultiExpConfig{})
@@ -94,8 +93,16 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(
 
 	firstECNttDone := time.Now()
 
-	// last step (5) "take first d elements of h^ as h"
-	h := sumVecInv[:dimE]
+	// last step (5) "take first d elements of h^ as h
+	h := sumVecInv[:len(sumVecInv)/2]
+
+	// append identity to results for adding redundancy when taking FFT
+	identity := bn254.G1Affine{}
+	identity.SetInfinity()
+	// now extend h with padding to do erasure coding on the proof
+	for i := uint64(len(h)); i < numTotalChunks; i++ {
+		h = append(h, identity)
+	}
 
 	// Now that we have h, we compute C_T = FFT(h).
 	// See https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf eqn 29.
@@ -120,11 +127,11 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(
 }
 
 // Helper function to handle coefficient computation.
-// Returns a [2*dimE][l] slice.
+// Returns a [2*toeplitzMatrixLen][l] slice.
 func (p *KzgMultiProofBackend) computeCoeffStore(
-	polyFr []fr.Element, numWorker, l, dimE uint64,
+	polyFr []fr.Element, numWorker, l, toeplitzMatrixLen uint64,
 ) ([][]fr.Element, error) {
-	coeffStore := make([][]fr.Element, dimE*2)
+	coeffStore := make([][]fr.Element, toeplitzMatrixLen*2)
 	for i := range coeffStore {
 		coeffStore[i] = make([]fr.Element, l)
 	}
@@ -134,7 +141,7 @@ func (p *KzgMultiProofBackend) computeCoeffStore(
 	g.SetLimit(int(numWorker))
 	for j := range l {
 		g.Go(func() error {
-			coeffs, err := p.getSlicesCoeff(polyFr, dimE, j, l)
+			coeffs, err := p.getSlicesCoeff(polyFr, toeplitzMatrixLen, j, l)
 			if err != nil {
 				return fmt.Errorf("get slices coeff: %w", err)
 			}
@@ -157,12 +164,17 @@ func (p *KzgMultiProofBackend) computeCoeffStore(
 // the indices used are more complex (eg. (m-j)/l below).
 // Those indices are from the matrix in section 3.1.1 of
 // https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf
-// Returned slice has len [2*dimE].
+// Returned slice has len [2*toeplitzMatrixLen].
 //
 // TODO(samlaf): better document/explain/refactor/rename this function,
 // to explain how it fits into the overall scheme.
-func (p *KzgMultiProofBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
-	toeplitzExtendedVec := make([]fr.Element, 2*dimE)
+func (p *KzgMultiProofBackend) getSlicesCoeff(
+	polyFr []fr.Element,
+	toeplitzMatrixLen uint64,
+	j uint64,
+	l uint64,
+) ([]fr.Element, error) {
+	toeplitzExtendedVec := make([]fr.Element, 2*toeplitzMatrixLen)
 
 	m := uint64(len(polyFr)) - 1 // there is a constant term
 	dim := (m - j) / l
