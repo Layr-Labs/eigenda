@@ -271,6 +271,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		nil, // no prover so will query disperser for generating commitments
 		accountant,
 		metrics.NoopDispersalMetrics,
+		false,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create disperser client: %w", err)
