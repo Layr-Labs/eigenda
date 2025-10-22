@@ -36,7 +36,9 @@ type InfrastructureConfig struct {
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
 // This includes containers for Anvil, LocalStack, GraphNode, and the Churner server.
-func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (infra *InfrastructureHarness, err error) {
+func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*InfrastructureHarness, error) {
+	var err error
+	var infra *InfrastructureHarness
 	if config.MetadataTableName == "" {
 		config.MetadataTableName = "test-BlobMetadata"
 	}
@@ -52,7 +54,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (inf
 	// Create test directory if needed
 	testName := config.TestName
 	if testName == "" {
-		var err error
 		testName, err = deploy.CreateNewTestDirectory(config.TemplateName, config.RootPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create test directory: %w", err)
