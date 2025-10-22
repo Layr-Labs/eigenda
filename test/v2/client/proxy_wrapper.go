@@ -45,6 +45,7 @@ func NewProxyWrapper(
 		proxyConfig.StoreBuilderConfig,
 		proxyConfig.SecretConfig,
 		registry,
+		false,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build store manager: %w", err)

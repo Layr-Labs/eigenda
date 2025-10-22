@@ -18,9 +18,15 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const maxNumberOfConnections = 32
+
+var tracer = otel.Tracer("github.com/Layr-Labs/eigenda/api/clients/v2")
 
 type DisperserClientConfig struct {
 	Hostname          string
@@ -71,6 +77,7 @@ func NewDisperserClient(
 	committer *committer.Committer,
 	accountant *Accountant,
 	metrics metrics.DispersalMetricer,
+	tracingEnabled bool,
 ) (*DisperserClient, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config must be provided")
@@ -97,7 +104,7 @@ func NewDisperserClient(
 	}
 
 	addr := fmt.Sprintf("%v:%v", config.Hostname, config.Port)
-	dialOptions := GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB)
+	dialOptions := GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB, tracingEnabled)
 	clientPool, err := common.NewGRPCClientPool(
 		logger,
 		disperser_rpc.NewDisperserClient,
@@ -121,20 +128,31 @@ func NewDisperserClient(
 
 // PopulateAccountant populates the accountant with the payment state from the disperser.
 func (c *DisperserClient) PopulateAccountant(ctx context.Context) error {
+	ctx, span := tracer.Start(ctx, "DisperserClient.PopulateAccountant")
+	defer span.End()
+
 	if c.accountant == nil {
-		return fmt.Errorf("accountant is nil")
+		err := fmt.Errorf("accountant is nil")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "accountant is nil")
+		return err
 	}
 
 	paymentState, err := c.GetPaymentState(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "error getting payment state")
 		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
 	}
 
 	err = c.accountant.SetPaymentState(paymentState)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "error setting payment state")
 		return fmt.Errorf("error setting payment state for accountant: %w", err)
 	}
 
+	span.SetStatus(codes.Ok, "accountant populated successfully")
 	return nil
 }
 
@@ -163,18 +181,34 @@ func (c *DisperserClient) DisperseBlob(
 	// if this is nil, that indicates we will use the legacy payment system to create the paymentMetadata
 	paymentMetadata *core.PaymentMetadata,
 ) (*corev2.BlobHeader, *disperser_rpc.DisperseBlobReply, error) {
+	ctx, span := tracer.Start(ctx, "DisperserClient.DisperseBlob",
+		trace.WithAttributes(
+			attribute.Int("blob_size_bytes", len(data)),
+			attribute.Int("quorum_count", len(quorums)),
+		))
+	defer span.End()
+
 	if len(quorums) == 0 {
+		err := api.NewErrorInvalidArg("quorum numbers must be provided")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid quorum numbers")
 		//nolint:wrapcheck
-		return nil, nil, api.NewErrorInvalidArg("quorum numbers must be provided")
+		return nil, nil, err
 	}
 	if c.signer == nil {
+		err := api.NewErrorInternal("uninitialized signer for authenticated dispersal")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "uninitialized signer")
 		//nolint:wrapcheck
-		return nil, nil, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
+		return nil, nil, err
 	}
 	for _, q := range quorums {
 		if q > corev2.MaxQuorumID {
+			err := api.NewErrorInvalidArg(fmt.Sprintf("quorum number %d must be <= %d", q, corev2.MaxQuorumID))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "invalid quorum ID")
 			//nolint:wrapcheck
-			return nil, nil, api.NewErrorInvalidArg(fmt.Sprintf("quorum number %d must be <= %d", q, corev2.MaxQuorumID))
+			return nil, nil, err
 		}
 	}
 
@@ -190,12 +224,16 @@ func (c *DisperserClient) DisperseBlob(
 		err := c.initOncePopulateAccountant(ctx)
 		if err != nil {
 			c.accountantLock.Unlock()
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "error initializing accountant")
 			return nil, nil, fmt.Errorf("error initializing accountant: %w", err)
 		}
 
 		paymentMetadata, err = c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
 		if err != nil {
 			c.accountantLock.Unlock()
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "error accounting blob")
 			return nil, nil, fmt.Errorf("error accounting blob: %w", err)
 		}
 
@@ -213,6 +251,8 @@ func (c *DisperserClient) DisperseBlob(
 	// check every 32 bytes of data are within the valid range for a bn254 field element
 	_, err := rs.ToFrArray(data)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid field element")
 		return nil, nil, fmt.Errorf(
 			"encountered an error to convert a 32-bytes into a valid field element, "+
 				"please use the correct format where every 32bytes(big-endian) is less than "+
@@ -227,10 +267,14 @@ func (c *DisperserClient) DisperseBlob(
 		commitments, err := c.GetBlobCommitment(ctx, data)
 		if err != nil {
 			// Failover worthy error because it means the disperser is not responsive.
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "GetBlobCommitment RPC failed")
 			return nil, nil, api.NewErrorFailover(fmt.Errorf("GetBlobCommitment rpc: %w", err))
 		}
 		deserialized, err := encoding.BlobCommitmentsFromProtobuf(commitments.GetBlobCommitment())
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "error deserializing blob commitments")
 			return nil, nil, fmt.Errorf("error deserializing blob commitments: %w", err)
 		}
 		blobCommitments = *deserialized
@@ -242,14 +286,19 @@ func (c *DisperserClient) DisperseBlob(
 		// fail, if the length claimed in the encoded payload header is larger than the blob length in the commitment.
 		lengthFromCommitment := commitments.GetBlobCommitment().GetLength()
 		if lengthFromCommitment != uint32(symbolLength) {
-			return nil, nil, fmt.Errorf(
-				"blob commitment length (%d) from disperser doesn't match expected length (%d): %w",
-				lengthFromCommitment, symbolLength, err)
+			err := fmt.Errorf(
+				"blob commitment length (%d) from disperser doesn't match expected length (%d)",
+				lengthFromCommitment, symbolLength)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "blob commitment length mismatch")
+			return nil, nil, err
 		}
 	} else {
 		// if committer is configured, get commitments from committer
 		blobCommitments, err = c.committer.GetCommitmentsForPaddedLength(data)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "error getting blob commitments")
 			return nil, nil, fmt.Errorf("error getting blob commitments: %w", err)
 		}
 	}
@@ -265,10 +314,14 @@ func (c *DisperserClient) DisperseBlob(
 
 	sig, err := c.signer.SignBlobRequest(blobHeader)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "error signing blob request")
 		return nil, nil, fmt.Errorf("error signing blob request: %w", err)
 	}
 	blobHeaderProto, err := blobHeader.ToProtobuf()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "error converting blob header to protobuf")
 		return nil, nil, fmt.Errorf("error converting blob header to protobuf: %w", err)
 	}
 	request := &disperser_rpc.DisperseBlobRequest{
@@ -281,10 +334,18 @@ func (c *DisperserClient) DisperseBlob(
 
 	reply, err := c.clientPool.GetClient().DisperseBlob(ctx, request)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DisperseBlob RPC failed")
 		return nil, nil, api.NewErrorFailover(fmt.Errorf("DisperseBlob rpc: %w", err))
 	}
 
 	c.metrics.RecordBlobSizeBytes(len(data))
+
+	// Add blob key to span on success
+	if blobKey, err := blobHeader.BlobKey(); err == nil {
+		span.SetAttributes(attribute.String("blob_key", blobKey.Hex()))
+	}
+	span.SetStatus(codes.Ok, "blob dispersed successfully")
 
 	return blobHeader, reply, nil
 }
@@ -294,27 +355,47 @@ func (c *DisperserClient) GetBlobStatus(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 ) (*disperser_rpc.BlobStatusReply, error) {
+	ctx, span := tracer.Start(ctx, "DisperserClient.GetBlobStatus",
+		trace.WithAttributes(
+			attribute.String("blob_key", blobKey.Hex()),
+		))
+	defer span.End()
+
 	request := &disperser_rpc.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	}
 	reply, err := c.clientPool.GetClient().GetBlobStatus(ctx, request)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "GetBlobStatus RPC failed")
 		return nil, fmt.Errorf("error while calling GetBlobStatus: %w", err)
 	}
+
+	span.SetAttributes(attribute.String("blob_status", reply.GetStatus().String()))
+	span.SetStatus(codes.Ok, "blob status retrieved successfully")
 	return reply, nil
 }
 
 // GetPaymentState returns the payment state of the disperser client
 func (c *DisperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+	ctx, span := tracer.Start(ctx, "DisperserClient.GetPaymentState")
+	defer span.End()
+
 	accountID, err := c.signer.GetAccountID()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "error getting account ID")
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 	}
+
+	span.SetAttributes(attribute.String("account_id", accountID.Hex()))
 
 	timestamp := uint64(time.Now().UnixNano())
 
 	signature, err := c.signer.SignPaymentStateRequest(timestamp)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "error signing payment state request")
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
 
@@ -325,8 +406,12 @@ func (c *DisperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	}
 	reply, err := c.clientPool.GetClient().GetPaymentState(ctx, request)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "GetPaymentState RPC failed")
 		return nil, fmt.Errorf("error while calling GetPaymentState: %w", err)
 	}
+
+	span.SetStatus(codes.Ok, "payment state retrieved successfully")
 	return reply, nil
 }
 
@@ -338,13 +423,23 @@ func (c *DisperserClient) GetBlobCommitment(
 	ctx context.Context,
 	data []byte,
 ) (*disperser_rpc.BlobCommitmentReply, error) {
+	ctx, span := tracer.Start(ctx, "DisperserClient.GetBlobCommitment",
+		trace.WithAttributes(
+			attribute.Int("blob_size_bytes", len(data)),
+		))
+	defer span.End()
+
 	request := &disperser_rpc.BlobCommitmentRequest{
 		Blob: data,
 	}
 	reply, err := c.clientPool.GetClient().GetBlobCommitment(ctx, request)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "GetBlobCommitment RPC failed")
 		return nil, fmt.Errorf("error while calling GetBlobCommitment: %w", err)
 	}
+
+	span.SetStatus(codes.Ok, "blob commitment retrieved successfully")
 	return reply, nil
 }
 

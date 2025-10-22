@@ -64,6 +64,7 @@ func BuildManagers(
 	config Config,
 	secrets common.SecretConfigV2,
 	registry *prometheus.Registry,
+	tracingEnabled bool,
 ) (*store.EigenDAManager, *store.KeccakManager, error) {
 	var err error
 	var s3Store *s3.Store
@@ -117,7 +118,7 @@ func BuildManagers(
 			}
 		}
 		eigenDAV2Store, err = buildEigenDAV2Backend(
-			ctx, log, config, secrets, rsv2.NewEncoder(log, nil), kzgVerifier, registry)
+			ctx, log, config, secrets, rsv2.NewEncoder(log, nil), kzgVerifier, registry, tracingEnabled)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
 		}
@@ -224,6 +225,7 @@ func buildEigenDAV2Backend(
 	encoder *rsv2.Encoder,
 	kzgVerifier *kzgverifierv2.Verifier,
 	registry *prometheus.Registry,
+	tracingEnabled bool,
 ) (common.EigenDAV2Store, error) {
 	kzgCommitter, err := committer.NewFromConfig(committer.Config{
 		G1SRSPath:         config.KzgConfig.G1Path,
@@ -388,6 +390,7 @@ func buildEigenDAV2Backend(
 			operatorStateRetrieverAddr,
 			registryCoordinator,
 			registry,
+			tracingEnabled,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("build payload disperser: %w", err)
@@ -611,6 +614,7 @@ func buildPayloadDisperser(
 	operatorStateRetrieverAddr geth_common.Address,
 	registryCoordinatorAddr geth_common.Address,
 	registry *prometheus.Registry,
+	tracingEnabled bool,
 ) (*payloaddispersal.PayloadDisperser, error) {
 	signer, err := buildLocalSigner(ctx, log, secrets, ethClient)
 	if err != nil {
@@ -646,6 +650,7 @@ func buildPayloadDisperser(
 		kzgCommitter,
 		accountant,
 		dispersalMetrics,
+		tracingEnabled,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)

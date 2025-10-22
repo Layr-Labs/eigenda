@@ -1,0 +1,29 @@
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        http:
+          endpoint: 0.0.0.0:4318
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+ingester:
+  max_block_duration: 5m               # cut the headblock when this much time passes
+
+compactor:
+  compaction:
+    block_retention: 1h                # overall Tempo trace retention
+
+storage:
+  trace:
+    backend: local                     # backend configuration to use
+    wal:
+      path: /var/tempo/wal             # where to store the wal locally
+    local:
+      path: /var/tempo/blocks
+
+overrides:
+  metrics_generator_processors: [service-graphs, span-metrics]

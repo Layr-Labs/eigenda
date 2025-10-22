@@ -19,7 +19,13 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
+
+var tracer = otel.Tracer("github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal")
 
 // PayloadDisperser provides the ability to disperse payloads to EigenDA via a Disperser grpc service.
 //
@@ -89,6 +95,14 @@ func (pd *PayloadDisperser) SendPayload(
 	// payload is the raw data to be stored on eigenDA
 	payload coretypes.Payload,
 ) (coretypes.EigenDACert, error) {
+	ctx, span := tracer.Start(ctx, "PayloadDisperser.SendPayload",
+		trace.WithAttributes(
+			attribute.Int("payload_size_bytes", len(payload)),
+			attribute.Int("blob_version", int(pd.config.BlobVersion)),
+			attribute.Int("payload_form", int(pd.config.PayloadPolynomialForm)),
+			attribute.Bool("payment.new_ledger", pd.clientLedger != nil),
+		))
+	defer span.End()
 
 	probe := pd.stageTimer.NewSequence()
 	defer probe.End()
@@ -98,6 +112,8 @@ func (pd *PayloadDisperser) SendPayload(
 	// which means the encoded payload will need to be IFFT'd since EigenDA blobs are in coefficient form.
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to convert payload to blob")
 		return nil, fmt.Errorf("failed to convert payload to blob: %w", err)
 	}
 
@@ -112,18 +128,32 @@ func (pd *PayloadDisperser) SendPayload(
 	//       This is a known issue and will be addressed with future enhancements.
 	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "get quorum numbers required failed")
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
+	span.SetAttributes(attribute.IntSlice("quorums", intSliceFromQuorums(requiredQuorums)))
 
 	symbolCount := blob.LenSymbols()
+	span.SetAttributes(attribute.Int("symbol_count", int(symbolCount)))
 
 	var paymentMetadata *core.PaymentMetadata
 	if pd.clientLedger != nil {
 		// we are using the new payment system if clientLedger is non nil
 		probe.SetStage("debit")
+
 		paymentMetadata, err = pd.clientLedger.Debit(ctx, symbolCount, requiredQuorums)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "debit failed")
 			return nil, fmt.Errorf("debit: %w", err)
+		}
+
+		if paymentMetadata != nil {
+			span.SetAttributes(
+				attribute.String("payment.account_id", paymentMetadata.AccountID.Hex()),
+				attribute.Int64("payment.timestamp", paymentMetadata.Timestamp),
+			)
 		}
 	}
 
@@ -145,10 +175,14 @@ func (pd *PayloadDisperser) SendPayload(
 		if pd.clientLedger != nil {
 			revertErr := pd.clientLedger.RevertDebit(ctx, paymentMetadata, symbolCount)
 			if revertErr != nil {
+				span.RecordError(errors.Join(err, revertErr))
+				span.SetStatus(codes.Error, "disperse blob and revert debit failed")
 				return nil, fmt.Errorf("disperse blob and revert debit: %w", errors.Join(err, revertErr))
 			}
 		}
 
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "disperse blob failed")
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}
 
@@ -156,10 +190,22 @@ func (pd *PayloadDisperser) SendPayload(
 
 	blobKey, err := verifyReceivedBlobKey(blobHeader, reply)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "verify received blob key failed")
 		return nil, fmt.Errorf("verify received blob key: %w", err)
 	}
 
-	return pd.buildEigenDACert(ctx, reply.GetResult(), blobKey, probe)
+	span.SetAttributes(attribute.String("blob_key", blobKey.Hex()))
+
+	cert, err := pd.buildEigenDACert(ctx, reply.GetResult(), blobKey, probe)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "build EigenDA cert failed")
+		return nil, err
+	}
+
+	span.SetStatus(codes.Ok, "payload sent successfully")
+	return cert, nil
 }
 
 // Waits for a blob to be signed, and builds the EigenDA cert with the operator signatures
@@ -171,6 +217,12 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	blobKey corev2.BlobKey,
 	probe *common.SequenceProbe,
 ) (coretypes.EigenDACert, error) {
+	ctx, span := tracer.Start(ctx, "PayloadDisperser.buildEigenDACert",
+		trace.WithAttributes(
+			attribute.String("blob_key", blobKey.Hex()),
+			attribute.String("initial_status", initialBlobStatus.String()),
+		))
+	defer span.End()
 
 	probe.SetStage("QUEUED")
 
@@ -180,33 +232,45 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	defer cancel()
 	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, initialBlobStatus, probe)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "poll blob status until signed failed")
 		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
 
 	pd.logSigningPercentages(blobKey, blobStatusReply)
+	addSigningPercentagesToSpan(span, blobStatusReply)
+
+	rbn := blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber()
+	span.SetAttributes(attribute.Int64("reference_block_number", int64(rbn)))
 
 	probe.SetStage("wait_for_block_number")
 	// TODO: given the repeated context timeout declaration in this method we should consider creating some
 	// generic function or helper to enhance DRY
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	err = pd.blockMonitor.WaitForBlockNumber(
-		timeoutCtx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
-	if err != nil {
-		return nil, fmt.Errorf("wait for block number: %w", err)
+	waitErr := pd.blockMonitor.WaitForBlockNumber(timeoutCtx, rbn)
+	if waitErr != nil {
+		span.RecordError(waitErr)
+		span.SetStatus(codes.Error, "wait for block number failed")
+		return nil, fmt.Errorf("wait for block number: %w", waitErr)
 	}
 
-	certVersion, err := pd.certVerifier.GetCertVersion(
-		ctx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
+	certVersion, err := pd.certVerifier.GetCertVersion(ctx, rbn)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "get certificate version failed")
 		return nil, fmt.Errorf("get certificate version: %w", err)
 	}
+
+	span.SetAttributes(attribute.Int("cert_version", int(certVersion)))
 
 	probe.SetStage("build_cert")
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 	eigenDACert, err := pd.certBuilder.BuildCert(timeoutCtx, certVersion, blobStatusReply)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "build cert failed")
 		return nil, fmt.Errorf("build cert: %w", err)
 	}
 	pd.logger.Debug("EigenDACert built", "blobKey", blobKey.Hex(), "certVersion", certVersion)
@@ -216,20 +280,25 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 
-	err = pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert)
-	if err != nil {
+	checkErr := pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert)
+	if checkErr != nil {
 		var errInvalidCert *verification.CertVerifierInvalidCertError
-		if errors.As(err, &errInvalidCert) {
+		if errors.As(checkErr, &errInvalidCert) {
 			// Regardless of whether the cert is invalid (400) or certVerifier contract has a bug (500),
 			// we send a failover signal. If we can't construct a valid cert after retrying a few times (proxy retry
 			// policy), then its safer for the rollup to failover to another DA layer.
-			return nil, api.NewErrorFailover(fmt.Errorf("checkDACert failed with blobKey %v: %w", blobKey.Hex(), err))
+			span.RecordError(checkErr)
+			span.SetStatus(codes.Error, "check DA cert invalid")
+			return nil, api.NewErrorFailover(fmt.Errorf("checkDACert failed with blobKey %v: %w", blobKey.Hex(), checkErr))
 		}
-		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
+		span.RecordError(checkErr)
+		span.SetStatus(codes.Error, "verify cert failed")
+		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), checkErr)
 	}
 
 	pd.logger.Debug("EigenDACert verified", "blobKey", blobKey.Hex())
 
+	span.SetStatus(codes.Ok, "cert built and verified successfully")
 	return eigenDACert, nil
 }
 
@@ -255,6 +324,21 @@ func (pd *PayloadDisperser) logSigningPercentages(blobKey corev2.BlobKey, blobSt
 
 	pd.logger.Debug("Blob signed",
 		"blobKey", blobKey.Hex(), "quorumPercentages", quorumPercentagesBuilder.String())
+}
+
+// addSigningPercentagesToSpan adds the signing percentages of each quorum to the span attributes
+func addSigningPercentagesToSpan(span trace.Span, blobStatusReply *dispgrpc.BlobStatusReply) {
+	attestation := blobStatusReply.GetSignedBatch().GetAttestation()
+	if len(attestation.GetQuorumNumbers()) != len(attestation.GetQuorumSignedPercentages()) {
+		return
+	}
+
+	for index, quorumNumber := range attestation.GetQuorumNumbers() {
+		span.SetAttributes(attribute.Int(
+			fmt.Sprintf("signing.q%d_pct", quorumNumber),
+			int(attestation.GetQuorumSignedPercentages()[index]),
+		))
+	}
 }
 
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
@@ -283,6 +367,12 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	initialStatus dispgrpc.BlobStatus,
 	probe *common.SequenceProbe,
 ) (*dispgrpc.BlobStatusReply, error) {
+	ctx, span := tracer.Start(ctx, "PayloadDisperser.pollBlobStatusUntilSigned",
+		trace.WithAttributes(
+			attribute.String("blob_key", blobKey.Hex()),
+			attribute.String("initial_status", initialStatus.String()),
+		))
+	defer span.End()
 
 	previousStatus := initialStatus
 
@@ -293,11 +383,14 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 		select {
 		case <-ctx.Done():
 			// Failover to another DA layer because EigenDA is not completing its signing duty in time.
-			return nil, api.NewErrorFailover(fmt.Errorf(
+			err := api.NewErrorFailover(fmt.Errorf(
 				"timed out waiting for %v blob status, final status was %v: %w",
 				dispgrpc.BlobStatus_COMPLETE.String(),
 				previousStatus.String(),
 				ctx.Err()))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "timeout waiting for blob status")
+			return nil, err
 		case <-ticker.C:
 			// This call to the disperser doesn't have a dedicated timeout configured.
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
@@ -328,11 +421,17 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 					// for networking reasons, which we don't want to failover to eth for!
 					var thresholdNotMetErr *thresholdNotMetError
 					if errors.As(err, &thresholdNotMetErr) {
+						span.RecordError(err)
+						span.SetStatus(codes.Error, "threshold not met")
 						return nil, api.NewErrorFailover(fmt.Errorf("check thresholds: %w", err))
 					}
+					span.RecordError(err)
+					span.SetStatus(codes.Error, "check thresholds failed")
 					return nil, fmt.Errorf("check thresholds: %w", err)
 				}
 
+				span.SetAttributes(attribute.String("final_status", newStatus.String()))
+				span.SetStatus(codes.Ok, "blob signed successfully")
 				return blobStatusReply, nil
 			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED:
 				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
@@ -358,10 +457,13 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 				continue
 			default:
 				// Failover to another DA layer because something is wrong with EigenDA.
-				return nil, api.NewErrorFailover(
+				err := api.NewErrorFailover(
 					fmt.Errorf("terminal dispersal failure for blobKey %v. blob status: %v",
 						blobKey.Hex(),
 						newStatus.String()))
+				span.RecordError(err)
+				span.SetStatus(codes.Error, "terminal dispersal failure")
+				return nil, err
 			}
 		}
 	}
@@ -397,4 +499,13 @@ func verifyReceivedBlobKey(
 	}
 
 	return blobKeyFromDisperser, nil
+}
+
+// intSliceFromQuorums converts a slice of QuorumIDs to a slice of ints for tracing attributes
+func intSliceFromQuorums(quorums []core.QuorumID) []int {
+	result := make([]int, len(quorums))
+	for i, q := range quorums {
+		result[i] = int(q)
+	}
+	return result
 }

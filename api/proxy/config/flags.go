@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/redis"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
+	"github.com/Layr-Labs/eigenda/api/proxy/telemetry"
 	"github.com/urfave/cli/v2"
 )
 
@@ -24,6 +25,7 @@ const (
 
 	LoggingFlagsCategory = "Logging"
 	MetricsFlagCategory  = "Metrics"
+	TelemetryCategory    = "OpenTelemetry Tracing"
 
 	StorageFlagsCategory  = "Storage"
 	MemstoreFlagsCategory = "Memstore (for testing purposes - replaces EigenDA backend)"
@@ -51,6 +53,7 @@ func init() {
 	Flags = append(Flags, rest.CLIFlags(GlobalEnvVarPrefix, ProxyRestServerCategory)...)
 	Flags = append(Flags, arbitrum_altda.CLIFlags(GlobalEnvVarPrefix, ArbCustomDASvrCategory)...)
 	Flags = append(Flags, metrics.CLIFlags(GlobalEnvVarPrefix, MetricsFlagCategory)...)
+	Flags = append(Flags, telemetry.CLIFlags(GlobalEnvVarPrefix, TelemetryCategory)...)
 
 	Flags = append(Flags, logging.CLIFlags(GlobalEnvVarPrefix, LoggingFlagsCategory)...)
 	Flags = append(Flags, eigendaflags.CLIFlags(GlobalEnvVarPrefix, EigenDAClientCategory)...)

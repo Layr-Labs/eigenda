@@ -41,7 +41,9 @@ func NewNodeClient(config *NodeClientConfig, requestSigner DispersalRequestSigne
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
 	addr := fmt.Sprintf("%v:%v", config.Hostname, config.Port)
-	dialOptions := GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB)
+
+	// TODO: NodeClient has not been updated to use tracing, so tracing is disabled by default
+	dialOptions := GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB, false)
 	conn, err := grpc.NewClient(addr, dialOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("new grpc client: %w", err)
