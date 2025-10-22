@@ -48,7 +48,7 @@ type InfrastructureHarness struct {
 	OperatorHarness OperatorHarness
 
 	// EigenDA components (includes relays)
-	DisperserHarness DisperserHarness
+	// DisperserHarness DisperserHarness
 
 	// Proxy
 	// TODO: Add harness when we need it

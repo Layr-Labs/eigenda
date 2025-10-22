@@ -69,7 +69,17 @@ func RunRelay(cliCtx *cli.Context) error {
 
 	// Create blob store and chunk reader
 	blobStore := blobstore.NewBlobStore(config.BucketName, s3Client, logger)
-	chunkReader := chunkstore.NewChunkReader(logger, s3Client, config.BucketName)
+
+	chunkClient, err := chunkstore.NewChunkClient(
+		config.AWS.EndpointURL,
+		config.AWS.Region,
+		config.AWS.AccessKey,
+		config.AWS.SecretAccessKey,
+		config.BucketName,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create chunk client: %w", err)
+	}
 
 	// Create eth writer
 	tx, err := eth.NewWriter(logger, ethClient, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
@@ -96,7 +106,7 @@ func RunRelay(cliCtx *cli.Context) error {
 		&config.RelayConfig,
 		metadataStore,
 		blobStore,
-		chunkReader,
+		chunkClient,
 		tx,
 		ics,
 		listener,
