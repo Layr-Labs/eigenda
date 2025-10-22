@@ -36,7 +36,7 @@ type InfrastructureConfig struct {
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
 // This includes containers for Anvil, LocalStack, GraphNode, and the Churner server.
-func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*InfrastructureHarness, error) {
+func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (infra *InfrastructureHarness, err error) {
 	if config.MetadataTableName == "" {
 		config.MetadataTableName = "test-BlobMetadata"
 	}
@@ -66,9 +66,8 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	infraCtx, infraCancel := context.WithCancel(ctx)
 
 	// Ensure we cancel the context if we return an error
-	var setupErr error
 	defer func() {
-		if setupErr != nil && infraCancel != nil {
+		if err != nil {
 			infraCancel()
 		}
 	}()
@@ -79,13 +78,12 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		network.WithDriver("bridge"),
 		network.WithAttachable())
 	if err != nil {
-		setupErr = fmt.Errorf("failed to create docker network: %w", err)
-		return nil, setupErr
+		return nil, fmt.Errorf("failed to create docker network: %w", err)
 	}
 	logger.Info("Created Docker network", "name", sharedDockerNetwork.Name)
 
 	// Create infrastructure harness early so we can populate it incrementally
-	infra := &InfrastructureHarness{
+	infra = &InfrastructureHarness{
 		SharedNetwork:  sharedDockerNetwork,
 		TestConfig:     testConfig,
 		TemplateName:   config.TemplateName,
@@ -104,8 +102,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 	chainHarness, err := SetupChainHarness(infraCtx, chainHarnessConfig)
 	if err != nil {
-		setupErr = fmt.Errorf("failed to setup chain harness: %w", err)
-		return nil, setupErr
+		return nil, fmt.Errorf("failed to setup chain harness: %w", err)
 	}
 	infra.ChainHarness = *chainHarness
 
@@ -129,8 +126,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 			*disperserHarnessConfig,
 		)
 		if err != nil {
-			setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
-			return nil, setupErr
+			return nil, fmt.Errorf("failed to setup disperser harness: %w", err)
 		}
 		infra.DisperserHarness = *disperserHarness
 	} else {
@@ -144,8 +140,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
 	if err != nil {
-		setupErr = fmt.Errorf("failed to setup operator harness: %w", err)
-		return nil, setupErr
+		return nil, fmt.Errorf("failed to setup operator harness: %w", err)
 	}
 	infra.OperatorHarness = *operatorHarness
 
