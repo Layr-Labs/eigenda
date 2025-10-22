@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/auth"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
@@ -46,8 +47,8 @@ type Server struct {
 	// blobProvider encapsulates logic for fetching blobs.
 	blobProvider *blobProvider
 
-	// chunkProvider encapsulates logic for fetching chunks.
-	chunkProvider *chunkProvider
+	// can be used to read/write chunks from S3.
+	chunkClient *chunkstore.ChunkClient
 
 	// blobRateLimiter enforces rate limits on GetBlob and operations.
 	blobRateLimiter *limiter.BlobRateLimiter
@@ -82,7 +83,7 @@ func NewServer(
 	config *Config,
 	metadataStore blobstore.MetadataStore,
 	blobStore *blobstore.BlobStore,
-	chunkReader chunkstore.ChunkReader,
+	chunkClient *chunkstore.ChunkClient,
 	chainReader core.Reader,
 	ics core.IndexedChainState,
 	listener net.Listener,
@@ -128,19 +129,6 @@ func NewServer(
 		return nil, fmt.Errorf("error creating blob provider: %w", err)
 	}
 
-	cp, err := newChunkProvider(
-		ctx,
-		logger,
-		chunkReader,
-		config.ChunkCacheBytes,
-		config.ChunkMaxConcurrency,
-		config.Timeouts.InternalGetProofsTimeout,
-		config.Timeouts.InternalGetCoefficientsTimeout,
-		relayMetrics.ChunkCacheMetrics)
-	if err != nil {
-		return nil, fmt.Errorf("error creating chunk provider: %w", err)
-	}
-
 	var authenticator auth.RequestAuthenticator
 	if !config.AuthenticationDisabled {
 		authenticator, err = auth.NewRequestAuthenticator(ctx, ics, config.AuthenticationKeyCacheSize)
@@ -159,7 +147,7 @@ func NewServer(
 		logger:           logger.With("component", "RelayServer"),
 		metadataProvider: mp,
 		blobProvider:     bp,
-		chunkProvider:    cp,
+		chunkClient:      chunkClient,
 		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits, relayMetrics),
 		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits, relayMetrics),
 		authenticator:    authenticator,
@@ -364,14 +352,12 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 	s.metrics.ReportGetChunksBandwidthUsage(requiredBandwidth)
 
-	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
+	bytesToSend, err := s.downloadChunkData(ctx, request, mMap)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching frames: %v", err))
-	}
-
-	bytesToSend, err := gatherChunkDataToSend(frames, request)
-	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err))
+		if strings.Contains(err.Error(), "not found") {
+			return nil, api.NewErrorNotFound(fmt.Sprintf("chunk data not found: %v", err))
+		}
+		return nil, api.NewErrorInternal(fmt.Sprintf("error downloading chunk data: %v", err))
 	}
 
 	s.metrics.ReportChunkDataLatency(time.Since(finishedFetchingMetadata))
@@ -379,6 +365,119 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 	return &pb.GetChunksReply{
 		Data: bytesToSend,
+	}, nil
+}
+
+// Download the requested chunk data from S3.
+func (s *Server) downloadChunkData(
+	ctx context.Context,
+	request *pb.GetChunksRequest,
+	metadataMap metadataMap,
+) (data [][]byte, err error) {
+
+	data = make([][]byte, 0)
+
+	for _, chunkRequest := range request.GetChunkRequests() {
+		if chunkRequest.GetByIndex() != nil {
+			// TODO if we actually deploy this, we need to be backwards compatible for a little while at least.
+			return nil, fmt.Errorf("GetChunks by index is no longer supported")
+		}
+
+		requestByRange := chunkRequest.GetByRange()
+		blobKey, err := v2.BytesToBlobKey(requestByRange.GetBlobKey())
+		if err != nil {
+			return nil, fmt.Errorf("invalid blob key: %v", err)
+		}
+
+		firstIndex := requestByRange.GetStartIndex()
+		count := requestByRange.GetEndIndex() - requestByRange.GetStartIndex()
+
+		metadata, ok := metadataMap[blobKey]
+		if !ok || metadata == nil {
+			return nil, fmt.Errorf("metadata not found for blob %s", blobKey.Hex())
+		}
+
+		errChan := make(chan error, 1)
+		var coefficients [][]byte
+
+		go func() {
+			var err error
+			var found bool
+			coefficients, found, err = s.chunkClient.GetBinaryChunkCoefficients(
+				ctx,
+				blobKey,
+				firstIndex,
+				count,
+				metadata.elementCount,
+			)
+			if err != nil {
+				errChan <- fmt.Errorf("error getting chunk data for blob %s: %v", blobKey.Hex(), err)
+				return
+			}
+			if !found {
+				errChan <- fmt.Errorf("chunk data not found for blob %s", blobKey.Hex())
+				return
+			}
+
+			errChan <- nil
+		}()
+
+		proofs, found, err := s.chunkClient.GetBinaryChunkProofs(
+			ctx,
+			blobKey,
+			firstIndex,
+			count,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error getting chunk proofs for blob %s: %v", blobKey.Hex(), err)
+		}
+		if !found {
+			return nil, fmt.Errorf("chunk proofs not found for blob %s", blobKey.Hex())
+		}
+
+		err = <-errChan
+		if err != nil {
+			return nil, fmt.Errorf("error getting chunk coefficients for blob %s: %v", blobKey.Hex(), err)
+		}
+
+		// TODO before merge: rename elementCount to symbolsPerFrame
+
+		chunks, err := buildChunksData(proofs, int(metadata.elementCount), coefficients)
+		if err != nil {
+			return nil, err
+		}
+
+		data = append(data, chunks.Chunks...)
+	}
+
+	return data, nil
+}
+
+// BuildChunksData creates a binary core.ChunksData object from the given proofs and coefficients.
+func buildChunksData(
+	proofs [][]byte,
+	// the number of symbols per frame
+	elementCount int,
+	coefficients [][]byte) (*core.ChunksData, error) {
+
+	if len(proofs) != len(coefficients) {
+		return nil, fmt.Errorf("proofs and coefficients have different lengths (%d vs %d)",
+			len(proofs), len(coefficients))
+	}
+
+	binaryChunks := make([][]byte, len(proofs))
+
+	for i := 0; i < len(proofs); i++ {
+		binaryFrame := make([]byte, len(proofs[i])+len(coefficients[i]))
+		copy(binaryFrame, proofs[i])
+		copy(binaryFrame[len(proofs[i]):], coefficients[i])
+		binaryChunks[i] = binaryFrame
+	}
+
+	return &core.ChunksData{
+		Chunks:   binaryChunks,
+		Format:   core.GnarkChunkEncodingFormat,
+		ChunkLen: elementCount,
 	}, nil
 }
 
@@ -537,7 +636,7 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 			return 0, fmt.Errorf("metadata not found for key %s", key.Hex())
 		}
 
-		requiredBandwidth += requestedChunks * metadata.chunkSizeBytes
+		requiredBandwidth += requestedChunks * metadata.elementCount * encoding.BYTES_PER_SYMBOL
 	}
 
 	return requiredBandwidth, nil
