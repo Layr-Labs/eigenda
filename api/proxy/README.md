@@ -384,7 +384,7 @@ A normal (non-archival) Ethereum node is sufficient for running the proxy with c
 1. immutable (eg: [securityThresholds](https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L30)), or
 2. are upgradeable but have all the historical versions available in contract storage (eg: [versioninedBlobParams](https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L27))
 
-The proxy interacts with a single RPC endpoint. Load-balancing and/or failover behaviour should be handled by an external proxy, e.g: [erpc](https://github.com/erpc/erpc)
+The proxy interacts with a single RPC endpoint. Load-balancing and/or failover behavior should be handled by an external proxy, e.g: [erpc](https://github.com/erpc/erpc)
 
 #### SRS Points
 
