@@ -163,7 +163,7 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 	}
 
 	e.logger.Info("Validator is eligible for ejection",
-		"validatorID", signingRate.GetValidatorId(),
+		"validatorID", core.OperatorID(signingRate.GetValidatorId()).Hex(),
 		"validatorAddress", validatorAddress.Hex(),
 		"signedBatches", signingRate.GetSignedBatches(),
 		"unsignedBatches", signingRate.GetUnsignedBatches(),
@@ -198,6 +198,8 @@ func (e *Ejector) getStakeFractionMap(validatorID core.OperatorID) (map[core.Quo
 	if err != nil {
 		return nil, fmt.Errorf("error looking up quorums for validator: %w", err)
 	}
+
+	e.logger.Debugf("validator %x is in quorums: %v", validatorID, quorums) // TODO remove
 
 	stakeFractions := make(map[core.QuorumID]float64, len(quorums))
 

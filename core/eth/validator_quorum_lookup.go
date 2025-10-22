@@ -3,7 +3,6 @@ package eth
 import (
 	"context"
 	"fmt"
-	"math"
 	"math/big"
 
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
@@ -63,23 +62,17 @@ func (v *validatorQuorumLookup) GetQuorumsForValidator(
 		BlockNumber: blockNumber,
 	}
 
-	// This method returns a bitmap as a big.Int, where the first 255 bits represent membership in quorums 0-254.
+	// This method returns a bitmap as a big.Int.
 	bigIntBitmap, err := v.registryCoordinator.GetCurrentQuorumBitmap(opts, validatorID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get quorum bitmap: %w", err)
 	}
-	bitmap := bigIntBitmap.Bytes()
+
 	quorumIDs := make([]core.QuorumID, 0)
 
-	// Although technically 254 is the max quorum ID (due to an embarrassing off-by-one typo), it doesn't hurt
-	// to check bit 255. It's possible that the typo will be fixed in the future, and this
-	// code should still work if that happens.
-	for i := 0; i <= math.MaxUint8; i++ {
-		byteIndex := i / 8
-		bitIndex := i % 8
-
-		bit := (bitmap[byteIndex] >> bitIndex) & 1
-		if bit == 1 {
+	for i := 0; i <= 192; i++ {
+		present := bigIntBitmap.Bit(i)
+		if present == 1 {
 			quorumID := core.QuorumID(i)
 			quorumIDs = append(quorumIDs, quorumID)
 		}
