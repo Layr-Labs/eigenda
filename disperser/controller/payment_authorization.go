@@ -20,19 +20,39 @@ import (
 
 // PaymentAuthorizationConfig contains configuration for building a payment authorization handler
 type PaymentAuthorizationConfig struct {
-	OnDemandTableName          string
-	OnDemandMaxLedgers         int
-	ReservationMaxLedgers      int
-	PaymentVaultUpdateInterval time.Duration
+	OnDemandConfig    ondemandvalidation.OnDemandLedgerCacheConfig
+	ReservationConfig reservationvalidation.ReservationLedgerCacheConfig
 }
 
-// DefaultPaymentAuthorizationConfig returns a config with reasonable defaults for tests
-func DefaultPaymentAuthorizationConfig() PaymentAuthorizationConfig {
-	return PaymentAuthorizationConfig{
-		OnDemandTableName:          "e2e_v2_ondemand",
-		OnDemandMaxLedgers:         100,
-		ReservationMaxLedgers:      100,
-		PaymentVaultUpdateInterval: 1 * time.Second,
+// Verify validates the PaymentAuthorizationConfig
+func (c *PaymentAuthorizationConfig) Verify() error {
+	if err := c.OnDemandConfig.Verify(); err != nil {
+		return fmt.Errorf("on-demand config: %w", err)
+	}
+	if err := c.ReservationConfig.Verify(); err != nil {
+		return fmt.Errorf("reservation config: %w", err)
+	}
+	return nil
+}
+
+// DefaultPaymentAuthorizationConfig returns a new PaymentAuthorizationConfig with default values
+func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
+	onDemandConfig := ondemandvalidation.OnDemandLedgerCacheConfig{
+		MaxLedgers:        1024,
+		OnDemandTableName: "",
+		UpdateInterval:    30 * time.Second,
+	}
+
+	reservationConfig := reservationvalidation.ReservationLedgerCacheConfig{
+		MaxLedgers:           1024,
+		BucketCapacityPeriod: 75 * time.Second,
+		OverfillBehavior:     ratelimit.OverfillOncePermitted,
+		UpdateInterval:       30 * time.Second,
+	}
+
+	return &PaymentAuthorizationConfig{
+		OnDemandConfig:    onDemandConfig,
+		ReservationConfig: reservationConfig,
 	}
 }
 
@@ -84,16 +104,6 @@ func BuildPaymentAuthorizationHandler(
 		onDemandMetererMetrics,
 	)
 
-	// Create on-demand config
-	onDemandConfig, err := ondemandvalidation.NewOnDemandLedgerCacheConfig(
-		config.OnDemandMaxLedgers,
-		config.OnDemandTableName,
-		config.PaymentVaultUpdateInterval,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create on-demand config: %w", err)
-	}
-
 	// Create on-demand validator (use nil metrics if registry is nil)
 	var onDemandValidatorMetrics *ondemandvalidation.OnDemandValidatorMetrics
 	var onDemandCacheMetrics *ondemandvalidation.OnDemandCacheMetrics
@@ -113,7 +123,7 @@ func BuildPaymentAuthorizationHandler(
 	onDemandValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
 		ctx,
 		logger,
-		onDemandConfig,
+		config.OnDemandConfig,
 		paymentVault,
 		awsDynamoClient,
 		onDemandValidatorMetrics,
@@ -121,20 +131,6 @@ func BuildPaymentAuthorizationHandler(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create on-demand payment validator: %w", err)
-	}
-
-	// Create reservation config
-	// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
-	// instead of hardcoding. At that point, this field will be removed from the config struct
-	// entirely, and the value will be fetched dynamically at runtime.
-	reservationConfig, err := reservationvalidation.NewReservationLedgerCacheConfig(
-		config.ReservationMaxLedgers,
-		75*time.Second, // bucketCapacityPeriod
-		ratelimit.OverfillOncePermitted,
-		config.PaymentVaultUpdateInterval,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create reservation config: %w", err)
 	}
 
 	// Create reservation validator (use nil metrics if registry is nil)
@@ -156,7 +152,7 @@ func BuildPaymentAuthorizationHandler(
 	reservationValidator, err := reservationvalidation.NewReservationPaymentValidator(
 		ctx,
 		logger,
-		reservationConfig,
+		config.ReservationConfig,
 		paymentVault,
 		time.Now,
 		reservationValidatorMetrics,

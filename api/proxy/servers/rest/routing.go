@@ -167,7 +167,6 @@ func parseReturnEncodedPayloadQueryParam(r *http.Request) bool {
 	if !exists || len(returnEncodedPayloadValues) == 0 {
 		return false
 	}
-	fmt.Println("returnEncodedPayloadValues:", returnEncodedPayloadValues)
 	returnEncodedPayload := strings.ToLower(returnEncodedPayloadValues[0])
 	if returnEncodedPayload == "" || returnEncodedPayload == "true" || returnEncodedPayload == "1" {
 		return true

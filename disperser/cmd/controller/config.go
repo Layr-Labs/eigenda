@@ -45,8 +45,7 @@ type Config struct {
 	ServerConfig                 server.Config
 	HeartbeatMonitorConfig       healthcheck.HeartbeatMonitorConfig
 
-	OnDemandConfig    ondemandvalidation.OnDemandLedgerCacheConfig
-	ReservationConfig reservationvalidation.ReservationLedgerCacheConfig
+	PaymentAuthorizationConfig controller.PaymentAuthorizationConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -116,6 +115,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("create reservation config: %w", err)
 	}
 
+	paymentAuthorizationConfig := controller.PaymentAuthorizationConfig{
+		OnDemandConfig:    onDemandConfig,
+		ReservationConfig: reservationConfig,
+	}
+
 	heartbeatMonitorConfig := healthcheck.HeartbeatMonitorConfig{
 		FilePath:         ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 		MaxStallDuration: ctx.GlobalDuration(flags.ControllerHeartbeatMaxStallDurationFlag.Name),
@@ -170,8 +174,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
 		ServerConfig:                    serverConfig,
 		HeartbeatMonitorConfig:          heartbeatMonitorConfig,
-		OnDemandConfig:                  onDemandConfig,
-		ReservationConfig:               reservationConfig,
+		PaymentAuthorizationConfig:      paymentAuthorizationConfig,
 	}
 
 	if err := config.DispersalRequestSignerConfig.Verify(); err != nil {
@@ -183,6 +186,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 	if err := config.DispatcherConfig.Verify(); err != nil {
 		return Config{}, fmt.Errorf("invalid dispatcher config: %w", err)
+	}
+	if err := config.PaymentAuthorizationConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid payment authorization config: %w", err)
 	}
 
 	return config, nil
