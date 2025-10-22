@@ -6,7 +6,7 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/v1/fft"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/v1/rs"
 	"github.com/Layr-Labs/eigenda/resources/srs"

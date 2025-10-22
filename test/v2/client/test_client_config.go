@@ -16,15 +16,8 @@ var _ config.VerifiableConfig = (*TestClientConfig)(nil)
 type TestClientConfig struct {
 	// The location where the SRS files can be found.
 	SrsPath string `docs:"required"`
-	// The location where the test client's private key is stored. This is the key for the account that is
-	// paying for dispersals.
-	//
-	// Either this or KeyVar must be set. If both are set, KeyPath is used.
-	KeyPath string `docs:"required"`
-	// The environment variable that contains the private key for the account that is paying for dispersals.
-	//
-	// This is used if KeyPath is not set.
-	KeyVar string `docs:"required"`
+	// The private key for the account that is paying for dispersals, in hex format (0x...)
+	PrivateKey string `docs:"required"`
 	// The disperser's hostname (url or IP address)
 	DisperserHostname string `docs:"required"`
 	// The disperser's port
@@ -33,10 +26,6 @@ type TestClientConfig struct {
 	//
 	// Either this or EthRpcUrlsVar must be set. If both are set, EthRpcUrls is used.
 	EthRpcUrls []string `docs:"required"`
-	// The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.
-	//
-	// Either this or EthRpcUrls must be set. If both are set, EthRpcUrls is used.
-	EthRpcUrlsVar string `docs:"required"`
 	// The contract address for the EigenDA address directory, where all contract addresses are stored
 	ContractDirectoryAddress string `docs:"required"`
 	// The URL/IP of a subgraph to use for the chain state
@@ -96,8 +85,8 @@ func (c *TestClientConfig) Verify() error {
 	if c.SrsPath == "" {
 		return fmt.Errorf("SrsPath must be set")
 	}
-	if c.KeyPath == "" && c.KeyVar == "" {
-		return fmt.Errorf("either KeyPath or KeyVar must be set")
+	if c.PrivateKey == "" {
+		return fmt.Errorf("PrivateKey must be set")
 	}
 	if c.DisperserHostname == "" {
 		return fmt.Errorf("DisperserHostname must be set")
@@ -105,8 +94,8 @@ func (c *TestClientConfig) Verify() error {
 	if c.DisperserPort <= 0 || c.DisperserPort > 65535 {
 		return fmt.Errorf("DisperserPort must be a valid port number")
 	}
-	if len(c.EthRpcUrls) == 0 && c.EthRpcUrlsVar == "" {
-		return fmt.Errorf("either EthRpcUrls or EthRpcUrlsVar must be set")
+	if c.EthRpcUrls == nil || len(c.EthRpcUrls) == 0 {
+		return fmt.Errorf("EthRpcUrls must be set and contain at least one URL")
 	}
 	if c.ContractDirectoryAddress == "" {
 		return fmt.Errorf("ContractDirectoryAddress must be set")

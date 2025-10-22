@@ -25,14 +25,6 @@ const (
 // //   preimage_type -> preimage_hash_key -> preimage bytes
 //
 // only the CustomDAPreimageType is used for EigenDAV2 batches
-//
-// TODO: Figure out what's getting passed over the wire. We're
-// being passed a mapping and populating it with EigenDAV2 Arbitrum batch
-// context. It'd be good to know when an EigenDA batch is populated
-// during the preimage mapping population given we can use up-to 16,252,897 bytes for
-// a batch which arbitrum doesn't
-// natively support. If other preimage entries exist for the node prestate trie then request data size limits
-// could unknowningly be hit/exceeded.
 type PreimagesMap map[PreimageType]map[common.Hash][]byte
 
 /*
@@ -41,38 +33,36 @@ type PreimagesMap map[PreimageType]map[common.Hash][]byte
 	requring delicate inter-play of different go-ethereum forks (especially since we already import from OP Stack).
 */
 
-// IsValidHeaderByteResult is the result struct that data availability providers should use to
-// respond if the given headerByte corresponds to their DA service
-type IsValidHeaderByteResult struct {
-	IsValid bool `json:"is-valid,omitempty"`
+// PreimagesResult contains the collected preimages
+type PreimagesResult struct {
+	Preimages PreimagesMap
 }
 
-// RecoverPayloadFromBatchResult is the result struct that data availability providers should use
-// to respond with underlying payload and updated preimages map to a RecoverPayloadFromBatch
-// fetch request
-type RecoverPayloadFromBatchResult struct {
-	Payload hexutil.Bytes `json:"payload,omitempty"`
-	// TODO: Understand the "preimage population lifecycle" to assess for potential max size risks
-	Preimages PreimagesMap `json:"preimages,omitempty"`
+// PayloadResult contains the recovered payload data
+type PayloadResult struct {
+	Payload []byte
 }
 
-// StoreResult is the result struct that data availability providers should use to respond with
-// a commitment to a Store request for posting batch data to their DA service
+// SupportedHeaderBytesResult is the result struct that data availability providers should use to respond with
+// their supported header bytes
+type SupportedHeaderBytesResult struct {
+	HeaderBytes hexutil.Bytes `json:"headerBytes,omitempty"`
+}
+
+// StoreResult is the result struct that data availability providers should use to respond with a commitment to a
+// Store request for posting batch data to their DA service
 type StoreResult struct {
-	// TODO: Encoding schema
 	SerializedDACert hexutil.Bytes `json:"serialized-da-cert,omitempty"`
 }
 
-// GenerateProofResult is the result struct that data availability providers should use to
-// respond with a proof for a specific preimage
-type GenerateProofResult struct {
-	// TODO: encoding schema
+// GenerateReadPreimageProofResult is the result struct that data availability providers
+// should use to respond with a proof for a specific preimage
+type GenerateReadPreimageProofResult struct {
 	Proof hexutil.Bytes `json:"proof,omitempty"`
 }
 
-// GenerateCertificateValidityProofResult is the result struct that data availability
-// providers should use to respond with validity proof
+// GenerateCertificateValidityProofResult is the result struct that data availability providers should use to
+// respond with validity proof
 type GenerateCertificateValidityProofResult struct {
-	// TODO: Figure out how to best NOOP this
 	Proof hexutil.Bytes `json:"proof,omitempty"`
 }

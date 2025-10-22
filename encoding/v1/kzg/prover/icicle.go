@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
+	"github.com/Layr-Labs/eigenda/encoding/v1/fft"
 	gnarkprover "github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover/gnark"
 	icicleprover "github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover/icicle"
 )
