@@ -181,7 +181,7 @@ By substituting the variables using the notation mapping shown at the beginning 
 `(ConfirmationThreshold - SafetyThreshold) >= (c / (c - n)) * γ`.
 
 Recall that `ReconstructionThreshold = (c / (c - n)) * γ, (c > n)`(see more details in [Reconstruction Threshold](#reconstruction-threshold)).
-Thereofre, the inequality above is exactly inequality (1) shown in the previous subsection.  
+Therefore, the inequality above is exactly inequality (1) shown in the previous subsection.  
 
 **2. Liveness Threshold**
 
