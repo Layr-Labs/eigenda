@@ -29,9 +29,9 @@ func DefaultTrafficGeneratorConfig() *TrafficGeneratorConfig {
 // LoadGeneratorConfig is the configuration for the load generator.
 type LoadGeneratorConfig struct {
 	// The desired number of megabytes bytes per second to write.
-	MBPerSecond float64
+	MbPerSecond float64
 	// The size of the blobs to write, in megabytes.
-	BlobSizeMB float64
+	BlobSizeMb float64
 	// By default, this utility reads each blob back from each relay once. The number of
 	// reads per relay is multiplied by this factor. For example, If this is set to 3,
 	// then each blob is read back from each relay 3 times. If less than 1, then this value
@@ -80,8 +80,8 @@ type LoadGeneratorConfig struct {
 // DefaultLoadGeneratorConfig returns a default configuration for the load generator.
 func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 	return &LoadGeneratorConfig{
-		MBPerSecond:                   0.5,
-		BlobSizeMB:                    2.0,
+		MbPerSecond:                   0.5,
+		BlobSizeMb:                    2.0,
 		RelayReadAmplification:        1.0,
 		ValidatorReadAmplification:    1.0,
 		ValidatorVerificationFraction: 0.01,

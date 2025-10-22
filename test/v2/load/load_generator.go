@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
@@ -79,10 +79,10 @@ func NewLoadGenerator(
 	config *LoadGeneratorConfig,
 	client *client.TestClient) (*LoadGenerator, error) {
 
-	bytesPerSecond := config.MBPerSecond * units.MiB
+	bytesPerSecond := config.MbPerSecond * units.MiB
 
 	// The size of the blob we want to send.
-	targetBlobSize := uint64(config.BlobSizeMB * units.MiB)
+	targetBlobSize := uint64(config.BlobSizeMb * units.MiB)
 	// The target blob size must be a power of 2.
 	targetBlobSize = math.NextPowOf2u64(targetBlobSize)
 

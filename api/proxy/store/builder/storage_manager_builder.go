@@ -44,10 +44,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	rsv2 "github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -116,7 +116,8 @@ func BuildManagers(
 				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 			}
 		}
-		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, rs.NewEncoder(log, nil), kzgVerifier, registry)
+		eigenDAV2Store, err = buildEigenDAV2Backend(
+			ctx, log, config, secrets, rsv2.NewEncoder(log, nil), kzgVerifier, registry)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
 		}
@@ -220,7 +221,7 @@ func buildEigenDAV2Backend(
 	log logging.Logger,
 	config Config,
 	secrets common.SecretConfigV2,
-	encoder *rs.Encoder,
+	encoder *rsv2.Encoder,
 	kzgVerifier *kzgverifierv2.Verifier,
 	registry *prometheus.Registry,
 ) (common.EigenDAV2Store, error) {
@@ -557,7 +558,7 @@ func buildValidatorPayloadRetriever(
 	ethClient common_eigenda.EthClient,
 	operatorStateRetrieverAddr geth_common.Address,
 	eigenDAServiceManagerAddr geth_common.Address,
-	encoder *rs.Encoder,
+	encoder *rsv2.Encoder,
 	kzgVerifier *kzgverifierv2.Verifier,
 	g1Srs []bn254.G1Affine,
 	metrics metrics_v2.RetrievalMetricer,

@@ -8,7 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgflags"
 	"github.com/urfave/cli"
 )
 
@@ -557,7 +557,7 @@ var (
 	}
 	// TODO(cody.littley): this needs to be enabled by default prior to allowing third parties to eject.
 	//  In the immediate term, leave it disabled by default to give operators time to adjust to the idea.
-	EjectionDefenseEnabledFlag = cli.BoolTFlag{
+	EjectionDefenseEnabledFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "ejection-defense-enabled"),
 		Usage:    "Whether to enable the ejection defense mechanism.",
 		Required: false,
@@ -742,7 +742,7 @@ var optionalFlags = []cli.Flag{
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
-	Flags = append(Flags, kzg.CLIFlags(EnvVarPrefix)...)
+	Flags = append(Flags, kzgflags.CLIFlags(EnvVarPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(EnvVarPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(EnvVarPrefix, FlagPrefix)...)
 }

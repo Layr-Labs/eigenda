@@ -17,12 +17,11 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
@@ -101,8 +100,8 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 		assignments[opID] = assignment
 	}
 
-	// Create the actual blob chunks using the prover
-	chunks, err := p.GetFrames(data, encodingParams)
+	// Create the actual blob frames using the prover
+	frames, _, err := p.GetFrames(data, encodingParams)
 	require.NoError(t, err)
 
 	// Store chunks by operator
@@ -110,7 +109,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	for opID, assignment := range assignments {
 		operatorChunks[opID] = make([]*encoding.Frame, assignment.NumChunks())
 		for i := uint32(0); i < assignment.NumChunks(); i++ {
-			operatorChunks[opID][i] = chunks[assignment.Indices[i]]
+			operatorChunks[opID][i] = frames[assignment.Indices[i]]
 		}
 	}
 
@@ -212,33 +211,29 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 // makeTestEncodingComponents makes a KZG prover, committer and verifier
 func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
-	config := &kzg.KzgConfig{
-		G1Path:          "../../../../resources/srs/g1.point",
-		G2Path:          "../../../../resources/srs/g2.point",
-		G2TrailingPath:  "../../../../resources/srs/g2.trailing.point",
-		CacheDir:        "../../../../resources/srs/SRSTables",
-		SRSOrder:        8192,
-		SRSNumberToLoad: 8192,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
-	}
-
 	c, err := committer.NewFromConfig(committer.Config{
-		SRSNumberToLoad:   config.SRSNumberToLoad,
-		G1SRSPath:         config.G1Path,
-		G2SRSPath:         config.G2Path,
-		G2TrailingSRSPath: config.G2TrailingPath,
+		SRSNumberToLoad:   8192,
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
 	})
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new committer from config: %w", err)
 	}
 
-	p, err := prover.NewProver(logger, prover.KzgConfigFromV1Config(config), nil)
+	proverConfig := &prover.KzgConfig{
+		SRSNumberToLoad: 8192,
+		G1Path:          "../../../../resources/srs/g1.point",
+		PreloadEncoder:  false,
+		CacheDir:        "../../../../resources/srs/SRSTables",
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	}
+	p, err := prover.NewProver(logger, proverConfig, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	v, err := verifier.NewVerifier(verifier.ConfigFromV1KzgConfig(config))
+	v, err := verifier.NewVerifier(verifier.ConfigFromProverV2Config(proverConfig))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new verifier: %w", err)
 	}

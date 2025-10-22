@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -22,9 +22,10 @@ var (
 	clientLock sync.Mutex
 	configMap  = make(map[string]*TestClientConfig)
 	clientMap  = make(map[string]*TestClient)
-	logger     logging.Logger
-	metrics    *testClientMetrics
+	metrics    *TestClientMetrics
 )
+
+const LiveTestPrefix = "LIVE_TEST"
 
 // GetEnvironmentConfigPaths returns a list of paths to the environment config files.
 func GetEnvironmentConfigPaths() ([]string, error) {
@@ -33,7 +34,7 @@ func GetEnvironmentConfigPaths() ([]string, error) {
 	// such as `test/v2/live` where they are currently used from.
 	// TODO: GetEnvironmentConfigPaths should take a base path as an argument
 	// to allow for more flexibility in where the config files are located.
-	configDir, err := util.SanitizePath("../config/environment")
+	configDir, err := util.SanitizePath("../config")
 	if err != nil {
 		return nil, fmt.Errorf("failed to sanitize path: %w", err)
 	}
@@ -44,61 +45,59 @@ func GetEnvironmentConfigPaths() ([]string, error) {
 	}
 	var configPaths []string
 	for _, file := range files {
-		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".toml") {
 			continue
 		}
-		configPath := fmt.Sprintf("../config/environment/%s", file.Name())
+		configPath := fmt.Sprintf("../config/%s", file.Name())
 		configPaths = append(configPaths, configPath)
 	}
 	if len(configPaths) == 0 {
-		return nil, fmt.Errorf("no environment config files found in ../config/environment")
+		return nil, fmt.Errorf("no environment config files found in ../config")
 	}
 	return configPaths, nil
 }
 
 // GetConfig returns a TestClientConfig instance parsed from the config file.
-func GetConfig(configPath string) (*TestClientConfig, error) {
+func GetConfig(
+	t *testing.T,
+	logger logging.Logger,
+	prefix string,
+	configPath string,
+) (*TestClientConfig, error) {
+
+	skipInCI(t)
+
 	configLock.Lock()
 	defer configLock.Unlock()
 
-	if config, ok := configMap[configPath]; ok {
-		return config, nil
+	if cfg, ok := configMap[configPath]; ok {
+		return cfg, nil
 	}
 
-	configFile, err := util.SanitizePath(configPath)
+	cfg, err := config.ParseConfig(logger, DefaultTestClientConfig(), prefix, nil, configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed sanitize path: %w", err)
-	}
-	configFileBytes, err := os.ReadFile(configFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	config := DefaultTestClientConfig()
-	err = json.Unmarshal(configFileBytes, config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
+		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
 	// Resolve relative SRS path based on config file location
-	if config.SRSPath != "" && !filepath.IsAbs(config.SRSPath) {
-		configDir := filepath.Dir(configFile)
-		absPath := filepath.Join(configDir, config.SRSPath)
-		config.SRSPath = filepath.Clean(absPath)
-		// to debug this, you can print filepath.Abs(config.SRSPath)
+	if cfg.SrsPath != "" && !filepath.IsAbs(cfg.SrsPath) {
+		configDir := filepath.Dir(configPath)
+		absPath := filepath.Join(configDir, cfg.SrsPath)
+		cfg.SrsPath = filepath.Clean(absPath)
+		// to debug this, you can print filepath.Abs(cfg.SrsPath)
 	}
 
-	configMap[configPath] = config
+	configMap[configPath] = cfg
 
-	return config, nil
+	return cfg, nil
 }
 
 // GetTestClient is the same as GetClient, but also performs a check to ensure that the test is not
 // running in a CI environment. If using a TestClient in a unit test, it is critical to use this method
 // to ensure that the test is not running in a CI environment.
-func GetTestClient(t *testing.T, configPath string) *TestClient {
+func GetTestClient(t *testing.T, logger logging.Logger, configPath string) *TestClient {
 	skipInCI(t)
-	c, err := GetClient(configPath)
+	c, err := GetClient(t, logger, configPath)
 	require.NoError(t, err)
 	return c
 }
@@ -106,7 +105,7 @@ func GetTestClient(t *testing.T, configPath string) *TestClient {
 // GetClient returns a TestClient instance, creating one if it does not exist.
 // This uses a global static client... this is icky, but it takes a long time
 // to read the SRS points, so it's the lesser of two evils to keep it around.
-func GetClient(configPath string) (*TestClient, error) {
+func GetClient(t *testing.T, logger logging.Logger, configPath string) (*TestClient, error) {
 	clientLock.Lock()
 	defer clientLock.Unlock()
 
@@ -114,7 +113,7 @@ func GetClient(configPath string) (*TestClient, error) {
 		return client, nil
 	}
 
-	testConfig, err := GetConfig(configPath)
+	testConfig, err := GetConfig(t, logger, LiveTestPrefix, configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get config: %w", err)
 	}
@@ -131,9 +130,9 @@ func GetClient(configPath string) (*TestClient, error) {
 		}
 
 		if !testConfig.DisableMetrics {
-			testMetrics := newTestClientMetrics(logger, testConfig.MetricsPort)
+			testMetrics := NewTestClientMetrics(logger, testConfig.MetricsPort)
 			metrics = testMetrics
-			testMetrics.start()
+			testMetrics.Start()
 		}
 	}
 

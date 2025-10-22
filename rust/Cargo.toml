@@ -1,0 +1,64 @@
+[workspace]
+members = [
+  "crates/eigenda-ethereum",
+  "crates/eigenda-verification",
+  "crates/eigenda-srs-data",
+  "crates/eigenda-proxy",
+]
+resolver = "2"
+
+[workspace.dependencies]
+alloy-consensus = { version = "1.0.32", default-features = false }
+alloy-eips = { version = "1.0.32", default-features = false }
+alloy-network = { version = "1.0.32", default-features = false }
+alloy-primitives = { version = "1.3.1", default-features = false, features = [
+  "rlp",
+] }
+alloy-provider = { version = "1.0.32", default-features = false }
+alloy-rlp = { version = "0.3.12", default-features = false }
+alloy-rpc-client = { version = "1.0.32", default-features = false }
+alloy-rpc-types = { version = "1.0.32", default-features = false }
+alloy-rpc-types-eth = { version = "1.0.32", default-features = false }
+alloy-signer = { version = "1.0.32", default-features = false }
+alloy-signer-local = { version = "1.0.32", default-features = false }
+alloy-sol-types = { version = "1.3.1", default-features = false }
+alloy-transport = { version = "1.0.32", default-features = false }
+anyhow = { version = "1.0.99", default-features = false }
+arbitrary = { version = "1.3" }
+ark-bn254 = { version = "0.5.0", default-features = false }
+ark-ec = { version = "0.5.0", default-features = false }
+ark-ff = { version = "0.5.0", default-features = false }
+ark-serialize = { version = "0.5.0", default-features = false }
+async-trait = { version = "0.1.88" }
+backon = { version = "1.5.2" }
+bincode = { version = "2.0.1", default-features = false }
+bitvec = { version = "1.0.1", default-features = false }
+borsh = { version = "1.5.7", default-features = false }
+bytes = { version = "1.10.1", default-features = false }
+criterion = { version = "0.5" }
+derive_more = { version = "2.0.1" }
+futures = { version = "0.3.31" }
+hashbrown = { version = "0.15.4", default-features = false }
+hex = { version = "0.4.3" }
+jsonschema = "0.33.0"
+proptest = { version = "1.7.0" }
+rand = { version = "0.8" }
+reltester = { version = "2.0.0" }
+reqwest = { version = "0.12.22" }
+reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.7.0", default-features = false }
+risc0-zkvm = { version = "2.1", default-features = false }
+rust-kzg-bn254-prover = { git = "https://github.com/Layr-Labs/rust-kzg-bn254.git", rev = "60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6", default-features = false }
+rustls = { version = "0.23.31" }
+schemars = { version = "0.8.21", default-features = false }
+serde = { version = "1.0.219", default-features = false }
+serde_json = { version = "1.0.141" }
+serde_with = { version = "3.14.0" }
+test-strategy = { version = "0.4.3" }
+testcontainers = "0.25.0"
+thiserror = { version = "2.0.12", default-features = false }
+tokio = { version = "1.47.1" }
+tracing = { version = "0.1.41" }
+tracing-subscriber = { version = "0.3.20" }
+tracing-tree = { version = "0.4" }
+url = { version = "2.5.4" }
+wiremock = "0.6.0"

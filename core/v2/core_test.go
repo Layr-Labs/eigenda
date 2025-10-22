@@ -13,10 +13,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -168,7 +168,7 @@ func prepareBlobs(
 
 		params, err := corev2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
 		require.NoError(t, err)
-		chunks, err := p.GetFrames(blob, params)
+		frames, _, err := p.GetFrames(blob, params)
 		require.NoError(t, err)
 		state, err := cst.GetOperatorState(ctx, uint(referenceBlockNumber), header.QuorumNumbers)
 
@@ -188,7 +188,7 @@ func prepareBlobs(
 				Bundle:          make([]*encoding.Frame, assignment.NumChunks()),
 			}
 			for i := uint32(0); i < assignment.NumChunks(); i++ {
-				shard.Bundle[i] = chunks[assignment.Indices[i]]
+				shard.Bundle[i] = frames[assignment.Indices[i]]
 			}
 
 			blobsMap[opID] = append(blobsMap[opID], shard)

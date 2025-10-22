@@ -256,7 +256,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
 		Usage:    "the port for the controller gRPC server",
 		Required: false,
-		Value:    "32001",
+		Value:    "32010",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PORT"),
 	}
 	GrpcMaxMessageSizeFlag = cli.IntFlag{
