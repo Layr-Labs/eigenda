@@ -46,6 +46,7 @@ type DisperserHarnessConfig struct {
 	BucketTableName     string
 	S3BucketName        string // S3 bucket name for blob storage
 	MetadataTableNameV2 string
+	OnDemandTableName   string // DynamoDB table name for on-demand payments
 
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
@@ -159,6 +160,9 @@ func SetupDisperserHarness(
 	}
 	if config.MetadataTableNameV2 == "" {
 		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
+	}
+	if config.OnDemandTableName == "" {
+		config.OnDemandTableName = "e2e_v2_ondemand"
 	}
 
 	// Populate the harness tables and buckets metadata
@@ -621,10 +625,14 @@ func startController(
 
 		// Build payment authorization handler
 		paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
+		paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
+		paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
+		paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
+
 		paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
 			ctx,
 			controllerLogger,
-			paymentAuthConfig,
+			*paymentAuthConfig,
 			contractDirectory,
 			ethClient,
 			dynamoClient.GetAwsClient(),
