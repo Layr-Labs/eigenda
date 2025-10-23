@@ -13,13 +13,18 @@ const (
 
 	DeprecatedAPIsEnabledFlagName = "api-enabled"
 	DeprecatedAdminAPIType        = "admin"
-
-	// MaxCertSizeBytes is used as an upper bound for validating a payload hex's length
-	// to harden the rest server against memory exhaustion attacks. It is NOT enforced on
-	// the protocol level. If we are expecting an increase in cert size (e.g: a significant
-	// increase in operators) this value needs to be updated accordingly.
-	MaxCertSizeBytes int = 21000
 )
+
+var (
+	// MaxCertSizeBytes is used to set an upper bound for validating a payload hex's length
+	// to harden the rest server against memory exhaustion attacks. It is NOT enforced on
+	// the protocol level. By default there is no upper bound.
+	MaxCertSizeFlagName = withFlagPrefix("max-certificate-size")
+)
+
+func withFlagPrefix(s string) string {
+	return "rest." + s
+}
 
 // We don't add any _SERVER_ middlefix to the env vars like we do for other categories
 // because these flags were originally in the global namespace, and we don't want to cause
@@ -60,6 +65,13 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "PORT"),
 			Category: category,
 		},
+		&cli.IntFlag{
+			Name:     MaxCertSizeFlagName,
+			Usage:    "Maximum certificate size (bytes) to accept in API requests. Setting to (0) results in no maximum size.",
+			Value:    0,
+			EnvVars:  withEnvPrefix(envPrefix, "MAX_CERTIFICATE_SIZE"),
+			Category: category,
+		},
 	}
 
 	return flags
@@ -67,8 +79,9 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 
 func ReadConfig(ctx *cli.Context, apisEnabled *enablement.RestApisEnabled) Config {
 	return Config{
-		Host:        ctx.String(ListenAddrFlagName),
-		Port:        ctx.Int(PortFlagName),
-		APIsEnabled: apisEnabled,
+		Host:             ctx.String(ListenAddrFlagName),
+		Port:             ctx.Int(PortFlagName),
+		APIsEnabled:      apisEnabled,
+		MaxCertSizeBytes: ctx.Int(MaxCertSizeFlagName),
 	}
 }

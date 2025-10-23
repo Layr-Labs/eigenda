@@ -41,6 +41,7 @@ var (
 			OpKeccakCommitment:  true,
 			StandardCommitment:  true,
 		},
+		MaxCertSizeBytes: 21000,
 	}
 )
 
@@ -60,8 +61,8 @@ func TestHandlerGet(t *testing.T) {
 	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
 	// generate large payloads to test MaxCertSizeBytes
 	random := random.NewTestRandom()
-	testUpperBoundMaxCertSize := hex.EncodeToString(random.Bytes(MaxCertSizeBytes))
-	testExceedMaxCertSize := hex.EncodeToString(random.Bytes(MaxCertSizeBytes + 1))
+	testUpperBoundMaxCertSize := hex.EncodeToString(random.Bytes(testCfg.MaxCertSizeBytes))
+	testExceedMaxCertSize := hex.EncodeToString(random.Bytes(testCfg.MaxCertSizeBytes + 1))
 
 	tests := []struct {
 		name         string
