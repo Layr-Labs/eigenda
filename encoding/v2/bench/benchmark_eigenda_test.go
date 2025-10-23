@@ -2,9 +2,7 @@ package bench_test
 
 import (
 	"fmt"
-	"os"
 	"runtime"
-	"runtime/trace"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -105,20 +103,11 @@ func BenchmarkRSBackendGnark(b *testing.B) {
 }
 
 func benchmarkRSBackend(b *testing.B, rsBackend backend.RSEncoderBackend) {
-	f, err := os.Create("trace.out")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer f.Close()
-
 	rand := random.NewTestRandomNoPrint(1337)
 	blobCoeffs := rand.FrElements(1 << 24)
 	for _, logNumFrs := range []uint8{17, 20, 21, 24} {
 		b.Run("2^"+fmt.Sprint(logNumFrs)+"_Frs", func(b *testing.B) {
 			numFrs := uint64(1) << logNumFrs
-			if err := trace.Start(f); err != nil {
-				b.Fatal(err)
-			}
 			// run multiple goroutines in parallel to better utilize the GPU
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
@@ -126,7 +115,6 @@ func benchmarkRSBackend(b *testing.B, rsBackend backend.RSEncoderBackend) {
 					require.NoError(b, err)
 				}
 			})
-			trace.Stop()
 		})
 	}
 }
