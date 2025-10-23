@@ -69,26 +69,41 @@ func SplitSerializedFrameCoeffs(serializedData []byte) (elementCount uint32, bin
 	}
 
 	elementCount = binary.BigEndian.Uint32(serializedData)
-	index := uint32(4)
 
 	if elementCount == 0 {
 		return 0, nil, fmt.Errorf("element count cannot be 0")
 	}
 
+	binaryFrameCoeffs, err = SplitSerializedFrameCoeffsWithElementCount(serializedData[4:], elementCount)
+	if err != nil {
+		return 0, nil, fmt.Errorf("split serialized frame coeffs with element count %d: %w", elementCount, err)
+	}
+
+	return elementCount, binaryFrameCoeffs, nil
+}
+
+// TODO possibly rename elementCount -> symbolsPerFrame
+
+// SplitSerializedFrameCoeffsWithElementCount splits serialized frame coefficients data into a slice of byte slices,
+// each containing the serialized data for a single FrameCoeffs object. The number of symbols per frame must
+// be provided.
+func SplitSerializedFrameCoeffsWithElementCount(serializedData []byte, elementCount uint32) ([][]byte, error) {
+	index := uint32(0)
+
 	bytesPerFrameCoeffs := encoding.BYTES_PER_SYMBOL * elementCount
 	remainingBytes := uint32(len(serializedData[index:]))
 	if remainingBytes%bytesPerFrameCoeffs != 0 {
-		return 0, nil, fmt.Errorf("invalid data size: %d", len(serializedData))
+		return nil, fmt.Errorf("invalid data size: %d", len(serializedData))
 	}
 	frameCoeffCount := uint32(len(serializedData[index:])) / bytesPerFrameCoeffs
-	binaryFrameCoeffs = make([][]byte, frameCoeffCount)
+	binaryFrameCoeffs := make([][]byte, frameCoeffCount)
 
 	for i := uint32(0); i < frameCoeffCount; i++ {
 		binaryFrameCoeffs[i] = serializedData[index : index+bytesPerFrameCoeffs]
 		index += bytesPerFrameCoeffs
 	}
 
-	return elementCount, binaryFrameCoeffs, nil
+	return binaryFrameCoeffs, nil
 }
 
 // DeserializeSplitFrameCoeffs deserializes a slice of byte slices into a slice of FrameCoeffs.

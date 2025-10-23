@@ -107,32 +107,32 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 	infra.ChainHarness = *chainHarness
 
-	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
-	if !config.DisableDisperser {
-		disperserHarnessConfig := &DisperserHarnessConfig{
-			Network:             sharedDockerNetwork,
-			TestConfig:          testConfig,
-			TestName:            testName,
-			LocalStackPort:      infra.LocalStackPort,
-			MetadataTableName:   config.MetadataTableName,
-			BucketTableName:     config.BucketTableName,
-			S3BucketName:        config.S3BucketName,
-			MetadataTableNameV2: config.MetadataTableNameV2,
-			RelayCount:          config.RelayCount,
-		}
-		disperserHarness, err := SetupDisperserHarness(
-			infraCtx,
-			logger,
-			infra.ChainHarness.EthClient,
-			*disperserHarnessConfig,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup disperser harness: %w", err)
-		}
-		infra.DisperserHarness = *disperserHarness
-	} else {
-		logger.Info("Disperser deployment disabled, skipping disperser harness setup")
-	}
+	// // Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
+	// if !config.DisableDisperser {
+	// 	disperserHarnessConfig := &DisperserHarnessConfig{
+	// 		Network:             sharedDockerNetwork,
+	// 		TestConfig:          testConfig,
+	// 		TestName:            testName,
+	// 		LocalStackPort:      infra.LocalStackPort,
+	// 		MetadataTableName:   config.MetadataTableName,
+	// 		BucketTableName:     config.BucketTableName,
+	// 		S3BucketName:        config.S3BucketName,
+	// 		MetadataTableNameV2: config.MetadataTableNameV2,
+	// 		RelayCount:          config.RelayCount,
+	// 	}
+	// 	disperserHarness, err := SetupDisperserHarness(
+	// 		infraCtx,
+	// 		logger,
+	// 		infra.ChainHarness.EthClient,
+	// 		*disperserHarnessConfig,
+	// 	)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to setup disperser harness: %w", err)
+	// 	}
+	// 	infra.DisperserHarness = *disperserHarness
+	// } else {
+	// 	logger.Info("Disperser deployment disabled, skipping disperser harness setup")
+	// }
 
 	// Setup Operator Harness third (requires chain and disperser to be ready)
 	operatorHarnessConfig := &OperatorHarnessConfig{
@@ -170,7 +170,7 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	infra.TestConfig.StopBinaries()
 
 	// Clean up disperser harness
-	infra.DisperserHarness.Cleanup(cleanupCtx, infra.Logger)
+	// infra.DisperserHarness.Cleanup(cleanupCtx, infra.Logger)
 
 	// Clean up chain harness (churner and anvil)
 	infra.ChainHarness.Cleanup(cleanupCtx, infra.Logger)

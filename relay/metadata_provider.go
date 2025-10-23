@@ -18,14 +18,10 @@ import (
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.
 // This struct adds caching and threading on top of blobstore.BlobMetadataStore.
 type blobMetadata struct {
+	// the number of symbols per frame for this blob
+	elementCount uint32
 	// the size of the blob in bytes
 	blobSizeBytes uint32
-	// the size of each encoded chunk
-	chunkSizeBytes uint32
-	// the size of the file containing the encoded chunks
-	totalChunkSizeBytes uint32
-	// the fragment size used for uploading the encoded chunks
-	fragmentSizeBytes uint32
 }
 
 // metadataProvider encapsulates logic for fetching metadata for blobs. Utilized by the relay Server.
@@ -212,16 +208,9 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 	// TODO(cody-littley): blob size is not correct https://github.com/Layr-Labs/eigenda/pull/906#discussion_r1847396530
 	blobSize := uint32(cert.BlobHeader.BlobCommitments.Length) * encoding.BYTES_PER_SYMBOL
 
-	chunkSize, err := m.computeChunkSize(cert.BlobHeader, fragmentInfo.TotalChunkSizeBytes)
-	if err != nil {
-		return nil, fmt.Errorf("error getting chunk length: %w", err)
-	}
-
 	metadata := &blobMetadata{
-		blobSizeBytes:       blobSize,
-		chunkSizeBytes:      chunkSize,
-		totalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-		fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+		elementCount:  fragmentInfo.ElementCount,
+		blobSizeBytes: blobSize,
 	}
 
 	return metadata, nil

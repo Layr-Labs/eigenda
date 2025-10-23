@@ -29,8 +29,8 @@ message EncodingParams {
 
 // FragmentInfo contains metadata about the encoded fragments
 message FragmentInfo {
-  uint32 total_chunk_size_bytes = 1;
-  uint32 fragment_size_bytes = 2;
+  // The number of symbols in each frame.
+  uint32 element_count = 1;
 }
 
 // EncodeBlobReply contains metadata about the encoded chunks
