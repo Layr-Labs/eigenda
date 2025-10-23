@@ -4,6 +4,7 @@ package icicle
 
 import (
 	"math"
+	"runtime"
 	"sync"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -16,24 +17,68 @@ import (
 func ConvertFrToScalarFieldsBytes(data []fr.Element) []iciclebn254.ScalarField {
 	scalars := make([]iciclebn254.ScalarField, len(data))
 
-	for i := 0; i < len(data); i++ {
-		src := data[i] // 4 uint64
-		var littleEndian [32]byte
-
-		fr.LittleEndian.PutElement(&littleEndian, src)
-		scalars[i].FromBytesLittleEndian(littleEndian[:])
+	numWorkers := runtime.GOMAXPROCS(0)
+	if len(data) < numWorkers {
+		numWorkers = len(data)
 	}
+
+	var wg sync.WaitGroup
+	interval := int(math.Ceil(float64(len(data)) / float64(numWorkers)))
+
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		start := w * interval
+		end := (w + 1) * interval
+		if len(data) < end {
+			end = len(data)
+		}
+
+		go func() {
+			defer wg.Done()
+			for i := start; i < end; i++ {
+				src := data[i] // 4 uint64
+				var littleEndian [32]byte
+
+				fr.LittleEndian.PutElement(&littleEndian, src)
+				scalars[i].FromBytesLittleEndian(littleEndian[:])
+			}
+		}()
+	}
+	wg.Wait()
+
 	return scalars
 }
 
 func ConvertScalarFieldsToFrBytes(scalars []iciclebn254.ScalarField) []fr.Element {
 	frElements := make([]fr.Element, len(scalars))
 
-	for i := 0; i < len(frElements); i++ {
-		v := scalars[i]
-		slice64, _ := fr.LittleEndian.Element((*[fr.Bytes]byte)(v.ToBytesLittleEndian()))
-		frElements[i] = slice64
+	numWorkers := runtime.GOMAXPROCS(0)
+	if len(scalars) < numWorkers {
+		numWorkers = len(scalars)
 	}
+
+	var wg sync.WaitGroup
+	interval := int(math.Ceil(float64(len(scalars)) / float64(numWorkers)))
+
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		start := w * interval
+		end := (w + 1) * interval
+		if len(scalars) < end {
+			end = len(scalars)
+		}
+
+		go func(workerStart, workerEnd int) {
+			defer wg.Done()
+			for i := workerStart; i < workerEnd; i++ {
+				v := scalars[i]
+				slice64, _ := fr.LittleEndian.Element((*[fr.Bytes]byte)(v.ToBytesLittleEndian()))
+				frElements[i] = slice64
+			}
+		}(start, end)
+	}
+	wg.Wait()
+
 	return frElements
 }
 
