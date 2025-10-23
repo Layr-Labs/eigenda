@@ -128,7 +128,6 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 		CacheDir:       "../../../resources/srs/SRSTables",
 		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
 	}
-
 	// use a non-silent logger to see the "Multiproof Time Decomp" log lines.
 	p, err := prover.NewProver(common.SilentLogger(), &proverConfig, nil)
 	require.NoError(b, err)
@@ -150,8 +149,10 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 			}
 
 			// Run this before entering the benchmark loop to preload the SRSTable for the params size.
+			b.Log("Generating frames for one blob to preload SRSTable...")
 			_, _, err = p.GetFrames(blobBytes, params)
 			require.NoError(b, err)
+			b.Log("Preloading done, starting benchmark...")
 
 			for b.Loop() {
 				_, _, err = p.GetFrames(blobBytes, params)
