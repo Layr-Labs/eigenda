@@ -6,25 +6,31 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
-	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/disperser/controller"
-	payments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	"github.com/Layr-Labs/eigenda/disperser/encoder"
-	gethcommon "github.com/ethereum/go-ethereum/common"
+	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
+	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/gammazero/workerpool"
 	"github.com/urfave/cli"
 )
 
@@ -70,7 +76,6 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create DynamoDB client: %w", err)
 	}
-
 	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
@@ -93,13 +98,11 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get OperatorStateRetriever address: %w", err)
 	}
-
 	serviceManagerAddress, err :=
 		contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
 	if err != nil {
 		return fmt.Errorf("failed to get ServiceManager address: %w", err)
 	}
-
 	registryCoordinatorAddress, err :=
 		contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
 	if err != nil {
@@ -142,16 +145,34 @@ func RunController(cliCtx *cli.Context) error {
 		Backend:     blobstore.BackendDynamoDB,
 	})
 
+	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
+	}
+	encodingPool := workerpool.New(config.EncodingManagerConfig.NumConcurrentRequests)
+	encodingManagerBlobSet := controller.NewBlobSet()
+	encodingManager, err := controller.NewEncodingManager(
+		&config.EncodingManagerConfig,
+		blobMetadataStore,
+		encodingPool,
+		encoderClient,
+		chainReader,
+		logger,
+		metricsRegistry,
+		encodingManagerBlobSet,
+		controllerLivenessChan,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create encoding manager: %v", err)
 	}
 
 	sigAgg, err := core.NewStdSignatureAggregator(logger, chainReader)
 	if err != nil {
 		return fmt.Errorf("failed to create signature aggregator: %v", err)
 	}
-
+	dispatcherPool := workerpool.New(config.DispatcherConfig.NumConcurrentRequests)
 	chainState := eth.NewChainState(chainReader, gethClient)
 	var ics core.IndexedChainState
 	if config.UseGraph {
@@ -183,8 +204,12 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
+	beforeDispatch := func(blobKey corev2.BlobKey) error {
+		encodingManagerBlobSet.RemoveBlob(blobKey)
+		return nil
+	}
+	dispatcherBlobSet := controller.NewBlobSet()
 
-	// Create batch metadata manager
 	batchMetadataManager, err := metadata.NewBatchMetadataManager(
 		ctx,
 		logger,
@@ -198,63 +223,103 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
-	// Build payment authorization handler if needed
-	var paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
-	if config.ServerConfig.EnableServer && config.ServerConfig.EnablePaymentAuthentication {
-		logger.Info("Payment authentication ENABLED - building payment authorization handler")
-
-		paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
-			ctx,
-			logger,
-			config.PaymentAuthorizationConfig,
-			contractDirectory,
-			gethClient,
-			dynamoClient.GetAwsClient(),
-			metricsRegistry,
-		)
-		if err != nil {
-			return fmt.Errorf("build payment authorization handler: %w", err)
-		}
-	}
-
-	// Create a controller with all the required dependencies.
-	c, err := controller.NewController(
-		logger,
+	dispatcher, err := controller.NewDispatcher(
+		&config.DispatcherConfig,
 		blobMetadataStore,
-		chainReader,
-		encoderClient,
+		dispatcherPool,
 		ics,
 		batchMetadataManager,
 		sigAgg,
 		nodeClientManager,
+		logger,
 		metricsRegistry,
-		&config.EncodingManagerConfig,
-		&config.DispatcherConfig,
-		&config.ServerConfig,
-		paymentAuthorizationHandler,
+		beforeDispatch,
+		dispatcherBlobSet,
+		controllerLivenessChan,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create controller: %w", err)
+		return fmt.Errorf("failed to create dispatcher: %v", err)
 	}
 
-	// Start the controller with all its components
-	if err := c.Start(ctx, controller.StartOptions{
-		MetricsServer:          metricsServer,
-		ReadinessProbePath:     config.ControllerReadinessProbePath,
-		HeartbeatMonitorConfig: config.HeartbeatMonitorConfig,
-	}); err != nil {
-		return fmt.Errorf("failed to start controller: %w", err)
+	err = controller.RecoverState(ctx, blobMetadataStore, logger)
+	if err != nil {
+		return fmt.Errorf("failed to recover state: %v", err)
 	}
 
-	// Start gRPC server if enabled
-	if config.ServerConfig.EnableServer && c.Server != nil {
+	err = encodingManager.Start(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start encoding manager: %v", err)
+	}
+
+	err = dispatcher.Start(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start dispatcher: %v", err)
+	}
+
+	if config.ServerConfig.EnableServer {
+		logger.Info("Controller gRPC server ENABLED", "port", config.ServerConfig.GrpcPort)
+		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
+		if config.ServerConfig.EnablePaymentAuthentication {
+			logger.Info("Payment authentication ENABLED - building payment authorization handler")
+			paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
+				ctx,
+				logger,
+				config.PaymentAuthorizationConfig,
+				contractDirectory,
+				gethClient,
+				dynamoClient.GetAwsClient(),
+				metricsRegistry,
+			)
+			if err != nil {
+				return fmt.Errorf("build payment authorization handler: %w", err)
+			}
+		} else {
+			logger.Warn("Payment authentication DISABLED - payment requests will fail")
+		}
+
+		grpcServer, err := server.NewServer(
+			ctx,
+			config.ServerConfig,
+			logger,
+			metricsRegistry,
+			paymentAuthorizationHandler)
+		if err != nil {
+			return fmt.Errorf("create gRPC server: %w", err)
+		}
+
 		go func() {
 			logger.Info("Starting controller gRPC server", "port", config.ServerConfig.GrpcPort)
-			if err := c.Server.Start(); err != nil {
+			if err := grpcServer.Start(); err != nil {
 				panic(fmt.Sprintf("gRPC server failed: %v", err))
 			}
 		}()
+	} else {
+		logger.Info("Controller gRPC server disabled")
 	}
+
+	go func() {
+		err := metricsServer.ListenAndServe()
+		if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
+			logger.Errorf("metrics metricsServer error: %v", err)
+		}
+	}()
+
+	// Create readiness probe file once the controller starts successfully
+	if _, err := os.Create(config.ControllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to create readiness file", "error", err, "path", config.ControllerReadinessProbePath)
+	}
+
+	// Start heartbeat monitor
+	go func() {
+		err := healthcheck.NewHeartbeatMonitor(
+			logger,
+			controllerLivenessChan,
+			config.HeartbeatMonitorConfig,
+		)
+		if err != nil {
+			logger.Warn("Heartbeat monitor failed", "err", err)
+		}
+	}()
 
 	return nil
 }

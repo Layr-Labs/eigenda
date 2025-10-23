@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
@@ -21,7 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -30,6 +30,7 @@ import (
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/gammazero/workerpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -65,8 +66,10 @@ type DisperserHarness struct {
 	S3Buckets struct {
 		BlobStore string
 	}
-	RelayServers []*relay.Server
-	Controller   *controller.Controller
+	RelayServers     []*relay.Server
+	EncodingManager  *controller.EncodingManager
+	Dispatcher       *controller.Dispatcher
+	ControllerServer *server.Server
 }
 
 // setupLocalStackResources initializes LocalStack and deploys AWS resources
@@ -272,11 +275,14 @@ func startRelays(
 
 // Cleanup releases resources held by the DisperserHarness (excluding shared network)
 func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) {
-	// Stop controller
-	if dh.Controller != nil {
-		logger.Info("Stopping controller")
-		stopController(dh.Controller, logger)
+	// Stop controller components
+	if dh.ControllerServer != nil {
+		logger.Info("Stopping controller gRPC server")
+		dh.ControllerServer.Stop()
 	}
+
+	// Note: EncodingManager and Dispatcher don't have explicit Stop methods in the current implementation
+	// They will be cleaned up when the context is cancelled or the process exits
 
 	// Stop relay goroutines
 	if len(dh.RelayServers) > 0 {
@@ -427,7 +433,7 @@ func stopAllRelays(servers []*relay.Server, logger logging.Logger) {
 	}
 }
 
-// startController starts the controller as a singleton goroutine
+// startController starts the controller components (encoding manager and dispatcher)
 func startController(
 	ctx context.Context,
 	ethClient common.EthClient,
@@ -537,11 +543,33 @@ func startController(
 		return fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
+	// Create heartbeat channel
+	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
+
 	// Create encoder client
 	encoderClient, err := encoder.NewEncoderClientV2(encodingManagerConfig.EncoderAddress)
 	if err != nil {
 		_ = logFile.Close()
 		return fmt.Errorf("failed to create encoder client: %w", err)
+	}
+
+	// Create encoding manager with workerpool and blob set
+	encodingPool := workerpool.New(encodingManagerConfig.NumConcurrentRequests)
+	encodingManagerBlobSet := controller.NewBlobSet()
+	encodingManager, err := controller.NewEncodingManager(
+		encodingManagerConfig,
+		metadataStore,
+		encodingPool,
+		encoderClient,
+		chainReader,
+		controllerLogger,
+		metricsRegistry,
+		encodingManagerBlobSet,
+		controllerLivenessChan,
+	)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create encoding manager: %w", err)
 	}
 
 	// Create signature aggregator
@@ -550,6 +578,9 @@ func startController(
 		_ = logFile.Close()
 		return fmt.Errorf("failed to create signature aggregator: %w", err)
 	}
+
+	// Create dispatcher pool
+	dispatcherPool := workerpool.New(dispatcherConfig.NumConcurrentRequests)
 
 	// Create indexed chain state
 	chainState := eth.NewChainState(chainReader, ethClient)
@@ -581,35 +612,58 @@ func startController(
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
-	// Build server config and payment authorization handler if needed
-	var serverConfig *server.Config
-	var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
+	// Create beforeDispatch callback to remove blobs from encoding manager's set
+	beforeDispatch := func(blobKey corev2.BlobKey) error {
+		encodingManagerBlobSet.RemoveBlob(blobKey)
+		return nil
+	}
+	dispatcherBlobSet := controller.NewBlobSet()
+
+	// Create dispatcher
+	dispatcher, err := controller.NewDispatcher(
+		dispatcherConfig,
+		metadataStore,
+		dispatcherPool,
+		ics,
+		batchMetadataManager,
+		sigAgg,
+		nodeClientManager,
+		controllerLogger,
+		metricsRegistry,
+		beforeDispatch,
+		dispatcherBlobSet,
+		controllerLivenessChan,
+	)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create dispatcher: %w", err)
+	}
+
+	// Recover state before starting
+	if err := controller.RecoverState(ctx, metadataStore, controllerLogger); err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to recover state: %w", err)
+	}
+
+	// Start encoding manager
+	if err := encodingManager.Start(ctx); err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to start encoding manager: %w", err)
+	}
+
+	// Start dispatcher
+	if err := dispatcher.Start(ctx); err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to start dispatcher: %w", err)
+	}
+
+	// Store components in harness
+	harness.EncodingManager = encodingManager
+	harness.Dispatcher = dispatcher
+
+	// Build and start gRPC server if payments are enabled
 	if config.TestConfig.UseControllerMediatedPayments {
-		controllerLogger.Info("UseControllerMediatedPayments enabled - building server config and payment handler")
-
-		// Create server config
-		grpcServerConfig, err := common.NewGRPCServerConfig(
-			true,
-			30000, // TODO(dmanc): inject listener instead
-			1024*1024,
-			5*time.Minute,
-			5*time.Minute,
-			3*time.Minute,
-		)
-		if err != nil {
-			_ = logFile.Close()
-			return fmt.Errorf("failed to create gRPC server config: %w", err)
-		}
-
-		serverCfg, err := server.NewConfig(
-			grpcServerConfig,
-			true, // EnablePaymentAuthentication
-		)
-		if err != nil {
-			_ = logFile.Close()
-			return fmt.Errorf("failed to create server config: %w", err)
-		}
-		serverConfig = &serverCfg
+		controllerLogger.Info("UseControllerMediatedPayments enabled - starting gRPC server")
 
 		// Create contract directory
 		contractDirectory, err := directory.NewContractDirectory(
@@ -629,7 +683,7 @@ func startController(
 		paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
 		paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
 
-		paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
+		paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
 			ctx,
 			controllerLogger,
 			*paymentAuthConfig,
@@ -643,52 +697,56 @@ func startController(
 			return fmt.Errorf("failed to build payment authorization handler: %w", err)
 		}
 
-		controllerLogger.Info("Payment authentication handler built successfully")
+		// Create server config
+		grpcServerConfig, err := common.NewGRPCServerConfig(
+			true,
+			30000, // TODO(dmanc): inject listener instead
+			1024*1024,
+			5*time.Minute,
+			5*time.Minute,
+			3*time.Minute,
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to create gRPC server config: %w", err)
+		}
+
+		serverConfig, err := server.NewConfig(
+			grpcServerConfig,
+			true, // EnablePaymentAuthentication
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to create server config: %w", err)
+		}
+
+		// Create and start gRPC server
+		grpcServer, err := server.NewServer(
+			ctx,
+			serverConfig,
+			controllerLogger,
+			metricsRegistry,
+			paymentAuthorizationHandler,
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to create gRPC server: %w", err)
+		}
+
+		go func() {
+			controllerLogger.Info("Starting controller gRPC server", "port", serverConfig.GrpcPort)
+			if err := grpcServer.Start(); err != nil {
+				controllerLogger.Error("gRPC server failed", "error", err)
+			}
+		}()
+
+		harness.ControllerServer = grpcServer
+		controllerLogger.Info("Controller gRPC server started successfully")
 	} else {
-		controllerLogger.Info("UseControllerMediatedPayments disabled - controller will not have server or payment handler")
+		controllerLogger.Info("UseControllerMediatedPayments disabled - controller will not have server")
 	}
 
-	// Create controller
-	controllerInstance, err := controller.NewController(
-		controllerLogger,
-		metadataStore,
-		chainReader,
-		encoderClient,
-		ics,
-		batchMetadataManager,
-		sigAgg,
-		nodeClientManager,
-		metricsRegistry,
-		encodingManagerConfig,
-		dispatcherConfig,
-		serverConfig,
-		paymentAuthorizationHandler,
-	)
-	if err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to create controller: %w", err)
-	}
-
-	// Start controller
-	if err := controllerInstance.Start(ctx, controller.StartOptions{}); err != nil {
-		_ = logFile.Close()
-		return fmt.Errorf("failed to start controller: %w", err)
-	}
-
-	// Store controller instance in harness
-	harness.Controller = controllerInstance
-
-	controllerLogger.Info("Controller started successfully", "logFile", logFilePath)
+	controllerLogger.Info("Controller components started successfully", "logFile", logFilePath)
 
 	return nil
-}
-
-// stopController stops the controller
-func stopController(instance *controller.Controller, logger logging.Logger) {
-	if instance == nil {
-		return
-	}
-
-	// Note: EncodingManager and Dispatcher don't have explicit Stop methods in the current implementation
-	logger.Info("Controller stopped")
 }
