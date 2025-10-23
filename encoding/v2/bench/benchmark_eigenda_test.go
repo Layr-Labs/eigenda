@@ -11,9 +11,14 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/icicle"
+	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs/backend"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs/backend/gnark"
+	rsicicle "github.com/Layr-Labs/eigenda/encoding/v2/rs/backend/icicle"
 	"github.com/Layr-Labs/eigenda/test/random"
 )
 
@@ -70,6 +75,38 @@ func BenchmarkCommittmentGeneration(b *testing.B) {
 
 			for b.Loop() {
 				_, _, _, err := committer.GetCommitments(blob)
+				require.NoError(b, err)
+			}
+		})
+	}
+}
+
+// TODO(samlaf): maybe move this to benchmark_icicle_test.go file?
+// That file is currently metal only, we should generalize it.
+func BenchmarkRSBackendIcicle(b *testing.B) {
+	if !icicle.IsAvailable {
+		b.Skip("code compiled without the icicle build tag")
+	}
+	icicleBackend, err := rsicicle.BuildRSBackend(common.SilentLogger(), true)
+	require.NoError(b, err)
+	benchmarkRSBackend(b, icicleBackend)
+}
+
+func BenchmarkRSBackendGnark(b *testing.B) {
+	fs := fft.NewFFTSettings(24)
+	gnarkBackend := gnark.NewRSBackend(fs)
+	benchmarkRSBackend(b, gnarkBackend)
+}
+
+func benchmarkRSBackend(b *testing.B, rsBackend backend.RSEncoderBackend) {
+	for _, logNumFrs := range []uint8{17, 20, 21, 24} {
+		b.Run("2^"+fmt.Sprint(logNumFrs)+"_Frs", func(b *testing.B) {
+			numFrs := uint64(1) << logNumFrs
+			rand := random.NewTestRandomNoPrint(1337)
+			blobCoeffs := rand.FrElements(numFrs)
+
+			for b.Loop() {
+				_, err := rsBackend.ExtendPolyEval(blobCoeffs)
 				require.NoError(b, err)
 			}
 		})
