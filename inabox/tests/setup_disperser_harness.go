@@ -43,11 +43,17 @@ type DisperserHarnessConfig struct {
 	LocalStackPort string
 
 	// LocalStack resources for blobstore and metadata store
-	MetadataTableName   string
-	BucketTableName     string
-	S3BucketName        string // S3 bucket name for blob storage
+	MetadataTableName string
+	BucketTableName   string
+
+	// S3 bucket name for blob storage
+	S3BucketName string
+
+	// V2 metadata table name
 	MetadataTableNameV2 string
-	OnDemandTableName   string // DynamoDB table name for on-demand payments
+
+	// DynamoDB table name for on-demand payments, currently used by the controller.
+	OnDemandTableName string
 
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
@@ -56,17 +62,25 @@ type DisperserHarnessConfig struct {
 	OperatorStateSubgraphURL string
 }
 
-// TODO: Add encoder, api server, batcher
+// DisperserHarness is the harness for spinning up the disperser infrastructure as goroutines.
+// It will only support V2 components of the disperser.
+// TODO: Add encoder, api server
 type DisperserHarness struct {
+	// LocalStack infrastructure for blobstore and metadata store
 	LocalStack     *testbed.LocalStackContainer
 	DynamoDBTables struct {
 		BlobMetadataV1 string
-		BlobMetaV2     string
+		BlobMetadataV2 string
 	}
 	S3Buckets struct {
 		BlobStore string
 	}
-	RelayServers     []*relay.Server
+
+	// Relay
+	RelayServers []*relay.Server
+
+	// Controller components
+	// TODO: Refactor into a single struct for controller components
 	EncodingManager  *controller.EncodingManager
 	Dispatcher       *controller.Dispatcher
 	ControllerServer *server.Server
@@ -170,7 +184,7 @@ func SetupDisperserHarness(
 
 	// Populate the harness tables and buckets metadata
 	harness.DynamoDBTables.BlobMetadataV1 = config.MetadataTableName
-	harness.DynamoDBTables.BlobMetaV2 = config.MetadataTableNameV2
+	harness.DynamoDBTables.BlobMetadataV2 = config.MetadataTableNameV2
 	harness.S3Buckets.BlobStore = config.S3BucketName
 
 	localstack, err := setupLocalStackResources(ctx, logger, config)
