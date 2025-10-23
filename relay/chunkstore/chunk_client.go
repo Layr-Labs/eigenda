@@ -72,6 +72,7 @@ func NewChunkClient(
 
 	return &ChunkClient{
 		s3Client: s3Client,
+		bucket:   bucket,
 	}, nil
 }
 
