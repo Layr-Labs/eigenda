@@ -154,8 +154,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
         paymentVaultImplementation = PaymentVault(payable(address(new PaymentVault())));
 
         paymentVault = PaymentVault(
-            payable(
-                address(
+            payable(address(
                     new TransparentUpgradeableProxy(
                         address(paymentVaultImplementation),
                         address(proxyAdmin),
@@ -170,8 +169,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
                             globalRatePeriodInterval
                         )
                     )
-                )
-            )
+                ))
         );
 
         mockToken = new ERC20("Mock Token", "MOCK");
@@ -250,13 +248,16 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             if (i < 2) {
                 blobHeader.quorumBlobParams[i].quorumNumber = uint8(i);
             } else {
-                blobHeader.quorumBlobParams[i].quorumNumber = uint8(
-                    uint256(
-                        keccak256(
-                            abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i)
-                        )
-                    )
-                ) % 192;
+                blobHeader.quorumBlobParams[i].quorumNumber =
+                    uint8(
+                            uint256(
+                                keccak256(
+                                    abi.encodePacked(
+                                        pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i
+                                    )
+                                )
+                            )
+                        ) % 192;
 
                 // make sure it isn't already used
                 while (quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber]) {
@@ -266,15 +267,19 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
 
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDAThresholdRegistry
-                .getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage =
+                eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(
+                    blobHeader.quorumBlobParams[i].quorumNumber
+                );
             blobHeader.quorumBlobParams[i].chunkLength = uint32(
                 uint256(
                     keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))
                 )
             );
-            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDAThresholdRegistry
-                .getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage =
+                eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(
+                    blobHeader.quorumBlobParams[i].quorumNumber
+                );
         }
         // mark all quorum numbers as unused
         for (uint256 i = 0; i < numQuorumsBlobParams; i++) {

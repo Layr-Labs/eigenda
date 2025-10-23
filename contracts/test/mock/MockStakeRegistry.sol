@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-import {IDelegationManager} from
-    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {
+    IDelegationManager
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
 pragma solidity =0.8.12;
 

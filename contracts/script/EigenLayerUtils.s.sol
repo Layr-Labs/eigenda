@@ -12,7 +12,7 @@ contract EigenLayerUtils {
             if (token == IERC20(address(0))) {
                 payable(tos[i]).transfer(amounts[i]);
             } else {
-                token.transfer(tos[i], amounts[i]);
+                require(token.transfer(tos[i], amounts[i]), "ERC20 transfer failed");
             }
         }
     }

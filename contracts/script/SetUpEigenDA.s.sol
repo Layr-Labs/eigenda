@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {PauserRegistry} from
-    "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
+import {
+    PauserRegistry
+} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {EigenDARegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
@@ -174,9 +175,8 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             vm.startBroadcast(stakerPrivateKeys[i]);
             for (uint256 j = 0; j < numStrategies; j++) {
                 if (stakerTokenAmounts[j][i] > 0) {
-                    deployedStrategyArray[j].underlyingToken().approve(
-                        address(strategyManager), stakerTokenAmounts[j][i]
-                    );
+                    deployedStrategyArray[j].underlyingToken()
+                        .approve(address(strategyManager), stakerTokenAmounts[j][i]);
                     strategyManager.depositIntoStrategy(
                         deployedStrategyArray[j], deployedStrategyArray[j].underlyingToken(), stakerTokenAmounts[j][i]
                     );

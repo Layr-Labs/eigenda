@@ -38,9 +38,9 @@ protoc-gen-go-grpc = "v1.3.0"
 "go:github.com/segmentio/golines" = "0.12.0"
 
 # Forge Dependencies
-forge = "v1.0.0"
-cast = "v1.0.0"
-anvil = "v1.0.0"
+forge = "v1.4.2"
+cast = "v1.4.2"
+anvil = "v1.4.2"
 
 [alias]
 forge = "ubi:foundry-rs/foundry[exe=forge]"

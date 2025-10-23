@@ -62,10 +62,13 @@ contract Deployer_EjectionManager is Script, Test {
         address[] memory ejectors = new address[](1);
         ejectors[0] = ejector;
 
-        TransparentUpgradeableProxy(payable(address(ejectionManager))).upgradeToAndCall(
-            address(ejectionManagerImplementation),
-            abi.encodeWithSelector(EjectionManager.initialize.selector, ejectorOwner, ejectors, quorumEjectionParams)
-        );
+        TransparentUpgradeableProxy(payable(address(ejectionManager)))
+            .upgradeToAndCall(
+                address(ejectionManagerImplementation),
+                abi.encodeWithSelector(
+                    EjectionManager.initialize.selector, ejectorOwner, ejectors, quorumEjectionParams
+                )
+            );
 
         TransparentUpgradeableProxy(payable(address(ejectionManager))).changeAdmin(address(eigenDAProxyAdmin));
 

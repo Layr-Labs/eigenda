@@ -25,9 +25,8 @@ library EigenDACertVerificationV1Lib {
     ) internal view {
         require(
             hashBatchMetadata(blobVerificationProof.batchMetadata)
-                == IEigenDABatchMetadataStorage(batchMetadataStorage).batchIdToBatchMetadataHash(
-                    blobVerificationProof.batchId
-                ),
+                == IEigenDABatchMetadataStorage(batchMetadataStorage)
+                    .batchIdToBatchMetadataHash(blobVerificationProof.batchId),
             "EigenDACertVerificationV1Lib._verifyDACertForQuorums: batchMetadata does not match stored metadata"
         );
 
@@ -46,9 +45,8 @@ library EigenDACertVerificationV1Lib {
         for (uint256 i = 0; i < blobHeader.quorumBlobParams.length; i++) {
             require(
                 uint8(
-                    blobVerificationProof.batchMetadata.batchHeader.quorumNumbers[uint8(
-                        blobVerificationProof.quorumIndices[i]
-                    )]
+                    blobVerificationProof.batchMetadata.batchHeader
+                    .quorumNumbers[uint8(blobVerificationProof.quorumIndices[i])]
                 ) == blobHeader.quorumBlobParams[i].quorumNumber,
                 "EigenDACertVerificationV1Lib._verifyDACertForQuorums: quorumNumber does not match"
             );
@@ -69,9 +67,8 @@ library EigenDACertVerificationV1Lib {
 
             require(
                 uint8(
-                    blobVerificationProof.batchMetadata.batchHeader.signedStakeForQuorums[uint8(
-                        blobVerificationProof.quorumIndices[i]
-                    )]
+                    blobVerificationProof.batchMetadata.batchHeader
+                    .signedStakeForQuorums[uint8(blobVerificationProof.quorumIndices[i])]
                 ) >= blobHeader.quorumBlobParams[i].confirmationThresholdPercentage,
                 "EigenDACertVerificationV1Lib._verifyDACertForQuorums: confirmationThresholdPercentage is not met"
             );
@@ -81,7 +78,9 @@ library EigenDACertVerificationV1Lib {
         }
 
         require(
-            BitmapUtils.isSubsetOf(BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers), confirmedQuorumsBitmap),
+            BitmapUtils.isSubsetOf(
+                BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers), confirmedQuorumsBitmap
+            ),
             "EigenDACertVerificationV1Lib._verifyDACertForQuorums: required quorums are not a subset of the confirmed quorums"
         );
     }
@@ -104,9 +103,8 @@ library EigenDACertVerificationV1Lib {
         for (uint256 i = 0; i < blobHeaders.length; ++i) {
             require(
                 hashBatchMetadata(blobVerificationProofs[i].batchMetadata)
-                    == IEigenDABatchMetadataStorage(batchMetadataStorage).batchIdToBatchMetadataHash(
-                        blobVerificationProofs[i].batchId
-                    ),
+                    == IEigenDABatchMetadataStorage(batchMetadataStorage)
+                        .batchIdToBatchMetadataHash(blobVerificationProofs[i].batchId),
                 "EigenDACertVerificationV1Lib._verifyDACertsForQuorums: batchMetadata does not match stored metadata"
             );
 
@@ -125,9 +123,8 @@ library EigenDACertVerificationV1Lib {
             for (uint256 j = 0; j < blobHeaders[i].quorumBlobParams.length; j++) {
                 require(
                     uint8(
-                        blobVerificationProofs[i].batchMetadata.batchHeader.quorumNumbers[uint8(
-                            blobVerificationProofs[i].quorumIndices[j]
-                        )]
+                        blobVerificationProofs[i].batchMetadata.batchHeader
+                        .quorumNumbers[uint8(blobVerificationProofs[i].quorumIndices[j])]
                     ) == blobHeaders[i].quorumBlobParams[j].quorumNumber,
                     "EigenDACertVerificationV1Lib._verifyDACertsForQuorums: quorumNumber does not match"
                 );
@@ -146,9 +143,8 @@ library EigenDACertVerificationV1Lib {
 
                 require(
                     uint8(
-                        blobVerificationProofs[i].batchMetadata.batchHeader.signedStakeForQuorums[uint8(
-                            blobVerificationProofs[i].quorumIndices[j]
-                        )]
+                        blobVerificationProofs[i].batchMetadata.batchHeader
+                        .signedStakeForQuorums[uint8(blobVerificationProofs[i].quorumIndices[j])]
                     ) >= blobHeaders[i].quorumBlobParams[j].confirmationThresholdPercentage,
                     "EigenDACertVerificationV1Lib._verifyDACertsForQuorums: confirmationThresholdPercentage is not met"
                 );
@@ -252,8 +248,7 @@ library EigenDACertVerificationV1Lib {
         returns (DATypesV1.ReducedBatchHeader memory)
     {
         return DATypesV1.ReducedBatchHeader({
-            blobHeadersRoot: batchHeader.blobHeadersRoot,
-            referenceBlockNumber: batchHeader.referenceBlockNumber
+            blobHeadersRoot: batchHeader.blobHeadersRoot, referenceBlockNumber: batchHeader.referenceBlockNumber
         });
     }
 

@@ -5,12 +5,15 @@ libs = ['lib']
 fs_permissions = [{ access = "read-write", path = "./" }]
 
 # We force all warnings to be fixed
-deny_warnings = true
+deny = "warnings"
 # We error warnings from libraries. This should be fixed upstream but I'm lazy.
 # See https://github.com/ethereum/solidity/issues/2675 for an interesting discussion.
 ignored_warnings_from = [
     "lib/eigenlayer-middleware/src/RegistryCoordinator.sol",
 ]
+
+[lint]
+severity = ["high"]
 
 gas_reports = ["*"]
 
