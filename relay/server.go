@@ -451,7 +451,12 @@ func (s *Server) downloadChunkData(
 			return nil, err
 		}
 
-		data = append(data, mergeChunkBytes(chunks.Chunks))
+		bundleBytes, err := chunks.FlattenToBundle()
+		if err != nil {
+			return nil, fmt.Errorf("error serializing chunk data for blob %s: %w", blobKey.Hex(), err)
+		}
+
+		data = append(data, bundleBytes)
 	}
 
 	return data, nil
@@ -483,23 +488,6 @@ func buildChunksData(
 		Format:   core.GnarkChunkEncodingFormat,
 		ChunkLen: elementCount,
 	}, nil
-}
-
-// Merge multiple chunk byte slices into a single byte slice.
-func mergeChunkBytes(chunks [][]byte) []byte {
-	totalLength := 0
-	for _, chunk := range chunks {
-		totalLength += len(chunk)
-	}
-
-	merged := make([]byte, totalLength)
-	currentIndex := 0
-	for _, chunk := range chunks {
-		copy(merged[currentIndex:], chunk)
-		currentIndex += len(chunk)
-	}
-
-	return merged
 }
 
 // getKeysFromChunkRequest gathers a slice of blob keys from a GetChunks request.
