@@ -199,6 +199,9 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 		case <-ctx.Done():
 			return nil, fmt.Errorf("context done: %w", ctx.Err())
 		case reply := <-chunksChan:
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("context done: %w", ctx.Err())
+			}
 			if reply.Err != nil {
 				r.logger.Warn("failed to get chunks from operator", "operator", reply.OperatorID.Hex(), "err", reply.Err)
 				continue
