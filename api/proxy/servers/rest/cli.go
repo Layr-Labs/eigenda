@@ -18,7 +18,10 @@ const (
 var (
 	// MaxCertSizeBytes is used to set an upper bound for validating a payload hex's length
 	// to harden the rest server against memory exhaustion attacks. It is NOT enforced on
-	// the protocol level. By default there is no upper bound.
+	// the protocol level. By default there is no upper bound. If this value is set too low
+	// requests containing valid certificates that exceed this limit will return a 404. It is
+	// strongly recommended to leave this as the default unless the api is exposed publicly
+	// and is experiencing attacks in which this setting may help mitigate.
 	MaxCertSizeFlagName = withFlagPrefix("max-certificate-size")
 )
 
