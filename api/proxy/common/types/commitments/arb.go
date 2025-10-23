@@ -6,9 +6,8 @@ const (
 	ArbCustomDAHeaderByte = 0x01
 )
 
-// ArbitrumCommitment is the default commitment used by arbitrum nitro stack, AVSs,
-// and any stack that doesn't need any specific bytes prefix.
-// Its encoding simply returns the serialized versionedCert.
+// ArbitrumCommitment is the default commitment used by arbitrum nitro stack
+// for EigenDA V2
 type ArbitrumCommitment struct {
 	versionedCert certs.VersionedCert
 }
