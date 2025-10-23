@@ -155,7 +155,7 @@ func (h *Handlers) RecoverPayload(
 	payload, err := h.eigenDAManager.Get(ctx, versionedCert, proxy_common.GETOpts{})
 	if err != nil {
 		var dpError *coretypes.DerivationError
-		if errors.As(err, dpError) {
+		if errors.As(err, &dpError) {
 			// returning nil for the batch payload indicates to the
 			// nitro derivation pipeline to "discard" this batch and move
 			// onto the next DA Cert in the Sequencer Inbox

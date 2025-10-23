@@ -234,7 +234,7 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert certs.VersionedCert
 		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACertV2)
 		if err != nil {
 			return coretypes.NewCertParsingFailedError(
-				hex.EncodeToString(versionedCert.SerializedCert), fmt.Sprintf("RLP decoding EigenDA v1 cert: %v", err))
+				hex.EncodeToString(versionedCert.SerializedCert), fmt.Sprintf("RLP decoding EigenDA v2 cert: %v", err))
 		}
 
 		referenceBlockNumber = eigenDACertV2.ReferenceBlockNumber()
