@@ -16,9 +16,9 @@ Given:
 - A set of $c$ chunks to be assigned to the validators
 
 Within a single quorum, the number of chunks assigned to validator $i$ is:
-$$
+```math
 c'_i = \lceil \eta_i(c - n) \rceil
-$$
+```
 
 The proof that any subset of validators with sufficient combined stake can reconstruct the blob is provided in [Security Parameters](./security-parameters.md).
 
