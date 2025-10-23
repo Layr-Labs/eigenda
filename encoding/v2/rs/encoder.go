@@ -9,7 +9,9 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
-	gnarkencoder "github.com/Layr-Labs/eigenda/encoding/v2/rs/gnark"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs/backend"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs/backend/gnark"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs/backend/icicle"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	_ "go.uber.org/automaxprocs"
@@ -70,7 +72,7 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 
 	intermediate = time.Now()
 
-	polyEvals, err := encoder.RSEncoderComputer.ExtendPolyEval(pdCoeffs)
+	polyEvals, err := encoder.rsEncoderBackend.ExtendPolyEval(pdCoeffs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reed-solomon extend poly evals, %w", err)
 	}
@@ -229,38 +231,30 @@ func (e *Encoder) newEncoder(params encoding.EncodingParams) (*ParametrizedEncod
 
 	fs := e.createFFTSettings(params)
 
+	var rsEncoderBackend backend.RSEncoderBackend
 	switch e.Config.BackendType {
 	case encoding.GnarkBackend:
-		return e.createGnarkBackendEncoder(params, fs)
+		if e.Config.GPUEnable {
+			return nil, errors.New("GPU is not supported in gnark backend")
+		}
+		rsEncoderBackend = gnark.NewRSBackend(fs)
 	case encoding.IcicleBackend:
-		return e.createIcicleBackendEncoder(params, fs)
+		rsEncoderBackend, err = icicle.BuildRSBackend(e.logger, e.Config.GPUEnable)
+		if err != nil {
+			return nil, fmt.Errorf("build icicle rs backend: %w", err)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported backend type: %v", e.Config.BackendType)
 	}
+	return &ParametrizedEncoder{
+		Config:           e.Config,
+		Params:           params,
+		Fs:               fs,
+		rsEncoderBackend: rsEncoderBackend,
+	}, nil
 }
 
 func (e *Encoder) createFFTSettings(params encoding.EncodingParams) *fft.FFTSettings {
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
 	return fft.NewFFTSettings(n)
-}
-
-func (e *Encoder) createGnarkBackendEncoder(
-	params encoding.EncodingParams, fs *fft.FFTSettings,
-) (*ParametrizedEncoder, error) {
-	if e.Config.GPUEnable {
-		return nil, errors.New("GPU is not supported in gnark backend")
-	}
-
-	return &ParametrizedEncoder{
-		Config:            e.Config,
-		Params:            params,
-		Fs:                fs,
-		RSEncoderComputer: &gnarkencoder.RsGnarkBackend{Fs: fs},
-	}, nil
-}
-
-func (e *Encoder) createIcicleBackendEncoder(
-	params encoding.EncodingParams, fs *fft.FFTSettings,
-) (*ParametrizedEncoder, error) {
-	return CreateIcicleBackendEncoder(e, params, fs)
 }
