@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
@@ -34,7 +35,7 @@ func TestArbCustomDAGetSupportedHeaderBytesMethod(t *testing.T) {
 	err = rpcClient.Call(&supportedHeaderBytesResult,
 		arbitrum_altda.MethodGetSupportedHeaderBytes)
 	require.NoError(t, err)
-	require.Equal(t, supportedHeaderBytesResult.HeaderBytes[0], arbitrum_altda.EigenDAV2MessageHeaderByte)
+	require.Equal(t, supportedHeaderBytesResult.HeaderBytes[0], commitments.ArbCustomDAHeaderByte)
 
 }
 

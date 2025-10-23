@@ -2,8 +2,10 @@ package arbitrum_altda
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	proxy_common "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
@@ -114,13 +116,10 @@ func NewHandlers(m *store.EigenDAManager) IHandlers {
 	}
 }
 
-// GetSupportedHeaderBytes determines whether or not the sequencer message header byte is an EigenDAV2 cert type.
-// Arbitrum Nitro does this check via a bitwise AND which can cause overlapping and requires careful future
-// management. while we could determine a byte value with bits that don't overlap - it's more maintainable
-// to do a literal comparison and assume OCL NOR our competitors would never introduce a conflicting byte value
+// GetSupportedHeaderBytes returns the supported DA Header bytes by the CustomDA server
 func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeaderBytesResult, error) {
 	return &SupportedHeaderBytesResult{
-		HeaderBytes: []byte{EigenDAV2MessageHeaderByte},
+		HeaderBytes: []byte{commitments.ArbCustomDAHeaderByte},
 	}, nil
 }
 
@@ -129,7 +128,7 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 //
 // @param batch_num: batch number position in global state sequence
 // @param batch_block_hash: block hash of the certL1InclusionBlock
-// @param sequencer_msg: The DA Certificate
+// @param sequencer_msg: The encoded rollup payload
 //
 // @return bytes: Rollup payload bytes
 // @return error: A structured error message (if applicable)
@@ -139,23 +138,30 @@ func (h *Handlers) RecoverPayload(
 	batchBlockHash common.Hash,
 	sequencerMsg hexutil.Bytes,
 ) (*PayloadResult, error) {
-	if len(sequencerMsg) <= 1 {
+	if len(sequencerMsg) <= 2 {
 		return nil,
-			fmt.Errorf("sequencer message expected to be >1 byte, got: %d", len(sequencerMsg))
+			fmt.Errorf("sequencer message expected to be >2 bytes, got: %d", len(sequencerMsg))
 	}
 
-	// strip version byte from sequencer message
-	//
-	// TODO: There will be additional bytes encoded here (i.e, CustomDA byte, EigenDAV2 Message Header byte).
-	//       Given the lack of response from OCL, it's still unknown what the exact expected schema should.
-	//       Once their interface is more hardended we can make a safer deduction for how to introduce this.
-	//       Will likely require introducing a new ArbCustomDA commitment type
-	//
-	versionByte := sequencerMsg[0]
-	versionedCert := certs.NewVersionedCert([]byte(sequencerMsg[1:]), certs.VersionByte(versionByte))
+	daCommitByte := sequencerMsg[0]
+	if daCommitByte != commitments.ArbCustomDAHeaderByte {
+		return nil,
+			fmt.Errorf("expected %x for header byte, got %x", commitments.ArbCustomDAHeaderByte, daCommitByte)
+	}
+
+	certVersionByte := sequencerMsg[1]
+	versionedCert := certs.NewVersionedCert([]byte(sequencerMsg[2:]), certs.VersionByte(certVersionByte))
 
 	payload, err := h.eigenDAManager.Get(ctx, versionedCert, proxy_common.GETOpts{})
 	if err != nil {
+		var dpError *coretypes.DerivationError
+		if errors.As(err, dpError) {
+			// returning nil for the batch payload indicates to the
+			// nitro derivation pipeline to "discard" this batch and move
+			// onto the next DA Cert in the Sequencer Inbox
+			return nil, nil
+		}
+
 		return nil, fmt.Errorf("get rollup payload from DA Cert: %w", err)
 	}
 
@@ -205,7 +211,7 @@ func (h *Handlers) Store(
 	// TODO: This should eventually be propagated by the Put method given the actual
 	//       version byte assumed is dictated by the EigenDACertVerifier used
 	versionedCert := certs.NewVersionedCert(certBytes, certs.V2VersionByte)
-	daCommitment := commitments.NewStandardCommitment(versionedCert)
+	daCommitment := commitments.NewArbCommitment(versionedCert)
 
 	result := &StoreResult{
 		SerializedDACert: daCommitment.Encode(),
