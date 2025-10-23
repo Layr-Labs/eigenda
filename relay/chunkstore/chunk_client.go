@@ -237,7 +237,7 @@ func (c *ChunkClient) GetBinaryChunkCoefficients(
 ) ([][]byte, bool, error) {
 
 	bytesPerFrame := encoding.BYTES_PER_SYMBOL * elementCount
-	firstByteIndex := firstIndex * bytesPerFrame
+	firstByteIndex := 4 + firstIndex*bytesPerFrame
 	size := count * bytesPerFrame
 
 	s3Key := eigens3.ScopedChunkKey(blobKey)
@@ -269,7 +269,9 @@ func (c *ChunkClient) GetBinaryChunkCoefficients(
 	// Deserialize the frames
 	frames, err := rs.SplitSerializedFrameCoeffsWithElementCount(buffer.Bytes(), elementCount)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to split coefficient frames for blob %s: %w", blobKey.Hex(), err)
+		return nil, false, fmt.Errorf(
+			"failed to split coefficient frames for blob %s, symbols per frame %d, range header %s: %w",
+			blobKey.Hex(), elementCount, rangeHeader, err)
 	}
 
 	return frames, true, nil
