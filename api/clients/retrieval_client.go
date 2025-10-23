@@ -195,26 +195,33 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 	var indices []encoding.ChunkNumber
 	// TODO(ian-shim): if we gathered enough chunks, cancel remaining RPC calls
 	for i := 0; i < len(operators); i++ {
-		reply := <-chunksChan
-		if reply.Err != nil {
-			r.logger.Warn("failed to get chunks from operator", "operator", reply.OperatorID.Hex(), "err", reply.Err)
-			continue
-		}
-		assignment, ok := assignments[reply.OperatorID]
-		if !ok {
-			return nil, fmt.Errorf("no assignment to operator %s", reply.OperatorID.Hex())
-		}
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context done: %w", ctx.Err())
+		case reply := <-chunksChan:
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("context done: %w", ctx.Err())
+			}
+			if reply.Err != nil {
+				r.logger.Warn("failed to get chunks from operator", "operator", reply.OperatorID.Hex(), "err", reply.Err)
+				continue
+			}
+			assignment, ok := assignments[reply.OperatorID]
+			if !ok {
+				return nil, fmt.Errorf("no assignment to operator %s", reply.OperatorID.Hex())
+			}
 
-		err = r.verifier.VerifyFrames(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
-		if err != nil {
-			r.logger.Warn("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
-			continue
-		} else {
-			r.logger.Info("verified chunks from operator", "operator", reply.OperatorID.Hex())
-		}
+			err = r.verifier.VerifyFrames(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
+			if err != nil {
+				r.logger.Warn("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
+				continue
+			} else {
+				r.logger.Info("verified chunks from operator", "operator", reply.OperatorID.Hex())
+			}
 
-		chunks = append(chunks, reply.Chunks...)
-		indices = append(indices, assignment.GetIndices()...)
+			chunks = append(chunks, reply.Chunks...)
+			indices = append(indices, assignment.GetIndices()...)
+		}
 	}
 
 	return &BlobChunks{
