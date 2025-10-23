@@ -121,8 +121,9 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
 
    Proxy REST API Server (compatible with OP Stack ALT DA and standard commitment clients)
 
-   --addr value  Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ADDR]
-   --port value  Server listening port (default: 3100) [$EIGENDA_PROXY_PORT]
+   --addr value                       Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ADDR]
+   --port value                       Server listening port (default: 3100) [$EIGENDA_PROXY_PORT]
+   --rest.max-certificate-size value  Maximum certificate size (bytes) to accept in API requests. Setting to (0) results in no maximum size. (default: 0) [$EIGENDA_PROXY_MAX_CERTIFICATE_SIZE]
 
    S3 Cache/Fallback
 
