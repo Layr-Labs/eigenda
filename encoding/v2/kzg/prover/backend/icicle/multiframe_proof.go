@@ -41,7 +41,7 @@ type KzgMultiProofBackend struct {
 }
 
 func NewMultiProofBackend(logger logging.Logger,
-	fs *fft.FFTSettings, fftPointsT [][]bn254.G1Affine,
+	fs *fft.FFTSettings, fftPointsT [][]bn254.G1Affine, g1SRS []bn254.G1Affine,
 	gpuEnabled bool, numWorker uint64,
 ) (*KzgMultiProofBackend, error) {
 	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
@@ -49,6 +49,7 @@ func NewMultiProofBackend(logger logging.Logger,
 		GPUEnable:  gpuEnabled,
 		NTTSize:    MAX_NTT_SIZE,
 		FFTPointsT: fftPointsT,
+		SRSG1:      g1SRS,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("configure icicle device: %w", err)

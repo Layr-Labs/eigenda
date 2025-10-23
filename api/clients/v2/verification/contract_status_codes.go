@@ -46,7 +46,7 @@ func (s CheckDACertStatusCode) String() string {
 	case StatusInvalidInclusionProof:
 		return "Invalid inclusion proof detected: Merkle inclusion proof for blob batch is invalid"
 	case StatusSecurityAssumptionsNotMet:
-		return "Security assumptions not met: BLS signer weight is less than the required threshold"
+		return "Security assumptions not met: The security parameters do not pass the check. For more info read eigenda/docs/spec/src/protocol/architecture/security-parameters.md"
 	case StatusBlobQuorumsNotSubset:
 		return "Blob quorums are not a subset of the confirmed quorums"
 	case StatusRequiredQuorumsNotSubset:

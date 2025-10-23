@@ -150,11 +150,11 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 			}
 
 			// Run this before entering the benchmark loop to preload the SRSTable for the params size.
-			_, err = p.GetFrames(blobBytes, params)
+			_, _, err = p.GetFrames(blobBytes, params)
 			require.NoError(b, err)
 
 			for b.Loop() {
-				_, err = p.GetFrames(blobBytes, params)
+				_, _, err = p.GetFrames(blobBytes, params)
 				require.NoError(b, err)
 			}
 		})

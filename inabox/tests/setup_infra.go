@@ -30,14 +30,16 @@ type InfrastructureConfig struct {
 	// node with operator registration)
 	DisableDisperser bool
 
-	// The following field is temporary, to be able to test different payments configurations.
-	// It will be removed once legacy payments are removed.
+	// The following field is temporary, to be able to test different payments configurations. It will be removed
+	// once legacy payments are removed.
 	ControllerUseNewPayments bool
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
 // This includes containers for Anvil, LocalStack, GraphNode, and the Churner server.
 func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*InfrastructureHarness, error) {
+	var err error
+	var infra *InfrastructureHarness
 	if config.MetadataTableName == "" {
 		config.MetadataTableName = "test-BlobMetadata"
 	}
@@ -56,7 +58,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	// Create test directory if needed
 	testName := config.TestName
 	if testName == "" {
-		var err error
 		testName, err = deploy.CreateNewTestDirectory(config.TemplateName, config.RootPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create test directory: %w", err)
@@ -70,9 +71,8 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	infraCtx, infraCancel := context.WithCancel(ctx)
 
 	// Ensure we cancel the context if we return an error
-	var setupErr error
 	defer func() {
-		if setupErr != nil && infraCancel != nil {
+		if err != nil {
 			infraCancel()
 		}
 	}()
@@ -83,13 +83,12 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		network.WithDriver("bridge"),
 		network.WithAttachable())
 	if err != nil {
-		setupErr = fmt.Errorf("failed to create docker network: %w", err)
-		return nil, setupErr
+		return nil, fmt.Errorf("failed to create docker network: %w", err)
 	}
 	logger.Info("Created Docker network", "name", sharedDockerNetwork.Name)
 
 	// Create infrastructure harness early so we can populate it incrementally
-	infra := &InfrastructureHarness{
+	infra = &InfrastructureHarness{
 		SharedNetwork:  sharedDockerNetwork,
 		TestConfig:     testConfig,
 		TemplateName:   config.TemplateName,
@@ -108,8 +107,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 	chainHarness, err := SetupChainHarness(infraCtx, chainHarnessConfig)
 	if err != nil {
-		setupErr = fmt.Errorf("failed to setup chain harness: %w", err)
-		return nil, setupErr
+		return nil, fmt.Errorf("failed to setup chain harness: %w", err)
 	}
 	infra.ChainHarness = *chainHarness
 
@@ -136,8 +134,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 			*disperserHarnessConfig,
 		)
 		if err != nil {
-			setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
-			return nil, setupErr
+			return nil, fmt.Errorf("failed to setup disperser harness: %w", err)
 		}
 		infra.DisperserHarness = *disperserHarness
 	} else {
@@ -151,8 +148,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
 	if err != nil {
-		setupErr = fmt.Errorf("failed to setup operator harness: %w", err)
-		return nil, setupErr
+		return nil, fmt.Errorf("failed to setup operator harness: %w", err)
 	}
 	infra.OperatorHarness = *operatorHarness
 
@@ -180,7 +176,7 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	infra.Logger.Info("Stopping binaries")
 	infra.TestConfig.StopBinaries()
 
-	// Clean up disperser harness (graph node and localstack)
+	// Clean up disperser harness
 	infra.DisperserHarness.Cleanup(cleanupCtx, infra.Logger)
 
 	// Clean up chain harness (churner and anvil)
