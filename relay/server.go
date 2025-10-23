@@ -379,6 +379,8 @@ func (s *Server) downloadChunkData(
 
 	data = make([][]byte, 0)
 
+	// TODO parallelize each chunk request... perhaps not needed with single blob batches
+
 	for _, chunkRequest := range request.GetChunkRequests() {
 		if chunkRequest.GetByIndex() != nil {
 			// TODO if we actually deploy this, we need to be backwards compatible for a little while at least.

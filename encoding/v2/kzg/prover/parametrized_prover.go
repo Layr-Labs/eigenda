@@ -58,6 +58,10 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 		start := time.Now()
 
 		frames, indices, err := g.encoder.Encode(inputFr, g.encodingParams)
+		if err != nil {
+			err = fmt.Errorf("rs encode, encoding params = %v, len(inputFr) = %d: %w",
+				g.encodingParams, len(inputFr), err)
+		}
 		rsChan <- rsEncodeResult{
 			Frames:   frames,
 			Indices:  indices,
@@ -81,6 +85,11 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 
 		proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(
 			flatpaddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.computeMultiproofNumWorker)
+		if err != nil {
+			err = fmt.Errorf(
+				"compute multi proof, encoding params = %v, len(flatpaddedCoeffs) = %d, numWorkers = %d: %w",
+				g.encodingParams, len(flatpaddedCoeffs), g.computeMultiproofNumWorker, err)
+		}
 		proofChan <- proofsResult{
 			Proofs:   proofs,
 			Err:      err,
