@@ -66,3 +66,35 @@ func sortByUnsignedBytesDescending(rates []*validator.ValidatorSigningRate) {
 		return strings.Compare(string(rates[i].GetValidatorId()), string(rates[j].GetValidatorId())) < 0
 	})
 }
+
+// Combines two slices of ValidatorSigningRate reports. Reports in each slice are assumed to be unique by
+// ValidatorId, but the same ValidatorId may appear in both slices. The resulting slice will contain one
+// entry per unique ValidatorId, with rates combined using combineSigningRates.
+func combineSigningRateSlices(
+	ratesA []*validator.ValidatorSigningRate,
+	ratesB []*validator.ValidatorSigningRate,
+) ([]*validator.ValidatorSigningRate, error) {
+
+	rateMap := make(map[string]*validator.ValidatorSigningRate)
+	for _, rate := range ratesA {
+		rateMap[string(rate.GetValidatorId())] = rate
+	}
+	for _, rate := range ratesB {
+		var err error
+		rateMap[string(rate.GetValidatorId())], err =
+			combineSigningRates(
+				rateMap[string(rate.GetValidatorId())],
+				rate)
+		if err != nil {
+			return nil, fmt.Errorf("error combining signing rates for validator %s: %w",
+				hex.EncodeToString(rate.GetValidatorId()), err)
+		}
+	}
+
+	combinedRates := make([]*validator.ValidatorSigningRate, 0, len(rateMap))
+	for _, rate := range rateMap {
+		combinedRates = append(combinedRates, rate)
+	}
+
+	return combinedRates, nil
+}

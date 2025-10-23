@@ -1465,13 +1465,13 @@ func TestThrottlePreventsEjection(t *testing.T) {
 
 			// Verify bucket state
 			em := manager.(*ejectionManager)
-			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			fill, err := em.getLeakyBucketForQuorum(currentTime, 0).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.01, fill)
-			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 1).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.01, fill)
-			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 2).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.33, fill)
 		}
@@ -1486,13 +1486,13 @@ func TestThrottlePreventsEjection(t *testing.T) {
 
 			// Verify bucket state. Throttled ejection should not have resulted in any change.
 			em := manager.(*ejectionManager)
-			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			fill, err := em.getLeakyBucketForQuorum(currentTime, 0).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.01, fill)
-			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 1).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.01, fill)
-			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 2).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.33, fill)
 		}
@@ -1654,13 +1654,13 @@ func TestFailureToStartRevertsThrottle(t *testing.T) {
 
 			// Verify bucket state. Any changes to the bucket from the failed ejection should have been rolled back.
 			em := manager.(*ejectionManager)
-			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			fill, err := em.getLeakyBucketForQuorum(currentTime, 0).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.0, fill)
-			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 1).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.0, fill)
-			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 2).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.0, fill)
 		}
@@ -1675,13 +1675,13 @@ func TestFailureToStartRevertsThrottle(t *testing.T) {
 
 			// Verify bucket state.
 			em := manager.(*ejectionManager)
-			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			fill, err := em.getLeakyBucketForQuorum(currentTime, 0).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.01, fill)
-			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 1).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.01, fill)
-			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 2).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.33, fill)
 		}
@@ -1827,13 +1827,13 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 
 			// Verify bucket state
 			em := manager.(*ejectionManager)
-			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			fill, err := em.getLeakyBucketForQuorum(currentTime, 0).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.01, fill)
-			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 1).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.01, fill)
-			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 2).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.33, fill)
 		}
@@ -1848,13 +1848,13 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 
 			// Verify bucket state. Throttled ejection should not have resulted in any change.
 			em := manager.(*ejectionManager)
-			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			fill, err := em.getLeakyBucketForQuorum(currentTime, 0).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.01, fill)
-			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 1).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.01, fill)
-			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 2).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.33, fill)
 		}
@@ -1901,13 +1901,13 @@ func TestFailureToFinalizeRevertsThrottle(t *testing.T) {
 			// The failure to finalize should have rolled back the throttle. C's ejection should not have started
 			// yet, so there should be nothing in any of the buckets after the rollback.
 			em := manager.(*ejectionManager)
-			fill, err := em.getLeakyBucketForQuorum(0).GetFillLevel(currentTime)
+			fill, err := em.getLeakyBucketForQuorum(currentTime, 0).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.0, fill)
-			fill, err = em.getLeakyBucketForQuorum(1).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 1).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.0, fill)
-			fill, err = em.getLeakyBucketForQuorum(2).GetFillLevel(currentTime)
+			fill, err = em.getLeakyBucketForQuorum(currentTime, 2).GetFillLevel(currentTime)
 			require.NoError(t, err)
 			require.Equal(t, 0.0, fill)
 		}
