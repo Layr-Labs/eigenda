@@ -6,19 +6,15 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	rb "github.com/Layr-Labs/eigenda/encoding/utils/reverseBits"
 	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs/backend"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-// Proof device represents a device capable of computing reed-solomon operations.
-type EncoderDevice interface {
-	ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error)
-}
-
 type ParametrizedEncoder struct {
 	*encoding.Config
-	Params            encoding.EncodingParams
-	Fs                *fft.FFTSettings
-	RSEncoderComputer EncoderDevice
+	Params           encoding.EncodingParams
+	Fs               *fft.FFTSettings
+	rsEncoderBackend backend.RSEncoderBackend
 }
 
 // padPolyEval pads the input polynomial coefficients to match the number of evaluations

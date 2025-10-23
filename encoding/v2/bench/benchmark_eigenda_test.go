@@ -128,14 +128,19 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 		CacheDir:       "../../../resources/srs/SRSTables",
 		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
 	}
-
+	encodingConfig := encoding.Config{
+		NumWorker: uint64(runtime.NumCPU()),
+		GPUEnable:   true,
+		BackendType: encoding.IcicleBackend,
+		// BackendType: encoding.GnarkBackend,
+	}
 	// use a non-silent logger to see the "Multiproof Time Decomp" log lines.
-	p, err := prover.NewProver(common.SilentLogger(), &proverConfig, nil)
+	p, err := prover.NewProver(common.TestLogger(b), &proverConfig, &encodingConfig)
 	require.NoError(b, err)
 
 	// We only have 16MiBs of SRS points. Since we use blob_version=0's 8x coding
 	// ratio, we can encode blobs of size at most 2MiB (2^21 bytes).
-	for _, blobPower := range []uint64{17, 20, 21} {
+	for _, blobPower := range []uint64{17} {
 		b.Run("Multiproof_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
 			blobSizeBytes := uint64(1) << blobPower
 			params := encoding.EncodingParams{
@@ -150,8 +155,10 @@ func BenchmarkMultiproofFrameGeneration(b *testing.B) {
 			}
 
 			// Run this before entering the benchmark loop to preload the SRSTable for the params size.
+			b.Log("Generating frames for one blob to preload SRSTable...")
 			_, _, err = p.GetFrames(blobBytes, params)
 			require.NoError(b, err)
+			b.Log("Preloading done, starting benchmark...")
 
 			for b.Loop() {
 				_, _, err = p.GetFrames(blobBytes, params)

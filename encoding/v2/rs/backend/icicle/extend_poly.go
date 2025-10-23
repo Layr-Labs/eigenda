@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
 	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
@@ -14,14 +15,34 @@ import (
 	icicleRuntime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
-type RsIcicleBackend struct {
+const (
+	defaultNTTSize = 25 // Used for NTT setup in Icicle backend
+)
+
+type RSBackend struct {
 	NttCfg  core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	Device  icicleRuntime.Device
 	GpuLock sync.Mutex
 }
 
+func BuildRSBackend(logger logging.Logger, enableGPU bool) (*RSBackend, error) {
+	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
+		Logger:    logger,
+		GPUEnable: enableGPU,
+		NTTSize:   defaultNTTSize,
+		// No MSM setup needed for encoder
+	})
+	if err != nil {
+		return nil, fmt.Errorf("setup icicle device: %w", err)
+	}
+	return &RSBackend{
+		NttCfg: icicleDevice.NttCfg,
+		Device: icicleDevice.Device,
+	}, nil
+}
+
 // Encoding Reed Solomon using FFT
-func (g *RsIcicleBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
+func (g *RSBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
 	// Lock the GPU for operations
 	g.GpuLock.Lock()
 	defer g.GpuLock.Unlock()
