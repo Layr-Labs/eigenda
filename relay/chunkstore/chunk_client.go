@@ -267,14 +267,9 @@ func (c *ChunkClient) GetBinaryChunkCoefficients(
 	}
 
 	// Deserialize the frames
-	observedElementCount, frames, err := rs.SplitSerializedFrameCoeffs(buffer.Bytes())
+	frames, err := rs.SplitSerializedFrameCoeffsWithElementCount(buffer.Bytes(), elementCount)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to split coefficient frames for blob %s: %w", blobKey.Hex(), err)
-	}
-
-	if observedElementCount != elementCount {
-		return nil, false, fmt.Errorf("mismatched element count: expected %d, got %d",
-			elementCount, observedElementCount)
 	}
 
 	return frames, true, nil
