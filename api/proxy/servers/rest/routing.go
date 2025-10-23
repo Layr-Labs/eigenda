@@ -21,14 +21,6 @@ const (
 )
 
 func (svr *Server) RegisterRoutes(r *mux.Router) {
-	// Set maxCertSizeRegExp based on MaxCertSizeBytes (optional setting)
-	maxCertSizeRegExp := "[0-9a-fA-F]"
-	// MaxCertSizeBytes <= 0: hex string with unbounded size/length (default)
-	// MaxCertSizeBytes > 0: hex string with length <= MaxCertSizeBytes * 2 (2 characters in a hex string = 1 byte)
-	if svr.config.MaxCertSizeBytes > 0 {
-		maxCertSizeRegExp = fmt.Sprintf("%s{0,%d}", maxCertSizeRegExp, svr.config.MaxCertSizeBytes*2)
-	}
-
 	subrouterGET := r.Methods("GET").PathPrefix("/get").Subrouter()
 	// std commitments (for nitro)
 	subrouterGET.HandleFunc("/"+
@@ -57,7 +49,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 			"{"+routingVarNameCommitTypeByteHex+":01}"+ // 01 for generic commitments
 			"{da_layer_byte:[0-9a-fA-F]{2}}"+ // should always be 0x00 for eigenDA but we let others through to return a 404
 			"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
-			"{"+routingVarNamePayloadHex+":"+maxCertSizeRegExp+"}",
+			"{"+routingVarNamePayloadHex+"}",
 		middleware.WithCertMiddlewares(
 			svr.handleGetOPGenericCommitment,
 			svr.log,
