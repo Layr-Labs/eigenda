@@ -12,7 +12,7 @@ import (
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
 	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ntt"
-	icicleRuntime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
+	icicle_runtime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 
 type RSBackend struct {
 	NttCfg  core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
-	Device  icicleRuntime.Device
+	Device  icicle_runtime.Device
 	GpuLock sync.Mutex
 }
 
@@ -43,27 +43,15 @@ func BuildRSBackend(logger logging.Logger, enableGPU bool) (*RSBackend, error) {
 
 // Encoding Reed Solomon using FFT
 func (g *RSBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
-	// Lock the GPU for operations
-	g.GpuLock.Lock()
-	defer g.GpuLock.Unlock()
-
-	// Convert and prepare data
-	g.NttCfg.BatchSize = int32(1)
-	scalarsSF := icicle.ConvertFrToScalarFieldsBytes(coeffs)
-	scalars := core.HostSliceFromElements[iciclebn254.ScalarField](scalarsSF)
-	outputDevice := make(core.HostSlice[iciclebn254.ScalarField], len(coeffs))
-
-	// Set device
-	err := icicleRuntime.SetDevice(&g.Device)
-	if err != icicleRuntime.Success {
-		return nil, fmt.Errorf("failed to set device: %v", err.AsString())
-	}
-
-	// Perform NTT
+	// coeffs will be moved to device memory inside Ntt function,
+	// and the result copied back into outputEvals.
+	coeffsSlice := core.HostSliceFromElements(coeffs)
+	outputEvals := make(core.HostSlice[fr.Element], len(coeffs))
 	var icicleErr error
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	icicleRuntime.RunOnDevice(&g.Device, func(args ...any) {
+	icicle_runtime.RunOnDevice(&g.Device, func(args ...any) {
 		defer wg.Done()
 		defer func() {
 			if r := recover(); r != nil {
@@ -71,16 +59,17 @@ func (g *RSBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
 			}
 		}()
 
-		ntt.Ntt(scalars, core.KForward, &g.NttCfg, outputDevice)
+		cfg := g.NttCfg
+		// We just perform the NTT synchronously here; we have nothing to do while waiting.
+		cfg.IsAsync = false
+		cfg.BatchSize = int32(1)
+		ntt.Ntt(coeffsSlice, core.KForward, &cfg, outputEvals)
 	})
-
 	wg.Wait()
 
 	// Check if there was a panic
 	if icicleErr != nil {
 		return nil, icicleErr
 	}
-
-	evals := icicle.ConvertScalarFieldsToFrBytes(outputDevice)
-	return evals, nil
+	return outputEvals, nil
 }
