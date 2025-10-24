@@ -20,6 +20,7 @@ type InfrastructureConfig struct {
 	BucketTableName     string
 	S3BucketName        string
 	MetadataTableNameV2 string
+	OnDemandTableName   string
 
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
@@ -47,6 +48,9 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 	if config.MetadataTableNameV2 == "" {
 		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
+	}
+	if config.OnDemandTableName == "" {
+		config.OnDemandTableName = "e2e_v2_ondemand"
 	}
 
 	logger := config.Logger
@@ -118,7 +122,10 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 			BucketTableName:     config.BucketTableName,
 			S3BucketName:        config.S3BucketName,
 			MetadataTableNameV2: config.MetadataTableNameV2,
+			OnDemandTableName:   config.OnDemandTableName,
 			RelayCount:          config.RelayCount,
+			OperatorStateSubgraphURL: infra.ChainHarness.GraphNode.HTTPURL() +
+				"/subgraphs/name/Layr-Labs/eigenda-operator-state",
 		}
 		disperserHarness, err := SetupDisperserHarness(
 			infraCtx,
