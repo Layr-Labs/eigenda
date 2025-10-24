@@ -182,7 +182,7 @@ var (
 		Usage:    "Max number of blobs to disperse in a batch",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BATCH_SIZE"),
-		Value:    32,
+		Value:    128,
 	}
 	MetricsPortFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-port"),
