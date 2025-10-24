@@ -40,6 +40,12 @@ type EigenDADispersalBackendJSON struct {
 	EigenDADispersalBackend string `json:"eigenDADispersalBackend"`
 }
 
+// TODO(iquidus): Determine what other values should be included
+type ProxyConfigJSON struct {
+	Version           string `json:"version"`
+	RecencyWindowSize uint64 `json:"recencyWindowSize"`
+}
+
 // handleGetEigenDADispersalBackend handles the GET request to check the current EigenDA backend used for dispersal.
 // This endpoint returns which EigenDA backend version (v1 or v2) is currently being used for blob dispersal.
 func (svr *Server) handleGetEigenDADispersalBackend(w http.ResponseWriter, r *http.Request) {
@@ -102,6 +108,11 @@ func (svr *Server) handleSetEigenDADispersalBackend(w http.ResponseWriter, r *ht
 	backendString := common.EigenDABackendToString(newBackend)
 
 	response := EigenDADispersalBackendJSON{EigenDADispersalBackend: backendString}
+	svr.writeJSON(w, r, response)
+}
+
+func (svr *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	response := ProxyConfigJSON{Version: "version", RecencyWindowSize: 0} // TODO(iquidus): populate these values
 	svr.writeJSON(w, r, response)
 }
 
