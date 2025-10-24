@@ -64,7 +64,13 @@ func NewDynamoDBMeteringStore(
 	}, nil
 }
 
-func (s *DynamoDBMeteringStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64) (uint64, error) {
+func (s *DynamoDBMeteringStore) UpdateReservationBin(
+	ctx context.Context,
+	accountID gethcommon.Address,
+	reservationPeriod uint64,
+	size uint64,
+) (uint64, error) {
+
 	key := map[string]types.AttributeValue{
 		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
@@ -85,7 +91,7 @@ func (s *DynamoDBMeteringStore) UpdateReservationBin(ctx context.Context, accoun
 		return 0, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
 	}
 
-	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
+	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse BinUsage: %w", err)
 	}
@@ -322,7 +328,7 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, e
 		return nil, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
 	}
 
-	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
+	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse BinUsage: %w", err)
 	}

@@ -118,7 +118,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "dispatcher-pull-interval"),
 		Usage:    "Interval at which to pull from the queue",
 		Required: false,
-		Value:    1 * time.Second,
+		Value:    10 * time.Millisecond, // TODO don't merge this
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPATCHER_PULL_INTERVAL"),
 	}
 	AttestationTimeoutFlag = cli.DurationFlag{
