@@ -96,14 +96,14 @@ var (
 		Usage:    "Number of concurrent encoding requests",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NUM_CONCURRENT_ENCODING_REQUESTS"),
-		Value:    250,
+		Value:    1024,
 	}
 	MaxNumBlobsPerIterationFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-num-blobs-per-iteration"),
 		Usage:    "Max number of blobs to encode in a single iteration",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_BLOBS_PER_ITERATION"),
-		Value:    128,
+		Value:    1024,
 	}
 	OnchainStateRefreshIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
