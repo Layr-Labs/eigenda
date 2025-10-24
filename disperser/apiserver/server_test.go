@@ -646,6 +646,7 @@ func setup() {
 			LocalStackEndpoint:  localstackContainer.Endpoint(),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
+			BlobStoreBucketName: s3BucketName,
 			V2MetadataTableName: v2MetadataTableName,
 			AWSConfig:           localstackContainer.GetAWSClientConfig(),
 			Logger:              logger,
