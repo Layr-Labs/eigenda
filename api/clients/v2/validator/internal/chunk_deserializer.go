@@ -7,7 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 )
 
 // A ChunkDeserializer is responsible for deserializing binary chunks. Will only return chunks if they are valid.
@@ -70,9 +70,9 @@ func (d *chunkDeserializer) DeserializeAndVerify(
 
 	assignment := d.assignments[operatorID]
 
-	assignmentIndices := make([]uint, len(assignment.GetIndices()))
+	assignmentIndices := make([]core.ChunkNumber, len(assignment.GetIndices()))
 	for i, index := range assignment.GetIndices() {
-		assignmentIndices[i] = uint(index)
+		assignmentIndices[i] = core.ChunkNumber(index)
 	}
 
 	err := d.verifier.VerifyFrames(chunks, assignmentIndices, *blobCommitments, *encodingParams)

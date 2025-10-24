@@ -13,8 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LIVE_TESTS: "true"
-      LIVE_TEST_PREPROD_HOLESKY_KEY: ${{ secrets.LIVE_TEST_PREPROD_HOLESKY_KEY }}
-      LIVE_TEST_TESTNET_SEPOLIA_KEY: ${{ secrets.LIVE_TEST_TESTNET_SEPOLIA_KEY }}
+      LIVE_TEST_PRIVATE_KEY: ${{ secrets.LIVE_TEST_TESTNET_SEPOLIA_KEY }}
+      LIVE_TEST_ETH_RPC_URLS: ${{ secrets.LIVE_TEST_TESTNET_SEPOLIA_ETH_RPC_URLS }}
+      LIVE_TEST_SUBGRAPH_URL: ${{ secrets.LIVE_TEST_TESTNET_SEPOLIA_SUBGRAPH_URL }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,7 +42,7 @@ jobs:
           else
             COLOR="danger"
             STATUS_EMOJI="❌"
-            MENTION="<@da-oncall> "
+            MENTION=""
           fi
 
           PAYLOAD=$(jq -n \
@@ -96,7 +97,7 @@ jobs:
           else
             COLOR="danger"
             STATUS_EMOJI="❌"
-            MENTION="@here "
+            MENTION=""
           fi
 
           PAYLOAD=$(jq -n \

@@ -12,7 +12,7 @@ import (
 func TestNodeClientManager(t *testing.T) {
 	rand := random.NewTestRandom()
 
-	_, private, err := rand.ECDSA()
+	_, private, err := rand.EthAccount()
 	require.NoError(t, err)
 	requestSigner := mock.NewStaticRequestSigner(private)
 

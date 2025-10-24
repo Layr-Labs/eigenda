@@ -1,5 +1,6 @@
-# Fuzz examplars are written to disk after fuzzing in these paths.
-**/testdata
+# Fuzz inputs and outputs are written to disk under these dirs.
+# See https://pkg.go.dev/testing#hdr-Fuzzing
+**/testdata/fuzz
 
 inabox/testdata/*
 inabox/anvil.pid
@@ -29,3 +30,6 @@ icicle/*
 .DS_Store
 
 **/logs/**
+
+# Rust
+**/target/

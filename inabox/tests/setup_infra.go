@@ -13,51 +13,63 @@ import (
 
 // InfrastructureConfig contains the configuration for setting up the infrastructure
 type InfrastructureConfig struct {
-	TemplateName string
-	TestName     string
-	Logger       logging.Logger
-
-	// V2 disperser related configuration
-	V2MetadataTableName string
-	BlobStoreBucketName string
+	TemplateName         string
+	TestName             string
+	Logger               logging.Logger
+	RootPath             string
+	S3BucketName         string
+	MetadataTableNameV2  string
+	OnDemandTableName    string
 
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
+
+	// DisableDisperser disables the disperser deployment when set to true. This is useful for
+	// tests that do not require the disperser infrastructure to be deployed (e.g. testing graph
+	// node with operator registration)
+	DisableDisperser bool
+
+	// The following field is temporary, to be able to test different payments configurations. It will be removed
+	// once legacy payments are removed.
+	ControllerUseNewPayments bool
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
 // This includes containers for Anvil, LocalStack, GraphNode, and the Churner server.
 func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*InfrastructureHarness, error) {
-	if config.V2MetadataTableName == "" {
-		config.V2MetadataTableName = "test-BlobMetadata-v2"
+	var err error
+	var infra *InfrastructureHarness
+
+	if config.S3BucketName == "" {
+		config.S3BucketName = "test-eigenda-blobstore"
 	}
-	if config.BlobStoreBucketName == "" {
-		config.BlobStoreBucketName = "test-eigenda-blobstore"
+	if config.MetadataTableNameV2 == "" {
+		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
+	}
+	if config.OnDemandTableName == "" {
+		config.OnDemandTableName = "e2e_v2_ondemand"
 	}
 
 	logger := config.Logger
 
-	rootPath := "../../"
-
 	// Create test directory if needed
 	testName := config.TestName
 	if testName == "" {
-		var err error
-		testName, err = deploy.CreateNewTestDirectory(config.TemplateName, rootPath)
+		testName, err = deploy.CreateNewTestDirectory(config.TemplateName, config.RootPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create test directory: %w", err)
 		}
 	}
 
-	testConfig := deploy.ReadTestConfig(testName, rootPath)
+	testConfig := deploy.ReadTestConfig(testName, config.RootPath)
+	testConfig.UseControllerMediatedPayments = config.ControllerUseNewPayments
 
 	// Create a long-lived context for the infrastructure lifecycle
 	infraCtx, infraCancel := context.WithCancel(ctx)
 
 	// Ensure we cancel the context if we return an error
-	var setupErr error
 	defer func() {
-		if setupErr != nil && infraCancel != nil {
+		if err != nil {
 			infraCancel()
 		}
 	}()
@@ -68,19 +80,19 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		network.WithDriver("bridge"),
 		network.WithAttachable())
 	if err != nil {
-		setupErr = fmt.Errorf("failed to create docker network: %w", err)
-		return nil, setupErr
+		return nil, fmt.Errorf("failed to create docker network: %w", err)
 	}
 	logger.Info("Created Docker network", "name", sharedDockerNetwork.Name)
 
 	// Create infrastructure harness early so we can populate it incrementally
-	infra := &InfrastructureHarness{
-		SharedNetwork: sharedDockerNetwork,
-		TestConfig:    testConfig,
-		TemplateName:  config.TemplateName,
-		TestName:      testName,
-		Logger:        config.Logger,
-		Cancel:        infraCancel,
+	infra = &InfrastructureHarness{
+		SharedNetwork:  sharedDockerNetwork,
+		TestConfig:     testConfig,
+		TemplateName:   config.TemplateName,
+		TestName:       testName,
+		LocalStackPort: "4570",
+		Logger:         config.Logger,
+		Cancel:         infraCancel,
 	}
 
 	// Setup Chain Harness first (Anvil, Graph Node, Contracts, Churner)
@@ -92,78 +104,47 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 	chainHarness, err := SetupChainHarness(infraCtx, chainHarnessConfig)
 	if err != nil {
-		setupErr = fmt.Errorf("failed to setup chain harness: %w", err)
-		return nil, setupErr
+		return nil, fmt.Errorf("failed to setup chain harness: %w", err)
 	}
 	infra.ChainHarness = *chainHarness
 
-	// Setup a shared localstack container
-	sharedLocalStack, err := testbed.NewLocalStackContainerWithOptions(
-		infraCtx,
-		testbed.LocalStackOptions{
-			ExposeHostPort: true,
-			HostPort:       infra.LocalStackPort,
-			Logger:         logger,
-		})
-	if err != nil {
-		setupErr = fmt.Errorf("failed to create shared localstack container: %w", err)
-		return nil, setupErr
-	}
-
-	// Setup Disperser Harness (V2) (DynamoDB tables, S3 buckets, relays, encoders)
-	disperserHarnessConfig := &DisperserHarnessConfig{
-		TestConfig: testConfig,
-		TestName:   testName,
-		RelayCount: config.RelayCount,
-
-		// LocalStack resources
-		BlobStoreBucketName: config.BlobStoreBucketName,
-		V2MetadataTableName: config.V2MetadataTableName,
-	}
-	disperserHarness, err := SetupDisperserHarness(
-		infraCtx,
-		logger,
-		infra.ChainHarness.EthClient,
-		sharedLocalStack,
-		*disperserHarnessConfig,
-	)
-	if err != nil {
-		setupErr = fmt.Errorf("failed to setup disperser harness: %w", err)
-		return nil, setupErr
-	}
-	infra.DisperserHarness = *disperserHarness
-
-	// Start remaining binaries (disperser, batcher, etc.)
-	// TODO(dmanc): Once all of these components are migrated to goroutines, we can remove this.
-	if testConfig != nil {
-		config.Logger.Info("Starting remaining binaries")
-		// Get encoder addresses, using empty string if instances are nil
-		// TODO(dmanc): This is a hack to get the tests to pass when using in-memory blob store, we should refactor this.
-		encoderV1Address := "" // V1 disperser no longer supported
-		encoderV2Address := ""
-		if disperserHarness.EncoderV2Instance != nil {
-			encoderV2Address = disperserHarness.EncoderV2Instance.URL
+	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
+	if !config.DisableDisperser {
+		disperserHarnessConfig := &DisperserHarnessConfig{
+			Network:             sharedDockerNetwork,
+			TestConfig:          testConfig,
+			TestName:            testName,
+			LocalStackPort:      infra.LocalStackPort,
+			S3BucketName:        config.S3BucketName,
+			MetadataTableNameV2: config.MetadataTableNameV2,
+			OnDemandTableName:   config.OnDemandTableName,
+			RelayCount:          config.RelayCount,
+			OperatorStateSubgraphURL: infra.ChainHarness.GraphNode.HTTPURL() +
+				"/subgraphs/name/Layr-Labs/eigenda-operator-state",
 		}
-		err := testConfig.GenerateAllVariables(
-			encoderV1Address,
-			encoderV2Address,
+		disperserHarness, err := SetupDisperserHarness(
+			infraCtx,
+			logger,
+			infra.ChainHarness.EthClient,
+			*disperserHarnessConfig,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("could not generate environment variables: %w", err)
+			return nil, fmt.Errorf("failed to setup disperser harness: %w", err)
 		}
-		testConfig.StartBinaries(true) // true = for tests, will skip churner and operators
+		infra.DisperserHarness = *disperserHarness
+	} else {
+		logger.Info("Disperser deployment disabled, skipping disperser harness setup")
 	}
+
 
 	// Setup Operator Harness third (requires chain and disperser to be ready)
 	operatorHarnessConfig := &OperatorHarnessConfig{
 		TestConfig: testConfig,
 		TestName:   testName,
-		Logger:     logger,
 	}
-	operatorHarness, err := SetupOperatorHarness(infraCtx, operatorHarnessConfig, &infra.ChainHarness)
+	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
 	if err != nil {
-		setupErr = fmt.Errorf("failed to setup operator harness: %w", err)
-		return nil, setupErr
+		return nil, fmt.Errorf("failed to setup operator harness: %w", err)
 	}
 	infra.OperatorHarness = *operatorHarness
 
@@ -189,9 +170,9 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	infra.TestConfig.StopBinaries()
 
 	// Stop operator goroutines using the harness cleanup
-	infra.OperatorHarness.Cleanup(cleanupCtx, infra.Logger)
+	infra.OperatorHarness.Cleanup(infra.Logger)
 
-	// Clean up disperser harness (graph node and localstack)
+	// Clean up disperser harness
 	infra.DisperserHarness.Cleanup(cleanupCtx, infra.Logger)
 
 	// Clean up localstack

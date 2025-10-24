@@ -13,11 +13,12 @@ import (
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
@@ -62,7 +63,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	p, c, v, err = makeTestComponents()
+	p, c, v, err = makeTestComponents(logger)
 	if err != nil {
 		panic("failed to start localstack container: " + err.Error())
 	}
@@ -72,33 +73,32 @@ func TestMain(m *testing.M) {
 }
 
 // makeTestComponents makes a prover and verifier currently using the only supported backend.
-func makeTestComponents() (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
+func makeTestComponents(logger logging.Logger) (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
 	proverConfig := &prover.KzgConfig{
+		SRSNumberToLoad: 8192,
 		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
-		G2TrailingPath:  "../../resources/srs/g2.trailing.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSNumberToLoad: 8192,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
 	}
-	verifierConfig := &verifier.KzgConfig{
-		SRSNumberToLoad: 8192,
-		G1Path:          "../../resources/srs/g1.point",
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	verifierConfig := verifier.ConfigFromProverV2Config(proverConfig)
+	committerConfig := committer.Config{
+		SRSNumberToLoad:   proverConfig.SRSNumberToLoad,
+		G1SRSPath:         proverConfig.G1Path,
+		G2SRSPath:         "../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../resources/srs/g2.trailing.point",
 	}
 
-	p, err := prover.NewProver(proverConfig, nil)
+	p, err := prover.NewProver(logger, proverConfig, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	c, err := committer.New(p.Srs.G1, p.Srs.G2, p.G2Trailing)
+	c, err := committer.NewFromConfig(committerConfig)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new committer: %w", err)
 	}
 
-	v, err := verifier.NewVerifier(verifierConfig, nil)
+	v, err := verifier.NewVerifier(verifierConfig)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new verifier: %w", err)
 	}
@@ -168,7 +168,7 @@ func prepareBlobs(
 
 		params, err := corev2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
 		require.NoError(t, err)
-		chunks, err := p.GetFrames(blob, params)
+		frames, _, err := p.GetFrames(blob, params)
 		require.NoError(t, err)
 		state, err := cst.GetOperatorState(ctx, uint(referenceBlockNumber), header.QuorumNumbers)
 
@@ -188,7 +188,7 @@ func prepareBlobs(
 				Bundle:          make([]*encoding.Frame, assignment.NumChunks()),
 			}
 			for i := uint32(0); i < assignment.NumChunks(); i++ {
-				shard.Bundle[i] = chunks[assignment.Indices[i]]
+				shard.Bundle[i] = frames[assignment.Indices[i]]
 			}
 
 			blobsMap[opID] = append(blobsMap[opID], shard)

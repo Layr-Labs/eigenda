@@ -217,6 +217,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_HEALTH_PROBE_PATH"),
 		Value:    "/tmp/controller-health",
 	}
+	ControllerHeartbeatMaxStallDurationFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "heartbeat-max-stall-duration"),
+		Usage:    "Maximum time allowed between heartbeats before a component is considered stalled",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "HEARTBEAT_MAX_STALL_DURATION"),
+		Value:    4 * time.Minute,
+	}
 	SignificantSigningThresholdPercentageFlag = cli.UintFlag{
 		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-percentage"),
 		Usage: "Percentage of stake that represents a 'significant' signing threshold. Currently used to track" +
@@ -249,7 +256,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
 		Usage:    "the port for the controller gRPC server",
 		Required: false,
-		Value:    "32001",
+		Value:    "32010",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PORT"),
 	}
 	GrpcMaxMessageSizeFlag = cli.IntFlag{
@@ -302,13 +309,6 @@ var (
 		Value:    1024,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVATION_PAYMENTS_LEDGER_CACHE_SIZE"),
 	}
-	ReservationBucketCapacityPeriodFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "reservation-bucket-capacity-period"),
-		Usage:    "Duration used to calculate bucket capacity for reservations",
-		Required: false,
-		Value:    60 * time.Second,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVATION_BUCKET_CAPACITY_PERIOD"),
-	}
 	PaymentVaultUpdateIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "payment-vault-update-interval"),
 		Usage:    "Interval for checking payment vault updates",
@@ -350,6 +350,7 @@ var optionalFlags = []cli.Flag{
 	DisperserKMSKeyIDFlag,
 	ControllerReadinessProbePathFlag,
 	ControllerHealthProbePathFlag,
+	ControllerHeartbeatMaxStallDurationFlag,
 	SignificantSigningThresholdPercentageFlag,
 	SignificantSigningMetricsThresholdsFlag,
 	EigenDAContractDirectoryAddressFlag,
@@ -364,7 +365,6 @@ var optionalFlags = []cli.Flag{
 	OnDemandPaymentsTableNameFlag,
 	OnDemandPaymentsLedgerCacheSizeFlag,
 	ReservationPaymentsLedgerCacheSizeFlag,
-	ReservationBucketCapacityPeriodFlag,
 	PaymentVaultUpdateIntervalFlag,
 }
 

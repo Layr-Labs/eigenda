@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"runtime"
 	"time"
 
@@ -41,6 +42,10 @@ type ServerV2 struct {
 
 	// The current software version.
 	softwareVersion *version.Semver
+
+	// Pre-created listeners for the gRPC servers
+	dispersalListener net.Listener
+	retrievalListener net.Listener
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -52,7 +57,9 @@ func NewServerV2(
 	ratelimiter common.RateLimiter,
 	registry *prometheus.Registry,
 	reader core.Reader,
-	softwareVersion *version.Semver) (*ServerV2, error) {
+	softwareVersion *version.Semver,
+	dispersalListener net.Listener,
+	retrievalListener net.Listener) (*ServerV2, error) {
 
 	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
@@ -91,7 +98,42 @@ func NewServerV2(
 		blobAuthenticator:  blobAuthenticator,
 		replayGuardian:     replayGuardian,
 		softwareVersion:    softwareVersion,
+		dispersalListener:  dispersalListener,
+		retrievalListener:  retrievalListener,
 	}, nil
+}
+
+// GetDispersalPort returns the port number the dispersal listener is bound to.
+func (s *ServerV2) GetDispersalPort() int {
+	if s.dispersalListener == nil {
+		return 0
+	}
+	return s.dispersalListener.Addr().(*net.TCPAddr).Port
+}
+
+// GetRetrievalPort returns the port number the retrieval listener is bound to.
+func (s *ServerV2) GetRetrievalPort() int {
+	if s.retrievalListener == nil {
+		return 0
+	}
+	return s.retrievalListener.Addr().(*net.TCPAddr).Port
+}
+
+// Stop shuts down the listeners
+func (s *ServerV2) Stop() {
+	s.logger.Info("ServerV2 stop requested")
+
+	if s.dispersalListener != nil {
+		if err := s.dispersalListener.Close(); err != nil {
+			s.logger.Warn("Failed to close dispersal listener", "error", err)
+		}
+	}
+
+	if s.retrievalListener != nil {
+		if err := s.retrievalListener.Close(); err != nil {
+			s.logger.Warn("Failed to close retrieval listener", "error", err)
+		}
+	}
 }
 
 func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (*pb.GetNodeInfoReply, error) {
@@ -355,7 +397,9 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 	}
 
 	if corev2.MaxQuorumID < in.GetQuorumId() {
-		return nil, api.NewErrorInvalidArg("invalid quorum ID")
+		//nolint: wrapcheck
+		return nil, api.NewErrorInvalidArg(
+			fmt.Sprintf("quorumID %d must be <= maxQuorumID %d", in.GetQuorumId(), corev2.MaxQuorumID))
 	}
 
 	// The current sampling scheme will store the same chunks for all quorums, so we always use quorum 0 as the quorum key in storage.

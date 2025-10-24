@@ -1,48 +1,45 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/Layr-Labs/eigenda/test/v2/load"
 )
 
 func main() {
-	if len(os.Args) != 3 {
-		panic(fmt.Sprintf("Expected 3 args, got %d. Usage: %s <env_file> <load_file>.\n"+
-			"If '-' is passed in lieu of a config file, the config file path is read from the environment variable "+
-			"$GENERATOR_ENV or $GENERATOR_LOAD, respectively.\n",
-			len(os.Args), os.Args[0]))
-	}
 
-	envFile := os.Args[1]
-	if envFile == "-" {
-		envFile = os.Getenv("GENERATOR_ENV")
-		if envFile == "" {
-			panic("$GENERATOR_ENV not set")
-		}
-	}
-
-	loadFile := os.Args[2]
-	if loadFile == "-" {
-		loadFile = os.Getenv("GENERATOR_LOAD")
-		if loadFile == "" {
-			panic("$GENERATOR_LOAD not set")
-		}
-	}
-
-	c, err := client.GetClient(envFile)
+	cfg, err := config.Bootstrap(
+		load.DefaultTrafficGeneratorConfig,
+		"TRAFFIC_GENERATOR_SIGNER_PRIVATE_KEY_HEX",
+		"TRAFFIC_GENERATOR_RPC_URLS",
+	)
 	if err != nil {
-		panic(fmt.Errorf("failed to get client: %w", err))
+		panic(fmt.Errorf("failed to bootstrap config: %w", err))
 	}
 
-	config, err := load.ReadConfigFile(loadFile)
+	loggerConfig := common.DefaultTextLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
-		panic(fmt.Errorf("failed to read config file %s: %w", loadFile, err))
+		panic(fmt.Errorf("failed to create logger: %w", err))
 	}
 
-	generator, err := load.NewLoadGenerator(config, c)
+	var metrics *client.TestClientMetrics
+	if !cfg.Environment.DisableMetrics {
+		metrics = client.NewTestClientMetrics(logger, cfg.Environment.MetricsPort)
+		metrics.Start()
+	}
+
+	testClient, err := client.NewTestClient(context.Background(), logger, metrics, &cfg.Environment)
+	if err != nil {
+		panic(fmt.Errorf("failed to create test client: %w", err))
+	}
+
+	generator, err := load.NewLoadGenerator(&cfg.Load, testClient)
 	if err != nil {
 		panic(fmt.Errorf("failed to create load generator: %w", err))
 	}

@@ -214,6 +214,8 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		return fmt.Errorf("payment state cannot be nil")
 	} else if paymentState.GetPaymentGlobalParams() == nil {
 		return fmt.Errorf("payment global params cannot be nil")
+	} else if paymentState.GetPaymentGlobalParams().GetReservationWindow() == 0 {
+		return fmt.Errorf("reservationWindow cannot be 0")
 	}
 
 	a.minNumSymbols = paymentState.GetPaymentGlobalParams().GetMinNumSymbols()

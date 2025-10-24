@@ -11,7 +11,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
-	"gopkg.in/yaml.v3"
+)
+
+const (
+	controllerGrpcPort = uint16(30000)
 )
 
 var logger = test.GetLogger()
@@ -221,12 +224,20 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e_v2_reservation",
 		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e_v2_ondemand",
 		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
+		DISPERSER_SERVER_CONTROLLER_ADDRESS:      fmt.Sprintf("localhost:%d", controllerGrpcPort),
 
 		// V2 inabox test is setup with a client that doesn't setup a client for some reason,
 		// so it calls the grpc GetBlobCommitment to generate commitments.
 		// DisperserV2 uses the V2 prover which always uses SRSOrder=2^28.
 		// So it needs the trailing g2 points to generate correct length commitments.
-		DISPERSER_SERVER_G2_TRAILING_PATH: "../resources/srs/g2.trailing.point",
+		DISPERSER_SERVER_G2_TRAILING_PATH:               "../resources/srs/g2.trailing.point",
+		DISPERSER_SERVER_ONCHAIN_STATE_REFRESH_INTERVAL: "1s",
+	}
+
+	if env.UseControllerMediatedPayments {
+		v.DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS = "true"
+	} else {
+		v.DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS = "false"
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -356,6 +367,17 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "5",
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
+	}
+
+	if env.UseControllerMediatedPayments {
+		v.CONTROLLER_GRPC_SERVER_ENABLE = "true"
+		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "true"
+		v.CONTROLLER_GRPC_PORT = fmt.Sprintf("%d", controllerGrpcPort)
+		v.CONTROLLER_ON_DEMAND_PAYMENTS_TABLE_NAME = "e2e_v2_ondemand"
+		v.CONTROLLER_PAYMENT_VAULT_UPDATE_INTERVAL = "1s"
+	} else {
+		v.CONTROLLER_GRPC_SERVER_ENABLE = "false"
+		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "false"
 	}
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
@@ -516,75 +538,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 	return v
 }
 
-// Used to generate a docker compose file corresponding to the test environment
-func (env *Config) genService(compose DockerCompose, name, image, envFile string, ports []string) {
-
-	for i, port := range ports {
-		ports[i] = port + ":" + port
-	}
-
-	compose.Services[name] = map[string]interface{}{
-		"image":    image,
-		"env_file": []string{envFile},
-		"ports":    ports,
-		"volumes": []string{
-			env.Path + ":/data",
-			env.rootPath + "/testbed/secrets:/secrets",
-			env.rootPath + "/resources/srs:/resources",
-		},
-		"extra_hosts": []string{
-			"host.docker.internal:host-gateway",
-		},
-	}
-}
-
-// Used to generate a docker compose file corresponding to the test environment
-func (env *Config) genNodeService(compose DockerCompose, name, image, envFile string, ports []string) {
-
-	for i, port := range ports {
-		ports[i] = port + ":" + port
-	}
-
-	compose.Services[name] = map[string]interface{}{
-		"image":    image,
-		"env_file": []string{envFile},
-		"volumes": []string{
-			env.Path + ":/data",
-			env.rootPath + "/testbed/secrets:/secrets",
-			env.rootPath + "/resources/srs:/resources",
-		},
-		"extra_hosts": []string{
-			"host.docker.internal:host-gateway",
-		},
-		// "environment": []string{
-		// 	"NODE_HOSTNAME=" + name,
-		// },
-	}
-
-	nginxService := name + "_nginx"
-	compose.Services[nginxService] = map[string]interface{}{
-		"image":    "nginx:latest",
-		"env_file": []string{envFile},
-		"environment": []string{
-			"REQUEST_LIMIT=1r/s",
-			"BURST_LIMIT=2",
-			"NODE_HOST=" + name,
-		},
-		"depends_on": []string{name},
-		"ports":      ports,
-		"volumes": []string{
-			env.rootPath + "/node/cmd/resources/nginx-local.conf:/etc/nginx/templates/default.conf.template:ro",
-		},
-	}
-}
-
-func genTelemetryServices(compose DockerCompose, name, image string, volumes []string) {
-	compose.Services[name] = map[string]interface{}{
-		"image":  image,
-		"volume": volumes,
-	}
-}
-
 func (env *Config) getPaths(name string) (logPath, dbPath, envFilename, envFile string) {
 	if env.Environment.IsLocal() {
 		logPath = ""
@@ -636,29 +589,18 @@ func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string)
 		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	// Create compose file
-	composeFile := env.Path + "/docker-compose.yml"
-	servicesMap := make(map[string]map[string]interface{})
-	compose := DockerCompose{
-		Services: servicesMap,
-	}
-
 	// Create participants
 	port := env.Services.BasePort
 
 	// Generate churners
 	name := "churner"
 	port += 2
-	logPath, _, filename, envFile := env.getPaths(name)
+	logPath, _, _, envFile := env.getPaths(name)
 	churnerConfig := env.generateChurnerVars(0, graphUrl, logPath, fmt.Sprint(port))
 	if err := writeEnv(churnerConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Churner = churnerConfig
-	env.genService(
-		compose, name, churnerImage,
-		filename, []string{fmt.Sprint(port)})
-
 	churnerUrl := fmt.Sprintf("%s:%s", churnerConfig.CHURNER_HOSTNAME, churnerConfig.CHURNER_GRPC_PORT)
 
 	// Generate disperser nodes
@@ -667,22 +609,19 @@ func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string)
 	port += 2
 
 	name = "dis0"
-	logPath, dbPath, filename, envFile := env.getPaths(name)
+	logPath, dbPath, _, envFile := env.getPaths(name)
 	disperserConfig := env.generateDisperserVars(0, logPath, dbPath, grpcPort)
 	if err := writeEnv(disperserConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Dispersers = append(env.Dispersers, disperserConfig)
-	env.genService(
-		compose, name, disImage,
-		filename, []string{grpcPort})
 
 	// v2 disperser
 	grpcPort = fmt.Sprint(port + 1)
 	port += 2
 
 	name = "dis1"
-	logPath, dbPath, filename, envFile = env.getPaths(name)
+	logPath, dbPath, _, envFile = env.getPaths(name)
 
 	// Convert key to address
 	disperserConfig = env.generateDisperserV2Vars(0, logPath, dbPath, grpcPort)
@@ -690,10 +629,6 @@ func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string)
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Dispersers = append(env.Dispersers, disperserConfig)
-
-	env.genService(
-		compose, name, disImage,
-		filename, []string{grpcPort})
 
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
 		metricsPort := fmt.Sprint(port + 1) // port
@@ -705,7 +640,7 @@ func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string)
 		port += 7
 
 		name := fmt.Sprintf("opr%v", i)
-		logPath, dbPath, filename, envFile := env.getPaths(name)
+		logPath, dbPath, _, envFile := env.getPaths(name)
 		key, _, err := env.getKey(name)
 		if err != nil {
 			return fmt.Errorf("failed to get key for %s: %w", name, err)
@@ -718,15 +653,11 @@ func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string)
 			return fmt.Errorf("failed to write env file: %w", err)
 		}
 		env.Operators = append(env.Operators, operatorConfig)
-
-		env.genNodeService(
-			compose, name, nodeImage,
-			filename, []string{dispersalPort, retrievalPort})
 	}
 
 	// Batcher
 	name = "batcher0"
-	logPath, _, filename, envFile = env.getPaths(name)
+	logPath, _, _, envFile = env.getPaths(name)
 	key, _, err := env.getKey(name)
 	if err != nil {
 		return fmt.Errorf("failed to get key for %s: %w", name, err)
@@ -737,34 +668,25 @@ func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string)
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Batcher = append(env.Batcher, batcherConfig)
-	env.genService(
-		compose, name, batcherImage,
-		filename, []string{})
 
 	// Encoders
 	// TODO: Add more encoders
 	name = "enc0"
-	_, _, filename, envFile = env.getPaths(name)
+	_, _, _, envFile = env.getPaths(name)
 	encoderConfig := env.generateEncoderVars(0, "34000")
 	if err := writeEnv(encoderConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Encoder = append(env.Encoder, encoderConfig)
-	env.genService(
-		compose, name, encoderImage,
-		filename, []string{"34000"})
 
 	// v2 encoder
 	name = "enc1"
-	_, _, filename, envFile = env.getPaths(name)
+	_, _, _, envFile = env.getPaths(name)
 	encoderConfig = env.generateEncoderV2Vars(0, "34001")
 	if err := writeEnv(encoderConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Encoder = append(env.Encoder, encoderConfig)
-	env.genService(
-		compose, name, encoderImage,
-		filename, []string{"34001"})
 
 	// Stakers
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
@@ -788,15 +710,12 @@ func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string)
 		name := fmt.Sprintf("relay%v", i)
 		grpcPort := fmt.Sprint(port + 1)
 		port += 2
-		_, _, filename, envFile := env.getPaths(name)
+		_, _, _, envFile := env.getPaths(name)
 		relayConfig := env.generateRelayVars(i, graphUrl, grpcPort)
 		if err := writeEnv(relayConfig.getEnvMap(), envFile); err != nil {
 			return fmt.Errorf("failed to write env file: %w", err)
 		}
 		env.Relays = append(env.Relays, relayConfig)
-		env.genService(
-			compose, name, relayImage,
-			filename, []string{grpcPort})
 	}
 
 	name = "retriever0"
@@ -829,33 +748,6 @@ func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string)
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Proxy = proxyConfig
-
-	if env.Environment.IsLocal() {
-
-		if env.Telemetry.IsNeeded {
-			// sd is required for accessing docker daemon
-			// agent.yaml configures the grafana agent
-			agentVolumes := append(
-				env.Telemetry.DockerSd,
-				env.Telemetry.ConfigPath+":/etc/agent/agent.yaml",
-			)
-
-			// run grafana agent
-			genTelemetryServices(compose, "grafana-agent", "grafana/agent", agentVolumes)
-			// run node exporter
-			genTelemetryServices(compose, "node-exporter", "prom/node-exporter", nil)
-		}
-
-		// Write to compose file
-		composeYaml, err := yaml.Marshal(&compose)
-		if err != nil {
-			return fmt.Errorf("error marshalling compose file: %w", err)
-		}
-
-		if err := writeFile(composeFile, composeYaml); err != nil {
-			return fmt.Errorf("error writing compose file: %w", err)
-		}
-	}
 
 	return nil
 }

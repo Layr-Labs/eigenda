@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -64,7 +64,7 @@ func makeBatch(
 			QuantizationFactor: batcher.QuantizationFactor,
 		}
 
-		params := encoding.ParamsFromMins(chunkLength, quorumInfo.Info.TotalChunks)
+		params := encoding.ParamsFromMins(uint64(chunkLength), quorumInfo.Info.TotalChunks)
 		t.Logf("Encoding params: ChunkLength: %d, NumChunks: %d", params.ChunkLength, params.NumChunks)
 		commits, chunks, err := p.EncodeAndProve(data, params)
 		assert.NoError(t, err)

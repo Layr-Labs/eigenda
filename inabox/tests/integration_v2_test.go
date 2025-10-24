@@ -37,7 +37,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	ctx := t.Context()
 	// mine finalization_delay # of blocks given sometimes registry coordinator updates can sometimes happen
 	// in-between the current_block_number - finalization_block_delay. This ensures consistent test execution.
-	mineAnvilBlocks(t, testHarness.RPCClient, 6)
+	integration.MineAnvilBlocks(t, testHarness.RPCClient, 6)
 
 	payload1 := randomPayload(992)
 	payload2 := randomPayload(123)
@@ -108,22 +108,27 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	// ensure that a verifier can't be added at the latest block number
 	latestBlock, err := testHarness.EthClient.BlockNumber(ctx)
 	require.NoError(t, err)
+
+	opts, unlock := testHarness.GetDeployerTransactOpts()
 	_, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
-		testHarness.DeployerTransactorOpts,
+		opts,
 		uint32(latestBlock),
 		gethcommon.HexToAddress("0x0"),
 	)
+	unlock()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), getSolidityFunctionSig("ABNNotInFuture(uint32)"))
 
 	// ensure that a verifier #2 can be added two blocks in the future where activation_block_number = latestBlock + 2
+	opts, unlock = testHarness.GetDeployerTransactOpts()
 	tx, err := testHarness.EigenDACertVerifierRouter.AddCertVerifier(
-		testHarness.DeployerTransactorOpts,
+		opts,
 		uint32(latestBlock)+2,
 		gethcommon.HexToAddress("0x0"),
 	)
+	unlock()
 	require.NoError(t, err)
-	mineAnvilBlocks(t, testHarness.RPCClient, 1)
+	integration.MineAnvilBlocks(t, testHarness.RPCClient, 1)
 
 	// ensure that tx successfully executed
 	err = validateTxReceipt(ctx, testHarness, tx.Hash())
@@ -140,7 +145,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.Equal(t, globalInfra.TestConfig.EigenDA.CertVerifier, verifier.String())
 
 	// progress anvil chain 10 blocks
-	mineAnvilBlocks(t, testHarness.RPCClient, 10)
+	integration.MineAnvilBlocks(t, testHarness.RPCClient, 10)
 
 	// disperse blob #3 to trigger the new cert verifier which should fail
 	// since the address is not a valid cert verifier and the GetQuorums call will fail
@@ -152,13 +157,15 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	latestBlock, err = testHarness.EthClient.BlockNumber(ctx)
 	require.NoError(t, err)
 
+	opts, unlock = testHarness.GetDeployerTransactOpts()
 	tx, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
-		testHarness.DeployerTransactorOpts,
+		opts,
 		uint32(latestBlock)+2,
 		gethcommon.HexToAddress(globalInfra.TestConfig.EigenDA.CertVerifier),
 	)
+	unlock()
 	require.NoError(t, err)
-	mineAnvilBlocks(t, testHarness.RPCClient, 10)
+	integration.MineAnvilBlocks(t, testHarness.RPCClient, 10)
 
 	err = validateTxReceipt(ctx, testHarness, tx.Hash())
 	require.NoError(t, err)

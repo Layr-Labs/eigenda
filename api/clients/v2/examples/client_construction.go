@@ -28,9 +28,9 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -219,6 +219,7 @@ func createValidatorPayloadRetriever(
 		logger,
 		ethReader,
 		chainState,
+		rs.NewEncoder(logger, nil),
 		kzgVerifier,
 		clientConfig,
 		nil,
@@ -285,9 +286,8 @@ func createDisperserClient(
 }
 
 func createKzgVerifier() (*verifier.Verifier, error) {
-	kzgConfigV1 := createKzgConfig()
-	kzgConfig := verifier.KzgConfigFromV1Config(&kzgConfigV1)
-	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	verifierConfig := createVerifierConfig()
+	blobVerifier, err := verifier.NewVerifier(&verifierConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create blob verifier: %w", err)
 	}
@@ -350,15 +350,10 @@ func createEthClient(logger logging.Logger) (*geth.EthClient, error) {
 		logger)
 }
 
-func createKzgConfig() kzg.KzgConfig {
+func createVerifierConfig() verifier.Config {
 	srsPath := "../../../../resources/srs"
-	return kzg.KzgConfig{
-		LoadG2Points:    true,
+	return verifier.Config{
 		G1Path:          filepath.Join(srsPath, "g1.point"),
-		G2Path:          filepath.Join(srsPath, "g2.point"),
-		G2TrailingPath:  filepath.Join(srsPath, "g2.trailing.point"),
-		CacheDir:        filepath.Join(srsPath, "SRSTables"),
-		SRSOrder:        encoding.SRSOrder,
 		SRSNumberToLoad: uint64(1<<13) / encoding.BYTES_PER_SYMBOL,
 		NumWorker:       4,
 	}

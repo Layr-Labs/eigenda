@@ -1,9 +1,27 @@
 dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
-.PHONY: run-e2e-tests start-inabox stop-inabox new-testdata-dir clean start-infra stop-infra start-services stop-services
+.PHONY: run-e2e-tests start-inabox stop-inabox new-testdata-dir clean start-infra stop-infra start-services stop-services run-payment-test
 
 # Starts a short-lived inabox devnet, and runs integration/e2e tests against it.
 run-e2e-tests:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
+
+# Uses the inabox framework to run tests of the payment system
+# Runs each test individually with cleanup between them to avoid teardown issues. This is an ugly workaround, and should
+# be removed as soon as we figure out why in-test teardown isn't always succeeding.
+run-payments-tests:
+	@for test in \
+		TestLegacyController \
+		TestNewController; do \
+		echo "Running $$test..."; \
+		if ! gotestsum --format pkgname-and-test-fails -- ./tests/payments -run "^$$test$$" -parallel=3; then \
+			echo "❌ TEST FAILED: $$test"; \
+			$(MAKE) -s stop-inabox; \
+			exit 1; \
+		fi; \
+		$(MAKE) -s stop-inabox; \
+	done; \
+	echo "========================================="; \
+	echo "✅ ALL PAYMENT TESTS PASSED"
 
 # Starts a long-lived inabox local devnet.
 # If you need to make configuration changes to inabox,

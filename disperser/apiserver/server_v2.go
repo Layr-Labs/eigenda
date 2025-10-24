@@ -20,7 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
@@ -143,7 +143,7 @@ func NewDispersalServerV2(
 		controllerConnection = connection
 		controllerClient = controller.NewControllerServiceClient(connection)
 
-		logger.Info("Using controller-based payment system")
+		logger.Info("Using controller-based payment system", "controller", controllerAddress)
 	} else {
 		logger.Info("Using legacy payment metering system")
 	}

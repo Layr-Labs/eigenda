@@ -9,65 +9,104 @@ import (
 	"os"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
-	"github.com/Layr-Labs/eigenda/encoding"
-	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
-	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/gammazero/workerpool"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/testcontainers/testcontainers-go"
 )
 
 // DisperserHarnessConfig contains the configuration for setting up the disperser harness
 type DisperserHarnessConfig struct {
-	TestConfig          *deploy.Config
-	TestName            string
-	LocalStackPort      string
-	V2MetadataTableName string
-	BlobStoreBucketName string // S3 bucket name for blob storage
+	Network        *testcontainers.DockerNetwork
+	TestConfig     *deploy.Config
+	TestName       string
+	LocalStackPort string
+
+	// S3 bucket name for blob storage
+	S3BucketName string
+
+	// V2 metadata table name
+	MetadataTableNameV2 string
+
+	// DynamoDB table name for on-demand payments, currently used by the controller.
+	OnDemandTableName string
 
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
+
+	// OperatorStateSubgraphURL is the URL for the operator state subgraph
+	OperatorStateSubgraphURL string
 }
 
-// TODO: Add api server, controller, batcher
+// DisperserHarness is the harness for spinning up the disperser infrastructure as goroutines.
+// It will only support V2 components of the disperser.
+// TODO: Add encoder, api server
 type DisperserHarness struct {
+	// LocalStack infrastructure for blobstore and metadata store
 	LocalStack     *testbed.LocalStackContainer
 	DynamoDBTables struct {
-		BlobMetaV2 string
+		BlobMetadataV2 string
 	}
 	S3Buckets struct {
 		BlobStore string
 	}
-	RelayInstances    []*RelayInstance
-	EncoderV2Instance *EncoderV2Instance
+
+	// Relay
+	RelayServers []*relay.Server
+
+	// Controller components
+	// TODO: Refactor into a single struct for controller components
+	EncodingManager  *controller.EncodingManager
+	Dispatcher       *controller.Dispatcher
+	ControllerServer *server.Server
 }
 
 // setupLocalStackResources initializes LocalStack and deploys AWS resources
-func setupV2LocalStackResources(
+func setupLocalStackResources(
 	ctx context.Context,
 	logger logging.Logger,
-	localstack *testbed.LocalStackContainer,
 	config DisperserHarnessConfig,
 ) (*testbed.LocalStackContainer, error) {
+	logger.Info("Setting up LocalStack for blob store")
+	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(
+		ctx,
+		testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       config.LocalStackPort,
+			Logger:         logger,
+			Network:        config.Network,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start localstack: %w", err)
+	}
+
 	// Deploy AWS resources (DynamoDB tables and S3 buckets)
 	logger.Info("Deploying AWS resources in LocalStack")
 	deployConfig := testbed.DeployResourcesConfig{
-		LocalStackEndpoint:  localstack.Endpoint(),
-		V2MetadataTableName: config.V2MetadataTableName,
-		BlobStoreBucketName: config.BlobStoreBucketName,
-		AWSConfig:           localstack.GetAWSClientConfig(),
+		LocalStackEndpoint:  localstackContainer.Endpoint(),
+		BlobStoreBucketName: config.S3BucketName,
+		V2MetadataTableName: config.MetadataTableNameV2,
+		AWSConfig:           localstackContainer.GetAWSClientConfig(),
 		Logger:              logger,
 	}
 	if err := testbed.DeployResources(ctx, deployConfig); err != nil {
@@ -75,15 +114,14 @@ func setupV2LocalStackResources(
 	}
 	logger.Info("AWS resources deployed successfully")
 
-	return localstack, nil
+	return localstackContainer, nil
 }
 
 // setupDisperserKeypairAndRegistrations generates disperser keypair and performs registrations
 func setupDisperserKeypairAndRegistrations(
 	logger logging.Logger,
 	ethClient common.EthClient,
-	config DisperserHarnessConfig,
-) error {
+	config DisperserHarnessConfig) error {
 	if config.TestConfig == nil {
 		return nil
 	}
@@ -107,24 +145,35 @@ func SetupDisperserHarness(
 	ctx context.Context,
 	logger logging.Logger,
 	ethClient common.EthClient,
-	localstack *testbed.LocalStackContainer,
 	config DisperserHarnessConfig,
 ) (*DisperserHarness, error) {
-	// Check if localstack resources are empty
-	if config.V2MetadataTableName == "" || config.BlobStoreBucketName == "" {
-		return nil, fmt.Errorf("missing name for localstack resources")
+	harness := &DisperserHarness{
+		RelayServers: make([]*relay.Server, 0),
 	}
 
-	harness := &DisperserHarness{
-		RelayInstances: make([]*RelayInstance, 0),
+	if config.OperatorStateSubgraphURL == "" {
+		return nil, fmt.Errorf("operator state subgraph URL is required")
+	}
+
+	// Set default values if not provided
+	if config.LocalStackPort == "" {
+		config.LocalStackPort = "4570"
+	}
+	if config.S3BucketName == "" {
+		config.S3BucketName = "test-eigenda-blobstore"
+	}
+	if config.MetadataTableNameV2 == "" {
+		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
+	}
+	if config.OnDemandTableName == "" {
+		config.OnDemandTableName = "e2e_v2_ondemand"
 	}
 
 	// Populate the harness tables and buckets metadata
-	harness.DynamoDBTables.BlobMetaV2 = config.V2MetadataTableName
-	harness.S3Buckets.BlobStore = config.BlobStoreBucketName
+	harness.DynamoDBTables.BlobMetadataV2 = config.MetadataTableNameV2
+	harness.S3Buckets.BlobStore = config.S3BucketName
 
-	// Setup LocalStack if not using in-memory blob store
-	localstack, err := setupV2LocalStackResources(ctx, logger, localstack, config)
+	localstack, err := setupLocalStackResources(ctx, logger, config)
 	if err != nil {
 		return nil, err
 	}
@@ -144,34 +193,22 @@ func SetupDisperserHarness(
 		logger.Warn("Relay count is not specified, skipping relay setup")
 	}
 
-	// Start encoder v2 instance
-	logger.Info("Starting encoder v2 instance")
-	encoderInstance, err := startEncoderV2(ctx, logger, harness, config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start encoder v2: %w", err)
+	// Start controller goroutine
+	if err := startController(ctx, ethClient, config.OperatorStateSubgraphURL, harness, config); err != nil {
+		return nil, fmt.Errorf("failed to start controller: %w", err)
 	}
-	harness.EncoderV2Instance = encoderInstance
+
+	// Start remaining binaries (disperser, encoder, batcher, etc.)
+	if config.TestConfig != nil {
+		logger.Info("Starting remaining binaries")
+		err := config.TestConfig.GenerateAllVariables("", "")
+		if err != nil {
+			return nil, fmt.Errorf("could not generate environment variables: %w", err)
+		}
+		config.TestConfig.StartBinaries(true) // true = for tests, will skip churner and operators
+	}
 
 	return harness, nil
-}
-
-// RelayInstance holds the state for a single relay
-// TODO(dmanc): This (or something similar) should live in the relay package instead of here.
-type RelayInstance struct {
-	Server   *relay.Server
-	Listener net.Listener
-	Port     string
-	URL      string
-	Logger   logging.Logger
-}
-
-// EncoderV2Instance holds the state for a single encoder v2
-type EncoderV2Instance struct {
-	Server   *encoder.EncoderServerV2
-	Listener net.Listener
-	Port     string
-	URL      string
-	Logger   logging.Logger
 }
 
 // startRelays starts all relay goroutines
@@ -217,10 +254,10 @@ func startRelays(
 
 	// Now start each relay with its pre-created listener
 	for i, listener := range listeners {
-		instance, err := startRelayWithListener(ctx, logger, ethClient, i, actualURLs[i], listener, harness, config)
+		instance, err := startRelayWithListener(ctx, ethClient, i, listener, harness, config)
 		if err != nil {
 			// Clean up any relays we started and all remaining listeners
-			stopAllRelays(harness.RelayInstances, logger)
+			stopAllRelays(harness.RelayServers, logger)
 			for j := i; j < len(listeners); j++ {
 				err := listeners[j].Close()
 				if err != nil {
@@ -229,7 +266,7 @@ func startRelays(
 			}
 			return fmt.Errorf("failed to start relay %d (%s): %w", i, actualURLs[i], err)
 		}
-		harness.RelayInstances = append(harness.RelayInstances, instance)
+		harness.RelayServers = append(harness.RelayServers, instance)
 		logger.Info("Started relay", "index", i, "url", actualURLs[i])
 	}
 
@@ -238,34 +275,31 @@ func startRelays(
 
 // Cleanup releases resources held by the DisperserHarness (excluding shared network)
 func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) {
-	// Stop relay goroutines
-	if len(dh.RelayInstances) > 0 {
-		logger.Info("Stopping relay goroutines")
-		stopAllRelays(dh.RelayInstances, logger)
+	// Stop controller components
+	if dh.ControllerServer != nil {
+		logger.Info("Stopping controller gRPC server")
+		dh.ControllerServer.Stop()
 	}
 
-	// Stop encoder v2 instance
-	if dh.EncoderV2Instance != nil {
-		logger.Info("Stopping encoder v2 instance")
-		dh.EncoderV2Instance.Logger.Info("Stopping encoder v2")
-		dh.EncoderV2Instance.Server.Close()
+	// Note: EncodingManager and Dispatcher don't have explicit Stop methods in the current implementation
+	// They will be cleaned up when the context is cancelled or the process exits
+
+	// Stop relay goroutines
+	if len(dh.RelayServers) > 0 {
+		logger.Info("Stopping relay goroutines")
+		stopAllRelays(dh.RelayServers, logger)
 	}
 }
 
-// startRelayWithListener starts a single relay with the given index, URL, and pre-created listener
+// startRelayWithListener starts a single relay with the given index and pre-created listener
 func startRelayWithListener(
 	ctx context.Context,
-	logger logging.Logger,
 	ethClient common.EthClient,
 	relayIndex int,
-	relayURL string,
 	listener net.Listener,
 	harness *DisperserHarness,
 	config DisperserHarnessConfig,
-) (*RelayInstance, error) {
-	// Extract port from the listener's address
-	port := fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
-
+) (*relay.Server, error) {
 	// Create logs directory
 	// TODO(dmanc): If possible we should have a centralized place for creating loggers and injecting them into the config.
 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
@@ -279,7 +313,7 @@ func startRelayWithListener(
 		return nil, fmt.Errorf("failed to open relay log file: %w", err)
 	}
 
-	// Create relay logger
+	// Create relay logger config for file output
 	loggerConfig := common.LoggerConfig{
 		Format:       common.TextLogFormat,
 		OutputWriter: io.MultiWriter(os.Stdout, logFile),
@@ -290,20 +324,27 @@ func startRelayWithListener(
 		},
 	}
 
-	relayLogger, err := common.NewLogger(&loggerConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create relay logger: %w", err)
-	}
-
 	// Create AWS clients using LocalStack container's configuration
 	awsConfig := harness.LocalStack.GetAWSClientConfig()
-	dynamoClient, err := dynamodb.NewClient(awsConfig, relayLogger)
+
+	// Create logger
+	logger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
+		_ = logFile.Close()
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	// Create DynamoDB client
+	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
+	if err != nil {
+		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
-	s3Client, err := s3.NewClient(ctx, awsConfig, relayLogger)
+	// Create S3 client
+	s3Client, err := s3.NewClient(ctx, awsConfig, logger)
 	if err != nil {
+		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
@@ -311,7 +352,7 @@ func startRelayWithListener(
 	metricsRegistry := prometheus.NewRegistry()
 
 	// Create metadata store
-	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, relayLogger, config.V2MetadataTableName)
+	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.MetadataTableNameV2)
 	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
 		ServiceName: "relay",
 		Registry:    metricsRegistry,
@@ -319,168 +360,97 @@ func startRelayWithListener(
 	})
 
 	// Create blob store and chunk reader
-	blobStore := blobstore.NewBlobStore(harness.S3Buckets.BlobStore, s3Client, relayLogger)
-	chunkReader := chunkstore.NewChunkReader(relayLogger, s3Client, harness.S3Buckets.BlobStore)
+	blobStore := blobstore.NewBlobStore(config.S3BucketName, s3Client, logger)
+	chunkReader := chunkstore.NewChunkReader(logger, s3Client, config.S3BucketName)
 
-	// Create eth writer and chain state
-	tx, err := coreeth.NewWriter(
-		relayLogger,
+	// Create eth writer
+	tx, err := eth.NewWriter(
+		logger,
 		ethClient,
 		config.TestConfig.EigenDA.OperatorStateRetriever,
 		config.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
+		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create eth writer: %w", err)
 	}
 
-	cs := coreeth.NewChainState(tx, ethClient)
-	ics := thegraph.MakeIndexedChainState(thegraph.Config{}, cs, relayLogger)
+	// Create chain state
+	cs := eth.NewChainState(tx, ethClient)
+	ics := thegraph.MakeIndexedChainState(thegraph.Config{}, cs, logger)
 
-	// Create relay configuration
-	// TODO(dmanc): In addition to loggers, we should have a centralized place for
-	// setting up configuration and injecting it into the harness config.
-	relayConfig := &relay.Config{
-		RelayKeys:                  []v2.RelayKey{v2.RelayKey(relayIndex)}, // Serve data for any shard
-		GRPCPort:                   mustParsePort(port),
-		MaxGRPCMessageSize:         1024 * 1024 * 300,
-		MetadataCacheSize:          1024 * 1024,
-		MetadataMaxConcurrency:     32,
-		BlobCacheBytes:             32 * 1024 * 1024,
-		BlobMaxConcurrency:         32,
-		ChunkCacheBytes:            32 * 1024 * 1024,
-		ChunkMaxConcurrency:        32,
-		MaxKeysPerGetChunksRequest: 1024,
-		RateLimits: limiter.Config{
-			MaxGetBlobOpsPerSecond:          1024,
-			GetBlobOpsBurstiness:            1024,
-			MaxGetBlobBytesPerSecond:        20 * 1024 * 1024,
-			GetBlobBytesBurstiness:          20 * 1024 * 1024,
-			MaxConcurrentGetBlobOps:         1024,
-			MaxGetChunkOpsPerSecond:         1024,
-			GetChunkOpsBurstiness:           1024,
-			MaxGetChunkBytesPerSecond:       20 * 1024 * 1024,
-			GetChunkBytesBurstiness:         20 * 1024 * 1024,
-			MaxConcurrentGetChunkOps:        1024,
-			MaxGetChunkOpsPerSecondClient:   8,
-			GetChunkOpsBurstinessClient:     8,
-			MaxGetChunkBytesPerSecondClient: 2 * 1024 * 1024,
-			GetChunkBytesBurstinessClient:   2 * 1024 * 1024,
-			MaxConcurrentGetChunkOpsClient:  1,
-		},
-		AuthenticationKeyCacheSize:   1024,
-		AuthenticationDisabled:       true, // Disabled for testing
-		GetChunksRequestMaxPastAge:   5 * time.Minute,
-		GetChunksRequestMaxFutureAge: 1 * time.Minute,
-		Timeouts: relay.TimeoutConfig{
-			GetChunksTimeout:               20 * time.Second,
-			GetBlobTimeout:                 20 * time.Second,
-			InternalGetMetadataTimeout:     5 * time.Second,
-			InternalGetBlobTimeout:         20 * time.Second,
-			InternalGetProofsTimeout:       5 * time.Second,
-			InternalGetCoefficientsTimeout: 20 * time.Second,
-		},
-		OnchainStateRefreshInterval: 10 * time.Second,
-		MetricsPort:                 9100 + relayIndex,
-		EnableMetrics:               true,
-		EnablePprof:                 false,
-		PprofHttpPort:               0,
-		MaxConnectionAge:            0,
-		MaxConnectionAgeGrace:       5 * time.Second,
-		MaxIdleConnectionAge:        30 * time.Second,
-	}
+	// Create relay test configuration
+	relayConfig := relay.NewTestConfig(relayIndex)
 
-	// Create relay server
+	// Create server
 	server, err := relay.NewServer(
 		ctx,
 		metricsRegistry,
-		relayLogger,
+		logger,
 		relayConfig,
 		metadataStore,
 		blobStore,
 		chunkReader,
 		tx,
 		ics,
+		listener,
 	)
 	if err != nil {
+		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create relay server: %w", err)
 	}
 
-	// Start the relay server in a goroutine using the pre-created listener
+	// Start server in background
 	go func() {
-		relayLogger.Info("Starting relay server with listener", "port", port)
-		if err := server.StartWithListener(ctx, listener); err != nil {
-			relayLogger.Error("Relay server failed", "error", err)
+		logger.Info("Starting relay server", "address", listener.Addr().String(), "logFile", logFilePath)
+		if err := server.Start(ctx); err != nil {
+			logger.Error("Relay server failed", "error", err)
 		}
 	}()
 
-	// Wait for server to be ready
-	time.Sleep(100 * time.Millisecond)
-	relayLogger.Info("Relay server started successfully", "port", port, "logFile", logFilePath)
+	// TODO(dmanc): Replace with proper health check endpoint
+	logger.Info("Relay server started successfully", "port", listener.Addr().(*net.TCPAddr).Port, "logFile", logFilePath)
 
-	return &RelayInstance{
-		Server:   server,
-		Listener: listener,
-		Port:     port,
-		URL:      relayURL,
-		Logger:   relayLogger,
-	}, nil
+	return server, nil
 }
 
-// stopAllRelays stops all relay instances
-func stopAllRelays(instances []*RelayInstance, logger logging.Logger) {
-	for i, instance := range instances {
-		if instance == nil {
+// stopAllRelays stops all relay servers
+func stopAllRelays(servers []*relay.Server, logger logging.Logger) {
+	for i, server := range servers {
+		if server == nil {
 			continue
 		}
-		logger.Info("Stopping relay", "index", i, "url", instance.URL)
-		instance.Logger.Info("Stopping relay")
-		// TODO: Add graceful shutdown of relay server once it's implemented
-		// For now, the context cancellation in TeardownInfrastructure will stop the server
+		logger.Info("Stopping relay", "index", i)
+		if err := server.Stop(); err != nil {
+			logger.Warn("Error stopping relay server", "index", i, "error", err)
+		}
 	}
 }
 
-// startEncoderV2 starts a single encoder v2 instance
-func startEncoderV2(
+// startController starts the controller components (encoding manager and dispatcher)
+func startController(
 	ctx context.Context,
-	logger logging.Logger,
+	ethClient common.EthClient,
+	operatorStateSubgraphURL string,
 	harness *DisperserHarness,
 	config DisperserHarnessConfig,
-) (*EncoderV2Instance, error) {
-	logger.Info("Starting encoder v2 instance")
-
-	// Get SRS paths using the same function as operator setup
-	g1Path, _, err := getSRSPaths()
-	if err != nil {
-		return nil, fmt.Errorf("failed to determine SRS file paths: %w", err)
+) error {
+	if config.TestConfig == nil {
+		return fmt.Errorf("test config is required to start controller")
 	}
-
-	// Pre-create listener with port 0 (OS assigns port)
-	listener, err := net.Listen("tcp", "0.0.0.0:0")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create listener for encoder v2: %w", err)
-	}
-
-	// Extract the actual port assigned by the OS
-	actualPort := listener.Addr().(*net.TCPAddr).Port
-	encoderURL := fmt.Sprintf("0.0.0.0:%d", actualPort)
-	port := fmt.Sprintf("%d", actualPort)
-
-	logger.Info("Created listener for encoder v2", "assigned_port", actualPort)
 
 	// Create logs directory
 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		_ = listener.Close()
-		return nil, fmt.Errorf("failed to create logs directory: %w", err)
+		return fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
-	logFilePath := fmt.Sprintf("%s/encoder_v2.log", logsDir)
+	logFilePath := fmt.Sprintf("%s/controller.log", logsDir)
 	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		_ = listener.Close()
-		return nil, fmt.Errorf("failed to open encoder v2 log file: %w", err)
+		return fmt.Errorf("failed to open controller log file: %w", err)
 	}
 
-	// Create encoder logger
+	// Create controller logger config for file output
 	loggerConfig := common.LoggerConfig{
 		Format:       common.TextLogFormat,
 		OutputWriter: io.MultiWriter(os.Stdout, logFile),
@@ -491,101 +461,285 @@ func startEncoderV2(
 		},
 	}
 
-	encoderLogger, err := common.NewLogger(&loggerConfig)
+	// Create logger
+	controllerLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
-		_ = listener.Close()
-		return nil, fmt.Errorf("failed to create encoder v2 logger: %w", err)
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Create AWS clients using LocalStack container's configuration
 	awsConfig := harness.LocalStack.GetAWSClientConfig()
-	s3Client, err := s3.NewClient(ctx, awsConfig, encoderLogger)
+
+	// Create DynamoDB client
+	dynamoClient, err := dynamodb.NewClient(awsConfig, controllerLogger)
 	if err != nil {
-		_ = listener.Close()
-		return nil, fmt.Errorf("failed to create s3 client: %w", err)
-	}
-
-	// Create blob store and chunk writer
-	blobStore := blobstore.NewBlobStore(harness.S3Buckets.BlobStore, s3Client, encoderLogger)
-	chunkWriter := chunkstore.NewChunkWriter(encoderLogger, s3Client, harness.S3Buckets.BlobStore, 4*1024*1024)
-
-	// Create prover with dynamically determined paths
-	// TODO(dmanc): Make these configurable
-	kzgConfig := &proverv2.KzgConfig{
-		SRSNumberToLoad: 10000,
-		G1Path:          g1Path,
-		LoadG2Points:    false, // Encoder doesn't need G2 points
-		PreloadEncoder:  false,
-		CacheDir:        fmt.Sprintf("testdata/%s/cache/encoder", config.TestName),
-		NumWorker:       1,
-		Verbose:         false,
-	}
-	encodingConfig := &encoding.Config{
-		BackendType: encoding.GnarkBackend,
-		GPUEnable:   false,
-		NumWorker:   1,
-	}
-
-	prover, err := proverv2.NewProver(kzgConfig, encodingConfig)
-	if err != nil {
-		_ = listener.Close()
-		return nil, fmt.Errorf("failed to create prover: %w", err)
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
 	// Create metrics registry
 	metricsRegistry := prometheus.NewRegistry()
-	metrics := encoder.NewMetrics(metricsRegistry, "9200", encoderLogger)
-	grpcMetrics := grpcprom.NewServerMetrics()
-	metricsRegistry.MustRegister(grpcMetrics)
 
-	// Create encoder server configuration
-	serverConfig := encoder.ServerConfig{
-		GrpcPort:              port,
-		MaxConcurrentRequests: 32,
-		RequestQueueSize:      100,
-		PreventReencoding:     false,
-		Backend:               "gnark",
-		GPUEnable:             false,
+	// Get available relays from config
+	availableRelays := make([]corev2.RelayKey, config.RelayCount)
+	for i := range config.RelayCount {
+		availableRelays[i] = corev2.RelayKey(i)
 	}
 
-	// Create encoder server
-	server := encoder.NewEncoderServerV2(
-		serverConfig,
-		blobStore,
-		chunkWriter,
-		encoderLogger,
-		prover,
-		metrics,
-		grpcMetrics,
-	)
-
-	// Start the encoder server in a goroutine using the pre-created listener
-	go func() {
-		encoderLogger.Info("Starting encoder v2 server with listener", "port", port)
-		if err := server.StartWithListener(listener); err != nil {
-			encoderLogger.Error("Encoder v2 server failed", "error", err)
-		}
-	}()
-
-	// Wait for server to be ready
-	time.Sleep(100 * time.Millisecond)
-	encoderLogger.Info("Encoder v2 server started successfully", "port", port, "logFile", logFilePath)
-
-	return &EncoderV2Instance{
-		Server:   server,
-		Listener: listener,
-		Port:     port,
-		URL:      encoderURL,
-		Logger:   encoderLogger,
-	}, nil
-}
-
-// mustParsePort parses a port string to an int, panicking on error
-func mustParsePort(portStr string) int {
-	var port int
-	_, err := fmt.Sscanf(portStr, "%d", &port)
+	requestSigner, err := clients.NewDispersalRequestSigner(
+		ctx,
+		clients.DispersalRequestSignerConfig{
+			Region:   awsConfig.Region,
+			Endpoint: awsConfig.EndpointURL,
+			KeyID:    config.TestConfig.DisperserKMSKeyID,
+		})
 	if err != nil {
-		panic(fmt.Sprintf("invalid port: %s", portStr))
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create dispersal request signer: %w", err)
 	}
-	return port
+
+	// Build encoding manager configs
+	encodingManagerConfig := controller.DefaultEncodingManagerConfig()
+	encodingManagerConfig.NumRelayAssignment = uint16(config.RelayCount)
+	encodingManagerConfig.AvailableRelays = availableRelays
+	encodingManagerConfig.EncoderAddress = "localhost:34001"
+
+	// Build dispatcher configs
+	dispatcherConfig := controller.DefaultDispatcherConfig()
+	dispatcherConfig.FinalizationBlockDelay = 5
+	dispatcherConfig.BatchMetadataUpdatePeriod = 100 * time.Millisecond
+
+	// Chain state config
+	chainStateConfig := thegraph.Config{
+		PullInterval: 100 * time.Millisecond,
+		MaxRetries:   5,
+	}
+	chainStateConfig.Endpoint = operatorStateSubgraphURL
+
+	// Create metadata store
+	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, controllerLogger, config.MetadataTableNameV2)
+	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+		ServiceName: "controller",
+		Registry:    metricsRegistry,
+		Backend:     blobstore.BackendDynamoDB,
+	})
+
+	// Create chain reader
+	chainReader, err := eth.NewReader(
+		controllerLogger,
+		ethClient,
+		config.TestConfig.EigenDA.OperatorStateRetriever,
+		config.TestConfig.EigenDA.ServiceManager)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create chain reader: %w", err)
+	}
+
+	// Create heartbeat channel
+	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
+
+	// Create encoder client
+	encoderClient, err := encoder.NewEncoderClientV2(encodingManagerConfig.EncoderAddress)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create encoder client: %w", err)
+	}
+
+	// Create encoding manager with workerpool and blob set
+	encodingPool := workerpool.New(encodingManagerConfig.NumConcurrentRequests)
+	encodingManagerBlobSet := controller.NewBlobSet()
+	encodingManager, err := controller.NewEncodingManager(
+		encodingManagerConfig,
+		metadataStore,
+		encodingPool,
+		encoderClient,
+		chainReader,
+		controllerLogger,
+		metricsRegistry,
+		encodingManagerBlobSet,
+		controllerLivenessChan,
+	)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create encoding manager: %w", err)
+	}
+
+	// Create signature aggregator
+	sigAgg, err := core.NewStdSignatureAggregator(controllerLogger, chainReader)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create signature aggregator: %w", err)
+	}
+
+	// Create dispatcher pool
+	dispatcherPool := workerpool.New(dispatcherConfig.NumConcurrentRequests)
+
+	// Create indexed chain state
+	chainState := eth.NewChainState(chainReader, ethClient)
+	ics := thegraph.MakeIndexedChainState(chainStateConfig, chainState, controllerLogger)
+
+	// Create node client manager
+	nodeClientManager, err := controller.NewNodeClientManager(
+		dispatcherConfig.NodeClientCacheSize,
+		requestSigner,
+		controllerLogger,
+	)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create node client manager: %w", err)
+	}
+
+	// Create batch metadata manager
+	batchMetadataManager, err := metadata.NewBatchMetadataManager(
+		ctx,
+		controllerLogger,
+		ethClient,
+		ics,
+		gethcommon.HexToAddress(config.TestConfig.EigenDA.RegistryCoordinator),
+		dispatcherConfig.BatchMetadataUpdatePeriod,
+		dispatcherConfig.FinalizationBlockDelay,
+	)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create batch metadata manager: %w", err)
+	}
+
+	// Create beforeDispatch callback to remove blobs from encoding manager's set
+	beforeDispatch := func(blobKey corev2.BlobKey) error {
+		encodingManagerBlobSet.RemoveBlob(blobKey)
+		return nil
+	}
+	dispatcherBlobSet := controller.NewBlobSet()
+
+	// Create dispatcher
+	dispatcher, err := controller.NewDispatcher(
+		dispatcherConfig,
+		metadataStore,
+		dispatcherPool,
+		ics,
+		batchMetadataManager,
+		sigAgg,
+		nodeClientManager,
+		controllerLogger,
+		metricsRegistry,
+		beforeDispatch,
+		dispatcherBlobSet,
+		controllerLivenessChan,
+	)
+	if err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to create dispatcher: %w", err)
+	}
+
+	// Recover state before starting
+	if err := controller.RecoverState(ctx, metadataStore, controllerLogger); err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to recover state: %w", err)
+	}
+
+	// Start encoding manager
+	if err := encodingManager.Start(ctx); err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to start encoding manager: %w", err)
+	}
+
+	// Start dispatcher
+	if err := dispatcher.Start(ctx); err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("failed to start dispatcher: %w", err)
+	}
+
+	// Store components in harness
+	harness.EncodingManager = encodingManager
+	harness.Dispatcher = dispatcher
+
+	// Build and start gRPC server if payments are enabled
+	if config.TestConfig.UseControllerMediatedPayments {
+		controllerLogger.Info("UseControllerMediatedPayments enabled - starting gRPC server")
+
+		// Create contract directory
+		contractDirectory, err := directory.NewContractDirectory(
+			ctx,
+			controllerLogger,
+			ethClient,
+			gethcommon.HexToAddress(config.TestConfig.EigenDA.EigenDADirectory),
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to create contract directory: %w", err)
+		}
+
+		// Build payment authorization handler
+		paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
+		paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
+		paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
+		paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
+
+		paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
+			ctx,
+			controllerLogger,
+			*paymentAuthConfig,
+			contractDirectory,
+			ethClient,
+			dynamoClient.GetAwsClient(),
+			metricsRegistry,
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to build payment authorization handler: %w", err)
+		}
+
+		// Create server config
+		grpcServerConfig, err := common.NewGRPCServerConfig(
+			true,
+			30000, // TODO(dmanc): inject listener instead
+			1024*1024,
+			5*time.Minute,
+			5*time.Minute,
+			3*time.Minute,
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to create gRPC server config: %w", err)
+		}
+
+		serverConfig, err := server.NewConfig(
+			grpcServerConfig,
+			true, // EnablePaymentAuthentication
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to create server config: %w", err)
+		}
+
+		// Create and start gRPC server
+		grpcServer, err := server.NewServer(
+			ctx,
+			serverConfig,
+			controllerLogger,
+			metricsRegistry,
+			paymentAuthorizationHandler,
+		)
+		if err != nil {
+			_ = logFile.Close()
+			return fmt.Errorf("failed to create gRPC server: %w", err)
+		}
+
+		go func() {
+			controllerLogger.Info("Starting controller gRPC server", "port", serverConfig.GrpcPort)
+			if err := grpcServer.Start(); err != nil {
+				controllerLogger.Error("gRPC server failed", "error", err)
+			}
+		}()
+
+		harness.ControllerServer = grpcServer
+		controllerLogger.Info("Controller gRPC server started successfully")
+	} else {
+		controllerLogger.Info("UseControllerMediatedPayments disabled - controller will not have server")
+	}
+
+	controllerLogger.Info("Controller components started successfully", "logFile", logFilePath)
+
+	return nil
 }

@@ -17,8 +17,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -189,7 +189,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKe
 
 	// Encode the data
 	encodingStart := time.Now()
-	frames, err := s.prover.GetFrames(data, encodingParams)
+	frames, _, err := s.prover.GetFrames(data, encodingParams)
 	if err != nil {
 		s.logger.Error("failed to encode frames", "error", err)
 		return nil, status.Errorf(codes.Internal, "encoding failed: %v", err)
