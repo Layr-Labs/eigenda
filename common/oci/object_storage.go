@@ -23,12 +23,12 @@ var (
 
 // ObjectStorageConfig holds configuration for OCI Object Storage
 type ObjectStorageConfig struct {
-	Namespace                   string `mapstructure:"namespace"`
-	Region                      string `mapstructure:"region"`
-	CompartmentID               string `mapstructure:"compartment_id"`
-	BucketName                  string `mapstructure:"bucket_name"`
-	FragmentParallelismConstant int    `mapstructure:"fragment_parallelism_constant"`
-	FragmentParallelismFactor   int    `mapstructure:"fragment_parallelism_factor"`
+	Namespace                   string
+	Region                      string
+	CompartmentID               string
+	BucketName                  string
+	FragmentParallelismConstant int
+	FragmentParallelismFactor   int
 }
 
 // ociClient implements the S3 Client interface using OCI Object Storage

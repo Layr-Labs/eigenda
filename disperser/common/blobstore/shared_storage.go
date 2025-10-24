@@ -59,9 +59,9 @@ type Config struct {
 	TableName  string
 	Backend    ObjectStorageBackend
 	// OCI-specific configuration
-	OCINamespace     string `mapstructure:"oci_namespace"`
-	OCIRegion        string `mapstructure:"oci_region"`
-	OCICompartmentID string `mapstructure:"oci_compartment_id"`
+	OCINamespace     string
+	OCIRegion        string
+	OCICompartmentID string
 }
 
 // This represents the s3 fetch result for a blob.
