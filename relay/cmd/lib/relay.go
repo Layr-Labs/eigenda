@@ -52,8 +52,11 @@ func RunRelay(cliCtx *cli.Context) error {
 
 	// Create object storage client (supports both S3 and OCI)
 	blobStoreConfig := blobstorefactory.Config{
-		BucketName: config.BucketName,
-		Backend:    blobstorefactory.ObjectStorageBackend(config.ObjectStorageBackend),
+		BucketName:       config.BucketName,
+		Backend:          blobstorefactory.ObjectStorageBackend(config.ObjectStorageBackend),
+		OCIRegion:        config.OCIRegion,
+		OCICompartmentID: config.OCICompartmentID,
+		OCINamespace:     config.OCINamespace,
 	}
 	objectStorageClient, err := blobstorefactory.CreateObjectStorageClient(
 		ctx, blobStoreConfig, config.AWS, logger)

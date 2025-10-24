@@ -42,6 +42,24 @@ var (
 		Value:    "s3",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OBJECT_STORAGE_BACKEND"),
 	}
+	OCIRegionFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-region"),
+		Usage:    "OCI region (only used when object-storage-backend is oci)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_REGION"),
+	}
+	OCICompartmentIDFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-compartment-id"),
+		Usage:    "OCI compartment ID (only used when object-storage-backend is oci)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_COMPARTMENT_ID"),
+	}
+	OCINamespaceFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-namespace"),
+		Usage:    "OCI namespace (only used when object-storage-backend is oci). If not provided, will be retrieved dynamically",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_NAMESPACE"),
+	}
 	MetricsHTTPPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
 		Usage:    "the http port which the metrics prometheus server is listening",
@@ -130,6 +148,9 @@ var optionalFlags = []cli.Flag{
 	EncoderVersionFlag,
 	S3BucketNameFlag,
 	ObjectStorageBackendFlag,
+	OCIRegionFlag,
+	OCICompartmentIDFlag,
+	OCINamespaceFlag,
 	GPUEnableFlag,
 	BackendFlag,
 	PreventReencodingFlag,

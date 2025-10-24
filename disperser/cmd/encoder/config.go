@@ -45,8 +45,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EncoderVersion:  EncoderVersion(version),
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		BlobStoreConfig: blobstore.Config{
-			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
-			Backend:    blobstore.ObjectStorageBackend(ctx.GlobalString(flags.ObjectStorageBackendFlag.Name)),
+			BucketName:       ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			Backend:          blobstore.ObjectStorageBackend(ctx.GlobalString(flags.ObjectStorageBackendFlag.Name)),
+			OCIRegion:        ctx.GlobalString(flags.OCIRegionFlag.Name),
+			OCICompartmentID: ctx.GlobalString(flags.OCICompartmentIDFlag.Name),
+			OCINamespace:     ctx.GlobalString(flags.OCINamespaceFlag.Name),
 		},
 		ChunkStoreConfig: chunkstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),

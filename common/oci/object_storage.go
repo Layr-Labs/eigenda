@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"runtime"
 	"sort"
 	"strings"
@@ -24,12 +23,12 @@ var (
 
 // ObjectStorageConfig holds configuration for OCI Object Storage
 type ObjectStorageConfig struct {
-	Namespace                   string
-	Region                      string
-	CompartmentID               string
-	BucketName                  string
-	FragmentParallelismConstant int
-	FragmentParallelismFactor   int
+	Namespace                   string `mapstructure:"namespace"`
+	Region                      string `mapstructure:"region"`
+	CompartmentID               string `mapstructure:"compartment_id"`
+	BucketName                  string `mapstructure:"bucket_name"`
+	FragmentParallelismConstant int    `mapstructure:"fragment_parallelism_constant"`
+	FragmentParallelismFactor   int    `mapstructure:"fragment_parallelism_factor"`
 }
 
 // ociClient implements the S3 Client interface using OCI Object Storage
@@ -63,31 +62,16 @@ func NewObjectStorageClient(
 		return nil, fmt.Errorf("failed to create OCI Object Storage client: %w", err)
 	}
 
-	// Fall back to standard OCI environment variables if application config is empty
+	// Get namespace dynamically if not provided in config
 	finalCfg := cfg
-	if finalCfg.Region == "" {
-		if region := os.Getenv("OCI_REGION"); region != "" {
-			finalCfg.Region = region
-		}
-	}
-	if finalCfg.CompartmentID == "" {
-		if compartmentID := os.Getenv("OCI_COMPARTMENT_ID"); compartmentID != "" {
-			finalCfg.CompartmentID = compartmentID
-		}
-	}
 	if finalCfg.Namespace == "" {
-		if namespace := os.Getenv("OCI_NAMESPACE"); namespace != "" {
-			finalCfg.Namespace = namespace
-		} else {
-			// Get namespace dynamically if not provided (like in the working example)
-			namespaceReq := objectstorage.GetNamespaceRequest{}
-			namespaceResp, err := objectStorageClient.GetNamespace(ctx, namespaceReq)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get OCI namespace: %w", err)
-			}
-			finalCfg.Namespace = *namespaceResp.Value
-			logger.Info("Retrieved OCI namespace dynamically", "namespace", finalCfg.Namespace)
+		namespaceReq := objectstorage.GetNamespaceRequest{}
+		namespaceResp, err := objectStorageClient.GetNamespace(ctx, namespaceReq)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get OCI namespace: %w", err)
 		}
+		finalCfg.Namespace = *namespaceResp.Value
+		logger.Info("Retrieved OCI namespace dynamically", "namespace", finalCfg.Namespace)
 	}
 
 	// Set region
