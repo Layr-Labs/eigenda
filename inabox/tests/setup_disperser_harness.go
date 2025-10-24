@@ -318,6 +318,14 @@ func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) 
 		logger.Info("Stopping relay goroutines")
 		stopAllRelays(dh.RelayServers, logger)
 	}
+
+	// Clean up LocalStack
+	if dh.LocalStack != nil {
+		logger.Info("Terminating LocalStack container")
+		if err := dh.LocalStack.Terminate(ctx); err != nil {
+			logger.Error("Failed to terminate LocalStack container", "error", err)
+		}
+	}
 }
 
 // startRelayWithListener starts a single relay with the given index and pre-created listener

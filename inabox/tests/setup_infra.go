@@ -175,13 +175,8 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	// Stop operator goroutines using the harness cleanup
 	infra.OperatorHarness.Cleanup(infra.Logger)
 
-	// Clean up disperser harness
+	// Clean up disperser harness (includes LocalStack termination)
 	infra.DisperserHarness.Cleanup(cleanupCtx, infra.Logger)
-
-	// Clean up localstack
-	if err := infra.SharedLocalStack.Terminate(cleanupCtx); err != nil {
-		infra.Logger.Error("Failed to terminate localstack container", "error", err)
-	}
 
 	// Clean up chain harness (churner and anvil)
 	infra.ChainHarness.Cleanup(cleanupCtx, infra.Logger)

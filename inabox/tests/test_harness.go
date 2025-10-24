@@ -29,7 +29,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -45,13 +44,10 @@ type InfrastructureHarness struct {
 	// Chain related components
 	ChainHarness ChainHarness
 
-	// Shared localstack container
-	SharedLocalStack *testbed.LocalStackContainer
-
 	// Operator related components
 	OperatorHarness OperatorHarness
 
-	// EigenDA V2 disperser components (includes relays)
+	// EigenDA V2 disperser components (includes relays and LocalStack)
 	DisperserHarness DisperserHarness
 
 	// Proxy
