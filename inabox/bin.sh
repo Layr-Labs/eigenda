@@ -270,8 +270,19 @@ function start_detached_for_tests {
         waiters="$waiters $!"
     done
 
-    # Skip encoder v2 - it runs as a goroutine in tests
-    echo "Skipping encoder v2 (running as goroutine in tests)"
+    for FILE in $(ls $testpath/envs/enc*.env); do
+        set -a
+        source $FILE
+        set +a
+        id=$(basename $FILE | tr -d -c 0-9)
+        ../disperser/bin/encoder > $testpath/logs/enc${id}.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+
+        ./wait-for 0.0.0.0:${DISPERSER_ENCODER_GRPC_PORT} -- echo "Encoder up" &
+        waiters="$waiters $!"
+    done
 
     for FILE in $(ls $testpath/envs/batcher*.env); do
         set -a

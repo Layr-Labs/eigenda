@@ -45,6 +45,9 @@ type DisperserHarnessConfig struct {
 	// S3 bucket name for blob storage
 	S3BucketName string
 
+	// V1 metadata table name
+	MetadataTableName string
+
 	// V2 metadata table name
 	MetadataTableNameV2 string
 
@@ -65,6 +68,7 @@ type DisperserHarness struct {
 	// LocalStack infrastructure for blobstore and metadata store
 	LocalStack     *testbed.LocalStackContainer
 	DynamoDBTables struct {
+		BlobMetadata   string
 		BlobMetadataV2 string
 	}
 	S3Buckets struct {
@@ -105,6 +109,7 @@ func setupLocalStackResources(
 	deployConfig := testbed.DeployResourcesConfig{
 		LocalStackEndpoint:  localstackContainer.Endpoint(),
 		BlobStoreBucketName: config.S3BucketName,
+		V1MetadataTableName: config.MetadataTableName,
 		V2MetadataTableName: config.MetadataTableNameV2,
 		AWSConfig:           localstackContainer.GetAWSClientConfig(),
 		Logger:              logger,
@@ -162,6 +167,9 @@ func SetupDisperserHarness(
 	if config.S3BucketName == "" {
 		config.S3BucketName = "test-eigenda-blobstore"
 	}
+	if config.MetadataTableName == "" {
+		config.MetadataTableName = "test-BlobMetadata"
+	}
 	if config.MetadataTableNameV2 == "" {
 		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
 	}
@@ -170,6 +178,7 @@ func SetupDisperserHarness(
 	}
 
 	// Populate the harness tables and buckets metadata
+	harness.DynamoDBTables.BlobMetadata = config.MetadataTableName
 	harness.DynamoDBTables.BlobMetadataV2 = config.MetadataTableNameV2
 	harness.S3Buckets.BlobStore = config.S3BucketName
 

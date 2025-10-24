@@ -6,20 +6,20 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/testcontainers/testcontainers-go/network"
 )
 
 // InfrastructureConfig contains the configuration for setting up the infrastructure
 type InfrastructureConfig struct {
-	TemplateName         string
-	TestName             string
-	Logger               logging.Logger
-	RootPath             string
-	S3BucketName         string
-	MetadataTableNameV2  string
-	OnDemandTableName    string
+	TemplateName        string
+	TestName            string
+	Logger              logging.Logger
+	RootPath            string
+	S3BucketName        string
+	MetadataTableName   string
+	MetadataTableNameV2 string
+	OnDemandTableName   string
 
 	// Number of relay instances to start, if not specified, no relays will be started.
 	RelayCount int
@@ -42,6 +42,9 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 
 	if config.S3BucketName == "" {
 		config.S3BucketName = "test-eigenda-blobstore"
+	}
+	if config.MetadataTableName == "" {
+		config.MetadataTableName = "test-BlobMetadata"
 	}
 	if config.MetadataTableNameV2 == "" {
 		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
@@ -116,6 +119,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 			TestName:            testName,
 			LocalStackPort:      infra.LocalStackPort,
 			S3BucketName:        config.S3BucketName,
+			MetadataTableName:   config.MetadataTableName,
 			MetadataTableNameV2: config.MetadataTableNameV2,
 			OnDemandTableName:   config.OnDemandTableName,
 			RelayCount:          config.RelayCount,
@@ -135,7 +139,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	} else {
 		logger.Info("Disperser deployment disabled, skipping disperser harness setup")
 	}
-
 
 	// Setup Operator Harness third (requires chain and disperser to be ready)
 	operatorHarnessConfig := &OperatorHarnessConfig{
