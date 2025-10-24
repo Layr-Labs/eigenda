@@ -54,7 +54,7 @@ func NewObjectStorageClient(
 	// Create OCI configuration provider using workload identity
 	configProvider, err := auth.OkeWorkloadIdentityConfigurationProvider()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create OCI workload identity provider: %w", err)
+		return nil, fmt.Errorf("failed to create OCI Object Storage client: %w", err)
 	}
 
 	// Create Object Storage client
