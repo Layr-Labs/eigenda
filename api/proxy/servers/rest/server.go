@@ -18,11 +18,18 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// ProxyConfig ... ProxyConfig is used by the /config endpoint
+type ProxyConfig struct {
+	Version           string `json:"version"`
+	RecencyWindowSize uint64 `json:"recencyWindowSize"`
+}
+
 // Config ... Config for the proxy HTTP server
 type Config struct {
 	Host        string
 	Port        int
 	APIsEnabled *enablement.RestApisEnabled
+	ProxyCfg    ProxyConfig
 }
 
 type Server struct {

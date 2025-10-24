@@ -35,7 +35,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 
 	log.Info("Starting EigenDA Proxy Service", "version", Version, "date", Date, "commit", Commit)
 
-	cfg, err := config.ReadAppConfig(cliCtx)
+	cfg, err := config.ReadAppConfig(cliCtx, Version)
 	if err != nil {
 		return fmt.Errorf("read cli config: %w", err)
 	}

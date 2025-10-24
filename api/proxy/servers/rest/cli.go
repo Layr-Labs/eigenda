@@ -59,10 +59,11 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 	return flags
 }
 
-func ReadConfig(ctx *cli.Context, apisEnabled *enablement.RestApisEnabled) Config {
+func ReadConfig(ctx *cli.Context, apisEnabled *enablement.RestApisEnabled, proxyCfg ProxyConfig) Config {
 	return Config{
 		Host:        ctx.String(ListenAddrFlagName),
 		Port:        ctx.Int(PortFlagName),
 		APIsEnabled: apisEnabled,
+		ProxyCfg:    proxyCfg,
 	}
 }
