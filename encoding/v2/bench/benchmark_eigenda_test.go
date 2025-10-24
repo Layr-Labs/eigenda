@@ -11,9 +11,14 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/icicle"
+	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs/backend"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs/backend/gnark"
+	rsicicle "github.com/Layr-Labs/eigenda/encoding/v2/rs/backend/icicle"
 	"github.com/Layr-Labs/eigenda/test/random"
 )
 
@@ -72,6 +77,43 @@ func BenchmarkCommittmentGeneration(b *testing.B) {
 				_, _, _, err := committer.GetCommitments(blob)
 				require.NoError(b, err)
 			}
+		})
+	}
+}
+
+// TODO(samlaf): maybe move this to benchmark_icicle_test.go file?
+// That file is currently metal only, we should generalize it.
+func BenchmarkRSBackendIcicle(b *testing.B) {
+	if !icicle.IsAvailable {
+		b.Skip("code compiled without the icicle build tag")
+	}
+	icicleBackend, err := rsicicle.BuildRSBackend(common.SilentLogger(), true)
+	require.NoError(b, err)
+	benchmarkRSBackend(b, icicleBackend)
+}
+
+func BenchmarkRSBackendGnark(b *testing.B) {
+	fs := fft.NewFFTSettings(24)
+	gnarkBackend := gnark.NewRSBackend(fs)
+	benchmarkRSBackend(b, gnarkBackend)
+}
+
+func benchmarkRSBackend(b *testing.B, rsBackend backend.RSEncoderBackend) {
+	rand := random.NewTestRandomNoPrint(1337)
+	blobCoeffs := rand.FrElements(1 << 22) // max size we benchmark below: 24+3-5=22
+	for _, blobPowerBytes := range []uint8{17, 20, 21, 24} {
+		// Reed-Solomon encoding with 8x redundancy: 2^3 = 8
+		rsExtendedBlobPowerBytes := blobPowerBytes + 3
+		rsExtendedBlobPowerFrs := rsExtendedBlobPowerBytes - 5 // 32 bytes per Fr element
+		b.Run("2^"+fmt.Sprint(rsExtendedBlobPowerFrs)+"_Frs", func(b *testing.B) {
+			numFrs := uint64(1) << rsExtendedBlobPowerFrs
+			// run multiple goroutines in parallel to better utilize the GPU
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					_, err := rsBackend.ExtendPolyEval(blobCoeffs[:numFrs])
+					require.NoError(b, err)
+				}
+			})
 		})
 	}
 }
