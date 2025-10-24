@@ -151,53 +151,72 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 	}
 }
 
+// TODO(samlaf): maybe move this to benchmark_icicle_test.go file?
+// That file is currently metal only, we should generalize it.
+func BenchmarkMultiproofGenerationIcicle(b *testing.B) {
+	if !icicle.IsAvailable {
+		b.Skip("code compiled without the icicle build tag")
+	}
+	encodingConfig := encoding.Config{
+		NumWorker:   uint64(runtime.NumCPU()),
+		BackendType: encoding.IcicleBackend,
+		GPUEnable:   true,
+	}
+	benchmarkMultiproofGeneration(b, encodingConfig)
+}
+
+func BenchmarkMultiproofGenerationGnark(b *testing.B) {
+	encodingConfig := encoding.Config{
+		NumWorker:   uint64(runtime.NumCPU()),
+		BackendType: encoding.GnarkBackend,
+		GPUEnable:   false,
+	}
+	benchmarkMultiproofGeneration(b, encodingConfig)
+}
+
 // The encoder service on the disperser generates a multiproof for each chunk.
 // This is the most intensive part of the encoding process.
-//
-// This Benchmark is very high-level, since GetFrames does both RS encoding and multiproof generation.
-// TODO(samlaf): refactor Prover to only do multiproof generation and keep RS encoding separate.
 //
 // The benchmark uses a silent logger, but you can switch to a normal logger to see
 // the log lines giving a breakdown of the different proof steps. E.g.:
 // Multiproof Time Decomp total=9.478006875s preproc=33.987083ms msm=1.496717042s fft1=5.912448708s fft2=2.034854042s
 // Where fft1 and fft2 are on G1, and preproc contains an FFT on Fr elements.
-func BenchmarkMultiproofFrameGeneration(b *testing.B) {
+func benchmarkMultiproofGeneration(b *testing.B, encodingConfig encoding.Config) {
 	proverConfig := prover.KzgConfig{
-		SRSNumberToLoad: 1 << 19,
+		// The loaded G1 point is not used because we require the SRSTables to be preloaded for the benchmark.
+		// We don't have enough SRS points in resourcs/srs/g1.point to compute the largest SRSTables anyways.
+		// Note that we can't input 0 here because the prover checks that at least 1 point is loaded.
+		// TODO(samlaf): fix this. We should be able to not load any G1 points if we are preloading the SRSTables.
+		SRSNumberToLoad: 1,
 		G1Path:          "../../../resources/srs/g1.point",
-		// we preload only the needed SRSTables right before b.Loop below.
-		PreloadEncoder: false,
+		// make sure to run `make download_srs_tables` to have the SRSTables available here.
+		PreloadEncoder: true,
 		CacheDir:       "../../../resources/srs/SRSTables",
 		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
 	}
+	b.Log("Reading precomputed SRSTables, this may take a while...")
 	// use a non-silent logger to see the "Multiproof Time Decomp" log lines.
-	p, err := prover.NewProver(common.SilentLogger(), &proverConfig, nil)
+	p, err := prover.NewProver(common.TestLogger(b), &proverConfig, &encodingConfig)
 	require.NoError(b, err)
 
-	// We only have 16MiBs of SRS points. Since we use blob_version=0's 8x coding
-	// ratio, we can encode blobs of size at most 2MiB (2^21 bytes).
-	for _, blobPower := range []uint64{17, 20, 21} {
-		b.Run("Multiproof_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
-			blobSizeBytes := uint64(1) << blobPower
+	rand := random.NewTestRandomNoPrint(1337)
+	maxSizeBlobCoeffs := rand.FrElements(1 << 22)
+
+	for _, blobPowerBytes := range []uint64{17, 20, 21, 24} {
+		b.Run("Multiproof_size_2^"+fmt.Sprint(blobPowerBytes)+"_bytes", func(b *testing.B) {
+			// Reed-Solomon encoding with 8x redundancy: 2^3 = 8
+			rsExtendedBlobPowerBytes := blobPowerBytes + 3
+			rsExtendedBlobPowerFrs := rsExtendedBlobPowerBytes - 5 // 32 bytes per Fr element
+			rsExtendedBlobFrs := uint64(1) << rsExtendedBlobPowerFrs
 			params := encoding.EncodingParams{
-				NumChunks:   8192,                            // blob_version=0
-				ChunkLength: max(1, blobSizeBytes*8/8192/32), // chosen such that numChunks*ChunkLength=blobSize
+				NumChunks:   8192,                           // blob_version=0
+				ChunkLength: max(1, rsExtendedBlobFrs/8192), // chosen such that numChunks*ChunkLength=rsExtendedBlobFrs
 			}
-
-			rand := random.NewTestRandomNoPrint(1337)
-			blobBytes := rand.Bytes(int(blobSizeBytes))
-			for i := 0; i < len(blobBytes); i += 32 {
-				blobBytes[i] = 0 // to make them Fr elements
-			}
-
-			// Run this before entering the benchmark loop to preload the SRSTable for the params size.
-			b.Log("Generating frames for one blob to preload SRSTable...")
-			_, _, err = p.GetFrames(blobBytes, params)
+			parametrizedProver, err := p.GetKzgProver(params)
 			require.NoError(b, err)
-			b.Log("Preloading done, starting benchmark...")
 
 			for b.Loop() {
-				_, _, err = p.GetFrames(blobBytes, params)
+				_, err = parametrizedProver.GetProofs(maxSizeBlobCoeffs[:rsExtendedBlobFrs])
 				require.NoError(b, err)
 			}
 		})
