@@ -215,12 +215,20 @@ func SetupDisperserHarness(
 	}
 
 	// Start encoder v2 goroutine
-	if err := startEncoderV2(ctx, harness, config); err != nil {
+	encoderAddress, err := startEncoderV2(ctx, harness, config)
+	if err != nil {
 		return nil, fmt.Errorf("failed to start encoder v2: %w", err)
 	}
 
 	// Start controller goroutine
-	if err := startController(ctx, ethClient, config.OperatorStateSubgraphURL, harness, config); err != nil {
+	if err := startController(
+		ctx,
+		ethClient,
+		config.OperatorStateSubgraphURL,
+		encoderAddress,
+		harness,
+		config,
+	); err != nil {
 		return nil, fmt.Errorf("failed to start controller: %w", err)
 	}
 
@@ -468,26 +476,26 @@ func stopAllRelays(servers []*relay.Server, logger logging.Logger) {
 	}
 }
 
-// startEncoderV2 starts the encoder v2 server as a goroutine
+// startEncoderV2 starts the encoder v2 server as a goroutine and returns its actual address
 func startEncoderV2(
 	ctx context.Context,
 	harness *DisperserHarness,
 	config DisperserHarnessConfig,
-) error {
+) (string, error) {
 	if config.TestConfig == nil {
-		return fmt.Errorf("test config is required to start encoder v2")
+		return "", fmt.Errorf("test config is required to start encoder v2")
 	}
 
 	// Create logs directory
 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create logs directory: %w", err)
+		return "", fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
 	logFilePath := fmt.Sprintf("%s/enc1.log", logsDir)
 	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open encoder log file: %w", err)
+		return "", fmt.Errorf("failed to open encoder log file: %w", err)
 	}
 
 	// Create encoder logger config for file output
@@ -505,7 +513,7 @@ func startEncoderV2(
 	encoderLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
 		_ = logFile.Close()
-		return fmt.Errorf("failed to create logger: %w", err)
+		return "", fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Create AWS clients using LocalStack container's configuration
@@ -515,7 +523,7 @@ func startEncoderV2(
 	s3Client, err := s3.NewClient(ctx, awsConfig, encoderLogger)
 	if err != nil {
 		_ = logFile.Close()
-		return fmt.Errorf("failed to create s3 client: %w", err)
+		return "", fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
 	// Create metrics registry
@@ -533,7 +541,7 @@ func startEncoderV2(
 	g1Path, _, err := getSRSPaths()
 	if err != nil {
 		_ = logFile.Close()
-		return fmt.Errorf("failed to determine SRS file paths: %w", err)
+		return "", fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}
 
 	// Construct cache directory path from g1Path
@@ -557,7 +565,7 @@ func startEncoderV2(
 	proverV2, err := prover.NewProver(encoderLogger, &kzgConfig, encodingConfig)
 	if err != nil {
 		_ = logFile.Close()
-		return fmt.Errorf("failed to create prover: %w", err)
+		return "", fmt.Errorf("failed to create prover: %w", err)
 	}
 
 	// Create blob store
@@ -569,7 +577,6 @@ func startEncoderV2(
 
 	// Create encoder server config
 	serverConfig := encoder.ServerConfig{
-		GrpcPort:              "34001",
 		MaxConcurrentRequests: 16,
 		RequestQueueSize:      32,
 		PreventReencoding:     true,
@@ -588,12 +595,18 @@ func startEncoderV2(
 		grpcMetrics,
 	)
 
-	// Pre-create listener
-	listener, err := net.Listen("tcp", "0.0.0.0:34001")
+	// Pre-create listener with port 0 (OS assigns random port)
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
 	if err != nil {
 		_ = logFile.Close()
-		return fmt.Errorf("failed to create listener for encoder v2: %w", err)
+		return "", fmt.Errorf("failed to create listener for encoder v2: %w", err)
 	}
+
+	// Extract the actual port assigned by the OS
+	actualPort := listener.Addr().(*net.TCPAddr).Port
+	actualAddress := fmt.Sprintf("localhost:%d", actualPort)
+
+	encoderLogger.Info("Created listener for encoder v2", "assigned_port", actualPort, "address", actualAddress)
 
 	// Start encoder server in background
 	go func() {
@@ -606,9 +619,9 @@ func startEncoderV2(
 	// Store encoder in harness
 	harness.EncoderServerV2 = encoderServerV2
 
-	encoderLogger.Info("Encoder v2 server started successfully", "logFile", logFilePath)
+	encoderLogger.Info("Encoder v2 server started successfully", "address", actualAddress, "logFile", logFilePath)
 
-	return nil
+	return actualAddress, nil
 }
 
 // startController starts the controller components (encoding manager and dispatcher)
@@ -616,6 +629,7 @@ func startController(
 	ctx context.Context,
 	ethClient common.EthClient,
 	operatorStateSubgraphURL string,
+	encoderAddress string,
 	harness *DisperserHarness,
 	config DisperserHarnessConfig,
 ) error {
@@ -688,7 +702,7 @@ func startController(
 	encodingManagerConfig := controller.DefaultEncodingManagerConfig()
 	encodingManagerConfig.NumRelayAssignment = uint16(config.RelayCount)
 	encodingManagerConfig.AvailableRelays = availableRelays
-	encodingManagerConfig.EncoderAddress = "localhost:34001"
+	encodingManagerConfig.EncoderAddress = encoderAddress
 
 	// Build dispatcher configs
 	dispatcherConfig := controller.DefaultDispatcherConfig()

@@ -13,7 +13,6 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -78,17 +77,6 @@ func NewEncoderServerV2(
 	}
 }
 
-func (s *EncoderServerV2) Start() error {
-	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("Could not start tcp listener: %v", err)
-	}
-
-	return s.StartWithListener(listener)
-}
-
 // StartWithListener starts the server using the provided listener. This method will block until the server is stopped.
 func (s *EncoderServerV2) StartWithListener(listener net.Listener) error {
 	gs := grpc.NewServer(
@@ -112,7 +100,7 @@ func (s *EncoderServerV2) StartWithListener(listener net.Listener) error {
 		gs.GracefulStop()
 	}
 
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	s.logger.Info("address", listener.Addr().String(), "GRPC Listening")
 	return gs.Serve(listener)
 }
 

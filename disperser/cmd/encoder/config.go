@@ -53,7 +53,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EncoderConfig: kzg.ReadCLIConfig(ctx),
 		LoggerConfig:  *loggerConfig,
 		ServerConfig: &encoder.ServerConfig{
-			GrpcPort:                 ctx.GlobalString(flags.GrpcPortFlag.Name),
 			MaxConcurrentRequests:    ctx.GlobalInt(flags.MaxConcurrentRequestsFlag.Name),
 			RequestPoolSize:          ctx.GlobalInt(flags.RequestPoolSizeFlag.Name),
 			RequestQueueSize:         ctx.GlobalInt(flags.RequestQueueSizeFlag.Name),

@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	commonpprof "github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
@@ -71,6 +73,13 @@ func RunEncoderServer(ctx *cli.Context) error {
 		reg.MustRegister(grpcMetrics)
 	}
 
+	// Start pprof server if enabled (works for both v1 and v2)
+	pprofProfiler := commonpprof.NewPprofProfiler(config.ServerConfig.PprofHttpPort, logger)
+	if config.ServerConfig.EnablePprof {
+		go pprofProfiler.Start()
+		logger.Info("Enabled pprof for encoder server", "port", config.ServerConfig.PprofHttpPort)
+	}
+
 	backendType, err := encoding.ParseBackendType(config.ServerConfig.Backend)
 	if err != nil {
 		return err
@@ -83,22 +92,35 @@ func RunEncoderServer(ctx *cli.Context) error {
 		NumWorker:   config.EncoderConfig.NumWorker,
 	}
 
+	// Read the GRPC port from flags
+	grpcPort := ctx.GlobalString(flags.GrpcPortFlag.Name)
+
+	// Create listener
+	addr := fmt.Sprintf("0.0.0.0:%s", grpcPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("failed to create listener on %s: %w", addr, err)
+	}
+
 	if config.EncoderVersion == V2 {
 		// We no longer load the G2 points in V2 because the KZG commitments are computed
 		// on the API server side.
 		config.EncoderConfig.LoadG2Points = false
 		prover, err := proverv2.NewProver(logger, proverv2.KzgConfigFromV1Config(&config.EncoderConfig), encodingConfig)
 		if err != nil {
+			_ = listener.Close()
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
 
 		s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
 		if err != nil {
+			_ = listener.Close()
 			return err
 		}
 
 		blobStoreBucketName := config.BlobStoreConfig.BucketName
 		if blobStoreBucketName == "" {
+			_ = listener.Close()
 			return fmt.Errorf("blob store bucket name is required")
 		}
 
@@ -119,16 +141,19 @@ func RunEncoderServer(ctx *cli.Context) error {
 			grpcMetrics,
 		)
 
-		return server.Start()
+		logger.Info("Starting encoder v2 server", "address", listener.Addr().String())
+		return fmt.Errorf("failed to start encoder v2 server: %w", server.StartWithListener(listener))
 	}
 
 	config.EncoderConfig.LoadG2Points = true
 	prover, err := prover.NewProver(&config.EncoderConfig, encodingConfig)
 	if err != nil {
+		_ = listener.Close()
 		return fmt.Errorf("failed to create encoder: %w", err)
 	}
 
 	server := encoder.NewEncoderServer(*config.ServerConfig, logger, prover, metrics, grpcMetrics)
 
-	return server.Start()
+	logger.Info("Starting encoder v1 server", "address", listener.Addr().String())
+	return fmt.Errorf("failed to start encoder v1 server: %w", server.StartWithListener(listener))
 }
