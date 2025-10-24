@@ -29,9 +29,6 @@ type Config struct {
 	// ObjectStorageBackend is the backend to use for object storage (s3 or oci). Default is "s3".
 	ObjectStorageBackend string
 
-	// OCINamespace is the OCI namespace (optional).
-	OCINamespace string
-
 	// MetadataTableName is the name of the DynamoDB table that stores metadata. Default is "metadata".
 	MetadataTableName string
 
@@ -62,7 +59,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		AWS:                  awsClientConfig,
 		BucketName:           ctx.String(flags.BucketNameFlag.Name),
 		ObjectStorageBackend: ctx.String(flags.ObjectStorageBackendFlag.Name),
-		OCINamespace:         ctx.String(flags.OCINamespaceFlag.Name),
 		MetadataTableName:    ctx.String(flags.MetadataTableNameFlag.Name),
 		RelayConfig: relay.Config{
 			RelayKeys:                  make([]core.RelayKey, len(relayKeys)),

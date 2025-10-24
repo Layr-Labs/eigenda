@@ -56,7 +56,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
 
-	s3Client, err := blobstore.CreateObjectStorageClient(
+	objectStorageClient, err := blobstore.CreateObjectStorageClient(
 		context.Background(), config.BlobstoreConfig, config.AwsClientConfig, logger)
 	if err != nil {
 		return err
@@ -146,7 +146,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			Registry:    reg,
 			Backend:     blobstorev2.BackendDynamoDB,
 		})
-		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
+		blobStore := blobstorev2.NewBlobStore(bucketName, objectStorageClient, logger)
 
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
@@ -172,7 +172,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 	}
 
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
-	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+	blobStore := blobstore.NewSharedStorage(bucketName, objectStorageClient, blobMetadataStore, logger)
 
 	grpcMetrics := grpcprom.NewServerMetrics()
 	metrics := disperser.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)
