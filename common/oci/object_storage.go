@@ -121,6 +121,12 @@ func NewObjectStorageClient(
 	}, nil
 }
 
+// NOTE: The methods below have 0% test coverage because they all require live OCI credentials
+// and network access to Oracle Cloud. We could refactor to use dependency injection with
+// interfaces, but that adds complexity for minimal benefit since these are just thin wrappers
+// around the OCI SDK. The utility functions (GetFragmentCount, RecombineFragments) and
+// config processing in NewObjectStorageClient have good coverage where it matters.
+
 func (c *ociClient) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
 	getObjectRequest := objectstorage.GetObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),

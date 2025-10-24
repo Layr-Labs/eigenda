@@ -12,11 +12,11 @@ import (
 // mockLogger is a simple mock logger for testing
 type mockLogger struct{}
 
-func (m *mockLogger) Debug(msg string, args ...interface{})   {}
-func (m *mockLogger) Info(msg string, args ...interface{})    {}
-func (m *mockLogger) Warn(msg string, args ...interface{})    {}
-func (m *mockLogger) Error(msg string, args ...interface{})   {}
-func (m *mockLogger) Fatal(msg string, args ...interface{})   {}
+func (m *mockLogger) Debug(msg string, args ...interface{})       {}
+func (m *mockLogger) Info(msg string, args ...interface{})        {}
+func (m *mockLogger) Warn(msg string, args ...interface{})        {}
+func (m *mockLogger) Error(msg string, args ...interface{})       {}
+func (m *mockLogger) Fatal(msg string, args ...interface{})       {}
 func (m *mockLogger) Debugf(template string, args ...interface{}) {}
 func (m *mockLogger) Infof(template string, args ...interface{})  {}
 func (m *mockLogger) Warnf(template string, args ...interface{})  {}
