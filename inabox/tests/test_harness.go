@@ -35,10 +35,6 @@ type InfrastructureHarness struct {
 	// Operator related components
 	OperatorHarness OperatorHarness
 
-	// EigenDA V1 disperser related components
-	// Note: Once V1 is deprecated, we can remove this component
-	DisperserV1Harness DisperserV1Harness
-
 	// EigenDA V2 disperser components (includes relays)
 	DisperserHarness DisperserHarness
 

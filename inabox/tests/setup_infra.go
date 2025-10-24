@@ -17,10 +17,6 @@ type InfrastructureConfig struct {
 	TestName     string
 	Logger       logging.Logger
 
-	// V1 disperser related configuration
-	V1MetadataTableName string
-	BucketTableName     string
-
 	// V2 disperser related configuration
 	V2MetadataTableName string
 	BlobStoreBucketName string
@@ -32,17 +28,11 @@ type InfrastructureConfig struct {
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
 // This includes containers for Anvil, LocalStack, GraphNode, and the Churner server.
 func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*InfrastructureHarness, error) {
-	if config.V1MetadataTableName == "" {
-		config.V1MetadataTableName = "test-BlobMetadata"
-	}
 	if config.V2MetadataTableName == "" {
 		config.V2MetadataTableName = "test-BlobMetadata-v2"
 	}
 	if config.BlobStoreBucketName == "" {
 		config.BlobStoreBucketName = "test-eigenda-blobstore"
-	}
-	if config.BucketTableName == "" {
-		config.BucketTableName = "test-BucketStore"
 	}
 
 	logger := config.Logger
@@ -120,23 +110,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		return nil, setupErr
 	}
 
-	// Setup Disperser Harness (V1) (DynamoDB tables, S3 buckets, encoders)
-	disperserV1HarnessConfig := &DisperserV1HarnessConfig{
-		TestConfig: testConfig,
-		TestName:   testName,
-
-		// LocalStack resources
-		V1MetadataTableName: config.V1MetadataTableName,
-		BucketTableName:     config.BucketTableName,
-		BlobStoreBucketName: config.BlobStoreBucketName,
-	}
-	disperserV1Harness, err := SetupDisperserV1Harness(infraCtx, logger, sharedLocalStack, *disperserV1HarnessConfig)
-	if err != nil {
-		setupErr = fmt.Errorf("failed to setup disperser v1 harness: %w", err)
-		return nil, setupErr
-	}
-	infra.DisperserV1Harness = *disperserV1Harness
-
 	// Setup Disperser Harness (V2) (DynamoDB tables, S3 buckets, relays, encoders)
 	disperserHarnessConfig := &DisperserHarnessConfig{
 		TestConfig: testConfig,
@@ -166,10 +139,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 		config.Logger.Info("Starting remaining binaries")
 		// Get encoder addresses, using empty string if instances are nil
 		// TODO(dmanc): This is a hack to get the tests to pass when using in-memory blob store, we should refactor this.
-		encoderV1Address := ""
-		if disperserV1Harness.EncoderV1Instance != nil {
-			encoderV1Address = disperserV1Harness.EncoderV1Instance.URL
-		}
+		encoderV1Address := "" // V1 disperser no longer supported
 		encoderV2Address := ""
 		if disperserHarness.EncoderV2Instance != nil {
 			encoderV2Address = disperserHarness.EncoderV2Instance.URL
@@ -223,9 +193,6 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 
 	// Clean up disperser harness (graph node and localstack)
 	infra.DisperserHarness.Cleanup(cleanupCtx, infra.Logger)
-
-	// Clean up disperser v1 harness
-	infra.DisperserV1Harness.Cleanup(cleanupCtx, infra.Logger)
 
 	// Clean up localstack
 	if err := infra.SharedLocalStack.Terminate(cleanupCtx); err != nil {
