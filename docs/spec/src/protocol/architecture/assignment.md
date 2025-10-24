@@ -51,10 +51,10 @@ The multi-quorum assignment algorithm consists of four key functions:
 This algorithm guarantees that validators participating in both quorums store only `max(chunks_in_quorum_1, chunks_in_quorum_2)` unique chunks rather than the sum.
 
 **3. MergeAssignmentsAndCap:** Merges assignments across all quorums and caps the total at the reconstruction threshold:
-$
+```math
 \text{max\_chunks} = c / r
-$,
-where $c$ is the total number of chunks and $r$ is the coding rate. This cap exists because once an operator has enough unique chunks to reconstruct the blob, additional chunks provide no incremental benefit.
+```
+ where $c$ is the total number of chunks and $r$ is the coding rate. This cap exists because once an operator has enough unique chunks to reconstruct the blob, additional chunks provide no incremental benefit.
 
 **4. GetAssignmentsForBlob:** Coordinates the full multi-quorum assignment process:
 1. Generate the assignment for quorum 0 using `GetAssignmentsForQuorum`
