@@ -1,13 +1,10 @@
 ## Assignment Module
 
-The assignment module determines how encoded blob chunks are allocated to DA operators based on the Ethereum chain state, specifically operator stakes and quorum memberships. Given the operator state and blob parameters, it produces a deterministic mapping from operators to chunk indices.
+The assignment module determines how encoded blob chunks are allocated to validators based on the Ethereum chain state, specifically validator stakes and quorum memberships. Given the validator state and blob parameters, it produces a deterministic mapping from validators to chunk indices. The mapping ensures that a sufficient number of signatures and honest validators implies that data is available.
 
 The assignment module is implemented in `core/v2/assignment.go`. For blobs dispersed to multiple quorums, the algorithm employs overlap optimization to minimize storage requirements while maintaining security guarantees. 
 
-![image](../../assets/assignment-module.png)
-
-
-### Chunk Assignment Algorithm for a Single Quorum
+### Chunk Assignment Algorithm within One Quorum
 
 The chunk assignment scheme assigns encoded chunks to validators proportionally to their stake, ensuring that any coalition of validators with sufficient combined stake can reconstruct the blob.
 
@@ -24,7 +21,7 @@ The proof that any subset of validators with sufficient combined stake can recon
 
 ### Chunk Assignment for Multiple Quorums
 
-EigenDA supports blobs dispersed to multiple quorums simultaneously. The security threshold is guaranteed to hold for each quorum independently. The multi-quorum assignment algorithm minimizes storage requirements through overlap optimization while maintaining security guarantees.
+EigenDA supports blobs dispersed to multiple quorums simultaneously. The security threshold is guaranteed to hold for each quorum independently, as shown in the previous section. The multi-quorum assignment algorithm minimizes storage requirements through overlap optimization while maintaining security guarantees.
 
 #### Storage Optimization Strategy
 
@@ -44,9 +41,9 @@ The multi-quorum assignment algorithm consists of four key functions:
 
 **2. AddAssignmentsForQuorum:** Generates the assignment for a new quorum while maximizing overlap with a baseline quorum assignment through a two-phase process:
 
-- **Phase 1 (Overlap Maximization):** For each operator, reuse as many chunk indices as possible from the baseline quorum assignment, up to the number required for the new quorum. Mark these reused indices as "used."
+- **Phase 1 (Overlap Maximization):** For each validator, reuse as many chunk indices as possible from the baseline quorum assignment, up to the number required for the new quorum. Mark these reused indices as "used."
 
-- **Phase 2 (Gap Filling):** Distribute the remaining unused chunk indices to operators who need additional chunks beyond what was reused from the baseline, ensuring each operator receives their stake-proportional allocation in the new quorum.
+- **Phase 2 (Gap Filling):** Distribute the remaining unused chunk indices to validators who need additional chunks beyond what was reused from the baseline, ensuring each validator receives their stake-proportional allocation in the new quorum.
 
 This algorithm guarantees that validators participating in both quorums store only `max(chunks_in_quorum_1, chunks_in_quorum_2)` unique chunks rather than the sum.
 
@@ -54,7 +51,7 @@ This algorithm guarantees that validators participating in both quorums store on
 ```math
 \text{max\_chunks} = c / r
 ```
- where $c$ is the total number of chunks and $r$ is the coding rate. This cap exists because once an operator has enough unique chunks to reconstruct the blob, additional chunks provide no incremental benefit.
+ where $c$ is the total number of chunks and $r$ is the coding rate. This cap exists because once a validator has enough unique chunks to reconstruct the blob, additional chunks provide no incremental security benefit. Therefore, pruning the extra chunks improves performance and reduces storage and bandwidth requirements without affecting security.
 
 **4. GetAssignmentsForBlob:** Coordinates the full multi-quorum assignment process:
 1. Generate the assignment for quorum 0 using `GetAssignmentsForQuorum`
@@ -64,6 +61,7 @@ This algorithm guarantees that validators participating in both quorums store on
 **Note on Optimality:** The algorithm produces optimal storage assignments for two quorums. For three or more quorums, the assignment is not guaranteed to be globally optimal. Since quorums 0 and 1 are typically the largest (containing most validators), and other quorums are smaller custom quorums, the algorithm achieves near-optimal storage reduction for the majority of validators.
 
 ### Code Walkthrough
+Notation note: In the code, we use `operator` to refer to `validator`.
 
 **Location:** `core/v2/assignment.go`
 
