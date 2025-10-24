@@ -76,26 +76,24 @@ func StartProxyService(cliCtx *cli.Context) error {
 	}
 
 	restEnabledCfg := cfg.EnabledServersConfig.RestAPIConfig
-	if restEnabledCfg.Enabled() {
-		if err := restServer.Start(router); err != nil {
-			return fmt.Errorf("start proxy rest server: %w", err)
+	if err := restServer.Start(router); err != nil {
+		return fmt.Errorf("start proxy rest server: %w", err)
+	}
+
+	log.Info("Started EigenDA Proxy REST ALT DA server",
+		string(enabled_apis.Admin), restEnabledCfg.Admin,
+		string(enabled_apis.StandardCommitment), restEnabledCfg.StandardCommitment,
+		string(enabled_apis.OpGenericCommitment), restEnabledCfg.OpGenericCommitment,
+		string(enabled_apis.OpKeccakCommitment), restEnabledCfg.OpKeccakCommitment)
+
+	defer func() {
+		if err := restServer.Stop(); err != nil {
+			log.Error("failed to stop REST ALT DA server", "err", err)
+		} else {
+			log.Info("Successfully shutdown REST ALT DA server")
 		}
 
-		log.Info("Started EigenDA Proxy REST ALT DA server",
-			string(enabled_apis.Admin), restEnabledCfg.Admin,
-			string(enabled_apis.StandardCommitment), restEnabledCfg.StandardCommitment,
-			string(enabled_apis.OpGenericCommitment), restEnabledCfg.OpGenericCommitment,
-			string(enabled_apis.OpKeccakCommitment), restEnabledCfg.OpKeccakCommitment)
-
-		defer func() {
-			if err := restServer.Stop(); err != nil {
-				log.Error("failed to stop REST ALT DA server", "err", err)
-			} else {
-				log.Info("Successfully shutdown REST ALT DA server")
-			}
-
-		}()
-	}
+	}()
 
 	if cfg.EnabledServersConfig.ArbCustomDA {
 		h := arbitrum_altda.NewHandlers(certMgr)
