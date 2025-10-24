@@ -16,8 +16,9 @@ type InfrastructureConfig struct {
 	TestName            string
 	Logger              logging.Logger
 	RootPath            string
-	S3BucketName        string
 	MetadataTableName   string
+	BucketTableName     string
+	S3BucketName        string
 	MetadataTableNameV2 string
 	OnDemandTableName   string
 
@@ -39,12 +40,11 @@ type InfrastructureConfig struct {
 func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*InfrastructureHarness, error) {
 	var err error
 	var infra *InfrastructureHarness
-
-	if config.S3BucketName == "" {
-		config.S3BucketName = "test-eigenda-blobstore"
-	}
 	if config.MetadataTableName == "" {
 		config.MetadataTableName = "test-BlobMetadata"
+	}
+	if config.BucketTableName == "" {
+		config.BucketTableName = "test-BucketStore"
 	}
 	if config.MetadataTableNameV2 == "" {
 		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
@@ -118,8 +118,9 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 			TestConfig:          testConfig,
 			TestName:            testName,
 			LocalStackPort:      infra.LocalStackPort,
-			S3BucketName:        config.S3BucketName,
 			MetadataTableName:   config.MetadataTableName,
+			BucketTableName:     config.BucketTableName,
+			S3BucketName:        config.S3BucketName,
 			MetadataTableNameV2: config.MetadataTableNameV2,
 			OnDemandTableName:   config.OnDemandTableName,
 			RelayCount:          config.RelayCount,
@@ -168,14 +169,14 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cleanupCancel()
 
+	// Stop operator goroutines using the harness cleanup
+	infra.OperatorHarness.Cleanup(infra.Logger)
+
 	// Stop test binaries
 	infra.Logger.Info("Stopping binaries")
 	infra.TestConfig.StopBinaries()
 
-	// Stop operator goroutines using the harness cleanup
-	infra.OperatorHarness.Cleanup(infra.Logger)
-
-	// Clean up disperser harness (includes LocalStack termination)
+	// Clean up disperser harness
 	infra.DisperserHarness.Cleanup(cleanupCtx, infra.Logger)
 
 	// Clean up chain harness (churner and anvil)

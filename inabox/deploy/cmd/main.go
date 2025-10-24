@@ -25,7 +25,6 @@ var (
 	metadataTableName   = "test-BlobMetadata"
 	bucketTableName     = "test-BucketStore"
 	metadataTableNameV2 = "test-BlobMetadata-v2"
-	blobStoreBucketName = "test-eigenda-blobstore"
 
 	logger = test.GetLogger()
 )
@@ -123,7 +122,7 @@ func DeployAll(ctx *cli.Context) error {
 	config.RegisterRelays(ethClient, relayURLs, ethClient.GetAccountAddress())
 
 	logger.Info("Generating variables")
-	err = config.GenerateAllVariables("0.0.0.0:34000", "0.0.0.0:34001")
+	err = config.GenerateAllVariables()
 	if err != nil {
 		logger.Errorf("could not generate environment variables: %v", err)
 		panic(err)
@@ -217,10 +216,9 @@ func startLocalstack(ctx *cli.Context, config *deploy.Config) error {
 
 	deployConfig := testbed.DeployResourcesConfig{
 		LocalStackEndpoint:  localstackContainer.Endpoint(),
-		V1MetadataTableName: metadataTableName,
+		MetadataTableName:   metadataTableName,
 		BucketTableName:     bucketTableName,
 		V2MetadataTableName: metadataTableNameV2,
-		BlobStoreBucketName: blobStoreBucketName,
 		AWSConfig:           localstackContainer.GetAWSClientConfig(),
 	}
 	if err := testbed.DeployResources(context, deployConfig); err != nil {

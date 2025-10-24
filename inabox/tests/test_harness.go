@@ -47,7 +47,7 @@ type InfrastructureHarness struct {
 	// Operator related components
 	OperatorHarness OperatorHarness
 
-	// EigenDA V2 disperser components (includes relays and LocalStack)
+	// EigenDA V2 disperser components
 	DisperserHarness DisperserHarness
 
 	// Proxy

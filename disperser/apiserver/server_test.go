@@ -644,7 +644,7 @@ func setup() {
 		// Deploy resources using the testbed DeployResources function
 		deployConfig := testbed.DeployResourcesConfig{
 			LocalStackEndpoint:  localstackContainer.Endpoint(),
-			V1MetadataTableName: metadataTableName,
+			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
 			BlobStoreBucketName: s3BucketName,
 			V2MetadataTableName: v2MetadataTableName,

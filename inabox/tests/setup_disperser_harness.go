@@ -46,11 +46,12 @@ type DisperserHarnessConfig struct {
 	TestName       string
 	LocalStackPort string
 
+	// LocalStack resources for blobstore and metadata store
+	MetadataTableName string
+	BucketTableName   string
+
 	// S3 bucket name for blob storage
 	S3BucketName string
-
-	// V1 metadata table name
-	MetadataTableName string
 
 	// V2 metadata table name
 	MetadataTableNameV2 string
@@ -72,7 +73,7 @@ type DisperserHarness struct {
 	// LocalStack infrastructure for blobstore and metadata store
 	LocalStack     *testbed.LocalStackContainer
 	DynamoDBTables struct {
-		BlobMetadata   string
+		BlobMetadataV1 string
 		BlobMetadataV2 string
 	}
 	S3Buckets struct {
@@ -116,7 +117,8 @@ func setupLocalStackResources(
 	deployConfig := testbed.DeployResourcesConfig{
 		LocalStackEndpoint:  localstackContainer.Endpoint(),
 		BlobStoreBucketName: config.S3BucketName,
-		V1MetadataTableName: config.MetadataTableName,
+		MetadataTableName:   config.MetadataTableName,
+		BucketTableName:     config.BucketTableName,
 		V2MetadataTableName: config.MetadataTableNameV2,
 		AWSConfig:           localstackContainer.GetAWSClientConfig(),
 		Logger:              logger,
@@ -171,11 +173,14 @@ func SetupDisperserHarness(
 	if config.LocalStackPort == "" {
 		config.LocalStackPort = "4570"
 	}
-	if config.S3BucketName == "" {
-		config.S3BucketName = "test-eigenda-blobstore"
-	}
 	if config.MetadataTableName == "" {
 		config.MetadataTableName = "test-BlobMetadata"
+	}
+	if config.BucketTableName == "" {
+		config.BucketTableName = "test-BucketStore"
+	}
+	if config.S3BucketName == "" {
+		config.S3BucketName = "test-eigenda-blobstore"
 	}
 	if config.MetadataTableNameV2 == "" {
 		config.MetadataTableNameV2 = "test-BlobMetadata-v2"
@@ -185,7 +190,7 @@ func SetupDisperserHarness(
 	}
 
 	// Populate the harness tables and buckets metadata
-	harness.DynamoDBTables.BlobMetadata = config.MetadataTableName
+	harness.DynamoDBTables.BlobMetadataV1 = config.MetadataTableName
 	harness.DynamoDBTables.BlobMetadataV2 = config.MetadataTableNameV2
 	harness.S3Buckets.BlobStore = config.S3BucketName
 
@@ -222,7 +227,7 @@ func SetupDisperserHarness(
 	// Start remaining binaries (disperser, batcher, etc.)
 	if config.TestConfig != nil {
 		logger.Info("Starting remaining binaries")
-		err := config.TestConfig.GenerateAllVariables("", "")
+		err := config.TestConfig.GenerateAllVariables()
 		if err != nil {
 			return nil, fmt.Errorf("could not generate environment variables: %w", err)
 		}

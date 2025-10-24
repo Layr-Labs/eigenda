@@ -246,7 +246,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 }
 
 // Generates batcher .env
-func (env *Config) generateBatcherVars(ind int, key, graphUrl, encoderAddress string) BatcherVars {
+func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) BatcherVars {
 	v := BatcherVars{
 		BATCHER_LOG_FORMAT:                    "text",
 		BATCHER_S3_BUCKET_NAME:                "test-eigenda-blobstore",
@@ -254,7 +254,6 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, encoderAddress st
 		BATCHER_ENABLE_METRICS:                "true",
 		BATCHER_METRICS_HTTP_PORT:             "9094",
 		BATCHER_PULL_INTERVAL:                 "5s",
-		BATCHER_ENCODER_ADDRESS:               encoderAddress,
 		BATCHER_EIGENDA_DIRECTORY:             env.EigenDA.EigenDADirectory,
 		BATCHER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetriever,
 		BATCHER_EIGENDA_SERVICE_MANAGER:       env.EigenDA.ServiceManager,
@@ -338,8 +337,7 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 
 func (env *Config) generateControllerVars(
 	ind int,
-	graphUrl string,
-	encoderV2Address string) ControllerVars {
+	graphUrl string) ControllerVars {
 
 	v := ControllerVars{
 		CONTROLLER_LOG_FORMAT:                         "text",
@@ -360,7 +358,7 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_AWS_ACCESS_KEY_ID:                  "",
 		CONTROLLER_AWS_SECRET_ACCESS_KEY:              "",
 		CONTROLLER_AWS_ENDPOINT_URL:                   "",
-		CONTROLLER_ENCODER_ADDRESS:                    encoderV2Address,
+		CONTROLLER_ENCODER_ADDRESS:                    "0.0.0.0:34001",
 		CONTROLLER_BATCH_METADATA_UPDATE_PERIOD:       "100ms",
 		// set to 5 to ensure payload disperser checkDACert calls pass in integration_v2 test since
 		// disperser chooses rbn = latest_block_number - finalization_block_delay
@@ -567,7 +565,7 @@ func (env *Config) getKey(name string) (key, address string, err error) {
 // GenerateAllVariables all of the config for the test environment.
 // Returns an object that corresponds to the participants of the
 // current experiment.
-func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string) error {
+func (env *Config) GenerateAllVariables() error {
 	// hardcode graphurl for now
 	graphUrl := "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
 
@@ -663,7 +661,7 @@ func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string)
 		return fmt.Errorf("failed to get key for %s: %w", name, err)
 	}
 
-	batcherConfig := env.generateBatcherVars(0, key, graphUrl, encoderAddress)
+	batcherConfig := env.generateBatcherVars(0, key, graphUrl, logPath)
 	if err := writeEnv(batcherConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
@@ -734,7 +732,7 @@ func (env *Config) GenerateAllVariables(encoderAddress, encoderV2Address string)
 	// Controller
 	name = "controller0"
 	_, _, _, envFile = env.getPaths(name)
-	controllerConfig := env.generateControllerVars(0, graphUrl, encoderV2Address)
+	controllerConfig := env.generateControllerVars(0, graphUrl)
 	if err := writeEnv(controllerConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
