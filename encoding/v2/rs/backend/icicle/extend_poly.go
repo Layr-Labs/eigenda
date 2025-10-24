@@ -43,6 +43,16 @@ func BuildRSBackend(logger logging.Logger, enableGPU bool) (*RSBackend, error) {
 
 // Encoding Reed Solomon using FFT
 func (g *RSBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
+	// We lock the GPU here to avoid concurrent NTT calls.
+	// This is WAY too conservative, and we could achieve way better throughput by submitting multiple
+	// NTT jobs in parallel to the GPU, but the issue is that icicle doesn't have nice backpressure,
+	// and the GPU kernel just panics if too many jobs are submitted at once.
+	// TODO(samlaf): add some kind of job queue, backpressure, exponential backoff,
+	// or whatever to allow maximizing GPU utilization.
+	// See https://github.com/Layr-Labs/eigenda/pull/2214 for more details.
+	g.GpuLock.Lock()
+	defer g.GpuLock.Unlock()
+
 	// coeffs will be moved to device memory inside Ntt function,
 	// and the result copied back into outputEvals.
 	coeffsSlice := core.HostSliceFromElements(coeffs)
