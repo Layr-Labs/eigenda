@@ -83,10 +83,6 @@ func BenchmarkCommittmentGeneration(b *testing.B) {
 
 // TODO(samlaf): maybe move this to benchmark_icicle_test.go file?
 // That file is currently metal only, we should generalize it.
-// Not super sure how RunParallel behaves with icicle, but noticed
-// that on g6.xlarge, when running benchmark for the default 1 second,
-// we get ~250ms/op, whereas when running for even slightly longer (5seconds),
-// we get an average of ~150ms/op.
 func BenchmarkRSBackendIcicle(b *testing.B) {
 	if !icicle.IsAvailable {
 		b.Skip("code compiled without the icicle build tag")
@@ -104,10 +100,13 @@ func BenchmarkRSBackendGnark(b *testing.B) {
 
 func benchmarkRSBackend(b *testing.B, rsBackend backend.RSEncoderBackend) {
 	rand := random.NewTestRandomNoPrint(1337)
-	blobCoeffs := rand.FrElements(1 << 24)
-	for _, logNumFrs := range []uint8{17, 20, 21, 24} {
-		b.Run("2^"+fmt.Sprint(logNumFrs)+"_Frs", func(b *testing.B) {
-			numFrs := uint64(1) << logNumFrs
+	blobCoeffs := rand.FrElements(1 << 22) // max size we benchmark below: 24+3-5=22
+	for _, blobPowerBytes := range []uint8{17, 20, 21, 24} {
+		// Reed-Solomon encoding with 8x redundancy: 2^3 = 8
+		rsExtendedBlobPowerBytes := blobPowerBytes + 3
+		rsExtendedBlobPowerFrs := rsExtendedBlobPowerBytes - 5 // 32 bytes per Fr element
+		b.Run("2^"+fmt.Sprint(rsExtendedBlobPowerFrs)+"_Frs", func(b *testing.B) {
+			numFrs := uint64(1) << rsExtendedBlobPowerFrs
 			// run multiple goroutines in parallel to better utilize the GPU
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
