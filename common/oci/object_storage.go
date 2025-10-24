@@ -108,10 +108,15 @@ func NewObjectStorageClient(
 		workers = 1
 	}
 
+	// Initialize concurrency limiter with tokens
+	limiter := make(chan struct{}, workers)
+	for i := 0; i < workers; i++ {
+		limiter <- struct{}{}
+	}
 	return &ociClient{
 		cfg:                 &finalCfg,
 		objectStorageClient: objectStorageClient,
-		concurrencyLimiter:  make(chan struct{}, workers),
+		concurrencyLimiter:  limiter,
 		logger:              logger.With("component", "OCIObjectStorageClient"),
 	}, nil
 }
