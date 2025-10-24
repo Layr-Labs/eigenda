@@ -157,27 +157,30 @@ func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, r
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, symbolsCharged uint64, reservationWindow uint64, requestReservationPeriod uint64) error {
-	newUsage, err := m.MeteringStore.UpdateReservationBin(ctx, header.AccountID, requestReservationPeriod, symbolsCharged)
-	if err != nil {
-		return fmt.Errorf("failed to increment bin usage: %w", err)
-	}
+	// newUsage, err := m.MeteringStore.UpdateReservationBin(ctx, header.AccountID, requestReservationPeriod, symbolsCharged)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to increment bin usage: %w", err)
+	// }
 
-	// metered usage stays within the bin limit
-	usageLimit := m.GetReservationBinLimit(reservation, reservationWindow)
-	if newUsage <= usageLimit {
-		return nil
-	} else if newUsage-symbolsCharged >= usageLimit {
-		// metered usage before updating the size already exceeded the limit
-		return fmt.Errorf("bin has already been filled")
-	}
-	if newUsage <= 2*usageLimit && requestReservationPeriod+2 <= GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow) {
-		_, err := m.MeteringStore.UpdateReservationBin(ctx, header.AccountID, uint64(requestReservationPeriod+2), newUsage-usageLimit)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	return fmt.Errorf("overflow usage exceeds bin limit")
+	// // metered usage stays within the bin limit
+	// usageLimit := m.GetReservationBinLimit(reservation, reservationWindow)
+	// if newUsage <= usageLimit {
+	// 	return nil
+	// } else if newUsage-symbolsCharged >= usageLimit {
+	// 	// // metered usage before updating the size already exceeded the limit
+	// 	// return fmt.Errorf("bin has already been filled")
+	// }
+	// if newUsage <= 2*usageLimit && requestReservationPeriod+2 <= GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow) {
+	// 	_, err := m.MeteringStore.UpdateReservationBin(ctx, header.AccountID, uint64(requestReservationPeriod+2), newUsage-usageLimit)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	return nil
+	// }
+	// return fmt.Errorf("overflow usage exceeds bin limit")
+
+	// allow unlimited usage for now
+	return nil
 }
 
 // GetReservationPeriodByNanosecondTimestamp returns the current reservation period by finding the nearest lower multiple of the bin interval;
