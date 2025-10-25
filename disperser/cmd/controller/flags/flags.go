@@ -203,6 +203,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_KEY_ID"),
 	}
+	DisperserPrivateKeyFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-private-key"),
+		Usage:    "Private key for signing disperser requests (hex format without 0x prefix, alternative to KMS)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_PRIVATE_KEY"),
+	}
 	ControllerReadinessProbePathFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "controller-readiness-probe-path"),
 		Usage:    "File path for the readiness probe; created once the controller is fully started and ready to serve traffic",
@@ -348,6 +354,7 @@ var optionalFlags = []cli.Flag{
 	MetricsPortFlag,
 	DisperserStoreChunksSigningDisabledFlag,
 	DisperserKMSKeyIDFlag,
+	DisperserPrivateKeyFlag,
 	ControllerReadinessProbePathFlag,
 	ControllerHealthProbePathFlag,
 	ControllerHeartbeatMaxStallDurationFlag,
