@@ -130,7 +130,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 	}
 
 	// proxy config endpoint
-	r.HandleFunc("/config", svr.handleGetConfig).Methods("GET")
+	r.HandleFunc("/info", svr.handleGetInfo).Methods("GET")
 }
 
 func notCommitmentModeStandard(r *http.Request, _ *mux.RouteMatch) bool {

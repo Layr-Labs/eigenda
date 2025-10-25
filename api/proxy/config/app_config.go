@@ -58,7 +58,7 @@ func ReadAppConfig(ctx *cli.Context, version string) (AppConfig, error) {
 	}
 
 	enabledServersCfg := enablement.ReadEnabledServersCfg(ctx)
-	restProxyConfig := rest.ProxyConfig{
+	restPublicInfo := rest.PubliclyExposedInfo{
 		Version:           version,
 		RecencyWindowSize: storeBuilderConfig.ClientConfigV2.RBNRecencyWindowSize,
 	}
@@ -69,7 +69,7 @@ func ReadAppConfig(ctx *cli.Context, version string) (AppConfig, error) {
 		EnabledServersConfig: enabledServersCfg,
 
 		ArbCustomDASvrCfg: arbitrum_altda.ReadConfig(ctx),
-		RestSvrCfg:        rest.ReadConfig(ctx, &enabledServersCfg.RestAPIConfig, restProxyConfig),
+		RestSvrCfg:        rest.ReadConfig(ctx, &enabledServersCfg.RestAPIConfig, restPublicInfo),
 		MetricsSvrConfig:  metrics.ReadConfig(ctx),
 	}, nil
 }

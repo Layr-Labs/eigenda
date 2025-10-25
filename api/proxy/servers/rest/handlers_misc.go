@@ -105,11 +105,11 @@ func (svr *Server) handleSetEigenDADispersalBackend(w http.ResponseWriter, r *ht
 	svr.writeJSON(w, r, response)
 }
 
-// handleGetConfig handles the GET request to check proxy version and config.
-// This endpoint returns the proxy version, and any settings that may be valuable to
+// handleGetInfo handles the GET request to check proxy info.
+// This endpoint returns the proxy version, and any info that may be valuable to
 // external services (e.g recency window size), to ensure correct configuration on both sides.
-func (svr *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
-	svr.writeJSON(w, r, svr.config.ProxyCfg)
+func (svr *Server) handleGetInfo(w http.ResponseWriter, r *http.Request) {
+	svr.writeJSON(w, r, svr.config.PublicInfo)
 }
 
 func (svr *Server) writeJSON(w http.ResponseWriter, r *http.Request, response interface{}) {

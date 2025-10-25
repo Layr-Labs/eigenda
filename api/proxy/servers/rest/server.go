@@ -18,8 +18,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// ProxyConfig ... ProxyConfig is used by the /config endpoint
-type ProxyConfig struct {
+// PubliclyExposedInfo ... PubliclyExposedInfo is used by the /info endpoint
+type PubliclyExposedInfo struct {
 	Version           string `json:"version"`
 	RecencyWindowSize uint64 `json:"recencyWindowSize"`
 }
@@ -29,7 +29,7 @@ type Config struct {
 	Host        string
 	Port        int
 	APIsEnabled *enablement.RestApisEnabled
-	ProxyCfg    ProxyConfig
+	PublicInfo  PubliclyExposedInfo
 }
 
 type Server struct {
