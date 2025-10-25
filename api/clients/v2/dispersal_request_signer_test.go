@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -238,5 +239,187 @@ func TestKMSSignatureVerification(t *testing.T) {
 		hash, err := auth.VerifyStoreChunksRequest(publicAddress2, request2)
 		require.NoError(t, err, "second key signature verification should succeed")
 		require.NotNil(t, hash, "hash should not be nil for valid second key signature")
+	})
+}
+
+func TestLocalSignerWithEmptyPrivateKey(t *testing.T) {
+	ctx := t.Context()
+
+	_, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		PrivateKey: "",
+	})
+
+	require.Error(t, err, "should fail to create signer with empty private key")
+}
+
+func TestLocalSignerWithInvalidPrivateKey(t *testing.T) {
+	ctx := t.Context()
+
+	_, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		PrivateKey: "invalid_hex",
+	})
+
+	require.Error(t, err, "should fail to create signer with invalid private key")
+}
+
+func TestLocalSignerPrivateKeyFormats(t *testing.T) {
+	ctx := t.Context()
+
+	// Test with 0x prefix - should fail
+	_, err1 := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		PrivateKey: "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+	})
+	require.Error(t, err1, "should fail with 0x prefix")
+
+	// Test without 0x prefix - should succeed
+	_, err2 := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		PrivateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+	})
+	require.NoError(t, err2, "should succeed without 0x prefix")
+}
+
+func TestLocalSignerWithBothKMSAndPrivateKey(t *testing.T) {
+	ctx := t.Context()
+
+	_, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		KeyID:      "some_key_id",
+		PrivateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		Region:     region,
+	})
+
+	require.Error(t, err, "should fail when both KeyID and PrivateKey are specified")
+}
+
+func TestLocalSignerSignatureVerification(t *testing.T) {
+	ctx := t.Context()
+	rand := random.NewTestRandom()
+
+	// Generate a private key for testing
+	privateKey, err := crypto.GenerateKey()
+	require.NoError(t, err, "failed to generate test private key")
+
+	publicAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
+	privateKeyHex := fmt.Sprintf("%x", crypto.FromECDSA(privateKey))
+
+	// Create signer with private key
+	signer, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		PrivateKey: privateKeyHex,
+	})
+	require.NoError(t, err, "failed to create local dispersal request signer")
+
+	request := auth.RandomStoreChunksRequest(rand)
+	request.Signature = nil
+
+	// Sign the request
+	validSignature, err := signer.SignStoreChunksRequest(ctx, request)
+	require.NoError(t, err, "failed to sign store chunks request")
+
+	// Table-driven test scenarios
+	tests := []struct {
+		name             string
+		setupRequest     func() *grpc.StoreChunksRequest
+		expectError      bool
+		expectNilHash    bool
+		errorDescription string
+	}{
+		{
+			name: "valid_signature",
+			setupRequest: func() *grpc.StoreChunksRequest {
+				req := &grpc.StoreChunksRequest{
+					Batch:       request.GetBatch(),
+					DisperserID: request.GetDisperserID(),
+					Timestamp:   request.GetTimestamp(),
+					Signature:   validSignature,
+				}
+				return req
+			},
+			expectError:      false,
+			expectNilHash:    false,
+			errorDescription: "valid signature should verify successfully",
+		},
+		{
+			name: "corrupted_signature",
+			setupRequest: func() *grpc.StoreChunksRequest {
+				badSignature := make([]byte, len(validSignature))
+				copy(badSignature, validSignature)
+				badSignature[10] = badSignature[10] + 1
+				req := &grpc.StoreChunksRequest{
+					Batch:       request.GetBatch(),
+					DisperserID: request.GetDisperserID(),
+					Timestamp:   request.GetTimestamp(),
+					Signature:   badSignature,
+				}
+				return req
+			},
+			expectError:      true,
+			expectNilHash:    true,
+			errorDescription: "corrupted signature should fail verification",
+		},
+		{
+			name: "modified_request",
+			setupRequest: func() *grpc.StoreChunksRequest {
+				req := &grpc.StoreChunksRequest{
+					Batch:       request.GetBatch(),
+					DisperserID: request.GetDisperserID() + 1,
+					Timestamp:   request.GetTimestamp(),
+					Signature:   validSignature,
+				}
+				return req
+			},
+			expectError:      true,
+			expectNilHash:    true,
+			errorDescription: "modified request should fail verification with valid signature",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testRequest := tt.setupRequest()
+
+			hash, err := auth.VerifyStoreChunksRequest(publicAddress, testRequest)
+
+			if tt.expectError {
+				require.Error(t, err, tt.errorDescription)
+			} else {
+				require.NoError(t, err, tt.errorDescription)
+			}
+
+			if tt.expectNilHash {
+				require.Nil(t, hash, "hash should be nil for failed verification")
+			} else {
+				require.NotNil(t, hash, "hash should not be nil for successful verification")
+				expectedHash, err := hashing.HashStoreChunksRequest(testRequest)
+				require.NoError(t, err, "failed to compute expected hash")
+				require.Equal(t, expectedHash, hash, "computed hash should match expected hash")
+			}
+		})
+	}
+
+	// Test with a different private key to ensure isolation
+	t.Run("different_keys", func(t *testing.T) {
+		privateKey2, err := crypto.GenerateKey()
+		require.NoError(t, err, "failed to generate second test private key")
+
+		publicAddress2 := crypto.PubkeyToAddress(privateKey2.PublicKey)
+
+		signer2, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+			PrivateKey: fmt.Sprintf("%x", crypto.FromECDSA(privateKey2)),
+		})
+		require.NoError(t, err, "failed to create second local dispersal request signer")
+
+		request2 := auth.RandomStoreChunksRequest(rand)
+		request2.Signature = nil
+
+		signature2, err := signer2.SignStoreChunksRequest(ctx, request2)
+		require.NoError(t, err, "failed to sign request with second key")
+
+		request2.Signature = signature2
+		hash, err := auth.VerifyStoreChunksRequest(publicAddress2, request2)
+		require.NoError(t, err, "second key signature verification should succeed")
+		require.NotNil(t, hash, "hash should not be nil for valid second key signature")
+
+		// Verify that first key cannot verify signature from second key
+		_, err = auth.VerifyStoreChunksRequest(publicAddress, request2)
+		require.Error(t, err, "first key should not verify signature from second key")
 	})
 }

@@ -136,9 +136,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		DisperserStoreChunksSigningDisabled: ctx.GlobalBool(flags.DisperserStoreChunksSigningDisabledFlag.Name),
 		LoggerConfig:                        *loggerConfig,
 		DispersalRequestSignerConfig: clients.DispersalRequestSignerConfig{
-			KeyID:    ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
-			Region:   awsClientConfig.Region,
-			Endpoint: awsClientConfig.EndpointURL,
+			KeyID:      ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
+			PrivateKey: ctx.GlobalString(flags.DisperserPrivateKeyFlag.Name),
+			Region:     awsClientConfig.Region,
+			Endpoint:   awsClientConfig.EndpointURL,
 		},
 		EncodingManagerConfig: controller.EncodingManagerConfig{
 			PullInterval:                ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
