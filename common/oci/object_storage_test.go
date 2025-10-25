@@ -1416,11 +1416,9 @@ func TestObjectStorageConfig_WorkerCalculations(t *testing.T) {
 	}
 }
 
-// TestOCIClient_ConcurrencyLimiter_Fixed tests the fixed concurrency limiter implementation
-// This test verifies that the fix for the semaphore pattern works correctly
-func TestOCIClient_ConcurrencyLimiter_Fixed(t *testing.T) {
+// This test verifies the worker semaphore pattern does not deadlock
+func TestOCIClient_ConcurrencyLimiter(t *testing.T) {
 	t.Run("Semaphore pattern works with correct token operations", func(t *testing.T) {
-		// Test that the correct semaphore pattern (receive to acquire, send to release) works
 		limiter := make(chan struct{}, 2)
 
 		// Pre-fill with tokens (semaphore pattern)
@@ -1439,8 +1437,7 @@ func TestOCIClient_ConcurrencyLimiter_Fixed(t *testing.T) {
 		assert.Equal(t, 2, len(limiter))
 	})
 
-	t.Run("Production code uses correct semaphore pattern", func(t *testing.T) {
-		// This test documents that the production code now uses the correct pattern
+	t.Run("Check concurrency limiter initialization", func(t *testing.T) {
 		// We can't easily test the actual fragmented methods due to OCI SDK dependencies,
 		// but we can test the concurrency limiter initialization and basic pattern
 
@@ -1448,21 +1445,19 @@ func TestOCIClient_ConcurrencyLimiter_Fixed(t *testing.T) {
 			FragmentParallelismConstant: 3,
 		}
 
-		// Test client creation logic (will fail at OCI auth, but that's expected)
+		// Test client creation logic - will fail at OCI auth (expected)
 		_, err := NewObjectStorageClient(context.Background(), cfg, &mockLogger{})
 		assert.Error(t, err) // Expected due to missing OCI credentials
 		assert.Contains(t, err.Error(), "failed to create OCI Object Storage client")
 	})
 
-	t.Run("Fragment count calculation still works correctly", func(t *testing.T) {
-		// Verify helper functions work as expected (these are tested but good to document)
+	t.Run("Fragment count calculation checks", func(t *testing.T) {
 		assert.Equal(t, 1, GetFragmentCount(5, 10))  // Small data
 		assert.Equal(t, 3, GetFragmentCount(25, 10)) // 25 bytes with 10-byte fragments = 3 fragments
 		assert.Equal(t, 4, GetFragmentCount(35, 10)) // 35 bytes with 10-byte fragments = 4 fragments
 	})
 
-	t.Run("RecombineFragments handles fragment ordering", func(t *testing.T) {
-		// Test that fragment recombination works correctly (validates the fix works end-to-end)
+	t.Run("Validate fragment recombination ordering", func(t *testing.T) {
 		fragments := []*s3.Fragment{
 			{FragmentKey: "test-1", Data: []byte("bcdefghijk"), Index: 1},
 			{FragmentKey: "test-0", Data: []byte("0123456789"), Index: 0},
