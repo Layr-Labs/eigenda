@@ -18,11 +18,23 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// PubliclyExposedInfo ... PubliclyExposedInfo is used by the /info endpoint
+type PubliclyExposedInfo struct {
+	Version             string `json:"version"`
+	DispersalBackend    string `json:"dispersal_backend"`
+	Network             string `json:"network"`
+	DirectoryAddress    string `json:"directory_address"`
+	CertVerifierAddress string `json:"cert_verifier_address"`
+	MaxBlobSizeBytes    uint64 `json:"max_blob_size_bytes"`
+	RecencyWindowSize   uint64 `json:"recency_window_size"`
+}
+
 // Config ... Config for the proxy HTTP server
 type Config struct {
 	Host        string
 	Port        int
 	APIsEnabled *enablement.RestApisEnabled
+	PublicInfo  PubliclyExposedInfo
 }
 
 type Server struct {

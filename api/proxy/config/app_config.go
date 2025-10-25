@@ -51,13 +51,21 @@ func (c AppConfig) Check() error {
 	return nil
 }
 
-func ReadAppConfig(ctx *cli.Context) (AppConfig, error) {
+func ReadAppConfig(ctx *cli.Context, version string) (AppConfig, error) {
 	storeBuilderConfig, err := builder.ReadConfig(ctx)
 	if err != nil {
 		return AppConfig{}, fmt.Errorf("read proxy config: %w", err)
 	}
 
 	enabledServersCfg := enablement.ReadEnabledServersCfg(ctx)
+	restPublicInfo := rest.PubliclyExposedInfo{
+		Version:             version,
+		Network:             storeBuilderConfig.ClientConfigV2.EigenDANetwork.String(),
+		DirectoryAddress:    storeBuilderConfig.ClientConfigV2.EigenDADirectory,
+		CertVerifierAddress: storeBuilderConfig.ClientConfigV2.EigenDACertVerifierOrRouterAddress,
+		MaxBlobSizeBytes:    storeBuilderConfig.ClientConfigV2.MaxBlobSizeBytes,
+		RecencyWindowSize:   storeBuilderConfig.ClientConfigV2.RBNRecencyWindowSize,
+	}
 
 	return AppConfig{
 		StoreBuilderConfig:   storeBuilderConfig,
@@ -65,7 +73,7 @@ func ReadAppConfig(ctx *cli.Context) (AppConfig, error) {
 		EnabledServersConfig: enabledServersCfg,
 
 		ArbCustomDASvrCfg: arbitrum_altda.ReadConfig(ctx),
-		RestSvrCfg:        rest.ReadConfig(ctx, &enabledServersCfg.RestAPIConfig),
+		RestSvrCfg:        rest.ReadConfig(ctx, &enabledServersCfg.RestAPIConfig, restPublicInfo),
 		MetricsSvrConfig:  metrics.ReadConfig(ctx),
 	}, nil
 }
