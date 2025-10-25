@@ -5,15 +5,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-// EigenDAV2MessageHeaderByte is the unique EigenDAV2MessageHeaderByte.
-// The value chosen is purely arbitrary.
-//
-// TODO: See if there can be social consensus on the value we assume,
-// otherwise could eventually conflict with competitors or even OCL.
-// maybe we could reuse the existing OP social contract for DA layers
-// and assume 0x01?
-const EigenDAV2MessageHeaderByte byte = 0x42
-
 type PreimageType uint8
 
 // The ALT DA server only cares about type 3 Custom DA preimage types
