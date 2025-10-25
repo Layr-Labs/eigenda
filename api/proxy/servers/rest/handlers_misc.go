@@ -109,6 +109,10 @@ func (svr *Server) handleSetEigenDADispersalBackend(w http.ResponseWriter, r *ht
 // This endpoint returns the proxy version, and any info that may be valuable to
 // external services (e.g recency window size), to ensure correct configuration on both sides.
 func (svr *Server) handleGetInfo(w http.ResponseWriter, r *http.Request) {
+	// We get the dispersal backend here as it can be changed via the admin api
+	backend := svr.certMgr.GetDispersalBackend()
+	svr.config.PublicInfo.DispersalBackend = common.EigenDABackendToString(backend)
+
 	svr.writeJSON(w, r, svr.config.PublicInfo)
 }
 

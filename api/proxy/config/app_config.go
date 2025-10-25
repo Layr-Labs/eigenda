@@ -59,8 +59,12 @@ func ReadAppConfig(ctx *cli.Context, version string) (AppConfig, error) {
 
 	enabledServersCfg := enablement.ReadEnabledServersCfg(ctx)
 	restPublicInfo := rest.PubliclyExposedInfo{
-		Version:           version,
-		RecencyWindowSize: storeBuilderConfig.ClientConfigV2.RBNRecencyWindowSize,
+		Version:             version,
+		Network:             storeBuilderConfig.ClientConfigV2.EigenDANetwork.String(),
+		DirectoryAddress:    storeBuilderConfig.ClientConfigV2.EigenDADirectory,
+		CertVerifierAddress: storeBuilderConfig.ClientConfigV2.EigenDACertVerifierOrRouterAddress,
+		MaxBlobSizeBytes:    storeBuilderConfig.ClientConfigV2.MaxBlobSizeBytes,
+		RecencyWindowSize:   storeBuilderConfig.ClientConfigV2.RBNRecencyWindowSize,
 	}
 
 	return AppConfig{
