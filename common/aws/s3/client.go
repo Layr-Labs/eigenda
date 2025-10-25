@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"sync"
 
@@ -235,7 +236,11 @@ func (s *client) FragmentedUploadObject(
 
 	for _, fragment := range fragments {
 		fragmentCapture := fragment
-		s.concurrencyLimiter <- struct{}{}
+		select {
+		case s.concurrencyLimiter <- struct{}{}:
+		case <-ctx.Done():
+			return fmt.Errorf("context cancelled during fragmented upload: %w", ctx.Err())
+		}
 		go func() {
 			defer func() {
 				<-s.concurrencyLimiter
@@ -293,7 +298,11 @@ func (s *client) FragmentedDownloadObject(
 	for i, fragmentKey := range fragmentKeys {
 		boundFragmentKey := fragmentKey
 		boundI := i
-		s.concurrencyLimiter <- struct{}{}
+		select {
+		case s.concurrencyLimiter <- struct{}{}:
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context cancelled during fragmented download: %w", ctx.Err())
+		}
 		go func() {
 			defer func() {
 				<-s.concurrencyLimiter
