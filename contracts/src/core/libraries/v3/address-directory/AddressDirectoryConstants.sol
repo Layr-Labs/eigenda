@@ -3,7 +3,6 @@ pragma solidity ^0.8.9;
 
 library AddressDirectoryConstants {
     /// PROXY ADMIN
-
     string internal constant PROXY_ADMIN_NAME = "PROXY_ADMIN";
 
     /// CORE
@@ -33,6 +32,9 @@ library AddressDirectoryConstants {
 
     string internal constant CERT_VERIFIER_NAME = "CERT_VERIFIER";
     string internal constant CERT_VERIFIER_ROUTER_NAME = "CERT_VERIFIER_ROUTER";
+
+    /// @dev This is an optional contract that EigenDA may deploy to provide more complex getters for configurations.
+    string internal constant EIGEN_DA_CONFIG_REGISTRY_NAME = "EIGEN_DA_CONFIG_RETRIEVER";
 
     /// LEGACY
 
