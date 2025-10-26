@@ -138,7 +138,7 @@ type Reader interface {
 
 	// GetDisperserAddress returns the disperser address with the given ID.
 	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)
-	
+
 	// GetAllDisperserAddresses returns all registered addresses for the disperser with the given ID.
 	// maxKeys limits how many keys to check to prevent unbounded iteration.
 	GetAllDisperserAddresses(ctx context.Context, disperserID uint32, maxKeys uint32) ([]gethcommon.Address, error)

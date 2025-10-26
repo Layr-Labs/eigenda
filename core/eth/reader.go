@@ -1023,31 +1023,31 @@ func (t *Reader) GetAllDisperserAddresses(
 
 	var addresses []gethcommon.Address
 	var defaultAddress gethcommon.Address
-	
+
 	for keyIndex := uint32(0); keyIndex < maxKeys; keyIndex++ {
 		compositeKey := disperserID*maxKeys + keyIndex
-		
+
 		address, err := registry.DisperserKeyToAddress(
 			&bind.CallOpts{
 				Context: ctx,
 			},
 			compositeKey)
-		
+
 		if err != nil {
 			break
 		}
-		
+
 		if address == defaultAddress {
 			break
 		}
-		
+
 		addresses = append(addresses, address)
 	}
-	
+
 	if len(addresses) == 0 {
 		return nil, fmt.Errorf("no addresses found for disperser with id %d", disperserID)
 	}
-	
+
 	return addresses, nil
 }
 
