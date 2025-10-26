@@ -77,12 +77,13 @@ type WorkerResult struct {
 func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 
-	dimE := numChunks
 	l := chunkLen
-	numPoly := uint64(len(polyFr)) / dimE / chunkLen
+
+	toeplitzMatrixLen := uint64(len(polyFr)) / chunkLen
+	numPoly := 1
 
 	// Pre-processing stage - CPU computations
-	flattenCoeffStoreFr, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
+	flattenCoeffStoreFr, err := p.computeCoeffStore(polyFr, numWorker, l, toeplitzMatrixLen)
 	if err != nil {
 		return nil, fmt.Errorf("coefficient computation error: %v", err)
 	}
@@ -114,7 +115,7 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 		var flattenStoreCopyToDevice core.DeviceSlice
 		flattenCoeffStoreCopy.CopyToDevice(&flattenStoreCopyToDevice, true)
 
-		sumVec, err := p.msmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
+		sumVec, err := p.msmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(toeplitzMatrixLen)*2)
 		if err != nil {
 			icicleErr = fmt.Errorf("msm error: %w", err)
 			return
@@ -127,7 +128,15 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 
 		// Compute the first ecntt, and set new batch size for ntt
 		p.NttCfg.BatchSize = int32(numPoly)
-		sumVecInv, err := p.ecnttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
+		// make sure output has enough size
+
+		// run two ecntt in one function, because the second ecntt needs to be larger
+		// size, but icicle does not offer device to device copy, so we have to use
+		// Range trick. Hence we combine two ecntt into one function allowing us to
+		// manage it better
+		sumVecInv, err := p.twoEcnttOnDevice(sumVec, int(numChunk), int(toeplitzMatrixLen))
+
+		sumVecInv, err := p.ecnttOnDevice(sumVec, true, int(numChunk)*int(numPoly))
 		if err != nil {
 			icicleErr = fmt.Errorf("first ECNtt error: %w", err)
 			return
@@ -137,10 +146,10 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 
 		firstECNttDone = time.Now()
 
-		prunedSumVecInv := sumVecInv.Range(0, int(dimE), false)
+		prunedSumVecInv := sumVecInv.Range(0, int(numChunk), false)
 
-		// Compute the second ecntt on the reduced size array
-		flatProofsBatch, err := p.ecnttOnDevice(prunedSumVecInv, false, int(numPoly)*int(dimE))
+		// Compute the second ecntt on the numChunks
+		flatProofsBatch, err := p.ecnttOnDevice(prunedSumVecInv, false, int(numPoly)*int(numChunks))
 		if err != nil {
 			icicleErr = fmt.Errorf("second ECNtt error: %w", err)
 			return
@@ -150,7 +159,7 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 
 		secondECNttDone = time.Now()
 
-		flatProofsBatchHost := make(core.HostSlice[iciclebn254.Projective], int(numPoly)*int(dimE))
+		flatProofsBatchHost := make(core.HostSlice[iciclebn254.Projective], int(numPoly)*int(numChunks))
 		flatProofsBatchHost.CopyFromDevice(&flatProofsBatch)
 		flatProofsBatch.Free()
 		icicleFFTBatch = icicle.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
@@ -290,7 +299,7 @@ func (c *KzgMultiProofBackend) msmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlic
 	return out, nil
 }
 
-func (c *KzgMultiProofBackend) ecnttOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
+func (c *KzgMultiProofBackend) twoEcnttOnDevice(batchPoints core.DeviceSlice, numChunk int, toeplitzMatrixLen int) (core.DeviceSlice, error) {
 	var p iciclebn254.Projective
 	var out core.DeviceSlice
 

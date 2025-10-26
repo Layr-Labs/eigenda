@@ -47,7 +47,7 @@ func NewMultiProofBackend(
 // 2. https://eprint.iacr.org/2023/033.pdf (how to compute the single multiproof fast)
 // 3. https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf (fast multiple multiproofs)
 func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(
-	polyFr []fr.Element, numTotalChunks, toeplitzMatrixLen, chunkLen, numWorker uint64,
+	polyFr []fr.Element, numTotalChunks, chunkLen, numWorker uint64,
 ) ([]bn254.G1Affine, error) {
 	// We describe the steps in the computation by following section 2.2 of
 	// https://eprint.iacr.org/2023/033.pdf, generalized to the multiple multiproofs case.
@@ -56,6 +56,8 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
 	l := chunkLen
+
+	toeplitzMatrixLen := uint64(len(polyFr)) / chunkLen
 
 	// eqn (2) DFT_2d(c^)
 	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, toeplitzMatrixLen)
