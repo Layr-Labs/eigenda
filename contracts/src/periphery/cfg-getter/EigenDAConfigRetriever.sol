@@ -23,26 +23,28 @@ contract EigenDAConfigRetriever {
         bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
         uint256 numCheckpoints = configRegistry.getNumCheckpointsBytes32(nameDigest);
 
-        // Count how many checkpoints are after the given activation key
-        uint256 count = 0;
+        // There are 3 cases to handle:
+        // 1. If no checkpoints have activation keys greater than the provided activation key, we return an empty array.
+        // 2. If all checkpoints have activation keys greater than the provided activation key, we return the entire array.
+        // 3. If some checkpoints have activation keys greater than the provided activation key, we return the relevant subset.
+
+        uint256 startIndex = numCheckpoints; // Default to numCheckpoints (case 1)
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            if (configRegistry.getActivationKeyBytes32(nameDigest, i) > activationKey) {
-                count++;
+            uint256 checkpointActivationKey = configRegistry.getActivationKeyBytes32(nameDigest, numCheckpoints - 1 - i);
+            if (checkpointActivationKey <= activationKey) {
+                startIndex = numCheckpoints - i; // Found the first checkpoint with activation key <= provided key
+                break;
             }
         }
-
-        // Collect the checkpoints after the given activation key
-        ConfigRegistryTypes.Bytes32Checkpoint[] memory result = new ConfigRegistryTypes.Bytes32Checkpoint[](count);
-        uint256 index = 0;
-        for (uint256 i = 0; i < numCheckpoints; i++) {
-            uint256 checkpointActivationKey = configRegistry.getActivationKeyBytes32(nameDigest, i);
-            if (checkpointActivationKey > activationKey) {
-                result[index] = configRegistry.getCheckpointBytes32(nameDigest, i);
-                index++;
-            }
+        // Collect the checkpoints from startIndex to the end
+        uint256 resultCount = numCheckpoints - startIndex;
+        ConfigRegistryTypes.Bytes32Checkpoint[] memory results = new ConfigRegistryTypes.Bytes32Checkpoint[](
+            resultCount
+        );
+        for (uint256 i = 0; i < resultCount; i++) {
+            results[i] = configRegistry.getCheckpointBytes32(nameDigest, startIndex + i);
         }
-
-        return result;
+        return results;
     }
 
     /// @notice Retrieves all bytes configuration checkpoints for a given name that have an activation key greater than the provided activation key.
@@ -53,24 +55,28 @@ contract EigenDAConfigRetriever {
     {
         bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
         uint256 numCheckpoints = configRegistry.getNumCheckpointsBytes(nameDigest);
+        
+        // There are 3 cases to handle:
+        // 1. If no checkpoints have activation keys greater than the provided activation key, we return an empty array.
+        // 2. If all checkpoints have activation keys greater than the provided activation key, we return the entire array.
+        // 3. If some checkpoints have activation keys greater than the provided activation key, we return the relevant subset.
 
-        // Count how many checkpoints are after the given activation key
-        uint256 count = 0;
+        uint256 startIndex = numCheckpoints; // Default to numCheckpoints (case 1)
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            if (configRegistry.getActivationKeyBytes(nameDigest, i) > activationKey) {
-                count++;
+            uint256 checkpointActivationKey = configRegistry.getActivationKeyBytes(nameDigest, numCheckpoints - 1 - i);
+            if (checkpointActivationKey <= activationKey) {
+                startIndex = numCheckpoints - i; // Found the first checkpoint with activation key <= provided key
+                break;
             }
         }
-        // Collect the checkpoints after the given activation key
-        ConfigRegistryTypes.BytesCheckpoint[] memory result = new ConfigRegistryTypes.BytesCheckpoint[](count);
-        uint256 index = 0;
-        for (uint256 i = 0; i < numCheckpoints; i++) {
-            uint256 checkpointActivationKey = configRegistry.getActivationKeyBytes(nameDigest, i);
-            if (checkpointActivationKey > activationKey) {
-                result[index] = configRegistry.getCheckpointBytes(nameDigest, i);
-                index++;
-            }
+        // Collect the checkpoints from startIndex to the end
+        uint256 resultCount = numCheckpoints - startIndex;
+        ConfigRegistryTypes.BytesCheckpoint[] memory results = new ConfigRegistryTypes.BytesCheckpoint[](
+            resultCount
+        );
+        for (uint256 i = 0; i < resultCount; i++) {
+            results[i] = configRegistry.getCheckpointBytes(nameDigest, startIndex + i);
         }
-        return result;
+        return results;
     }
 }
