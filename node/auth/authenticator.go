@@ -25,10 +25,9 @@ type RequestAuthenticator interface {
 		now time.Time) ([]byte, error)
 }
 
-// keyWithTimeout is a key with that key's expiration time. After a key "expires", it should be reloaded
-// from the chain state in case the key has been changed.
-type keyWithTimeout struct {
-	key        gethcommon.Address
+// keysWithTimeout contains all keys for a disperser with their expiration time.
+type keysWithTimeout struct {
+	keys       []gethcommon.Address
 	expiration time.Time
 }
 
@@ -40,12 +39,15 @@ type requestAuthenticator struct {
 
 	// keyCache is used to cache the public keys of dispersers. The uint32 map keys are disperser IDs. Disperser
 	// IDs are serial numbers, with the original EigenDA disperser assigned ID 0. The map values contain
-	// the public key of the disperser and the time when the local cache of the key will expire.
-	keyCache *lru.Cache[uint32 /* disperser ID */, *keyWithTimeout]
+	// all public keys of the disperser and the time when the local cache of the keys will expire.
+	keyCache *lru.Cache[uint32 /* disperser ID */, *keysWithTimeout]
 
 	// keyTimeoutDuration is the duration for which a key is cached. After this duration, the key should be
 	// reloaded from the chain state in case the key has been changed.
 	keyTimeoutDuration time.Duration
+
+	// keyLimit is the maximum number of keys to check per disperser.
+	keyLimit int
 
 	// disperserIDFilter is a function that returns true if the given disperser ID is valid.
 	disperserIDFilter func(uint32) bool
@@ -57,10 +59,11 @@ func NewRequestAuthenticator(
 	chainReader core.Reader,
 	keyCacheSize int,
 	keyTimeoutDuration time.Duration,
+	keyLimit int,
 	disperserIDFilter func(uint32) bool,
 	now time.Time) (RequestAuthenticator, error) {
 
-	keyCache, err := lru.New[uint32, *keyWithTimeout](keyCacheSize)
+	keyCache, err := lru.New[uint32, *keysWithTimeout](keyCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create key cache: %w", err)
 	}
@@ -69,6 +72,7 @@ func NewRequestAuthenticator(
 		chainReader:        chainReader,
 		keyCache:           keyCache,
 		keyTimeoutDuration: keyTimeoutDuration,
+		keyLimit:           keyLimit,
 		disperserIDFilter:  disperserIDFilter,
 	}
 
@@ -82,9 +86,9 @@ func NewRequestAuthenticator(
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
 	// this will need to be updated for decentralized dispersers
-	_, err := a.getDisperserKey(ctx, now, api.EigenLabsDisperserID)
+	_, err := a.getDisperserKeys(ctx, now, api.EigenLabsDisperserID)
 	if err != nil {
-		return fmt.Errorf("failed to get operator key: %w", err)
+		return fmt.Errorf("failed to get disperser keys: %w", err)
 	}
 
 	return nil
@@ -95,12 +99,12 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	request *grpc.StoreChunksRequest,
 	now time.Time) ([]byte, error) {
 
-	key, err := a.getDisperserKey(ctx, now, request.GetDisperserID())
+	keys, err := a.getDisperserKeys(ctx, now, request.GetDisperserID())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get operator key: %w", err)
+		return nil, fmt.Errorf("failed to get disperser keys: %w", err)
 	}
 
-	hash, err := VerifyStoreChunksRequest(*key, request)
+	hash, err := VerifyStoreChunksRequestWithKeys(keys, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify request: %w", err)
 	}
@@ -108,33 +112,33 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	return hash, nil
 }
 
-// getDisperserKey returns the public key of the operator with the given ID, caching the result.
-func (a *requestAuthenticator) getDisperserKey(
+// getDisperserKeys returns all public keys of the disperser with the given ID, caching the result.
+func (a *requestAuthenticator) getDisperserKeys(
 	ctx context.Context,
 	now time.Time,
-	disperserID uint32) (*gethcommon.Address, error) {
+	disperserID uint32) ([]gethcommon.Address, error) {
 
 	if !a.disperserIDFilter(disperserID) {
 		return nil, fmt.Errorf("invalid disperser ID: %d", disperserID)
 	}
 
-	key, ok := a.keyCache.Get(disperserID)
+	keys, ok := a.keyCache.Get(disperserID)
 	if ok {
-		expirationTime := key.expiration
+		expirationTime := keys.expiration
 		if now.Before(expirationTime) {
-			return &key.key, nil
+			return keys.keys, nil
 		}
 	}
 
-	address, err := a.chainReader.GetDisperserAddress(ctx, disperserID)
+	addresses, err := a.chainReader.GetAllDisperserAddresses(ctx, disperserID, uint32(a.keyLimit))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get disperser address: %w", err)
+		return nil, fmt.Errorf("failed to get disperser addresses: %w", err)
 	}
 
-	a.keyCache.Add(disperserID, &keyWithTimeout{
-		key:        address,
+	a.keyCache.Add(disperserID, &keysWithTimeout{
+		keys:       addresses,
 		expiration: now.Add(a.keyTimeoutDuration),
 	})
 
-	return &address, nil
+	return addresses, nil
 }

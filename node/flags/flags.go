@@ -284,6 +284,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_KEY_CACHE_SIZE"),
 		Value:    units.KiB,
 	}
+	DispersalAuthenticationKeyLimitFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "dispersal-authentication-key-limit"),
+		Usage:    "Maximum number of keys to check per disperser for authentication",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_KEY_LIMIT"),
+		Value:    32,
+	}
 	DisperserKeyTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-key-timeout"),
 		Usage:    "The duration for which a disperser key is cached",
@@ -704,6 +711,7 @@ var optionalFlags = []cli.Flag{
 	EnablePprof,
 	DisableDispersalAuthenticationFlag,
 	DispersalAuthenticationKeyCacheSizeFlag,
+	DispersalAuthenticationKeyLimitFlag,
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,

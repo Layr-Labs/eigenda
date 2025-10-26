@@ -1013,6 +1013,44 @@ func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (g
 	return address, nil
 }
 
+// GetAllDisperserAddresses returns all registered addresses for the disperser with the given ID.
+func (t *Reader) GetAllDisperserAddresses(
+	ctx context.Context, disperserID uint32, maxKeys uint32) ([]gethcommon.Address, error) {
+	registry := t.bindings.DisperserRegistry
+	if registry == nil {
+		return nil, errors.New("disperser registry not deployed")
+	}
+
+	var addresses []gethcommon.Address
+	var defaultAddress gethcommon.Address
+	
+	for keyIndex := uint32(0); keyIndex < maxKeys; keyIndex++ {
+		compositeKey := disperserID*maxKeys + keyIndex
+		
+		address, err := registry.DisperserKeyToAddress(
+			&bind.CallOpts{
+				Context: ctx,
+			},
+			compositeKey)
+		
+		if err != nil {
+			break
+		}
+		
+		if address == defaultAddress {
+			break
+		}
+		
+		addresses = append(addresses, address)
+	}
+	
+	if len(addresses) == 0 {
+		return nil, fmt.Errorf("no addresses found for disperser with id %d", disperserID)
+	}
+	
+	return addresses, nil
+}
+
 func (t *Reader) GetRelayRegistryAddress() gethcommon.Address {
 	return t.bindings.RelayRegistryAddress
 }

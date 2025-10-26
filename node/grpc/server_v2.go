@@ -74,6 +74,7 @@ func NewServerV2(
 			reader,
 			config.DispersalAuthenticationKeyCacheSize,
 			config.DisperserKeyTimeout,
+			config.DispersalAuthenticationKeyLimit,
 			func(id uint32) bool {
 				return id == api.EigenLabsDisperserID
 			},
