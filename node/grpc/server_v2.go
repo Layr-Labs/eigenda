@@ -78,6 +78,7 @@ func NewServerV2(
 			func(id uint32) bool {
 				return id == api.EigenLabsDisperserID
 			},
+			logger,
 			time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create authenticator: %w", err)
