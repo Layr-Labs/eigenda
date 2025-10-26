@@ -42,7 +42,7 @@ func VerifyStoreChunksRequest(key gethcommon.Address, request *grpc.StoreChunksR
 	signingAddress := crypto.PubkeyToAddress(*signingPublicKey)
 
 	if key.Cmp(signingAddress) != 0 {
-		return nil, fmt.Errorf("signature public key %x doesn't match registered public key %x", 
+		return nil, fmt.Errorf("signature public key %x doesn't match registered public key %x",
 			signingAddress.Hex(), key.Hex())
 	}
 	return requestHash, nil

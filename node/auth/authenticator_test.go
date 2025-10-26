@@ -279,8 +279,8 @@ func TestKeyCacheSize(t *testing.T) {
 		keyMap[uint32(i)] = privateKey
 
 		mockChainReader.Mock.On("GetAllDisperserAddresses", uint32(i), uint32(3)).Return([]gethcommon.Address{
-		disperserAddress,
-	}, nil)
+			disperserAddress,
+		}, nil)
 	}
 
 	logger := test.GetLogger()

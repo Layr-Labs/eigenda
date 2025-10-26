@@ -142,8 +142,8 @@ func (a *requestAuthenticator) getDisperserKeys(
 	}
 
 	for _, addr := range addresses {
-		a.logger.Debug("Adding disperser key", 
-			"disperserID", disperserID, 
+		a.logger.Debug("Adding disperser key",
+			"disperserID", disperserID,
 			"address", addr.Hex())
 	}
 
