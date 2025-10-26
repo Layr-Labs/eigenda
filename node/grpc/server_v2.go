@@ -74,9 +74,11 @@ func NewServerV2(
 			reader,
 			config.DispersalAuthenticationKeyCacheSize,
 			config.DisperserKeyTimeout,
+			config.DispersalAuthenticationKeyLimit,
 			func(id uint32) bool {
 				return id == api.EigenLabsDisperserID
 			},
+			logger,
 			time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create authenticator: %w", err)
