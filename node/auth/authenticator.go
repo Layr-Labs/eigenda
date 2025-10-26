@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
@@ -51,6 +52,9 @@ type requestAuthenticator struct {
 
 	// disperserIDFilter is a function that returns true if the given disperser ID is valid.
 	disperserIDFilter func(uint32) bool
+
+	// logger for debug output
+	logger logging.Logger
 }
 
 // NewRequestAuthenticator creates a new RequestAuthenticator.
@@ -61,6 +65,7 @@ func NewRequestAuthenticator(
 	keyTimeoutDuration time.Duration,
 	keyLimit int,
 	disperserIDFilter func(uint32) bool,
+	logger logging.Logger,
 	now time.Time) (RequestAuthenticator, error) {
 
 	keyCache, err := lru.New[uint32, *keysWithTimeout](keyCacheSize)
@@ -74,6 +79,7 @@ func NewRequestAuthenticator(
 		keyTimeoutDuration: keyTimeoutDuration,
 		keyLimit:           keyLimit,
 		disperserIDFilter:  disperserIDFilter,
+		logger:             logger,
 	}
 
 	err = authenticator.preloadCache(ctx, now)
@@ -133,6 +139,12 @@ func (a *requestAuthenticator) getDisperserKeys(
 	addresses, err := a.chainReader.GetAllDisperserAddresses(ctx, disperserID, uint32(a.keyLimit))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get disperser addresses: %w", err)
+	}
+
+	for _, addr := range addresses {
+		a.logger.Debug("Adding disperser key", 
+			"disperserID", disperserID, 
+			"address", addr.Hex())
 	}
 
 	a.keyCache.Add(disperserID, &keysWithTimeout{

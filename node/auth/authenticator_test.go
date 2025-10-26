@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	wmock "github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,7 @@ func TestValidRequest(t *testing.T) {
 		disperserAddress,
 	}, nil)
 
+	logger := test.GetLogger()
 	authenticator, err := NewRequestAuthenticator(
 		ctx,
 		&chainReader,
@@ -35,6 +37,7 @@ func TestValidRequest(t *testing.T) {
 		time.Minute,
 		3,
 		func(uint32) bool { return true },
+		logger,
 		start)
 	require.NoError(t, err)
 
@@ -65,6 +68,7 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 		disperserAddress,
 	}, nil)
 
+	logger := test.GetLogger()
 	authenticator, err := NewRequestAuthenticator(
 		ctx,
 		&chainReader,
@@ -72,6 +76,7 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 		time.Minute,
 		3,
 		func(uint32) bool { return true },
+		logger,
 		start)
 	require.NoError(t, err)
 
@@ -102,6 +107,7 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 		disperserAddress,
 	}, nil)
 
+	logger := test.GetLogger()
 	authenticator, err := NewRequestAuthenticator(
 		ctx,
 		&chainReader,
@@ -109,6 +115,7 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 		time.Minute,
 		3,
 		func(uint32) bool { return true },
+		logger,
 		start)
 	require.NoError(t, err)
 
@@ -150,6 +157,7 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 
 	filterCallCount := atomic.Uint32{}
 
+	logger := test.GetLogger()
 	authenticator, err := NewRequestAuthenticator(
 		ctx,
 		&chainReader,
@@ -160,6 +168,7 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 			filterCallCount.Add(1)
 			return id != uint32(1)
 		},
+		logger,
 		start)
 	require.NoError(t, err)
 	require.Equal(t, uint32(1), filterCallCount.Load())
@@ -205,6 +214,7 @@ func TestKeyExpiry(t *testing.T) {
 		disperserAddress,
 	}, nil)
 
+	logger := test.GetLogger()
 	authenticator, err := NewRequestAuthenticator(
 		ctx,
 		&mockChainReader,
@@ -212,6 +222,7 @@ func TestKeyExpiry(t *testing.T) {
 		time.Minute,
 		3,
 		func(uint32) bool { return true },
+		logger,
 		start)
 	require.NoError(t, err)
 
@@ -272,6 +283,7 @@ func TestKeyCacheSize(t *testing.T) {
 	}, nil)
 	}
 
+	logger := test.GetLogger()
 	authenticator, err := NewRequestAuthenticator(
 		ctx,
 		&mockChainReader,
@@ -279,6 +291,7 @@ func TestKeyCacheSize(t *testing.T) {
 		time.Minute,
 		3,
 		func(uint32) bool { return true },
+		logger,
 		start)
 	require.NoError(t, err)
 
