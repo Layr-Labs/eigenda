@@ -16,6 +16,137 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+func TestInfoEndpoint(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
+	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
+
+	t.Run("Success - Returns All PublicInfo Fields", func(t *testing.T) {
+		// Setup test config with known values
+		testPublicInfo := PubliclyExposedInfo{
+			Version:             "1.2.3",
+			Network:             "mainnet",
+			DirectoryAddress:    "0x1234567890abcdef",
+			CertVerifierAddress: "0xfedcba0987654321",
+			MaxBlobSizeBytes:    16777216, // 16 MiB
+			RecencyWindowSize:   100,
+			// DispersalBackend will be set dynamically
+		}
+
+		cfg := Config{
+			Host: "localhost",
+			Port: 0,
+			APIsEnabled: &enablement.RestApisEnabled{
+				Admin:               true,
+				OpGenericCommitment: true,
+				OpKeccakCommitment:  true,
+				StandardCommitment:  true,
+			},
+			PublicInfo: testPublicInfo,
+		}
+
+		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
+
+		req := httptest.NewRequest(http.MethodGet, "/info", nil)
+		rec := httptest.NewRecorder()
+
+		r := mux.NewRouter()
+		server := NewServer(cfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+		server.RegisterRoutes(r)
+		r.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+		var response PubliclyExposedInfo
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		// Verify all fields
+		require.Equal(t, testPublicInfo.Version, response.Version)
+		require.Equal(t, testPublicInfo.Network, response.Network)
+		require.Equal(t, testPublicInfo.DirectoryAddress, response.DirectoryAddress)
+		require.Equal(t, testPublicInfo.CertVerifierAddress, response.CertVerifierAddress)
+		require.Equal(t, testPublicInfo.MaxBlobSizeBytes, response.MaxBlobSizeBytes)
+		require.Equal(t, testPublicInfo.RecencyWindowSize, response.RecencyWindowSize)
+		require.Equal(t, common.EigenDABackendToString(common.V1EigenDABackend), response.DispersalBackend)
+	})
+
+	t.Run("Success - Dynamically Updates Dispersal Backend V1", func(t *testing.T) {
+		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
+
+		req := httptest.NewRequest(http.MethodGet, "/info", nil)
+		rec := httptest.NewRecorder()
+
+		r := mux.NewRouter()
+		server := NewServer(testCfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+		server.RegisterRoutes(r)
+		r.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var response PubliclyExposedInfo
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Equal(t, "V1", response.DispersalBackend)
+	})
+
+	t.Run("Success - Dynamically Updates Dispersal Backend V2", func(t *testing.T) {
+		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V2EigenDABackend)
+
+		req := httptest.NewRequest(http.MethodGet, "/info", nil)
+		rec := httptest.NewRecorder()
+
+		r := mux.NewRouter()
+		server := NewServer(testCfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+		server.RegisterRoutes(r)
+		r.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var response PubliclyExposedInfo
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Equal(t, "V2", response.DispersalBackend)
+	})
+
+	t.Run("Success - Info Endpoint Always Available", func(t *testing.T) {
+		// Unlike admin endpoints, /info should always be available
+		adminDisabledCfg := Config{
+			Host: "localhost",
+			Port: 0,
+			APIsEnabled: &enablement.RestApisEnabled{
+				Admin:               false,
+				OpGenericCommitment: false,
+				OpKeccakCommitment:  false,
+				StandardCommitment:  false,
+			},
+			PublicInfo: PubliclyExposedInfo{
+				Version: "test-version",
+			},
+		}
+
+		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
+
+		req := httptest.NewRequest(http.MethodGet, "/info", nil)
+		rec := httptest.NewRecorder()
+
+		r := mux.NewRouter()
+		server := NewServer(adminDisabledCfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+		server.RegisterRoutes(r)
+		r.ServeHTTP(rec, req)
+
+		// Should succeed even with admin endpoints disabled
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var response PubliclyExposedInfo
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Equal(t, "test-version", response.Version)
+	})
+}
+
 func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
