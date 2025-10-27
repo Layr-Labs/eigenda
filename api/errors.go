@@ -5,6 +5,9 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/Layr-Labs/eigenda/api/grpc/common"
 )
 
 // The canonical errors from the EigenDA gRPC API endpoints.
@@ -36,6 +39,36 @@ func NewErrorNotFound(msg string) error {
 // HTTP Mapping: 429 Too Many Requests
 func NewErrorResourceExhausted(msg string) error {
 	return newErrorGRPC(codes.ResourceExhausted, msg)
+}
+
+// NewErrorResourceExhaustedWithRateLimitDetails creates a RESOURCE_EXHAUSTED error with rate limit details.
+// This allows clients to distinguish rate limit errors from other RESOURCE_EXHAUSTED errors
+// and provides guidance on when to retry.
+func NewErrorResourceExhaustedWithRateLimitDetails(msg string, rateLimitType common.RateLimitType, quorumId uint32, retryAfterSeconds uint32, context string) error {
+	// Create the rate limit details
+	details := &common.RateLimitDetails{
+		RateLimitType:     rateLimitType,
+		QuorumId:          quorumId,
+		RetryAfterSeconds: retryAfterSeconds,
+		Context:           context,
+	}
+
+	// Convert to Any
+	anyDetails, err := anypb.New(details)
+	if err != nil {
+		// Fallback to simple error if we can't create details
+		return newErrorGRPC(codes.ResourceExhausted, msg)
+	}
+
+	// Create status with details
+	st := status.New(codes.ResourceExhausted, msg)
+	st, err = st.WithDetails(anyDetails)
+	if err != nil {
+		// Fallback to simple error if we can't add details
+		return newErrorGRPC(codes.ResourceExhausted, msg)
+	}
+
+	return st.Err()
 }
 
 // HTTP Mapping: 401 Unauthorized
