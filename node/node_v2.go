@@ -108,7 +108,7 @@ func (n *Node) DetermineChunkLocations(
 // Although indices may not be contiguous, it is safe to assume that they will be "mostly contiguous".
 // In practice, we should expect to see at most one continuous range of indices per quorum.
 //
-// Eventually, the assignment logic aught to be refactored to return ranges of chunks instead of individual
+// Eventually, the assignment logic ought to be refactored to return ranges of chunks instead of individual
 // of individual indices, but the required changes are non-trivial.
 func convertIndicesToRangeRequests(blobKey corev2.BlobKey, indices []uint32) []*relay.ChunkRequestByRange {
 	requests := make([]*relay.ChunkRequestByRange, 0)
@@ -121,8 +121,9 @@ func convertIndicesToRangeRequests(blobKey corev2.BlobKey, indices []uint32) []*
 		if indices[i] != indices[i-1]+1 {
 			// break in continuity, create a request for the previous range
 			request := &relay.ChunkRequestByRange{
-				Start: startIndex,       // inclusive
-				End:   indices[i-1] + 1, // exclusive
+				BlobKey: blobKey,
+				Start:   startIndex,       // inclusive
+				End:     indices[i-1] + 1, // exclusive
 			}
 			requests = append(requests, request)
 			startIndex = indices[i]
