@@ -70,6 +70,8 @@ func (v *validatorQuorumLookup) GetQuorumsForValidator(
 
 	quorumIDs := make([]core.QuorumID, 0)
 
+	// An implementation detail of the solidity: the number returned by the contract is a bitmap backed by a
+	// uint192, so we need to check each bit up to 192. If we check for higher bits, we will panic.
 	for i := 0; i <= 192; i++ {
 		present := bigIntBitmap.Bit(i)
 		if present == 1 {
