@@ -12,11 +12,36 @@ const (
 	CustomDAPreimageType PreimageType = 3
 )
 
+// TODO: Reduce this mapping logic to be less generalized to
+//
+//	multi PreimageType since EigenDA x CustomDA only
+//	cares about the one key
+//
 // PreimagesMap maintains a nested mapping:
 // //   preimage_type -> preimage_hash_key -> preimage bytes
 //
 // only the CustomDAPreimageType is used for EigenDAV2 batches
 type PreimagesMap map[PreimageType]map[common.Hash][]byte
+
+// PreimageRecorder is used to add (key,value) pair to the map accessed by key = ty of a bigger map, preimages.
+// If ty doesn't exist as a key in the preimages map,
+// then it is intialized to map[common.Hash][]byte and then (key,value) pair is added
+type PreimageRecorder func(key common.Hash, value []byte, ty PreimageType)
+
+// RecordPreimagesTo takes in preimages map and returns a function that can be used
+// In recording (hash,preimage) key value pairs into preimages map,
+// when fetching payload through RecoverPayloadFromBatch
+func RecordPreimagesTo(preimages PreimagesMap) PreimageRecorder {
+	if preimages == nil {
+		return nil
+	}
+	return func(key common.Hash, value []byte, ty PreimageType) {
+		if preimages[ty] == nil {
+			preimages[ty] = make(map[common.Hash][]byte)
+		}
+		preimages[ty][key] = value
+	}
+}
 
 /*
 	These response types are copied verbatim (types, comments) from the upstream nitro reference implementation.

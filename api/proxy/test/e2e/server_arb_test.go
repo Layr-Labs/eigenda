@@ -59,22 +59,24 @@ func TestArbCustomDAStoreAndRecoverMethods(t *testing.T) {
 	var storeResult *arbitrum_altda.StoreResult
 	seqMessageArg := "0xDEADBEEF"
 	timeoutArg := hexutil.Uint(200)
-	disableFallbackStoreDataOnChain := false
 
 	err = rpcClient.Call(&storeResult, arbitrum_altda.MethodStore,
 		seqMessageArg,
-		timeoutArg,
-		disableFallbackStoreDataOnChain)
+		timeoutArg)
 	require.NoError(t, err)
 
 	var recoverPayloadResult *arbitrum_altda.PayloadResult
 	batchNum := hexutil.Uint(0)
 	batchBlockHash := gethcommon.HexToHash("0x43")
 
+	// pad 40 bytes for "message header"
+	seqMessage := hexutil.Bytes(make([]byte, 40))
+	seqMessage = append(seqMessage, storeResult.SerializedDACert...)
+
 	err = rpcClient.Call(&recoverPayloadResult, arbitrum_altda.MethodRecoverPayload,
 		batchNum,
 		batchBlockHash,
-		storeResult.SerializedDACert,
+		seqMessage,
 	)
 	require.NoError(t, err)
 
