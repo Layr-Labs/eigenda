@@ -271,6 +271,12 @@ function start_detached_for_tests {
     done
 
     for FILE in $(ls $testpath/envs/enc*.env); do
+        # Skip enc1 - it runs as a goroutine in tests (encoder v2)
+        if [[ "$FILE" == *"enc1.env" ]]; then
+            echo "Skipping enc1 (encoder v2 running as goroutine in tests)"
+            continue
+        fi
+
         set -a
         source $FILE
         set +a
