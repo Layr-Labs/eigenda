@@ -26,28 +26,6 @@ func SignStoreChunksRequest(key *ecdsa.PrivateKey, request *grpc.StoreChunksRequ
 	return signature, nil
 }
 
-// VerifyStoreChunksRequest verifies the given signature of the given StoreChunksRequest with the given
-// public key. Returns the hash of the request.
-func VerifyStoreChunksRequest(key gethcommon.Address, request *grpc.StoreChunksRequest) ([]byte, error) {
-	requestHash, err := hashing.HashStoreChunksRequest(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to hash request: %w", err)
-	}
-
-	signingPublicKey, err := crypto.SigToPub(requestHash, request.GetSignature())
-	if err != nil {
-		return nil, fmt.Errorf("failed to recover public key from signature %x: %w", request.GetSignature(), err)
-	}
-
-	signingAddress := crypto.PubkeyToAddress(*signingPublicKey)
-
-	if key.Cmp(signingAddress) != 0 {
-		return nil, fmt.Errorf("signature public key %x doesn't match registered public key %x",
-			signingAddress.Hex(), key.Hex())
-	}
-	return requestHash, nil
-}
-
 // VerifyStoreChunksRequestWithKeys verifies the given signature against any of the provided keys.
 // Returns the hash of the request if valid, error if signature doesn't match any key.
 func VerifyStoreChunksRequestWithKeys(keys []gethcommon.Address, request *grpc.StoreChunksRequest) ([]byte, error) {

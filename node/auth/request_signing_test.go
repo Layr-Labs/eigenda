@@ -5,6 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/test/random"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -174,7 +175,7 @@ func TestRequestSigning(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	hash, err := VerifyStoreChunksRequest(publicAddress, request)
+	hash, err := VerifyStoreChunksRequestWithKeys([]gethcommon.Address{publicAddress}, request)
 	require.NoError(t, err)
 	expectedHash, err := hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
@@ -183,7 +184,7 @@ func TestRequestSigning(t *testing.T) {
 	// Using a different public key should make the signature invalid
 	otherPublicAddress, _, err := rand.EthAccount()
 	require.NoError(t, err)
-	_, err = VerifyStoreChunksRequest(otherPublicAddress, request)
+	_, err = VerifyStoreChunksRequestWithKeys([]gethcommon.Address{otherPublicAddress}, request)
 	require.Error(t, err)
 
 	// Changing a byte in the signature should make it invalid
@@ -191,12 +192,12 @@ func TestRequestSigning(t *testing.T) {
 	copy(alteredSignature, signature)
 	alteredSignature[0] = alteredSignature[0] + 1
 	request.Signature = alteredSignature
-	_, err = VerifyStoreChunksRequest(publicAddress, request)
+	_, err = VerifyStoreChunksRequestWithKeys([]gethcommon.Address{publicAddress}, request)
 	require.Error(t, err)
 
 	// Changing a field in the request should make it invalid
 	request.DisperserID = request.GetDisperserID() + 1
 	request.Signature = signature
-	_, err = VerifyStoreChunksRequest(publicAddress, request)
+	_, err = VerifyStoreChunksRequestWithKeys([]gethcommon.Address{publicAddress}, request)
 	require.Error(t, err)
 }

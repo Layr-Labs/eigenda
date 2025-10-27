@@ -198,7 +198,7 @@ func TestKMSSignatureVerification(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			testRequest := tt.setupRequest()
 
-			hash, err := auth.VerifyStoreChunksRequest(publicAddress, testRequest)
+			hash, err := auth.VerifyStoreChunksRequestWithKeys([]gethcommon.Address{publicAddress}, testRequest)
 
 			if tt.expectError {
 				require.Error(t, err, tt.errorDescription)
@@ -235,7 +235,7 @@ func TestKMSSignatureVerification(t *testing.T) {
 		require.NoError(t, err, "failed to sign request with second key")
 
 		request2.Signature = signature2
-		hash, err := auth.VerifyStoreChunksRequest(publicAddress2, request2)
+		hash, err := auth.VerifyStoreChunksRequestWithKeys([]gethcommon.Address{publicAddress2}, request2)
 		require.NoError(t, err, "second key signature verification should succeed")
 		require.NotNil(t, hash, "hash should not be nil for valid second key signature")
 	})
