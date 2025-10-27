@@ -23,8 +23,6 @@ type TestClientConfig struct {
 	// The disperser's port
 	DisperserPort int `docs:"required"`
 	// The URL(s) to point the eth client to
-	//
-	// Either this or EthRpcUrlsVar must be set. If both are set, EthRpcUrls is used.
 	EthRpcUrls []string `docs:"required"`
 	// The contract address for the EigenDA address directory, where all contract addresses are stored
 	ContractDirectoryAddress string `docs:"required"`
