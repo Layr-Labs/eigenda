@@ -14,7 +14,7 @@ We define the **Blob parameters** as a tuple **$(n, c, \gamma)$** where:
 
 - $n$ (`MaxNumOperators`): Maximum number of validators allowed in EigenDA.  
 - $c$ (`NumChunks`): The total number of encoded chunks after erasure coding (must be a power of 2).  
-- $\gamma$ (`1/CodingRate`): The ratio of original data to total encoded chunks, providing redundancy (must be an inverse power of 2). Note that for representational purposes, the `CodingRate` in our code is the inverse of  $\gamma$, the standard coding rate used in coding theory.
+- $\gamma$ (`1/CodingRate`): The ratio of original data to total encoded chunks, providing redundancy (must be an inverse power of 2). Note that for representational purposes, the `CodingRate` in our code is the inverse of $\gamma$, while $\gamma$ is the the standard coding rate used in coding theory.
 
 Among the blob parameters, `CodingRate` and `NumChunks` are used in the [encoding](./encoding.md) process, while `NumChunks` and `MaxNumOperators` are used in the chunk [assignment](./assignment.md) process.
 

@@ -32,7 +32,7 @@ The assignment algorithm uses two key strategies to minimize storage:
 
 2. **Reconstruction Capping:** Each validator is assigned at most the number of chunks needed to independently reconstruct the blob.
 
-**Example:** Consider a validator with 5% stake in quorum 0 and 15% stake in quorum 1. Without optimization, the validator might receive two non-overlapping sets of chunks (one per quorum), totaling up to 20% of all chunks. With overlap optimization, the validator stores only `max(chunks_quorum_0, chunks_quorum_1)` unique chunks, which is 15% of the total chunks. With reconstruction capping, if the coding rate is $r = 8$, the validator only needs to store 1/8 of the total chunks.
+**Example:** Consider a validator with 5% stake in quorum 0 and 15% stake in quorum 1. Without optimization, the validator might receive two non-overlapping sets of chunks (one per quorum), totaling up to 20% of all chunks. With overlap optimization, the validator stores only `max(chunks_quorum_0, chunks_quorum_1)` unique chunks, which is 15% of the total chunks. With reconstruction capping, if the [coding rate](./security-parameters.md#blob-parameters) is $\gamma = 1/8$, the validator only needs to store 1/8 of the total chunks.
 
 #### Algorithm Components
 
@@ -50,9 +50,9 @@ This algorithm guarantees that validators participating in both quorums store on
 
 **3. MergeAssignmentsAndCap:** Merges assignments across all quorums and caps the total at the reconstruction threshold:
 ```math
-\text{max\_chunks} = c / r
+\text{max\_chunks} = c \cdot \gamma
 ```
- where $c$ is the total number of chunks and $r$ is the coding rate. This cap exists because once a validator has enough unique chunks to reconstruct the blob, additional chunks provide no incremental security benefit. Therefore, pruning the extra chunks improves performance and reduces storage and bandwidth requirements without affecting security.
+ where $c$ is the total number of chunks and $\gamma$ is the [coding rate](./security-parameters.md#blob-parameters). This cap exists because once a validator has enough unique chunks to reconstruct the blob, additional chunks provide no incremental security benefit. Therefore, pruning the extra chunks improves performance and reduces storage and bandwidth requirements without affecting security.
 
 **4. GetAssignmentsForBlob:** Coordinates the full multi-quorum assignment process:
 1. Generate the assignment for quorum 0 using `GetAssignmentsForQuorum`
