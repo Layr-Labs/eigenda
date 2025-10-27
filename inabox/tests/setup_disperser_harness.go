@@ -16,16 +16,21 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
+	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay"
@@ -68,7 +73,6 @@ type DisperserHarnessConfig struct {
 
 // DisperserHarness is the harness for spinning up the disperser infrastructure as goroutines.
 // It will only support V2 components of the disperser.
-// TODO: Add api server
 type DisperserHarness struct {
 	// LocalStack infrastructure for blobstore and metadata store
 	LocalStack     *testbed.LocalStackContainer
@@ -85,6 +89,9 @@ type DisperserHarness struct {
 
 	// Encoder V2
 	EncoderServerV2 *encoder.EncoderServerV2
+
+	// API Server V2
+	APIServerV2 *apiserver.DispersalServerV2
 
 	// Controller components
 	// TODO: Refactor into a single struct for controller components
@@ -232,6 +239,18 @@ func SetupDisperserHarness(
 		return nil, fmt.Errorf("failed to start controller: %w", err)
 	}
 
+	// Start API server v2 goroutine
+	controllerAddress := "localhost:30000" // Controller gRPC server address
+	if _, err := startAPIServerV2(
+		ctx,
+		ethClient,
+		controllerAddress,
+		harness,
+		config,
+	); err != nil {
+		return nil, fmt.Errorf("failed to start API server v2: %w", err)
+	}
+
 	// Start remaining binaries (disperser, batcher, etc.)
 	if config.TestConfig != nil {
 		logger.Info("Starting remaining binaries")
@@ -315,6 +334,14 @@ func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) 
 	if dh.EncoderServerV2 != nil {
 		logger.Info("Stopping encoder v2 server")
 		dh.EncoderServerV2.Close()
+	}
+
+	// Stop API server v2
+	if dh.APIServerV2 != nil {
+		logger.Info("Stopping API server v2")
+		if err := dh.APIServerV2.Stop(); err != nil {
+			logger.Error("Failed to stop API server v2", "error", err)
+		}
 	}
 
 	// Stop controller components
@@ -538,7 +565,7 @@ func startEncoderV2(
 	encoderMetrics.Start(ctx)
 
 	// Get SRS paths using the utility function
-	g1Path, _, err := getSRSPaths()
+	g1Path, _, _, err := getSRSPaths()
 	if err != nil {
 		_ = logFile.Close()
 		return "", fmt.Errorf("failed to determine SRS file paths: %w", err)
@@ -941,4 +968,219 @@ func startController(
 	controllerLogger.Info("Controller components started successfully", "logFile", logFilePath)
 
 	return nil
+}
+
+// startAPIServerV2 starts the API server v2 as a goroutine and returns its actual address
+func startAPIServerV2(
+	ctx context.Context,
+	ethClient common.EthClient,
+	controllerAddress string,
+	harness *DisperserHarness,
+	config DisperserHarnessConfig,
+) (string, error) {
+	if config.TestConfig == nil {
+		return "", fmt.Errorf("test config is required to start API server v2")
+	}
+
+	// Create logs directory
+	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create logs directory: %w", err)
+	}
+
+	logFilePath := fmt.Sprintf("%s/apiserver_v2.log", logsDir)
+	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return "", fmt.Errorf("failed to open API server log file: %w", err)
+	}
+
+	// Create API server logger config for file output
+	loggerConfig := common.LoggerConfig{
+		Format:       common.TextLogFormat,
+		OutputWriter: io.MultiWriter(os.Stdout, logFile),
+		HandlerOpts: logging.SLoggerOptions{
+			Level:     slog.LevelDebug,
+			NoColor:   true,
+			AddSource: true,
+		},
+	}
+
+	// Create logger
+	apiServerLogger, err := common.NewLogger(&loggerConfig)
+	if err != nil {
+		_ = logFile.Close()
+		return "", fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	// Create AWS clients using LocalStack container's configuration
+	awsConfig := harness.LocalStack.GetAWSClientConfig()
+
+	// Create DynamoDB client
+	dynamoClient, err := dynamodb.NewClient(awsConfig, apiServerLogger)
+	if err != nil {
+		_ = logFile.Close()
+		return "", fmt.Errorf("failed to create dynamodb client: %w", err)
+	}
+
+	// Create S3 client
+	s3Client, err := s3.NewClient(ctx, awsConfig, apiServerLogger)
+	if err != nil {
+		_ = logFile.Close()
+		return "", fmt.Errorf("failed to create s3 client: %w", err)
+	}
+
+	// Create metrics registry
+	metricsRegistry := prometheus.NewRegistry()
+
+	// Create metadata store
+	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, apiServerLogger, config.MetadataTableNameV2)
+	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+		ServiceName: "apiserver",
+		Registry:    metricsRegistry,
+		Backend:     blobstore.BackendDynamoDB,
+	})
+
+	// Create blob store
+	blobStore := blobstore.NewBlobStore(config.S3BucketName, s3Client, apiServerLogger)
+
+	// Create committer
+	g1Path, g2Path, g2TrailingPath, err := getSRSPaths()
+	if err != nil {
+		_ = logFile.Close()
+		return "", fmt.Errorf("failed to determine SRS file paths: %w", err)
+	}
+
+	committerConfig := committer.Config{
+		SRSNumberToLoad:   10000,
+		G1SRSPath:         g1Path,
+		G2SRSPath:         g2Path,
+		G2TrailingSRSPath: g2TrailingPath,
+	}
+
+	kzgCommitter, err := committer.NewFromConfig(committerConfig)
+	if err != nil {
+		_ = logFile.Close()
+		return "", fmt.Errorf("failed to create committer: %w", err)
+	}
+
+	// Create chain reader
+	chainReader, err := eth.NewReader(
+		apiServerLogger,
+		ethClient,
+		config.TestConfig.EigenDA.OperatorStateRetriever,
+		config.TestConfig.EigenDA.ServiceManager)
+	if err != nil {
+		_ = logFile.Close()
+		return "", fmt.Errorf("failed to create chain reader: %w", err)
+	}
+
+	// Create blob request authenticator
+	authenticator := authv2.NewPaymentStateAuthenticator(
+		5*time.Minute, // AuthPmtStateRequestMaxPastAge
+		5*time.Minute, // AuthPmtStateRequestMaxFutureAge
+	)
+
+	// Create meterer
+	// Note: The meterer is always created to serve GetPaymentState calls, even when using
+	// controller-mediated payments. The UseControllerMediatedPayments flag controls which
+	// payment system is used for authorization during dispersals, but doesn't affect
+	// whether the meterer is available for querying payment state.
+	apiServerLogger.Info("Creating meterer")
+
+	mtConfig := meterer.Config{
+		ChainReadTimeout: 5 * time.Second,
+		UpdateInterval:   1 * time.Second, // Match deploy config for tests
+	}
+
+	paymentChainState, err := meterer.NewOnchainPaymentState(ctx, chainReader, apiServerLogger)
+	if err != nil {
+		_ = logFile.Close()
+		return "", fmt.Errorf("failed to create onchain payment state: %w", err)
+	}
+	if err := paymentChainState.RefreshOnchainPaymentState(ctx); err != nil {
+		_ = logFile.Close()
+		return "", fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
+	}
+
+	// Use the standard v2 payment table prefix
+	const v2PaymentPrefix = "e2e_v2_"
+	meteringStore, err := meterer.NewDynamoDBMeteringStore(
+		awsConfig,
+		v2PaymentPrefix+"reservation",        // ReservationsTableName
+		v2PaymentPrefix+"ondemand",           // OnDemandTableName
+		v2PaymentPrefix+"global_reservation", // GlobalRateTableName
+		apiServerLogger,
+	)
+	if err != nil {
+		_ = logFile.Close()
+		return "", fmt.Errorf("failed to create offchain store: %w", err)
+	}
+
+	mt := meterer.NewMeterer(
+		mtConfig,
+		paymentChainState,
+		meteringStore,
+		apiServerLogger,
+	)
+	mt.Start(ctx)
+
+	// Create server config
+	serverConfig := disperser.ServerConfig{
+		GrpcPort:              "32005", // Use a specific port for API server
+		GrpcTimeout:           10 * time.Second,
+		MaxConnectionAge:      5 * time.Minute,
+		MaxConnectionAgeGrace: 30 * time.Second,
+		MaxIdleConnectionAge:  1 * time.Minute,
+	}
+
+	metricsConfig := disperser.MetricsConfig{
+		HTTPPort:      "9100",
+		EnableMetrics: true,
+	}
+
+	// Max number of symbols per blob (based on typical config)
+	const maxNumSymbolsPerBlob = 16 * 1024 * 1024
+
+	// Onchain state refresh interval
+	onchainStateRefreshInterval := 1 * time.Second
+
+	// Create API server v2
+	// Note: meterer is nil when using controller-mediated payments, otherwise it's the legacy meterer
+	apiServerV2, err := apiserver.NewDispersalServerV2(
+		serverConfig,
+		blobStore,
+		metadataStore,
+		chainReader,
+		mt, // meterer (nil when using controller-mediated payments, otherwise legacy meterer)
+		authenticator,
+		kzgCommitter,
+		maxNumSymbolsPerBlob,
+		onchainStateRefreshInterval,
+		apiServerLogger,
+		metricsRegistry,
+		metricsConfig,
+		false, // ReservedOnly
+		config.TestConfig.UseControllerMediatedPayments,
+		controllerAddress,
+	)
+	if err != nil {
+		_ = logFile.Close()
+		return "", fmt.Errorf("failed to create API server v2: %w", err)
+	}
+
+	// Start API server in background
+	go func() {
+		apiServerLogger.Info("Starting API server v2", "port", serverConfig.GrpcPort, "logFile", logFilePath)
+		if err := apiServerV2.Start(ctx); err != nil {
+			apiServerLogger.Error("API server v2 failed", "error", err)
+		}
+	}()
+
+	// Store server in harness
+	harness.APIServerV2 = apiServerV2
+
+	actualAddress := fmt.Sprintf("localhost:%s", serverConfig.GrpcPort)
+	apiServerLogger.Info("API server v2 started successfully", "address", actualAddress, "logFile", logFilePath)
+
+	return actualAddress, nil
 }
