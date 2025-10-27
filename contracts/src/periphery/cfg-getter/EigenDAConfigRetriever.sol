@@ -38,9 +38,8 @@ contract EigenDAConfigRetriever {
         }
         // Collect the checkpoints from startIndex to the end
         uint256 resultCount = numCheckpoints - startIndex;
-        ConfigRegistryTypes.Bytes32Checkpoint[] memory results = new ConfigRegistryTypes.Bytes32Checkpoint[](
-            resultCount
-        );
+        ConfigRegistryTypes.Bytes32Checkpoint[] memory results =
+            new ConfigRegistryTypes.Bytes32Checkpoint[](resultCount);
         for (uint256 i = 0; i < resultCount; i++) {
             results[i] = configRegistry.getCheckpointBytes32(nameDigest, startIndex + i);
         }
@@ -55,7 +54,7 @@ contract EigenDAConfigRetriever {
     {
         bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
         uint256 numCheckpoints = configRegistry.getNumCheckpointsBytes(nameDigest);
-        
+
         // There are 3 cases to handle:
         // 1. If no checkpoints have activation keys greater than the provided activation key, we return an empty array.
         // 2. If all checkpoints have activation keys greater than the provided activation key, we return the entire array.
@@ -71,9 +70,7 @@ contract EigenDAConfigRetriever {
         }
         // Collect the checkpoints from startIndex to the end
         uint256 resultCount = numCheckpoints - startIndex;
-        ConfigRegistryTypes.BytesCheckpoint[] memory results = new ConfigRegistryTypes.BytesCheckpoint[](
-            resultCount
-        );
+        ConfigRegistryTypes.BytesCheckpoint[] memory results = new ConfigRegistryTypes.BytesCheckpoint[](resultCount);
         for (uint256 i = 0; i < resultCount; i++) {
             results[i] = configRegistry.getCheckpointBytes(nameDigest, startIndex + i);
         }
