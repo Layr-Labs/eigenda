@@ -256,10 +256,10 @@ func (c *ociClient) FragmentedUploadObject(
 
 	for _, fragment := range fragments {
 		fragmentCapture := fragment
-		c.concurrencyLimiter <- struct{}{}
+		<-c.concurrencyLimiter
 		go func() {
 			defer func() {
-				<-c.concurrencyLimiter
+				c.concurrencyLimiter <- struct{}{}
 			}()
 			c.fragmentedWriteTask(ctx, resultChannel, fragmentCapture, bucket)
 		}()
@@ -320,10 +320,10 @@ func (c *ociClient) FragmentedDownloadObject(
 	for i, fragmentKey := range fragmentKeys {
 		boundFragmentKey := fragmentKey
 		boundI := i
-		c.concurrencyLimiter <- struct{}{}
+		<-c.concurrencyLimiter
 		go func() {
 			defer func() {
-				<-c.concurrencyLimiter
+				c.concurrencyLimiter <- struct{}{}
 			}()
 			c.readTask(ctx, resultChannel, bucket, boundFragmentKey, boundI)
 		}()
