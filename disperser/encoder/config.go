@@ -5,7 +5,6 @@ const (
 )
 
 type ServerConfig struct {
-	GrpcPort                 string
 	MaxConcurrentRequests    int
 	RequestPoolSize          int
 	RequestQueueSize         int
