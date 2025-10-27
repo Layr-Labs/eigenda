@@ -115,6 +115,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Proxy build stage
 FROM common-builder AS proxy-builder
+ARG SEMVER
+ARG GITCOMMIT
+ARG GITDATE
 WORKDIR /app/api/proxy
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
