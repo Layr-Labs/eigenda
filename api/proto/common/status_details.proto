@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package common;
+
+import "google/rpc/error_details.proto";
+
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common";
+
+// RateLimitDetails provides additional information when a request is rate limited.
+// This allows clients to distinguish rate limit errors from other RESOURCE_EXHAUSTED errors
+// and provides guidance on when to retry.
+message RateLimitDetails {
+  // The type of rate limit that was exceeded
+  RateLimitType rate_limit_type = 1;
+  
+  // The quorum ID that was rate limited (if applicable)
+  uint32 quorum_id = 2;
+  
+  // Suggested retry delay in seconds
+  uint32 retry_after_seconds = 3;
+  
+  // Additional context about the rate limit
+  string context = 4;
+}
+
+// RateLimitType enumerates the different types of rate limits
+enum RateLimitType {
+  RATE_LIMIT_TYPE_UNSPECIFIED = 0;
+  
+  // System-level throughput rate limit
+  SYSTEM_THROUGHPUT_RATE_LIMIT = 1;
+  
+  // System-level blob rate limit  
+  SYSTEM_BLOB_RATE_LIMIT = 2;
+  
+  // Account-level throughput rate limit
+  ACCOUNT_THROUGHPUT_RATE_LIMIT = 3;
+  
+  // Account-level blob rate limit
+  ACCOUNT_BLOB_RATE_LIMIT = 4;
+  
+  // Retrieval throughput rate limit
+  RETRIEVAL_THROUGHPUT_RATE_LIMIT = 5;
+  
+  // Retrieval blob rate limit
+  RETRIEVAL_BLOB_RATE_LIMIT = 6;
+  
+  // Request queue is full
+  REQUEST_QUEUE_FULL = 7;
+  
+  // Global rate limit exceeded
+  GLOBAL_RATE_LIMIT_EXCEEDED = 8;
+}
