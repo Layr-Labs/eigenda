@@ -8,9 +8,9 @@ import (
 	"os"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	commonpprof "github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -116,7 +116,9 @@ func RunEncoderServer(ctx *cli.Context) error {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
 
-		s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
+		// Create object storage client (supports both S3 and OCI)
+		objectStorageClient, err := blobstore.CreateObjectStorageClient(
+			context.Background(), config.BlobStoreConfig, config.AwsClientConfig, logger)
 		if err != nil {
 			return err
 		}
@@ -126,12 +128,12 @@ func RunEncoderServer(ctx *cli.Context) error {
 			return fmt.Errorf("blob store bucket name is required")
 		}
 
-		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, s3Client, logger)
-		logger.Info("Blob store", "bucket", blobStoreBucketName)
+		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, objectStorageClient, logger)
+		logger.Info("Blob store", "bucket", blobStoreBucketName, "backend", config.BlobStoreConfig.Backend)
 
 		chunkStoreBucketName := config.ChunkStoreConfig.BucketName
-		chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, DefaultFragmentSizeBytes)
-		logger.Info("Chunk store writer", "bucket", blobStoreBucketName)
+		chunkWriter := chunkstore.NewChunkWriter(logger, objectStorageClient, chunkStoreBucketName, DefaultFragmentSizeBytes)
+		logger.Info("Chunk store writer", "bucket", chunkStoreBucketName, "backend", config.ChunkStoreConfig.Backend)
 
 		server := encoder.NewEncoderServerV2(
 			*config.ServerConfig,
