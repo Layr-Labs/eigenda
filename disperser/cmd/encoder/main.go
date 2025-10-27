@@ -101,6 +101,11 @@ func RunEncoderServer(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create listener on %s: %w", addr, err)
 	}
+	defer func() {
+		if err := listener.Close(); err != nil {
+			logger.Error("Failed to close listener", "error", err)
+		}
+	}()
 
 	if config.EncoderVersion == V2 {
 		// We no longer load the G2 points in V2 because the KZG commitments are computed
@@ -108,19 +113,16 @@ func RunEncoderServer(ctx *cli.Context) error {
 		config.EncoderConfig.LoadG2Points = false
 		prover, err := proverv2.NewProver(logger, proverv2.KzgConfigFromV1Config(&config.EncoderConfig), encodingConfig)
 		if err != nil {
-			_ = listener.Close()
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
 
 		s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
 		if err != nil {
-			_ = listener.Close()
 			return err
 		}
 
 		blobStoreBucketName := config.BlobStoreConfig.BucketName
 		if blobStoreBucketName == "" {
-			_ = listener.Close()
 			return fmt.Errorf("blob store bucket name is required")
 		}
 
@@ -142,18 +144,21 @@ func RunEncoderServer(ctx *cli.Context) error {
 		)
 
 		logger.Info("Starting encoder v2 server", "address", listener.Addr().String())
-		return fmt.Errorf("failed to start encoder v2 server: %w", server.StartWithListener(listener))
+
+		//nolint:wrapcheck
+		return server.StartWithListener(listener)
 	}
 
 	config.EncoderConfig.LoadG2Points = true
 	prover, err := prover.NewProver(&config.EncoderConfig, encodingConfig)
 	if err != nil {
-		_ = listener.Close()
 		return fmt.Errorf("failed to create encoder: %w", err)
 	}
 
 	server := encoder.NewEncoderServer(*config.ServerConfig, logger, prover, metrics, grpcMetrics)
 
 	logger.Info("Starting encoder v1 server", "address", listener.Addr().String())
-	return fmt.Errorf("failed to start encoder v1 server: %w", server.StartWithListener(listener))
+
+	//nolint:wrapcheck
+	return server.StartWithListener(listener)
 }

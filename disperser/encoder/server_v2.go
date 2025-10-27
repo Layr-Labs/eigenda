@@ -100,7 +100,7 @@ func (s *EncoderServerV2) StartWithListener(listener net.Listener) error {
 		gs.GracefulStop()
 	}
 
-	s.logger.Info("address", listener.Addr().String(), "GRPC Listening")
+	s.logger.Info("GRPC Listening", "address", listener.Addr().String())
 	return gs.Serve(listener)
 }
 
