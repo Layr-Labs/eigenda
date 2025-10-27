@@ -102,8 +102,6 @@ func (n *Node) DetermineChunkLocations(
 	return downloadSizeInBytes, relayRequests, nil
 }
 
-// TODO write tests for this method
-
 // Given a list of chunk indices we want to download, create a list of relay requests by range.
 // Although indices may not be contiguous, it is safe to assume that they will be "mostly contiguous".
 // In practice, we should expect to see at most one continuous range of indices per quorum.
