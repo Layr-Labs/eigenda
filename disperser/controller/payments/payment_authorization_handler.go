@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	grpccommon "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/common"
@@ -137,7 +138,13 @@ func (h *PaymentAuthorizationHandler) authorizeOnDemandPayment(
 	probe.SetStage("global_meter_check")
 	reservation, err := h.onDemandMeterer.MeterDispersal(symbolCount)
 	if err != nil {
-		return api.NewErrorResourceExhausted(fmt.Sprintf("global rate limit exceeded: %v", err))
+		return api.NewErrorResourceExhaustedWithRateLimitDetails(
+			fmt.Sprintf("global rate limit exceeded: %v", err),
+			commonpb.RateLimitType_GLOBAL_RATE_LIMIT_EXCEEDED,
+			0,  // No specific quorum
+			60, // Retry after 60 seconds for global limits
+			"Global rate limit exceeded",
+		)
 	}
 
 	probe.SetStage("on_demand_validation")
