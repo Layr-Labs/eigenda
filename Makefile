@@ -90,11 +90,18 @@ fmt-check:
 # The images will be tagged with :dev, which is the default BUILD_TAG in docker-bake.hcl.
 # This can be changed by running for example `BUILD_TAG=master make docker-build`.
 docker-build:
+	SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT}  \
 	docker buildx bake all --load
 
 # builds all services and pushes them to the configured registry (ghcr by default).
 docker-build-push:
+	SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT}  \
 	docker buildx bake all --push
+
+# builds all services but doesn't load them into dockerd (used in ci)
+docker-build-without-load:
+	SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT}  \
+	docker buildx bake all
 
 # Should only ever be used by the docker-publish-release CI workflow.
 # We keep the node-group and proxy targets separate since we might want to release them separately in the future.

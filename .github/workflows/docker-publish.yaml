@@ -50,7 +50,7 @@ jobs:
 
       # Build And Push Images
       - name: Build Docker images
-        run: docker buildx bake all
+        run: make docker-build-without-load
       - name: Push Docker images
         if: github.ref == 'refs/heads/master'
         run: BUILD_TAG=master make docker-build-push
