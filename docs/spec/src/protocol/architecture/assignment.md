@@ -14,10 +14,11 @@ Given:
 
 Within a single quorum, the number of chunks assigned to validator $i$ is:
 ```math
-c'_i = \lceil \eta_i(c - n) \rceil
+c_i = \lceil \eta_i(c - n) \rceil
 ```
+This assignment ensures that the total number of assigned chunks is less than or equal to the total number of chunks $c$, since $\sum_{i=1}^n c_i = \sum_{i=1}^n \lceil \eta_i(c - n) \rceil \le \sum_{i=1}^n [\eta_i(c - n) + 1]  = c$. 
 
-The proof that any subset of validators with sufficient combined stake can reconstruct the blob is provided in [Security Parameters](./security-parameters.md).
+This guarantees that the chunks assigned to validators within a quorum are **non-overlapping**. In other words, each validator in a quorum contributes **distinct chunks** for reconstruction. The proof that any subset of validators with sufficient combined stake can reconstruct the blob is provided in [Security Parameters](./security-parameters.md).
 
 ### Chunk Assignment for Multiple Quorums
 

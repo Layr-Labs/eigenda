@@ -49,7 +49,7 @@ Formally, we need to show that for any set of validators $H$ with total stake $\
 **Proof:**
 
 By the chunk assignment scheme, we have:
-$$c_i \geq c'_i = \lceil \eta_i(c - n) \rceil $$
+$$c_i = \lceil \eta_i(c - n) \rceil $$
 $$\geq \eta_i(c - n)$$
 
 Therefore, since $\sum_{i \in H} \eta_i \geq \frac{c}{c-n} \gamma$, we have:
