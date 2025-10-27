@@ -24,8 +24,8 @@ import (
 )
 
 // ProvingParams controls the size of matrix multiplication when generating kzg multi-reveal proofs.
-// For a blob that is zero appended to m (equal to power of 2) field elements, two parameters holds the relation
-// ChunkLength * ToeplitzMatrixLength = m, where ChunkLength equals to the same parameters from the encoding.EncodingParams.
+// For a padded blob of m field elements, two parameters holds the relation ChunkLength * ToeplitzMatrixLength = m,
+// where ChunkLength equals to the same parameters from the encoding.EncodingParams.
 // They maps to the Kate Amortized paper, https://eprint.iacr.org/2023/033.pdf, proposition 4, where
 // ChunkLength is l, and ToeplitzMatrixLength is r. In the paper, the length of the square toeplitz matrix is r-1,
 // but in order to use standard FFT library, we pad the matrix in both dimension with 0; and we pad the vector being
@@ -74,7 +74,7 @@ func ValidateProvingParams(params ProvingParams, srsOrder uint64) error {
 	// params.ChunkLen*params.ToeplitzMatrixLength-1 <= g.SRSOrder. The condition below could technically
 	// be relaxed to params.ChunkLen*params.ToeplitzMatrixLength > g.SRSOrder+1, but because all of the parameters are
 	// powers of 2, the stricter condition is equivalent.
-	if params.BlobLength() > srsOrder {
+	if params.ChunkLength*params.ToeplitzMatrixLength > srsOrder {
 		return fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.ToeplitzMatrixLength, srsOrder)
 	}
 

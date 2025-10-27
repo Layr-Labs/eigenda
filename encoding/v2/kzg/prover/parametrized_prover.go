@@ -33,6 +33,7 @@ func (g *ParametrizedProver) GetProofs(inputFr []fr.Element, provingParams Provi
 	proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(
 		paddedCoeffs,
 		g.encodingParams.NumChunks,
+		provingParams.ToeplitzMatrixLength,
 		g.encodingParams.ChunkLength,
 		g.computeMultiproofNumWorker,
 	)
