@@ -580,7 +580,34 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 			s.logger.Info("request ratelimited", "requesterName", requesterName, "requesterID", params.RequesterID, "rateType", info.RateType.String(), "quorum", info.QuorumID)
 		}
 		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
-		return api.NewErrorResourceExhausted(errorString)
+
+		// Map internal rate type to proto rate type
+		var rateLimitType commonpb.RateLimitType
+		switch info.RateType {
+		case SystemThroughputType:
+			rateLimitType = commonpb.RateLimitType_SYSTEM_THROUGHPUT_RATE_LIMIT
+		case SystemBlobRateType:
+			rateLimitType = commonpb.RateLimitType_SYSTEM_BLOB_RATE_LIMIT
+		case AccountThroughputType:
+			rateLimitType = commonpb.RateLimitType_ACCOUNT_THROUGHPUT_RATE_LIMIT
+		case AccountBlobRateType:
+			rateLimitType = commonpb.RateLimitType_ACCOUNT_BLOB_RATE_LIMIT
+		case RetrievalThroughputType:
+			rateLimitType = commonpb.RateLimitType_RETRIEVAL_THROUGHPUT_RATE_LIMIT
+		case RetrievalBlobRateType:
+			rateLimitType = commonpb.RateLimitType_RETRIEVAL_BLOB_RATE_LIMIT
+		default:
+			rateLimitType = commonpb.RateLimitType_RATE_LIMIT_TYPE_UNSPECIFIED
+		}
+
+		// Return error with rate limit details
+		return api.NewErrorResourceExhaustedWithRateLimitDetails(
+			errorString,
+			rateLimitType,
+			uint32(info.QuorumID),
+			30, // Default retry after 30 seconds
+			fmt.Sprintf("Rate limit exceeded for %s", info.RateType.String()),
+		)
 	}
 
 	return nil
@@ -739,7 +766,13 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			if ok {
 				errorString += ": " + info
 			}
-			return nil, api.NewErrorResourceExhausted(errorString)
+			return nil, api.NewErrorResourceExhaustedWithRateLimitDetails(
+				errorString,
+				commonpb.RateLimitType_RETRIEVAL_BLOB_RATE_LIMIT,
+				0,  // No specific quorum for retrieval
+				30, // Default retry after 30 seconds
+				"Retrieval blob rate limit exceeded",
+			)
 		}
 	}
 	s.logger.Debug("checked retrieval blob rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalBlobRateType.Plug()), "duration", time.Since(stageTimer).String())
@@ -800,7 +833,13 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			if ok {
 				errorString += ": " + info
 			}
-			return nil, api.NewErrorResourceExhausted(errorString)
+			return nil, api.NewErrorResourceExhaustedWithRateLimitDetails(
+				errorString,
+				commonpb.RateLimitType_RETRIEVAL_THROUGHPUT_RATE_LIMIT,
+				0,  // No specific quorum for retrieval
+				30, // Default retry after 30 seconds
+				"Retrieval throughput rate limit exceeded",
+			)
 		}
 	}
 	s.logger.Debug("checked retrieval throughput rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalThroughputType.Plug()), "duration (ms)", time.Since(stageTimer).String())
