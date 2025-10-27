@@ -3,7 +3,6 @@ package encoder
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -11,8 +10,6 @@ import (
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	commonpprof "github.com/Layr-Labs/eigenda/common/pprof"
-	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -88,20 +85,8 @@ func NewEncoderServer(
 	}
 }
 
-func (s *EncoderServer) Start() error {
-	pprofProfiler := commonpprof.NewPprofProfiler(s.config.PprofHttpPort, s.logger)
-	if s.config.EnablePprof {
-		go pprofProfiler.Start()
-		s.logger.Info("Enabled pprof for encoder server", "port", s.config.PprofHttpPort)
-	}
-
-	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("Could not start tcp listener: %v", err)
-	}
-
+// StartWithListener starts the server using the provided listener. This method will block until the server is stopped.
+func (s *EncoderServer) StartWithListener(listener net.Listener) error {
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
 	gs := grpc.NewServer(opt,
 		grpc.UnaryInterceptor(
@@ -124,7 +109,7 @@ func (s *EncoderServer) Start() error {
 		gs.GracefulStop()
 	}
 
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	s.logger.Info("GRPC Listening", "address", listener.Addr().String())
 	return gs.Serve(listener)
 }
 
