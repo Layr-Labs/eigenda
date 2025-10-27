@@ -100,8 +100,6 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 		assignments[opID] = assignment
 	}
 
-	fmt.Println("encodingParams", encodingParams, "data", len(data), "blobParams", blobParams)
-
 	// Create the actual blob frames using the prover
 	frames, _, err := p.GetFrames(data, encodingParams)
 	require.NoError(t, err)

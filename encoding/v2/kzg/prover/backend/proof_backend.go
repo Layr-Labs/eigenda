@@ -11,8 +11,9 @@ import (
 
 // Proof device represents a backend capable of computing KZG multiproofs.
 type KzgMultiProofsBackendV2 interface {
+	// the length of blobFr must be power of 2
 	ComputeMultiFrameProofV2(blobFr []fr.Element,
-		numChunks, toeplitzMatrixLen, chunkLen, numWorker uint64) ([]bn254.G1Affine, error)
+		numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error)
 }
 
 // We implement two backends: gnark and icicle.

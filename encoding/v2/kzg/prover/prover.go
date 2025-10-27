@@ -24,19 +24,19 @@ import (
 )
 
 // ProvingParams controls the size of matrix multiplication when generating kzg multi-reveal proofs.
-// For a padded blob of m field elements, two parameters holds the relation ChunkLength * ToeplitzMatrixLength = m,
-// where ChunkLength equals to the same parameters from the encoding.EncodingParams.
-// They maps to the Kate Amortized paper, https://eprint.iacr.org/2023/033.pdf, proposition 4, where
-// ChunkLength is l, and ToeplitzMatrixLength is r. In the paper, the length of the square toeplitz matrix is r-1,
-// but in order to use standard FFT library, we pad the matrix in both dimension with 0; and we pad the vector being
-// multiplied with 0. The multiplication result still holds.
+// For a blob that is zero appended to BlobLength (equal to power of 2) field elements, two parameters holds the
+// relation ChunkLength * ToeplitzMatrixLength = BlobLength, where ChunkLength equals to the same parameters from
+// the encoding.EncodingParams. They maps to the Kate Amortized paper, https://eprint.iacr.org/2023/033.pdf,
+// proposition 4, where ChunkLength is l, and ToeplitzMatrixLength is r. In the paper, the length of the square
+// toeplitz matrix is r-1, but in order to use standard FFT library, we pad the matrix in both dimension with 0;
+// and we pad the vector being multiplied with 0. The multiplication result still holds.
 type ProvingParams struct {
-	ChunkLength          uint64
-	ToeplitzMatrixLength uint64
+	ChunkLength uint64
+	BlobLength  uint64
 }
 
-func (p *ProvingParams) BlobLength() uint64 {
-	return p.ChunkLength * p.ToeplitzMatrixLength
+func (p *ProvingParams) ToeplitzSquareMatrixLength() uint64 {
+	return p.BlobLength / p.ChunkLength
 }
 
 // blobLength assumes to be power of 2
@@ -46,36 +46,39 @@ func BuildProvingParamsFromEncodingParams(params encoding.EncodingParams, blobLe
 	}
 
 	return ProvingParams{
-		ChunkLength:          params.ChunkLength,
-		ToeplitzMatrixLength: blobLength / params.ChunkLength,
+		ChunkLength: params.ChunkLength,
+		BlobLength:  blobLength,
 	}, nil
 }
 
 func ValidateProvingParams(params ProvingParams, srsOrder uint64) error {
-	if params.ToeplitzMatrixLength == 0 {
-		return errors.New("number of chunks must be greater than 0")
+	toeplitzLength := params.ToeplitzSquareMatrixLength()
+
+	if toeplitzLength == 0 {
+		return errors.New("size of square toeplitz length must be greater than 0")
 	}
 	if params.ChunkLength == 0 {
 		return errors.New("chunk length must be greater than 0")
 	}
 
-	if params.ToeplitzMatrixLength > gomath.MaxUint64/params.ChunkLength {
+	if toeplitzLength > gomath.MaxUint64/params.ChunkLength {
 		return fmt.Errorf("multiplication overflow: ChunkLength: %d, NumChunks: %d",
-			params.ChunkLength, params.ToeplitzMatrixLength)
+			params.ChunkLength, toeplitzLength)
 	}
 
-	if !math.IsPowerOfTwo(params.ChunkLength) || !math.IsPowerOfTwo(params.ToeplitzMatrixLength) {
+	if !math.IsPowerOfTwo(params.ChunkLength) || !math.IsPowerOfTwo(toeplitzLength) {
 		return fmt.Errorf("proving parameters must be power of 2: ChunkLength: %d, ToeplitzMatrixLength: %d",
-			params.ChunkLength, params.ToeplitzMatrixLength)
+			params.ChunkLength, toeplitzLength)
 	}
 
-	// Check that the parameters are valid with respect to the SRS. The precomputed terms of the amortized KZG
-	// prover use up to order params.ChunkLen*params.ToeplitzMatrixLength-1 for the SRS, so we must have
-	// params.ChunkLen*params.ToeplitzMatrixLength-1 <= g.SRSOrder. The condition below could technically
-	// be relaxed to params.ChunkLen*params.ToeplitzMatrixLength > g.SRSOrder+1, but because all of the parameters are
-	// powers of 2, the stricter condition is equivalent.
-	if params.ChunkLength*params.ToeplitzMatrixLength > srsOrder {
-		return fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.ToeplitzMatrixLength, srsOrder)
+	if params.BlobLength > srsOrder {
+		return fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. "+
+			"BlobLength %d, ChunkLength %d, NumChunks %d, SRSOrder %d",
+			params.BlobLength,
+			params.ChunkLength,
+			toeplitzLength,
+			srsOrder,
+		)
 	}
 
 	return nil
@@ -342,9 +345,11 @@ func getAllPrecomputedSrsMap(tableDir string) ([]ProvingParams, error) {
 			return nil, fmt.Errorf("parse coset size part of the table: %w", err)
 		}
 
+		blobLength := dimEValue * cosetSizeValue
+
 		params := ProvingParams{
-			ToeplitzMatrixLength: uint64(dimEValue),
-			ChunkLength:          uint64(cosetSizeValue),
+			BlobLength:  uint64(blobLength),
+			ChunkLength: uint64(cosetSizeValue),
 		}
 		tables = append(tables, params)
 	}
@@ -359,7 +364,9 @@ func (p *Prover) setupFFTPoints(provingParams ProvingParams) ([][]bn254.G1Affine
 		return nil, nil, fmt.Errorf("failed to create SRS table: %w", err)
 	}
 
-	fftPoints, err := subTable.GetSubTables(provingParams.ToeplitzMatrixLength, provingParams.ChunkLength)
+	toeplitzLength := provingParams.ToeplitzSquareMatrixLength()
+
+	fftPoints, err := subTable.GetSubTables(toeplitzLength, provingParams.ChunkLength)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get SRS table: %w", err)
 	}
