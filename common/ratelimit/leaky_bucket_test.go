@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,22 +9,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testStartTime = time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-
 func TestNewLeakyBucket(t *testing.T) {
 	t.Run("create with valid parameters", func(t *testing.T) {
+
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		leakyBucket, err := NewLeakyBucket(10, 10*time.Second, true, OverfillNotPermitted, testStartTime)
 		require.NotNil(t, leakyBucket)
 		require.NoError(t, err)
 	})
 
 	t.Run("create with invalid leak rate", func(t *testing.T) {
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		leakyBucket, err := NewLeakyBucket(0, 10*time.Second, true, OverfillNotPermitted, testStartTime)
 		require.Nil(t, leakyBucket)
 		require.Error(t, err, "zero leak rate should cause error")
 	})
 
 	t.Run("create with invalid bucket size duration", func(t *testing.T) {
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		leakyBucket, err := NewLeakyBucket(10, -10*time.Second, true, OverfillNotPermitted, testStartTime)
 		require.Nil(t, leakyBucket)
 		require.Error(t, err, "negative bucket duration should cause error")
@@ -37,6 +46,9 @@ func TestNewLeakyBucket(t *testing.T) {
 func TestFill(t *testing.T) {
 	t.Run("test overfill", func(t *testing.T) {
 		leakyBucket, err := NewLeakyBucket(11, 10*time.Second, false, OverfillOncePermitted, testStartTime)
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
@@ -57,6 +69,9 @@ func TestFill(t *testing.T) {
 	})
 
 	t.Run("non-overfill", func(t *testing.T) {
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, false, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
@@ -73,6 +88,9 @@ func TestFill(t *testing.T) {
 	})
 
 	t.Run("fill to exact capacity", func(t *testing.T) {
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, false, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 
@@ -83,6 +101,9 @@ func TestFill(t *testing.T) {
 	})
 
 	t.Run("fill with invalid symbol count", func(t *testing.T) {
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, false, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
@@ -96,6 +117,9 @@ func TestFill(t *testing.T) {
 
 	// tests that waiting a really long time leaks the bucket empty, and that filling after that behaves as expected
 	t.Run("large idle leakage to empty", func(t *testing.T) {
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, true, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 
@@ -109,6 +133,9 @@ func TestFill(t *testing.T) {
 
 func TestRevertFill(t *testing.T) {
 	t.Run("valid revert fill", func(t *testing.T) {
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, false, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
@@ -125,6 +152,9 @@ func TestRevertFill(t *testing.T) {
 	})
 
 	t.Run("revert fill resulting in 0 capacity", func(t *testing.T) {
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, false, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
@@ -142,6 +172,9 @@ func TestRevertFill(t *testing.T) {
 	})
 
 	t.Run("revert fill with invalid symbol count", func(t *testing.T) {
+		rand := random.NewTestRandom()
+		testStartTime := rand.Time()
+
 		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, false, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
@@ -154,6 +187,9 @@ func TestRevertFill(t *testing.T) {
 }
 
 func TestLeak(t *testing.T) {
+	rand := random.NewTestRandom()
+	testStartTime := rand.Time()
+
 	leakRate := float64(5)
 
 	// This test uses a large capacity, to make sure that none of the fills or leaks are bumping up against the
@@ -190,6 +226,9 @@ func TestLeak(t *testing.T) {
 }
 
 func TestTimeRegression(t *testing.T) {
+	rand := random.NewTestRandom()
+	testStartTime := rand.Time()
+
 	leakyBucket, err := NewLeakyBucket(100, 10*time.Second, false, OverfillNotPermitted, testStartTime)
 	require.NoError(t, err)
 
@@ -211,12 +250,12 @@ func TestTimeRegression(t *testing.T) {
 
 func TestReconfigure(t *testing.T) {
 	rand := random.NewTestRandom()
+	testStartTime := rand.Time()
+	now := testStartTime
 
 	leakyBucket, err := NewLeakyBucket(1, 11*time.Second, false, OverfillOncePermitted, testStartTime)
 	require.NoError(t, err)
 	require.NotNil(t, leakyBucket)
-
-	now := rand.Time()
 
 	// Leak a few times, do not advance time. All should pass.
 	for i := 1; i <= 6; i++ {
