@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"strings"
 	"time"
@@ -24,12 +25,18 @@ import (
 	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
+	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
@@ -243,6 +250,25 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
 	}
 
+	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	clientLedger, err := buildClientLedger(
+		ctx,
+		logger,
+		ethClient,
+		paymentVaultAddr,
+		accountId,
+		clientledger.ClientLedgerMode(config.ClientLedgerPaymentMode),
+		disperserClient,
+		accountantMetrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build client ledger: %w", err)
+	}
+
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
@@ -250,7 +276,7 @@ func NewTestClient(
 		blockMon,
 		certBuilder,
 		certVerifier,
-		nil,
+		clientLedger,
 		registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
@@ -917,4 +943,162 @@ func (c *TestClient) EstimateGasAndReportCheckDACert(
 
 	c.metrics.reportEstimateGasCheckDACert(gas)
 	return gas, nil
+}
+
+func buildClientLedger(
+	ctx context.Context,
+	logger logging.Logger,
+	ethClient common_eigenda.EthClient,
+	paymentVaultAddr gethcommon.Address,
+	accountID gethcommon.Address,
+	mode clientledger.ClientLedgerMode,
+	disperserClient *clientsv2.DisperserClient,
+	accountantMetrics metricsv2.AccountantMetricer,
+) (*clientledger.ClientLedger, error) {
+	if mode == clientledger.ClientLedgerModeLegacy {
+		return nil, nil
+	}
+
+	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddr)
+	if err != nil {
+		return nil, fmt.Errorf("new payment vault: %w", err)
+	}
+
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get min num symbols: %w", err)
+	}
+
+	var reservationLedger *reservation.ReservationLedger
+	var onDemandLedger *ondemand.OnDemandLedger
+	switch mode {
+	case clientledger.ClientLedgerModeLegacy:
+		panic("impossible case- this is checked at the start of the method")
+	case clientledger.ClientLedgerModeReservationOnly:
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
+		if err != nil {
+			return nil, fmt.Errorf("build reservation ledger: %w", err)
+		}
+	case clientledger.ClientLedgerModeOnDemandOnly:
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		if err != nil {
+			return nil, fmt.Errorf("build on-demand ledger: %w", err)
+		}
+
+	case clientledger.ClientLedgerModeReservationAndOnDemand:
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
+		if err != nil {
+			return nil, fmt.Errorf("build reservation ledger: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		if err != nil {
+			return nil, fmt.Errorf("build on-demand ledger: %w", err)
+		}
+
+	default:
+		return nil, fmt.Errorf("unexpected client ledger mode: %s", mode)
+	}
+
+	ledger := clientledger.NewClientLedger(
+		ctx,
+		logger,
+		accountantMetrics,
+		accountID,
+		mode,
+		reservationLedger,
+		onDemandLedger,
+		time.Now,
+		paymentVault,
+		30*time.Second,
+	)
+
+	return ledger, nil
+}
+
+func buildReservationLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID gethcommon.Address,
+	minNumSymbols uint32,
+) (*reservation.ReservationLedger, error) {
+	reservationData, err := paymentVault.GetReservation(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation: %w", err)
+	}
+	if reservationData == nil {
+		return nil, fmt.Errorf("no reservation found for account %s", accountID.Hex())
+	}
+
+	clientReservation, err := reservation.NewReservation(
+		reservationData.SymbolsPerSecond,
+		time.Unix(int64(reservationData.StartTimestamp), 0),
+		time.Unix(int64(reservationData.EndTimestamp), 0),
+		reservationData.QuorumNumbers,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation: %w", err)
+	}
+
+	reservationConfig, err := reservation.NewReservationLedgerConfig(
+		*clientReservation,
+		minNumSymbols,
+		true,
+		ratelimit.OverfillOncePermitted,
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		30*time.Second,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger config: %w", err)
+	}
+
+	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger: %w", err)
+	}
+
+	return reservationLedger, nil
+}
+
+func buildOnDemandLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID gethcommon.Address,
+	minNumSymbols uint32,
+	disperserClient *clientsv2.DisperserClient,
+) (*ondemand.OnDemandLedger, error) {
+	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get price per symbol: %w", err)
+	}
+
+	totalDeposits, err := paymentVault.GetTotalDeposit(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get total deposit from vault: %w", err)
+	}
+
+	paymentState, err := disperserClient.GetPaymentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get payment state from disperser: %w", err)
+	}
+
+	var cumulativePayment *big.Int
+	if paymentState.GetCumulativePayment() == nil {
+		cumulativePayment = big.NewInt(0)
+	} else {
+		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
+	}
+
+	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
+		totalDeposits,
+		new(big.Int).SetUint64(pricePerSymbol),
+		minNumSymbols,
+		cumulativePayment,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("on-demand ledger from value: %w", err)
+	}
+
+	return onDemandLedger, nil
 }
