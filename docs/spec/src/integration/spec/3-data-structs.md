@@ -130,11 +130,11 @@ An RPC call to the Disperser's `GetPaymentState` method can be made to query the
 
 ### BlobKey (Blob Header Hash)
 
-The `blobKey` (also known as `blob_header_hash` or `blobHeaderHash`) is a unique identifier for a blob dispersal in the EigenDA system. It is computed as the keccak256 hash of the ABI-encoded `BlobHeader`, and is cryptographically equivalent to the `blob_header_hash` used in on-chain verification. This identifier serves as the primary lookup key throughout the EigenDA system.
+The `blobKey` (also known as `blob_header_hash` or `blobHeaderHash`) serves as the _primary lookup key_ throughout the EigenDA system. It uniquely identifies a blob dispersal and is used for querying dispersal status, retrieving blobs from the network, and linking blobs to their certificates. The `blobKey` is computed as the keccak256 hash of the ABI-encoded `BlobHeader`, and is cryptographically equivalent to the `blob_header_hash` used in on-chain verification.
 
 #### Computing the BlobKey
 
-The computation differs between V1 and V2 blob headers. For V2 BlobHeaders, the hashing follows a nested structure:
+The hashing follows a nested structure where the core dispersal fields are hashed first, then combined with the payment metadata hash:
 
 ```solidity
 blobKey = keccak256(
@@ -145,15 +145,7 @@ blobKey = keccak256(
 )
 ```
 
-For V1 BlobHeaders, the computation is simpler:
-
-```solidity
-blobKey = keccak256(abi.encode(blobHeader))
-```
-
-The V2 approach uses a two-level hashing structure where the core dispersal fields (version, quorum numbers, and commitment) are hashed first, then combined with the payment metadata hash. This design reflects the separation between dispersal parameters and payment concerns.
-
-When a rollup receives an encoded DA commitment from the proxy, the `blobKey` can be extracted by deserializing the BlobCertificate from the commitment payload, extracting its BlobHeader, and computing the hash as shown above.
+This two-level approach reflects the separation between dispersal parameters and payment concerns. When a rollup receives an encoded DA commitment from the proxy, the `blobKey` can be extracted by deserializing the BlobCertificate from the commitment payload, extracting its BlobHeader, and computing the hash as shown above.
 
 #### Relationship to Other Data Structures
 
@@ -165,25 +157,25 @@ The `BlobHeader` is hashed to produce the `blobKey`. A `BlobCertificate` wraps a
 
 #### Code References
 
-The Solidity implementations can be found in [`hashBlobHeaderV2()`](https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L324) for V2 and [`hashBlobHeader()`](https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/integrations/cert/legacy/v1/EigenDACertVerificationV1Lib.sol#L241) for V1.
+The Solidity implementation can be found in [`hashBlobHeaderV2()`](https://github.com/Layr-Labs/eigenda/blob/d73a9fa66a44dd2cfd334dcb83614cd5c1c5e005/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L324).
 
-The Go implementations include [`ComputeBlobKey()`](https://github.com/Layr-Labs/eigenda/blob/master/core/v2/serialization.go#L42) for V2 computation, [`hashBlobHeader()`](https://github.com/Layr-Labs/eigenda/blob/master/api/hashing/node_hashing.go#L62) for node hashing, and [`HashBlobHeader()`](https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/store/generated_key/eigenda/verify/hasher.go#L109) for proxy verification.
+The Go implementation is available in [`ComputeBlobKey()`](https://github.com/Layr-Labs/eigenda/blob/d73a9fa66a44dd2cfd334dcb83614cd5c1c5e005/core/v2/serialization.go#L42).
 
 #### Usage
 
 The `blobKey` is a central identifier used throughout the **dispersal** and **retrieval** process:
 
-- **Dispersal phase:**  
-  The disperser’s `DisperseBlob` method returns a `blobKey`. Clients then use this `blobKey` with `GetBlobStatus` to check when dispersal is complete
+- **Dispersal phase:**
+  The disperser's `DisperseBlob` method returns a `blobKey`. Clients then use this `blobKey` with `GetBlobStatus` to check when dispersal is complete
   (see [Disperser polling](./5-lifecycle-phases.md#disperser-polling)).
 
-- **Retrieval phase:**  
-  The Relay API’s `GetBlob` method uses the `blobKey` as its main lookup parameter (see [Retrieval Paths](./5-lifecycle-phases.md#retrieval-paths)).
+- **Retrieval phase:**
+  The Relay API's `GetBlob` method uses the `blobKey` as its main lookup parameter (see [Retrieval Paths](./5-lifecycle-phases.md#retrieval-paths)).
 
-- **Peripheral APIs:**  
+- **Peripheral APIs:**
   Both the Data API and the Blob Explorer rely on `blobKey` as the **primary identifier** for querying blob metadata and status.
 
-- **Verification:**  
+- **Verification:**
   The `blobKey` connects each blob to its certificate, ensuring that the certificate corresponds to the correct blob.
 
 ### EigenDA Certificate (`DACert`)
