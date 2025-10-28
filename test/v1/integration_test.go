@@ -148,8 +148,13 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	store := inmem.NewBlobStore()
 	dis := mustMakeDisperser(t, cst, store)
+
+	// Create listener for encoder server
+	encoderListener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", encoderPort))
+	require.NoError(t, err)
+
 	go func() {
-		_ = dis.encoderServer.Start()
+		_ = dis.encoderServer.StartWithListener(encoderListener)
 	}()
 	t.Cleanup(func() {
 		dis.encoderServer.Close()
@@ -436,7 +441,6 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 
 	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
 	grpcEncoder := encoder.NewEncoderServer(encoder.ServerConfig{
-		GrpcPort:              encoderPort,
 		MaxConcurrentRequests: 16,
 		RequestPoolSize:       32,
 	}, logger, p0, metrics, grpcprom.NewServerMetrics())
