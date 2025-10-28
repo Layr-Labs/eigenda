@@ -1195,7 +1195,7 @@ func startAPIServerV2(
 		blobStore,
 		metadataStore,
 		chainReader,
-		mt, // meterer (nil when using controller-mediated payments, otherwise legacy meterer)
+		mt,
 		authenticator,
 		kzgCommitter,
 		maxNumSymbolsPerBlob,
