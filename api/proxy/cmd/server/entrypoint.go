@@ -98,7 +98,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 	}
 
 	if cfg.EnabledServersConfig.ArbCustomDA {
-		h := arbitrum_altda.NewHandlers(certMgr)
+		h := arbitrum_altda.NewHandlers(certMgr, log)
 
 		arbitrumRpcServer, err := arbitrum_altda.NewServer(ctx, &cfg.ArbCustomDASvrCfg, h)
 		if err != nil {
