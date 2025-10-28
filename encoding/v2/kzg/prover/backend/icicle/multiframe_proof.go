@@ -31,15 +31,15 @@ const (
 )
 
 type KzgMultiProofBackend struct {
-	Logger         logging.Logger
-	Fs             *fft.FFTSettings
-	FlatFFTPointsT []iciclebn254.Affine
-	InfinityPoints []iciclebn254.Affine
-	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
-	MsmCfg         core.MSMConfig
-	Device         runtime.Device
-	GpuLock        sync.Mutex
-	NumWorker      uint64
+	Logger                   logging.Logger
+	Fs                       *fft.FFTSettings
+	FlatFFTPointsT           []iciclebn254.Affine
+	InfinityProjectivePoints []iciclebn254.Projective
+	NttCfg                   core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
+	MsmCfg                   core.MSMConfig
+	Device                   runtime.Device
+	GpuLock                  sync.Mutex
+	NumWorker                uint64
 }
 
 func NewMultiProofBackend(logger logging.Logger,
@@ -59,15 +59,15 @@ func NewMultiProofBackend(logger logging.Logger,
 
 	// Set up icicle multiproof backend
 	return &KzgMultiProofBackend{
-		Logger:         logger,
-		Fs:             fs,
-		FlatFFTPointsT: icicleDevice.FlatFFTPointsT,
-		InfinityPoints: icicleDevice.InfinityPoints,
-		NttCfg:         icicleDevice.NttCfg,
-		MsmCfg:         icicleDevice.MsmCfg,
-		Device:         icicleDevice.Device,
-		GpuLock:        sync.Mutex{},
-		NumWorker:      numWorker,
+		Logger:                   logger,
+		Fs:                       fs,
+		FlatFFTPointsT:           icicleDevice.FlatFFTPointsT,
+		InfinityProjectivePoints: icicleDevice.InfinityProjectivePoints,
+		NttCfg:                   icicleDevice.NttCfg,
+		MsmCfg:                   icicleDevice.MsmCfg,
+		Device:                   icicleDevice.Device,
+		GpuLock:                  sync.Mutex{},
+		NumWorker:                numWorker,
 	}, nil
 }
 
@@ -117,6 +117,7 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 		var flattenStoreCopyToDevice core.DeviceSlice
 		flattenCoeffStoreCopy.CopyToDevice(&flattenStoreCopyToDevice, true)
 
+		// although the inputs are affine, MSM returns value in projective form
 		sumVec, err := p.msmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(toeplitzMatrixLen)*2)
 		if err != nil {
 			icicleErr = fmt.Errorf("msm error: %w", err)
@@ -302,10 +303,12 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	}
 
 	// now only keep the toeplitzMatrixLen elements as they are, set the rest to zero.
-	// Zeros are the infinity points for G1Affine
+	// Zeros are the infinity points for G1Projective points
 	// unit in the Range function is measured by element size
 	infinityPointsDevice := deviceWithNumChunkElement.Range(toeplitzMatrixLen, numChunks, false)
-	infinityPointsHost := core.HostSliceFromElements[iciclebn254.Affine](c.InfinityPoints[:numChunks-toeplitzMatrixLen])
+	infinityPointsHost := core.HostSliceFromElements[iciclebn254.Projective](
+		c.InfinityProjectivePoints[:numChunks-toeplitzMatrixLen],
+	)
 	infinityPointsHost.CopyToDevice(&infinityPointsDevice, false)
 
 	// take the second ecntt

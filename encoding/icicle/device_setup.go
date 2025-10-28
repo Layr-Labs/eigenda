@@ -16,12 +16,12 @@ import (
 
 // IcicleDevice wraps the core device setup and configurations
 type IcicleDevice struct {
-	Device         runtime.Device
-	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
-	MsmCfg         core.MSMConfig
-	FlatFFTPointsT []iciclebn254.Affine
-	InfinityPoints []iciclebn254.Affine
-	SRSG1Icicle    []iciclebn254.Affine
+	Device                   runtime.Device
+	NttCfg                   core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
+	MsmCfg                   core.MSMConfig
+	FlatFFTPointsT           []iciclebn254.Affine
+	InfinityProjectivePoints []iciclebn254.Projective
+	SRSG1Icicle              []iciclebn254.Affine
 }
 
 // IcicleDeviceConfig holds configuration options for a single device.
@@ -62,7 +62,7 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 		srsG1Icicle    []iciclebn254.Affine
 		setupErr       error
 		icicleErr      runtime.EIcicleError
-		infinityPoints []iciclebn254.Affine
+		infinityPoints []iciclebn254.Projective
 	)
 
 	// Setup NTT and optionally MSM on device
@@ -87,6 +87,8 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 				return
 			}
 		}
+
+		infinityPoints = make([]iciclebn254.Projective, config.NumChunk)
 	})
 
 	wg.Wait()
@@ -96,12 +98,12 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 	}
 
 	return &IcicleDevice{
-		Device:         device,
-		NttCfg:         nttCfg,
-		MsmCfg:         msmCfg,
-		FlatFFTPointsT: flatFftPointsT,
-		InfinityPoints: infinityPoints,
-		SRSG1Icicle:    srsG1Icicle,
+		Device:                   device,
+		NttCfg:                   nttCfg,
+		MsmCfg:                   msmCfg,
+		FlatFFTPointsT:           flatFftPointsT,
+		InfinityProjectivePoints: infinityPoints,
+		SRSG1Icicle:              srsG1Icicle,
 	}, nil
 }
 
