@@ -22,9 +22,11 @@ type ParametrizedProver struct {
 
 // The inputFr has not been padded to the next power of 2 field of elements. But ComputeMultiFrameProofV2
 // requires it.
-func (g *ParametrizedProver) GetProofs(inputFr []fr.Element, provingParams ProvingParams) ([]encoding.Proof, error) {
+func (g *ParametrizedProver) GetProofs(inputFr []fr.Element) ([]encoding.Proof, error) {
+	// get the blob length
+	blobLength := uint64(encoding.GetBlobLengthPowerOf2(uint32(len(inputFr))))
 	// pad inputFr to BlobLength if it is not power of 2, which encodes the RS redundancy
-	paddedCoeffs := make([]fr.Element, provingParams.BlobLength)
+	paddedCoeffs := make([]fr.Element, blobLength)
 	copy(paddedCoeffs, inputFr)
 
 	proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(

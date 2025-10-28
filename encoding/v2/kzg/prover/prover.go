@@ -182,7 +182,7 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	}()
 
 	getProofsStart := time.Now()
-	proofs, err := prover.GetProofs(symbols, provingParams)
+	proofs, err := prover.GetProofs(symbols)
 	getProofsDuration := time.Since(getProofsStart)
 
 	// Wait for both chunks and frames to have finished generating
