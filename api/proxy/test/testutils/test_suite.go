@@ -76,7 +76,11 @@ func CreateTestSuite(
 	var ethClient common_eigenda.EthClient
 
 	if !appConfig.StoreBuilderConfig.MemstoreEnabled {
-		ec, _, err := common.BuildEthClient(ctx, logger, appConfig.SecretConfig.EthRPCURL, appConfig.StoreBuilderConfig.ClientConfigV2.EigenDANetwork)
+		ec, _, err := common.BuildEthClient(
+			ctx,
+			logger,
+			appConfig.SecretConfig.EthRPCURL,
+			appConfig.StoreBuilderConfig.ClientConfigV2.EigenDANetwork)
 		if err != nil {
 			panic(fmt.Sprintf("build eth client: %v", err.Error()))
 		}
