@@ -60,6 +60,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.blobIndex = 1;
         blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
         for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
+            // forge-lint: disable-next-item(unsafe-typecast)
+            // If batchHeader.quorumNumbers.length is greater than 255, overflow will occur.
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
@@ -106,6 +108,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProofs[1].blobIndex = 1;
         blobVerificationProofs[0].quorumIndices = new bytes(batchHeader.quorumNumbers.length);
         blobVerificationProofs[1].quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+        if (batchHeader.quorumNumbers.length > type(uint8).max) revert(); // Sanity check.
+        // forge-lint: disable-next-item(unsafe-typecast)
         for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
             blobVerificationProofs[0].quorumIndices[i] = bytes1(uint8(i));
             blobVerificationProofs[1].quorumIndices[i] = bytes1(uint8(i));
@@ -190,8 +194,10 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
         blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+        if (batchHeader.quorumNumbers.length > type(uint8).max) revert(); // Sanity check.
+        // forge-lint: disable-next-item(unsafe-typecast)
         for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
-            blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
+            blobVerificationProof.quorumIndices[i] = bytes1(uint8(i)); // Typecast is checked above.
         }
 
         cheats.expectRevert(
@@ -235,9 +241,11 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
         blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+        if (batchHeader.quorumNumbers.length > type(uint8).max) revert(); // Sanity check.
+        // forge-lint: disable-next-item(unsafe-typecast)
         for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
             // implant the incorrect quorumNumbers here
-            blobVerificationProof.quorumIndices[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i));
+            blobVerificationProof.quorumIndices[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i)); // Typecast is checked above.
         }
 
         cheats.expectRevert("EigenDACertVerificationV1Lib._verifyDACertForQuorums: quorumNumber does not match");
@@ -280,6 +288,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
         blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+        if (batchHeader.quorumNumbers.length > type(uint8).max) revert(); // Sanity check.
+        // forge-lint: disable-next-item(unsafe-typecast)
         for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
             // implant the incorrect quorumNumbers here
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));

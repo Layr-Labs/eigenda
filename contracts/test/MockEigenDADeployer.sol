@@ -244,12 +244,14 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
         blobHeader.quorumBlobParams = new DATypesV1.QuorumBlobParam[](numQuorumsBlobParams);
         blobHeader.dataLength =
             uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.dataLength"))));
+        if (numQuorumsBlobParams > type(uint8).max) revert(); // Sanity check.
+        // forge-lint: disable-next-item(unsafe-typecast)
         for (uint256 i = 0; i < numQuorumsBlobParams; i++) {
             if (i < 2) {
-                blobHeader.quorumBlobParams[i].quorumNumber = uint8(i);
+                blobHeader.quorumBlobParams[i].quorumNumber = uint8(i); // Typecast is checked above.
             } else {
                 blobHeader.quorumBlobParams[i].quorumNumber =
-                    uint8(
+                    uint8( // Typecast is checked above.
                             uint256(
                                 keccak256(
                                     abi.encodePacked(

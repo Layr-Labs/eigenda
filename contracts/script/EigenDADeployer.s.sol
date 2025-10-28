@@ -115,6 +115,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         address tokenOwner,
         uint256 maxOperatorCount
     ) internal {
+        if (maxOperatorCount > type(uint32).max) revert(); // Sanity check.
+
         StrategyConfig[] memory strategyConfigs = new StrategyConfig[](numStrategies);
         // deploy a token and create a strategy config for each token
         for (uint8 i = 0; i < numStrategies; i++) {
@@ -280,8 +282,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 new IRegistryCoordinator.OperatorSetParam[](numStrategies);
             for (uint256 i = 0; i < numStrategies; i++) {
                 // hard code these for now
+                // forge-lint: disable-next-item(unsafe-typecast)
                 operatorSetParams[i] = IRegistryCoordinator.OperatorSetParam({
-                    maxOperatorCount: uint32(maxOperatorCount),
+                    maxOperatorCount: uint32(maxOperatorCount), // Typecast is checked above.
                     kickBIPsOfOperatorStake: 11000, // an operator needs to have kickBIPsOfOperatorStake / 10000 times the stake of the operator with the least stake to kick them out
                     kickBIPsOfTotalStake: 1001 // an operator needs to have less than kickBIPsOfTotalStake / 10000 of the total stake to be kicked out
                 });

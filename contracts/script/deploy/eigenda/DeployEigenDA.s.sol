@@ -337,6 +337,8 @@ contract DeployEigenDA is Script {
         EigenDAAccessControl accessControl =
             EigenDAAccessControl(directory.getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME));
 
+        // forge-lint: disable-next-item(unsafe-typecast)
+        // TODO(clandestine): Revisit this typecast.
         for (uint256 i; i < cfg.dispersers().length; i++) {
             IEigenDADisperserRegistry(directory.getAddress(AddressDirectoryConstants.DISPERSER_REGISTRY_NAME))
                 .setDisperserInfo(uint32(i), DATypesV2.DisperserInfo(cfg.dispersers()[i]));

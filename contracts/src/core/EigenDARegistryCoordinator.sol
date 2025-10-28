@@ -672,6 +672,8 @@ contract EigenDARegistryCoordinator is
 
         // Traverse the operator's bitmap history in reverse, returning the first index
         // corresponding to an update made before or at `blockNumber`
+        // forge-lint: disable-next-item(unsafe-typecast)
+        // TODO(clandestine): Revisit this typecast.
         for (uint256 i = 0; i < length; i++) {
             index = uint32(length - i - 1);
 
