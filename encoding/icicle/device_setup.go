@@ -20,7 +20,6 @@ type IcicleDevice struct {
 	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
 	FlatFFTPointsT []iciclebn254.Affine
-	InfinityPoints []iciclebn254.Affine
 	SRSG1Icicle    []iciclebn254.Affine
 }
 
@@ -36,7 +35,6 @@ type IcicleDeviceConfig struct {
 	Logger    logging.Logger
 	GPUEnable bool
 	NTTSize   uint8
-	NumChunk  uint64
 
 	// MSM setup parameters (optional)
 	FFTPointsT [][]bn254.G1Affine
@@ -62,7 +60,6 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 		srsG1Icicle    []iciclebn254.Affine
 		setupErr       error
 		icicleErr      runtime.EIcicleError
-		infinityPoints []iciclebn254.Affine
 	)
 
 	// Setup NTT and optionally MSM on device
@@ -100,7 +97,6 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 		NttCfg:         nttCfg,
 		MsmCfg:         msmCfg,
 		FlatFFTPointsT: flatFftPointsT,
-		InfinityPoints: infinityPoints,
 		SRSG1Icicle:    srsG1Icicle,
 	}, nil
 }
