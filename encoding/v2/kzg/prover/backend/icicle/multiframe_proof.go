@@ -37,7 +37,6 @@ type KzgMultiProofBackend struct {
 	// Also need to account how much memory this would use over all parametrized provers.
 	FlatFFTPointsT []iciclebn254.Affine
 	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
-	MsmCfg         core.MSMConfig
 	Device         runtime.Device
 	GpuLock        sync.Mutex
 	NumWorker      uint64
@@ -64,7 +63,6 @@ func NewMultiProofBackend(logger logging.Logger,
 		Fs:             fs,
 		FlatFFTPointsT: icicleDevice.FlatFFTPointsT,
 		NttCfg:         icicleDevice.NttCfg,
-		MsmCfg:         icicleDevice.MsmCfg,
 		Device:         icicleDevice.Device,
 		GpuLock:        sync.Mutex{},
 		NumWorker:      numWorker,
@@ -276,11 +274,16 @@ func (c *KzgMultiProofBackend) msmBatchOnDevice(frs []fr.Element, g1Points []ici
 		return out, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
 	}
 
-	frsHostSlice := core.HostSliceFromElements(frs)
+	// The msm is computed synchronously (default config value is async=false).
+	// We could possibly share the same stream as the ecntt use (c.NttCfg.StreamHandle).
+	// TODO(samlaf): rethink how we use streams and async computations in general.
+	msmCfg := msm.GetDefaultMSMConfig()
+	msmCfg.AreScalarsMontgomeryForm = true
+	frsHostOrDeviceSlice := core.HostSliceFromElements(frs)
 	// TODO(samlaf): we could send the srs table points to the device once in the constructor
 	// and keep a deviceSlice pointer to it.
 	g1PointsHostSlice := core.HostSliceFromElements(g1Points)
-	err = msm.Msm(frsHostSlice, g1PointsHostSlice, &c.MsmCfg, out)
+	err = msm.Msm(frsHostOrDeviceSlice, g1PointsHostSlice, &msmCfg, out)
 	if err != runtime.Success {
 		return out, fmt.Errorf("msm error: %v", err.AsString())
 	}
