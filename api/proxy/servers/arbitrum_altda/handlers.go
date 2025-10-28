@@ -122,6 +122,9 @@ func NewHandlers(m *store.EigenDAManager, l logging.Logger) IHandlers {
 }
 
 // GetSupportedHeaderBytes returns the supported DA Header bytes by the CustomDA server
+// this method is designed to return a span of bytes for compatibility with
+// Arbitrum AnyTrust where multiple message types are supported.
+// For CustomDA the provider only returns the Arbitrum CustomDA header byte.
 func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeaderBytesResult, error) {
 	h.logMethodCall(MethodGetSupportedHeaderBytes)
 
