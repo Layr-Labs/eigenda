@@ -30,7 +30,8 @@ func NewReservationValidatorMetrics(
 			Namespace: namespace,
 			Name:      "reservation_symbols",
 			Subsystem: subsystem,
-			Help:      "Distribution of symbol counts for successful reservation payments",
+			Help: "Distribution of symbol counts for successful reservation payments. " +
+				"Counts reflect actual dispersed symbols, not billed symbols (which may be higher due to min size).",
 			// Buckets chosen to go from min to max blob sizes (128KiB -> 16MiB)
 			Buckets: prometheus.ExponentialBuckets(4096, 2, 8),
 		},
@@ -41,7 +42,8 @@ func NewReservationValidatorMetrics(
 			Namespace: namespace,
 			Name:      "reservation_symbols_total",
 			Subsystem: subsystem,
-			Help:      "Total number of symbols validated for successful reservation payments",
+			Help: "Total number of symbols validated for successful reservation payments. " +
+				"Counts reflect actual dispersed symbols, not billed symbols (which may be higher due to min size).",
 		},
 	)
 

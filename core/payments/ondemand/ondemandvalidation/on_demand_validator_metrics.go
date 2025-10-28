@@ -28,7 +28,8 @@ func NewOnDemandValidatorMetrics(
 			Namespace: namespace,
 			Name:      "on_demand_symbols",
 			Subsystem: subsystem,
-			Help:      "Distribution of symbol counts for successful on-demand payments",
+			Help: "Distribution of symbol counts for successful on-demand payments. " +
+				"Counts reflect actual dispersed symbols, not billed symbols (which may be higher due to min size).",
 			// Buckets chosen to go from min to max blob sizes (128KiB -> 16MiB)
 			Buckets: prometheus.ExponentialBuckets(4096, 2, 8),
 		},
@@ -39,7 +40,8 @@ func NewOnDemandValidatorMetrics(
 			Namespace: namespace,
 			Name:      "on_demand_symbols_total",
 			Subsystem: subsystem,
-			Help:      "Total number of symbols validated for successful on-demand payments",
+			Help: "Total number of symbols validated for successful on-demand payments. " +
+				"Counts reflect actual dispersed symbols, not billed symbols (which may be higher due to min size).",
 		},
 	)
 
