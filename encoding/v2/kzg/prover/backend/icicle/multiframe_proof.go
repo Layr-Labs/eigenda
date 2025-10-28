@@ -26,13 +26,15 @@ const (
 	// largest supported blobs. Assuming a coding ratio of 1/8 and symbol size of 32 bytes:
 	// - Encoded size: 2^{MAX_NTT_SIZE} * 32 bytes ≈ 1 GB
 	// - Original blob size: 2^{MAX_NTT_SIZE} * 32 / 8 = 2^{MAX_NTT_SIZE + 2} ≈ 128 MB
-	MAX_NTT_SIZE = 25
+	MAX_NTT_SIZE  = 25
+	MAX_NUM_CHUNK = 8192
 )
 
 type KzgMultiProofBackend struct {
 	Logger         logging.Logger
 	Fs             *fft.FFTSettings
 	FlatFFTPointsT []iciclebn254.Affine
+	InfinityPoints []iciclebn254.Affine
 	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
 	Device         runtime.Device
@@ -60,6 +62,7 @@ func NewMultiProofBackend(logger logging.Logger,
 		Logger:         logger,
 		Fs:             fs,
 		FlatFFTPointsT: icicleDevice.FlatFFTPointsT,
+		InfinityPoints: icicleDevice.InfinityPoints,
 		NttCfg:         icicleDevice.NttCfg,
 		MsmCfg:         icicleDevice.MsmCfg,
 		Device:         icicleDevice.Device,
@@ -299,18 +302,11 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	}
 
 	// now only keep the toeplitzMatrixLen elements as they are, set the rest to zero.
-	// Zeros are the infinity points for G1Affine, see
-	// https://github.com/ingonyama-zk/icicle/blob/f797dae1fbaa30cf1a7133f89f37d333adb590f5/wrappers/golang/curves/bn254/curve.go#L116
+	// Zeros are the infinity points for G1Affine
 	// unit in the Range function is measured by element size
-	infinityPoints := deviceWithNumChunkElement.Range(toeplitzMatrixLen, numChunks, false)
-	err = runtime.MemSet(
-		infinityPoints.AsUnsafePointer(),
-		0,
-		uint(infinityPoints.Cap()),
-	)
-	if err != runtime.Success {
-		return nil, time.Time{}, fmt.Errorf("setting zeros on inverse ecntt result failed: %v", err.AsString())
-	}
+	infinityPointsDevice := deviceWithNumChunkElement.Range(toeplitzMatrixLen, numChunks, false)
+	infinityPointsHost := core.HostSliceFromElements[iciclebn254.Affine](c.InfinityPoints[:numChunks-toeplitzMatrixLen])
+	infinityPointsHost.CopyToDevice(&infinityPointsDevice, false)
 
 	// take the second ecntt
 	_, err = deviceWithNumChunkElement.Malloc(p.Size(), numChunks)
