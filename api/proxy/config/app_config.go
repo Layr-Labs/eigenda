@@ -60,7 +60,7 @@ func ReadAppConfig(ctx *cli.Context, version string) (AppConfig, error) {
 	enabledServersCfg := enablement.ReadEnabledServersCfg(ctx)
 	restPublicInfo := rest.PubliclyExposedInfo{
 		Version:             version,
-		Network:             storeBuilderConfig.ClientConfigV2.EigenDANetwork.String(),
+		ChainID:             "", // TODO(iquidus) populate with the chainId of the configured ethereum network
 		DirectoryAddress:    storeBuilderConfig.ClientConfigV2.EigenDADirectory,
 		CertVerifierAddress: storeBuilderConfig.ClientConfigV2.EigenDACertVerifierOrRouterAddress,
 		MaxBlobSizeBytes:    storeBuilderConfig.ClientConfigV2.MaxBlobSizeBytes,

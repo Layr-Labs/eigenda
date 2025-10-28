@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
+	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 )
@@ -71,6 +72,7 @@ func CreateTestSuite(
 
 	var restServer *rest.Server
 	var arbServer *arbitrum_altda.Server
+	var ethClient common_eigenda.EthClient
 
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
@@ -79,6 +81,7 @@ func CreateTestSuite(
 		appConfig.StoreBuilderConfig,
 		appConfig.SecretConfig,
 		nil,
+		ethClient,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("build storage managers: %v", err.Error()))

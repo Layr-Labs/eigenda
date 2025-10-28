@@ -26,7 +26,7 @@ func TestInfoEndpoint(t *testing.T) {
 		// Setup test config with known values
 		testPublicInfo := PubliclyExposedInfo{
 			Version:             "1.2.3",
-			Network:             "mainnet",
+			ChainID:             "11155111",
 			DirectoryAddress:    "0x1234567890abcdef",
 			CertVerifierAddress: "0xfedcba0987654321",
 			MaxBlobSizeBytes:    16777216, // 16 MiB
@@ -65,7 +65,7 @@ func TestInfoEndpoint(t *testing.T) {
 
 		// Verify all fields
 		require.Equal(t, testPublicInfo.Version, response.Version)
-		require.Equal(t, testPublicInfo.Network, response.Network)
+		require.Equal(t, testPublicInfo.ChainID, response.ChainID)
 		require.Equal(t, testPublicInfo.DirectoryAddress, response.DirectoryAddress)
 		require.Equal(t, testPublicInfo.CertVerifierAddress, response.CertVerifierAddress)
 		require.Equal(t, testPublicInfo.MaxBlobSizeBytes, response.MaxBlobSizeBytes)

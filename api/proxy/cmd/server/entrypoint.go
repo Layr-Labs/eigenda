@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/big"
 
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_logging "github.com/Layr-Labs/eigenda/api/proxy/logging"
@@ -12,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
+	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli/v2"
@@ -56,6 +59,22 @@ func StartProxyService(cliCtx *cli.Context) error {
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
 
+	var ethClient common_eigenda.EthClient
+	if !cfg.StoreBuilderConfig.MemstoreEnabled {
+		var chainID *big.Int
+		ethClient, chainID, err = common.BuildEthClient(
+			ctx,
+			log,
+			cfg.SecretConfig.EthRPCURL,
+			cfg.StoreBuilderConfig.ClientConfigV2.EigenDANetwork,
+		)
+		if err != nil {
+			return fmt.Errorf("build eth client: %w", err)
+		}
+		// Set ChainID in rest server config
+		cfg.RestSvrCfg.PublicInfo.ChainID = chainID.String()
+	}
+
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
 		log,
@@ -63,11 +82,13 @@ func StartProxyService(cliCtx *cli.Context) error {
 		cfg.StoreBuilderConfig,
 		cfg.SecretConfig,
 		registry,
+		ethClient,
 	)
 	if err != nil {
 		return fmt.Errorf("build storage managers: %w", err)
 	}
 
+	// The rest server is always started to provide the /health and /info endpoints
 	restServer := rest.NewServer(cfg.RestSvrCfg, certMgr, keccakMgr, log, metrics)
 	router := mux.NewRouter()
 	restServer.RegisterRoutes(router)

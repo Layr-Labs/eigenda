@@ -22,7 +22,7 @@ import (
 type PubliclyExposedInfo struct {
 	Version             string `json:"version"`
 	DispersalBackend    string `json:"dispersal_backend"`
-	Network             string `json:"network"`
+	ChainID             string `json:"chain_id"`
 	DirectoryAddress    string `json:"directory_address"`
 	CertVerifierAddress string `json:"cert_verifier_address"`
 	MaxBlobSizeBytes    uint64 `json:"max_blob_size_bytes"`
