@@ -336,16 +336,16 @@ func TestV2StoreChunksLittDBValidationFailure(t *testing.T) {
 	require.NoError(t, err)
 	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return(
+	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return(
 		[][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return(
+	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return(
 		[][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
