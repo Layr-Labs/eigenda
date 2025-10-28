@@ -24,7 +24,7 @@ import (
 // with the proxy instance, such as version, chainID, and recency window size. These values are returned by the rest
 // servers /config endpoint.
 type CompatibilityConfig struct {
-	// Current proxy version in the format v{MAJOR}.{MINOR}.{PATCH}-{META} e.g: v2.4.0-43-g3b4f9f40. The version
+	// Current proxy version in the format {MAJOR}.{MINOR}.{PATCH}-{META} e.g: 2.4.0-43-g3b4f9f40. The version
 	// is injected at build using `git describe --tags --always --dirty`. This allows a service to perform a
 	// minimum version supported check.
 	Version string `json:"version"`
@@ -57,6 +57,14 @@ func (c *Config) BuildCompatibilityConfig(version string, chainID string, client
 		uint32(clientConfigV2.MaxBlobSizeBytes / encoding.BYTES_PER_SYMBOL))
 	if err != nil {
 		return fmt.Errorf("calculate max payload size: %w", err)
+	}
+
+	// Remove 'v' prefix from version string if present for compatibility with eigenda/common/version helper funcs
+	if len(version) > 0 {
+		versionRunes := []rune(version)
+		if versionRunes[0] == 'v' || versionRunes[0] == 'V' {
+			version = string(versionRunes[1:])
+		}
 	}
 
 	c.CompatibilityCfg = CompatibilityConfig{
