@@ -50,6 +50,7 @@ func (m *OnDemandMeterer) MeterDispersal(symbolCount uint32) (*rate.Reservation,
 		return nil, fmt.Errorf("global rate limit exceeded: cannot reserve %d symbols", symbolCount)
 	}
 
+	m.metrics.RecordGlobalMeterThroughput(symbolCount)
 	return reservation, nil
 }
 
