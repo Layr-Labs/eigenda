@@ -109,7 +109,7 @@ func (n *Node) DetermineChunkLocations(
 // Although indices may not be contiguous, it is safe to assume that they will be "mostly contiguous".
 // In practice, we should expect to see at most one continuous range of indices per quorum.
 //
-// Important: the provided indices MUST be in (mostly) sorted order in order to collapse into ranges correctly. 
+// Important: the provided indices MUST be in (mostly) sorted order in order to collapse into ranges correctly.
 // Unsorted indices may lead to a very large number of range requests being generated. The current chunk assignment
 // logic produces mostly sorted indices, so this is not an issue at present.
 //
