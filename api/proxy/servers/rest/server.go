@@ -42,6 +42,8 @@ type CompatibilityConfig struct {
 	RecencyWindowSize uint64 `json:"recency_window_size"`
 	// The APIs currently enabled on the rest server
 	APIsEnabled []string `json:"apis_enabled"`
+	// Whether the proxy is in read-only mode (no signer payment key)
+	ReadOnlyMode bool `json:"read_only_mode"`
 }
 
 // Config ... Config for the proxy HTTP server
@@ -52,7 +54,12 @@ type Config struct {
 	CompatibilityCfg CompatibilityConfig
 }
 
-func (c *Config) BuildCompatibilityConfig(version string, chainID string, clientConfigV2 common.ClientConfigV2) error {
+func (c *Config) BuildCompatibilityConfig(
+	version string,
+	chainID string,
+	clientConfigV2 common.ClientConfigV2,
+	readOnly bool,
+) error {
 	maxPayloadSize, err := codec.BlobSymbolsToMaxPayloadSize(
 		uint32(clientConfigV2.MaxBlobSizeBytes / encoding.BYTES_PER_SYMBOL))
 	if err != nil {
@@ -75,6 +82,7 @@ func (c *Config) BuildCompatibilityConfig(version string, chainID string, client
 		MaxPayloadSizeBytes: maxPayloadSize,
 		RecencyWindowSize:   clientConfigV2.RBNRecencyWindowSize,
 		APIsEnabled:         c.APIsEnabled.ToStringSlice(),
+		ReadOnlyMode:        readOnly,
 	}
 	return nil
 }
