@@ -14,6 +14,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 )
@@ -34,8 +36,8 @@ type CompatibilityConfig struct {
 	// The cert verifier router or immutable contract address. This allows a service to verify the cert verifier being
 	// used by the proxy.
 	CertVerifierAddress string `json:"cert_verifier_address"`
-	// The max blob size in bytes the proxy instance has configured.
-	MaxBlobSizeBytes uint64 `json:"max_blob_size_bytes"`
+	// The max supported payload size in bytes supported by the proxy instance. Calculated from `MaxBlobSizeBytes`.
+	MaxPayloadSizeBytes uint32 `json:"max_payload_size_bytes"`
 	// The recency window size. This allows a service (e.g batch poster) to check alignment with the proxy instance.
 	RecencyWindowSize uint64 `json:"recency_window_size"`
 	// The APIs currently enabled on the rest server
@@ -50,16 +52,23 @@ type Config struct {
 	CompatibilityCfg CompatibilityConfig
 }
 
-func (c *Config) SetCompatibilityConfig(version string, chainID string, clientConfigV2 common.ClientConfigV2) {
+func (c *Config) BuildCompatibilityConfig(version string, chainID string, clientConfigV2 common.ClientConfigV2) error {
+	maxPayloadSize, err := codec.BlobSymbolsToMaxPayloadSize(
+		uint32(clientConfigV2.MaxBlobSizeBytes / encoding.BYTES_PER_SYMBOL))
+	if err != nil {
+		return fmt.Errorf("calculate max payload size: %w", err)
+	}
+
 	c.CompatibilityCfg = CompatibilityConfig{
 		Version:             version,
 		ChainID:             chainID,
 		DirectoryAddress:    clientConfigV2.EigenDADirectory,
 		CertVerifierAddress: clientConfigV2.EigenDACertVerifierOrRouterAddress,
-		MaxBlobSizeBytes:    clientConfigV2.MaxBlobSizeBytes,
+		MaxPayloadSizeBytes: maxPayloadSize,
 		RecencyWindowSize:   clientConfigV2.RBNRecencyWindowSize,
 		APIsEnabled:         c.APIsEnabled.ToStringSlice(),
 	}
+	return nil
 }
 
 type Server struct {

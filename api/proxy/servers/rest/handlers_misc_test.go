@@ -36,7 +36,7 @@ func TestConfigEndpoint(t *testing.T) {
 			ChainID:             "11155111",
 			DirectoryAddress:    "0x1234567890abcdef",
 			CertVerifierAddress: "0xfedcba0987654321",
-			MaxBlobSizeBytes:    16777216, // 16 MiB
+			MaxPayloadSizeBytes: 16777216, // 16 MiB
 			RecencyWindowSize:   100,
 			APIsEnabled:         apisEnabled.ToStringSlice(),
 		}
@@ -68,7 +68,7 @@ func TestConfigEndpoint(t *testing.T) {
 		require.Equal(t, testCompatibilityConfig.ChainID, response.ChainID)
 		require.Equal(t, testCompatibilityConfig.DirectoryAddress, response.DirectoryAddress)
 		require.Equal(t, testCompatibilityConfig.CertVerifierAddress, response.CertVerifierAddress)
-		require.Equal(t, testCompatibilityConfig.MaxBlobSizeBytes, response.MaxBlobSizeBytes)
+		require.Equal(t, testCompatibilityConfig.MaxPayloadSizeBytes, response.MaxPayloadSizeBytes)
 		require.Equal(t, testCompatibilityConfig.RecencyWindowSize, response.RecencyWindowSize)
 		require.Equal(t, testCompatibilityConfig.APIsEnabled, response.APIsEnabled)
 	})
