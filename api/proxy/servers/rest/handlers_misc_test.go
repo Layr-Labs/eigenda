@@ -16,7 +16,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestInfoEndpoint(t *testing.T) {
+func TestConfigEndpoint(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
@@ -24,6 +24,13 @@ func TestInfoEndpoint(t *testing.T) {
 
 	t.Run("Success - Returns All CompatibilityConfig Fields", func(t *testing.T) {
 		// Setup test config with known values
+		apisEnabled := &enablement.RestApisEnabled{
+			Admin:               true,
+			OpGenericCommitment: true,
+			OpKeccakCommitment:  true,
+			StandardCommitment:  true,
+		}
+
 		testCompatibilityConfig := CompatibilityConfig{
 			Version:             "1.2.3",
 			ChainID:             "11155111",
@@ -31,21 +38,15 @@ func TestInfoEndpoint(t *testing.T) {
 			CertVerifierAddress: "0xfedcba0987654321",
 			MaxBlobSizeBytes:    16777216, // 16 MiB
 			RecencyWindowSize:   100,
+			APIsEnabled:         apisEnabled.ToStringSlice(),
 		}
 
 		cfg := Config{
-			Host: "localhost",
-			Port: 0,
-			APIsEnabled: &enablement.RestApisEnabled{
-				Admin:               true,
-				OpGenericCommitment: true,
-				OpKeccakCommitment:  true,
-				StandardCommitment:  true,
-			},
+			Host:             "localhost",
+			Port:             0,
+			APIsEnabled:      apisEnabled,
 			CompatibilityCfg: testCompatibilityConfig,
 		}
-
-		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
 
 		req := httptest.NewRequest(http.MethodGet, "/config", nil)
 		rec := httptest.NewRecorder()
@@ -69,6 +70,7 @@ func TestInfoEndpoint(t *testing.T) {
 		require.Equal(t, testCompatibilityConfig.CertVerifierAddress, response.CertVerifierAddress)
 		require.Equal(t, testCompatibilityConfig.MaxBlobSizeBytes, response.MaxBlobSizeBytes)
 		require.Equal(t, testCompatibilityConfig.RecencyWindowSize, response.RecencyWindowSize)
+		require.Equal(t, testCompatibilityConfig.APIsEnabled, response.APIsEnabled)
 	})
 
 	t.Run("Success - Config Endpoint Always Available", func(t *testing.T) {
@@ -86,8 +88,6 @@ func TestInfoEndpoint(t *testing.T) {
 				Version: "test-version",
 			},
 		}
-
-		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
 
 		req := httptest.NewRequest(http.MethodGet, "/config", nil)
 		rec := httptest.NewRecorder()
