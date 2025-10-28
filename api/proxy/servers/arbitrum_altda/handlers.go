@@ -242,6 +242,9 @@ func (h *Handlers) Store(
 		return nil, fmt.Errorf("received empty rollup payload")
 	}
 
+	// TODO: These "certBytes" should be ABI encoded before publishing to SequencerInbox
+	//       since the byte committed to onchain are the same bytes being referenced during the
+	//       one step proof
 	certBytes, err := h.eigenDAManager.Put(ctx, message)
 	if err != nil {
 		return nil, fmt.Errorf("put rollup payload: %w", err)
