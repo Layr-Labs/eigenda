@@ -169,9 +169,26 @@ The Solidity implementations can be found in [`hashBlobHeaderV2()`](https://gith
 
 The Go implementations include [`ComputeBlobKey()`](https://github.com/Layr-Labs/eigenda/blob/master/core/v2/serialization.go#L42) for V2 computation, [`hashBlobHeader()`](https://github.com/Layr-Labs/eigenda/blob/master/api/hashing/node_hashing.go#L62) for node hashing, and [`HashBlobHeader()`](https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/store/generated_key/eigenda/verify/hasher.go#L109) for proxy verification.
 
-#### Usage in the EigenDA System
+#### Usage
 
-The `blobKey` appears throughout the dispersal and retrieval flow. The disperser's `DisperseBlob` method returns it, and clients use it as input to `GetBlobStatus` to poll for dispersal completion (see [Disperser polling](./5-lifecycle-phases.md#disperser-polling)). During retrieval, the Relay API's `GetBlob` method accepts the `blobKey` as its primary lookup parameter (see [Retrieval Paths](./5-lifecycle-phases.md#retrieval-paths)). The Data API and Blob Explorer also use `blobKey` as the primary identifier for querying blob metadata and status. Finally, the `blobKey` links a blob to its certificate and enables verification that the certificate corresponds to the correct blob.
+The `blobKey` is a central identifier used throughout the **dispersal** and **retrieval** process:
+
+- **Dispersal phase:**  
+  The disperser’s `DisperseBlob` method returns a `blobKey`.  
+  Clients then use this `blobKey` with `GetBlobStatus` to check when dispersal is complete  
+  (see [Disperser polling](./5-lifecycle-phases.md#disperser-polling)).
+
+- **Retrieval phase:**  
+  The Relay API’s `GetBlob` method uses the `blobKey` as its main lookup parameter  
+  (see [Retrieval Paths](./5-lifecycle-phases.md#retrieval-paths)).
+
+- **Peripheral APIs:**  
+  Both the Data API and the Blob Explorer rely on `blobKey` as the **primary identifier**  
+  for querying blob metadata and status.
+
+- **Verification:**  
+  The `blobKey` connects each blob to its certificate, ensuring that the certificate  
+  corresponds to the correct blob.
 
 #### Common Pitfalls
 
