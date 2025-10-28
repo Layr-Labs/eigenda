@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
@@ -60,8 +59,8 @@ func StartProxyService(cliCtx *cli.Context) error {
 	defer ctxCancel()
 
 	var ethClient common_eigenda.EthClient
+	var chainID = "memstore"
 	if !cfg.StoreBuilderConfig.MemstoreEnabled {
-		var chainID *big.Int
 		ethClient, chainID, err = common.BuildEthClient(
 			ctx,
 			log,
@@ -71,8 +70,6 @@ func StartProxyService(cliCtx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("build eth client: %w", err)
 		}
-		// Set ChainID in rest server config
-		cfg.RestSvrCfg.PublicInfo.ChainID = chainID.String()
 	}
 
 	certMgr, keccakMgr, err := builder.BuildManagers(
@@ -88,7 +85,10 @@ func StartProxyService(cliCtx *cli.Context) error {
 		return fmt.Errorf("build storage managers: %w", err)
 	}
 
-	// The rest server is always started to provide the /health and /info endpoints
+	// Construct and set the compatibility config for the rest server. This could not be done while reading configs
+	// as ChainID is fetched from the ethClient.
+	cfg.RestSvrCfg.CompatibilityCfg = rest.NewCompatibilityConfig(Version, chainID, cfg.StoreBuilderConfig.ClientConfigV2)
+	// The rest server is always started to provide the /health and /config endpoints
 	restServer := rest.NewServer(cfg.RestSvrCfg, certMgr, keccakMgr, log, metrics)
 	router := mux.NewRouter()
 	restServer.RegisterRoutes(router)

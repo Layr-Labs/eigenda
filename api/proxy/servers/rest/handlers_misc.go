@@ -105,15 +105,11 @@ func (svr *Server) handleSetEigenDADispersalBackend(w http.ResponseWriter, r *ht
 	svr.writeJSON(w, r, response)
 }
 
-// handleGetInfo handles the GET request to check proxy info.
+// handleGetCompatibilityConfig handles the GET request to return the proxy compatibility config.
 // This endpoint returns the proxy version, and any info that may be valuable to
 // external services (e.g recency window size), to ensure correct configuration on both sides.
-func (svr *Server) handleGetInfo(w http.ResponseWriter, r *http.Request) {
-	// We get the dispersal backend here as it can be changed via the admin api
-	backend := svr.certMgr.GetDispersalBackend()
-	svr.config.PublicInfo.DispersalBackend = common.EigenDABackendToString(backend)
-
-	svr.writeJSON(w, r, svr.config.PublicInfo)
+func (svr *Server) handleGetCompatibilityConfig(w http.ResponseWriter, r *http.Request) {
+	svr.writeJSON(w, r, svr.config.CompatibilityCfg)
 }
 
 func (svr *Server) writeJSON(w http.ResponseWriter, r *http.Request, response interface{}) {

@@ -22,16 +22,15 @@ func TestInfoEndpoint(t *testing.T) {
 	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
 
-	t.Run("Success - Returns All PublicInfo Fields", func(t *testing.T) {
+	t.Run("Success - Returns All CompatibilityConfig Fields", func(t *testing.T) {
 		// Setup test config with known values
-		testPublicInfo := PubliclyExposedInfo{
+		testCompatibilityConfig := CompatibilityConfig{
 			Version:             "1.2.3",
 			ChainID:             "11155111",
 			DirectoryAddress:    "0x1234567890abcdef",
 			CertVerifierAddress: "0xfedcba0987654321",
 			MaxBlobSizeBytes:    16777216, // 16 MiB
 			RecencyWindowSize:   100,
-			// DispersalBackend will be set dynamically
 		}
 
 		cfg := Config{
@@ -43,12 +42,12 @@ func TestInfoEndpoint(t *testing.T) {
 				OpKeccakCommitment:  true,
 				StandardCommitment:  true,
 			},
-			PublicInfo: testPublicInfo,
+			CompatibilityCfg: testCompatibilityConfig,
 		}
 
 		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
 
-		req := httptest.NewRequest(http.MethodGet, "/info", nil)
+		req := httptest.NewRequest(http.MethodGet, "/config", nil)
 		rec := httptest.NewRecorder()
 
 		r := mux.NewRouter()
@@ -59,60 +58,21 @@ func TestInfoEndpoint(t *testing.T) {
 		require.Equal(t, http.StatusOK, rec.Code)
 		require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
 
-		var response PubliclyExposedInfo
+		var response CompatibilityConfig
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
 
 		// Verify all fields
-		require.Equal(t, testPublicInfo.Version, response.Version)
-		require.Equal(t, testPublicInfo.ChainID, response.ChainID)
-		require.Equal(t, testPublicInfo.DirectoryAddress, response.DirectoryAddress)
-		require.Equal(t, testPublicInfo.CertVerifierAddress, response.CertVerifierAddress)
-		require.Equal(t, testPublicInfo.MaxBlobSizeBytes, response.MaxBlobSizeBytes)
-		require.Equal(t, testPublicInfo.RecencyWindowSize, response.RecencyWindowSize)
-		require.Equal(t, common.EigenDABackendToString(common.V1EigenDABackend), response.DispersalBackend)
+		require.Equal(t, testCompatibilityConfig.Version, response.Version)
+		require.Equal(t, testCompatibilityConfig.ChainID, response.ChainID)
+		require.Equal(t, testCompatibilityConfig.DirectoryAddress, response.DirectoryAddress)
+		require.Equal(t, testCompatibilityConfig.CertVerifierAddress, response.CertVerifierAddress)
+		require.Equal(t, testCompatibilityConfig.MaxBlobSizeBytes, response.MaxBlobSizeBytes)
+		require.Equal(t, testCompatibilityConfig.RecencyWindowSize, response.RecencyWindowSize)
 	})
 
-	t.Run("Success - Dynamically Updates Dispersal Backend V1", func(t *testing.T) {
-		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
-
-		req := httptest.NewRequest(http.MethodGet, "/info", nil)
-		rec := httptest.NewRecorder()
-
-		r := mux.NewRouter()
-		server := NewServer(testCfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
-		server.RegisterRoutes(r)
-		r.ServeHTTP(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
-
-		var response PubliclyExposedInfo
-		err := json.Unmarshal(rec.Body.Bytes(), &response)
-		require.NoError(t, err)
-		require.Equal(t, "V1", response.DispersalBackend)
-	})
-
-	t.Run("Success - Dynamically Updates Dispersal Backend V2", func(t *testing.T) {
-		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V2EigenDABackend)
-
-		req := httptest.NewRequest(http.MethodGet, "/info", nil)
-		rec := httptest.NewRecorder()
-
-		r := mux.NewRouter()
-		server := NewServer(testCfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
-		server.RegisterRoutes(r)
-		r.ServeHTTP(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
-
-		var response PubliclyExposedInfo
-		err := json.Unmarshal(rec.Body.Bytes(), &response)
-		require.NoError(t, err)
-		require.Equal(t, "V2", response.DispersalBackend)
-	})
-
-	t.Run("Success - Info Endpoint Always Available", func(t *testing.T) {
-		// Unlike admin endpoints, /info should always be available
+	t.Run("Success - Config Endpoint Always Available", func(t *testing.T) {
+		// Unlike admin endpoints, /config should always be available
 		adminDisabledCfg := Config{
 			Host: "localhost",
 			Port: 0,
@@ -122,14 +82,14 @@ func TestInfoEndpoint(t *testing.T) {
 				OpKeccakCommitment:  false,
 				StandardCommitment:  false,
 			},
-			PublicInfo: PubliclyExposedInfo{
+			CompatibilityCfg: CompatibilityConfig{
 				Version: "test-version",
 			},
 		}
 
 		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
 
-		req := httptest.NewRequest(http.MethodGet, "/info", nil)
+		req := httptest.NewRequest(http.MethodGet, "/config", nil)
 		rec := httptest.NewRecorder()
 
 		r := mux.NewRouter()
@@ -140,7 +100,7 @@ func TestInfoEndpoint(t *testing.T) {
 		// Should succeed even with admin endpoints disabled
 		require.Equal(t, http.StatusOK, rec.Code)
 
-		var response PubliclyExposedInfo
+		var response CompatibilityConfig
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
 		require.Equal(t, "test-version", response.Version)

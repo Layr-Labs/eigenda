@@ -18,23 +18,45 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// PubliclyExposedInfo ... PubliclyExposedInfo is used by the /info endpoint
-type PubliclyExposedInfo struct {
-	Version             string `json:"version"`
-	DispersalBackend    string `json:"dispersal_backend"`
-	ChainID             string `json:"chain_id"`
-	DirectoryAddress    string `json:"directory_address"`
+// CompatibilityConfig ... CompatibilityConfig stores values useful to external services for checking compatibility
+// with the proxy instance, such as version, chainID, and recency window size. These values are returned by the rest
+// servers /config endpoint.
+type CompatibilityConfig struct {
+	// Current proxy version in the format v{MAJOR}.{MINOR}.{PATCH}-{META} e.g: v2.4.0-43-g3b4f9f40. The version
+	// is injected at build using `git describe --tags --always --dirty`. This allows a service to perform a
+	// minimum version supported check.
+	Version string `json:"version"`
+	// The ChainID of the connected ethClient. This allows a service to check which chain the proxy is connected
+	// to. If the proxy has memstore enabled, a ChainID of "memstore" will be set.
+	ChainID string `json:"chain_id"`
+	// The EigenDA directory address. This allows a service to verify which contracts are being used by the proxy.
+	DirectoryAddress string `json:"directory_address"`
+	// The cert verifier router or immutable contract address. This allows a service to verify the cert verifier being
+	// used by the proxy.
 	CertVerifierAddress string `json:"cert_verifier_address"`
-	MaxBlobSizeBytes    uint64 `json:"max_blob_size_bytes"`
-	RecencyWindowSize   uint64 `json:"recency_window_size"`
+	// The max blob size in bytes the proxy instance has configured.
+	MaxBlobSizeBytes uint64 `json:"max_blob_size_bytes"`
+	// The recency window size. This allows a service (e.g batch poster) to check alignment with the proxy instance.
+	RecencyWindowSize uint64 `json:"recency_window_size"`
+}
+
+func NewCompatibilityConfig(version string, chainID string, clientConfigV2 common.ClientConfigV2) CompatibilityConfig {
+	return CompatibilityConfig{
+		Version:             version,
+		ChainID:             chainID,
+		DirectoryAddress:    clientConfigV2.EigenDADirectory,
+		CertVerifierAddress: clientConfigV2.EigenDACertVerifierOrRouterAddress,
+		MaxBlobSizeBytes:    clientConfigV2.MaxBlobSizeBytes,
+		RecencyWindowSize:   clientConfigV2.RBNRecencyWindowSize,
+	}
 }
 
 // Config ... Config for the proxy HTTP server
 type Config struct {
-	Host        string
-	Port        int
-	APIsEnabled *enablement.RestApisEnabled
-	PublicInfo  PubliclyExposedInfo
+	Host             string
+	Port             int
+	APIsEnabled      *enablement.RestApisEnabled
+	CompatibilityCfg CompatibilityConfig
 }
 
 type Server struct {

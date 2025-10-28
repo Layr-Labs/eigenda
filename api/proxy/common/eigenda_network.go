@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"slices"
 	"strings"
 	"time"
@@ -115,22 +114,22 @@ func EigenDANetworkFromString(inputString string) (EigenDANetwork, error) {
 }
 
 // BuildEthClient creates an Ethereum client using the provided RPC URL and, if set, validates that the chain ID
-// matches the expected EigenDA network.
+// matches the expected EigenDA network. It returns an ethClient, it's ChainID, and an error.
 func BuildEthClient(ctx context.Context, log logging.Logger, ethRpcUrl string,
-	expectedNetwork EigenDANetwork) (common_eigenda.EthClient, *big.Int, error) {
+	expectedNetwork EigenDANetwork) (common_eigenda.EthClient, string, error) {
 	gethCfg := geth.EthClientConfig{
 		RPCURLs: []string{ethRpcUrl},
 	}
 
 	ethClient, err := geth.NewClient(gethCfg, geth_common.Address{}, 0, log)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create geth client: %w", err)
+		return nil, "", fmt.Errorf("create geth client: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	chainID, err := ethClient.ChainID(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get chain ID from ETH RPC: %w", err)
+		return nil, "", fmt.Errorf("failed to get chain ID from ETH RPC: %w", err)
 	}
 
 	log.Infof("Using chain id: %d", chainID.Uint64())
@@ -139,10 +138,10 @@ func BuildEthClient(ctx context.Context, log logging.Logger, ethRpcUrl string,
 	if expectedNetwork != "" {
 		actualNetworks, err := EigenDANetworksFromChainID(chainID.String())
 		if err != nil {
-			return nil, nil, fmt.Errorf("unknown chain ID %s: %w", chainID.String(), err)
+			return nil, "", fmt.Errorf("unknown chain ID %s: %w", chainID.String(), err)
 		}
 		if !slices.Contains(actualNetworks, expectedNetwork) {
-			return nil, nil, fmt.Errorf("network mismatch: expected %s (based on configuration), but ETH RPC "+
+			return nil, "", fmt.Errorf("network mismatch: expected %s (based on configuration), but ETH RPC "+
 				"returned chain ID %s which corresponds to %s",
 				expectedNetwork, chainID.String(), actualNetworks)
 		}
@@ -151,5 +150,5 @@ func BuildEthClient(ctx context.Context, log logging.Logger, ethRpcUrl string,
 			"aren't provided.", expectedNetwork.String())
 	}
 
-	return ethClient, chainID, nil
+	return ethClient, chainID.String(), nil
 }

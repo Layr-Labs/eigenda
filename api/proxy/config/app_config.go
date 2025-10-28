@@ -58,14 +58,6 @@ func ReadAppConfig(ctx *cli.Context, version string) (AppConfig, error) {
 	}
 
 	enabledServersCfg := enablement.ReadEnabledServersCfg(ctx)
-	restPublicInfo := rest.PubliclyExposedInfo{
-		Version:             version,
-		ChainID:             "", // TODO(iquidus) populate with the chainId of the configured ethereum network
-		DirectoryAddress:    storeBuilderConfig.ClientConfigV2.EigenDADirectory,
-		CertVerifierAddress: storeBuilderConfig.ClientConfigV2.EigenDACertVerifierOrRouterAddress,
-		MaxBlobSizeBytes:    storeBuilderConfig.ClientConfigV2.MaxBlobSizeBytes,
-		RecencyWindowSize:   storeBuilderConfig.ClientConfigV2.RBNRecencyWindowSize,
-	}
 
 	return AppConfig{
 		StoreBuilderConfig:   storeBuilderConfig,
@@ -73,7 +65,7 @@ func ReadAppConfig(ctx *cli.Context, version string) (AppConfig, error) {
 		EnabledServersConfig: enabledServersCfg,
 
 		ArbCustomDASvrCfg: arbitrum_altda.ReadConfig(ctx),
-		RestSvrCfg:        rest.ReadConfig(ctx, &enabledServersCfg.RestAPIConfig, restPublicInfo),
+		RestSvrCfg:        rest.ReadConfig(ctx, &enabledServersCfg.RestAPIConfig),
 		MetricsSvrConfig:  metrics.ReadConfig(ctx),
 	}, nil
 }

@@ -59,11 +59,13 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 	return flags
 }
 
-func ReadConfig(ctx *cli.Context, apisEnabled *enablement.RestApisEnabled, publicInfo PubliclyExposedInfo) Config {
+func ReadConfig(ctx *cli.Context, apisEnabled *enablement.RestApisEnabled) Config {
 	return Config{
 		Host:        ctx.String(ListenAddrFlagName),
 		Port:        ctx.Int(PortFlagName),
 		APIsEnabled: apisEnabled,
-		PublicInfo:  publicInfo,
+		// We can't set compatibility values until after configs have been read as
+		// ChainID requires an ethClient connection.
+		CompatibilityCfg: CompatibilityConfig{},
 	}
 }
