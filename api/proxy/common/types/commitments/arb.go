@@ -16,5 +16,5 @@ func NewArbCommitment(versionedCert certs.VersionedCert) ArbitrumCommitment {
 	return ArbitrumCommitment{versionedCert}
 }
 func (c ArbitrumCommitment) Encode() []byte {
-	return append([]byte{ArbCustomDAHeaderByte}, c.versionedCert.Encode()...)
+	return append([]byte{ArbCustomDAHeaderByte, EigenDALayerByte}, c.versionedCert.Encode()...)
 }
