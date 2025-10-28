@@ -92,11 +92,14 @@ func (n *Node) DetermineChunkLocations(
 		// Chunks from one blob are requested to the same relay
 		rangeRequests := convertIndicesToRangeRequests(blobKey, assgn.Indices)
 		req.chunkRequests = append(req.chunkRequests, rangeRequests...)
-		req.metadata = append(req.metadata, &requestMetadata{
-			blobShardIndex: i,
-			assignment:     assgn,
-		})
 
+		// Code expects one metadata entry per range request
+		for range rangeRequests {
+			req.metadata = append(req.metadata, &requestMetadata{
+				blobShardIndex: i,
+				assignment:     assgn,
+			})
+		}
 	}
 
 	return downloadSizeInBytes, relayRequests, nil
@@ -106,8 +109,12 @@ func (n *Node) DetermineChunkLocations(
 // Although indices may not be contiguous, it is safe to assume that they will be "mostly contiguous".
 // In practice, we should expect to see at most one continuous range of indices per quorum.
 //
+// Important: the provided indices MUST be in (mostly) sorted order in order to collapse into ranges correctly. 
+// Unsorted indices may lead to a very large number of range requests being generated. The current chunk assignment
+// logic produces mostly sorted indices, so this is not an issue at present.
+//
 // Eventually, the assignment logic ought to be refactored to return ranges of chunks instead of individual
-// of individual indices, but the required changes are non-trivial.
+// indices, but the required changes are non-trivial.
 func convertIndicesToRangeRequests(blobKey corev2.BlobKey, indices []uint32) []*relay.ChunkRequestByRange {
 	requests := make([]*relay.ChunkRequestByRange, 0)
 	if len(indices) == 0 {
