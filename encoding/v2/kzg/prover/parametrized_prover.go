@@ -3,6 +3,7 @@ package prover
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/backend"
@@ -24,7 +25,7 @@ type ParametrizedProver struct {
 // requires it.
 func (g *ParametrizedProver) GetProofs(inputFr []fr.Element) ([]encoding.Proof, error) {
 	// get the blob length
-	blobLength := uint64(encoding.GetBlobLengthPowerOf2(uint32(len(inputFr))))
+	blobLength := uint64(math.NextPowOf2u32(uint32(len(inputFr))))
 	// pad inputFr to BlobLength if it is not power of 2, which encodes the RS redundancy
 	paddedCoeffs := make([]fr.Element, blobLength)
 	copy(paddedCoeffs, inputFr)
