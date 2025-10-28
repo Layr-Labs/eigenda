@@ -212,15 +212,11 @@ func benchmarkMultiproofGeneration(b *testing.B, encodingConfig encoding.Config)
 				NumChunks:   8192,                           // blob_version=0
 				ChunkLength: max(1, rsExtendedBlobFrs/8192), // chosen such that numChunks*ChunkLength=rsExtendedBlobFrs
 			}
-			provingParams := prover.ProvingParams{
-				BlobLength:  rsExtendedBlobFrs,
-				ChunkLength: max(1, rsExtendedBlobFrs/8192), // chosen such that numChunks*ChunkLength=rsExtendedBlobFrs
-			}
-			parametrizedProver, err := p.GetKzgProver(params, provingParams)
+			parametrizedProver, err := p.GetKzgProver(params)
 			require.NoError(b, err)
 
 			for b.Loop() {
-				_, err = parametrizedProver.GetProofs(maxSizeBlobCoeffs[:rsExtendedBlobFrs], provingParams)
+				_, err = parametrizedProver.GetProofs(maxSizeBlobCoeffs[:rsExtendedBlobFrs])
 				require.NoError(b, err)
 			}
 		})
