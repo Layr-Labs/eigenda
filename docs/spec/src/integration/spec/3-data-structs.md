@@ -174,29 +174,17 @@ The Go implementations include [`ComputeBlobKey()`](https://github.com/Layr-Labs
 The `blobKey` is a central identifier used throughout the **dispersal** and **retrieval** process:
 
 - **Dispersal phase:**  
-  The disperser’s `DisperseBlob` method returns a `blobKey`.  
-  Clients then use this `blobKey` with `GetBlobStatus` to check when dispersal is complete  
+  The disperser’s `DisperseBlob` method returns a `blobKey`. Clients then use this `blobKey` with `GetBlobStatus` to check when dispersal is complete
   (see [Disperser polling](./5-lifecycle-phases.md#disperser-polling)).
 
 - **Retrieval phase:**  
-  The Relay API’s `GetBlob` method uses the `blobKey` as its main lookup parameter  
-  (see [Retrieval Paths](./5-lifecycle-phases.md#retrieval-paths)).
+  The Relay API’s `GetBlob` method uses the `blobKey` as its main lookup parameter (see [Retrieval Paths](./5-lifecycle-phases.md#retrieval-paths)).
 
 - **Peripheral APIs:**  
-  Both the Data API and the Blob Explorer rely on `blobKey` as the **primary identifier**  
-  for querying blob metadata and status.
+  Both the Data API and the Blob Explorer rely on `blobKey` as the **primary identifier** for querying blob metadata and status.
 
 - **Verification:**  
-  The `blobKey` connects each blob to its certificate, ensuring that the certificate  
-  corresponds to the correct blob.
-
-#### Common Pitfalls
-
-When implementing `blobKey` computation, ensure correct type widths in ABI encoding — for instance, the version field should be encoded as `uint32`, not `uint256`. Quorum numbers must be sorted before encoding to ensure consistent hashing across different implementations.
-
-G2 points in the `BlobCommitment` follow Ethereum's ordering convention (A1, A0) rather than the typical cryptographic library ordering (A0, A1), as documented in [`core/v2/serialization.go:131-146`](https://github.com/Layr-Labs/eigenda/blob/master/core/v2/serialization.go#L131-L146). This is a subtle but critical detail when porting code between different cryptographic libraries.
-
-Since payment metadata is not stored on-chain, it may not always be possible to reconstruct a complete `BlobHeader` from on-chain data alone. In such cases, use `ComputeBlobKey()` which accepts the individual components needed for hashing without requiring a full `BlobHeader` object.
+  The `blobKey` connects each blob to its certificate, ensuring that the certificate corresponds to the correct blob.
 
 ### EigenDA Certificate (`DACert`)
 
