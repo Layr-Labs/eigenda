@@ -87,7 +87,7 @@ func CreateTestSuite(
 		panic(fmt.Sprintf("build storage managers: %v", err.Error()))
 	}
 
-	if appConfig.EnabledServersConfig.RestAPIConfig.HasCertEndpointEnabled() {
+	if appConfig.EnabledServersConfig.RestAPIConfig.DAEndpointEnabled() {
 		restServer = rest.NewServer(appConfig.RestSvrCfg, certMgr, keccakMgr, logger, metrics)
 		router := mux.NewRouter()
 		restServer.RegisterRoutes(router)
@@ -114,7 +114,7 @@ func CreateTestSuite(
 	}
 
 	kill := func() {
-		if appConfig.EnabledServersConfig.RestAPIConfig.HasCertEndpointEnabled() {
+		if appConfig.EnabledServersConfig.RestAPIConfig.DAEndpointEnabled() {
 			if err := restServer.Stop(); err != nil {
 				logger.Error("failed to stop proxy server", "err", err)
 			}

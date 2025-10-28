@@ -86,8 +86,8 @@ func StartProxyService(cliCtx *cli.Context) error {
 	}
 
 	// Construct and set the compatibility config for the rest server. This could not be done while reading configs
-	// as ChainID is fetched from the ethClient.
-	cfg.RestSvrCfg.CompatibilityCfg = rest.NewCompatibilityConfig(Version, chainID, cfg.StoreBuilderConfig.ClientConfigV2)
+	// as ChainID is fetched from the ethClient afterwards.
+	cfg.RestSvrCfg.SetCompatibilityConfig(Version, chainID, cfg.StoreBuilderConfig.ClientConfigV2)
 	// The rest server is always started to provide the /health and /config endpoints
 	restServer := rest.NewServer(cfg.RestSvrCfg, certMgr, keccakMgr, log, metrics)
 	router := mux.NewRouter()

@@ -18,7 +18,7 @@ type EnabledServersConfig struct {
 
 // RestApisEnabled stores boolean fields that dictate which
 // commitment modes and routes to support.
-// Note: /info and /health endpoints are always enabled.
+// Note: /config and /health endpoints are always enabled.
 // TODO: Add support for a `read-only` mode
 type RestApisEnabled struct {
 	Admin               bool
@@ -27,14 +27,32 @@ type RestApisEnabled struct {
 	StandardCommitment  bool
 }
 
-func (e *RestApisEnabled) HasCertEndpointEnabled() bool {
+func (e *RestApisEnabled) DAEndpointEnabled() bool {
 	return e.OpGenericCommitment ||
 		e.OpKeccakCommitment || e.StandardCommitment
 }
 
+// ToStringSlice returns a string slice containing only the APIs enabled
+func (e *RestApisEnabled) ToStringSlice() []string {
+	enabled := []string{}
+	if e.Admin {
+		enabled = append(enabled, string(Admin))
+	}
+	if e.OpGenericCommitment {
+		enabled = append(enabled, string(OpGenericCommitment))
+	}
+	if e.OpKeccakCommitment {
+		enabled = append(enabled, string(OpKeccakCommitment))
+	}
+	if e.StandardCommitment {
+		enabled = append(enabled, string(StandardCommitment))
+	}
+	return enabled
+}
+
 // Check ... Ensures that expression of the enabled API set is correct
 func (e EnabledServersConfig) Check() error {
-	if !e.RestAPIConfig.HasCertEndpointEnabled() && !e.ArbCustomDA {
+	if !e.RestAPIConfig.DAEndpointEnabled() && !e.ArbCustomDA {
 		return fmt.Errorf("an `arb` or REST ALT DA Server api type must be provided to start application")
 	}
 

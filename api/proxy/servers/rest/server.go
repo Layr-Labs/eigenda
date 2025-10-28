@@ -38,17 +38,8 @@ type CompatibilityConfig struct {
 	MaxBlobSizeBytes uint64 `json:"max_blob_size_bytes"`
 	// The recency window size. This allows a service (e.g batch poster) to check alignment with the proxy instance.
 	RecencyWindowSize uint64 `json:"recency_window_size"`
-}
-
-func NewCompatibilityConfig(version string, chainID string, clientConfigV2 common.ClientConfigV2) CompatibilityConfig {
-	return CompatibilityConfig{
-		Version:             version,
-		ChainID:             chainID,
-		DirectoryAddress:    clientConfigV2.EigenDADirectory,
-		CertVerifierAddress: clientConfigV2.EigenDACertVerifierOrRouterAddress,
-		MaxBlobSizeBytes:    clientConfigV2.MaxBlobSizeBytes,
-		RecencyWindowSize:   clientConfigV2.RBNRecencyWindowSize,
-	}
+	// The APIs currently enabled on the rest server
+	APIsEnabled []string `json:"apis_enabled"`
 }
 
 // Config ... Config for the proxy HTTP server
@@ -57,6 +48,18 @@ type Config struct {
 	Port             int
 	APIsEnabled      *enablement.RestApisEnabled
 	CompatibilityCfg CompatibilityConfig
+}
+
+func (c *Config) SetCompatibilityConfig(version string, chainID string, clientConfigV2 common.ClientConfigV2) {
+	c.CompatibilityCfg = CompatibilityConfig{
+		Version:             version,
+		ChainID:             chainID,
+		DirectoryAddress:    clientConfigV2.EigenDADirectory,
+		CertVerifierAddress: clientConfigV2.EigenDACertVerifierOrRouterAddress,
+		MaxBlobSizeBytes:    clientConfigV2.MaxBlobSizeBytes,
+		RecencyWindowSize:   clientConfigV2.RBNRecencyWindowSize,
+		APIsEnabled:         c.APIsEnabled.ToStringSlice(),
+	}
 }
 
 type Server struct {
