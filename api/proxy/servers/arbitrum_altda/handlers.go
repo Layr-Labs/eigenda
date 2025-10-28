@@ -146,7 +146,7 @@ func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (
 	daHeaderByte := seqMessageWithoutHeader[0]
 	if daHeaderByte != commitments.ArbCustomDAHeaderByte {
 		return certs.VersionedCert{},
-			fmt.Errorf("expected CutomDAHeader byte (%x) for 0th index byte of message, instead got: %x ",
+			fmt.Errorf("expected CustomDAHeader byte (%x) for 0th index byte of message, instead got: %x ",
 				commitments.ArbCustomDAHeaderByte, daHeaderByte)
 	}
 
@@ -154,7 +154,7 @@ func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (
 	if daLayerByte != commitments.EigenDALayerByte {
 		return certs.VersionedCert{},
 			fmt.Errorf("expected EigenDALayer byte (%x) for 1st index byte of message, instead got: %x ",
-				commitments.EigenDALayerByte, daHeaderByte)
+				commitments.EigenDALayerByte, daLayerByte)
 	}
 
 	certVersionByte := seqMessageWithoutHeader[2]
