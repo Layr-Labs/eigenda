@@ -100,6 +100,11 @@ type DisperserHarness struct {
 	ControllerServer *server.Server
 }
 
+// TODO: Consider refactoring these component structs into the underlying packages (relay, encoder, controller,
+// apiserver). This would reduce maintenance burden on tests - if the production code changes, the component structs
+// would be updated alongside it. Currently these exist here because production code runs each service as a separate
+// binary, while the test harness runs them as goroutines and needs to return/track the created objects.
+
 // RelayComponents contains the components created by startRelays
 type RelayComponents struct {
 	Servers []*relay.Server
