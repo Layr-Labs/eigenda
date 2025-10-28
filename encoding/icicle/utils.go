@@ -40,12 +40,12 @@ func ConvertScalarFieldsToFrBytes(scalars []iciclebn254.ScalarField) []fr.Elemen
 func BatchConvertGnarkAffineToIcicleAffine(gAffineList []bn254.G1Affine) []iciclebn254.Affine {
 	icicleAffineList := make([]iciclebn254.Affine, len(gAffineList))
 	for i := 0; i < len(gAffineList); i++ {
-		GnarkAffineToIcicleAffine(&gAffineList[i], &icicleAffineList[i])
+		gnarkAffineToIcicleAffine(&gAffineList[i], &icicleAffineList[i])
 	}
 	return icicleAffineList
 }
 
-func GnarkAffineToIcicleAffine(g1 *bn254.G1Affine, iciAffine *iciclebn254.Affine) {
+func gnarkAffineToIcicleAffine(g1 *bn254.G1Affine, iciAffine *iciclebn254.Affine) {
 	var littleEndBytesX, littleEndBytesY [32]byte
 	fp.LittleEndian.PutElement(&littleEndBytesX, g1.X)
 	fp.LittleEndian.PutElement(&littleEndBytesY, g1.Y)
