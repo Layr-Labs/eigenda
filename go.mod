@@ -46,6 +46,7 @@ require (
 	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.0.85
+	github.com/oracle/oci-go-sdk/v65 v65.78.0
 	github.com/pingcap/errors v0.11.4
 	github.com/prometheus/client_golang v1.21.1
 	github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466
@@ -275,3 +276,5 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 )
+
+require github.com/sony/gobreaker v0.5.0 // indirect

@@ -45,15 +45,19 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EncoderVersion:  EncoderVersion(version),
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		BlobStoreConfig: blobstore.Config{
-			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			BucketName:       ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			Backend:          blobstore.ObjectStorageBackend(ctx.GlobalString(flags.ObjectStorageBackendFlag.Name)),
+			OCIRegion:        ctx.GlobalString(flags.OCIRegionFlag.Name),
+			OCICompartmentID: ctx.GlobalString(flags.OCICompartmentIDFlag.Name),
+			OCINamespace:     ctx.GlobalString(flags.OCINamespaceFlag.Name),
 		},
 		ChunkStoreConfig: chunkstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			Backend:    ctx.GlobalString(flags.ObjectStorageBackendFlag.Name),
 		},
 		EncoderConfig: kzg.ReadCLIConfig(ctx),
 		LoggerConfig:  *loggerConfig,
 		ServerConfig: &encoder.ServerConfig{
-			GrpcPort:                 ctx.GlobalString(flags.GrpcPortFlag.Name),
 			MaxConcurrentRequests:    ctx.GlobalInt(flags.MaxConcurrentRequestsFlag.Name),
 			RequestPoolSize:          ctx.GlobalInt(flags.RequestPoolSizeFlag.Name),
 			RequestQueueSize:         ctx.GlobalInt(flags.RequestQueueSizeFlag.Name),

@@ -47,9 +47,21 @@ type SharedBlobStore struct {
 	logger            logging.Logger
 }
 
+type ObjectStorageBackend string
+
+const (
+	S3Backend  ObjectStorageBackend = "s3"
+	OCIBackend ObjectStorageBackend = "oci"
+)
+
 type Config struct {
 	BucketName string
 	TableName  string
+	Backend    ObjectStorageBackend
+	// OCI-specific configuration
+	OCINamespace     string
+	OCIRegion        string
+	OCICompartmentID string
 }
 
 // This represents the s3 fetch result for a blob.
