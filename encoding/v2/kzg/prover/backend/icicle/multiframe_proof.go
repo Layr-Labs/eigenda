@@ -78,18 +78,18 @@ type WorkerResult struct {
 func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 
-	dimE := numChunks
+	toeplitzMatrixLen := uint64(len(polyFr)) / chunkLen
+
 	l := chunkLen
-	numPoly := uint64(len(polyFr)) / dimE / chunkLen
 
 	// Pre-processing stage - CPU computations
-	flattenCoeffStoreFr, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
+	flattenCoeffStoreFr, err := p.computeCoeffStore(polyFr, numWorker, l, toeplitzMatrixLen)
 	if err != nil {
 		return nil, fmt.Errorf("coefficient computation error: %v", err)
 	}
 	preprocessDone := time.Now()
 
-	var icicleFFTBatch []bn254.G1Affine
+	var proofs []bn254.G1Affine
 	var icicleErr error
 
 	// GPU operations
@@ -108,7 +108,7 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 			}
 		}()
 
-		sumVec, err := p.msmBatchOnDevice(flattenCoeffStoreFr, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
+		sumVec, err := p.msmBatchOnDevice(flattenCoeffStoreFr, p.FlatFFTPointsT, int(toeplitzMatrixLen)*2)
 		if err != nil {
 			icicleErr = fmt.Errorf("msm error: %w", err)
 			return
@@ -117,35 +117,9 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 		msmDone = time.Now()
 
 		// Compute the first ecntt, and set new batch size for ntt
-		p.NttCfg.BatchSize = int32(numPoly)
-		sumVecInv, err := p.ecnttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
-		if err != nil {
-			icicleErr = fmt.Errorf("first ECNtt error: %w", err)
-			return
-		}
-
-		// TODO(samlaf): could we change this to FreeAsync to overlap with the next ECNtt?
-		sumVec.Free()
-
-		firstECNttDone = time.Now()
-
-		prunedSumVecInv := sumVecInv.Range(0, int(dimE), false)
-
-		// Compute the second ecntt on the reduced size array
-		flatProofsBatch, err := p.ecnttOnDevice(prunedSumVecInv, false, int(numPoly)*int(dimE))
-		if err != nil {
-			icicleErr = fmt.Errorf("second ECNtt error: %w", err)
-			return
-		}
-
-		prunedSumVecInv.Free()
-
-		secondECNttDone = time.Now()
-
-		flatProofsBatchHost := make(core.HostSlice[iciclebn254.Projective], int(numPoly)*int(dimE))
-		flatProofsBatchHost.CopyFromDevice(&flatProofsBatch)
-		flatProofsBatch.Free()
-		icicleFFTBatch = icicle.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
+		p.NttCfg.BatchSize = int32(1)
+		// run two ecntt in one function, the first and second ecntt operates on the same device slice
+		proofs, firstECNttDone, err = p.twoEcnttOnDevice(sumVec, int(numChunks), int(toeplitzMatrixLen))
 	})
 
 	wg.Wait()
@@ -164,7 +138,7 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 		"fft2", secondECNttDone.Sub(firstECNttDone),
 	)
 
-	return icicleFFTBatch, nil
+	return proofs, nil
 }
 
 // Modify the function signature to return a flat array
@@ -291,26 +265,60 @@ func (c *KzgMultiProofBackend) msmBatchOnDevice(frs []fr.Element, g1Points []ici
 	return out, nil
 }
 
-func (c *KzgMultiProofBackend) ecnttOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
+// twoEcnttOnDevice takes the first ecntt to generate the kzg proofs. Only the first half of the result
+// are considered kzg proof, and it comes from the Toeplitz trick, readers can refer to
+// https://alinush.github.io/2020/03/19/multiplying-a-vector-by-a-toeplitz-matrix.html
+// Then the kzg proofs are padded with infinity points to the size of numChunks. And this is the vector
+// which the second ecntt is taken.
+func (c *KzgMultiProofBackend) twoEcnttOnDevice(
+	batchPoints core.DeviceSlice,
+	numChunks int,
+	toeplitzMatrixLen int,
+) ([]bn254.G1Affine, time.Time, error) {
 	var p iciclebn254.Projective
-	var out core.DeviceSlice
+	var deviceWithNumChunkElement core.DeviceSlice
+	var output core.DeviceSlice
 
-	output, err := out.Malloc(p.Size(), totalSize)
+	_, err := deviceWithNumChunkElement.Malloc(p.Size(), numChunks)
 	if err != runtime.Success {
-		return out, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
+		return nil, time.Time{}, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
 	}
 
-	if isInverse {
-		err := ecntt.ECNtt(batchPoints, core.KInverse, &c.NttCfg, output)
-		if err != runtime.Success {
-			return out, fmt.Errorf("inverse ecntt failed: %v", err.AsString())
-		}
-	} else {
-		err := ecntt.ECNtt(batchPoints, core.KForward, &c.NttCfg, output)
-		if err != runtime.Success {
-			return out, fmt.Errorf("forward ecntt failed: %v", err.AsString())
-		}
+	// the size is twice because of the FFT trick on toeplitz matrix
+	firstECNTTLen := toeplitzMatrixLen * 2
+	// Device memory for first ecntt
+	firstECNTTDeviceSlice := deviceWithNumChunkElement.RangeTo(firstECNTTLen, false)
+	err = ecntt.ECNtt(batchPoints, core.KInverse, &c.NttCfg, firstECNTTDeviceSlice)
+	if err != runtime.Success {
+		return nil, time.Time{}, fmt.Errorf("inverse ecntt failed: %v", err.AsString())
 	}
 
-	return output, nil
+	// now only keep the toeplitzMatrixLen elements as they are, set the rest to zero.
+	// Zeros are the infinity points for G1Projective points
+	// unit in the Range function is measured by element size
+	infinityPointsDevice := deviceWithNumChunkElement.Range(toeplitzMatrixLen, numChunks, false)
+	infinityProjectivePoints := make([]iciclebn254.Projective, numChunks-toeplitzMatrixLen)
+	infinityPointsHost := core.HostSliceFromElements[iciclebn254.Projective](
+		infinityProjectivePoints[:numChunks-toeplitzMatrixLen],
+	)
+	infinityPointsHost.CopyToDevice(&infinityPointsDevice, false)
+
+	// take the second ecntt
+	_, err = deviceWithNumChunkElement.Malloc(p.Size(), numChunks)
+	err = ecntt.ECNtt(deviceWithNumChunkElement, core.KForward, &c.NttCfg, output)
+	if err != runtime.Success {
+		return nil, time.Time{}, fmt.Errorf("forward ecntt failed: %v", err.AsString())
+	}
+
+	// free intermediate GPU memory
+	deviceWithNumChunkElement.Free()
+
+	proofsBatchHost := make(core.HostSlice[iciclebn254.Projective], numChunks)
+	proofsBatchHost.CopyFromDevice(&output)
+	// free GPU memory for proof
+	output.Free()
+
+	proofs := icicle.HostSliceIcicleProjectiveToGnarkAffine(proofsBatchHost, int(c.NumWorker))
+
+	return proofs, time.Time{}, nil
 }
