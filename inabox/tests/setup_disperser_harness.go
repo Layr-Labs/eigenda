@@ -278,7 +278,7 @@ func startRelays(
 
 	// Pre-create all listeners with port 0 (OS assigns ports)
 	listeners := make([]net.Listener, config.RelayCount)
-	actualURLs := make([]string, config.RelayCount)
+	assignedURLs := make([]string, config.RelayCount)
 
 	for i := range config.RelayCount {
 		listener, err := net.Listen("tcp", "0.0.0.0:0")
@@ -294,17 +294,17 @@ func startRelays(
 		}
 		listeners[i] = listener
 
-		// Extract the actual port assigned by the OS
-		actualPort := listener.Addr().(*net.TCPAddr).Port
-		actualURLs[i] = fmt.Sprintf("0.0.0.0:%d", actualPort)
+		// Extract the port assigned by the OS
+		assignedPort := listener.Addr().(*net.TCPAddr).Port
+		assignedURLs[i] = fmt.Sprintf("0.0.0.0:%d", assignedPort)
 
-		logger.Info("Created listener for relay", "index", i, "assigned_port", actualPort)
+		logger.Info("Created listener for relay", "index", i, "assigned_port", assignedPort)
 	}
 
-	// Now that we have all the actual URLs, register them on-chain
+	// Now that we have all the assigned URLs, register them on-chain
 	if config.TestConfig != nil && config.TestConfig.EigenDA.Deployer != "" && config.TestConfig.IsEigenDADeployed() {
-		logger.Info("Registering relay URLs with actual ports", "urls", actualURLs)
-		config.TestConfig.RegisterRelays(ethClient, actualURLs, ethClient.GetAccountAddress())
+		logger.Info("Registering relay URLs with assigned ports", "urls", assignedURLs)
+		config.TestConfig.RegisterRelays(ethClient, assignedURLs, ethClient.GetAccountAddress())
 	}
 
 	// Now start each relay with its pre-created listener
@@ -319,10 +319,10 @@ func startRelays(
 					logger.Warn("Failed to close listener for relay", "index", j, "error", err)
 				}
 			}
-			return fmt.Errorf("failed to start relay %d (%s): %w", i, actualURLs[i], err)
+			return fmt.Errorf("failed to start relay %d (%s): %w", i, assignedURLs[i], err)
 		}
 		harness.RelayServers = append(harness.RelayServers, instance)
-		logger.Info("Started relay", "index", i, "url", actualURLs[i])
+		logger.Info("Started relay", "index", i, "url", assignedURLs[i])
 	}
 
 	return nil
@@ -629,11 +629,11 @@ func startEncoderV2(
 		return "", fmt.Errorf("failed to create listener for encoder v2: %w", err)
 	}
 
-	// Extract the actual port assigned by the OS
-	actualPort := listener.Addr().(*net.TCPAddr).Port
-	actualAddress := fmt.Sprintf("localhost:%d", actualPort)
+	// Extract the port assigned by the OS
+	assignedPort := listener.Addr().(*net.TCPAddr).Port
+	assignedAddress := fmt.Sprintf("localhost:%d", assignedPort)
 
-	encoderLogger.Info("Created listener for encoder v2", "assigned_port", actualPort, "address", actualAddress)
+	encoderLogger.Info("Created listener for encoder v2", "assigned_port", assignedPort, "address", assignedAddress)
 
 	// Start encoder server in background
 	go func() {
@@ -646,9 +646,9 @@ func startEncoderV2(
 	// Store encoder in harness
 	harness.EncoderServerV2 = encoderServerV2
 
-	encoderLogger.Info("Encoder v2 server started successfully", "address", actualAddress, "logFile", logFilePath)
+	encoderLogger.Info("Encoder v2 server started successfully", "address", assignedAddress, "logFile", logFilePath)
 
-	return actualAddress, nil
+	return assignedAddress, nil
 }
 
 // startController starts the controller components (encoding manager and dispatcher)
@@ -970,7 +970,8 @@ func startController(
 		controllerLogger.Info("UseControllerMediatedPayments disabled - controller will not have server")
 	}
 
-	controllerLogger.Info("Controller components started successfully", "address", controllerAddress, "logFile", logFilePath)
+	controllerLogger.Info("Controller components started successfully",
+		"address", controllerAddress, "logFile", logFilePath)
 
 	return controllerAddress, nil
 }
@@ -1184,8 +1185,8 @@ func startAPIServerV2(
 	// Store server in harness
 	harness.APIServerV2 = apiServerV2
 
-	actualAddress := fmt.Sprintf("localhost:%s", serverConfig.GrpcPort)
-	apiServerLogger.Info("API server v2 started successfully", "address", actualAddress, "logFile", logFilePath)
+	grpcAddress := fmt.Sprintf("localhost:%s", serverConfig.GrpcPort)
+	apiServerLogger.Info("API server v2 started successfully", "address", grpcAddress, "logFile", logFilePath)
 
-	return actualAddress, nil
+	return grpcAddress, nil
 }
