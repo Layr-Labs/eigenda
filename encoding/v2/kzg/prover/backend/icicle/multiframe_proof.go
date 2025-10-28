@@ -30,11 +30,13 @@ const (
 )
 
 type KzgMultiProofBackend struct {
-	Logger         logging.Logger
-	Fs             *fft.FFTSettings
+	Logger logging.Logger
+	Fs     *fft.FFTSettings
+	// TODO(samlaf): we should send the srs table points to the device once in the constructor
+	// and keep a deviceSlice pointer to it. This would require a destructor to free the device memory.
+	// Also need to account how much memory this would use over all parametrized provers.
 	FlatFFTPointsT []iciclebn254.Affine
 	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
-	MsmCfg         core.MSMConfig
 	Device         runtime.Device
 	GpuLock        sync.Mutex
 	NumWorker      uint64
@@ -61,7 +63,6 @@ func NewMultiProofBackend(logger logging.Logger,
 		Fs:             fs,
 		FlatFFTPointsT: icicleDevice.FlatFFTPointsT,
 		NttCfg:         icicleDevice.NttCfg,
-		MsmCfg:         icicleDevice.MsmCfg,
 		Device:         icicleDevice.Device,
 		GpuLock:        sync.Mutex{},
 		NumWorker:      numWorker,
@@ -88,9 +89,6 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 	}
 	preprocessDone := time.Now()
 
-	flattenCoeffStoreSf := icicle.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
-	flattenCoeffStoreCopy := core.HostSliceFromElements[iciclebn254.ScalarField](flattenCoeffStoreSf)
-
 	var icicleFFTBatch []bn254.G1Affine
 	var icicleErr error
 
@@ -110,18 +108,11 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 			}
 		}()
 
-		// Copy the flatten coeff to device
-		var flattenStoreCopyToDevice core.DeviceSlice
-		flattenCoeffStoreCopy.CopyToDevice(&flattenStoreCopyToDevice, true)
-
-		sumVec, err := p.msmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
+		sumVec, err := p.msmBatchOnDevice(flattenCoeffStoreFr, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
 		if err != nil {
 			icicleErr = fmt.Errorf("msm error: %w", err)
 			return
 		}
-
-		// Free the flatten coeff store
-		flattenStoreCopyToDevice.Free()
 
 		msmDone = time.Now()
 
@@ -133,6 +124,7 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 			return
 		}
 
+		// TODO(samlaf): could we change this to FreeAsync to overlap with the next ECNtt?
 		sumVec.Free()
 
 		firstECNttDone = time.Now()
@@ -270,9 +262,9 @@ func (p *KzgMultiProofBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j, l ui
 }
 
 // MsmBatchOnDevice function supports batch across blobs.
-// totalSize is the number of output points, which equals to numPoly * 2 * dimE , dimE is number of chunks
-func (c *KzgMultiProofBackend) msmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlice, rowsG1Icicle []iciclebn254.Affine, totalSize int) (core.DeviceSlice, error) {
-	rowsG1IcicleCopy := core.HostSliceFromElements[iciclebn254.Affine](rowsG1Icicle)
+// totalSize is the number of output points, which equals to numPoly * 2 * dimE , dimE is number of chunks.
+// Returns a deviceSlice of G1 points, which must be freed by the caller.
+func (c *KzgMultiProofBackend) msmBatchOnDevice(frs []fr.Element, g1Points []iciclebn254.Affine, totalSize int) (core.DeviceSlice, error) {
 
 	var p iciclebn254.Projective
 	var out core.DeviceSlice
@@ -282,7 +274,16 @@ func (c *KzgMultiProofBackend) msmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlic
 		return out, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
 	}
 
-	err = msm.Msm(rowsFrIcicleCopy, rowsG1IcicleCopy, &c.MsmCfg, out)
+	// The msm is computed synchronously (default config value is async=false).
+	// We could possibly share the same stream as the ecntt use (c.NttCfg.StreamHandle).
+	// TODO(samlaf): rethink how we use streams and async computations in general.
+	msmCfg := msm.GetDefaultMSMConfig()
+	msmCfg.AreScalarsMontgomeryForm = true
+	frsHostOrDeviceSlice := core.HostSliceFromElements(frs)
+	// TODO(samlaf): we could send the srs table points to the device once in the constructor
+	// and keep a deviceSlice pointer to it.
+	g1PointsHostSlice := core.HostSliceFromElements(g1Points)
+	err = msm.Msm(frsHostOrDeviceSlice, g1PointsHostSlice, &msmCfg, out)
 	if err != runtime.Success {
 		return out, fmt.Errorf("msm error: %v", err.AsString())
 	}
