@@ -7,7 +7,8 @@ import (
 
 // Tracks metrics for the [OnDemandPaymentValidator]
 type OnDemandValidatorMetrics struct {
-	onDemandSymbolCount        prometheus.Histogram
+	onDemandSymbols            prometheus.Histogram
+	onDemandSymbolsTotal       prometheus.Counter
 	onDemandInsufficientFunds  prometheus.Counter
 	onDemandQuorumNotSupported prometheus.Counter
 	onDemandUnexpectedErrors   prometheus.Counter
@@ -22,14 +23,23 @@ func NewOnDemandValidatorMetrics(
 		return nil
 	}
 
-	symbolCount := promauto.With(registry).NewHistogram(
+	symbols := promauto.With(registry).NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
-			Name:      "on_demand_symbol_count",
+			Name:      "on_demand_symbols",
 			Subsystem: subsystem,
 			Help:      "Distribution of symbol counts for successful on-demand payments",
 			// Buckets chosen to go from min to max blob sizes (128KiB -> 16MiB)
 			Buckets: prometheus.ExponentialBuckets(4096, 2, 8),
+		},
+	)
+
+	symbolsTotal := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "on_demand_symbols_total",
+			Subsystem: subsystem,
+			Help:      "Total number of symbols validated for successful on-demand payments",
 		},
 	)
 
@@ -61,7 +71,8 @@ func NewOnDemandValidatorMetrics(
 	)
 
 	return &OnDemandValidatorMetrics{
-		onDemandSymbolCount:        symbolCount,
+		onDemandSymbols:            symbols,
+		onDemandSymbolsTotal:       symbolsTotal,
 		onDemandInsufficientFunds:  insufficientFunds,
 		onDemandQuorumNotSupported: quorumNotSupported,
 		onDemandUnexpectedErrors:   unexpectedErrors,
@@ -73,7 +84,8 @@ func (m *OnDemandValidatorMetrics) RecordSuccess(symbolCount uint32) {
 	if m == nil {
 		return
 	}
-	m.onDemandSymbolCount.Observe(float64(symbolCount))
+	m.onDemandSymbols.Observe(float64(symbolCount))
+	m.onDemandSymbolsTotal.Add(float64(symbolCount))
 }
 
 // Increments the counter for insufficient funds errors

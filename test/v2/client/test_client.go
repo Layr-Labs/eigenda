@@ -140,7 +140,13 @@ func NewTestClient(
 		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
 
-	accountant := clientsv2.NewUnpopulatedAccountant(accountId, metricsv2.NoopAccountantMetrics)
+	var registry *prometheus.Registry
+	if metrics != nil {
+		registry = metrics.registry
+	}
+
+	accountantMetrics := metricsv2.NewAccountantMetrics(registry)
+	accountant := clientsv2.NewUnpopulatedAccountant(accountId, accountantMetrics)
 	disperserClient, err := clientsv2.NewDisperserClient(
 		logger,
 		disperserConfig,
@@ -218,11 +224,6 @@ func NewTestClient(
 		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 		BlobCompleteTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 		ContractCallTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
-	}
-
-	var registry *prometheus.Registry
-	if metrics != nil {
-		registry = metrics.registry
 	}
 
 	certBuilder, err := clientsv2.NewCertBuilder(logger,

@@ -7,7 +7,8 @@ import (
 
 // Tracks metrics for the [ReservationPaymentValidator]
 type ReservationValidatorMetrics struct {
-	reservationSymbolCount           prometheus.Histogram
+	reservationSymbols               prometheus.Histogram
+	reservationSymbolsTotal          prometheus.Counter
 	reservationInsufficientBandwidth prometheus.Counter
 	reservationQuorumNotPermitted    prometheus.Counter
 	reservationTimeOutOfRange        prometheus.Counter
@@ -24,14 +25,23 @@ func NewReservationValidatorMetrics(
 		return nil
 	}
 
-	symbolCount := promauto.With(registry).NewHistogram(
+	symbols := promauto.With(registry).NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
-			Name:      "reservation_symbol_count",
+			Name:      "reservation_symbols",
 			Subsystem: subsystem,
 			Help:      "Distribution of symbol counts for successful reservation payments",
 			// Buckets chosen to go from min to max blob sizes (128KiB -> 16MiB)
 			Buckets: prometheus.ExponentialBuckets(4096, 2, 8),
+		},
+	)
+
+	symbolsTotal := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "reservation_symbols_total",
+			Subsystem: subsystem,
+			Help:      "Total number of symbols validated for successful reservation payments",
 		},
 	)
 
@@ -81,7 +91,8 @@ func NewReservationValidatorMetrics(
 	)
 
 	return &ReservationValidatorMetrics{
-		reservationSymbolCount:           symbolCount,
+		reservationSymbols:               symbols,
+		reservationSymbolsTotal:          symbolsTotal,
 		reservationInsufficientBandwidth: insufficientBandwidth,
 		reservationQuorumNotPermitted:    quorumNotPermitted,
 		reservationTimeOutOfRange:        timeOutOfRange,
@@ -95,7 +106,8 @@ func (m *ReservationValidatorMetrics) RecordSuccess(symbolCount uint32) {
 	if m == nil {
 		return
 	}
-	m.reservationSymbolCount.Observe(float64(symbolCount))
+	m.reservationSymbols.Observe(float64(symbolCount))
+	m.reservationSymbolsTotal.Add(float64(symbolCount))
 }
 
 // Increments the counter for when the holder of a reservation lacks bandwidth to perform the dispersal
