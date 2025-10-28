@@ -217,6 +217,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_HEALTH_PROBE_PATH"),
 		Value:    "/tmp/controller-health",
 	}
+	ControllerHeartbeatMaxStallDurationFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "heartbeat-max-stall-duration"),
+		Usage:    "Maximum time allowed between heartbeats before a component is considered stalled",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "HEARTBEAT_MAX_STALL_DURATION"),
+		Value:    4 * time.Minute,
+	}
 	SignificantSigningThresholdPercentageFlag = cli.UintFlag{
 		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-percentage"),
 		Usage: "Percentage of stake that represents a 'significant' signing threshold. Currently used to track" +
@@ -249,7 +256,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
 		Usage:    "the port for the controller gRPC server",
 		Required: false,
-		Value:    "32001",
+		Value:    "32010",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PORT"),
 	}
 	GrpcMaxMessageSizeFlag = cli.IntFlag{
@@ -279,6 +286,35 @@ var (
 		Required: false,
 		Value:    3 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_AUTHORIZATION_REQUEST_MAX_FUTURE_AGE"),
+	}
+	OnDemandPaymentsTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "on-demand-payments-table-name"),
+		Usage:    "Name of the DynamoDB table for storing on-demand payment state",
+		Required: false,
+		Value:    "on_demand",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ON_DEMAND_PAYMENTS_TABLE_NAME"),
+	}
+	OnDemandPaymentsLedgerCacheSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ondemand-payments-ledger-cache-size"),
+		Usage:    "Maximum number of on-demand ledgers to keep in the LRU cache",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONDEMAND_PAYMENTS_LEDGER_CACHE_SIZE"),
+	}
+	ReservationPaymentsLedgerCacheSizeFlag = cli.IntFlag{
+		Name: common.PrefixFlag(FlagPrefix, "reservation-payments-ledger-cache-size"),
+		Usage: "Initial number of reservation ledgers to keep in the LRU cache. May increase " +
+			"dynamically if premature evictions are detected, up to 65,536.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVATION_PAYMENTS_LEDGER_CACHE_SIZE"),
+	}
+	PaymentVaultUpdateIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "payment-vault-update-interval"),
+		Usage:    "Interval for checking payment vault updates",
+		Required: false,
+		Value:    30 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
 	}
 )
 
@@ -314,6 +350,7 @@ var optionalFlags = []cli.Flag{
 	DisperserKMSKeyIDFlag,
 	ControllerReadinessProbePathFlag,
 	ControllerHealthProbePathFlag,
+	ControllerHeartbeatMaxStallDurationFlag,
 	SignificantSigningThresholdPercentageFlag,
 	SignificantSigningMetricsThresholdsFlag,
 	EigenDAContractDirectoryAddressFlag,
@@ -325,6 +362,10 @@ var optionalFlags = []cli.Flag{
 	GrpcMaxIdleConnectionAgeFlag,
 	GrpcAuthorizationRequestMaxPastAgeFlag,
 	GrpcAuthorizationRequestMaxFutureAgeFlag,
+	OnDemandPaymentsTableNameFlag,
+	OnDemandPaymentsLedgerCacheSizeFlag,
+	ReservationPaymentsLedgerCacheSizeFlag,
+	PaymentVaultUpdateIntervalFlag,
 }
 
 var Flags []cli.Flag

@@ -17,7 +17,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	rsv2 "github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
@@ -80,31 +82,32 @@ func RetrieverMain(ctx *cli.Context) error {
 
 	nodeClient := clients.NewNodeClient(config.Timeout)
 
-	config.EncoderConfig.LoadG2Points = true
-	v, err := verifier.NewVerifier(&config.EncoderConfig, nil)
-	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
-	}
 	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+		log.Fatalln("new multi homing client", err)
 	}
 
 	tx, err := eth.NewReader(logger, gethClient, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+		log.Fatalln("new reader", err)
 	}
 
 	cs := eth.NewChainState(tx, gethClient)
 	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+		log.Fatalln("new chain state", err)
 	}
 
 	if config.EigenDAVersion == 1 {
-		agn := &core.StdAssignmentCoordinator{}
-		retrievalClient, err := clients.NewRetrievalClient(logger, cs, agn, nodeClient, v, config.NumConnections)
+		config.EncoderConfig.LoadG2Points = true
+		verifier, err := verifier.NewVerifier(&config.EncoderConfig, nil)
 		if err != nil {
-			log.Fatalln("could not start tcp listener", err)
+			log.Fatalln("new verifier", err)
+		}
+
+		agn := &core.StdAssignmentCoordinator{}
+		retrievalClient, err := clients.NewRetrievalClient(logger, cs, agn, nodeClient, verifier, config.NumConnections)
+		if err != nil {
+			log.Fatalln("new retrieval client", err)
 		}
 
 		chainClient := retrivereth.NewChainClient(gethClient, logger)
@@ -126,10 +129,16 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 2 {
+		encoder := rsv2.NewEncoder(logger, nil)
+		kzgConfig := verifierv2.ConfigFromV1KzgConfig(&config.EncoderConfig)
+		verifier, err := verifierv2.NewVerifier(kzgConfig)
+		if err != nil {
+			log.Fatalln("new v2 verifier", err)
+		}
 		clientConfig := clientsv2.DefaultClientConfig()
 		clientConfig.ConnectionPoolSize = config.NumConnections
 
-		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, v, clientConfig, nil)
+		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, encoder, verifier, clientConfig, nil)
 		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, cs)
 		retrieverServiceServer.Start(context.Background())
 

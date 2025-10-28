@@ -1,18 +1,18 @@
 package controller_test
 
 import (
-	"github.com/Layr-Labs/eigenda/api/clients/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNodeClientManager(t *testing.T) {
 	rand := random.NewTestRandom()
 
-	_, private, err := rand.ECDSA()
+	_, private, err := rand.EthAccount()
 	require.NoError(t, err)
 	requestSigner := mock.NewStaticRequestSigner(private)
 

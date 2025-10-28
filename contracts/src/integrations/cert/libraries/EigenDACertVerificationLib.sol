@@ -29,10 +29,18 @@ library EigenDACertVerificationLib {
     error InvalidInclusionProof(uint32 blobIndex, bytes32 blobHash, bytes32 rootHash);
 
     /// @notice Thrown when security assumptions are not met
-    /// @param gamma The difference between confirmation and adversary thresholds
-    /// @param n The calculated security parameter
-    /// @param minRequired The minimum required value for n
-    error SecurityAssumptionsNotMet(uint256 gamma, uint256 n, uint256 minRequired);
+    /// @param confirmationThreshold The confirmation threshold percentage
+    /// @param adversaryThreshold The safety threshold percentage
+    /// @param codingRate The coding rate for the blob
+    /// @param numChunks The number of chunks in the blob
+    /// @param maxNumOperators The maximum number of operators
+    error SecurityAssumptionsNotMet(
+        uint8 confirmationThreshold,
+        uint8 adversaryThreshold,
+        uint8 codingRate,
+        uint32 numChunks,
+        uint32 maxNumOperators
+    );
 
     /// @notice Thrown when blob quorums are not a subset of confirmed quorums
     /// @param blobQuorumsBitmap The bitmap of blob quorums
@@ -144,10 +152,13 @@ library EigenDACertVerificationLib {
 
     /**
      * @notice Checks the security parameters for a blob cert
+     * @dev Verifies that the security condition
+     *      (confirmationThreshold - adversaryThreshold > reconstructionThreshold)
+     *      holds, by checking an invariant.
+     *      If the inequality fails, the blob is considered insecure.
      * @param eigenDAThresholdRegistry The threshold registry contract
      * @param blobVersion The blob version to verify
      * @param securityThresholds The security thresholds to verify against
-     * @dev Checks the invariant `numChunks * (1 - 100/gamma/codingRate) >= maxNumOperators`
      */
     function checkSecurityParams(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
@@ -162,18 +173,34 @@ library EigenDACertVerificationLib {
         }
         DATypesV1.VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobVersion);
 
-        // In order to prevent divide by 0 panic, we need gamma > 0 and codingRate > 0.
-        // We assume here that the CertVerifier constructor checked that confirmationThreshold > adversaryThreshold.
-        // We also checked above that the blobParams are from a valid version.
-        // Thus, dividing by codingRate below will only panic if codingRate of a proper initialized version is 0,
-        // which is either a configuration bug, or a malicious attack. In both cases, we cannot tell whether the
-        // cert is valid or invalid, so it is ok to panic and let social consensus intervene (put a human debugger in the loop).
-        uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
-        uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
-        uint256 minRequired = blobParams.maxNumOperators * 10000;
+        // Check for potential underflow:
+        // maxNumOperators must not exceed numChunks
+        //
+        if (
+            blobParams.maxNumOperators > blobParams.numChunks
+                || securityThresholds.confirmationThreshold < securityThresholds.adversaryThreshold
+        ) {
+            revert SecurityAssumptionsNotMet(
+                securityThresholds.confirmationThreshold,
+                securityThresholds.adversaryThreshold,
+                blobParams.codingRate,
+                blobParams.numChunks,
+                blobParams.maxNumOperators
+            );
+        }
 
-        if (!(n >= minRequired)) {
-            revert SecurityAssumptionsNotMet(gamma, n, minRequired);
+        uint256 lhs = blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators)
+            * (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold);
+        uint256 rhs = 100 * blobParams.numChunks;
+
+        if (!(lhs >= rhs)) {
+            revert SecurityAssumptionsNotMet(
+                securityThresholds.confirmationThreshold,
+                securityThresholds.adversaryThreshold,
+                blobParams.codingRate,
+                blobParams.numChunks,
+                blobParams.maxNumOperators
+            );
         }
     }
 

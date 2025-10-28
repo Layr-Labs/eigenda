@@ -14,7 +14,8 @@ type Config struct {
 	FallbackTargets []string
 	CacheTargets    []string
 
-	WriteOnCacheMiss bool
+	WriteOnCacheMiss              bool
+	ErrorOnSecondaryInsertFailure bool
 }
 
 // checkTargets ... verifies that a backend target slice is constructed correctly
@@ -58,6 +59,12 @@ func (cfg *Config) Check() error {
 	// verify that thread counts are sufficiently set
 	if cfg.AsyncPutWorkers >= 100 {
 		return fmt.Errorf("number of secondary write workers can't be greater than 100")
+	}
+
+	// verify that ErrorOnSecondaryInsertFailure is not enabled with async writes
+	if cfg.ErrorOnSecondaryInsertFailure && cfg.AsyncPutWorkers > 0 {
+		return fmt.Errorf("error-on-secondary-insert-failure requires synchronous writes " +
+			"(i.e, storage.concurrent-write-routines must be 0)")
 	}
 
 	return nil

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"regexp"
 	"slices"
@@ -30,15 +31,23 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	"github.com/prometheus/client_golang/prometheus"
 
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	rsv2 "github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -78,27 +87,18 @@ func BuildManagers(
 		return nil, nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
 	}
 
-	var kzgVerifier *kzgverifier.Verifier
-	// there are two cases in which we need to construct the kzgVerifier:
-	// 1. V1
-	// 2. V2, when validator retrieval is enabled
-	if v1Enabled ||
-		v2Enabled && slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
+	if v1Enabled {
+		log.Info("Building EigenDA v1 storage backend")
 		// The verifier doesn't support loading trailing g2 points from a separate file. If LoadG2Points is true, and
 		// the user is using a slimmed down g2 SRS file, the verifier will encounter an error while trying to load g2
 		// points. Since the verifier doesn't actually need g2 points, it's safe to force LoadG2Points to false, to
 		// sidestep the issue entirely.
 		kzgConfig := config.KzgConfig
 		kzgConfig.LoadG2Points = false
-
-		kzgVerifier, err = kzgverifier.NewVerifier(&kzgConfig, nil)
+		kzgVerifier, err := kzgverifier.NewVerifier(&kzgConfig, nil)
 		if err != nil {
 			return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 		}
-	}
-
-	if v1Enabled {
-		log.Info("Building EigenDA v1 storage backend")
 		eigenDAV1Store, err = buildEigenDAV1Backend(ctx, log, config, kzgVerifier)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build v1 backend: %w", err)
@@ -107,7 +107,17 @@ func BuildManagers(
 
 	if v2Enabled {
 		log.Info("Building EigenDA v2 storage backend")
-		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier, registry)
+		// kzgVerifier and encoder are only needed when validator retrieval is enabled
+		var kzgVerifier *kzgverifierv2.Verifier
+		if slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
+			kzgConfig := kzgverifierv2.ConfigFromV1KzgConfig(&config.KzgConfig)
+			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig)
+			if err != nil {
+				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
+			}
+		}
+		eigenDAV2Store, err = buildEigenDAV2Backend(
+			ctx, log, config, secrets, rsv2.NewEncoder(log, nil), kzgVerifier, registry)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
 		}
@@ -115,7 +125,14 @@ func BuildManagers(
 
 	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store)
 	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store)
-	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks, config.StoreConfig.WriteOnCacheMiss)
+	secondary := secondary.NewSecondaryManager(
+		log,
+		metrics,
+		caches,
+		fallbacks,
+		config.StoreConfig.WriteOnCacheMiss,
+		config.StoreConfig.ErrorOnSecondaryInsertFailure,
+	)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
 		log.Info("Starting secondary write loop(s)", "count", config.StoreConfig.AsyncPutWorkers)
@@ -133,6 +150,7 @@ func BuildManagers(
 		"read_fallback", len(fallbacks) > 0,
 		"caching", len(caches) > 0,
 		"async_secondary_writes", (secondary.Enabled() && config.StoreConfig.AsyncPutWorkers > 0),
+		"error_on_secondary_insert_failure", config.StoreConfig.ErrorOnSecondaryInsertFailure,
 		"verify_v1_certs", config.VerifierConfigV1.VerifyCerts,
 	)
 
@@ -203,23 +221,22 @@ func buildEigenDAV2Backend(
 	log logging.Logger,
 	config Config,
 	secrets common.SecretConfigV2,
-	kzgVerifier *kzgverifier.Verifier,
+	encoder *rsv2.Encoder,
+	kzgVerifier *kzgverifierv2.Verifier,
 	registry *prometheus.Registry,
 ) (common.EigenDAV2Store, error) {
-	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
-	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
-	// the underlying core library to be more flexible, but that is a larger change for another time. As a stopgap, we
-	// simply set this value to whatever it needs to be prior to using it.
-	kzgConfig := config.KzgConfig
-	kzgConfig.LoadG2Points = true
-
-	kzgProver, err := prover.NewProver(&kzgConfig, nil)
+	kzgCommitter, err := committer.NewFromConfig(committer.Config{
+		G1SRSPath:         config.KzgConfig.G1Path,
+		G2SRSPath:         config.KzgConfig.G2Path,
+		G2TrailingSRSPath: config.KzgConfig.G2TrailingPath,
+		SRSNumberToLoad:   config.KzgConfig.SRSNumberToLoad,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("new KZG prover: %w", err)
+		return nil, fmt.Errorf("new kzg committer: %w", err)
 	}
 
 	if config.MemstoreEnabled {
-		return memstore_v2.New(ctx, log, config.MemstoreConfig, kzgProver.Srs.G1)
+		return memstore_v2.New(ctx, log, config.MemstoreConfig, kzgVerifier.G1SRS), nil
 	}
 
 	ethClient, err := buildEthClient(ctx, log, secrets, config.ClientConfigV2.EigenDANetwork)
@@ -328,7 +345,7 @@ func buildEigenDAV2Backend(
 				return nil, fmt.Errorf("get relay registry address: %w", err)
 			}
 			relayPayloadRetriever, err := buildRelayPayloadRetriever(
-				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, relayRegistryAddr, retrievalMetrics)
+				log, config.ClientConfigV2, ethClient, kzgVerifier.G1SRS, relayRegistryAddr, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
@@ -338,7 +355,7 @@ func buildEigenDAV2Backend(
 			validatorPayloadRetriever, err := buildValidatorPayloadRetriever(
 				log, config.ClientConfigV2, ethClient,
 				operatorStateRetrieverAddr, eigenDAServiceManagerAddr,
-				kzgVerifier, kzgProver.Srs.G1, retrievalMetrics)
+				encoder, kzgVerifier, kzgVerifier.G1SRS, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build validator payload retriever: %w", err)
 			}
@@ -353,29 +370,37 @@ func buildEigenDAV2Backend(
 		return nil, fmt.Errorf("no payload retrievers enabled, please enable at least one retriever type")
 	}
 
-	payloadDisperser, err := buildPayloadDisperser(
-		ctx,
-		log,
-		config.ClientConfigV2,
-		secrets,
-		ethClient,
-		kzgProver,
-		certVerifier,
-		operatorStateRetrieverAddr,
-		registryCoordinator,
-		registry,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("build payload disperser: %w", err)
+	var payloadDisperser *payloaddispersal.PayloadDisperser
+
+	if secrets.SignerPaymentKey == "" {
+		log.Warn("No SignerPaymentKey provided: EigenDA V2 backend configured in read-only mode")
+	} else {
+		log.Info("SignerPaymentKey available: EigenDA V2 backend configured with write support")
+		payloadDisperser, err = buildPayloadDisperser(
+			ctx,
+			log,
+			config.ClientConfigV2,
+			secrets,
+			ethClient,
+			kzgCommitter,
+			contractDirectory,
+			certVerifier,
+			operatorStateRetrieverAddr,
+			registryCoordinator,
+			registry,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("build payload disperser: %w", err)
+		}
 	}
 
 	eigenDAV2Store, err := eigenda_v2.NewStore(
 		log,
-		config.ClientConfigV2.PutTries,
-		config.ClientConfigV2.RBNRecencyWindowSize,
 		payloadDisperser,
-		retrievers,
+		config.ClientConfigV2.PutTries,
 		certVerifier,
+		config.ClientConfigV2.RBNRecencyWindowSize,
+		retrievers,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create v2 store: %w", err)
@@ -533,7 +558,8 @@ func buildValidatorPayloadRetriever(
 	ethClient common_eigenda.EthClient,
 	operatorStateRetrieverAddr geth_common.Address,
 	eigenDAServiceManagerAddr geth_common.Address,
-	kzgVerifier *kzgverifier.Verifier,
+	encoder *rsv2.Encoder,
+	kzgVerifier *kzgverifierv2.Verifier,
 	g1Srs []bn254.G1Affine,
 	metrics metrics_v2.RetrievalMetricer,
 ) (*payloadretrieval.ValidatorPayloadRetriever, error) {
@@ -552,6 +578,7 @@ func buildValidatorPayloadRetriever(
 		log,
 		ethReader,
 		chainState,
+		encoder,
 		kzgVerifier,
 		client_validator.DefaultClientConfig(),
 		nil,
@@ -578,7 +605,8 @@ func buildPayloadDisperser(
 	clientConfigV2 common.ClientConfigV2,
 	secrets common.SecretConfigV2,
 	ethClient common_eigenda.EthClient,
-	kzgProver *prover.Prover,
+	kzgCommitter *committer.Committer,
+	contractDirectory *directory.ContractDirectory,
 	certVerifier *verification.CertVerifier,
 	operatorStateRetrieverAddr geth_common.Address,
 	registryCoordinatorAddr geth_common.Address,
@@ -594,22 +622,48 @@ func buildPayloadDisperser(
 		return nil, fmt.Errorf("error getting account ID: %w", err)
 	}
 
+	log.Infof("Using account ID %s", accountId.Hex())
+
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
-	// The accountant is populated lazily by disperserClient.PopulateAccountant
-	accountant := clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
+	var accountant *clients_v2.Accountant
+	// The legacy `Accountant` is only initialized if using legacy payments.
+	//
+	// There isn't an `else` statement here, because `ClientLedger` (responsible for the new payment system)
+	// construction is handled below by the `buildClientLedger` helper function. The `ClientLedger` cannot be built
+	// here in the same place as the `Accountant` because it requires the `disperserClient` be already built, and the
+	// `Accountant`, if being used, is a part of the `disperserClient`
+	if clientConfigV2.ClientLedgerMode == clientledger.ClientLedgerModeLegacy {
+		// The accountant is populated lazily by disperserClient.PopulateAccountant
+		accountant = clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
+	}
 
 	disperserClient, err := clients_v2.NewDisperserClient(
 		log,
 		&clientConfigV2.DisperserClientCfg,
 		signer,
-		kzgProver,
+		kzgCommitter,
 		accountant,
 		dispersalMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)
+	}
+
+	clientLedger, err := buildClientLedger(
+		ctx,
+		log,
+		clientConfigV2,
+		ethClient,
+		accountId,
+		contractDirectory,
+		accountantMetrics,
+		time.Now,
+		disperserClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build client ledger: %w", err)
 	}
 
 	blockNumMonitor, err := verification.NewBlockNumberMonitor(
@@ -635,6 +689,7 @@ func buildPayloadDisperser(
 		blockNumMonitor,
 		certBuilder,
 		certVerifier,
+		clientLedger,
 		registry)
 	if err != nil {
 		return nil, fmt.Errorf("new payload disperser: %w", err)
@@ -677,4 +732,176 @@ func buildLocalSigner(
 	}
 
 	return signer, nil
+}
+
+// buildReservationLedger creates a reservation ledger for a given account
+func buildReservationLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID geth_common.Address,
+	now time.Time,
+	minNumSymbols uint32,
+) (*reservation.ReservationLedger, error) {
+	reservationData, err := paymentVault.GetReservation(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation: %w", err)
+	}
+	if reservationData == nil {
+		return nil, fmt.Errorf("no reservation found for account %s", accountID.Hex())
+	}
+
+	clientReservation, err := reservation.NewReservation(
+		reservationData.SymbolsPerSecond,
+		time.Unix(int64(reservationData.StartTimestamp), 0),
+		time.Unix(int64(reservationData.EndTimestamp), 0),
+		reservationData.QuorumNumbers,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation: %w", err)
+	}
+
+	reservationConfig, err := reservation.NewReservationLedgerConfig(
+		*clientReservation,
+		minNumSymbols,
+		// start full since reservation usage isn't persisted: assume the worst case (heavy usage before startup)
+		true,
+		// this is a parameter for flexibility, but there aren't plans to operate with anything other than this value
+		ratelimit.OverfillOncePermitted,
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		30*time.Second,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger config: %w", err)
+	}
+
+	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, now)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger: %w", err)
+	}
+
+	return reservationLedger, nil
+}
+
+// buildOnDemandLedger creates an on-demand ledger for a given account
+func buildOnDemandLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID geth_common.Address,
+	minNumSymbols uint32,
+	disperserClient *clients_v2.DisperserClient,
+) (*ondemand.OnDemandLedger, error) {
+	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get price per symbol: %w", err)
+	}
+
+	totalDeposits, err := paymentVault.GetTotalDeposit(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get total deposit from vault: %w", err)
+	}
+
+	paymentState, err := disperserClient.GetPaymentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get payment state from disperser: %w", err)
+	}
+
+	var cumulativePayment *big.Int
+	if paymentState.GetCumulativePayment() == nil {
+		cumulativePayment = big.NewInt(0)
+	} else {
+		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
+	}
+
+	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
+		totalDeposits,
+		new(big.Int).SetUint64(pricePerSymbol),
+		minNumSymbols,
+		cumulativePayment,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new on-demand ledger: %w", err)
+	}
+
+	return onDemandLedger, nil
+}
+
+// buildClientLedger creates a ClientLedger for managing payment state
+// Returns nil for legacy mode
+func buildClientLedger(
+	ctx context.Context,
+	log logging.Logger,
+	config common.ClientConfigV2,
+	ethClient common_eigenda.EthClient,
+	accountID geth_common.Address,
+	contractDirectory *directory.ContractDirectory,
+	accountantMetrics metrics_v2.AccountantMetricer,
+	getNow func() time.Time,
+	disperserClient *clients_v2.DisperserClient,
+) (*clientledger.ClientLedger, error) {
+	if config.ClientLedgerMode == clientledger.ClientLedgerModeLegacy {
+		return nil, nil
+	}
+	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	paymentVault, err := vault.NewPaymentVault(log, ethClient, paymentVaultAddr)
+	if err != nil {
+		return nil, fmt.Errorf("new payment vault: %w", err)
+	}
+
+	now := getNow()
+
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get min num symbols: %w", err)
+	}
+
+	var reservationLedger *reservation.ReservationLedger
+	var onDemandLedger *ondemand.OnDemandLedger
+	switch config.ClientLedgerMode {
+	case clientledger.ClientLedgerModeLegacy:
+		panic("impossible case- this is checked at the start of the method")
+	case clientledger.ClientLedgerModeReservationOnly:
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, now, minNumSymbols)
+		if err != nil {
+			return nil, fmt.Errorf("build reservation ledger: %w", err)
+		}
+	case clientledger.ClientLedgerModeOnDemandOnly:
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		if err != nil {
+			return nil, fmt.Errorf("build on-demand ledger: %w", err)
+		}
+
+	case clientledger.ClientLedgerModeReservationAndOnDemand:
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, now, minNumSymbols)
+		if err != nil {
+			return nil, fmt.Errorf("build reservation ledger: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		if err != nil {
+			return nil, fmt.Errorf("build on-demand ledger: %w", err)
+		}
+
+	default:
+		return nil, fmt.Errorf("unexpected client ledger mode: %s", config.ClientLedgerMode)
+	}
+
+	ledger := clientledger.NewClientLedger(
+		ctx,
+		log,
+		accountantMetrics,
+		accountID,
+		config.ClientLedgerMode,
+		reservationLedger,
+		onDemandLedger,
+		getNow,
+		paymentVault,
+		config.VaultMonitorInterval,
+	)
+
+	return ledger, nil
 }

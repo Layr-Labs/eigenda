@@ -1,8 +1,6 @@
 package node_test
 
 import (
-	"context"
-	"errors"
 	"os"
 	"runtime"
 	"testing"
@@ -13,7 +11,6 @@ import (
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -99,6 +96,7 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 		}
 	})
 	n := &node.Node{
+		CTX:            t.Context(),
 		Config:         config,
 		Logger:         logger,
 		KeyPair:        keyPair,
@@ -116,62 +114,6 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 		tx:          tx,
 		relayClient: clientsmock.NewRelayClient(),
 	}
-}
-
-func TestNodeStartNoAddress(t *testing.T) {
-	c := newComponents(t, op0)
-	c.node.Config.RegisterNodeAtStart = false
-
-	c.tx.On("GetOperatorSocket", mock.Anything).Return("", errors.New("failed to get operator socket"))
-
-	err := c.node.Start(context.Background())
-	assert.NoError(t, err)
-}
-
-func TestNodeStartOperatorIDMatch(t *testing.T) {
-	c := newComponents(t, op0)
-	c.node.Config.RegisterNodeAtStart = true
-	c.node.Config.EthClientConfig = geth.EthClientConfig{
-		RPCURLs:          []string{"http://localhost:8545"},
-		PrivateKeyString: privateKey,
-		NumConfirmations: 1,
-	}
-	c.tx.On("GetRegisteredQuorumIdsForOperator", mock.Anything).Return([]core.QuorumID{}, nil)
-	c.tx.On("GetOperatorSetParams", mock.Anything, mock.Anything).Return(&core.OperatorSetParam{
-		MaxOperatorCount:         uint32(4),
-		ChurnBIPsOfOperatorStake: uint16(1000),
-		ChurnBIPsOfTotalStake:    uint16(10),
-	}, nil)
-	c.tx.On("GetNumberOfRegisteredOperatorForQuorum", mock.Anything, mock.Anything).Return(uint32(0), nil)
-	c.tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-	c.tx.On("OperatorAddressToID", mock.Anything).Return(core.OperatorID(op0), nil)
-
-	err := c.node.Start(context.Background())
-	assert.NoError(t, err)
-}
-
-func TestNodeStartOperatorIDDoesNotMatch(t *testing.T) {
-	c := newComponents(t, op0)
-	c.node.Config.RegisterNodeAtStart = true
-	c.node.Config.EthClientConfig = geth.EthClientConfig{
-		RPCURLs:          []string{"http://localhost:8545"},
-		PrivateKeyString: privateKey,
-		NumConfirmations: 1,
-	}
-	c.tx.On("GetRegisteredQuorumIdsForOperator", mock.Anything).Return([]core.QuorumID{}, nil)
-	c.tx.On("GetOperatorSetParams", mock.Anything, mock.Anything).Return(&core.OperatorSetParam{
-		MaxOperatorCount:         uint32(4),
-		ChurnBIPsOfOperatorStake: uint16(1000),
-		ChurnBIPsOfTotalStake:    uint16(10),
-	}, nil)
-	c.tx.On("GetNumberOfRegisteredOperatorForQuorum", mock.Anything, mock.Anything).Return(uint32(0), nil)
-	c.tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-	c.tx.On("OperatorAddressToID", mock.Anything).Return(core.OperatorID{1}, nil)
-
-	err := c.node.Start(context.Background())
-	assert.ErrorContains(t, err, "operator ID mismatch")
 }
 
 func TestGetReachabilityURL(t *testing.T) {

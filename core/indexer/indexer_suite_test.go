@@ -3,74 +3,79 @@ package indexer_test
 import (
 	"context"
 	"flag"
+	"fmt"
+	"os"
 	"testing"
+	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/testbed"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 )
 
 var (
-	anvilContainer *testbed.AnvilContainer
-	templateName   string
-	testName       string
+	anvilContainer  *testbed.AnvilContainer
+	templateName    string
+	testName        string
+	headerStoreType string
 
 	testConfig *deploy.Config
 )
 
 func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil-nochurner.yaml", "Name of the config file (in `inabox/templates`)")
+	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
+	flag.StringVar(&headerStoreType, "headerStore", "leveldb",
+		"The header store implementation to be used (inmem, leveldb)")
 }
 
-func TestIntegration(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Integration Suite")
-}
+func TestMain(m *testing.M) {
+	flag.Parse()
 
-var _ = BeforeSuite(func() {
-	By("bootstrapping test environment")
+	if testing.Short() {
+		fmt.Println("Skipping integration tests in short mode")
+		os.Exit(0)
+	}
 
-	if !testing.Short() {
-		rootPath := "../../"
+	rootPath := "../../"
+	logger := test.GetLogger()
 
-		if testName == "" {
-			var err error
-			testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
-		}
-
-		testConfig = deploy.NewTestConfig(testName, rootPath)
-		testConfig.Deployers[0].DeploySubgraphs = false
-		logger := testutils.GetLogger()
-
-		if testConfig.Environment.IsLocal() {
-			logger.Info("Starting anvil")
-			var err error
-			anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
-				ExposeHostPort: true, // This will bind container port 8545 to host port 8545
-				Logger:         logger,
-			})
-			if err != nil {
-				panic(err)
-			}
-
-			logger.Info("Deploying experiment")
-			if err := testConfig.DeployExperiment(); err != nil {
-				panic(err)
-			}
+	if testName == "" {
+		var err error
+		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
+		if err != nil {
+			logger.Fatal("Failed to create test directory:", err)
 		}
 	}
 
-})
+	testConfig = deploy.ReadTestConfig(testName, rootPath)
+	testConfig.Deployers[0].DeploySubgraphs = false
 
-var _ = AfterSuite(func() {
-	if !testing.Short() && testConfig.Environment.IsLocal() {
-		_ = anvilContainer.Terminate(context.Background())
+	if testConfig.Environment.IsLocal() {
+		logger.Info("Starting anvil")
+		var err error
+		anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+			ExposeHostPort: true, // This will bind container port 8545 to host port 8545
+			Logger:         logger,
+		})
+		if err != nil {
+			logger.Fatal("Failed to start anvil container:", err)
+		}
+
+		logger.Info("Deploying experiment")
+		if err := testConfig.DeployExperiment(); err != nil {
+			logger.Fatal("Failed to deploy experiment:", err)
+		}
 	}
 
-})
+	code := m.Run()
+
+	// Cleanup
+	if testConfig != nil && testConfig.Environment.IsLocal() && anvilContainer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = anvilContainer.Terminate(ctx)
+	}
+
+	os.Exit(code)
+}

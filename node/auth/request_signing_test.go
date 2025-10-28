@@ -4,8 +4,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
@@ -166,9 +165,8 @@ func TestHashing(t *testing.T) {
 func TestRequestSigning(t *testing.T) {
 	rand := random.NewTestRandom()
 
-	public, private, err := rand.ECDSA()
+	publicAddress, private, err := rand.EthAccount()
 	require.NoError(t, err)
-	publicAddress := crypto.PubkeyToAddress(*public)
 
 	request := RandomStoreChunksRequest(rand)
 
@@ -183,9 +181,8 @@ func TestRequestSigning(t *testing.T) {
 	require.Equal(t, expectedHash, hash)
 
 	// Using a different public key should make the signature invalid
-	otherPublic, _, err := rand.ECDSA()
+	otherPublicAddress, _, err := rand.EthAccount()
 	require.NoError(t, err)
-	otherPublicAddress := crypto.PubkeyToAddress(*otherPublic)
 	_, err = VerifyStoreChunksRequest(otherPublicAddress, request)
 	require.Error(t, err)
 

@@ -15,19 +15,15 @@ endif
 
 RELEASE_TAG := $(or $(RELEASE_TAG),latest)
 
-build: clean
-	go mod tidy
+build:
 	go build -o ./bin/node ./cmd
+
+clean:
+	rm -rf ./bin
 
 build-plugin: clean
 	go mod tidy
 	go build -o ./bin/node_plugin ./plugin/cmd
-
-proto:
-	cd .. && make protoc
-
-clean:
-	rm -rf ./bin
 
 lint:
 	golangci-lint run

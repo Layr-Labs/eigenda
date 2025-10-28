@@ -20,6 +20,7 @@ type Config struct {
 	EigenDAServiceManagerAddr  string
 	EigenDADirectory           string
 
+	GRPCPort              string
 	PerPublicKeyRateLimit time.Duration
 	ChurnApprovalInterval time.Duration
 }
@@ -37,6 +38,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EigenDADirectory:           ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		OperatorStateRetrieverAddr: ctx.GlobalString(flags.OperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:  ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		GRPCPort:                   ctx.GlobalString(flags.GrpcPortFlag.Name),
 		PerPublicKeyRateLimit:      ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),
 		ChurnApprovalInterval:      ctx.GlobalDuration(flags.ChurnApprovalInterval.Name),
 		MetricsConfig: MetricsConfig{

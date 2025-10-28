@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"errors"
 	"sync/atomic"
@@ -9,26 +8,25 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	wmock "github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
 func TestValidRequest(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, privateKey, err := rand.ECDSA()
+	disperserAddress, privateKey, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
 	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
 	authenticator, err := NewRequestAuthenticator(
-		context.Background(),
+		ctx,
 		&chainReader,
 		10,
 		time.Minute,
@@ -42,7 +40,7 @@ func TestValidRequest(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	hash, err := authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 	require.NoError(t, err)
 	expectedHash, err := hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
@@ -50,19 +48,19 @@ func TestValidRequest(t *testing.T) {
 }
 
 func TestInvalidRequestWrongHash(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, privateKey, err := rand.ECDSA()
+	disperserAddress, privateKey, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
 	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
 	authenticator, err := NewRequestAuthenticator(
-		context.Background(),
+		ctx,
 		&chainReader,
 		10,
 		time.Minute,
@@ -79,24 +77,24 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 	// Modify the request so that the hash is different
 	request.Batch.BlobCertificates[0].BlobHeader.Commitment.LengthProof = rand.Bytes(32)
 
-	_, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	_, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 	require.Error(t, err)
 }
 
 func TestInvalidRequestWrongKey(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, _, err := rand.ECDSA()
+	disperserAddress, _, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
 	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
 	authenticator, err := NewRequestAuthenticator(
-		context.Background(),
+		ctx,
 		&chainReader,
 		10,
 		time.Minute,
@@ -107,29 +105,28 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 
-	_, differentPrivateKey, err := rand.ECDSA()
+	_, differentPrivateKey, err := rand.EthAccount()
 	require.NoError(t, err)
 	signature, err := SignStoreChunksRequest(differentPrivateKey, request)
 	require.NoError(t, err)
 	request.Signature = signature
 
-	_, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	_, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 	require.Error(t, err)
 }
 
 func TestInvalidRequestInvalidDisperserID(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey0, privateKey0, err := rand.ECDSA()
+	disperserAddress0, privateKey0, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress0 := crypto.PubkeyToAddress(*publicKey0)
 
 	// This disperser will be loaded on chain (simulated), but will fail the valid disperser ID filter.
-	publicKey1, privateKey1, err := rand.ECDSA()
+	disperserAddress1, privateKey1, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress1 := crypto.PubkeyToAddress(*publicKey1)
 
 	chainReader := wmock.MockWriter{}
 	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress0, nil)
@@ -140,7 +137,7 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	filterCallCount := atomic.Uint32{}
 
 	authenticator, err := NewRequestAuthenticator(
-		context.Background(),
+		ctx,
 		&chainReader,
 		10,
 		time.Minute,
@@ -157,7 +154,7 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	signature, err := SignStoreChunksRequest(privateKey0, request)
 	require.NoError(t, err)
 	request.Signature = signature
-	hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	hash, err := authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 	require.NoError(t, err)
 	expectedHash, err := hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
@@ -168,31 +165,31 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	signature, err = SignStoreChunksRequest(privateKey1, request)
 	require.NoError(t, err)
 	request.Signature = signature
-	_, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	_, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 	require.Error(t, err)
 
 	request.DisperserID = 1234
 	signature, err = SignStoreChunksRequest(privateKey1, request)
 	require.NoError(t, err)
 	request.Signature = signature
-	_, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	_, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 	require.Error(t, err)
 }
 
 func TestKeyExpiry(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, privateKey, err := rand.ECDSA()
+	disperserAddress, privateKey, err := rand.EthAccount()
 	require.NoError(t, err)
-	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	mockChainReader := wmock.MockWriter{}
 	mockChainReader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
 	authenticator, err := NewRequestAuthenticator(
-		context.Background(),
+		ctx,
 		&mockChainReader,
 		10,
 		time.Minute,
@@ -209,7 +206,7 @@ func TestKeyExpiry(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	hash, err := authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 	require.NoError(t, err)
 	expectedHash, err := hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
@@ -220,7 +217,7 @@ func TestKeyExpiry(t *testing.T) {
 
 	// Move time forward to just before the key expires.
 	now := start.Add(59 * time.Second)
-	hash, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, now)
+	hash, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, now)
 	require.NoError(t, err)
 	require.Equal(t, expectedHash, hash)
 
@@ -229,7 +226,7 @@ func TestKeyExpiry(t *testing.T) {
 
 	// Move time forward to just after the key expires.
 	now = now.Add(2 * time.Second)
-	hash, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, now)
+	hash, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, now)
 	require.NoError(t, err)
 	require.Equal(t, expectedHash, hash)
 
@@ -238,6 +235,7 @@ func TestKeyExpiry(t *testing.T) {
 }
 
 func TestKeyCacheSize(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	start := rand.Time()
@@ -247,16 +245,15 @@ func TestKeyCacheSize(t *testing.T) {
 	mockChainReader := wmock.MockWriter{}
 	keyMap := make(map[uint32]*ecdsa.PrivateKey, cacheSize+1)
 	for i := 0; i < cacheSize+1; i++ {
-		publicKey, privateKey, err := rand.ECDSA()
+		disperserAddress, privateKey, err := rand.EthAccount()
 		require.NoError(t, err)
-		disperserAddress := crypto.PubkeyToAddress(*publicKey)
 		keyMap[uint32(i)] = privateKey
 
 		mockChainReader.Mock.On("GetDisperserAddress", uint32(i)).Return(disperserAddress, nil)
 	}
 
 	authenticator, err := NewRequestAuthenticator(
-		context.Background(),
+		ctx,
 		&mockChainReader,
 		cacheSize,
 		time.Minute,
@@ -275,7 +272,7 @@ func TestKeyCacheSize(t *testing.T) {
 		require.NoError(t, err)
 		request.Signature = signature
 
-		hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+		hash, err := authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 		require.NoError(t, err)
 		expectedHash, err := hashing.HashStoreChunksRequest(request)
 		require.NoError(t, err)
@@ -293,7 +290,7 @@ func TestKeyCacheSize(t *testing.T) {
 		require.NoError(t, err)
 		request.Signature = signature
 
-		hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+		hash, err := authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 		require.NoError(t, err)
 		expectedHash, err := hashing.HashStoreChunksRequest(request)
 		require.NoError(t, err)
@@ -309,7 +306,7 @@ func TestKeyCacheSize(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	hash, err := authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 	require.NoError(t, err)
 	expectedHash, err := hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
@@ -324,7 +321,7 @@ func TestKeyCacheSize(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	hash, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	hash, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 	require.NoError(t, err)
 	expectedHash, err = hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)

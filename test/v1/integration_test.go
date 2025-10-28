@@ -22,7 +22,7 @@ import (
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/common/pubip"
-	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -34,15 +34,16 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrievermock "github.com/Layr-Labs/eigenda/retriever/mock"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/docker/go-units"
@@ -60,9 +61,9 @@ import (
 )
 
 var (
-	logger = testutils.GetLogger()
-	p      encoding.Prover
-	v      encoding.Verifier
+	logger = test.GetLogger()
+	p      *prover.Prover
+	v      *verifier.Verifier
 	asn    core.AssignmentCoordinator
 
 	gettysburgAddressBytes  = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
@@ -147,8 +148,13 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	store := inmem.NewBlobStore()
 	dis := mustMakeDisperser(t, cst, store)
+
+	// Create listener for encoder server
+	encoderListener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", encoderPort))
+	require.NoError(t, err)
+
 	go func() {
-		_ = dis.encoderServer.Start()
+		_ = dis.encoderServer.StartWithListener(encoderListener)
 	}()
 	t.Cleanup(func() {
 		dis.encoderServer.Close()
@@ -161,10 +167,6 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	for _, op := range ops {
 		idStr := hexutil.Encode(op.Node.Config.ID[:])
 		fmt.Println("Operator: ", idStr)
-
-		fmt.Println("Starting node")
-		err = op.Node.Start(ctx)
-		require.NoError(t, err)
 
 		fmt.Println("Starting server")
 		err = nodegrpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
@@ -268,8 +270,8 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	operatorState, err := cst.GetOperatorState(ctx, 0, []core.QuorumID{0})
 	require.NoError(t, err)
 
-	blobLength := encoding.GetBlobLength(uint(len(blob.Data)))
-	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, 0, blob.RequestHeader.SecurityParams[0])
+	blobLength := encoding.GetBlobLength(uint32(len(blob.Data)))
+	chunkLength, err := asn.CalculateChunkLength(operatorState, uint(blobLength), 0, blob.RequestHeader.SecurityParams[0])
 	require.NoError(t, err)
 
 	blobQuorumInfo := &core.BlobQuorumInfo{
@@ -281,7 +283,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		ChunkLength: chunkLength,
 	}
 
-	assignments, info, err := asn.GetAssignments(operatorState, blobLength, blobQuorumInfo)
+	assignments, info, err := asn.GetAssignments(operatorState, uint(blobLength), blobQuorumInfo)
 	require.NoError(t, err)
 
 	var indices []encoding.ChunkNumber
@@ -340,7 +342,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assignment, ok := assignments[op.Node.Config.ID]
 		require.True(t, ok)
 		for _, data := range chunksReply.GetChunks() {
-			chunk, err := new(encoding.Frame).Deserialize(data)
+			chunk, err := new(encoding.Frame).DeserializeGob(data)
 			require.NoError(t, err)
 			chunks = append(chunks, chunk)
 		}
@@ -348,7 +350,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	encodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+	encodingParams := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
 	require.NoError(t, err)
 	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_SYMBOL)
 	require.NoError(t, err)
@@ -359,7 +361,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	require.Equal(t, gettysburgAddressBytes, restored[:len(gettysburgAddressBytes)])
 }
 
-func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
+func mustMakeTestComponents() (*prover.Prover, *verifier.Verifier) {
 	config := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
@@ -439,7 +441,6 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 
 	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
 	grpcEncoder := encoder.NewEncoderServer(encoder.ServerConfig{
-		GrpcPort:              encoderPort,
 		MaxConcurrentRequests: 16,
 		RequestPoolSize:       32,
 	}, logger, p0, metrics, grpcprom.NewServerMetrics())
@@ -649,7 +650,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.Opera
 				return w.Result(), nil
 			}), "custom", "")
 
-		n := &node.Node{
+		node := &node.Node{
 			Config:                  config,
 			Logger:                  logger,
 			KeyPair:                 op.KeyPair,
@@ -672,19 +673,40 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.Opera
 		reader := &coremock.MockWriter{}
 		reader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
-		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter)
+		// Create listeners with OS-allocated ports for testing
+		v1DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+		v1RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+		v2DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+		v2RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+
+		serverV1 := nodegrpc.NewServer(
+			config,
+			node,
+			logger,
+			rateLimiter,
+			version.DefaultVersion(),
+			v1DispersalListener,
+			v1RetrievalListener,
+		)
 		serverV2, err := nodegrpc.NewServerV2(
 			ctx,
 			config,
-			n,
+			node,
 			logger,
 			rateLimiter,
 			prometheus.NewRegistry(),
-			reader)
+			reader,
+			version.DefaultVersion(),
+			v2DispersalListener,
+			v2RetrievalListener)
 		require.NoError(t, err)
 
 		ops[id] = TestOperator{
-			Node:     n,
+			Node:     node,
 			ServerV1: serverV1,
 			ServerV2: serverV2,
 		}

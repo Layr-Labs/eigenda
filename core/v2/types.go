@@ -143,7 +143,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 			Commitment:       commitment,
 			LengthCommitment: lengthCommitment,
 			LengthProof:      lengthProof,
-			Length:           uint(proto.GetCommitment().GetLength()),
+			Length:           proto.GetCommitment().GetLength(),
 		},
 		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: *paymentMetadata,
@@ -169,8 +169,8 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 	}, nil
 }
 
-func GetEncodingParams(blobLength uint, blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
-	length, err := blobParams.GetChunkLength(uint32(blobLength))
+func GetEncodingParams(blobLength uint32, blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
+	length, err := blobParams.GetChunkLength(blobLength)
 	if err != nil {
 		return encoding.EncodingParams{}, err
 	}
@@ -433,8 +433,8 @@ type DispersalResponse struct {
 }
 
 const (
-	// We use uint8 to count the number of quorums, so we can have at most 255 quorums,
-	// which means the max ID can not be larger than 254 (from 0 to 254, there are 255
-	// different IDs).
-	MaxQuorumID = 254
+	// This value should always match the onchain MAX_QUORUM_COUNT value in the EigenDARegistryCoordinator.
+	// https://github.com/Layr-Labs/eigenda/blob/00cc8868b7e2d742fc6584dc1dea312193c8d4c2/contracts/src/core/EigenDARegistryCoordinatorStorage.sol#L36
+	// There are at most 192 quorum numbers, meaning the allowed IDs are [0,191].
+	MaxQuorumID = 191
 )

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/common/enforce"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
@@ -172,9 +173,18 @@ func (cl *ClientLedger) debitReservationOnly(
 	// dispersal time when constructing the payment header, and it does so with its conception of "now"
 	success, remainingCapacity, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
 	if err != nil {
-		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
+		var timeMovedBackwardErr *ratelimit.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
 			// this is the only class of error that can be returned from Debit where trying again might help
+			return nil, fmt.Errorf("debit reservation: %w", err)
+		}
+
+		var reservationOutOfRange *reservation.TimeOutOfRangeError
+		if errors.As(err, &reservationOutOfRange) {
+			// Don't panic if in ReservationOnly mode. This error causes a panic in ReservationAndOnDemand mode, to
+			// avoid inadvertently depleting on-demand funds when a reservation expires. But in the case where only
+			// reservation payments are being used, the ClientLedger may recover if the user acquires a new
+			// reservation.
 			return nil, fmt.Errorf("debit reservation: %w", err)
 		}
 
@@ -204,8 +214,24 @@ func (cl *ClientLedger) debitOnDemandOnly(
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
 	cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
-	enforce.NilError(err, "on-demand debit failed. reservations aren't configured, and the ledger won't become "+
-		"aware of new on-chain deposits without a restart")
+	if err != nil {
+		var insufficientFundsErr *ondemand.InsufficientFundsError
+		if errors.As(err, &insufficientFundsErr) {
+			// Don't panic if insufficient funds occurs: new deposits will be observed by the client ledger, so it's
+			// possible to recover from this.
+			// nolint:wrapcheck // the returned error message is informative
+			return nil, err
+		}
+
+		var quorumNotSupportedErr *ondemand.QuorumNotSupportedError
+		if errors.As(err, &quorumNotSupportedErr) {
+			// This error is included here explicitly, for the sake of completeness (even though the behavior is the
+			// same as for a generic error)
+			panic(err.Error())
+		}
+
+		panic(err.Error())
+	}
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
 	enforce.NilError(err, "new payment metadata")
@@ -229,10 +255,19 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	// dispersal time when constructing the payment header, and it does so with its conception of "now"
 	success, remainingCapacity, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
 	if err != nil {
-		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
+		var timeMovedBackwardErr *ratelimit.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
 			// this is the only class of error that can be returned from Debit where trying again might help
 			return nil, fmt.Errorf("debit reservation: %w", err)
+		}
+
+		var reservationOutOfRange *reservation.TimeOutOfRangeError
+		if errors.As(err, &reservationOutOfRange) {
+			panic(fmt.Sprintf(
+				"%v: panicking to avoid inadvertently depleting on-demand funds due to expired reservation. "+
+					"Acquire a new reservation, or switch mode of ClientLedger operation to `on-demand-only` if you "+
+					"wish to continue operating without an active reservation.",
+				reservationOutOfRange))
 		}
 
 		// all other modes of failure are fatal

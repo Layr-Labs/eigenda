@@ -10,7 +10,11 @@ import (
 type BackendType string
 
 const (
-	GnarkBackend  BackendType = "gnark"
+	// GnarkBackend is the default backend, using the gnark-crypto library.
+	// It only supports CPU execution.
+	GnarkBackend BackendType = "gnark"
+	// IcicleBackend uses the icicle performanced-oriented library.
+	// It is optimized for GPU (CUDA and metal) execution, but also supports CPU.
 	IcicleBackend BackendType = "icicle"
 )
 
@@ -18,7 +22,6 @@ type Config struct {
 	NumWorker   uint64
 	BackendType BackendType
 	GPUEnable   bool
-	Verbose     bool
 }
 
 // DefaultConfig returns a Config struct with default values
@@ -27,7 +30,6 @@ func DefaultConfig() *Config {
 		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 		BackendType: GnarkBackend,
 		GPUEnable:   false,
-		Verbose:     false,
 	}
 }
 

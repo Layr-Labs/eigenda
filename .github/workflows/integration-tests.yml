@@ -47,7 +47,56 @@ jobs:
 
       - run: make integration-tests
 
+  fuzz-tests:
+    name: Fuzz Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout EigenDA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+        with:
+          submodules: recursive
+
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+
       - run: make fuzz-tests
+
+  inabox-tests:
+    name: Inabox Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add LocalStack AWS Credentials
+        run: |
+          mkdir -p ~/.aws
+          touch ~/.aws/credentials
+
+          echo '[default]' >> ~/.aws/credentials
+          echo 'aws_access_key_id=localstack' >> ~/.aws/credentials
+          echo 'aws_secret_access_key=localstack' >> ~/.aws/credentials
+
+      - name: Set Test Profile to default
+        run: |
+          aws configure --profile test-profile set region us-east-1
+          aws configure --profile test-profile set source_profile default
+
+      - name: Checkout EigenDA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+        with:
+          submodules: recursive
+
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+
+      - run: go version
+      - run: forge --version
+
+      - name: Build and compile contracts
+        run: make compile
+        working-directory: contracts
 
       - run: make integration-tests-inabox
 
@@ -60,8 +109,13 @@ jobs:
             inabox/testdata/*/logs/
             inabox/testdata/*/deploy.log
 
+  notify-slack:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [integration-tests, fuzz-tests, inabox-tests]
+    if: failure()
+    steps:
       - name: Send GitHub Action trigger data to Slack eigenda-pr channel
-        if: ${{ failure() }}
         id: slack
         uses: slackapi/slack-github-action@v1.24.0
         with:

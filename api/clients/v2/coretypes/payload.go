@@ -4,8 +4,9 @@ import (
 	"encoding/binary"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 )
 
 // Payload represents arbitrary user data, without any processing.
@@ -19,7 +20,7 @@ func (p Payload) ToEncodedPayload() *EncodedPayload {
 	// Calculate the length of the EncodedPayload in symbols (including the header) which has to be a power of 2.
 	encodedDataLenSymbols := uint32(len(encodedData)) / encoding.BYTES_PER_SYMBOL
 	encodedHeaderAndDataLenSymbols := codec.EncodedPayloadHeaderLenSymbols + encodedDataLenSymbols
-	encodedPayloadLenSymbols := encoding.NextPowerOf2(encodedHeaderAndDataLenSymbols)
+	encodedPayloadLenSymbols := math.NextPowOf2u32(encodedHeaderAndDataLenSymbols)
 
 	encodedPayloadBytes := make([]byte, encodedPayloadLenSymbols*encoding.BYTES_PER_SYMBOL)
 

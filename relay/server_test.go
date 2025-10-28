@@ -2,20 +2,21 @@ package relay
 
 import (
 	"encoding/binary"
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/replay"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/auth"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -63,7 +64,8 @@ func defaultConfig() *Config {
 			InternalGetProofsTimeout:       10 * time.Second,
 			InternalGetCoefficientsTimeout: 10 * time.Second,
 		},
-		MetricsPort: 9101,
+		MetricsPort:                 9101,
+		OnchainStateRefreshInterval: 1 * time.Minute,
 	}
 }
 
@@ -120,10 +122,8 @@ func getChunks(
 
 func TestReadWriteBlobs(t *testing.T) {
 	ctx := t.Context()
+	logger = test.GetLogger()
 	rand := random.NewTestRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
 
 	setup(t)
 	defer teardown(t)
@@ -141,6 +141,11 @@ func TestReadWriteBlobs(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	server, err := NewServer(
 		ctx,
 		prometheus.NewRegistry(),
@@ -150,13 +155,14 @@ func TestReadWriteBlobs(t *testing.T) {
 		blobStore,
 		nil, /* not used in this test*/
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
+		_ = server.Start(ctx)
 	}()
+
 	defer func() {
 		err = server.Stop()
 		require.NoError(t, err)
@@ -228,6 +234,11 @@ func TestReadNonExistentBlob(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -238,13 +249,14 @@ func TestReadNonExistentBlob(t *testing.T) {
 		blobStore,
 		nil, /* not used in this test */
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
+		_ = server.Start(ctx)
 	}()
+
 	defer func() {
 		err = server.Stop()
 		require.NoError(t, err)
@@ -252,7 +264,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		request := &pb.GetBlobRequest{
-			BlobKey: tu.RandomBytes(32),
+			BlobKey: random.RandomBytes(32),
 		}
 
 		response, err := getBlob(t, request)
@@ -263,10 +275,8 @@ func TestReadNonExistentBlob(t *testing.T) {
 
 func TestReadWriteBlobsWithSharding(t *testing.T) {
 	ctx := t.Context()
+	logger = test.GetLogger()
 	rand := random.NewTestRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
 
 	setup(t)
 	defer teardown(t)
@@ -294,6 +304,11 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayKeys = shardList
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -304,13 +319,14 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		blobStore,
 		nil, /* not used in this test*/
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
+		_ = server.Start(ctx)
 	}()
+
 	defer func() {
 		err = server.Stop()
 		require.NoError(t, err)
@@ -436,6 +452,11 @@ func TestReadWriteChunks(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -446,13 +467,14 @@ func TestReadWriteChunks(t *testing.T) {
 		nil, /* not used in this test*/
 		chunkReader,
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
+		_ = server.Start(ctx)
 	}()
+
 	defer func() {
 		err = server.Stop()
 		require.NoError(t, err)
@@ -660,6 +682,11 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -670,14 +697,15 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		nil, /* not used in this test */
 		chunkReader,
 		chainReader,
-		ics)
+		ics,
+		listener)
 	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
+		_ = server.Start(ctx)
 	}()
+
 	defer func() {
 		err = server.Stop()
 		require.NoError(t, err)
@@ -765,10 +793,8 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 func TestReadWriteChunksWithSharding(t *testing.T) {
 	ctx := t.Context()
+	logger = test.GetLogger()
 	rand := random.NewTestRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
 
 	setup(t)
 	defer teardown(t)
@@ -816,6 +842,11 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -826,13 +857,14 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		nil, /* not used in this test*/
 		chunkReader,
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
+		_ = server.Start(ctx)
 	}()
+
 	defer func() {
 		err = server.Stop()
 		require.NoError(t, err)
@@ -1120,6 +1152,11 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	require.NoError(t, err)
+
 	chainReader := newMockChainReader(t)
 	server, err := NewServer(
 		ctx,
@@ -1130,14 +1167,15 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		nil, /* not used in this test */
 		chunkReader,
 		chainReader,
-		ics)
+		ics,
+		listener)
 	require.NoError(t, err)
 	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 
 	go func() {
-		err = server.Start(ctx)
-		require.NoError(t, err)
+		_ = server.Start(ctx)
 	}()
+
 	defer func() {
 		err = server.Stop()
 		require.NoError(t, err)

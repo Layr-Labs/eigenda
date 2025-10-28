@@ -13,11 +13,11 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -34,7 +34,7 @@ type EncoderServerV2 struct {
 	blobStore   *blobstore.BlobStore
 	chunkWriter chunkstore.ChunkWriter
 	logger      logging.Logger
-	prover      encoding.Prover
+	prover      *prover.Prover
 	metrics     *Metrics
 	grpcMetrics *grpcprom.ServerMetrics
 	close       func()
@@ -57,7 +57,7 @@ func NewEncoderServerV2(
 	blobStore *blobstore.BlobStore,
 	chunkWriter chunkstore.ChunkWriter,
 	logger logging.Logger,
-	prover encoding.Prover,
+	prover *prover.Prover,
 	metrics *Metrics,
 	grpcMetrics *grpcprom.ServerMetrics,
 ) *EncoderServerV2 {
@@ -77,14 +77,8 @@ func NewEncoderServerV2(
 	}
 }
 
-func (s *EncoderServerV2) Start() error {
-	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("Could not start tcp listener: %v", err)
-	}
-
+// StartWithListener starts the server using the provided listener. This method will block until the server is stopped.
+func (s *EncoderServerV2) StartWithListener(listener net.Listener) error {
 	gs := grpc.NewServer(
 		grpc.UnaryInterceptor(
 			s.grpcMetrics.UnaryServerInterceptor(),
@@ -106,7 +100,7 @@ func (s *EncoderServerV2) Start() error {
 		gs.GracefulStop()
 	}
 
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	s.logger.Info("GRPC Listening", "address", listener.Addr().String())
 	return gs.Serve(listener)
 }
 
@@ -183,7 +177,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKe
 
 	// Encode the data
 	encodingStart := time.Now()
-	frames, err := s.prover.GetFrames(data, encodingParams)
+	frames, _, err := s.prover.GetFrames(data, encodingParams)
 	if err != nil {
 		s.logger.Error("failed to encode frames", "error", err)
 		return nil, status.Errorf(codes.Internal, "encoding failed: %v", err)
@@ -273,7 +267,9 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 		return blobKey, params, errors.New("number of chunks must be greater than zero")
 	}
 
-	if req.GetBlobSize() == 0 || uint64(encoding.GetBlobLength(uint(req.GetBlobSize()))) > req.GetEncodingParams().GetChunkLength()*req.GetEncodingParams().GetNumChunks() {
+	if req.GetBlobSize() == 0 ||
+		(uint64(encoding.GetBlobLength(uint32(req.GetBlobSize()))) >
+			req.GetEncodingParams().GetChunkLength()*req.GetEncodingParams().GetNumChunks()) {
 		return blobKey, params, errors.New("blob size is invalid")
 	}
 
@@ -288,7 +284,7 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 		NumChunks:   req.GetEncodingParams().GetNumChunks(),
 	}
 
-	err = encoding.ValidateEncodingParams(params, s.prover.GetSRSOrder())
+	err = encoding.ValidateEncodingParams(params, encoding.SRSOrder)
 	if err != nil {
 		return blobKey, params, fmt.Errorf("invalid encoding parameters: %v", err)
 	}

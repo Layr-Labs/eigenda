@@ -7,7 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -35,14 +35,12 @@ func TestGetSet(t *testing.T) {
 
 	require.NoError(t, err)
 
-	msV2, err := New(
+	msV2 := New(
 		t.Context(),
 		testLogger,
 		getDefaultMemStoreTestConfig(),
 		g1Srs,
 	)
-
-	require.NoError(t, err)
 
 	expected := []byte(testPreimage)
 	key, err := msV2.Put(t.Context(), expected)

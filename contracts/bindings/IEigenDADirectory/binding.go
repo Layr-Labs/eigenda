@@ -29,9 +29,21 @@ var (
 	_ = abi.ConvertType
 )
 
+// ConfigRegistryTypesBytes32Checkpoint is an auto generated low-level Go binding around an user-defined struct.
+type ConfigRegistryTypesBytes32Checkpoint struct {
+	ActivationKey *big.Int
+	Value         [32]byte
+}
+
+// ConfigRegistryTypesBytesCheckpoint is an auto generated low-level Go binding around an user-defined struct.
+type ConfigRegistryTypesBytesCheckpoint struct {
+	ActivationKey *big.Int
+	Value         []byte
+}
+
 // ContractIEigenDADirectoryMetaData contains all meta data concerning the ContractIEigenDADirectory contract.
 var ContractIEigenDADirectoryMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"addAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllNames\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getName\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"removeAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"replaceAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AddressAdded\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"value\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressRemoved\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressReplaced\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"oldValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AddressAlreadyExists\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"AddressDoesNotExist\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"NewValueIsOldValue\",\"inputs\":[{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddress\",\"inputs\":[]}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"addAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addConfigBytes\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"activationKey\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addConfigBytes32\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"activationKey\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getActivationKeyBytes\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getActivationKeyBytes32\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllConfigNamesBytes\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllConfigNamesBytes32\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllNames\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCheckpointBytes\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structConfigRegistryTypes.BytesCheckpoint\",\"components\":[{\"name\":\"activationKey\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCheckpointBytes32\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structConfigRegistryTypes.Bytes32Checkpoint\",\"components\":[{\"name\":\"activationKey\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBytes\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBytes32\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigNameBytes\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigNameBytes32\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getName\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getNumCheckpointsBytes\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getNumCheckpointsBytes32\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"removeAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"replaceAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AddressAdded\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"value\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressRemoved\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressReplaced\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"oldValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AddressAlreadyExists\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"AddressDoesNotExist\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"NewValueIsOldValue\",\"inputs\":[{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddress\",\"inputs\":[]}]",
 }
 
 // ContractIEigenDADirectoryABI is the input ABI used to generate the binding from.
@@ -180,6 +192,68 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorRaw) Transa
 	return _ContractIEigenDADirectory.Contract.contract.Transact(opts, method, params...)
 }
 
+// GetActivationKeyBytes is a free data retrieval call binding the contract method 0x19f73b7f.
+//
+// Solidity: function getActivationKeyBytes(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetActivationKeyBytes(opts *bind.CallOpts, nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getActivationKeyBytes", nameDigest, index)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// GetActivationKeyBytes is a free data retrieval call binding the contract method 0x19f73b7f.
+//
+// Solidity: function getActivationKeyBytes(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetActivationKeyBytes(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetActivationKeyBytes(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetActivationKeyBytes is a free data retrieval call binding the contract method 0x19f73b7f.
+//
+// Solidity: function getActivationKeyBytes(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetActivationKeyBytes(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetActivationKeyBytes(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetActivationKeyBytes32 is a free data retrieval call binding the contract method 0x8d033b96.
+//
+// Solidity: function getActivationKeyBytes32(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetActivationKeyBytes32(opts *bind.CallOpts, nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getActivationKeyBytes32", nameDigest, index)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// GetActivationKeyBytes32 is a free data retrieval call binding the contract method 0x8d033b96.
+//
+// Solidity: function getActivationKeyBytes32(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetActivationKeyBytes32(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetActivationKeyBytes32(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetActivationKeyBytes32 is a free data retrieval call binding the contract method 0x8d033b96.
+//
+// Solidity: function getActivationKeyBytes32(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetActivationKeyBytes32(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetActivationKeyBytes32(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
 // GetAddress is a free data retrieval call binding the contract method 0x21f8a721.
 //
 // Solidity: function getAddress(bytes32 key) view returns(address)
@@ -242,6 +316,68 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetAdd
 	return _ContractIEigenDADirectory.Contract.GetAddress0(&_ContractIEigenDADirectory.CallOpts, name)
 }
 
+// GetAllConfigNamesBytes is a free data retrieval call binding the contract method 0x424d2a23.
+//
+// Solidity: function getAllConfigNamesBytes() view returns(string[])
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetAllConfigNamesBytes(opts *bind.CallOpts) ([]string, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getAllConfigNamesBytes")
+
+	if err != nil {
+		return *new([]string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]string)).(*[]string)
+
+	return out0, err
+
+}
+
+// GetAllConfigNamesBytes is a free data retrieval call binding the contract method 0x424d2a23.
+//
+// Solidity: function getAllConfigNamesBytes() view returns(string[])
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetAllConfigNamesBytes() ([]string, error) {
+	return _ContractIEigenDADirectory.Contract.GetAllConfigNamesBytes(&_ContractIEigenDADirectory.CallOpts)
+}
+
+// GetAllConfigNamesBytes is a free data retrieval call binding the contract method 0x424d2a23.
+//
+// Solidity: function getAllConfigNamesBytes() view returns(string[])
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetAllConfigNamesBytes() ([]string, error) {
+	return _ContractIEigenDADirectory.Contract.GetAllConfigNamesBytes(&_ContractIEigenDADirectory.CallOpts)
+}
+
+// GetAllConfigNamesBytes32 is a free data retrieval call binding the contract method 0x3f51d885.
+//
+// Solidity: function getAllConfigNamesBytes32() view returns(string[])
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetAllConfigNamesBytes32(opts *bind.CallOpts) ([]string, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getAllConfigNamesBytes32")
+
+	if err != nil {
+		return *new([]string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]string)).(*[]string)
+
+	return out0, err
+
+}
+
+// GetAllConfigNamesBytes32 is a free data retrieval call binding the contract method 0x3f51d885.
+//
+// Solidity: function getAllConfigNamesBytes32() view returns(string[])
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetAllConfigNamesBytes32() ([]string, error) {
+	return _ContractIEigenDADirectory.Contract.GetAllConfigNamesBytes32(&_ContractIEigenDADirectory.CallOpts)
+}
+
+// GetAllConfigNamesBytes32 is a free data retrieval call binding the contract method 0x3f51d885.
+//
+// Solidity: function getAllConfigNamesBytes32() view returns(string[])
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetAllConfigNamesBytes32() ([]string, error) {
+	return _ContractIEigenDADirectory.Contract.GetAllConfigNamesBytes32(&_ContractIEigenDADirectory.CallOpts)
+}
+
 // GetAllNames is a free data retrieval call binding the contract method 0xfb825e5f.
 //
 // Solidity: function getAllNames() view returns(string[])
@@ -271,6 +407,192 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetAllNames(
 // Solidity: function getAllNames() view returns(string[])
 func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetAllNames() ([]string, error) {
 	return _ContractIEigenDADirectory.Contract.GetAllNames(&_ContractIEigenDADirectory.CallOpts)
+}
+
+// GetCheckpointBytes is a free data retrieval call binding the contract method 0x67134a1d.
+//
+// Solidity: function getCheckpointBytes(bytes32 nameDigest, uint256 index) view returns((uint256,bytes))
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetCheckpointBytes(opts *bind.CallOpts, nameDigest [32]byte, index *big.Int) (ConfigRegistryTypesBytesCheckpoint, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getCheckpointBytes", nameDigest, index)
+
+	if err != nil {
+		return *new(ConfigRegistryTypesBytesCheckpoint), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(ConfigRegistryTypesBytesCheckpoint)).(*ConfigRegistryTypesBytesCheckpoint)
+
+	return out0, err
+
+}
+
+// GetCheckpointBytes is a free data retrieval call binding the contract method 0x67134a1d.
+//
+// Solidity: function getCheckpointBytes(bytes32 nameDigest, uint256 index) view returns((uint256,bytes))
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetCheckpointBytes(nameDigest [32]byte, index *big.Int) (ConfigRegistryTypesBytesCheckpoint, error) {
+	return _ContractIEigenDADirectory.Contract.GetCheckpointBytes(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetCheckpointBytes is a free data retrieval call binding the contract method 0x67134a1d.
+//
+// Solidity: function getCheckpointBytes(bytes32 nameDigest, uint256 index) view returns((uint256,bytes))
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetCheckpointBytes(nameDigest [32]byte, index *big.Int) (ConfigRegistryTypesBytesCheckpoint, error) {
+	return _ContractIEigenDADirectory.Contract.GetCheckpointBytes(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetCheckpointBytes32 is a free data retrieval call binding the contract method 0xf1e98690.
+//
+// Solidity: function getCheckpointBytes32(bytes32 nameDigest, uint256 index) view returns((uint256,bytes32))
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetCheckpointBytes32(opts *bind.CallOpts, nameDigest [32]byte, index *big.Int) (ConfigRegistryTypesBytes32Checkpoint, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getCheckpointBytes32", nameDigest, index)
+
+	if err != nil {
+		return *new(ConfigRegistryTypesBytes32Checkpoint), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(ConfigRegistryTypesBytes32Checkpoint)).(*ConfigRegistryTypesBytes32Checkpoint)
+
+	return out0, err
+
+}
+
+// GetCheckpointBytes32 is a free data retrieval call binding the contract method 0xf1e98690.
+//
+// Solidity: function getCheckpointBytes32(bytes32 nameDigest, uint256 index) view returns((uint256,bytes32))
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetCheckpointBytes32(nameDigest [32]byte, index *big.Int) (ConfigRegistryTypesBytes32Checkpoint, error) {
+	return _ContractIEigenDADirectory.Contract.GetCheckpointBytes32(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetCheckpointBytes32 is a free data retrieval call binding the contract method 0xf1e98690.
+//
+// Solidity: function getCheckpointBytes32(bytes32 nameDigest, uint256 index) view returns((uint256,bytes32))
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetCheckpointBytes32(nameDigest [32]byte, index *big.Int) (ConfigRegistryTypesBytes32Checkpoint, error) {
+	return _ContractIEigenDADirectory.Contract.GetCheckpointBytes32(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetConfigBytes is a free data retrieval call binding the contract method 0x5e28bafc.
+//
+// Solidity: function getConfigBytes(bytes32 nameDigest, uint256 index) view returns(bytes)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigBytes(opts *bind.CallOpts, nameDigest [32]byte, index *big.Int) ([]byte, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigBytes", nameDigest, index)
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
+}
+
+// GetConfigBytes is a free data retrieval call binding the contract method 0x5e28bafc.
+//
+// Solidity: function getConfigBytes(bytes32 nameDigest, uint256 index) view returns(bytes)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigBytes(nameDigest [32]byte, index *big.Int) ([]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetConfigBytes is a free data retrieval call binding the contract method 0x5e28bafc.
+//
+// Solidity: function getConfigBytes(bytes32 nameDigest, uint256 index) view returns(bytes)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigBytes(nameDigest [32]byte, index *big.Int) ([]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetConfigBytes32 is a free data retrieval call binding the contract method 0xb8587056.
+//
+// Solidity: function getConfigBytes32(bytes32 nameDigest, uint256 index) view returns(bytes32)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigBytes32(opts *bind.CallOpts, nameDigest [32]byte, index *big.Int) ([32]byte, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigBytes32", nameDigest, index)
+
+	if err != nil {
+		return *new([32]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+
+	return out0, err
+
+}
+
+// GetConfigBytes32 is a free data retrieval call binding the contract method 0xb8587056.
+//
+// Solidity: function getConfigBytes32(bytes32 nameDigest, uint256 index) view returns(bytes32)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigBytes32(nameDigest [32]byte, index *big.Int) ([32]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes32(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetConfigBytes32 is a free data retrieval call binding the contract method 0xb8587056.
+//
+// Solidity: function getConfigBytes32(bytes32 nameDigest, uint256 index) view returns(bytes32)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigBytes32(nameDigest [32]byte, index *big.Int) ([32]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes32(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+}
+
+// GetConfigNameBytes is a free data retrieval call binding the contract method 0x4312f467.
+//
+// Solidity: function getConfigNameBytes(bytes32 nameDigest) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigNameBytes(opts *bind.CallOpts, nameDigest [32]byte) (string, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigNameBytes", nameDigest)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+// GetConfigNameBytes is a free data retrieval call binding the contract method 0x4312f467.
+//
+// Solidity: function getConfigNameBytes(bytes32 nameDigest) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigNameBytes(nameDigest [32]byte) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigNameBytes(&_ContractIEigenDADirectory.CallOpts, nameDigest)
+}
+
+// GetConfigNameBytes is a free data retrieval call binding the contract method 0x4312f467.
+//
+// Solidity: function getConfigNameBytes(bytes32 nameDigest) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigNameBytes(nameDigest [32]byte) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigNameBytes(&_ContractIEigenDADirectory.CallOpts, nameDigest)
+}
+
+// GetConfigNameBytes32 is a free data retrieval call binding the contract method 0x9e22085d.
+//
+// Solidity: function getConfigNameBytes32(bytes32 nameDigest) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigNameBytes32(opts *bind.CallOpts, nameDigest [32]byte) (string, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigNameBytes32", nameDigest)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+// GetConfigNameBytes32 is a free data retrieval call binding the contract method 0x9e22085d.
+//
+// Solidity: function getConfigNameBytes32(bytes32 nameDigest) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigNameBytes32(nameDigest [32]byte) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigNameBytes32(&_ContractIEigenDADirectory.CallOpts, nameDigest)
+}
+
+// GetConfigNameBytes32 is a free data retrieval call binding the contract method 0x9e22085d.
+//
+// Solidity: function getConfigNameBytes32(bytes32 nameDigest) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigNameBytes32(nameDigest [32]byte) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigNameBytes32(&_ContractIEigenDADirectory.CallOpts, nameDigest)
 }
 
 // GetName is a free data retrieval call binding the contract method 0x54b8d5e3.
@@ -304,6 +626,68 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetNam
 	return _ContractIEigenDADirectory.Contract.GetName(&_ContractIEigenDADirectory.CallOpts, key)
 }
 
+// GetNumCheckpointsBytes is a free data retrieval call binding the contract method 0x195e8d6e.
+//
+// Solidity: function getNumCheckpointsBytes(bytes32 nameDigest) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetNumCheckpointsBytes(opts *bind.CallOpts, nameDigest [32]byte) (*big.Int, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getNumCheckpointsBytes", nameDigest)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// GetNumCheckpointsBytes is a free data retrieval call binding the contract method 0x195e8d6e.
+//
+// Solidity: function getNumCheckpointsBytes(bytes32 nameDigest) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetNumCheckpointsBytes(nameDigest [32]byte) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetNumCheckpointsBytes(&_ContractIEigenDADirectory.CallOpts, nameDigest)
+}
+
+// GetNumCheckpointsBytes is a free data retrieval call binding the contract method 0x195e8d6e.
+//
+// Solidity: function getNumCheckpointsBytes(bytes32 nameDigest) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetNumCheckpointsBytes(nameDigest [32]byte) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetNumCheckpointsBytes(&_ContractIEigenDADirectory.CallOpts, nameDigest)
+}
+
+// GetNumCheckpointsBytes32 is a free data retrieval call binding the contract method 0x27b092a6.
+//
+// Solidity: function getNumCheckpointsBytes32(bytes32 nameDigest) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetNumCheckpointsBytes32(opts *bind.CallOpts, nameDigest [32]byte) (*big.Int, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getNumCheckpointsBytes32", nameDigest)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// GetNumCheckpointsBytes32 is a free data retrieval call binding the contract method 0x27b092a6.
+//
+// Solidity: function getNumCheckpointsBytes32(bytes32 nameDigest) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetNumCheckpointsBytes32(nameDigest [32]byte) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetNumCheckpointsBytes32(&_ContractIEigenDADirectory.CallOpts, nameDigest)
+}
+
+// GetNumCheckpointsBytes32 is a free data retrieval call binding the contract method 0x27b092a6.
+//
+// Solidity: function getNumCheckpointsBytes32(bytes32 nameDigest) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetNumCheckpointsBytes32(nameDigest [32]byte) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetNumCheckpointsBytes32(&_ContractIEigenDADirectory.CallOpts, nameDigest)
+}
+
 // AddAddress is a paid mutator transaction binding the contract method 0xceb35b0f.
 //
 // Solidity: function addAddress(string name, address value) returns()
@@ -323,6 +707,48 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) AddAddress(n
 // Solidity: function addAddress(string name, address value) returns()
 func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) AddAddress(name string, value common.Address) (*types.Transaction, error) {
 	return _ContractIEigenDADirectory.Contract.AddAddress(&_ContractIEigenDADirectory.TransactOpts, name, value)
+}
+
+// AddConfigBytes is a paid mutator transaction binding the contract method 0x515a49b3.
+//
+// Solidity: function addConfigBytes(string name, uint256 activationKey, bytes value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) AddConfigBytes(opts *bind.TransactOpts, name string, activationKey *big.Int, value []byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.contract.Transact(opts, "addConfigBytes", name, activationKey, value)
+}
+
+// AddConfigBytes is a paid mutator transaction binding the contract method 0x515a49b3.
+//
+// Solidity: function addConfigBytes(string name, uint256 activationKey, bytes value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) AddConfigBytes(name string, activationKey *big.Int, value []byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigBytes(&_ContractIEigenDADirectory.TransactOpts, name, activationKey, value)
+}
+
+// AddConfigBytes is a paid mutator transaction binding the contract method 0x515a49b3.
+//
+// Solidity: function addConfigBytes(string name, uint256 activationKey, bytes value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) AddConfigBytes(name string, activationKey *big.Int, value []byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigBytes(&_ContractIEigenDADirectory.TransactOpts, name, activationKey, value)
+}
+
+// AddConfigBytes32 is a paid mutator transaction binding the contract method 0x99febdd8.
+//
+// Solidity: function addConfigBytes32(string name, uint256 activationKey, bytes32 value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) AddConfigBytes32(opts *bind.TransactOpts, name string, activationKey *big.Int, value [32]byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.contract.Transact(opts, "addConfigBytes32", name, activationKey, value)
+}
+
+// AddConfigBytes32 is a paid mutator transaction binding the contract method 0x99febdd8.
+//
+// Solidity: function addConfigBytes32(string name, uint256 activationKey, bytes32 value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) AddConfigBytes32(name string, activationKey *big.Int, value [32]byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigBytes32(&_ContractIEigenDADirectory.TransactOpts, name, activationKey, value)
+}
+
+// AddConfigBytes32 is a paid mutator transaction binding the contract method 0x99febdd8.
+//
+// Solidity: function addConfigBytes32(string name, uint256 activationKey, bytes32 value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) AddConfigBytes32(name string, activationKey *big.Int, value [32]byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigBytes32(&_ContractIEigenDADirectory.TransactOpts, name, activationKey, value)
 }
 
 // RemoveAddress is a paid mutator transaction binding the contract method 0xf94d1312.

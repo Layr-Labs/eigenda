@@ -11,11 +11,13 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/stretchr/testify/assert"
 )
 
-func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThreshold int, refBlockNumber uint) (*core.BatchHeader, map[core.OperatorID][]*core.EncodedBlobMessage) {
+func makeBatch(
+	t *testing.T, blobSize uint32, numBlobs int, advThreshold, quorumThreshold int, refBlockNumber uint,
+) (*core.BatchHeader, map[core.OperatorID][]*core.EncodedBlobMessage) {
 	p, _, err := makeTestComponents()
 	assert.NoError(t, err)
 	asn := &core.StdAssignmentCoordinator{}
@@ -35,11 +37,12 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		operatorState, err := chainState.GetOperatorState(context.Background(), 0, []core.QuorumID{0})
 		assert.NoError(t, err)
 
-		chunkLength, err := asn.CalculateChunkLength(operatorState, encoding.GetBlobLength(uint(blobSize)), 0, &core.SecurityParam{
-			QuorumID:              0,
-			AdversaryThreshold:    uint8(advThreshold),
-			ConfirmationThreshold: uint8(quorumThreshold),
-		})
+		chunkLength, err := asn.CalculateChunkLength(operatorState, uint(encoding.GetBlobLength(blobSize)), 0,
+			&core.SecurityParam{
+				QuorumID:              0,
+				AdversaryThreshold:    uint8(advThreshold),
+				ConfirmationThreshold: uint8(quorumThreshold),
+			})
 		assert.NoError(t, err)
 
 		blobQuorumInfo := &core.BlobQuorumInfo{
@@ -53,7 +56,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 
 		// encode data
 
-		assignments, info, err := asn.GetAssignments(operatorState, encoding.GetBlobLength(uint(blobSize)), blobQuorumInfo)
+		assignments, info, err := asn.GetAssignments(operatorState, uint(encoding.GetBlobLength(blobSize)), blobQuorumInfo)
 		assert.NoError(t, err)
 		quorumInfo := batcher.QuorumInfo{
 			Assignments:        assignments,
@@ -61,7 +64,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 			QuantizationFactor: batcher.QuantizationFactor,
 		}
 
-		params := encoding.ParamsFromMins(chunkLength, quorumInfo.Info.TotalChunks)
+		params := encoding.ParamsFromMins(uint64(chunkLength), quorumInfo.Info.TotalChunks)
 		t.Logf("Encoding params: ChunkLength: %d, NumChunks: %d", params.ChunkLength, params.NumChunks)
 		commits, chunks, err := p.EncodeAndProve(data, params)
 		assert.NoError(t, err)
@@ -69,7 +72,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 
 		chunkBytes := make([][]byte, len(chunks))
 		for _, c := range chunks {
-			serialized, err := c.Serialize()
+			serialized, err := c.SerializeGob()
 			assert.NotNil(t, err)
 			chunkBytes = append(chunkBytes, serialized)
 		}

@@ -6,17 +6,15 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/indexer"
+	"github.com/Layr-Labs/eigenda/indexer/eth"
+	"github.com/Layr-Labs/eigenda/indexer/inmem"
+	"github.com/Layr-Labs/eigenda/indexer/test/mock"
+	"github.com/Layr-Labs/eigenda/test"
 	ethereumcm "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/indexer/eth"
-	"github.com/Layr-Labs/eigenda/indexer/test/mock"
-
-	"github.com/Layr-Labs/eigenda/indexer/inmem"
 )
 
-var logger = testutils.GetLogger()
+var logger = test.GetLogger()
 
 func newTestFilterer(sc *mock.ContractSimulator, isFastMode bool) *Filterer {
 	return &Filterer{
@@ -39,6 +37,7 @@ func newTestAccumlatorHandlers(filterer *Filterer, acc *Accumulator, status inde
 
 func TestIndex(t *testing.T) {
 	t.Skip("Skipping this test after the simulated backend upgrade broke this test. Enable it after fixing the issue.")
+	ctx := t.Context()
 	sc := mock.MustNewContractSimulator()
 
 	upgrader := &Upgrader{}
@@ -60,7 +59,7 @@ func TestIndex(t *testing.T) {
 		logger,
 	)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 
 	// Start Blockchain Events
 	sc.Start(time.Millisecond, cancel)

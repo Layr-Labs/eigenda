@@ -3,7 +3,6 @@ package encoder
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -11,8 +10,6 @@ import (
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	commonpprof "github.com/Layr-Labs/eigenda/common/pprof"
-	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -21,12 +18,38 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+type Decoder interface {
+	// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
+	Decode(
+		chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, inputSize uint64,
+	) ([]byte, error)
+}
+
+type Prover interface {
+	Decoder
+	// Encode takes in a blob and returns the commitments and encoded chunks. The encoding will satisfy the property that
+	// for any number M such that M*params.ChunkLength > BlobCommitments.Length,
+	// then any set of M chunks will be sufficient to reconstruct the blob.
+	EncodeAndProve(data []byte, params encoding.EncodingParams) (encoding.BlobCommitments, []*encoding.Frame, error)
+
+	// GetCommitmentsForPaddedLength takes in a byte slice representing a list of bn254
+	// field elements (32 bytes each, except potentially the last element),
+	// pads the (potentially incomplete) last element with zeroes, and returns the commitments for the padded list.
+	GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommitments, error)
+
+	GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, error)
+
+	GetMultiFrameProofs(data []byte, params encoding.EncodingParams) ([]encoding.Proof, error)
+
+	GetSRSOrder() uint64
+}
+
 type EncoderServer struct {
 	pb.UnimplementedEncoderServer
 
 	config      ServerConfig
 	logger      logging.Logger
-	prover      encoding.Prover
+	prover      Prover
 	metrics     *Metrics
 	grpcMetrics *grpcprom.ServerMetrics
 	close       func()
@@ -42,7 +65,10 @@ type blobRequest struct {
 	blobSizeByte int
 }
 
-func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics, grpcMetrics *grpcprom.ServerMetrics) *EncoderServer {
+func NewEncoderServer(
+	config ServerConfig, logger logging.Logger, prover Prover,
+	metrics *Metrics, grpcMetrics *grpcprom.ServerMetrics,
+) *EncoderServer {
 	// Set initial queue capacity metric
 	metrics.SetQueueCapacity(config.RequestPoolSize)
 
@@ -59,20 +85,8 @@ func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encodin
 	}
 }
 
-func (s *EncoderServer) Start() error {
-	pprofProfiler := commonpprof.NewPprofProfiler(s.config.PprofHttpPort, s.logger)
-	if s.config.EnablePprof {
-		go pprofProfiler.Start()
-		s.logger.Info("Enabled pprof for encoder server", "port", s.config.PprofHttpPort)
-	}
-
-	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("Could not start tcp listener: %v", err)
-	}
-
+// StartWithListener starts the server using the provided listener. This method will block until the server is stopped.
+func (s *EncoderServer) StartWithListener(listener net.Listener) error {
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
 	gs := grpc.NewServer(opt,
 		grpc.UnaryInterceptor(
@@ -95,7 +109,7 @@ func (s *EncoderServer) Start() error {
 		gs.GracefulStop()
 	}
 
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	s.logger.Info("GRPC Listening", "address", listener.Addr().String())
 	return gs.Serve(listener)
 }
 
@@ -198,7 +212,7 @@ func (s *EncoderServer) handleEncoding(ctx context.Context, req *pb.EncodeBlobRe
 		if s.config.EnableGnarkChunkEncoding {
 			chunkSerialized, err = chunk.SerializeGnark()
 		} else {
-			chunkSerialized, err = chunk.Serialize()
+			chunkSerialized, err = chunk.SerializeGob()
 		}
 		if err != nil {
 			return nil, err

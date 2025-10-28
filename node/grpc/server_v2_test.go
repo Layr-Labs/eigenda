@@ -3,12 +3,14 @@ package grpc_test
 import (
 	"context"
 	"errors"
+	"net"
 	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common/version"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/gammazero/workerpool"
@@ -119,6 +121,12 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	// The eth client is only utilized for StoreChunks validation, which is disabled in these tests
 	var reader *coreeth.Reader
 
+	// Create listeners with OS-allocated ports for testing
+	v2DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+	v2RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
 	server, err := grpc.NewServerV2(
 		context.Background(),
 		config,
@@ -126,7 +134,10 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		logger,
 		ratelimiter,
 		prometheus.NewRegistry(),
-		reader)
+		reader,
+		version.DefaultVersion(),
+		v2DispersalListener,
+		v2RetrievalListener)
 
 	require.NoError(t, err)
 	return &testComponents{
@@ -141,8 +152,8 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 func TestV2NodeInfoRequest(t *testing.T) {
 	c := newTestComponents(t, makeConfig(t))
 	resp, err := c.server.GetNodeInfo(context.Background(), &validator.GetNodeInfoRequest{})
-	assert.True(t, resp.GetSemver() == ">=0.9.0-rc.1")
-	assert.True(t, err == nil)
+	require.NoError(t, err)
+	require.Equal(t, resp.GetSemver(), version.DefaultVersion().String())
 }
 
 func TestV2ServerWithoutV2(t *testing.T) {

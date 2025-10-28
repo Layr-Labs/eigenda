@@ -10,8 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/docker/go-units"
 	"github.com/gammazero/workerpool"
+	"github.com/stretchr/testify/require"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -20,9 +22,9 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
@@ -56,7 +58,7 @@ func TestMain(m *testing.M) {
 }
 
 // makeTestVerifier makes a verifier currently using the only supported backend.
-func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
+func makeTestComponents() (*prover.Prover, *verifier.Verifier, error) {
 
 	config := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
@@ -182,7 +184,23 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 		Validator:      val,
 		ValidationPool: workerpool.New(1),
 	}
-	return grpc.NewServer(config, node, logger, ratelimiter)
+
+	// Create listeners with OS-allocated ports for testing
+	v1DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
+	v1RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
+	return grpc.NewServer(
+		config,
+		node,
+		logger,
+		ratelimiter,
+		version.DefaultVersion(),
+		v1DispersalListener,
+		v1RetrievalListener,
+	)
 }
 
 func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold uint8) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
@@ -273,7 +291,7 @@ func makeStoreChunksRequestExtended(t *testing.T, quorumThreshold, adversaryThre
 
 	var blob1Bundles, blob2Bundles []*pb.Bundle
 	if useGnarkBundleEncoding {
-		decoded, err := new(encoding.Frame).Deserialize(encodedChunk)
+		decoded, err := new(encoding.Frame).DeserializeGob(encodedChunk)
 		assert.NoError(t, err)
 		bundle := core.Bundle{
 			decoded,
@@ -347,8 +365,8 @@ func storeChunks(t *testing.T, server *grpc.Server, useGnarkBundleEncoding bool)
 func TestNodeInfoRequest(t *testing.T) {
 	server := newTestServer(t, true)
 	resp, err := server.NodeInfo(context.Background(), &pb.NodeInfoRequest{})
-	assert.True(t, resp.GetSemver() == ">=0.9.0-rc.1")
-	assert.True(t, err == nil)
+	require.NoError(t, err)
+	require.Equal(t, version.DefaultVersion().String(), resp.GetSemver())
 }
 
 func TestStoreChunksRequestValidation(t *testing.T) {
@@ -425,9 +443,9 @@ func TestRetrieveChunks(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.GetChunkEncodingFormat())
-	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
+	recovered, err := new(encoding.Frame).DeserializeGob(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
-	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
+	chunk, err := new(encoding.Frame).DeserializeGob(encodedChunk)
 	assert.NoError(t, err)
 	assert.Equal(t, recovered, chunk)
 
@@ -497,9 +515,9 @@ func TestMixedBundleEncoding(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.GetChunkEncodingFormat())
-	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
+	recovered, err := new(encoding.Frame).DeserializeGob(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
-	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
+	chunk, err := new(encoding.Frame).DeserializeGob(encodedChunk)
 	assert.NoError(t, err)
 	assert.Equal(t, recovered, chunk)
 

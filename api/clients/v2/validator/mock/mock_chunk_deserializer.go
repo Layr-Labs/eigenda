@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 )
 
 var _ internal.ChunkDeserializer = (*MockChunkDeserializer)(nil)
@@ -38,7 +39,7 @@ func (m *MockChunkDeserializer) DeserializeAndVerify(
 func NewMockChunkDeserializerFactory(deserializer internal.ChunkDeserializer) internal.ChunkDeserializerFactory {
 	return func(
 		assignments map[core.OperatorID]v2.Assignment,
-		verifier encoding.Verifier,
+		verifier *verifier.Verifier,
 	) internal.ChunkDeserializer {
 		return deserializer
 	}

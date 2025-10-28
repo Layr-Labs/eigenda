@@ -36,6 +36,11 @@ group "default" {
   targets = ["all"]
 }
 
+# NOTE: encoder-icicle is intentionally excluded from the "all" group and built in a separate
+# workflow (.github/workflows/docker-publish-encoder-icicle.yaml) because:
+# 1. It uses a different Dockerfile (icicle.Dockerfile) with GPU-specific dependencies
+# 2. It's restricted to linux/amd64 platform only (ICICLE requires NVIDIA GPUs)
+# 3. We've seen OOM on action workflow when ran together with other builds
 group "all" {
   targets = [
     "node-group",
@@ -67,6 +72,7 @@ group "internal-release" {
     "batcher-internal",
     "disperser-internal",
     "encoder-internal",
+    "encoder-icicle-internal",
     "retriever-internal",
     "churner-internal",
     "dataapi-internal",
@@ -122,6 +128,9 @@ target "encoder" {
 target "encoder-icicle" {
   context    = "."
   dockerfile = "./disperser/cmd/encoder/icicle.Dockerfile"
+  // Currently needed because Dockerfile has amd64 hardcoded in a few places.
+  // TODO: make Dockerfile also work for arm.
+  platforms  = ["linux/amd64"]
   tags       = ["${REGISTRY}/${REPO}/encoder-icicle:${BUILD_TAG}"]
 }
 

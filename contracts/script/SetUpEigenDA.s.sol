@@ -13,6 +13,7 @@ import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndex
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
+import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 
@@ -157,7 +158,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         // Register Reservations for client as the eigenDACommunityMultisig
         IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 452198,
+            symbolsPerSecond: uint64(vm.envOr("USER_RESERVATION_SYMBOLS_PER_SECOND", uint256(452198))),
             startTimestamp: uint64(block.timestamp),
             endTimestamp: uint64(block.timestamp + 1000000000),
             quorumNumbers: hex"0001",
@@ -166,8 +167,6 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
         vm.startBroadcast(msg.sender);
         paymentVault.setReservation(clientAddress, reservation);
-        // Deposit OnDemand
-        paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
         vm.stopBroadcast();
 
         // Deposit stakers into EigenLayer and delegate to operators
@@ -197,6 +196,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         vm.serializeAddress(output, "eigenDALegacyCertVerifier", address(legacyEigenDACertVerifier));
         vm.serializeAddress(output, "eigenDACertVerifier", address(eigenDACertVerifier));
         vm.serializeAddress(output, "eigenDACertVerifierRouter", address(eigenDACertVerifierRouter));
+        vm.serializeAddress(output, "eigenDAEjectionManager", address(eigenDAEjectionManager));
 
         string memory finalJson = vm.serializeString(output, "object", output);
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
+	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_logging "github.com/Layr-Labs/eigenda/api/proxy/logging"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
@@ -74,22 +75,32 @@ func StartProxyService(cliCtx *cli.Context) error {
 		memconfig.NewHandlerHTTP(log, cfg.StoreBuilderConfig.MemstoreConfig).RegisterMemstoreConfigHandlers(router)
 	}
 
-	if err := restServer.Start(router); err != nil {
-		return fmt.Errorf("start proxy rest server: %w", err)
-	}
-
-	log.Info("Started EigenDA proxy REST ALT DA server")
-
-	defer func() {
-		if err := restServer.Stop(); err != nil {
-			log.Error("failed to stop REST ALT DA server", "err", err)
+	restEnabledCfg := cfg.EnabledServersConfig.RestAPIConfig
+	if restEnabledCfg.Enabled() {
+		if err := restServer.Start(router); err != nil {
+			return fmt.Errorf("start proxy rest server: %w", err)
 		}
 
-		log.Info("Successfully shutdown REST ALT DA server")
-	}()
+		log.Info("Started EigenDA Proxy REST ALT DA server",
+			string(enabled_apis.Admin), restEnabledCfg.Admin,
+			string(enabled_apis.StandardCommitment), restEnabledCfg.StandardCommitment,
+			string(enabled_apis.OpGenericCommitment), restEnabledCfg.OpGenericCommitment,
+			string(enabled_apis.OpKeccakCommitment), restEnabledCfg.OpKeccakCommitment)
 
-	if cfg.ArbCustomDASvrCfg.Enable {
-		arbitrumRpcServer, err := arbitrum_altda.NewServer(ctx, &cfg.ArbCustomDASvrCfg)
+		defer func() {
+			if err := restServer.Stop(); err != nil {
+				log.Error("failed to stop REST ALT DA server", "err", err)
+			} else {
+				log.Info("Successfully shutdown REST ALT DA server")
+			}
+
+		}()
+	}
+
+	if cfg.EnabledServersConfig.ArbCustomDA {
+		h := arbitrum_altda.NewHandlers(certMgr)
+
+		arbitrumRpcServer, err := arbitrum_altda.NewServer(ctx, &cfg.ArbCustomDASvrCfg, h)
 		if err != nil {
 			return fmt.Errorf("new arbitrum custom da json rpc server: %w", err)
 		}
@@ -101,14 +112,15 @@ func StartProxyService(cliCtx *cli.Context) error {
 		defer func() {
 			if err := arbitrumRpcServer.Stop(); err != nil {
 				log.Error("failed to stop arbitrum custom da json rpc server", "err", err)
+			} else {
+				log.Info("Successfully shutdown Arbitrum Custom DA server")
 			}
-			log.Info("Successfully shutdown Arbitrum Custom DA server")
 		}()
 
 		log.Info("Started Arbitrum Custom DA JSON RPC server", "addr", arbitrumRpcServer.Addr())
 	}
 
-	if cfg.MetricsSvrConfig.Enabled {
+	if cfg.EnabledServersConfig.Metric {
 		log.Info("Starting metrics server", "addr", cfg.MetricsSvrConfig.Host, "port", cfg.MetricsSvrConfig.Port)
 		svr := proxy_metrics.NewServer(registry, cfg.MetricsSvrConfig)
 		err := svr.Start()
@@ -118,6 +130,8 @@ func StartProxyService(cliCtx *cli.Context) error {
 		defer func() {
 			if err := svr.Stop(context.Background()); err != nil {
 				log.Error("failed to stop metrics server", "err", err)
+			} else {
+				log.Info("Successfully shutdown Metrics server")
 			}
 		}()
 		log.Info("started metrics server", "addr", svr.Addr())

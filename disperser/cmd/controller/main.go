@@ -7,12 +7,11 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
+	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -24,7 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
@@ -32,7 +30,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gammazero/workerpool"
 	"github.com/urfave/cli"
 )
@@ -41,8 +38,6 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
-
-	controllerMaxStallDuration = 240 * time.Second
 )
 
 func main() {
@@ -61,8 +56,8 @@ func main() {
 	select {}
 }
 
-func RunController(ctx *cli.Context) error {
-	config, err := NewConfig(ctx)
+func RunController(cliCtx *cli.Context) error {
+	config, err := NewConfig(cliCtx)
 	if err != nil {
 		return err
 	}
@@ -87,8 +82,10 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create geth client: %w", err)
 	}
 
+	ctx := context.Background()
+
 	contractDirectory, err := directory.NewContractDirectory(
-		context.Background(),
+		ctx,
 		logger,
 		gethClient,
 		gethcommon.HexToAddress(config.EigenDAContractDirectoryAddress))
@@ -97,17 +94,17 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	operatorStateRetrieverAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.OperatorStateRetriever)
+		contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
 	if err != nil {
 		return fmt.Errorf("failed to get OperatorStateRetriever address: %w", err)
 	}
 	serviceManagerAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
+		contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
 	if err != nil {
 		return fmt.Errorf("failed to get ServiceManager address: %w", err)
 	}
 	registryCoordinatorAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.RegistryCoordinator)
+		contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
 	if err != nil {
 		return fmt.Errorf("failed to get registry coordinator address: %w", err)
 	}
@@ -154,7 +151,7 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
-	encodingPool := workerpool.New(config.NumConcurrentEncodingRequests)
+	encodingPool := workerpool.New(config.EncodingManagerConfig.NumConcurrentRequests)
 	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		&config.EncodingManagerConfig,
@@ -175,7 +172,7 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create signature aggregator: %v", err)
 	}
-	dispatcherPool := workerpool.New(config.NumConcurrentDispersalRequests)
+	dispatcherPool := workerpool.New(config.DispatcherConfig.NumConcurrentRequests)
 	chainState := eth.NewChainState(chainReader, gethClient)
 	var ics core.IndexedChainState
 	if config.UseGraph {
@@ -184,25 +181,7 @@ func RunController(ctx *cli.Context) error {
 		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
 		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 	} else {
-		logger.Info("Using built-in indexer")
-		rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
-		if err != nil {
-			return err
-		}
-		idx, err := indexer.CreateNewIndexer(
-			&config.IndexerConfig,
-			gethClient,
-			rpcClient,
-			serviceManagerAddress.Hex(),
-			logger,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create indexer: %w", err)
-		}
-		ics, err = indexer.NewIndexedChainState(chainState, idx)
-		if err != nil {
-			return fmt.Errorf("failed to create indexed chain state: %w", err)
-		}
+		return fmt.Errorf("built-in indexer is deprecated and will be removed soon, please use UseGraph=true")
 	}
 
 	var requestSigner clients.DispersalRequestSigner
@@ -210,16 +189,18 @@ func RunController(ctx *cli.Context) error {
 		logger.Warn("StoreChunks() signing is disabled")
 	} else {
 		requestSigner, err = clients.NewDispersalRequestSigner(
-			context.Background(),
-			config.AwsClientConfig.Region,
-			config.AwsClientConfig.EndpointURL,
-			config.DisperserKMSKeyID)
+			ctx,
+			config.DispersalRequestSignerConfig,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create request signer: %v", err)
 		}
 	}
 
-	nodeClientManager, err := controller.NewNodeClientManager(config.NodeClientCacheSize, requestSigner, logger)
+	nodeClientManager, err := controller.NewNodeClientManager(
+		config.DispatcherConfig.NodeClientCacheSize,
+		requestSigner,
+		logger)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
@@ -230,7 +211,7 @@ func RunController(ctx *cli.Context) error {
 	dispatcherBlobSet := controller.NewBlobSet()
 
 	batchMetadataManager, err := metadata.NewBatchMetadataManager(
-		context.Background(),
+		ctx,
 		logger,
 		gethClient,
 		ics,
@@ -260,31 +241,44 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
 	}
 
-	c := context.Background()
-
-	err = controller.RecoverState(c, blobMetadataStore, logger)
+	err = controller.RecoverState(ctx, blobMetadataStore, logger)
 	if err != nil {
 		return fmt.Errorf("failed to recover state: %v", err)
 	}
 
-	err = encodingManager.Start(c)
+	err = encodingManager.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start encoding manager: %v", err)
 	}
 
-	err = dispatcher.Start(c)
+	err = dispatcher.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
 
 	if config.ServerConfig.EnableServer {
-		var paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
+		logger.Info("Controller gRPC server ENABLED", "port", config.ServerConfig.GrpcPort)
+		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
 		if config.ServerConfig.EnablePaymentAuthentication {
-			paymentAuthorizationHandler = payments.NewPaymentAuthorizationHandler()
+			logger.Info("Payment authentication ENABLED - building payment authorization handler")
+			paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
+				ctx,
+				logger,
+				config.PaymentAuthorizationConfig,
+				contractDirectory,
+				gethClient,
+				dynamoClient.GetAwsClient(),
+				metricsRegistry,
+			)
+			if err != nil {
+				return fmt.Errorf("build payment authorization handler: %w", err)
+			}
+		} else {
+			logger.Warn("Payment authentication DISABLED - payment requests will fail")
 		}
 
 		grpcServer, err := server.NewServer(
-			c,
+			ctx,
 			config.ServerConfig,
 			logger,
 			metricsRegistry,
@@ -315,20 +309,15 @@ func RunController(ctx *cli.Context) error {
 		logger.Warn("Failed to create readiness file", "error", err, "path", config.ControllerReadinessProbePath)
 	}
 
-	if _, err := os.Create(config.ControllerHealthProbePath); err != nil {
-		logger.Warn("Failed to create healthProbe file: %v", err)
-	}
-
 	// Start heartbeat monitor
 	go func() {
-		err := healthcheck.HeartbeatMonitor(
-			config.ControllerHealthProbePath,
-			controllerMaxStallDuration,
-			controllerLivenessChan,
+		err := healthcheck.NewHeartbeatMonitor(
 			logger,
+			controllerLivenessChan,
+			config.HeartbeatMonitorConfig,
 		)
 		if err != nil {
-			logger.Warn("Heartbeat monitor exited with error", "err", err)
+			logger.Warn("Heartbeat monitor failed", "err", err)
 		}
 	}()
 

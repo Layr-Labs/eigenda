@@ -2,11 +2,12 @@ package codecs
 
 import (
 	"fmt"
-	"math"
+	gomath "math"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v1/fft"
+	"github.com/Layr-Labs/eigenda/encoding/v1/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -16,13 +17,13 @@ func FFT(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("error converting data to fr.Element: %w", err)
 	}
 	dataFrLen := uint64(len(dataFr))
-	dataFrLenPow2 := encoding.NextPowerOf2(dataFrLen)
+	dataFrLenPow2 := math.NextPowOf2u64(dataFrLen)
 
 	if dataFrLenPow2 != dataFrLen {
 		return nil, fmt.Errorf("data length %d is not a power of 2", dataFrLen)
 	}
 
-	maxScale := uint8(math.Log2(float64(dataFrLenPow2)))
+	maxScale := uint8(gomath.Log2(float64(dataFrLenPow2)))
 
 	fs := fft.NewFFTSettings(maxScale)
 
@@ -43,7 +44,7 @@ func IFFT(data []byte) ([]byte, error) {
 	}
 
 	dataFrLen := len(dataFr)
-	dataFrLenPow2 := encoding.NextPowerOf2(uint64(dataFrLen))
+	dataFrLenPow2 := math.NextPowOf2u64(uint64(dataFrLen))
 
 	// expand data to the next power of 2
 	paddedDataFr := make([]fr.Element, dataFrLenPow2)
@@ -55,7 +56,7 @@ func IFFT(data []byte) ([]byte, error) {
 		}
 	}
 
-	maxScale := uint8(math.Log2(float64(dataFrLenPow2)))
+	maxScale := uint8(gomath.Log2(float64(dataFrLenPow2)))
 
 	// perform IFFT
 	fs := fft.NewFFTSettings(maxScale)

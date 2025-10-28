@@ -4,41 +4,57 @@ import (
 	"context"
 	"flag"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/node/plugin"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
-func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
-	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
-}
-
 var (
-	templateName string
-	testName     string
-
-	logger = testutils.GetLogger()
+	logger = test.GetLogger()
 
 	// Shared test resources
 	anvilContainer *testbed.AnvilContainer
-	testConfig     *deploy.Config
+	deployResult   *testbed.DeploymentResult
+	privateKeys    *testbed.PrivateKeyMaps
+	testOperator   OperatorConfig
 )
+
+// OperatorConfig holds configuration for a test operator
+type OperatorConfig struct {
+	NODE_HOSTNAME                    string
+	NODE_DISPERSAL_PORT              string
+	NODE_RETRIEVAL_PORT              string
+	NODE_V2_DISPERSAL_PORT           string
+	NODE_V2_RETRIEVAL_PORT           string
+	NODE_ECDSA_KEY_FILE              string
+	NODE_BLS_KEY_FILE                string
+	NODE_ECDSA_KEY_PASSWORD          string
+	NODE_BLS_KEY_PASSWORD            string
+	NODE_QUORUM_ID_LIST              string
+	NODE_CHAIN_RPC                   string
+	NODE_EIGENDA_DIRECTORY           string
+	NODE_BLS_OPERATOR_STATE_RETRIVER string
+	NODE_EIGENDA_SERVICE_MANAGER     string
+	NODE_CHURNER_URL                 string
+}
 
 // TestMain sets up the test environment once for all tests
 func TestMain(m *testing.M) {
+	// Parse flags first to initialize the testing framework
 	flag.Parse()
 
 	if testing.Short() {
@@ -51,20 +67,7 @@ func TestMain(m *testing.M) {
 
 func setupAndRun(m *testing.M) {
 	ctx := context.Background()
-	rootPath := "../../../"
 
-	if testName == "" {
-		var err error
-		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
-		if err != nil {
-			logger.Fatal("Failed to create test directory:", err)
-		}
-	}
-
-	testConfig = deploy.NewTestConfig(testName, rootPath)
-	testConfig.Deployers[0].DeploySubgraphs = false
-
-	logger.Info("Starting anvil")
 	var err error
 	anvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
 		ExposeHostPort: true, // This will bind container port 8545 to host port 8545
@@ -74,10 +77,37 @@ func setupAndRun(m *testing.M) {
 		logger.Fatal("Failed to start anvil container:", err)
 	}
 
-	logger.Info("Deploying experiment")
-	if err := testConfig.DeployExperiment(); err != nil {
-		logger.Fatal("Failed to deploy experiment:", err)
+	logger.Info("Loading private keys")
+	privateKeys, err = testbed.LoadPrivateKeys(testbed.LoadPrivateKeysInput{
+		NumOperators: 1,
+		NumRelays:    0,
+	})
+	if err != nil {
+		logger.Fatal("Failed to load private keys:", err)
 	}
+
+	logger.Info("Deploying contracts")
+	// Get deployer key from testbed
+	deployerKey, _ := testbed.GetAnvilDefaultKeys()
+
+	// Deploy contracts using testbed
+	deployConfig := testbed.DeploymentConfig{
+		AnvilRPCURL:      "http://localhost:8545",
+		DeployerKey:      deployerKey,
+		NumOperators:     1,
+		NumRelays:        0,
+		MaxOperatorCount: 10,
+		PrivateKeys:      privateKeys,
+		Logger:           logger,
+	}
+
+	deployResult, err = testbed.DeployEigenDAContracts(deployConfig)
+	if err != nil {
+		logger.Fatal("Failed to deploy contracts:", err)
+	}
+
+	logger.Info("Setting up test operator")
+	setupTestOperator()
 
 	// Run tests
 	code := m.Run()
@@ -97,16 +127,38 @@ func cleanup() {
 	}
 }
 
+func setupTestOperator() {
+	// Create operator configurations using testbed keys
+	opName := "opr0"
+	operator := OperatorConfig{
+		NODE_HOSTNAME:                    "localhost",
+		NODE_DISPERSAL_PORT:              "32003",
+		NODE_RETRIEVAL_PORT:              "32004",
+		NODE_V2_DISPERSAL_PORT:           "32005",
+		NODE_V2_RETRIEVAL_PORT:           "32006",
+		NODE_ECDSA_KEY_FILE:              privateKeys.EcdsaMap[opName].KeyFile,
+		NODE_BLS_KEY_FILE:                privateKeys.BlsMap[opName].KeyFile,
+		NODE_ECDSA_KEY_PASSWORD:          privateKeys.EcdsaMap[opName].Password,
+		NODE_BLS_KEY_PASSWORD:            privateKeys.BlsMap[opName].Password,
+		NODE_QUORUM_ID_LIST:              "0,1",
+		NODE_CHAIN_RPC:                   "http://localhost:8545",
+		NODE_EIGENDA_DIRECTORY:           deployResult.EigenDA.EigenDADirectory,
+		NODE_BLS_OPERATOR_STATE_RETRIVER: deployResult.EigenDA.OperatorStateRetriever,
+		NODE_EIGENDA_SERVICE_MANAGER:     deployResult.EigenDA.ServiceManager,
+		NODE_CHURNER_URL:                 "",
+	}
+	testOperator = operator
+}
+
 func TestPluginOptIn(t *testing.T) {
 	ctx := t.Context()
 
-	operator := testConfig.Operators[0]
-	require.NotEmpty(t, operator.NODE_QUORUM_ID_LIST)
+	require.NotEmpty(t, testOperator.NODE_QUORUM_ID_LIST)
 
-	testConfig.RunNodePluginBinary("opt-out", operator)
+	runNodePlugin(t, "opt-out", testOperator)
 
-	tx := getTransactor(t, operator)
-	operatorID := getOperatorId(t, operator)
+	tx := getTransactor(t, testOperator)
+	operatorID := getOperatorId(t, testOperator)
 
 	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
@@ -116,7 +168,7 @@ func TestPluginOptIn(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint32(0), ids)
 
-	testConfig.RunNodePluginBinary("opt-in", operator)
+	runNodePlugin(t, "opt-in", testOperator)
 
 	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
@@ -130,15 +182,14 @@ func TestPluginOptIn(t *testing.T) {
 func TestPluginOptInAndOptOut(t *testing.T) {
 	ctx := t.Context()
 
-	operator := testConfig.Operators[0]
-	require.NotEmpty(t, operator.NODE_QUORUM_ID_LIST)
+	require.NotEmpty(t, testOperator.NODE_QUORUM_ID_LIST)
 
-	testConfig.RunNodePluginBinary("opt-out", operator)
+	runNodePlugin(t, "opt-out", testOperator)
 
-	tx := getTransactor(t, operator)
-	operatorID := getOperatorId(t, operator)
+	tx := getTransactor(t, testOperator)
+	operatorID := getOperatorId(t, testOperator)
 
-	testConfig.RunNodePluginBinary("opt-in", operator)
+	runNodePlugin(t, "opt-in", testOperator)
 	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(registeredQuorumIds))
@@ -146,7 +197,7 @@ func TestPluginOptInAndOptOut(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint32(1), ids)
 
-	testConfig.RunNodePluginBinary("opt-out", operator)
+	runNodePlugin(t, "opt-out", testOperator)
 
 	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
@@ -160,15 +211,14 @@ func TestPluginOptInAndOptOut(t *testing.T) {
 func TestPluginOptInAndQuorumUpdate(t *testing.T) {
 	ctx := t.Context()
 
-	operator := testConfig.Operators[0]
-	require.Equal(t, "0,1", operator.NODE_QUORUM_ID_LIST)
+	require.Equal(t, "0,1", testOperator.NODE_QUORUM_ID_LIST)
 
-	testConfig.RunNodePluginBinary("opt-out", operator)
+	runNodePlugin(t, "opt-out", testOperator)
 
-	tx := getTransactor(t, operator)
-	operatorID := getOperatorId(t, operator)
+	tx := getTransactor(t, testOperator)
+	operatorID := getOperatorId(t, testOperator)
 
-	testConfig.RunNodePluginBinary("opt-in", operator)
+	runNodePlugin(t, "opt-in", testOperator)
 
 	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
@@ -183,13 +233,12 @@ func TestPluginOptInAndQuorumUpdate(t *testing.T) {
 func TestPluginInvalidOperation(t *testing.T) {
 	ctx := t.Context()
 
-	operator := testConfig.Operators[0]
-	require.Equal(t, "0,1", operator.NODE_QUORUM_ID_LIST)
+	require.Equal(t, "0,1", testOperator.NODE_QUORUM_ID_LIST)
 
-	testConfig.RunNodePluginBinary("opt-out", operator)
+	runNodePlugin(t, "opt-out", testOperator)
 
-	tx := getTransactor(t, operator)
-	operatorID := getOperatorId(t, operator)
+	tx := getTransactor(t, testOperator)
+	operatorID := getOperatorId(t, testOperator)
 
 	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
@@ -199,7 +248,7 @@ func TestPluginInvalidOperation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint32(0), ids)
 
-	testConfig.RunNodePluginBinary("invalid", operator)
+	runNodePlugin(t, "invalid", testOperator)
 
 	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
@@ -210,14 +259,12 @@ func TestPluginInvalidOperation(t *testing.T) {
 	require.Equal(t, uint32(0), ids)
 }
 
-func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
+func getOperatorId(t *testing.T, operator OperatorConfig) [32]byte {
 	t.Helper()
 
 	_, privateKey, err := plugin.GetECDSAPrivateKey(operator.NODE_ECDSA_KEY_FILE, operator.NODE_ECDSA_KEY_PASSWORD)
 	require.NoError(t, err)
 	require.NotNil(t, privateKey)
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
 	require.NoError(t, err)
 
 	ethConfig := geth.EthClientConfig{
@@ -229,8 +276,16 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
+	contractDirectory, err := directory.NewContractDirectory(
+		t.Context(), logger, client, gethcommon.HexToAddress(operator.NODE_EIGENDA_DIRECTORY))
+	require.NoError(t, err)
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(t.Context(), directory.OperatorStateRetriever)
+	require.NoError(t, err)
+	serviceManagerAddr, err := contractDirectory.GetContractAddress(t.Context(), directory.ServiceManager)
+	require.NoError(t, err)
+
 	transactor, err := eth.NewWriter(
-		logger, client, operator.NODE_BLS_OPERATOR_STATE_RETRIVER, operator.NODE_EIGENDA_SERVICE_MANAGER)
+		logger, client, operatorStateRetrieverAddr.Hex(), serviceManagerAddr.Hex())
 	require.NoError(t, err)
 	require.NotNil(t, transactor)
 
@@ -248,14 +303,12 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	return keyPair.GetPubKeyG1().GetOperatorID()
 }
 
-func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Writer {
+func getTransactor(t *testing.T, operator OperatorConfig) *eth.Writer {
 	t.Helper()
 
-	hexPk := strings.TrimPrefix(testConfig.Pks.EcdsaMap[testConfig.Deployers[0].Name].PrivateKey, "0x")
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
-	require.NoError(t, err)
-
+	// Use deployer key from testbed
+	deployerKey, _ := testbed.GetAnvilDefaultKeys()
+	hexPk := strings.TrimPrefix(deployerKey, "0x")
 	ethConfig := geth.EthClientConfig{
 		RPCURLs:          []string{operator.NODE_CHAIN_RPC},
 		PrivateKeyString: hexPk,
@@ -266,10 +319,62 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Writer {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
+	contractDirectory, err := directory.NewContractDirectory(
+		t.Context(), logger, client, gethcommon.HexToAddress(operator.NODE_EIGENDA_DIRECTORY))
+	require.NoError(t, err)
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(t.Context(), directory.OperatorStateRetriever)
+	require.NoError(t, err)
+	serviceManagerAddr, err := contractDirectory.GetContractAddress(t.Context(), directory.ServiceManager)
+	require.NoError(t, err)
+
 	transactor, err := eth.NewWriter(
-		logger, client, operator.NODE_BLS_OPERATOR_STATE_RETRIVER, operator.NODE_EIGENDA_SERVICE_MANAGER)
+		logger, client, operatorStateRetrieverAddr.Hex(), serviceManagerAddr.Hex())
 	require.NoError(t, err)
 	require.NotNil(t, transactor)
 
 	return transactor
+}
+
+// runNodePlugin runs the node plugin directly using go run
+func runNodePlugin(t *testing.T, operation string, operator OperatorConfig) {
+	t.Helper()
+
+	ctx := t.Context()
+	socket := string(core.MakeOperatorSocket(
+		operator.NODE_HOSTNAME,
+		operator.NODE_DISPERSAL_PORT,
+		operator.NODE_RETRIEVAL_PORT,
+		operator.NODE_V2_DISPERSAL_PORT,
+		operator.NODE_V2_RETRIEVAL_PORT,
+	))
+
+	// Get the path to the node plugin cmd directory relative to this file
+	_, filename, _, _ := runtime.Caller(0)
+	testDir := filepath.Dir(filename)
+	rootDir := filepath.Join(testDir, "..", "..", "..")
+	pluginCmdPath := filepath.Join(rootDir, "node", "plugin", "cmd")
+
+	// Run the plugin directly with go run
+	cmd := exec.CommandContext(ctx, "go", "run", pluginCmdPath,
+		"--operation", operation,
+		"--ecdsa-key-file", operator.NODE_ECDSA_KEY_FILE,
+		"--bls-key-file", operator.NODE_BLS_KEY_FILE,
+		"--ecdsa-key-password", operator.NODE_ECDSA_KEY_PASSWORD,
+		"--bls-key-password", operator.NODE_BLS_KEY_PASSWORD,
+		"--socket", socket,
+		"--quorum-id-list", operator.NODE_QUORUM_ID_LIST,
+		"--chain-rpc", operator.NODE_CHAIN_RPC,
+		"--eigenda-directory", operator.NODE_EIGENDA_DIRECTORY,
+		"--churner-url", operator.NODE_CHURNER_URL,
+		"--num-confirmations", "0",
+	)
+
+	logger.Info("Running node plugin", "operation", operation)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Fatalf("failed to run node plugin: %v, output: %s", err, string(output))
+	}
+
+	logger.Info("Node plugin executed successfully", "output", string(output))
 }

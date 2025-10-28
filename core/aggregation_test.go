@@ -7,11 +7,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -30,7 +31,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	logger := testutils.GetLogger()
+	logger := test.GetLogger()
 	transactor := &mock.MockWriter{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err = core.NewStdSignatureAggregator(logger, transactor)
@@ -43,7 +44,6 @@ func TestMain(m *testing.M) {
 }
 
 func simulateOperators(state mock.PrivateOperatorState, message [32]byte, update chan core.SigningMessage, advCount uint) {
-
 	count := 0
 
 	// Simulate the operators signing the message.
@@ -72,7 +72,6 @@ func simulateOperators(state mock.PrivateOperatorState, message [32]byte, update
 }
 
 func TestAggregateSignaturesStatus(t *testing.T) {
-
 	tests := []struct {
 		name           string
 		quorums        []core.QuorumResult
@@ -152,7 +151,8 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := dat.GetTotalOperatorStateWithQuorums(context.Background(), 0, []core.QuorumID{0, 1})
+			ctx := t.Context()
+			state := dat.GetTotalOperatorStateWithQuorums(ctx, 0, []core.QuorumID{0, 1})
 
 			update := make(chan core.SigningMessage)
 			message := [32]byte{1, 2, 3, 4, 5, 6}
@@ -172,8 +172,8 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 			}
 
 			aq, err := agg.ReceiveSignatures(
-				context.Background(),
-				context.Background(),
+				ctx,
+				ctx,
 				state.IndexedOperatorState,
 				message,
 				update)
@@ -194,7 +194,10 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 				}
 			}
 
-			sigAgg, err := agg.AggregateSignatures(context.Background(), dat, 0, aq, quorumIDs)
+			indexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorumIDs)
+			require.NoError(t, err)
+
+			sigAgg, err := agg.AggregateSignatures(indexedOperatorState, aq, quorumIDs)
 			assert.NoError(t, err)
 
 			for i, quorum := range tt.quorums {
@@ -210,7 +213,9 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 }
 
 func TestSortNonsigners(t *testing.T) {
-	state := dat.GetTotalOperatorState(context.Background(), 0)
+	ctx := t.Context()
+
+	state := dat.GetTotalOperatorState(ctx, 0)
 
 	update := make(chan core.SigningMessage)
 	message := [32]byte{1, 2, 3, 4, 5, 6}
@@ -220,13 +225,17 @@ func TestSortNonsigners(t *testing.T) {
 	quorums := []core.QuorumID{0}
 
 	aq, err := agg.ReceiveSignatures(
-		context.Background(),
-		context.Background(),
+		ctx,
+		ctx,
 		state.IndexedOperatorState,
 		message,
 		update)
 	assert.NoError(t, err)
-	sigAgg, err := agg.AggregateSignatures(context.Background(), dat, 0, aq, quorums)
+
+	indexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorums)
+	require.NoError(t, err)
+
+	sigAgg, err := agg.AggregateSignatures(indexedOperatorState, aq, quorums)
 	assert.NoError(t, err)
 
 	for i := range sigAgg.NonSigners {
@@ -242,8 +251,10 @@ func TestSortNonsigners(t *testing.T) {
 }
 
 func TestFilterQuorums(t *testing.T) {
+	ctx := t.Context()
+
 	allQuorums := []core.QuorumID{0, 1}
-	state := dat.GetTotalOperatorStateWithQuorums(context.Background(), 0, allQuorums)
+	state := dat.GetTotalOperatorStateWithQuorums(ctx, 0, allQuorums)
 
 	update := make(chan core.SigningMessage)
 	message := [32]byte{1, 2, 3, 4, 5, 6}
@@ -288,7 +299,11 @@ func TestFilterQuorums(t *testing.T) {
 
 	// Only consider quorum 0
 	quorums := []core.QuorumID{0}
-	sigAgg, err := agg.AggregateSignatures(context.Background(), dat, 0, aq, quorums)
+
+	indexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorums)
+	require.NoError(t, err)
+
+	sigAgg, err := agg.AggregateSignatures(indexedOperatorState, aq, quorums)
 	assert.NoError(t, err)
 	assert.Len(t, sigAgg.NonSigners, 4)
 	assert.ElementsMatch(t, sigAgg.NonSigners, []*core.G1Point{
@@ -318,7 +333,11 @@ func TestFilterQuorums(t *testing.T) {
 
 	// Only consider quorum 1
 	quorums = []core.QuorumID{1}
-	sigAgg, err = agg.AggregateSignatures(context.Background(), dat, 0, aq, quorums)
+
+	indexedOperatorState, err = dat.GetIndexedOperatorState(ctx, 0, quorums)
+	require.NoError(t, err)
+
+	sigAgg, err = agg.AggregateSignatures(indexedOperatorState, aq, quorums)
 	assert.NoError(t, err)
 	assert.Len(t, sigAgg.NonSigners, 1)
 	assert.ElementsMatch(t, sigAgg.NonSigners, []*core.G1Point{

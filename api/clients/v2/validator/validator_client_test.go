@@ -12,22 +12,20 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/gammazero/workerpool"
-	"github.com/stretchr/testify/require"
-
+	"github.com/Layr-Labs/eigenda/test"
+	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-
-	coremock "github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/gammazero/workerpool"
+	"github.com/stretchr/testify/require"
 )
 
 var (
+	logger     = test.GetLogger()
 	blobParams = &core.BlobVersionParameters{
 		NumChunks:       8192,
 		CodingRate:      8,
@@ -36,6 +34,7 @@ var (
 )
 
 func MakeRandomAssignment(t *testing.T, rand *testrandom.TestRandom, validatorCount int32, quorumID core.QuorumID) map[core.OperatorID]v2.Assignment {
+	ctx := t.Context()
 
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
 		quorumID: {},
@@ -50,7 +49,7 @@ func MakeRandomAssignment(t *testing.T, rand *testrandom.TestRandom, validatorCo
 		t.Fatal(err)
 	}
 
-	state := dat.GetTotalOperatorState(context.Background(), 0)
+	state := dat.GetTotalOperatorState(ctx, 0)
 
 	assignments, err := v2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{quorumID})
 	require.NoError(t, err)
@@ -59,11 +58,9 @@ func MakeRandomAssignment(t *testing.T, rand *testrandom.TestRandom, validatorCo
 }
 
 func TestBasicWorkflow(t *testing.T) {
+	ctx := t.Context()
 	rand := testrandom.NewTestRandom()
 	start := rand.Time()
-
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
 
 	fakeClock := atomic.Pointer[time.Time]{}
 	fakeClock.Store(&start)
@@ -199,7 +196,7 @@ func TestBasicWorkflow(t *testing.T) {
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
-		indices []uint,
+		indices []encoding.ChunkNumber,
 		encodingParams *encoding.EncodingParams,
 		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
@@ -233,7 +230,7 @@ func TestBasicWorkflow(t *testing.T) {
 	}
 
 	worker, err := newRetrievalWorker(
-		context.Background(),
+		ctx,
 		logger,
 		config,
 		connectionPool,
@@ -268,11 +265,9 @@ func TestBasicWorkflow(t *testing.T) {
 }
 
 func TestDownloadTimeout(t *testing.T) {
+	ctx := t.Context()
 	rand := testrandom.NewTestRandom()
 	start := rand.Time()
-
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
 
 	fakeClock := atomic.Pointer[time.Time]{}
 	fakeClock.Store(&start)
@@ -419,7 +414,7 @@ func TestDownloadTimeout(t *testing.T) {
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
-		indices []uint,
+		indices []encoding.ChunkNumber,
 		encodingParams *encoding.EncodingParams,
 		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
@@ -453,7 +448,7 @@ func TestDownloadTimeout(t *testing.T) {
 	}
 
 	worker, err := newRetrievalWorker(
-		context.Background(),
+		ctx,
 		logger,
 		config,
 		connectionPool,
@@ -482,7 +477,7 @@ func TestDownloadTimeout(t *testing.T) {
 	pessimisticDownloadThreshold := uint32(math.Ceil(float64(minimumChunkCount) * config.DownloadPessimism))
 
 	// Wait until we've scheduled all the downloads.
-	testutils.AssertEventuallyTrue(
+	test.AssertEventuallyTrue(
 		t,
 		func() bool {
 			return chunksDownloadedCount.Load() >= pessimisticDownloadThreshold
@@ -497,7 +492,7 @@ func TestDownloadTimeout(t *testing.T) {
 	fakeClock.Store(&newTime)
 
 	// Wait until we've scheduled the additional downloads.
-	testutils.AssertEventuallyTrue(
+	test.AssertEventuallyTrue(
 		t,
 		func() bool {
 			return chunksDownloadedCount.Load()-initialDownloadsScheduled >= pessimisticDownloadThreshold
@@ -515,7 +510,7 @@ func TestDownloadTimeout(t *testing.T) {
 	}
 
 	// Wait for the blob to be downloaded.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	select {
 	case <-downloadFinishedChan:
@@ -532,11 +527,9 @@ func TestDownloadTimeout(t *testing.T) {
 }
 
 func TestFailedVerification(t *testing.T) {
+	ctx := t.Context()
 	rand := testrandom.NewTestRandom()
 	start := rand.Time()
-
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
 
 	fakeClock := atomic.Pointer[time.Time]{}
 	fakeClock.Store(&start)
@@ -680,7 +673,7 @@ func TestFailedVerification(t *testing.T) {
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
-		indices []uint,
+		indices []encoding.ChunkNumber,
 		encodingParams *encoding.EncodingParams,
 		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
@@ -714,7 +707,7 @@ func TestFailedVerification(t *testing.T) {
 	}
 
 	worker, err := newRetrievalWorker(
-		context.Background(),
+		ctx,
 		logger,
 		config,
 		connectionPool,

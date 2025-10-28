@@ -7,7 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -56,7 +56,7 @@ func (c *chunkWriter) PutFrameProofs(ctx context.Context, blobKey corev2.BlobKey
 		return fmt.Errorf("no proofs to upload")
 	}
 
-	bytes, err := rs.SerializeFrameProofs(proofs)
+	bytes, err := encoding.SerializeFrameProofs(proofs)
 	if err != nil {
 		c.logger.Error("Failed to encode proofs", "err", err)
 		return fmt.Errorf("failed to encode proofs: %v", err)
