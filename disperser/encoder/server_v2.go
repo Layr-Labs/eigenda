@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -206,8 +207,13 @@ func (s *EncoderServerV2) pushBacklogLimiter(blobSizeBytes int) error {
 		s.logger.Warn("rate limiting as request queue is full",
 			"requestQueueSize", s.config.RequestQueueSize,
 			"maxConcurrentRequests", s.config.MaxConcurrentRequests)
-		return api.NewErrorResourceExhausted(fmt.Sprintf(
-			"request queue is full, max queue size: %d", s.config.RequestQueueSize))
+		return api.NewErrorResourceExhaustedWithRateLimitDetails(
+			fmt.Sprintf("request queue is full, max queue size: %d", s.config.RequestQueueSize),
+			commonpb.RateLimitType_REQUEST_QUEUE_FULL,
+			0,  // No specific quorum
+			30, // Default retry after 30 seconds
+			fmt.Sprintf("Request queue is full with %d requests", s.config.RequestQueueSize),
+		)
 	}
 }
 
