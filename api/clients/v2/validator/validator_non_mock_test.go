@@ -3,6 +3,7 @@ package validator
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"math"
 	"runtime"
 	"sync"
@@ -12,36 +13,39 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/common"
-	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
+	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var duplicatedIndex uint32 = 1
+var (
+	duplicatedIndex uint32 = 1
+)
 
 // TestNonMockedValidatorClientWorkflow tests validator client retrieval using real KZG prover and verifier
 // This creates actual encoded blobs with proper KZG commitments, rather than using mocked components
 func TestNonMockedValidatorClientWorkflow(t *testing.T) {
-	// Set up KZG components (prover and verifier)
-	p, v, err := makeTestEncodingComponents()
+	ctx := t.Context()
+
+	// Set up KZG components (prover, committer and verifier)
+	p, c, v, err := makeTestEncodingComponents()
 	require.NoError(t, err)
+	encoder := rs.NewEncoder(logger, nil)
 
 	// Set up test environment
 	rand := testrandom.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
 	config := DefaultClientConfig()
 	config.ControlLoopPeriod = 50 * time.Microsecond
 
@@ -61,7 +65,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// Create blob and get commitments
 	blobVersion := v2.BlobVersion(0)
-	blobHeader, data := makeTestBlob(t, p, blobVersion, 2, quorumNumbers)
+	blobHeader, data := makeTestBlob(t, c, blobVersion, 2, quorumNumbers)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
 
@@ -79,7 +83,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// Prepare blobs with real encoding
 	// This creates actual sharded blobs for each operator with valid KZG proofs
-	operatorState, err := dat.GetOperatorState(context.Background(), 0, quorumNumbers)
+	operatorState, err := dat.GetOperatorState(ctx, 0, quorumNumbers)
 	require.NoError(t, err)
 
 	// Get encoding parameters
@@ -96,8 +100,8 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 		assignments[opID] = assignment
 	}
 
-	// Create the actual blob chunks using the prover
-	chunks, err := p.GetFrames(data, encodingParams)
+	// Create the actual blob frames using the prover
+	frames, _, err := p.GetFrames(data, encodingParams)
 	require.NoError(t, err)
 
 	// Store chunks by operator
@@ -105,7 +109,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	for opID, assignment := range assignments {
 		operatorChunks[opID] = make([]*encoding.Frame, assignment.NumChunks())
 		for i := uint32(0); i < assignment.NumChunks(); i++ {
-			operatorChunks[opID][i] = chunks[assignment.Indices[i]]
+			operatorChunks[opID][i] = frames[assignment.Indices[i]]
 		}
 	}
 
@@ -142,16 +146,17 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// We're using the real deserializer and decoder, but tracking frame counts
 	originalChunkDeserializerFactory := config.UnsafeChunkDeserializerFactory
-	config.UnsafeChunkDeserializerFactory = func(assignments map[core.OperatorID]v2.Assignment, verifier encoding.Verifier) internal.ChunkDeserializer {
-		realDeserializer := originalChunkDeserializerFactory(assignments, verifier)
-		return &instrumentedChunkDeserializer{
-			ChunkDeserializer: realDeserializer,
+	config.UnsafeChunkDeserializerFactory =
+		func(assignments map[core.OperatorID]v2.Assignment, verifier *verifier.Verifier) internal.ChunkDeserializer {
+			realDeserializer := originalChunkDeserializerFactory(assignments, verifier)
+			return &instrumentedChunkDeserializer{
+				ChunkDeserializer: realDeserializer,
+			}
 		}
-	}
 
 	originalBlobDecoderFactory := config.UnsafeBlobDecoderFactory
-	config.UnsafeBlobDecoderFactory = func(verifier encoding.Verifier) internal.BlobDecoder {
-		realDecoder := originalBlobDecoderFactory(verifier)
+	config.UnsafeBlobDecoderFactory = func(encoder *rs.Encoder) internal.BlobDecoder {
+		realDecoder := originalBlobDecoderFactory(encoder)
 		return &instrumentedBlobDecoder{
 			t:                         t,
 			BlobDecoder:               realDecoder,
@@ -162,14 +167,14 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// Create a worker with all the real components
 	worker, err := newRetrievalWorker(
-		context.Background(),
+		ctx,
 		logger,
 		config,
 		connectionPool,
 		computePool,
 		grpcManager,
 		config.UnsafeChunkDeserializerFactory(assignments, v),
-		config.UnsafeBlobDecoderFactory(v),
+		config.UnsafeBlobDecoderFactory(encoder),
 		assignments,
 		minimumChunkCount,
 		&encodingParams,
@@ -204,33 +209,42 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	require.GreaterOrEqual(t, maxToVerify, framesSentToDecodingCount.Load())
 }
 
-// makeTestEncodingComponents makes a prover and verifier for KZG
-func makeTestEncodingComponents() (encoding.Prover, encoding.Verifier, error) {
-	config := &kzg.KzgConfig{
-		G1Path:          "../../../../resources/srs/g1.point",
-		G2Path:          "../../../../resources/srs/g2.point",
-		CacheDir:        "../../../../resources/srs/SRSTables",
-		SRSOrder:        8192,
+// makeTestEncodingComponents makes a KZG prover, committer and verifier
+func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
+	c, err := committer.NewFromConfig(committer.Config{
+		SRSNumberToLoad:   8192,
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("new committer from config: %w", err)
+	}
+
+	proverConfig := &prover.KzgConfig{
 		SRSNumberToLoad: 8192,
+		G1Path:          "../../../../resources/srs/g1.point",
+		PreloadEncoder:  false,
+		CacheDir:        "../../../../resources/srs/SRSTables",
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
 	}
-
-	p, err := prover.NewProver(config, nil)
+	p, err := prover.NewProver(logger, proverConfig, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	v, err := verifier.NewVerifier(config, nil)
+	v, err := verifier.NewVerifier(verifier.ConfigFromProverV2Config(proverConfig))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, fmt.Errorf("new verifier: %w", err)
 	}
 
-	return p, v, nil
+	return p, c, v, nil
 }
 
 // makeTestBlob creates a test blob with valid commitments
-func makeTestBlob(t *testing.T, p encoding.Prover, version v2.BlobVersion, length int, quorums []core.QuorumID) (*v2.BlobHeaderWithHashedPayment, []byte) {
+func makeTestBlob(
+	t *testing.T, c *committer.Committer, version v2.BlobVersion, length int, quorums []core.QuorumID,
+) (*v2.BlobHeaderWithHashedPayment, []byte) {
 	data := make([]byte, length*31)
 	_, err := rand.Read(data)
 	if err != nil {
@@ -239,7 +253,7 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version v2.BlobVersion, lengt
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,7 +331,7 @@ type instrumentedBlobDecoder struct {
 func (d *instrumentedBlobDecoder) DecodeBlob(
 	blobKey v2.BlobKey,
 	chunks []*encoding.Frame,
-	indices []uint,
+	indices []encoding.ChunkNumber,
 	encodingParams *encoding.EncodingParams,
 	blobCommitments *encoding.BlobCommitments,
 ) ([]byte, error) {
@@ -335,7 +349,7 @@ func (d *instrumentedBlobDecoder) DecodeBlob(
 	// Count the number of times the duplicated index was sent to decoding
 	duplicatedIndexCount := 0
 	for _, i := range indices {
-		if i == uint(duplicatedIndex) {
+		if i == encoding.ChunkNumber(duplicatedIndex) {
 			duplicatedIndexCount++
 		}
 	}

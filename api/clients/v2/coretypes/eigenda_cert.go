@@ -217,8 +217,7 @@ func (c *EigenDACertV3) isEigenDACert() {}
 
 // This struct represents the composition of an EigenDA V2 certificate
 // NOTE: This type is hardforked from the V3 type and will no longer
-//
-//	be supported for dispersals after the CertV3 hardfork
+// be supported for dispersals after the CertV3 hardfork
 type EigenDACertV2 struct {
 	BlobInclusionInfo           contractEigenDACertVerifierV2.EigenDATypesV2BlobInclusionInfo
 	BatchHeader                 contractEigenDACertVerifierV2.EigenDATypesV2BatchHeaderV2

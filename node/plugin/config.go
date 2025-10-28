@@ -112,19 +112,6 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "CHAIN_RPC"),
 	}
-	OperatorStateRetrieverFlag = cli.StringFlag{
-		Name: "bls-operator-state-retriever",
-		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
-			"Note that the contract no longer uses the BLS prefix.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
-	}
-	EigenDAServiceManagerFlag = cli.StringFlag{
-		Name:     "eigenda-service-manager",
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
-	}
 	EigenDADirectoryFlag = cli.StringFlag{
 		Name:     "eigenda-directory",
 		Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain.",
@@ -144,27 +131,42 @@ var (
 		Value:    3,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "NUM_CONFIRMATIONS"),
 	}
+
+	// Deprecated flags, kept around just to give meaningful error msgs
+	DeprecatedOperatorStateRetrieverFlag = cli.StringFlag{
+		Name: "bls-operator-state-retriever",
+		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
+			"Note that the contract no longer uses the BLS prefix.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
+		Hidden:   true,
+	}
+	DeprecatedEigenDAServiceManagerFlag = cli.StringFlag{
+		Name:     "eigenda-service-manager",
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
+		Hidden:   true,
+	}
 )
 
 type Config struct {
-	PubIPProvider              string
-	Operation                  string
-	EcdsaKeyFile               string
-	BlsKeyFile                 string
-	EcdsaKeyPassword           string
-	BlsKeyPassword             string
-	BLSRemoteSignerUrl         string
-	BLSPublicKeyHex            string
-	BLSSignerCertFile          string
-	Socket                     string
-	QuorumIDList               []core.QuorumID
-	ChainRpcUrl                string
-	EigenDADirectory           string
-	OperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr  string
-	ChurnerUrl                 string
-	NumConfirmations           int
-	BLSSignerAPIKey            string
+	PubIPProvider      string
+	Operation          string
+	EcdsaKeyFile       string
+	BlsKeyFile         string
+	EcdsaKeyPassword   string
+	BlsKeyPassword     string
+	BLSRemoteSignerUrl string
+	BLSPublicKeyHex    string
+	BLSSignerCertFile  string
+	Socket             string
+	QuorumIDList       []core.QuorumID
+	ChainRpcUrl        string
+	EigenDADirectory   string
+	ChurnerUrl         string
+	NumConfirmations   int
+	BLSSignerAPIKey    string
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -189,24 +191,33 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, errors.New("unsupported operation type")
 	}
 
+	if ctx.GlobalString(DeprecatedOperatorStateRetrieverFlag.Name) != "" {
+		return nil, errors.New("the operator-state-retriever flag is deprecated. " +
+			"Please use the eigenda-directory flag instead. " +
+			"See https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses for the directory address")
+	}
+	if ctx.GlobalString(DeprecatedEigenDAServiceManagerFlag.Name) != "" {
+		return nil, errors.New("the eigenda-service-manager flag is deprecated. " +
+			"Please use the eigenda-directory flag instead. " +
+			"See https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses for the directory address")
+	}
+
 	return &Config{
-		PubIPProvider:              ctx.GlobalString(PubIPProviderFlag.Name),
-		Operation:                  op,
-		EcdsaKeyPassword:           ctx.GlobalString(EcdsaKeyPasswordFlag.Name),
-		BlsKeyPassword:             ctx.GlobalString(BlsKeyPasswordFlag.Name),
-		EcdsaKeyFile:               ctx.GlobalString(EcdsaKeyFileFlag.Name),
-		BlsKeyFile:                 ctx.GlobalString(BlsKeyFileFlag.Name),
-		BLSRemoteSignerUrl:         ctx.GlobalString(BLSRemoteSignerUrlFlag.Name),
-		BLSPublicKeyHex:            ctx.GlobalString(BLSPublicKeyHexFlag.Name),
-		BLSSignerCertFile:          ctx.GlobalString(BLSSignerCertFileFlag.Name),
-		Socket:                     ctx.GlobalString(SocketFlag.Name),
-		QuorumIDList:               ids,
-		ChainRpcUrl:                ctx.GlobalString(ChainRpcUrlFlag.Name),
-		EigenDADirectory:           ctx.GlobalString(EigenDADirectoryFlag.Name),
-		OperatorStateRetrieverAddr: ctx.GlobalString(OperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:  ctx.GlobalString(EigenDAServiceManagerFlag.Name),
-		ChurnerUrl:                 ctx.GlobalString(ChurnerUrlFlag.Name),
-		NumConfirmations:           ctx.GlobalInt(NumConfirmationsFlag.Name),
-		BLSSignerAPIKey:            ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
+		PubIPProvider:      ctx.GlobalString(PubIPProviderFlag.Name),
+		Operation:          op,
+		EcdsaKeyPassword:   ctx.GlobalString(EcdsaKeyPasswordFlag.Name),
+		BlsKeyPassword:     ctx.GlobalString(BlsKeyPasswordFlag.Name),
+		EcdsaKeyFile:       ctx.GlobalString(EcdsaKeyFileFlag.Name),
+		BlsKeyFile:         ctx.GlobalString(BlsKeyFileFlag.Name),
+		BLSRemoteSignerUrl: ctx.GlobalString(BLSRemoteSignerUrlFlag.Name),
+		BLSPublicKeyHex:    ctx.GlobalString(BLSPublicKeyHexFlag.Name),
+		BLSSignerCertFile:  ctx.GlobalString(BLSSignerCertFileFlag.Name),
+		Socket:             ctx.GlobalString(SocketFlag.Name),
+		QuorumIDList:       ids,
+		ChainRpcUrl:        ctx.GlobalString(ChainRpcUrlFlag.Name),
+		EigenDADirectory:   ctx.GlobalString(EigenDADirectoryFlag.Name),
+		ChurnerUrl:         ctx.GlobalString(ChurnerUrlFlag.Name),
+		NumConfirmations:   ctx.GlobalInt(NumConfirmationsFlag.Name),
+		BLSSignerAPIKey:    ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
 	}, nil
 }

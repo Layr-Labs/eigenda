@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"reflect"
 	"runtime"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
@@ -38,25 +40,75 @@ type Server struct {
 	ratelimiter common.RateLimiter
 
 	mu *sync.Mutex
+
+	// Version of the software.
+	softwareVersion *version.Semver
+
+	// Pre-created listeners for the gRPC servers
+	dispersalListener net.Listener
+	retrievalListener net.Listener
 }
 
 // NewServer creates a new Server instance with the provided parameters.
 //
 // Note: The Server's chunks store will be created at config.DbPath+"/chunk".
-func NewServer(config *node.Config, node *node.Node, logger logging.Logger, ratelimiter common.RateLimiter) *Server {
+func NewServer(
+	config *node.Config,
+	node *node.Node,
+	logger logging.Logger,
+	ratelimiter common.RateLimiter,
+	softwareVersion *version.Semver,
+	dispersalListener net.Listener,
+	retrievalListener net.Listener) *Server {
 
 	return &Server{
-		config:      config,
-		logger:      logger,
-		node:        node,
-		ratelimiter: ratelimiter,
-		mu:          &sync.Mutex{},
+		config:            config,
+		logger:            logger,
+		node:              node,
+		ratelimiter:       ratelimiter,
+		mu:                &sync.Mutex{},
+		softwareVersion:   softwareVersion,
+		dispersalListener: dispersalListener,
+		retrievalListener: retrievalListener,
+	}
+}
+
+// GetDispersalPort returns the port number the dispersal listener is bound to.
+func (s *Server) GetDispersalPort() int {
+	if s.dispersalListener == nil {
+		return 0
+	}
+	return s.dispersalListener.Addr().(*net.TCPAddr).Port
+}
+
+// GetRetrievalPort returns the port number the retrieval listener is bound to.
+func (s *Server) GetRetrievalPort() int {
+	if s.retrievalListener == nil {
+		return 0
+	}
+	return s.retrievalListener.Addr().(*net.TCPAddr).Port
+}
+
+// Stop shuts down the listeners
+func (s *Server) Stop() {
+	s.logger.Info("Server stop requested")
+
+	if s.dispersalListener != nil {
+		if err := s.dispersalListener.Close(); err != nil {
+			s.logger.Warn("Failed to close dispersal listener", "error", err)
+		}
+	}
+
+	if s.retrievalListener != nil {
+		if err := s.retrievalListener.Close(); err != nil {
+			s.logger.Warn("Failed to close retrieval listener", "error", err)
+		}
 	}
 }
 
 func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
-		return &pb.NodeInfoReply{Semver: node.SemVer}, nil
+		return &pb.NodeInfoReply{Semver: s.softwareVersion.String()}, nil
 	}
 
 	memBytes := uint64(0)
@@ -65,7 +117,13 @@ func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.Node
 		memBytes = v.Total
 	}
 
-	return &pb.NodeInfoReply{Semver: node.SemVer, Os: runtime.GOOS, Arch: runtime.GOARCH, NumCpu: uint32(runtime.GOMAXPROCS(0)), MemBytes: memBytes}, nil
+	return &pb.NodeInfoReply{
+		Semver:   s.softwareVersion.String(),
+		Os:       runtime.GOOS,
+		Arch:     runtime.GOARCH,
+		NumCpu:   uint32(runtime.GOMAXPROCS(0)),
+		MemBytes: memBytes,
+	}, nil
 }
 
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
@@ -206,7 +264,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	params := []common.RequestParams{
 		{
 			RequesterID: retrieverID,
-			BlobSize:    encodedBlobSize,
+			BlobSize:    uint(encodedBlobSize),
 			Rate:        rate,
 		},
 	}
@@ -239,7 +297,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 			if err != nil {
 				return nil, fmt.Errorf("the chunks are in Gnark but cannot be decoded: %v", err)
 			}
-			encoded, err := decoded.Serialize()
+			encoded, err := decoded.SerializeGob()
 			if err != nil {
 				return nil, err
 			}

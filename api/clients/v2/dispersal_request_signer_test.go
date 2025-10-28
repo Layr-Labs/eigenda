@@ -9,10 +9,10 @@ import (
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/node/auth"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
@@ -21,16 +21,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	logger = testutils.GetLogger()
-)
-
 const (
 	localstackPort = "4579"
 	localstackHost = "http://0.0.0.0:4579"
 	region         = "us-east-1"
 )
 
+var (
+	logger = test.GetLogger()
+)
+
+// TODO: Good candidate to be extracted into test package as a utility
 func setupLocalStack(t *testing.T) *testbed.LocalStackContainer {
 	t.Helper()
 
@@ -78,6 +79,32 @@ func createTestKMSKey(
 	return keyID, publicAddress
 }
 
+func TestKMSSignatureVerificationWithEmptyKeyID(t *testing.T) {
+	ctx := t.Context()
+
+	// Try to create signer with empty KeyID - validation should catch it immediately
+	_, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:   region,
+		Endpoint: localstackHost,
+		KeyID:    "",
+	})
+
+	require.Error(t, err, "should fail to create signer with empty KeyID")
+}
+
+func TestKMSSignatureVerificationWithEmptyRegion(t *testing.T) {
+	ctx := t.Context()
+
+	// Try to create signer with empty Region - validation should catch it immediately
+	_, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:   "",
+		Endpoint: localstackHost,
+		KeyID:    "random_key_id",
+	})
+
+	require.Error(t, err, "should fail to create signer with empty Region")
+}
+
 func TestKMSSignatureVerification(t *testing.T) {
 	ctx := t.Context()
 	rand := random.NewTestRandom()
@@ -92,7 +119,11 @@ func TestKMSSignatureVerification(t *testing.T) {
 	keyID, publicAddress := createTestKMSKey(t, ctx, keyManager)
 
 	// Create signer and request for all test scenarios
-	signer, err := NewDispersalRequestSigner(ctx, region, localstackHost, keyID)
+	signer, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:   region,
+		Endpoint: localstackHost,
+		KeyID:    keyID,
+	})
 	require.NoError(t, err, "failed to create dispersal request signer")
 
 	request := auth.RandomStoreChunksRequest(rand)
@@ -190,7 +221,11 @@ func TestKMSSignatureVerification(t *testing.T) {
 	// Test with a different KMS key to ensure multiple keys work
 	t.Run("multiple_keys", func(t *testing.T) {
 		keyID2, publicAddress2 := createTestKMSKey(t, ctx, keyManager)
-		signer2, err := NewDispersalRequestSigner(ctx, region, localstackHost, keyID2)
+		signer2, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+			Region:   region,
+			Endpoint: localstackHost,
+			KeyID:    keyID2,
+		})
 		require.NoError(t, err, "failed to create second dispersal request signer")
 
 		request2 := auth.RandomStoreChunksRequest(rand)

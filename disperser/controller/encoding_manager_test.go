@@ -5,12 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/encoding"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -18,6 +15,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	dispmock "github.com/Layr-Labs/eigenda/disperser/mock"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/gammazero/workerpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -111,7 +110,7 @@ func TestGetRelayKeys(t *testing.T) {
 }
 
 func TestEncodingManagerHandleBatch(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
@@ -183,7 +182,7 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 }
 
 func TestEncodingManagerHandleBatchDedup(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
@@ -240,7 +239,7 @@ func TestEncodingManagerHandleBatchDedup(t *testing.T) {
 }
 
 func TestEncodingManagerHandleManyBatches(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	numBlobs := 12
 	keys := make([]corev2.BlobKey, 0)
 	headers := make([]*corev2.BlobHeader, 0)
@@ -344,7 +343,7 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 }
 
 func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestComponents(t, false)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
@@ -380,7 +379,7 @@ func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
 }
 
 func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
@@ -452,7 +451,7 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 }
 
 func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
@@ -517,7 +516,9 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 }
 
 func newTestComponents(t *testing.T, mockPool bool) *testComponents {
-	logger := testutils.GetLogger()
+	t.Helper()
+	ctx := t.Context()
+	logger := test.GetLogger()
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// require.NoError(t, err)
 	var pool common.WorkerPool
@@ -553,10 +554,12 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
 		MaxNumBlobsPerIteration:     5,
 		OnchainStateRefreshInterval: onchainRefreshInterval,
+		NumConcurrentRequests:       5,
+		EncoderAddress:              "localhost:50051", // Encoder is mocked in the test so this doesn't matter
 	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry(), blobSet, livenessChan)
 	assert.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*onchainRefreshInterval)
+	ctx, cancel := context.WithTimeout(ctx, 2*onchainRefreshInterval)
 	defer cancel()
 	// Start the encoding manager to fetch the onchain state
 	_ = em.Start(ctx)

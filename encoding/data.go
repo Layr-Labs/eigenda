@@ -24,13 +24,26 @@ type Proof = bn254.G1Affine
 // Symbol is a symbol in the field used for polynomial commitments
 type Symbol = fr.Element
 
-// BlobCommitments contains the blob's commitment, degree proof, and the actual degree.
+// BlobCommitments contains the blob's commitment, as well as the length of the blob,
+// and a proof (consisting of a LengthCommitment + LengthProof) of that length.
 type BlobCommitments struct {
-	Commitment       *G1Commitment `json:"commitment"`
+	// Commitment is the KZG commitment of the blob, taken by evaluating the
+	// polynomial represented by the blob (blob elements are coefficients) at the SRS points.
+	Commitment *G1Commitment `json:"commitment"`
+	// This is the length in SYMBOLS (32 byte field elements) of the blob.
+	// When using EigenDA V2, it must be a power of 2.
+	//
+	// EigenDA blobs can be any power of 2 length between 32B and 16MiB (currently), and so the commitment alone
+	// is not sufficient to uniquely identify (binding property) the blob.
+	Length uint32 `json:"length"`
+	// The LengthCommitment and LengthProof are combined to prove that the polynomial represented by the blob
+	// (where the field elements represent the coefficients) is of degree at most Length-1.
+	// They are verified by validator nodes when receiving chunks of the blob, which asserts that the number
+	// of chunks sent to them is actually proportional to their stake. Otherwise, a malicious client could collude
+	// with a disperser and claim that the Blob Length is very small, and send only a few chunks to the validators,
+	// which wouldn't be enough to reconstruct the full blob.
 	LengthCommitment *G2Commitment `json:"length_commitment"`
 	LengthProof      *LengthProof  `json:"length_proof"`
-	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
-	Length uint `json:"length"`
 }
 
 // ToProfobuf converts the BlobCommitments to protobuf format
@@ -126,7 +139,7 @@ func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, 
 		Commitment:       commitment,
 		LengthCommitment: lengthCommitment,
 		LengthProof:      lengthProof,
-		Length:           uint(c.GetLength()),
+		Length:           c.GetLength(),
 	}, nil
 }
 
@@ -162,7 +175,7 @@ type SubBatch struct {
 	NumBlobs int
 }
 
-type ChunkNumber = uint
+type ChunkNumber = uint64
 
 // FragmentInfo contains metadata about how chunk coefficients file is stored.
 type FragmentInfo struct {

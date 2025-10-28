@@ -1,14 +1,13 @@
 package geth_test
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
 	damock "github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -25,7 +24,7 @@ func (j *JsonError) Error() string  { return "json error" }
 func (j *JsonError) ErrorCode() int { return -32000 }
 
 func makeTestMultihomingClient(numRetries int, designatedError error) (*geth.MultiHomingClient, error) {
-	logger := testutils.GetLogger()
+	logger := test.GetLogger()
 
 	ethClientCfg := geth.EthClientConfig{
 		RPCURLs:          rpcURLs,
@@ -54,8 +53,8 @@ func makeTestMultihomingClient(numRetries int, designatedError error) (*geth.Mul
 }
 
 func makeFailureCall(t *testing.T, client *geth.MultiHomingClient, numCall int) {
+	ctx := t.Context()
 	for i := 0; i < numCall; i++ {
-		ctx := context.Background()
 		_, err := client.ChainID(ctx)
 		require.NotNil(t, err)
 	}

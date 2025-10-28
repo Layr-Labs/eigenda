@@ -6,65 +6,18 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
-
-	"github.com/Layr-Labs/eigenda/encoding"
+	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	integration "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/sha3"
 )
 
-func RandomG1Point() (encoding.G1Commitment, error) {
-	// 1) pick r ← 𝐹ᵣ at random
-	var r fr.Element
-	if _, err := r.SetRandom(); err != nil {
-		return encoding.G1Commitment{}, err
-	}
-
-	// 2) compute P = r·G₁ in Jacobian form
-	G1Jac, _, _, _ := bn254.Generators()
-	var Pjac bn254.G1Jac
-
-	var rBigInt big.Int
-	r.BigInt(&rBigInt)
-	Pjac.ScalarMultiplication(&G1Jac, &rBigInt)
-
-	// 3) convert to affine (x, y)
-	var Paff bn254.G1Affine
-	Paff.FromJacobian(&Pjac)
-	return encoding.G1Commitment(Paff), nil
-}
-
-func RandomG2Point() (encoding.G2Commitment, error) {
-
-	// 1) pick r ← 𝐹ᵣ at random
-	var r fr.Element
-	if _, err := r.SetRandom(); err != nil {
-		return encoding.G2Commitment{}, err
-	}
-
-	// 2) compute P = r·G₂ in Jacobian form
-	_, g2Jac, _, _ := bn254.Generators()
-	var Pjac bn254.G2Jac
-
-	var rBigInt big.Int
-	r.BigInt(&rBigInt)
-	Pjac.ScalarMultiplication(&g2Jac, &rBigInt)
-
-	// 3) convert to affine (x, y)
-	var Paff bn254.G2Affine
-	Paff.FromJacobian(&Pjac)
-	return encoding.G2Commitment(Paff), nil
-}
-
-var _ = Describe("Inabox v2 Integration", func() {
+func TestEndToEndV2Scenario(t *testing.T) {
 	/*
 		This end to end test ensures that:
 		1. a blob can be dispersed using the lower level disperser client to successfully produce a blob status response
@@ -76,163 +29,185 @@ var _ = Describe("Inabox v2 Integration", func() {
 
 		TODO: Decompose this test into smaller tests that cover each of the above steps individually.
 	*/
-	It("test end to end scenario", func() {
-		ctx := context.Background()
-		// mine finalization_delay # of blocks given sometimes registry coordinator updates can sometimes happen
-		// in-between the current_block_number - finalization_block_delay. This ensures consistent test execution.
-		mineAnvilBlocks(6)
+	// Create a fresh test harness for this test
+	testHarness, err := integration.NewTestHarnessWithSetup(globalInfra)
+	require.NoError(t, err, "Failed to create test harness")
+	defer testHarness.Cleanup()
 
-		payload1 := randomPayload(992)
-		payload2 := randomPayload(123)
+	ctx := t.Context()
+	// mine finalization_delay # of blocks given sometimes registry coordinator updates can sometimes happen
+	// in-between the current_block_number - finalization_block_delay. This ensures consistent test execution.
+	integration.MineAnvilBlocks(t, testHarness.RPCClient, 6)
 
-		// certificates are verified within the payload disperser client
-		cert1, err := payloadDisperser.SendPayload(ctx, payload1)
-		Expect(err).To(BeNil())
+	payload1 := randomPayload(992)
+	payload2 := randomPayload(123)
 
-		cert2, err := payloadDisperser.SendPayload(ctx, payload2)
-		Expect(err).To(BeNil())
+	// certificates are verified within the payload disperser client
+	cert1, err := testHarness.PayloadDisperser.SendPayload(ctx, payload1)
+	require.NoError(t, err)
 
-		err = staticCertVerifier.CheckDACert(ctx, cert1)
-		Expect(err).To(BeNil())
+	cert2, err := testHarness.PayloadDisperser.SendPayload(ctx, payload2)
+	require.NoError(t, err)
 
-		err = routerCertVerifier.CheckDACert(ctx, cert1)
-		Expect(err).To(BeNil())
+	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert1)
+	require.NoError(t, err)
 
-		// test onchain verification using cert #2
-		err = staticCertVerifier.CheckDACert(ctx, cert2)
-		Expect(err).To(BeNil())
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert1)
+	require.NoError(t, err)
 
-		err = routerCertVerifier.CheckDACert(ctx, cert2)
-		Expect(err).To(BeNil())
+	// test onchain verification using cert #2
+	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert2)
+	require.NoError(t, err)
 
-		eigenDAV3Cert1, ok := cert1.(*coretypes.EigenDACertV3)
-		Expect(ok).To(BeTrue())
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert2)
+	require.NoError(t, err)
 
-		eigenDAV3Cert2, ok := cert2.(*coretypes.EigenDACertV3)
-		Expect(ok).To(BeTrue())
+	eigenDAV3Cert1, ok := cert1.(*coretypes.EigenDACertV3)
+	require.True(t, ok)
 
-		// test retrieval from disperser relay subnet
-		actualPayload1, err := relayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert1)
-		Expect(err).To(BeNil())
-		Expect(actualPayload1).To(Not(BeNil()))
-		Expect(actualPayload1).To(Equal(payload1))
+	eigenDAV3Cert2, ok := cert2.(*coretypes.EigenDACertV3)
+	require.True(t, ok)
 
-		actualPayload2, err := relayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert2)
-		Expect(err).To(BeNil())
-		Expect(actualPayload2).To(Not(BeNil()))
-		Expect(actualPayload2).To(Equal(payload2))
+	// test retrieval from disperser relay subnet
+	actualPayload1, err := testHarness.RelayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert1)
+	require.NoError(t, err)
+	require.NotNil(t, actualPayload1)
+	require.Equal(t, payload1, actualPayload1)
 
-		// test distributed retrieval from DA network validator nodes
-		actualPayload1, err = validatorRetrievalClientV2.GetPayload(
-			ctx,
-			eigenDAV3Cert1,
-		)
-		Expect(err).To(BeNil())
-		Expect(actualPayload1).To(Not(BeNil()))
-		Expect(actualPayload1).To(Equal(payload1))
+	actualPayload2, err := testHarness.RelayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert2)
+	require.NoError(t, err)
+	require.NotNil(t, actualPayload2)
+	require.Equal(t, payload2, actualPayload2)
 
-		actualPayload2, err = validatorRetrievalClientV2.GetPayload(
-			ctx,
-			eigenDAV3Cert2,
-		)
-		Expect(err).To(BeNil())
-		Expect(actualPayload2).To(Not(BeNil()))
-		Expect(actualPayload2).To(Equal(payload2))
+	// test distributed retrieval from DA network validator nodes
+	actualPayload1, err = testHarness.ValidatorRetrievalClientV2.GetPayload(
+		ctx,
+		eigenDAV3Cert1,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, actualPayload1)
+	require.Equal(t, payload1, actualPayload1)
 
-		/*
-			enforce correct functionality of the EigenDACertVerifierRouter contract:
-				1. ensure that a verifier can't be added at the latest block number
-				2. ensure that a verifier can be added two blocks in the future
-				3. ensure that the new verifier can be read from the contract when queried using a future rbn
-				4. ensure that the old verifier can still be read from the contract when queried using the latest block number
-				5. ensure that the new verifier is used to verify a cert at the future rbn after dispersal
-		*/
+	actualPayload2, err = testHarness.ValidatorRetrievalClientV2.GetPayload(
+		ctx,
+		eigenDAV3Cert2,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, actualPayload2)
+	require.Equal(t, payload2, actualPayload2)
 
-		// ensure that a verifier can't be added at the latest block number
-		latestBlock, err := ethClient.BlockNumber(ctx)
-		Expect(err).To(BeNil())
-		_, err = eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock), gethcommon.HexToAddress("0x0"))
-		Expect(err).Error()
-		Expect(err.Error()).To(ContainSubstring(getSolidityFunctionSig("ABNNotInFuture(uint32)")))
+	/*
+		enforce correct functionality of the EigenDACertVerifierRouter contract:
+			1. ensure that a verifier can't be added at the latest block number
+			2. ensure that a verifier can be added two blocks in the future
+			3. ensure that the new verifier can be read from the contract when queried using a future rbn
+			4. ensure that the old verifier can still be read from the contract when queried using the latest block number
+			5. ensure that the new verifier is used to verify a cert at the future rbn after dispersal
+	*/
 
-		// ensure that a verifier #2 can be added two blocks in the future where activation_block_number = latestBlock + 2
-		tx, err := eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress("0x0"))
-		Expect(err).To(BeNil())
-		mineAnvilBlocks(1)
+	// ensure that a verifier can't be added at the latest block number
+	latestBlock, err := testHarness.EthClient.BlockNumber(ctx)
+	require.NoError(t, err)
 
-		// ensure that tx successfully executed
-		err = validateTxReceipt(ctx, tx.Hash())
-		Expect(err).To(BeNil())
+	opts, unlock := testHarness.GetDeployerTransactOpts()
+	_, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
+		opts,
+		uint32(latestBlock),
+		gethcommon.HexToAddress("0x0"),
+	)
+	unlock()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), getSolidityFunctionSig("ABNNotInFuture(uint32)"))
 
-		// ensure that new verifier can be read from the contract at the future rbn
-		verifier, err := eigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock+2))
-		Expect(err).To(BeNil())
-		Expect(verifier).To(Equal(gethcommon.HexToAddress("0x0")))
+	// ensure that a verifier #2 can be added two blocks in the future where activation_block_number = latestBlock + 2
+	opts, unlock = testHarness.GetDeployerTransactOpts()
+	tx, err := testHarness.EigenDACertVerifierRouter.AddCertVerifier(
+		opts,
+		uint32(latestBlock)+2,
+		gethcommon.HexToAddress("0x0"),
+	)
+	unlock()
+	require.NoError(t, err)
+	integration.MineAnvilBlocks(t, testHarness.RPCClient, 1)
 
-		// and that old one still lives at the latest block number - 1
-		verifier, err = eigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock-1))
-		Expect(err).To(BeNil())
-		Expect(verifier.String()).To(Equal(testConfig.EigenDA.CertVerifier))
+	// ensure that tx successfully executed
+	err = validateTxReceipt(ctx, testHarness, tx.Hash())
+	require.NoError(t, err)
 
-		// progress anvil chain 10 blocks
-		mineAnvilBlocks(10)
+	// ensure that new verifier can be read from the contract at the future rbn
+	verifier, err := testHarness.EigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock+2))
+	require.NoError(t, err)
+	require.Equal(t, gethcommon.HexToAddress("0x0"), verifier)
 
-		// disperse blob #3 to trigger the new cert verifier which should fail
-		// since the address is not a valid cert verifier and the GetQuorums call will fail
-		payload3 := randomPayload(1234)
-		cert3, err := payloadDisperser.SendPayload(ctx, payload3)
-		Expect(err.Error()).To(ContainSubstring("no contract code at given address"))
-		Expect(cert3).To(BeNil())
+	// and that old one still lives at the latest block number - 1
+	verifier, err = testHarness.EigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock-1))
+	require.NoError(t, err)
+	require.Equal(t, globalInfra.TestConfig.EigenDA.CertVerifier, verifier.String())
 
-		latestBlock, err = ethClient.BlockNumber(ctx)
-		Expect(err).To(BeNil())
+	// progress anvil chain 10 blocks
+	integration.MineAnvilBlocks(t, testHarness.RPCClient, 10)
 
-		tx, err = eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
-		Expect(err).To(BeNil())
-		mineAnvilBlocks(10)
+	// disperse blob #3 to trigger the new cert verifier which should fail
+	// since the address is not a valid cert verifier and the GetQuorums call will fail
+	payload3 := randomPayload(1234)
+	cert3, err := testHarness.PayloadDisperser.SendPayload(ctx, payload3)
+	require.Contains(t, err.Error(), "no contract code at given address")
+	require.Nil(t, cert3)
 
-		err = validateTxReceipt(ctx, tx.Hash())
-		Expect(err).To(BeNil())
+	latestBlock, err = testHarness.EthClient.BlockNumber(ctx)
+	require.NoError(t, err)
 
-		// ensure that new verifier #3 can be used for successful verification
-		// now disperse blob #4 to trigger the new cert verifier which should pass
-		// ensure that a verifier can be added two blocks in the future
-		payload4 := randomPayload(1234)
-		cert4, err := payloadDisperser.SendPayload(ctx, payload4)
-		Expect(err).To(BeNil())
-		err = routerCertVerifier.CheckDACert(ctx, cert4)
-		Expect(err).To(BeNil())
+	opts, unlock = testHarness.GetDeployerTransactOpts()
+	tx, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
+		opts,
+		uint32(latestBlock)+2,
+		gethcommon.HexToAddress(globalInfra.TestConfig.EigenDA.CertVerifier),
+	)
+	unlock()
+	require.NoError(t, err)
+	integration.MineAnvilBlocks(t, testHarness.RPCClient, 10)
 
-		err = staticCertVerifier.CheckDACert(ctx, cert4)
-		Expect(err).To(BeNil())
+	err = validateTxReceipt(ctx, testHarness, tx.Hash())
+	require.NoError(t, err)
 
-		// now force verification to fail by modifying the cert contents
-		eigenDAV3Cert4, ok := cert4.(*coretypes.EigenDACertV3)
-		Expect(ok).To(BeTrue())
+	// ensure that new verifier #3 can be used for successful verification
+	// now disperse blob #4 to trigger the new cert verifier which should pass
+	// ensure that a verifier can be added two blocks in the future
+	payload4 := randomPayload(1234)
+	cert4, err := testHarness.PayloadDisperser.SendPayload(ctx, payload4)
+	require.NoError(t, err)
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert4)
+	require.NoError(t, err)
 
-		// modify the merkle root of the batch header and ensure verification fails
-		// TODO: Test other cert verification failure cases as well
-		eigenDAV3Cert4.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
+	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert4)
+	require.NoError(t, err)
 
-		var certErr *verification.CertVerifierInvalidCertError
-		err = routerCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
-		Expect(err).To(BeAssignableToTypeOf(&verification.CertVerifierInvalidCertError{}))
-		Expect(errors.As(err, &certErr)).To(BeTrue())
-		// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
-		// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
-		Expect(certErr.StatusCode).To(Equal(verification.StatusInvalidCert))
+	// now force verification to fail by modifying the cert contents
+	eigenDAV3Cert4, ok := cert4.(*coretypes.EigenDACertV3)
+	require.True(t, ok)
 
-		err = staticCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
-		Expect(err).To(BeAssignableToTypeOf(&verification.CertVerifierInvalidCertError{}))
-		Expect(errors.As(err, &certErr)).To(BeTrue())
-		// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
-		// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
-		Expect(certErr.StatusCode).To(Equal(verification.StatusInvalidCert))
-	})
-})
+	// modify the merkle root of the batch header and ensure verification fails
+	// TODO: Test other cert verification failure cases as well
+	eigenDAV3Cert4.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
 
-func validateTxReceipt(ctx context.Context, txHash gethcommon.Hash) error {
-	receipt, err := ethClient.TransactionReceipt(ctx, txHash)
+	var certErr *verification.CertVerifierInvalidCertError
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
+	require.True(t, errors.As(err, &certErr))
+	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
+	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
+	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
+
+	err = testHarness.StaticCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
+	require.True(t, errors.As(err, &certErr))
+	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
+	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
+	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
+}
+
+func validateTxReceipt(ctx context.Context, testHarness *integration.TestHarness, txHash gethcommon.Hash) error {
+	receipt, err := testHarness.EthClient.TransactionReceipt(ctx, txHash)
 	if err != nil {
 		return err
 	}

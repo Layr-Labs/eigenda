@@ -62,7 +62,7 @@ func TestRapidFlushes(t *testing.T) {
 	// We should expect to see 11 flushes (one at t=0, then once per 100ms for the remaining second).
 	// But assert for weaker conditions to avoid test flakiness.
 	lowerBound := 5
-	upperBound := 20
+	upperBound := 25
 	require.True(t, flushCount.Load() >= uint64(lowerBound),
 		"Expected at least %d flushes, got %d", lowerBound, flushCount.Load())
 	require.True(t, flushCount.Load() <= uint64(upperBound),

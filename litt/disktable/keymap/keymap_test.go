@@ -5,10 +5,10 @@ import (
 	"path"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -113,9 +113,7 @@ func TestBasicBehavior(t *testing.T) {
 	testDir := t.TempDir()
 	dbDir := path.Join(testDir, "keymap")
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	for _, builder := range builders {
 		keymap, err := builder(logger, dbDir)
 		require.NoError(t, err)
@@ -137,10 +135,7 @@ func TestBasicBehavior(t *testing.T) {
 func TestRestart(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	testDir := t.TempDir()
 	dbDir := path.Join(testDir, "keymap")
 

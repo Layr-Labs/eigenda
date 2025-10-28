@@ -4,7 +4,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgflags"
 	"github.com/urfave/cli"
 )
 
@@ -34,6 +34,31 @@ var (
 		Usage:    "Name of the bucket to retrieve blobs and store encoded chunks",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "S3_BUCKET_NAME"),
+	}
+	ObjectStorageBackendFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "object-storage-backend"),
+		Usage:    "Object storage backend to use (s3 or oci)",
+		Required: false,
+		Value:    "s3",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OBJECT_STORAGE_BACKEND"),
+	}
+	OCIRegionFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-region"),
+		Usage:    "OCI region (only used when object-storage-backend is oci)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_REGION"),
+	}
+	OCICompartmentIDFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-compartment-id"),
+		Usage:    "OCI compartment ID (only used when object-storage-backend is oci)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_COMPARTMENT_ID"),
+	}
+	OCINamespaceFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-namespace"),
+		Usage:    "OCI namespace (only used when object-storage-backend is oci). If not provided, will be retrieved dynamically",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_NAMESPACE"),
 	}
 	MetricsHTTPPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
@@ -122,6 +147,10 @@ var optionalFlags = []cli.Flag{
 	EnableGnarkChunkEncodingFlag,
 	EncoderVersionFlag,
 	S3BucketNameFlag,
+	ObjectStorageBackendFlag,
+	OCIRegionFlag,
+	OCICompartmentIDFlag,
+	OCINamespaceFlag,
 	GPUEnableFlag,
 	BackendFlag,
 	PreventReencodingFlag,
@@ -135,6 +164,6 @@ var Flags []cli.Flag
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
-	Flags = append(Flags, kzg.CLIFlags(envVarPrefix)...)
+	Flags = append(Flags, kzgflags.CLIFlags(envVarPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
 }

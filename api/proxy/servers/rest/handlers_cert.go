@@ -17,17 +17,17 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const (
-	// limit requests to only 32 MiB to mitigate potential DoS attacks
-	maxPOSTRequestBodySize int64 = 1024 * 1024 * 32
-)
-
 // =================================================================================================
 // GET ROUTES
 // =================================================================================================
 
 // handleGetOPKeccakCommitment handles GET requests for optimism keccak commitments.
 func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.APIsEnabled.OpKeccakCommitment {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("op-keccak DA Commitment type detected but `op-keccak` API is not enabled")
+	}
+
 	keccakCommitmentHex, ok := mux.Vars(r)[routingVarNameKeccakCommitmentHex]
 	if !ok {
 		return proxyerrors.NewParsingError(fmt.Errorf("keccak commitment not found in path: %s", r.URL.Path))
@@ -56,11 +56,21 @@ func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Re
 
 // handleGetOPGenericCommitment handles the GET request for optimism generic commitments.
 func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.APIsEnabled.OpGenericCommitment {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("op-generic DA Commitment type detected but `op-generic` API is not enabled")
+	}
+
 	return svr.handleGetShared(w, r)
 }
 
 // handleGetStdCommitment handles the GET request for std commitments.
 func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.APIsEnabled.StandardCommitment {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
+	}
+
 	return svr.handleGetShared(w, r)
 }
 
@@ -135,9 +145,10 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 		return proxyerrors.NewParsingError(
 			fmt.Errorf("failed to decode hex keccak commitment %s: %w", keccakCommitmentHex, err))
 	}
-	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
+
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, common.MaxServerPOSTRequestBodySize))
 	if err != nil {
-		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)
+		return proxyerrors.NewReadRequestBodyError(err, common.MaxServerPOSTRequestBodySize)
 	}
 
 	err = svr.keccakMgr.PutOPKeccakPairInS3(r.Context(), keccakCommitment, payload)
@@ -153,11 +164,21 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 
 // handlePostStdCommitment handles the POST request for std commitments.
 func (svr *Server) handlePostStdCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.APIsEnabled.StandardCommitment {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
+	}
+
 	return svr.handlePostShared(w, r, commitments.StandardCommitmentMode)
 }
 
 // handlePostOPGenericCommitment handles the POST request for optimism generic commitments.
 func (svr *Server) handlePostOPGenericCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.APIsEnabled.OpGenericCommitment {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("op-generic DA Commitment type detected but `op-generic` API is not enabled")
+	}
+
 	return svr.handlePostShared(w, r, commitments.OptimismGenericCommitmentMode)
 }
 
@@ -167,9 +188,14 @@ func (svr *Server) handlePostShared(
 	r *http.Request,
 	mode commitments.CommitmentMode,
 ) error {
-	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
+	if !svr.config.APIsEnabled.StandardCommitment && mode == commitments.StandardCommitmentMode {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
+	}
+
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, common.MaxServerPOSTRequestBodySize))
 	if err != nil {
-		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)
+		return proxyerrors.NewReadRequestBodyError(err, common.MaxServerPOSTRequestBodySize)
 	}
 
 	serializedCert, err := svr.certMgr.Put(r.Context(), payload)

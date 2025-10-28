@@ -17,20 +17,6 @@ type Staker struct {
 	Stake      string `json:"stake"`
 }
 
-// Docker compose
-type DockerCompose struct {
-	Services map[string]map[string]interface{} `yaml:"services"`
-}
-
-type Service struct {
-	Image         string   `yaml:"image"`
-	Volumes       []string `yaml:"volumes"`
-	Ports         []string `yaml:"ports"`
-	EnvFile       []string `yaml:"env_file"`
-	Command       []string `yaml:"command"`
-	ContainerName string   `yaml:"container_name"`
-}
-
 type EnvList map[string]string
 
 type ContractDeployer struct {
@@ -166,6 +152,8 @@ func (e Environment) IsLocal() bool {
 	return e.Type == "local"
 }
 
+// Config is used by devnet inabox, whereas inabox when spun up for tests uses InfrastructureConfig instead.
+// TODO: We should eventually find a way to consolidate them.
 type Config struct {
 	rootPath string
 
@@ -196,6 +184,7 @@ type Config struct {
 	Retriever  RetrieverVars
 	Controller ControllerVars
 	Relays     []RelayVars
+	Proxy      ProxyVars
 
 	localstackEndpoint string
 	localstackRegion   string
@@ -205,13 +194,15 @@ type Config struct {
 
 	// DisperserKMSKeyID is the KMS key ID used to encrypt disperser data
 	DisperserKMSKeyID string
+
+	UseControllerMediatedPayments bool
 }
 
 func (env *Config) IsEigenDADeployed() bool {
 	return env.EigenDA.ServiceManager != ""
 }
 
-func NewTestConfig(testName, rootPath string) (testEnv *Config) {
+func ReadTestConfig(testName, rootPath string) (testEnv *Config) {
 	rootPath, err := filepath.Abs(rootPath)
 	if err != nil {
 		log.Panicf("Error %s:", err.Error())

@@ -16,13 +16,13 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -34,7 +34,8 @@ import (
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -63,7 +64,7 @@ var (
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
 	testDataApiServerV2 *serverv2.ServerV2
 
-	logger = testutils.GetLogger()
+	logger = test.GetLogger()
 
 	// Local stack
 	localstackPort      = "4574"
@@ -267,13 +268,48 @@ func setUpRouter() *gin.Engine {
 	return gin.Default()
 }
 
+const (
+	maxRetries = 3
+	retryDelay = 100 * time.Millisecond
+)
+
 func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httptest.ResponseRecorder {
 	t.Helper()
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(method, url, nil)
-	router.ServeHTTP(w, req)
-	require.Equal(t, http.StatusOK, w.Code)
-	return w
+
+	var lastResponse *httptest.ResponseRecorder
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(method, url, nil)
+		router.ServeHTTP(w, req)
+
+		if w.Code == http.StatusOK {
+			return w
+		}
+
+		lastResponse = w
+
+		// Retry only on specific network-related 500 errors from localstack
+		if w.Code == http.StatusInternalServerError && isLocalstackNetworkError(w) {
+			if attempt < maxRetries-1 {
+				t.Logf("Localstack connectivity issue on attempt %d, retrying...", attempt+1)
+				time.Sleep(retryDelay)
+				continue
+			}
+		}
+
+		// Non-retryable error or final attempt
+		break
+	}
+
+	require.Equal(t, http.StatusOK, lastResponse.Code,
+		"Request failed after %d attempts. Response: %s", maxRetries, lastResponse.Body.String())
+	return lastResponse
+}
+
+func isLocalstackNetworkError(w *httptest.ResponseRecorder) bool {
+	body := w.Body.String()
+	return strings.Contains(body, "use of closed network connection")
 }
 
 func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {

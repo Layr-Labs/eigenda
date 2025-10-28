@@ -9,6 +9,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -29,14 +31,14 @@ type BlobShard struct {
 
 // shardValidator implements the validation logic that a DA node should apply to its received data
 type shardValidator struct {
-	verifier   encoding.Verifier
+	verifier   *verifier.Verifier
 	operatorID core.OperatorID
 	logger     logging.Logger
 }
 
 var _ ShardValidator = (*shardValidator)(nil)
 
-func NewShardValidator(v encoding.Verifier, operatorID core.OperatorID, logger logging.Logger) *shardValidator {
+func NewShardValidator(v *verifier.Verifier, operatorID core.OperatorID, logger logging.Logger) *shardValidator {
 	return &shardValidator{
 		verifier:   v,
 		operatorID: operatorID,
@@ -143,7 +145,7 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 			samples[ind] = encoding.Sample{
 				Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
 				Chunk:           chunks[ind],
-				AssignmentIndex: uint(indices[ind]),
+				AssignmentIndex: uint64(indices[ind]),
 				BlobIndex:       blobIndex,
 			}
 		}
@@ -167,8 +169,6 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 
 	// parallelize subBatch verification
 	for params, subBatch := range subBatchMap {
-		params := params
-		subBatch := subBatch
 		pool.Submit(func() {
 			v.universalVerifyWorker(params, subBatch, out)
 		})
@@ -176,13 +176,12 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 
 	// parallelize length proof verification
 	for _, blobCommitments := range blobCommitmentList {
-		blobCommitments := blobCommitments
 		pool.Submit(func() {
 			v.verifyBlobLengthWorker(blobCommitments, out)
 		})
 	}
 	// check if commitments are equivalent
-	err = v.verifier.VerifyCommitEquivalenceBatch(blobCommitmentList)
+	err = committer.VerifyCommitEquivalenceBatch(blobCommitmentList)
 	if err != nil {
 		return err
 	}
@@ -209,7 +208,7 @@ func (v *shardValidator) universalVerifyWorker(params encoding.EncodingParams, s
 }
 
 func (v *shardValidator) verifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
-	err := v.verifier.VerifyBlobLength(blobCommitments)
+	err := committer.VerifyLengthProof(blobCommitments)
 	if err != nil {
 		out <- err
 		return

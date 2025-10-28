@@ -25,24 +25,22 @@ COPY api/proxy/clients ./api/proxy/clients
 RUN go mod download
 
 # Copy the rest of the source code
-COPY ./disperser /app/disperser
-COPY common /app/common
-COPY contracts /app/contracts
-COPY core /app/core
-COPY api /app/api
-COPY indexer /app/indexer
-COPY encoding /app/encoding
-COPY relay /app/relay
+COPY . .
 
 # Define Icicle versions and checksums
-ENV ICICLE_VERSION=3.4
-ENV ICICLE_BASE_SHA256=e3eec1d5fca0e4ba52e09630dc360eb5f1c1d54b3bb1834eeef1624c2f7f4c48
-ENV ICICLE_CUDA_SHA256=090bdf255b1beab05efa7eb2e67d50481c0c6f57beda969356e71bd11bb39f17
+# If you ever change the ICICLE_VERSION, first find the new artifact links from
+# https://github.com/ingonyama-zk/icicle/releases, and then compute the new checksums by running:
+#  wget https://github.com/ingonyama-zk/icicle/releases/download/v3.9.2/icicle_3_9_2-ubuntu22.tar.gz
+#  sha256sum icicle_3_9_2-ubuntu22.tar.gz
+#  wget https://github.com/ingonyama-zk/icicle/releases/download/v3.9.2/icicle_3_9_2-ubuntu22-cuda122.tar.gz
+#  sha256sum icicle_3_9_2-ubuntu22-cuda122.tar.gz
+ENV ICICLE_VERSION=3.9.2
+ENV ICICLE_BASE_SHA256=d4510e6a5c4556cfc6e434e91d6b45329c43fc559d11b466283ed75391d5ff2e
+ENV ICICLE_CUDA_SHA256=de2d29c3df8da899e4097006e014c35e386e120b0433993fd4fec5c1753625f6
 
 # Download Icicle tarballs
-# https://github.com/ingonyama-zk/icicle/releases/download/v3.4.0/icicle_3_4-ubuntu22-cuda122.tar.gz
-ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}.0/icicle_${ICICLE_VERSION//./_}-ubuntu22.tar.gz /tmp/icicle.tar.gz
-ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}.0/icicle_${ICICLE_VERSION//./_}-ubuntu22-cuda122.tar.gz /tmp/icicle-cuda.tar.gz
+ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}/icicle_${ICICLE_VERSION//./_}-ubuntu22.tar.gz /tmp/icicle.tar.gz
+ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}/icicle_${ICICLE_VERSION//./_}-ubuntu22-cuda122.tar.gz /tmp/icicle-cuda.tar.gz
 
 # Verify checksums and install Icicle
 RUN echo "${ICICLE_BASE_SHA256} /tmp/icicle.tar.gz" | sha256sum -c - && \

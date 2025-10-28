@@ -38,7 +38,7 @@ func createChunksData(t *testing.T, seed int) (core.Bundle, *core.ChunksData, *c
 	gobChunks := make([][]byte, len(bundle))
 	gnarkChunks := make([][]byte, len(bundle))
 	for i, frame := range bundle {
-		gobChunk, err := frame.Serialize()
+		gobChunk, err := frame.SerializeGob()
 		assert.Nil(t, err)
 		gobChunks[i] = gobChunk
 

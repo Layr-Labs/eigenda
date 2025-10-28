@@ -17,31 +17,30 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
-	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
-	"github.com/Layr-Labs/eigenda/core/eth/directory"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/litt/util"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -56,8 +55,8 @@ type TestClient struct {
 	config                      *TestClientConfig
 	payloadClientConfig         *clientsv2.PayloadClientConfig
 	logger                      logging.Logger
-	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
-	disperserClient             clientsv2.DisperserClient
+	certVerifierAddressProvider clientsv2.CertVerifierAddressProvider
+	disperserClient             *clientsv2.DisperserClient
 	payloadDisperser            *payloaddispersal.PayloadDisperser
 	relayClient                 relay.RelayClient
 	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
@@ -72,14 +71,14 @@ type TestClient struct {
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
-	metrics                     *testClientMetrics
+	metrics                     *TestClientMetrics
 }
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(
 	ctx context.Context,
 	logger logging.Logger,
-	metrics *testClientMetrics,
+	metrics *TestClientMetrics,
 	config *TestClientConfig) (*TestClient, error) {
 
 	if config.SRSNumberToLoad == 0 {
@@ -88,12 +87,7 @@ func NewTestClient(
 
 	// Construct the disperser client
 
-	privateKey, err := loadPrivateKey(config.KeyPath, config.KeyVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load private key: %w", err)
-	}
-
-	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
+	signer, err := auth.NewLocalBlobRequestSigner(config.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
@@ -129,20 +123,14 @@ func NewTestClient(
 		g2TrailingPath = ""
 	}
 
-	kzgConfig := &kzg.KzgConfig{
-		LoadG2Points:    true,
-		G1Path:          g1Path,
-		G2Path:          g2Path,
-		G2TrailingPath:  g2TrailingPath,
-		CacheDir:        srsTablesPath,
-		SRSOrder:        config.SRSOrder,
-		SRSNumberToLoad: config.SRSNumberToLoad,
-		NumWorker:       32,
-	}
-
-	kzgProver, err := prover.NewProver(kzgConfig, nil)
+	kzgCommitter, err := committer.NewFromConfig(committer.Config{
+		G1SRSPath:         g1Path,
+		G2SRSPath:         g2Path,
+		G2TrailingSRSPath: g2TrailingPath,
+		SRSNumberToLoad:   config.SRSNumberToLoad,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create KZG prover: %w", err)
+		return nil, fmt.Errorf("new committer: %w", err)
 	}
 
 	disperserConfig := &clientsv2.DisperserClientConfig{
@@ -157,26 +145,21 @@ func NewTestClient(
 		logger,
 		disperserConfig,
 		signer,
-		kzgProver,
+		kzgCommitter,
 		accountant,
 		metricsv2.NoopDispersalMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}
-	err = disperserClient.PopulateAccountant(context.Background())
+	err = disperserClient.PopulateAccountant(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to populate accountant: %w", err)
 	}
 
-	ethRPCUrls, err := loadEthRPCURLs(config.EthRPCURLs, config.EthRPCUrlsVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load Ethereum RPC URLs: %w", err)
-	}
-
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          ethRPCUrls,
-		PrivateKeyString: privateKey,
+		RPCURLs:          config.EthRpcUrls,
+		PrivateKeyString: config.PrivateKey,
 		NumConfirmations: 0,
 		NumRetries:       3,
 	}
@@ -210,7 +193,15 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}
 
-	certVerifierAddressProvider := &test.TestCertVerifierAddressProvider{}
+	routerAddress, err := contractDirectory.GetContractAddress(ctx, directory.CertVerifierRouter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CertVerifierRouter address from contract directory: %w", err)
+	}
+
+	certVerifierAddressProvider, err := verification.BuildRouterAddressProvider(routerAddress, ethClient, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cert verifier address provider: %w", err)
+	}
 
 	certVerifier, err := verification.NewCertVerifier(logger, ethClient, certVerifierAddressProvider)
 	if err != nil {
@@ -258,6 +249,7 @@ func NewTestClient(
 		blockMon,
 		certBuilder,
 		certVerifier,
+		nil,
 		registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
@@ -295,9 +287,19 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
-	verifierKzgConfig := kzgConfig
-	verifierKzgConfig.LoadG2Points = false
-	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig, nil)
+	kzgConfig := &kzgv1.KzgConfig{
+		LoadG2Points:    true,
+		G1Path:          g1Path,
+		G2Path:          g2Path,
+		G2TrailingPath:  g2TrailingPath,
+		CacheDir:        srsTablesPath,
+		SRSOrder:        config.SrsOrder,
+		SRSNumberToLoad: config.SRSNumberToLoad,
+		NumWorker:       32,
+	}
+	verifierKzgConfig := verifier.ConfigFromV1KzgConfig(kzgConfig)
+	encoder := rs.NewEncoder(logger, nil)
+	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
 	}
@@ -322,7 +324,7 @@ func NewTestClient(
 
 	chainState := eth.NewChainState(ethReader, ethClient)
 	icsConfig := thegraph.Config{
-		Endpoint:     config.SubgraphURL,
+		Endpoint:     config.SubgraphUrl,
 		PullInterval: 100 * time.Millisecond,
 		MaxRetries:   5,
 	}
@@ -342,6 +344,7 @@ func NewTestClient(
 		logger,
 		ethReader,
 		indexedChainState,
+		encoder,
 		blobVerifier,
 		clientConfig,
 		validatorClientMetrics)
@@ -370,23 +373,37 @@ func NewTestClient(
 		logger,
 		ethReader,
 		indexedChainState,
+		encoder,
 		blobVerifier,
 		onlyDownloadClientConfig,
 		validatorClientMetrics)
 
-	proxyWrapper, err := NewProxyWrapper(context.Background(), logger,
+	proxyWrapper, err := NewProxyWrapper(ctx, logger,
 		&proxyconfig.AppConfig{
 			SecretConfig: proxycommon.SecretConfigV2{
-				SignerPaymentKey: privateKey,
-				EthRPCURL:        ethRPCUrls[0],
+				SignerPaymentKey: config.PrivateKey,
+				EthRPCURL:        config.EthRpcUrls[0],
+			},
+			EnabledServersConfig: &enablement.EnabledServersConfig{
+				Metric:      false,
+				ArbCustomDA: false,
+				RestAPIConfig: enablement.RestApisEnabled{
+					Admin:               false,
+					OpGenericCommitment: true,
+					OpKeccakCommitment:  true,
+					StandardCommitment:  true,
+				},
 			},
 			RestSvrCfg: proxyserver.Config{
-				Host:        "localhost",
-				Port:        config.ProxyPort,
-				EnabledAPIs: []string{"admin"},
-			},
-			MetricsSvrConfig: proxymetrics.Config{
-				Enabled: false, // TODO (cody.littley) enable proxy metrics
+				Host: "localhost",
+				Port: config.ProxyPort,
+				// TODO (cody.littley) enable proxy metrics
+				APIsEnabled: &enablement.RestApisEnabled{
+					Admin:               false,
+					OpGenericCommitment: true,
+					OpKeccakCommitment:  true,
+					StandardCommitment:  true,
+				},
 			},
 			StoreBuilderConfig: builder.Config{
 				StoreConfig: store.Config{
@@ -411,9 +428,11 @@ func NewTestClient(
 						PayloadClientConfig: *payloadClientConfig,
 						RelayTimeout:        5 * time.Second,
 					},
+					ClientLedgerMode:                   clientledger.ParseClientLedgerMode(config.ClientLedgerPaymentMode),
+					VaultMonitorInterval:               time.Second * 30,
 					PutTries:                           3,
 					MaxBlobSizeBytes:                   16 * units.MiB,
-					EigenDACertVerifierOrRouterAddress: config.EigenDACertVerifierAddressQuorums0_1,
+					EigenDACertVerifierOrRouterAddress: routerAddress.Hex(),
 					EigenDADirectory:                   contractDirectoryAddress.Hex(),
 					RetrieversToEnable: []proxycommon.RetrieverType{
 						proxycommon.RelayRetrieverType,
@@ -442,64 +461,11 @@ func NewTestClient(
 		certBuilder:                 certBuilder,
 		onlyDownloadValidatorClient: onlyDownloadValidatorClient,
 		certVerifier:                certVerifier,
-		privateKey:                  privateKey,
+		privateKey:                  config.PrivateKey,
 		metricsRegistry:             registry,
 		metrics:                     metrics,
 		proxyWrapper:                proxyWrapper,
 	}, nil
-}
-
-// loadPrivateKey loads the private key from the file/env var specified in the config.
-func loadPrivateKey(keyPath string, keyVar string) (string, error) {
-	var privateKey string
-	if keyPath != "" {
-		privateKeyFile, err := util.SanitizePath(keyPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to sanitize path: %w", err)
-		}
-
-		exists, err := util.Exists(privateKeyFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to check if private key file exists: %w", err)
-		}
-		if exists {
-			privateKeyBytes, err := os.ReadFile(privateKeyFile)
-			if err != nil {
-				return "", fmt.Errorf("failed to read private key file: %w", err)
-			}
-			privateKey = string(privateKeyBytes)
-		}
-	}
-
-	if privateKey == "" {
-		if keyVar == "" {
-			return "", fmt.Errorf("either KeyPath must reference a valid key file or KeyVar must be set")
-		}
-		privateKey = os.Getenv(keyVar)
-		if privateKey == "" {
-			return "", fmt.Errorf("key not found in environment variable %s", keyVar)
-		}
-	}
-
-	return formatPrivateKey(privateKey), nil
-}
-
-// loadEthRPCURLs loads the Ethereum RPC URLs from the file/env var specified in the config.
-func loadEthRPCURLs(urls []string, urlsVar string) ([]string, error) {
-	if len(urls) > 0 {
-		return urls, nil
-	}
-
-	if urlsVar == "" {
-		return nil, fmt.Errorf("either EthRPCURLs or EthRPCUrlsVar must be set")
-	}
-
-	ethRPCURLs := os.Getenv(urlsVar)
-	if ethRPCURLs == "" {
-		return nil, fmt.Errorf("URLs not found in environment variable %s", urlsVar)
-	}
-
-	return strings.Split(ethRPCURLs, ","), nil
 }
 
 // formatPrivateKey formats the private key by removing leading/trailing whitespace and "0x" prefix.
@@ -519,14 +485,8 @@ func (c *TestClient) GetLogger() logging.Logger {
 	return c.logger
 }
 
-// SetCertVerifierAddress sets the address string which will be returned by the cert verifier address to all users of
-// the provider
-func (c *TestClient) SetCertVerifierAddress(certVerifierAddress string) {
-	c.certVerifierAddressProvider.SetCertVerifierAddress(gethcommon.HexToAddress(certVerifierAddress))
-}
-
 // GetDisperserClient returns the test client's disperser client.
-func (c *TestClient) GetDisperserClient() clientsv2.DisperserClient {
+func (c *TestClient) GetDisperserClient() *clientsv2.DisperserClient {
 	return c.disperserClient
 }
 
@@ -639,7 +599,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		blobKey,
 		eigenDAV3Cert.RelayKeys(),
 		payload,
-		uint32(blobLengthSymbols),
+		blobLengthSymbols,
 		0)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
@@ -861,7 +821,7 @@ func (c *TestClient) ReadBlobFromValidators(
 			return fmt.Errorf("failed to read blob from validators, %s", err)
 		}
 
-		blobLengthSymbols := uint32(header.BlobCommitments.Length)
+		blobLengthSymbols := header.BlobCommitments.Length
 		var blob *coretypes.Blob
 		blob, err = coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
 		if err != nil {

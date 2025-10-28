@@ -24,7 +24,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -277,12 +277,13 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		securityParamsStrings[i] = sp.String()
 	}
 
-	blobSize := len(blob.Data)
+	blobSize := uint32(len(blob.Data))
 
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
 		for _, param := range securityParams {
-			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(),
+				fmt.Sprintf("%d", param.QuorumID), int(blobSize), apiMethodName)
 		}
 		s.metrics.HandleInvalidArgRpcRequest(apiMethodName)
 		return nil, api.NewErrorInvalidArg(err.Error())
@@ -293,7 +294,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	// If paymentHeader is not empty, we use the meterer, otherwise we use the ratelimiter if the ratelimiter is available
 	// Note that we have no plans to enable payments for v1 disperser
 	if paymentHeader != nil {
-		blobLength := encoding.GetBlobLength(uint(blobSize))
+		blobLength := encoding.GetBlobLength(blobSize)
 		_, err := s.meterer.MeterRequest(ctx, *paymentHeader, uint64(blobLength), blob.GetQuorumNumbers(), dispersalStart)
 		if err != nil {
 			return nil, api.NewErrorResourceExhausted(err.Error())
@@ -313,16 +314,17 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}
 	if err != nil {
 		for _, param := range securityParams {
-			s.metrics.HandleBlobStoreFailedRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
+			s.metrics.HandleBlobStoreFailedRequest(fmt.Sprintf("%d", param.QuorumID), int(blobSize), apiMethodName)
 		}
 		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
 		return nil, api.NewErrorInternal(fmt.Sprintf("store blob: %v", err))
 	}
 
 	for _, param := range securityParams {
-		s.metrics.HandleSuccessfulRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
+		s.metrics.HandleSuccessfulRequest(fmt.Sprintf("%d", param.QuorumID), int(blobSize), apiMethodName)
 	}
-	s.metrics.BlobLatency.WithLabelValues(apiMethodName, dispcommon.BlobSizeBucket(blobSize)).Set(float64(time.Since(dispersalStart).Milliseconds()))
+	s.metrics.BlobLatency.WithLabelValues(apiMethodName, dispcommon.BlobSizeBucket(int(blobSize))).
+		Set(float64(time.Since(dispersalStart).Milliseconds()))
 
 	return &pb.DisperseBlobReply{
 		Result:    pb.BlobStatus_PROCESSING,
@@ -468,8 +470,8 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 
 	requestParams := make([]common.RequestParams, 0)
 
-	blobSize := len(blob.Data)
-	length := encoding.GetBlobLength(uint(blobSize))
+	blobSize := uint32(len(blob.Data))
+	length := encoding.GetBlobLength(blobSize)
 	requesterName := ""
 	for i, param := range blob.RequestHeader.SecurityParams {
 
@@ -506,7 +508,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 		requestParams = append(requestParams, common.RequestParams{
 			RequesterID:   key,
 			RequesterName: systemAccountKey,
-			BlobSize:      encodedSize,
+			BlobSize:      uint(encodedSize),
 			Rate:          globalRates.TotalUnauthThroughput,
 			Info: limiterInfo{
 				RateType: SystemThroughputType,
@@ -531,7 +533,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 		requestParams = append(requestParams, common.RequestParams{
 			RequesterID:   key,
 			RequesterName: requesterName,
-			BlobSize:      encodedSize,
+			BlobSize:      uint(encodedSize),
 			Rate:          accountRates.Throughput,
 			Info: limiterInfo{
 				RateType: AccountThroughputType,
@@ -559,7 +561,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 	allowed, params, err := s.ratelimiter.AllowRequest(ctx, requestParams)
 	if err != nil {
 		s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
-		s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, apiMethodName)
+		s.metrics.HandleFailedRequest(codes.Internal.String(), "", int(blobSize), apiMethodName)
 		return api.NewErrorInternal(err.Error())
 	}
 
@@ -571,10 +573,10 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 		}
 		if info.RateType == SystemThroughputType || info.RateType == SystemBlobRateType {
 			s.metrics.HandleSystemRateLimitedRpcRequest(apiMethodName)
-			s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, apiMethodName)
+			s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), int(blobSize), apiMethodName)
 		} else if info.RateType == AccountThroughputType || info.RateType == AccountBlobRateType {
 			s.metrics.HandleAccountRateLimitedRpcRequest(apiMethodName)
-			s.metrics.HandleAccountRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, apiMethodName)
+			s.metrics.HandleAccountRateLimitedRequest(fmt.Sprint(info.QuorumID), int(blobSize), apiMethodName)
 			s.logger.Info("request ratelimited", "requesterName", requesterName, "requesterID", params.RequesterID, "rateType", info.RateType.String(), "quorum", info.QuorumID)
 		}
 		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
@@ -781,7 +783,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		allowed, param, err := s.ratelimiter.AllowRequest(ctx, []common.RequestParams{
 			{
 				RequesterID: fmt.Sprintf("%s:%s", origin, RetrievalThroughputType.Plug()),
-				BlobSize:    blobSize,
+				BlobSize:    uint(blobSize),
 				Rate:        s.rateConfig.RetrievalThroughput,
 				Info:        RetrievalThroughputType.String(),
 			},

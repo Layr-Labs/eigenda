@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 )
 
 var (
@@ -21,13 +22,15 @@ type ShardValidator interface {
 
 // shardValidator implements the validation logic that a DA node should apply to its received data
 type shardValidator struct {
-	verifier   encoding.Verifier
+	verifier   *verifier.Verifier
 	assignment AssignmentCoordinator
 	chainState ChainState
 	operatorID OperatorID
 }
 
-func NewShardValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst ChainState, operatorID OperatorID) ShardValidator {
+func NewShardValidator(
+	v *verifier.Verifier, asgn AssignmentCoordinator, cst ChainState, operatorID OperatorID,
+) ShardValidator {
 	return &shardValidator{
 		verifier:   v,
 		assignment: asgn,
@@ -56,12 +59,12 @@ func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	if assignment.NumChunks == 0 {
 		return nil, nil, nil, fmt.Errorf("%w: operator %s has no chunks in quorum %d", ErrBlobQuorumSkip, v.operatorID.Hex(), quorumHeader.QuorumID)
 	}
-	if assignment.NumChunks != uint(len(blob.Bundles[quorumHeader.QuorumID])) {
+	if assignment.NumChunks != ChunkNumber(len(blob.Bundles[quorumHeader.QuorumID])) {
 		return nil, nil, nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d) for quorum %d", len(blob.Bundles[quorumHeader.QuorumID]), assignment.NumChunks, quorumHeader.QuorumID)
 	}
 
 	// Validate the chunkLength against the confirmation and adversary threshold parameters
-	ok, err := v.assignment.ValidateChunkLength(operatorState, blob.BlobHeader.Length, quorumHeader)
+	ok, err := v.assignment.ValidateChunkLength(operatorState, uint(blob.BlobHeader.Length), quorumHeader)
 	if err != nil || !ok {
 		return nil, nil, nil, fmt.Errorf("invalid chunk length: %w", err)
 	}
@@ -75,7 +78,7 @@ func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	}
 
 	// Check the received chunks against the commitment
-	params := encoding.ParamsFromMins(quorumHeader.ChunkLength, info.TotalChunks)
+	params := encoding.ParamsFromMins(uint64(quorumHeader.ChunkLength), info.TotalChunks)
 	if params.ChunkLength != uint64(quorumHeader.ChunkLength) {
 		return nil, nil, nil, fmt.Errorf("%w: chunk length from encoding parameters (%d) does not match quorum header (%d)", ErrChunkLengthMismatch, params.ChunkLength, quorumHeader.ChunkLength)
 	}
@@ -134,7 +137,7 @@ func (v *shardValidator) ValidateBlobs(blobs []*BlobMessage, operatorState *Oper
 					samples[ind] = encoding.Sample{
 						Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
 						Chunk:           chunks[ind],
-						AssignmentIndex: uint(indices[ind]),
+						AssignmentIndex: indices[ind],
 						BlobIndex:       blobIndex,
 					}
 				}
