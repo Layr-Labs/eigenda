@@ -1,7 +1,6 @@
 package ratelimit
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -45,9 +44,10 @@ func TestNewLeakyBucket(t *testing.T) {
 
 func TestFill(t *testing.T) {
 	t.Run("test overfill", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(11, 10*time.Second, false, OverfillOncePermitted, testStartTime)
 		rand := random.NewTestRandom()
 		testStartTime := rand.Time()
+
+		leakyBucket, err := NewLeakyBucket(11, 10*time.Second, false, OverfillOncePermitted, testStartTime)
 
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
