@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
@@ -73,6 +74,14 @@ func CreateTestSuite(
 	var restServer *rest.Server
 	var arbServer *arbitrum_altda.Server
 	var ethClient common_eigenda.EthClient
+
+	if !appConfig.StoreBuilderConfig.MemstoreEnabled {
+		ec, _, err := common.BuildEthClient(ctx, logger, appConfig.SecretConfig.EthRPCURL, appConfig.StoreBuilderConfig.ClientConfigV2.EigenDANetwork)
+		if err != nil {
+			panic(fmt.Sprintf("build eth client: %v", err.Error()))
+		}
+		ethClient = ec
+	}
 
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
