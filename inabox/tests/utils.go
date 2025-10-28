@@ -22,11 +22,11 @@ func MineAnvilBlocks(t *testing.T, rpcClient common.RPCEthClient, numBlocks int)
 // getSRSPaths returns the correct paths to SRS files based on the source file location.
 // This uses runtime.Caller to determine where this file is located and calculates
 // the relative path to the resources/srs directory from there.
-func getSRSPaths() (g1Path, g2Path string, err error) {
+func getSRSPaths() (g1Path, g2Path, g2TrailingPath string, err error) {
 	// Get the path of this source file
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		return "", "", fmt.Errorf("failed to get caller information")
+		return "", "", "", fmt.Errorf("failed to get caller information")
 	}
 
 	// We need to go up 2 directories from tests/ to get to inabox/, then up one more to get to the project root
@@ -37,6 +37,7 @@ func getSRSPaths() (g1Path, g2Path string, err error) {
 
 	g1Path = filepath.Join(projectRoot, "resources", "srs", "g1.point")
 	g2Path = filepath.Join(projectRoot, "resources", "srs", "g2.point")
+	g2TrailingPath = filepath.Join(projectRoot, "resources", "srs", "g2.trailing.point")
 
-	return g1Path, g2Path, nil
+	return g1Path, g2Path, g2TrailingPath, nil
 }
