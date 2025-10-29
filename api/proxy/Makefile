@@ -27,6 +27,8 @@ disperse-test-blob:
 test-unit:
 	gotestsum --format pkgname-and-test-fails -- -short -parallel 4 ./...
 
+# TODO: Add support for E2E network tests with a `hoodi` testnet backend.
+
 # E2E tests using local memstore. Also tests the standard client against the proxy.
 test-e2e-local:
 	BACKEND=memstore gotestsum --format testname -- -v -timeout 10m ./test/e2e -parallel 8
