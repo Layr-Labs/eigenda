@@ -454,10 +454,6 @@ func TestInterleavedVersions(t *testing.T) {
 }
 
 func TestMaxBlobSizeV1(t *testing.T) {
-	if testutils.GetBackend() == testutils.PreprodBackend {
-		t.Skip("Preprod for v1 has a stricter blob size than normal.")
-	}
-
 	testMaxBlobSize(t, common.V1EigenDABackend)
 }
 
