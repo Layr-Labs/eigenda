@@ -203,7 +203,7 @@ func benchmarkMultiproofGeneration(b *testing.B, encodingConfig encoding.Config)
 	rand := random.NewTestRandomNoPrint(1337)
 	maxSizeBlobCoeffs := rand.FrElements(1 << 22)
 
-	for _, blobPowerBytes := range []uint64{21} {
+	for _, blobPowerBytes := range []uint64{17, 20, 21, 24} {
 		b.Run("Multiproof_size_2^"+fmt.Sprint(blobPowerBytes)+"_bytes", func(b *testing.B) {
 			// Reed-Solomon encoding with 8x redundancy: 2^3 = 8
 			rsExtendedBlobPowerBytes := blobPowerBytes + 3
@@ -251,7 +251,7 @@ func BenchmarkFrameGeneration(b *testing.B) {
 	rand := random.NewTestRandomNoPrint(1337)
 	maxSizeBlobCoeffs := rand.FrElements(1 << 22)
 
-	for _, blobPowerBytes := range []uint64{21} {
+	for _, blobPowerBytes := range []uint64{17, 20, 21, 24} {
 		b.Run("Multiproof_size_2^"+fmt.Sprint(blobPowerBytes)+"_bytes", func(b *testing.B) {
 			// Reed-Solomon encoding with 8x redundancy: 2^3 = 8
 			rsExtendedBlobPowerBytes := blobPowerBytes + 3
