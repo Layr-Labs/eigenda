@@ -131,7 +131,7 @@ func CreateTestSuite(
 	}
 
 	if appConfig.EnabledServersConfig.ArbCustomDA {
-		arbHandlers := arbitrum_altda.NewHandlers(certMgr, compatibilityCfg)
+		arbHandlers := arbitrum_altda.NewHandlers(certMgr, logger, compatibilityCfg)
 		arbServer, err = arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
 		if err != nil {
 			panic(fmt.Sprintf("create arbitrum server: %v", err.Error()))

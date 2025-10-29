@@ -2,14 +2,19 @@ package arbitrum_altda
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	proxy_common "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const (
@@ -64,7 +69,6 @@ type IHandlers interface {
 		ctx context.Context,
 		message hexutil.Bytes,
 		timeout hexutil.Uint64,
-		disableFallbackStoreDataOnChain bool,
 	) (*StoreResult, error)
 
 	GenerateReadPreimageProof(
@@ -109,25 +113,69 @@ type Handlers struct {
 	//       We should dig into this underlying logging and see if there's a way to intuitively override, disable,
 	//       or enforce consistency between log outputs.
 
-	eigenDAManager   *store.EigenDAManager
-	compatibilityCfg proxy_common.CompatibilityConfig
+	log            logging.Logger
+	eigenDAManager *store.EigenDAManager
+  compatibilityCfg proxy_common.CompatibilityConfig
 }
 
-func NewHandlers(m *store.EigenDAManager, compatCfg proxy_common.CompatibilityConfig) IHandlers {
+// NewHandlers is a constructor
+func NewHandlers(m *store.EigenDAManager, l logging.Logger, compatCfg proxy_common.CompatibilityConfig) IHandlers {
 	return &Handlers{
-		eigenDAManager:   m,
-		compatibilityCfg: compatCfg,
+		log:            l,
+		eigenDAManager: m,
+    compatibilityCfg: compatCfg,
 	}
 }
 
-// GetSupportedHeaderBytes determines whether or not the sequencer message header byte is an EigenDAV2 cert type.
-// Arbitrum Nitro does this check via a bitwise AND which can cause overlapping and requires careful future
-// management. while we could determine a byte value with bits that don't overlap - it's more maintainable
-// to do a literal comparison and assume OCL NOR our competitors would never introduce a conflicting byte value
+// GetSupportedHeaderBytes returns the supported DA Header bytes by the CustomDA server
+// this method is designed to return a span of bytes for compatibility with
+// Arbitrum AnyTrust where multiple message types are supported.
+// For CustomDA the provider only returns the Arbitrum CustomDA header byte.
 func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeaderBytesResult, error) {
+	h.logMethodCall(MethodGetSupportedHeaderBytes)
+
 	return &SupportedHeaderBytesResult{
-		HeaderBytes: []byte{EigenDAV2MessageHeaderByte},
+		HeaderBytes: []byte{commitments.ArbCustomDAHeaderByte},
 	}, nil
+}
+
+// deserializeCertFromSequencerMsg reads the VersionedCert from the raw sequencer message provided
+// by the DA Client
+func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (certs.VersionedCert, error) {
+	if len(sequencerMsg) <= 42 {
+		return certs.VersionedCert{},
+			fmt.Errorf("sequencer message expected to be >=42 bytes, got: %d", len(sequencerMsg))
+	}
+
+	seqMessageWithoutHeader := sequencerMsg[40:]
+
+	daHeaderByte := seqMessageWithoutHeader[0]
+	if daHeaderByte != commitments.ArbCustomDAHeaderByte {
+		return certs.VersionedCert{},
+			fmt.Errorf("expected CustomDAHeader byte (%x) for 0th index byte of message, instead got: %x ",
+				commitments.ArbCustomDAHeaderByte, daHeaderByte)
+	}
+
+	daLayerByte := seqMessageWithoutHeader[1]
+	if daLayerByte != commitments.EigenDALayerByte {
+		return certs.VersionedCert{},
+			fmt.Errorf("expected EigenDALayer byte (%x) for 1st index byte of message, instead got: %x ",
+				commitments.EigenDALayerByte, daLayerByte)
+	}
+
+	certVersionByte := seqMessageWithoutHeader[2]
+	versionedCert := certs.NewVersionedCert([]byte(seqMessageWithoutHeader[3:]), certs.VersionByte(certVersionByte))
+	return versionedCert, nil
+}
+
+// logMethodCall logs the method call with timing information and allows caller to pass in
+// method specific log context
+func (h *Handlers) logMethodCall(methodName string, logValue ...string) func() {
+	start := time.Now()
+
+	return func() {
+		h.log.Info(methodName, "ns", time.Since(start).Nanoseconds(), logValue)
+	}
 }
 
 // RecoverPayload is used to fetch the rollup payload of
@@ -135,7 +183,7 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 //
 // @param batch_num: batch number position in global state sequence
 // @param batch_block_hash: block hash of the certL1InclusionBlock
-// @param sequencer_msg: The DA Certificate
+// @param sequencer_msg: The encoded rollup payload
 //
 // @return bytes: Rollup payload bytes
 // @return error: A structured error message (if applicable)
@@ -145,23 +193,24 @@ func (h *Handlers) RecoverPayload(
 	batchBlockHash common.Hash,
 	sequencerMsg hexutil.Bytes,
 ) (*PayloadResult, error) {
-	if len(sequencerMsg) <= 1 {
-		return nil,
-			fmt.Errorf("sequencer message expected to be >1 byte, got: %d", len(sequencerMsg))
+	callBack := h.logMethodCall(MethodRecoverPayload, "sequencer_message", sequencerMsg.String())
+	defer callBack()
+
+	daCert, err := h.deserializeCertFromSequencerMsg(sequencerMsg)
+	if err != nil {
+		return nil, fmt.Errorf("deserialize cert: %w", err)
 	}
 
-	// strip version byte from sequencer message
-	//
-	// TODO: There will be additional bytes encoded here (i.e, CustomDA byte, EigenDAV2 Message Header byte).
-	//       Given the lack of response from OCL, it's still unknown what the exact expected schema should.
-	//       Once their interface is more hardended we can make a safer deduction for how to introduce this.
-	//       Will likely require introducing a new ArbCustomDA commitment type
-	//
-	versionByte := sequencerMsg[0]
-	versionedCert := certs.NewVersionedCert([]byte(sequencerMsg[1:]), certs.VersionByte(versionByte))
-
-	payload, err := h.eigenDAManager.Get(ctx, versionedCert, proxy_common.GETOpts{})
+	payload, err := h.eigenDAManager.Get(ctx, daCert, proxy_common.GETOpts{})
 	if err != nil {
+		var dpError *coretypes.DerivationError
+		if errors.As(err, &dpError) {
+			// returning nil for the batch payload indicates to the
+			// nitro derivation pipeline to "discard" this batch and move
+			// onto the next DA Cert in the Sequencer Inbox
+			return nil, nil
+		}
+
 		return nil, fmt.Errorf("get rollup payload from DA Cert: %w", err)
 	}
 
@@ -181,9 +230,6 @@ func (h *Handlers) RecoverPayload(
 //	@return bytes: Arbitrum Custom DA commitment bytes
 //	@return error: a structured error message (if applicable)
 //
-// TODO: Map 503 Service Unavailable status code error returned from EigenDA manager into an Arbitrum
-// failover error message if disableFallbackStoreDataOnChain=true
-//
 // TODO: Determine the encoding standard to use for the returned DA Commitment. It's assumed that an EigenDAV2 message
 // header byte will be prefixed. We can likely reuse the Standard Commitment mode but will require some analysis.
 //
@@ -192,8 +238,10 @@ func (h *Handlers) Store(
 	ctx context.Context,
 	message hexutil.Bytes,
 	timeout hexutil.Uint64,
-	disableFallbackStoreDataOnChain bool,
 ) (*StoreResult, error) {
+	callBack := h.logMethodCall(MethodStore)
+	defer callBack()
+
 	dispersalBackend := h.eigenDAManager.GetDispersalBackend()
 	if dispersalBackend != proxy_common.V2EigenDABackend {
 		return nil, fmt.Errorf("expected EigenDAV2 backend, got: %v", dispersalBackend)
@@ -203,6 +251,9 @@ func (h *Handlers) Store(
 		return nil, fmt.Errorf("received empty rollup payload")
 	}
 
+	// TODO: These "certBytes" should be ABI encoded before publishing to SequencerInbox
+	//       since the byte committed to onchain are the same bytes being referenced during the
+	//       one step proof
 	certBytes, err := h.eigenDAManager.Put(ctx, message)
 	if err != nil {
 		return nil, fmt.Errorf("put rollup payload: %w", err)
@@ -211,7 +262,7 @@ func (h *Handlers) Store(
 	// TODO: This should eventually be propagated by the Put method given the actual
 	//       version byte assumed is dictated by the EigenDACertVerifier used
 	versionedCert := certs.NewVersionedCert(certBytes, certs.V2VersionByte)
-	daCommitment := commitments.NewStandardCommitment(versionedCert)
+	daCommitment := commitments.NewArbCommitment(versionedCert)
 
 	result := &StoreResult{
 		SerializedDACert: daCommitment.Encode(),
@@ -220,7 +271,10 @@ func (h *Handlers) Store(
 	return result, nil
 }
 
-// CollectPreimages fetches the "polynomial evaluation form" of the dispersed rollup payload
+// NOTE: The validation pipeline for CustomDA in Arbitrum is currently unimplemented
+// meaning a consensus artifact cannot be generated which reads CustomDA rollup payloads
+//
+// CollectPreimages fetches the "polynomial evaluation form" (not yet) of the dispersed rollup payload
 // and inserts it as a value into a PreimageMap using the hash of the DA Cert as the
 // preimage key
 //
@@ -236,7 +290,38 @@ func (h *Handlers) CollectPreimages(
 	batchBlockHash common.Hash,
 	sequencerMsg hexutil.Bytes,
 ) (*PreimagesResult, error) {
-	panic("CollectPreimages method is unimplemented!")
+	callBack := h.logMethodCall(MethodCollectPreimages, "sequencer_message", sequencerMsg.String())
+	defer callBack()
+
+	daCert, err := h.deserializeCertFromSequencerMsg(sequencerMsg)
+	if err != nil {
+		return nil, fmt.Errorf("deserialize cert: %w", err)
+	}
+
+	payload, err := h.eigenDAManager.Get(ctx, daCert, proxy_common.GETOpts{})
+	if err != nil {
+		var dpError *coretypes.DerivationError
+		if errors.As(err, &dpError) {
+			// returning nil for the batch payload indicates to the
+			// nitro derivation pipeline to "discard" this batch and move
+			// onto the next DA Cert in the Sequencer Inbox
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("get rollup payload from DA Cert: %w", err)
+	}
+
+	preimages := make(PreimagesMap)
+	preimageRecorder := RecordPreimagesTo(preimages)
+
+	// Record the mapping from certificate hash to actual payload data
+	// This is what the replay binary expects: keccak256(certificate) -> payload
+	certHash := crypto.Keccak256Hash(sequencerMsg[40:])
+	preimageRecorder(certHash, payload, CustomDAPreimageType)
+
+	return &PreimagesResult{
+		Preimages: preimages,
+	}, nil
 }
 
 // GenerateReadPreimageProof is used to prove a 32 byte CustomDA preimage type for READPREIMAGE

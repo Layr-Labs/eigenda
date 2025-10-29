@@ -178,9 +178,10 @@ func (c *validatorClient) GetBlob(
 	return data, nil
 }
 
-// getFlattenedOperatorSockets merges the operator sockets contained in a nested mapping (QuorumID => OperatorID => OperatorInfo) to a flattened mapping
-// (OperatorID) => OperatorSocket). If an operator is encountered multiple times, it uses the socket corresponding to the first occurence.
-// As operators can only register a single socket across quorums, this is acceptable.
+// getFlattenedOperatorSockets merges the operator sockets contained in a nested mapping
+// (QuorumID => OperatorID => OperatorInfo) to a flattened mapping (OperatorID) => OperatorSocket).
+// If an operator is encountered multiple times, it uses the socket corresponding to
+// the first occurrence. As operators can only register a single socket across quorums, this is acceptable.
 func getFlattenedOperatorSockets(operatorsMap map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo) map[core.OperatorID]core.OperatorSocket {
 
 	operatorSockets := make(map[core.OperatorID]core.OperatorSocket)

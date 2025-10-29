@@ -21,10 +21,6 @@ type ParametrizedProver struct {
 }
 
 func (g *ParametrizedProver) GetProofs(inputFr []fr.Element) ([]encoding.Proof, error) {
-	if err := g.validateInput(inputFr); err != nil {
-		return nil, err
-	}
-
 	// pad inputFr to NumEvaluations(), which encodes the RS redundancy
 	paddedCoeffs := make([]fr.Element, g.encodingParams.NumEvaluations())
 	copy(paddedCoeffs, inputFr)
@@ -35,13 +31,4 @@ func (g *ParametrizedProver) GetProofs(inputFr []fr.Element) ([]encoding.Proof, 
 		return nil, fmt.Errorf("compute multi frame proof: %w", err)
 	}
 	return proofs, nil
-}
-
-func (g *ParametrizedProver) validateInput(inputFr []fr.Element) error {
-	if len(inputFr) > int(g.srsNumberToLoad) {
-		return fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v",
-			len(inputFr), int(g.srsNumberToLoad))
-	}
-
-	return nil
 }

@@ -48,7 +48,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":01}"+ // 01 for generic commitments
 			"{da_layer_byte:[0-9a-fA-F]{2}}"+ // should always be 0x00 for eigenDA but we let others through to return a 404
-			"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
+			"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // Should be either 0x00 (v1), 0x01 (v2), 0x02 (v3) but we let others through to return a 404
 			"{"+routingVarNamePayloadHex+"}",
 		middleware.WithCertMiddlewares(
 			svr.handleGetOPGenericCommitment,
