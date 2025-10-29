@@ -74,9 +74,13 @@ func NewServerV2(
 			reader,
 			config.DispersalAuthenticationKeyCacheSize,
 			config.DisperserKeyTimeout,
+			// TODO(litt3): this must be made configurable before additional dispersers can be added
 			func(id uint32) bool {
 				return id == api.EigenLabsDisperserID
 			},
+			// TODO(litt3): once the checkpointed onchain config registry is ready, the authorized
+			// on-demand dispersers should be read from there instead of being hardcoded.
+			[]uint32{api.EigenLabsDisperserID},
 			time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create authenticator: %w", err)
@@ -186,6 +190,12 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
 		if err != nil {
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
+		}
+
+		if !s.chunkAuthenticator.CheckOnDemandPaymentAuthorization(in.GetDisperserID(), batch) {
+			//nolint:wrapcheck
+			return nil, api.NewErrorPermissionDenied(
+				fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
 		}
 
 		timestamp := time.Unix(int64(in.GetTimestamp()), 0)

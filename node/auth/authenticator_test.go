@@ -3,12 +3,15 @@ package auth
 import (
 	"crypto/ecdsa"
 	"errors"
+	"math/big"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/core"
 	wmock "github.com/Layr-Labs/eigenda/core/mock"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
@@ -31,6 +34,7 @@ func TestValidRequest(t *testing.T) {
 		10,
 		time.Minute,
 		func(uint32) bool { return true },
+		[]uint32{0},
 		start)
 	require.NoError(t, err)
 
@@ -65,6 +69,7 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 		10,
 		time.Minute,
 		func(uint32) bool { return true },
+		[]uint32{0},
 		start)
 	require.NoError(t, err)
 
@@ -99,6 +104,7 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 		10,
 		time.Minute,
 		func(uint32) bool { return true },
+		[]uint32{0},
 		start)
 	require.NoError(t, err)
 
@@ -145,6 +151,7 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 			filterCallCount.Add(1)
 			return id != uint32(1)
 		},
+		[]uint32{0},
 		start)
 	require.NoError(t, err)
 	require.Equal(t, uint32(1), filterCallCount.Load())
@@ -194,6 +201,7 @@ func TestKeyExpiry(t *testing.T) {
 		10,
 		time.Minute,
 		func(uint32) bool { return true },
+		[]uint32{0},
 		start)
 	require.NoError(t, err)
 
@@ -258,6 +266,7 @@ func TestKeyCacheSize(t *testing.T) {
 		cacheSize,
 		time.Minute,
 		func(uint32) bool { return true },
+		[]uint32{0},
 		start)
 	require.NoError(t, err)
 
@@ -328,4 +337,50 @@ func TestKeyCacheSize(t *testing.T) {
 	require.Equal(t, expectedHash, hash)
 
 	mockChainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize+2)
+}
+
+func TestOnDemandPaymentAuthorization(t *testing.T) {
+	ctx := t.Context()
+	rand := random.NewTestRandom()
+
+	start := rand.Time()
+
+	disperser0Address, _, err := rand.EthAccount()
+	require.NoError(t, err)
+
+	disperser1Address, _, err := rand.EthAccount()
+	require.NoError(t, err)
+
+	chainReader := wmock.MockWriter{}
+	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperser0Address, nil)
+	chainReader.Mock.On("GetDisperserAddress", uint32(1)).Return(disperser1Address, nil)
+
+	authenticator, err := NewRequestAuthenticator(
+		ctx,
+		&chainReader,
+		10,
+		time.Minute,
+		func(uint32) bool { return true },
+		[]uint32{0},
+		start)
+	require.NoError(t, err)
+
+	onDemandBatch := &corev2.Batch{
+		BlobCertificates: []*corev2.BlobCertificate{
+			{BlobHeader: &corev2.BlobHeader{PaymentMetadata: core.PaymentMetadata{CumulativePayment: big.NewInt(10)}}},
+			{BlobHeader: &corev2.BlobHeader{PaymentMetadata: core.PaymentMetadata{CumulativePayment: big.NewInt(0)}}},
+		},
+	}
+
+	reservationBatch := &corev2.Batch{
+		BlobCertificates: []*corev2.BlobCertificate{
+			{BlobHeader: &corev2.BlobHeader{PaymentMetadata: core.PaymentMetadata{CumulativePayment: big.NewInt(0)}}},
+		},
+	}
+
+	require.True(t, authenticator.CheckOnDemandPaymentAuthorization(0, onDemandBatch))
+	require.True(t, authenticator.CheckOnDemandPaymentAuthorization(0, reservationBatch))
+
+	require.False(t, authenticator.CheckOnDemandPaymentAuthorization(1, onDemandBatch))
+	require.True(t, authenticator.CheckOnDemandPaymentAuthorization(1, reservationBatch))
 }
