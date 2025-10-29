@@ -145,7 +145,7 @@ func generateRandomFrameCoeffs(
 	size int,
 	params encoding.EncodingParams) []rs.FrameCoeffs {
 
-	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(random.RandomBytes(size)), params)
+	frames, _, err := encoder.EncodeBytes(t.Context(), codec.ConvertByPaddingEmptyByte(random.RandomBytes(size)), params)
 	require.NoError(t, err, "failed to encode bytes into frame coefficients")
 	return frames
 }

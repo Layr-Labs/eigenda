@@ -200,7 +200,7 @@ func TestParsingBundle(t *testing.T) {
 	enc := rs.NewEncoder(logger, cfg)
 
 	// Build some random coefficients
-	coeffs, _, err := enc.EncodeBytes(paddedPayload, params)
+	coeffs, _, err := enc.EncodeBytes(t.Context(), paddedPayload, params)
 	require.Nil(t, err)
 	require.NotNil(t, coeffs, err)
 	serializedCoeffs, err := rs.SerializeFrameCoeffsSlice(coeffs)

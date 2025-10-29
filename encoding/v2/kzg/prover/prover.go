@@ -170,7 +170,7 @@ func (e *Prover) GetFrames(
 	go func() {
 		defer close(encodeChan)
 		encodeStart := time.Now()
-		frames, indices, err := e.encoder.Encode(inputFr, params)
+		frames, indices, err := e.encoder.Encode(ctx, inputFr, params)
 		encodingDuration := time.Since(encodeStart)
 		encodeChan <- encodeChanResult{
 			chunks:   frames,

@@ -28,7 +28,7 @@ func TestEncodeDecode_InvertsWhenSamplingAllFrames(t *testing.T) {
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
-	frames, _, err := enc.Encode(inputFr, params)
+	frames, _, err := enc.Encode(t.Context(), inputFr, params)
 	assert.Nil(t, err)
 
 	// sample some Frames
@@ -49,7 +49,7 @@ func TestEncodeDecode_InvertsWhenSamplingMissingFrame(t *testing.T) {
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
-	frames, _, err := enc.Encode(inputFr, params)
+	frames, _, err := enc.Encode(t.Context(), inputFr, params)
 	assert.Nil(t, err)
 
 	// sample some Frames
@@ -72,7 +72,7 @@ func TestEncodeDecode_InvertsWithMissingAndDuplicateFrames(t *testing.T) {
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
-	frames, _, err := enc.Encode(inputFr, params)
+	frames, _, err := enc.Encode(t.Context(), inputFr, params)
 	assert.Nil(t, err)
 
 	assert.EqualValues(t, len(frames), numSys+numPar)
@@ -101,7 +101,7 @@ func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
-	frames, _, err := enc.Encode(inputFr, params)
+	frames, _, err := enc.Encode(t.Context(), inputFr, params)
 	assert.Nil(t, err)
 
 	// sample some Frames
@@ -123,7 +123,7 @@ func TestEncodeDecode_ErrorsWhenNotEnoughSampledFramesWithDuplicates(t *testing.
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
-	frames, _, err := enc.Encode(inputFr, params)
+	frames, _, err := enc.Encode(t.Context(), inputFr, params)
 	assert.Nil(t, err)
 
 	// sample some Frames
@@ -164,7 +164,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		enc := rs.NewEncoder(common.TestLogger(t), cfg)
 
 		//encode the data
-		frames, _, err := enc.EncodeBytes(input, params)
+		frames, _, err := enc.EncodeBytes(t.Context(), input, params)
 		if err != nil {
 			t.Errorf("Error Encoding:\n Data:\n %q \n Err: %q", input, err)
 		}

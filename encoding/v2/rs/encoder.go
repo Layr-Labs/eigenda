@@ -1,6 +1,7 @@
 package rs
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -42,19 +43,23 @@ func NewEncoder(logger logging.Logger, config *encoding.Config) *Encoder {
 }
 
 // just a wrapper to take bytes not Fr Element
-func (g *Encoder) EncodeBytes(inputBytes []byte, params encoding.EncodingParams) ([]FrameCoeffs, []uint32, error) {
+func (g *Encoder) EncodeBytes(
+	ctx context.Context, inputBytes []byte, params encoding.EncodingParams,
+) ([]FrameCoeffs, []uint32, error) {
 	inputFr, err := ToFrArray(inputBytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
 	}
-	return g.Encode(inputFr, params)
+	return g.Encode(ctx, inputFr, params)
 }
 
 // Encode function takes input in unit of Fr Element and creates a list of FramesCoeffs,
 // which each contain a list of multireveal interpolating polynomial coefficients.
 // A slice of uint32 is also returned, which corresponds to which leading coset
 // root of unity the frame is proving against. This can be deduced from a frame's index.
-func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) ([]FrameCoeffs, []uint32, error) {
+func (g *Encoder) Encode(
+	ctx context.Context, inputFr []fr.Element, params encoding.EncodingParams,
+) ([]FrameCoeffs, []uint32, error) {
 	start := time.Now()
 	intermediate := time.Now()
 
@@ -72,7 +77,7 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 
 	intermediate = time.Now()
 
-	polyEvals, err := encoder.rsEncoderBackend.ExtendPolyEval(pdCoeffs)
+	polyEvals, err := encoder.rsEncoderBackend.ExtendPolyEvalV2(ctx, pdCoeffs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reed-solomon extend poly evals, %w", err)
 	}

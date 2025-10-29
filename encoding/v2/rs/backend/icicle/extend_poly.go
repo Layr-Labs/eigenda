@@ -48,7 +48,7 @@ func BuildRSBackend(logger logging.Logger, enableGPU bool, gpuConcurrentEncoding
 }
 
 // Encoding Reed Solomon using FFT
-func (g *RSBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
+func (g *RSBackend) ExtendPolyEvalV2(ctx context.Context, coeffs []fr.Element) ([]fr.Element, error) {
 	// We acquire a semaphore here to avoid too many concurrent NTT calls.
 	// This is a very unideal and coarse grain solution, but unfortunately
 	// icicle doesn't have nice backpressure, and the GPU kernel just panics if RAM is exhausted.
@@ -57,7 +57,7 @@ func (g *RSBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
 	// but this would feel very hardcoded and hardware dependent (although we can request RAM available on the device
 	// dynamically using icicle APIs). For now opting to keep this simple.
 	// TODO(samlaf): rethink this approach.
-	g.GpuSemaphore.Acquire(context.TODO(), 1)
+	g.GpuSemaphore.Acquire(ctx, 1)
 	defer g.GpuSemaphore.Release(1)
 
 	// coeffs will be moved to device memory inside Ntt function,

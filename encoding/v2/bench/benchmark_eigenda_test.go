@@ -113,7 +113,7 @@ func benchmarkRSBackend(b *testing.B, rsBackend backend.RSEncoderBackend) {
 			// run multiple goroutines in parallel to better utilize the GPU
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
-					_, err := rsBackend.ExtendPolyEval(blobCoeffs[:numFrs])
+					_, err := rsBackend.ExtendPolyEvalV2(b.Context(), blobCoeffs[:numFrs])
 					require.NoError(b, err)
 				}
 			})
@@ -147,7 +147,7 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 			require.Nil(b, err)
 
 			for b.Loop() {
-				_, _, err = enc.Encode(blob, params)
+				_, _, err = enc.Encode(b.Context(), blob, params)
 				require.Nil(b, err)
 			}
 		})
