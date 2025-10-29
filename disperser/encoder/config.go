@@ -12,6 +12,7 @@ type ServerConfig struct {
 	PreventReencoding        bool
 	Backend                  string
 	GPUEnable                bool
-	PprofHttpPort            string
-	EnablePprof              bool
+	GPUConcurrentFrameGenerationDangerous int64
+	PprofHttpPort                         string
+	EnablePprof                           bool
 }

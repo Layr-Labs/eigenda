@@ -113,6 +113,18 @@ var (
 		Value:    string(encoding.GnarkBackend),
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BACKEND"),
 	}
+	GPUConcurrentFrameGenerationDangerousFlag = cli.IntFlag{
+		Name: common.PrefixFlag(FlagPrefix, "gpu-concurrent-frame-generation-dangerous"),
+		Usage: "Weight of the GPU semaphore. Increase this value to allow more concurrent GPU tasks. " +
+			"This is only used by V2 when GPU is enabled (Backend=icicle and GPUEnable=true). " +
+			"Chunk generation (encoding/v2/rs) and multiproofs generation (encoding/v2/kzg/prover) " +
+			"each have their own separate semaphore which is weighted using this value. " +
+			"WARNING: setting this value too high may lead to out-of-memory errors on the GPU. " +
+			"If this ever happens, the GPU device needs to be rebooted as it can be left in a bad state.",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GPU_CONCURRENT_ENCODINGS_DANGEROUS"),
+	}
 	PreventReencodingFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "prevent-reencoding"),
 		Usage:    "if true, will prevent reencoding of chunks by checking if the chunk already exists in the chunk store",
@@ -153,6 +165,7 @@ var optionalFlags = []cli.Flag{
 	OCINamespaceFlag,
 	GPUEnableFlag,
 	BackendFlag,
+	GPUConcurrentFrameGenerationDangerousFlag,
 	PreventReencodingFlag,
 	PprofHttpPort,
 	EnablePprof,

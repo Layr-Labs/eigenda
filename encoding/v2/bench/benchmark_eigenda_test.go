@@ -88,7 +88,9 @@ func BenchmarkRSBackendIcicle(b *testing.B) {
 	if !icicle.IsAvailable {
 		b.Skip("code compiled without the icicle build tag")
 	}
-	icicleBackend, err := rsicicle.BuildRSBackend(common.SilentLogger(), true)
+	// Change this value to allow more encodings to run in parallel on the GPU.
+	gpuConcurrentEncodings := int64(1)
+	icicleBackend, err := rsicicle.BuildRSBackend(common.SilentLogger(), true, gpuConcurrentEncodings)
 	require.NoError(b, err)
 	benchmarkRSBackend(b, icicleBackend)
 }
@@ -243,9 +245,15 @@ func BenchmarkFrameGeneration(b *testing.B) {
 		CacheDir:       "../../../resources/srs/SRSTables",
 		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
 	}
+	encodingConfig := encoding.Config{
+		NumWorker:                             uint64(runtime.NumCPU()),
+		BackendType:                           encoding.IcicleBackend,
+		GPUEnable:                             true,
+		GPUConcurrentFrameGenerationDangerous: 20,
+	}
 	b.Log("Reading precomputed SRSTables, this may take a while...")
 	// use a non-silent logger to see the "Multiproof Time Decomp" log lines.
-	p, err := prover.NewProver(common.TestLogger(b), &proverConfig, nil)
+	p, err := prover.NewProver(common.TestLogger(b), &proverConfig, &encodingConfig)
 	require.NoError(b, err)
 
 	rand := random.NewTestRandomNoPrint(1337)
@@ -263,9 +271,10 @@ func BenchmarkFrameGeneration(b *testing.B) {
 			}
 
 			for b.Loop() {
+				n := 20
 				wg := sync.WaitGroup{}
-				wg.Add(5)
-				for range 5 {
+				wg.Add(n)
+				for range n {
 					go func() {
 						defer wg.Done()
 						_, _, err = p.GetFrames(maxSizeBlobCoeffs[:rsExtendedBlobFrs], params)

@@ -25,7 +25,7 @@ func (*KzgMultiProofBackend) ComputeMultiFrameProofV2(
 
 func NewMultiProofBackend(logger logging.Logger,
 	fs *fft.FFTSettings, fftPointsT [][]bn254.G1Affine, g1SRS []bn254.G1Affine,
-	gpuEnabled bool, numWorker uint64,
+	gpuEnabled bool, numWorker uint64, gpuConcurrentTasks int64,
 ) (*KzgMultiProofBackend, error) {
 	// Not supported
 	return nil, errors.New("icicle backend called without icicle build tag")

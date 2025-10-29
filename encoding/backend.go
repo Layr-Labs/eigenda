@@ -23,6 +23,19 @@ type Config struct {
 	NumWorker   uint64
 	BackendType BackendType
 	GPUEnable   bool
+	// Increase this value to allow more concurrent GPU frame (chunk+proof) tasks.
+	// Only used by V2 when Backend=icicle and GPUEnable=true.
+	// Note Chunk generation (encoding/v2/rs) and multiproofs generation (encoding/v2/kzg/prover)
+	// each have their own separate semaphore which is weighted using this same value.
+	//
+	// This protects against out-of-memory errors on the GPU, not GPU time usage.
+	// WARNING: setting this value too high may lead to out-of-memory errors on the GPU.
+	// If this ever happens, the GPU device needs to be rebooted as it can be left in a bad state.
+	//
+	// For now we use this very coarse-grained approach, instead of using a RAM-usage based semaphore,
+	// because that would feel brittle and require approximations of RAM usage per MSM/NTT operation.
+	// We can rethink this abstraction later if needed.
+	GPUConcurrentFrameGenerationDangerous int64
 }
 
 // DefaultConfig returns a Config struct with default values.
@@ -32,15 +45,17 @@ type Config struct {
 func DefaultConfig() *Config {
 	if icicle.IsAvailable {
 		return &Config{
-			NumWorker:   uint64(runtime.GOMAXPROCS(0)),
-			BackendType: IcicleBackend,
-			GPUEnable:   true,
+			NumWorker:                             uint64(runtime.GOMAXPROCS(0)),
+			BackendType:                           IcicleBackend,
+			GPUEnable:                             true,
+			GPUConcurrentFrameGenerationDangerous: 1,
 		}
 	}
 	return &Config{
-		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
-		BackendType: GnarkBackend,
-		GPUEnable:   false,
+		NumWorker:                             uint64(runtime.GOMAXPROCS(0)),
+		BackendType:                           GnarkBackend,
+		GPUEnable:                             false,
+		GPUConcurrentFrameGenerationDangerous: 0, // Not used
 	}
 }
 

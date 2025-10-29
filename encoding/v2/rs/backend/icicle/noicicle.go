@@ -17,7 +17,7 @@ func (g *RSBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
 }
 
 func BuildRSBackend(
-	logger logging.Logger, enableGPU bool) (*RSBackend, error) {
+	logger logging.Logger, enableGPU bool, gpuConcurrentTasks int64) (*RSBackend, error) {
 	// Not supported
 	return nil, errors.New("icicle backend called without icicle build tag")
 }

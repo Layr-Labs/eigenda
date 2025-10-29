@@ -268,7 +268,8 @@ func (p *Prover) newProver(params encoding.EncodingParams, provingParams Proving
 	case encoding.IcicleBackend:
 		var err error
 		multiproofsBackend, err = icicle.NewMultiProofBackend(
-			p.logger, fs, fftPointsT, p.G1SRS, p.Config.GPUEnable, p.KzgConfig.NumWorker)
+			p.logger, fs, fftPointsT, p.G1SRS, p.Config.GPUEnable,
+			p.Config.NumWorker, p.Config.GPUConcurrentFrameGenerationDangerous)
 		if err != nil {
 			return nil, fmt.Errorf("create icicle backend prover: %w", err)
 		}
