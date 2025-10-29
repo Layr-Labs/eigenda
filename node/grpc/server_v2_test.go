@@ -229,14 +229,24 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 	require.NoError(t, err)
 	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+	c.relayClient.On(
+		"GetChunksByRange",
+		mock.Anything,
+		v2.RelayKey(0),
+		mock.Anything,
+	).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+	c.relayClient.On(
+		"GetChunksByRange",
+		mock.Anything,
+		v2.RelayKey(1),
+		mock.Anything,
+	).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
@@ -268,8 +278,8 @@ func TestV2StoreChunksDownloadFailure(t *testing.T) {
 	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	relayErr := errors.New("error")
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{}, relayErr)
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{}, relayErr)
+	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{}, relayErr)
+	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{}, relayErr)
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		DisperserID: 0,
 		Signature:   ecdsaSig,
@@ -296,14 +306,24 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 	require.NoError(t, err)
 	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+	c.relayClient.On(
+		"GetChunksByRange",
+		mock.Anything,
+		v2.RelayKey(0),
+		mock.Anything,
+	).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+	c.relayClient.On(
+		"GetChunksByRange",
+		mock.Anything,
+		v2.RelayKey(1),
+		mock.Anything,
+	).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
