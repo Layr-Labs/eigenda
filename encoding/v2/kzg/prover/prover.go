@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	_ "go.uber.org/automaxprocs"
 )
 
@@ -144,13 +145,9 @@ func NewProver(logger logging.Logger, kzgConfig *KzgConfig, encoderConfig *encod
 	return proverGroup, nil
 }
 
-func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, []uint32, error) {
-	symbols, err := rs.ToFrArray(data)
-	if err != nil {
-		return nil, nil, fmt.Errorf("ToFrArray: %w", err)
-	}
+func (e *Prover) GetFrames(inputFr []fr.Element, params encoding.EncodingParams) ([]*encoding.Frame, []uint32, error) {
 
-	blobLength := uint64(encoding.GetBlobLengthPowerOf2(uint32(len(data))))
+	blobLength := uint64(math.NextPowOf2u32(uint32(len(inputFr))))
 	provingParams, err := BuildProvingParamsFromEncodingParams(params, blobLength)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get proving params: %w", err)
@@ -171,7 +168,7 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	go func() {
 		defer close(encodeChan)
 		encodeStart := time.Now()
-		frames, indices, err := e.encoder.Encode(symbols, params)
+		frames, indices, err := e.encoder.Encode(inputFr, params)
 		encodingDuration := time.Since(encodeStart)
 		encodeChan <- encodeChanResult{
 			chunks:   frames,
@@ -182,7 +179,7 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	}()
 
 	getProofsStart := time.Now()
-	proofs, err := prover.GetProofs(symbols)
+	proofs, err := prover.GetProofs(inputFr)
 	getProofsDuration := time.Since(getProofsStart)
 
 	// Wait for both chunks and frames to have finished generating
@@ -196,7 +193,7 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	}
 
 	e.logger.Info("Frame process details",
-		"input_size_bytes", len(symbols)*encoding.BYTES_PER_SYMBOL,
+		"input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
 		"num_chunks", params.NumChunks,
 		"chunk_length", params.ChunkLength,
 		"rs_encode_duration", encodeResult.duration,
