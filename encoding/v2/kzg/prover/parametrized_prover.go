@@ -3,6 +3,7 @@ package prover
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/backend"
@@ -20,9 +21,13 @@ type ParametrizedProver struct {
 	kzgMultiProofBackend       backend.KzgMultiProofsBackendV2
 }
 
+// The inputFr has not been padded to the next power of 2 field of elements. But ComputeMultiFrameProofV2
+// requires it.
 func (g *ParametrizedProver) GetProofs(inputFr []fr.Element) ([]encoding.Proof, error) {
-	// pad inputFr to NumEvaluations(), which encodes the RS redundancy
-	paddedCoeffs := make([]fr.Element, g.encodingParams.NumEvaluations())
+	// get the blob length
+	blobLength := uint64(math.NextPowOf2u32(uint32(len(inputFr))))
+	// pad inputFr to BlobLength if it is not power of 2, which encodes the RS redundancy
+	paddedCoeffs := make([]fr.Element, blobLength)
 	copy(paddedCoeffs, inputFr)
 
 	proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(
