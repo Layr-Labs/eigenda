@@ -2,8 +2,6 @@ package auth
 
 import (
 	"crypto/ecdsa"
-	"errors"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -25,7 +23,7 @@ func TestValidRequest(t *testing.T) {
 	require.NoError(t, err)
 
 	chainReader := wmock.MockWriter{}
-	chainReader.Mock.On("GetAllDisperserAddresses", uint32(0), uint32(3)).Return([]gethcommon.Address{
+	chainReader.Mock.On("GetAllDisperserAddresses", uint32(10)).Return([]gethcommon.Address{
 		disperserAddress,
 	}, nil)
 
@@ -35,14 +33,11 @@ func TestValidRequest(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		3,
-		func(uint32) bool { return true },
 		logger,
 		start)
 	require.NoError(t, err)
 
 	request := RandomStoreChunksRequest(rand)
-	request.DisperserID = 0
 	signature, err := SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
 	request.Signature = signature
@@ -64,7 +59,7 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 	require.NoError(t, err)
 
 	chainReader := wmock.MockWriter{}
-	chainReader.Mock.On("GetAllDisperserAddresses", uint32(0), uint32(3)).Return([]gethcommon.Address{
+	chainReader.Mock.On("GetAllDisperserAddresses", uint32(10)).Return([]gethcommon.Address{
 		disperserAddress,
 	}, nil)
 
@@ -74,14 +69,11 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		3,
-		func(uint32) bool { return true },
 		logger,
 		start)
 	require.NoError(t, err)
 
 	request := RandomStoreChunksRequest(rand)
-	request.DisperserID = 0
 	signature, err := SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
 	request.Signature = signature
@@ -103,7 +95,7 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 	require.NoError(t, err)
 
 	chainReader := wmock.MockWriter{}
-	chainReader.Mock.On("GetAllDisperserAddresses", uint32(0), uint32(3)).Return([]gethcommon.Address{
+	chainReader.Mock.On("GetAllDisperserAddresses", uint32(10)).Return([]gethcommon.Address{
 		disperserAddress,
 	}, nil)
 
@@ -113,14 +105,11 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		3,
-		func(uint32) bool { return true },
 		logger,
 		start)
 	require.NoError(t, err)
 
 	request := RandomStoreChunksRequest(rand)
-	request.DisperserID = 0
 
 	_, differentPrivateKey, err := rand.EthAccount()
 	require.NoError(t, err)
@@ -132,30 +121,24 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestInvalidRequestInvalidDisperserID(t *testing.T) {
+func TestInvalidRequestUnregisteredKey(t *testing.T) {
 	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	disperserAddress0, privateKey0, err := rand.EthAccount()
+	// Create a legitimate disperser address for the registry
+	disperserAddress, _, err := rand.EthAccount()
 	require.NoError(t, err)
 
-	// This disperser will be loaded on chain (simulated), but will fail the valid disperser ID filter.
-	disperserAddress1, privateKey1, err := rand.EthAccount()
+	// Create a private key that is NOT in the registry
+	_, unregisteredPrivateKey, err := rand.EthAccount()
 	require.NoError(t, err)
 
 	chainReader := wmock.MockWriter{}
-	chainReader.Mock.On("GetAllDisperserAddresses", uint32(0), uint32(3)).Return([]gethcommon.Address{
-		disperserAddress0,
+	chainReader.Mock.On("GetAllDisperserAddresses", uint32(10)).Return([]gethcommon.Address{
+		disperserAddress, // Only this address is registered
 	}, nil)
-	chainReader.Mock.On("GetAllDisperserAddresses", uint32(1), uint32(3)).Return([]gethcommon.Address{
-		disperserAddress1,
-	}, nil)
-	chainReader.Mock.On("GetAllDisperserAddresses", uint32(1234), uint32(3)).Return(
-		nil, errors.New("disperser not found"))
-
-	filterCallCount := atomic.Uint32{}
 
 	logger := test.GetLogger()
 	authenticator, err := NewRequestAuthenticator(
@@ -163,41 +146,18 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		3,
-		func(id uint32) bool {
-			filterCallCount.Add(1)
-			return id != uint32(1)
-		},
 		logger,
 		start)
 	require.NoError(t, err)
-	require.Equal(t, uint32(1), filterCallCount.Load())
 
 	request := RandomStoreChunksRequest(rand)
-	request.DisperserID = 0
-	signature, err := SignStoreChunksRequest(privateKey0, request)
+	signature, err := SignStoreChunksRequest(unregisteredPrivateKey, request)
 	require.NoError(t, err)
 	request.Signature = signature
-	hash, err := authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
-	require.NoError(t, err)
-	expectedHash, err := hashing.HashStoreChunksRequest(request)
-	require.NoError(t, err)
-	require.Equal(t, expectedHash, hash)
-	require.Equal(t, uint32(2), filterCallCount.Load())
 
-	request.DisperserID = 1
-	signature, err = SignStoreChunksRequest(privateKey1, request)
-	require.NoError(t, err)
-	request.Signature = signature
 	_, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
 	require.Error(t, err)
-
-	request.DisperserID = 1234
-	signature, err = SignStoreChunksRequest(privateKey1, request)
-	require.NoError(t, err)
-	request.Signature = signature
-	_, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
-	require.Error(t, err)
+	require.Contains(t, err.Error(), "doesn't match any registered public key")
 }
 
 func TestKeyExpiry(t *testing.T) {
@@ -210,7 +170,7 @@ func TestKeyExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	mockChainReader := wmock.MockWriter{}
-	mockChainReader.On("GetAllDisperserAddresses", uint32(0), uint32(3)).Return([]gethcommon.Address{
+	mockChainReader.On("GetAllDisperserAddresses", uint32(10)).Return([]gethcommon.Address{
 		disperserAddress,
 	}, nil)
 
@@ -220,8 +180,6 @@ func TestKeyExpiry(t *testing.T) {
 		&mockChainReader,
 		10,
 		time.Minute,
-		3,
-		func(uint32) bool { return true },
 		logger,
 		start)
 	require.NoError(t, err)
@@ -230,7 +188,6 @@ func TestKeyExpiry(t *testing.T) {
 	mockChainReader.AssertNumberOfCalls(t, "GetAllDisperserAddresses", 1)
 
 	request := RandomStoreChunksRequest(rand)
-	request.DisperserID = 0
 	signature, err := SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
 	request.Signature = signature
@@ -278,7 +235,7 @@ func TestKeyCacheSize(t *testing.T) {
 		require.NoError(t, err)
 		keyMap[uint32(i)] = privateKey
 
-		mockChainReader.Mock.On("GetAllDisperserAddresses", uint32(i), uint32(3)).Return([]gethcommon.Address{
+		mockChainReader.Mock.On("GetAllDisperserAddresses", uint32(cacheSize)).Return([]gethcommon.Address{
 			disperserAddress,
 		}, nil)
 	}
@@ -289,8 +246,6 @@ func TestKeyCacheSize(t *testing.T) {
 		&mockChainReader,
 		cacheSize,
 		time.Minute,
-		3,
-		func(uint32) bool { return true },
 		logger,
 		start)
 	require.NoError(t, err)
@@ -301,7 +256,6 @@ func TestKeyCacheSize(t *testing.T) {
 	// Make a request for each key (except for the last one, which won't fit in the cache).
 	for i := 0; i < cacheSize; i++ {
 		request := RandomStoreChunksRequest(rand)
-		request.DisperserID = uint32(i)
 		signature, err := SignStoreChunksRequest(keyMap[uint32(i)], request)
 		require.NoError(t, err)
 		request.Signature = signature
@@ -319,7 +273,6 @@ func TestKeyCacheSize(t *testing.T) {
 	// Make another request for each key. None should require a read from the chain.
 	for i := 0; i < cacheSize; i++ {
 		request := RandomStoreChunksRequest(rand)
-		request.DisperserID = uint32(i)
 		signature, err := SignStoreChunksRequest(keyMap[uint32(i)], request)
 		require.NoError(t, err)
 		request.Signature = signature
@@ -335,7 +288,6 @@ func TestKeyCacheSize(t *testing.T) {
 
 	// Make a request for the last key. This should require a read from the chain and will boot key 0 from the cache.
 	request := RandomStoreChunksRequest(rand)
-	request.DisperserID = uint32(cacheSize)
 	signature, err := SignStoreChunksRequest(keyMap[uint32(cacheSize)], request)
 	require.NoError(t, err)
 	request.Signature = signature
@@ -350,7 +302,6 @@ func TestKeyCacheSize(t *testing.T) {
 
 	// Make another request for key 0. This should require a read from the chain.
 	request = RandomStoreChunksRequest(rand)
-	request.DisperserID = 0
 	signature, err = SignStoreChunksRequest(keyMap[0], request)
 	require.NoError(t, err)
 	request.Signature = signature

@@ -604,7 +604,6 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.Opera
 			ID:                                  id,
 			QuorumIDList:                        registeredQuorums,
 			DispersalAuthenticationKeyCacheSize: 1024,
-			DispersalAuthenticationKeyLimit:     3,
 			DisableDispersalAuthentication:      false,
 			RelayMaxMessageSize:                 units.GiB,
 			EnableV1:                            true,

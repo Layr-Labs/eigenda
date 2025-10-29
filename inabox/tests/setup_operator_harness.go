@@ -272,7 +272,6 @@ func (oh *OperatorHarness) startOperator(
 		ChunkDownloadTimeout:                10 * time.Second,
 		DownloadPoolSize:                    10,
 		DispersalAuthenticationKeyCacheSize: 100,
-		DispersalAuthenticationKeyLimit:     3,
 		DisperserKeyTimeout:                 10 * time.Minute,
 		RelayMaxMessageSize:                 units.GiB,
 		EjectionSentinelPeriod:              5 * time.Minute,

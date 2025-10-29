@@ -47,5 +47,5 @@ func VerifyStoreChunksRequestWithKeys(keys []gethcommon.Address, request *grpc.S
 		}
 	}
 
-	return nil, fmt.Errorf("signature public key %x doesn't match any registered public key", signingAddress.Hex())
+	return nil, fmt.Errorf("signature public key %s doesn't match any registered public key", signingAddress.Hex())
 }

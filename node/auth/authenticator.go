@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -26,9 +25,9 @@ type RequestAuthenticator interface {
 		now time.Time) ([]byte, error)
 }
 
-// keysWithTimeout contains all keys for a disperser with their expiration time.
-type keysWithTimeout struct {
-	keys       []gethcommon.Address
+// keyWithTimeout contains a single key with its expiration time.
+type keyWithTimeout struct {
+	key        gethcommon.Address
 	expiration time.Time
 }
 
@@ -38,20 +37,16 @@ type requestAuthenticator struct {
 	// chainReader is used to read the chain state.
 	chainReader core.Reader
 
-	// keyCache is used to cache the public keys of dispersers. The uint32 map keys are disperser IDs. Disperser
-	// IDs are serial numbers, with the original EigenDA disperser assigned ID 0. The map values contain
-	// all public keys of the disperser and the time when the local cache of the keys will expire.
-	keyCache *lru.Cache[uint32 /* disperser ID */, *keysWithTimeout]
+	// keyCache is used to cache the public keys from the disperser registry. The uint32 map keys are the
+	// registry indices (0, 1, 2, ...) and the values contain the address at that index with expiration time.
+	keyCache *lru.Cache[uint32 /* registry index */, *keyWithTimeout]
 
 	// keyTimeoutDuration is the duration for which a key is cached. After this duration, the key should be
 	// reloaded from the chain state in case the key has been changed.
 	keyTimeoutDuration time.Duration
 
-	// keyLimit is the maximum number of keys to check per disperser.
-	keyLimit int
-
-	// disperserIDFilter is a function that returns true if the given disperser ID is valid.
-	disperserIDFilter func(uint32) bool
+	// keyCacheCapacity is the maximum number of keys to scan from the registry
+	keyCacheCapacity int
 
 	// logger for debug output
 	logger logging.Logger
@@ -63,12 +58,10 @@ func NewRequestAuthenticator(
 	chainReader core.Reader,
 	keyCacheSize int,
 	keyTimeoutDuration time.Duration,
-	keyLimit int,
-	disperserIDFilter func(uint32) bool,
 	logger logging.Logger,
 	now time.Time) (RequestAuthenticator, error) {
 
-	keyCache, err := lru.New[uint32, *keysWithTimeout](keyCacheSize)
+	keyCache, err := lru.New[uint32, *keyWithTimeout](keyCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create key cache: %w", err)
 	}
@@ -77,8 +70,7 @@ func NewRequestAuthenticator(
 		chainReader:        chainReader,
 		keyCache:           keyCache,
 		keyTimeoutDuration: keyTimeoutDuration,
-		keyLimit:           keyLimit,
-		disperserIDFilter:  disperserIDFilter,
+		keyCacheCapacity:   keyCacheSize,
 		logger:             logger,
 	}
 
@@ -91,8 +83,7 @@ func NewRequestAuthenticator(
 }
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
-	// this will need to be updated for decentralized dispersers
-	_, err := a.getDisperserKeys(ctx, now, api.EigenLabsDisperserID)
+	_, err := a.getAllDisperserKeys(ctx, now)
 	if err != nil {
 		return fmt.Errorf("failed to get disperser keys: %w", err)
 	}
@@ -105,7 +96,7 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	request *grpc.StoreChunksRequest,
 	now time.Time) ([]byte, error) {
 
-	keys, err := a.getDisperserKeys(ctx, now, request.GetDisperserID())
+	keys, err := a.getAllDisperserKeys(ctx, now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get disperser keys: %w", err)
 	}
@@ -118,39 +109,48 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	return hash, nil
 }
 
-// getDisperserKeys returns all public keys of the disperser with the given ID, caching the result.
-func (a *requestAuthenticator) getDisperserKeys(
+// getAllDisperserKeys returns all public keys from the disperser registry, caching each address individually.
+func (a *requestAuthenticator) getAllDisperserKeys(
 	ctx context.Context,
-	now time.Time,
-	disperserID uint32) ([]gethcommon.Address, error) {
+	now time.Time) ([]gethcommon.Address, error) {
 
-	if !a.disperserIDFilter(disperserID) {
-		return nil, fmt.Errorf("invalid disperser ID: %d", disperserID)
-	}
+	maxKeys := uint32(a.keyCacheCapacity)
 
-	keys, ok := a.keyCache.Get(disperserID)
-	if ok {
-		expirationTime := keys.expiration
-		if now.Before(expirationTime) {
-			return keys.keys, nil
+	// Collect all valid cached addresses
+	var cachedAddresses []gethcommon.Address
+	needRefresh := false
+
+	// Check each index in the cache
+	for i := uint32(0); i < maxKeys; i++ {
+		key, ok := a.keyCache.Get(i)
+		if !ok || now.After(key.expiration) {
+			needRefresh = true
+			break
 		}
+		cachedAddresses = append(cachedAddresses, key.key)
 	}
 
-	addresses, err := a.chainReader.GetAllDisperserAddresses(ctx, disperserID, uint32(a.keyLimit))
+	if !needRefresh && len(cachedAddresses) > 0 {
+		return cachedAddresses, nil
+	}
+
+	// Fetch fresh data from chain
+	addresses, err := a.chainReader.GetAllDisperserAddresses(ctx, maxKeys)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get disperser addresses: %w", err)
 	}
 
-	for _, addr := range addresses {
+	// Cache each address individually by its index (zero addresses are not stored)
+	for i, addr := range addresses {
 		a.logger.Debug("Adding disperser key",
-			"disperserID", disperserID,
+			"index", i,
 			"address", addr.Hex())
-	}
 
-	a.keyCache.Add(disperserID, &keysWithTimeout{
-		keys:       addresses,
-		expiration: now.Add(a.keyTimeoutDuration),
-	})
+		a.keyCache.Add(uint32(i), &keyWithTimeout{
+			key:        addr,
+			expiration: now.Add(a.keyTimeoutDuration),
+		})
+	}
 
 	return addresses, nil
 }

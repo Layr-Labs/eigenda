@@ -304,8 +304,8 @@ func (t *MockWriter) GetDisperserAddress(ctx context.Context, disperserID uint32
 }
 
 func (t *MockWriter) GetAllDisperserAddresses(
-	ctx context.Context, disperserID uint32, maxKeys uint32) ([]gethcommon.Address, error) {
-	args := t.Called(disperserID, maxKeys)
+	ctx context.Context, maxDisperserKeys uint32) ([]gethcommon.Address, error) {
+	args := t.Called(maxDisperserKeys)
 	result := args.Get(0)
 	if result == nil {
 		return nil, fmt.Errorf("mock error: %w", args.Error(1))

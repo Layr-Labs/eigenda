@@ -99,8 +99,6 @@ type Config struct {
 	DisableDispersalAuthentication bool
 	// the size of the cache for storing public keys of dispersers
 	DispersalAuthenticationKeyCacheSize int
-	// maximum number of keys to check per disperser for authentication
-	DispersalAuthenticationKeyLimit int
 	// the timeout for disperser keys (after which the disperser key is reloaded from the chain)
 	DisperserKeyTimeout time.Duration
 
@@ -468,7 +466,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EnablePprof:                         ctx.GlobalBool(flags.EnablePprof.Name),
 		DisableDispersalAuthentication:      ctx.GlobalBool(flags.DisableDispersalAuthenticationFlag.Name),
 		DispersalAuthenticationKeyCacheSize: ctx.GlobalInt(flags.DispersalAuthenticationKeyCacheSizeFlag.Name),
-		DispersalAuthenticationKeyLimit:     ctx.GlobalInt(flags.DispersalAuthenticationKeyLimitFlag.Name),
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
