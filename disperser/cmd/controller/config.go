@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
@@ -21,18 +24,15 @@ import (
 const MaxUint16 = ^uint16(0)
 
 type Config struct {
-	EncodingManagerConfig          controller.EncodingManagerConfig
-	DispatcherConfig               controller.DispatcherConfig
-	NumConcurrentEncodingRequests  int
-	NumConcurrentDispersalRequests int
-	NodeClientCacheSize            int
+	EncodingManagerConfig controller.EncodingManagerConfig
+	DispatcherConfig      controller.DispatcherConfig
 
 	DynamoDBTableName string
 
 	EthClientConfig                     geth.EthClientConfig
 	AwsClientConfig                     aws.ClientConfig
 	DisperserStoreChunksSigningDisabled bool
-	DisperserKMSKeyID                   string
+	DispersalRequestSignerConfig        clients.DispersalRequestSignerConfig
 	LoggerConfig                        common.LoggerConfig
 	IndexerConfig                       indexer.Config
 	ChainStateConfig                    thegraph.Config
@@ -42,11 +42,10 @@ type Config struct {
 
 	MetricsPort                  int
 	ControllerReadinessProbePath string
-	ControllerHealthProbePath    string
 	ServerConfig                 server.Config
+	HeartbeatMonitorConfig       healthcheck.HeartbeatMonitorConfig
 
-	OnDemandConfig    ondemandvalidation.OnDemandLedgerCacheConfig
-	ReservationConfig reservationvalidation.ReservationLedgerCacheConfig
+	PaymentAuthorizationConfig controller.PaymentAuthorizationConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -104,7 +103,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 
 	reservationConfig, err := reservationvalidation.NewReservationLedgerCacheConfig(
 		ctx.GlobalInt(flags.ReservationPaymentsLedgerCacheSizeFlag.Name),
-		ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		75*time.Second,
 		// this doesn't need to be configurable. there are no plans to ever use a different value
 		ratelimit.OverfillOncePermitted,
 		paymentVaultUpdateInterval,
@@ -113,13 +115,31 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("create reservation config: %w", err)
 	}
 
+	paymentAuthorizationConfig := controller.PaymentAuthorizationConfig{
+		OnDemandConfig:    onDemandConfig,
+		ReservationConfig: reservationConfig,
+	}
+
+	heartbeatMonitorConfig := healthcheck.HeartbeatMonitorConfig{
+		FilePath:         ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
+		MaxStallDuration: ctx.GlobalDuration(flags.ControllerHeartbeatMaxStallDurationFlag.Name),
+	}
+	if err := heartbeatMonitorConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid heartbeat monitor config: %w", err)
+	}
+
+	awsClientConfig := aws.ReadClientConfig(ctx, flags.FlagPrefix)
 	config := Config{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		EthClientConfig:                     ethClientConfig,
 		AwsClientConfig:                     aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		DisperserStoreChunksSigningDisabled: ctx.GlobalBool(flags.DisperserStoreChunksSigningDisabledFlag.Name),
-		DisperserKMSKeyID:                   ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
 		LoggerConfig:                        *loggerConfig,
+		DispersalRequestSignerConfig: clients.DispersalRequestSignerConfig{
+			KeyID:    ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
+			Region:   awsClientConfig.Region,
+			Endpoint: awsClientConfig.EndpointURL,
+		},
 		EncodingManagerConfig: controller.EncodingManagerConfig{
 			PullInterval:                ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
 			EncodingRequestTimeout:      ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
@@ -130,6 +150,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EncoderAddress:              ctx.GlobalString(flags.EncoderAddressFlag.Name),
 			MaxNumBlobsPerIteration:     int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
 			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
 		},
 		DispatcherConfig: controller.DispatcherConfig{
 			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
@@ -142,23 +163,32 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxBatchSize:                          int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
 			SignificantSigningThresholdPercentage: uint8(ctx.GlobalUint(flags.SignificantSigningThresholdPercentageFlag.Name)),
 			SignificantSigningMetricsThresholds:   ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
+			NumConcurrentRequests:                 ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
+			NodeClientCacheSize:                   ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 		},
-		NumConcurrentEncodingRequests:   ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-		NumConcurrentDispersalRequests:  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
-		NodeClientCacheSize:             ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),
 		UseGraph:                        ctx.GlobalBool(flags.UseGraphFlag.Name),
 		EigenDAContractDirectoryAddress: ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
 		MetricsPort:                     ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
-		ControllerHealthProbePath:       ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 		ServerConfig:                    serverConfig,
-		OnDemandConfig:                  onDemandConfig,
-		ReservationConfig:               reservationConfig,
+		HeartbeatMonitorConfig:          heartbeatMonitorConfig,
+		PaymentAuthorizationConfig:      paymentAuthorizationConfig,
 	}
-	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
-		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")
+
+	if err := config.DispersalRequestSignerConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid dispersal request signer config: %w", err)
+	}
+
+	if err := config.EncodingManagerConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid encoding manager config: %w", err)
+	}
+	if err := config.DispatcherConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid dispatcher config: %w", err)
+	}
+	if err := config.PaymentAuthorizationConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid payment authorization config: %w", err)
 	}
 
 	return config, nil

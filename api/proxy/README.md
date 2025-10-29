@@ -44,8 +44,11 @@ Features:
     - [Migration With Service Restart](#migration-with-service-restart)
   - [Deployment Against Real EigenDA Network](#deployment-against-real-eigenda-network)
   - [Features and Configuration Options (flags/env vars)](#features-and-configuration-options-flagsenv-vars)
+    - [Payments](#payments)
+      - [V1 Payments](#v1-payments)
+      - [V2 Payments](#v2-payments)
+    - [Read Only Mode](#read-only-mode)
   - [Requirements / Dependencies](#requirements--dependencies)
-    - [Authn/Authz/Payments](#authnauthzpayments)
     - [Ethereum Node](#ethereum-node)
     - [SRS Points](#srs-points)
     - [Hardware Recommendation](#hardware-recommendation)
@@ -53,7 +56,7 @@ Features:
 - [Contributor Guide](#contributor-guide)
   - [Testing](#testing)
     - [Unit](#unit)
-    - [Integration / E2E](#integration--e2e)
+    - [End-to-End (E2E) Tests](#end-to-end-e2e-tests)
     - [Fuzz](#fuzz)
 - [Repo Structure and Releases](#repo-structure-and-releases)
 
@@ -273,20 +276,68 @@ $ cast wallet new --json > keypair.json
 ## Extract keypair private key and remove 0x prefix
 $ PRIVATE_KEY=$(jq -r '.[0].private_key' keypair.json | tail -c +3)
 
-## If running V1 against testnet or mainnet, register the keypair ETH address and wait for approval: https://forms.gle/niMzQqj1JEzqHEny9
+## If running with on-demand, follow the steps to deposit ETH: https://docs.eigencloud.xyz/products/eigenda/integrations-guides/quick-start/v2/#on-demand-data-dispersal
+## If running with reservation, send us the ETH address for requesting a reservation: https://forms.gle/niMzQqj1JEzqHEny9
 
-## Run EigenDA Proxy with EigenDA V1 backend
-$ ./bin/eigenda-proxy \
-    --port 3100 \
-    --eigenda.disperser-rpc disperser-testnet-sepolia.eigenda.xyz:443 \
-    --eigenda.signer-private-key-hex $PRIVATE_KEY \
-    --eigenda.eth-rpc https://ethereum-sepolia.rpc.subquery.network/public \
-    --eigenda.svc-manager-addr 0xD4A7E1Bd8015057293f0D0A557088c286942e84b
+## Start the binary
+$ set -a; source ./.env; set +a; ./bin/eigenda-proxy
 ```
 
 ### Features and Configuration Options (flags/env vars)
 
-Below is a list of the main high-level features offered for configuring the eigenda-proxy. These features are controlled via flags and/or env vars. To view the extensive list of available flags/env-vars to configure a given version of eigenda-proxy, run `eigenda-proxy --help`.
+Below is a list of the main high-level features offered for configuring the eigenda-proxy. These features are
+controlled via flags and/or env vars. To view the extensive list of available flags/env-vars to configure a given
+version of eigenda-proxy, run `eigenda-proxy --help`.
+
+#### Payments
+
+> Note: Proxy only supports using a single authorization (v1) or payment (v2) key. For RaaS providers, we discourage
+sharing keys between rollups, and thus recommend running a single instance of the Proxy per Rollup.
+
+##### V1 Payments
+
+In order to disperse to the EigenDA V1 network in production, or at high throughput on testnet, please register your
+authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication
+keypair address should not be associated with any funds anywhere. 
+
+##### V2 Payments
+
+When using EigenDA V2, the payment system can be configured using the `--eigenda.v2.client-ledger-mode` flag (or the
+`EIGENDA_PROXY_EIGENDA_V2_CLIENT_LEDGER_MODE` environment variable). This flag determines which payment mechanisms are
+active for blob dispersals. For detailed information about the payment system, see the
+[payment system documentation](../../docs/spec/src/protocol/payments/payment_system.md).
+
+**Available Payment Modes:**
+
+1. **`legacy` (default)** - Uses the legacy bin-based payment system that handles both reservation and on-demand
+   payments. This mode is in the process of being deprecated and will be removed in a future release. For more
+   information about the `legacy` payment system, please see our
+   [payments](https://docs.eigencloud.xyz/products/eigenda/core-concepts/payments) doc.
+
+> **IMPORTANT**: All clients should continue using this mode until the new payment system has officially shipped. The
+> other payment modes are documented below for awareness, but the dispersers currently deployed are incompatible with
+> these configurations.
+
+2. **`reservation-only`** - Uses pre-purchased bandwidth reservations that provide guaranteed throughput for a
+   specified time period. Reservations are tracked in the `PaymentVault` contract, and bandwidth is managed using a
+   leaky bucket algorithm. Dispersals will fail if a reservation is temporarily exhausted.
+
+3. **`on-demand-only`** - Uses pay-per-dispersal payments from funds deposited in the `PaymentVault` contract.
+   Limited to quorums 0 (ETH) and 1 (EIGEN). Dispersals will fail if on-demand funds are exhausted.
+
+4. **`reservation-and-on-demand`** - Enables both reservation and on-demand payment methods with intelligent fallback.
+   Uses reservation bandwidth when available, and automatically switches to on-demand payments when reservation
+   capacity is temporarily exhausted. If a reservation *expires*, this mode will prevent any dispersals from being made
+   to avoid inadvertent draining of on-demand funds due to an expired reservation.
+
+> **Note**: The payment mode should match your account's setup in the `PaymentVault` contract. Ensure you have an active
+> reservation (for `reservation-only` or `reservation-and-on-demand`) or sufficient deposits (for `on-demand-only` or
+> `reservation-and-on-demand`) before starting the proxy.
+
+#### Read Only Mode
+
+This feature is only available for EigenDA V2 backend. If `--eigenda.v2.signer-payment-key-hex` is not set, then the EigenDA V2 backend is started in read only mode,
+meaning that the POST routes will return 500 errors.
 
 #### Certificate verification <!-- omit from toc -->
 
@@ -327,17 +378,13 @@ This behavior is turned on by default, but configurable via the `--eigenda.confi
 
 ### Requirements / Dependencies
 
-#### Authn/Authz/Payments
-
-In order to disperse to the EigenDA V1 network in production, or at high throughput on testnet, please register your authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication keypair address should not be associated with any funds anywhere. For EigenDA V2, please see our [payments](https://docs.eigencloud.xyz/products/eigenda/core-concepts/payments) doc.
-
-> Note: Proxy only supports using a single authorization (v1) or payment (v2) key. For RaaS providers, we discourage sharing keys between rollups, and thus recommend running a single instance of the Proxy per Rollup.
-
 #### Ethereum Node
 
 A normal (non-archival) Ethereum node is sufficient for running the proxy with cert verification turned on. This is because all parameters that are read from the chain are either:
 1. immutable (eg: [securityThresholds](https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L30)), or
 2. are upgradeable but have all the historical versions available in contract storage (eg: [versioninedBlobParams](https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L27))
+
+The proxy interacts with a single RPC endpoint. Load-balancing and/or failover behavior should be handled by an external proxy, e.g: [erpc](https://github.com/erpc/erpc)
 
 #### SRS Points
 
@@ -366,12 +413,17 @@ Browse our [Makefile](./Makefile) for a list of available commands such as `make
 
 Unit tests can be run with `make test-unit`.
 
-#### Integration / E2E
+#### End-to-End (E2E) Tests
 
-Integration tests against op framework can be run with `make test-e2e`. These tests use the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch
-submission and state derivation. Tests are run both in a local environment, and in a sepolia testnet environment.
+E2E tests validate full client ↔ proxy ↔ EigenDA flows.  
+Use the provided `make` targets to run them with different backends:
 
-These tests also assert E2E client <-> server interactions using simple/op clients.
+| Command | Description |
+|----------|--------------|
+| `make test-e2e-local` | Runs E2E tests against a local **memstore** backend (fast, isolated). |
+| `make test-e2e-sepolia` | Same as local but runs against **Sepolia** network. |
+
+All commands execute `./test/e2e` with environment-specific settings and output via [gotestsum](https://github.com/gotestyourself/gotestsum).
 
 #### Fuzz
 

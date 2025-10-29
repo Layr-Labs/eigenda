@@ -196,7 +196,7 @@ func TestBasicWorkflow(t *testing.T) {
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
-		indices []uint,
+		indices []encoding.ChunkNumber,
 		encodingParams *encoding.EncodingParams,
 		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
@@ -414,7 +414,7 @@ func TestDownloadTimeout(t *testing.T) {
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
-		indices []uint,
+		indices []encoding.ChunkNumber,
 		encodingParams *encoding.EncodingParams,
 		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
@@ -673,7 +673,7 @@ func TestFailedVerification(t *testing.T) {
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
-		indices []uint,
+		indices []encoding.ChunkNumber,
 		encodingParams *encoding.EncodingParams,
 		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {

@@ -5,9 +5,9 @@ package icicle
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"sync"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
 	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
@@ -24,6 +24,7 @@ type IcicleDevice struct {
 }
 
 // IcicleDeviceConfig holds configuration options for a single device.
+//   - The Logger parameter is used for structured logging.
 //   - The GPUEnable parameter is used to enable GPU acceleration.
 //   - The NTTSize parameter is used to set the maximum domain size for NTT configuration.
 //   - The FFTPointsT and SRSG1 parameters are used to set up the MSM configuration.
@@ -31,6 +32,7 @@ type IcicleDevice struct {
 //     The reason for this is that not all applications require an MSM setup. For example
 //     in the case of reed-solomon, it only requires the NTT setup.
 type IcicleDeviceConfig struct {
+	Logger    logging.Logger
 	GPUEnable bool
 	NTTSize   uint8
 
@@ -43,7 +45,7 @@ type IcicleDeviceConfig struct {
 func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 	runtime.LoadBackendFromEnvOrDefault()
 
-	device, err := setupDevice(config.GPUEnable)
+	device, err := setupDevice(config.Logger, config.GPUEnable)
 	if err != nil {
 		return nil, err
 	}
@@ -100,34 +102,34 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 }
 
 // setupDevice initializes either a GPU or CPU device
-func setupDevice(gpuEnable bool) (runtime.Device, error) {
+func setupDevice(logger logging.Logger, gpuEnable bool) (runtime.Device, error) {
 	if gpuEnable {
-		return setupGPUDevice()
+		return setupGPUDevice(logger)
 	}
 
-	return setupCPUDevice()
+	return setupCPUDevice(logger)
 }
 
 // setupGPUDevice attempts to initialize a CUDA device, falling back to CPU if unavailable
-func setupGPUDevice() (runtime.Device, error) {
+func setupGPUDevice(logger logging.Logger) (runtime.Device, error) {
 	deviceCuda := runtime.CreateDevice("CUDA", 0)
 	if runtime.IsDeviceAvailable(&deviceCuda) {
 		device := runtime.CreateDevice("CUDA", 0)
-		slog.Info("CUDA device available, setting device")
+		logger.Info("CUDA device available, setting device")
 		runtime.SetDevice(&device)
 
 		return device, nil
 	}
 
-	slog.Info("CUDA device not available, falling back to CPU")
-	return setupCPUDevice()
+	logger.Info("CUDA device not available, falling back to CPU")
+	return setupCPUDevice(logger)
 }
 
 // setupCPUDevice initializes a CPU device
-func setupCPUDevice() (runtime.Device, error) {
+func setupCPUDevice(logger logging.Logger) (runtime.Device, error) {
 	device := runtime.CreateDevice("CPU", 0)
 	if !runtime.IsDeviceAvailable(&device) {
-		slog.Error("CPU device is not available")
+		logger.Error("CPU device is not available")
 		return device, errors.New("cpu device is not available")
 	}
 

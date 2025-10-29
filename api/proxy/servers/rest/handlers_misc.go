@@ -114,7 +114,7 @@ func (svr *Server) writeJSON(w http.ResponseWriter, r *http.Request, response in
 		return
 	}
 
-	w.Header().Set(contentTypeJSON, "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(jsonData)
 	if err != nil {

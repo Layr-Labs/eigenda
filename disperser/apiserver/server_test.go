@@ -28,8 +28,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	kzgcommitter "github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	kzgcommitter "github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -646,6 +646,7 @@ func setup() {
 			LocalStackEndpoint:  localstackContainer.Endpoint(),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
+			BlobStoreBucketName: s3BucketName,
 			V2MetadataTableName: v2MetadataTableName,
 			AWSConfig:           localstackContainer.GetAWSClientConfig(),
 			Logger:              logger,

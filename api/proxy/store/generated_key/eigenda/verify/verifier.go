@@ -13,8 +13,8 @@ import (
 
 	grpccommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/rs"
 )
 
 type Config struct {
@@ -180,6 +180,14 @@ func (v *Verifier) VerifyCommitment(certCommitment *grpccommon.G1Commitment, blo
 // verifySecurityParams ensures that returned security parameters are valid
 func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disperser.BatchHeader) error {
 	confirmedQuorums := make(map[uint8]bool)
+
+	// ensure the blob's quorum parameters does not exceed available quorums
+	if len(blobHeader.QuorumBlobParams) > len(batchHeader.GetQuorumNumbers()) {
+		return fmt.Errorf(
+			"blob has more quorum parameters than available quorums: got %d quorum params, available quorums: %d",
+			len(blobHeader.QuorumBlobParams),
+			len(batchHeader.GetQuorumNumbers()))
+	}
 
 	// require that the security param in each blob is met
 	for i := 0; i < len(blobHeader.QuorumBlobParams); i++ {

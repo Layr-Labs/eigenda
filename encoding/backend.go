@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/Layr-Labs/eigenda/encoding/icicle"
 	_ "go.uber.org/automaxprocs/maxprocs"
 )
 
@@ -22,16 +23,24 @@ type Config struct {
 	NumWorker   uint64
 	BackendType BackendType
 	GPUEnable   bool
-	Verbose     bool
 }
 
-// DefaultConfig returns a Config struct with default values
+// DefaultConfig returns a Config struct with default values.
+// If icicle is available (binary built with icicle tag), it sets the backend to icicle and enables GPU.
+// Make sure to set GPUEnable to false if you want to run on CPU only.
+// If icicle is not available (build without icicle tag), it sets the backend to gnark.
 func DefaultConfig() *Config {
+	if icicle.IsAvailable {
+		return &Config{
+			NumWorker:   uint64(runtime.GOMAXPROCS(0)),
+			BackendType: IcicleBackend,
+			GPUEnable:   true,
+		}
+	}
 	return &Config{
 		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 		BackendType: GnarkBackend,
 		GPUEnable:   false,
-		Verbose:     false,
 	}
 }
 

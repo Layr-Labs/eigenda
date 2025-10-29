@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"strings"
 	"time"
@@ -24,18 +25,24 @@ import (
 	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
+	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
-	"github.com/Layr-Labs/eigenda/litt/util"
+	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
@@ -71,14 +78,14 @@ type TestClient struct {
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
-	metrics                     *testClientMetrics
+	metrics                     *TestClientMetrics
 }
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(
 	ctx context.Context,
 	logger logging.Logger,
-	metrics *testClientMetrics,
+	metrics *TestClientMetrics,
 	config *TestClientConfig) (*TestClient, error) {
 
 	if config.SRSNumberToLoad == 0 {
@@ -87,12 +94,7 @@ func NewTestClient(
 
 	// Construct the disperser client
 
-	privateKey, err := loadPrivateKey(config.KeyPath, config.KeyVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load private key: %w", err)
-	}
-
-	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
+	signer, err := auth.NewLocalBlobRequestSigner(config.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
@@ -145,7 +147,13 @@ func NewTestClient(
 		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
 
-	accountant := clientsv2.NewUnpopulatedAccountant(accountId, metricsv2.NoopAccountantMetrics)
+	var registry *prometheus.Registry
+	if metrics != nil {
+		registry = metrics.registry
+	}
+
+	accountantMetrics := metricsv2.NewAccountantMetrics(registry)
+	accountant := clientsv2.NewUnpopulatedAccountant(accountId, accountantMetrics)
 	disperserClient, err := clientsv2.NewDisperserClient(
 		logger,
 		disperserConfig,
@@ -162,14 +170,9 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to populate accountant: %w", err)
 	}
 
-	ethRPCUrls, err := loadEthRPCURLs(config.EthRPCURLs, config.EthRPCUrlsVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load Ethereum RPC URLs: %w", err)
-	}
-
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          ethRPCUrls,
-		PrivateKeyString: privateKey,
+		RPCURLs:          config.EthRpcUrls,
+		PrivateKeyString: config.PrivateKey,
 		NumConfirmations: 0,
 		NumRetries:       3,
 	}
@@ -230,11 +233,6 @@ func NewTestClient(
 		ContractCallTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
-	var registry *prometheus.Registry
-	if metrics != nil {
-		registry = metrics.registry
-	}
-
 	certBuilder, err := clientsv2.NewCertBuilder(logger,
 		operatorStateRetrieverAddress,
 		ethReader.GetRegistryCoordinatorAddress(),
@@ -252,6 +250,25 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
 	}
 
+	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	clientLedger, err := buildClientLedger(
+		ctx,
+		logger,
+		ethClient,
+		paymentVaultAddr,
+		accountId,
+		clientledger.ClientLedgerMode(config.ClientLedgerPaymentMode),
+		disperserClient,
+		accountantMetrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build client ledger: %w", err)
+	}
+
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
@@ -259,7 +276,7 @@ func NewTestClient(
 		blockMon,
 		certBuilder,
 		certVerifier,
-		nil,
+		clientLedger,
 		registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
@@ -297,18 +314,19 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
-	kzgConfig := &kzg.KzgConfig{
+	kzgConfig := &kzgv1.KzgConfig{
 		LoadG2Points:    true,
 		G1Path:          g1Path,
 		G2Path:          g2Path,
 		G2TrailingPath:  g2TrailingPath,
 		CacheDir:        srsTablesPath,
-		SRSOrder:        config.SRSOrder,
+		SRSOrder:        config.SrsOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
 	}
-	verifierKzgConfig := verifier.KzgConfigFromV1Config(kzgConfig)
-	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig, nil)
+	verifierKzgConfig := verifier.ConfigFromV1KzgConfig(kzgConfig)
+	encoder := rs.NewEncoder(logger, nil)
+	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
 	}
@@ -333,7 +351,7 @@ func NewTestClient(
 
 	chainState := eth.NewChainState(ethReader, ethClient)
 	icsConfig := thegraph.Config{
-		Endpoint:     config.SubgraphURL,
+		Endpoint:     config.SubgraphUrl,
 		PullInterval: 100 * time.Millisecond,
 		MaxRetries:   5,
 	}
@@ -353,6 +371,7 @@ func NewTestClient(
 		logger,
 		ethReader,
 		indexedChainState,
+		encoder,
 		blobVerifier,
 		clientConfig,
 		validatorClientMetrics)
@@ -381,6 +400,7 @@ func NewTestClient(
 		logger,
 		ethReader,
 		indexedChainState,
+		encoder,
 		blobVerifier,
 		onlyDownloadClientConfig,
 		validatorClientMetrics)
@@ -388,8 +408,8 @@ func NewTestClient(
 	proxyWrapper, err := NewProxyWrapper(ctx, logger,
 		&proxyconfig.AppConfig{
 			SecretConfig: proxycommon.SecretConfigV2{
-				SignerPaymentKey: privateKey,
-				EthRPCURL:        ethRPCUrls[0],
+				SignerPaymentKey: config.PrivateKey,
+				EthRPCURL:        config.EthRpcUrls[0],
 			},
 			EnabledServersConfig: &enablement.EnabledServersConfig{
 				Metric:      false,
@@ -468,64 +488,11 @@ func NewTestClient(
 		certBuilder:                 certBuilder,
 		onlyDownloadValidatorClient: onlyDownloadValidatorClient,
 		certVerifier:                certVerifier,
-		privateKey:                  privateKey,
+		privateKey:                  config.PrivateKey,
 		metricsRegistry:             registry,
 		metrics:                     metrics,
 		proxyWrapper:                proxyWrapper,
 	}, nil
-}
-
-// loadPrivateKey loads the private key from the file/env var specified in the config.
-func loadPrivateKey(keyPath string, keyVar string) (string, error) {
-	var privateKey string
-	if keyPath != "" {
-		privateKeyFile, err := util.SanitizePath(keyPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to sanitize path: %w", err)
-		}
-
-		exists, err := util.Exists(privateKeyFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to check if private key file exists: %w", err)
-		}
-		if exists {
-			privateKeyBytes, err := os.ReadFile(privateKeyFile)
-			if err != nil {
-				return "", fmt.Errorf("failed to read private key file: %w", err)
-			}
-			privateKey = string(privateKeyBytes)
-		}
-	}
-
-	if privateKey == "" {
-		if keyVar == "" {
-			return "", fmt.Errorf("either KeyPath must reference a valid key file or KeyVar must be set")
-		}
-		privateKey = os.Getenv(keyVar)
-		if privateKey == "" {
-			return "", fmt.Errorf("key not found in environment variable %s", keyVar)
-		}
-	}
-
-	return formatPrivateKey(privateKey), nil
-}
-
-// loadEthRPCURLs loads the Ethereum RPC URLs from the file/env var specified in the config.
-func loadEthRPCURLs(urls []string, urlsVar string) ([]string, error) {
-	if len(urls) > 0 {
-		return urls, nil
-	}
-
-	if urlsVar == "" {
-		return nil, fmt.Errorf("either EthRPCURLs or EthRPCUrlsVar must be set")
-	}
-
-	ethRPCURLs := os.Getenv(urlsVar)
-	if ethRPCURLs == "" {
-		return nil, fmt.Errorf("URLs not found in environment variable %s", urlsVar)
-	}
-
-	return strings.Split(ethRPCURLs, ","), nil
 }
 
 // formatPrivateKey formats the private key by removing leading/trailing whitespace and "0x" prefix.
@@ -976,4 +943,162 @@ func (c *TestClient) EstimateGasAndReportCheckDACert(
 
 	c.metrics.reportEstimateGasCheckDACert(gas)
 	return gas, nil
+}
+
+func buildClientLedger(
+	ctx context.Context,
+	logger logging.Logger,
+	ethClient common_eigenda.EthClient,
+	paymentVaultAddr gethcommon.Address,
+	accountID gethcommon.Address,
+	mode clientledger.ClientLedgerMode,
+	disperserClient *clientsv2.DisperserClient,
+	accountantMetrics metricsv2.AccountantMetricer,
+) (*clientledger.ClientLedger, error) {
+	if mode == clientledger.ClientLedgerModeLegacy {
+		return nil, nil
+	}
+
+	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddr)
+	if err != nil {
+		return nil, fmt.Errorf("new payment vault: %w", err)
+	}
+
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get min num symbols: %w", err)
+	}
+
+	var reservationLedger *reservation.ReservationLedger
+	var onDemandLedger *ondemand.OnDemandLedger
+	switch mode {
+	case clientledger.ClientLedgerModeLegacy:
+		panic("impossible case- this is checked at the start of the method")
+	case clientledger.ClientLedgerModeReservationOnly:
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
+		if err != nil {
+			return nil, fmt.Errorf("build reservation ledger: %w", err)
+		}
+	case clientledger.ClientLedgerModeOnDemandOnly:
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		if err != nil {
+			return nil, fmt.Errorf("build on-demand ledger: %w", err)
+		}
+
+	case clientledger.ClientLedgerModeReservationAndOnDemand:
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
+		if err != nil {
+			return nil, fmt.Errorf("build reservation ledger: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		if err != nil {
+			return nil, fmt.Errorf("build on-demand ledger: %w", err)
+		}
+
+	default:
+		return nil, fmt.Errorf("unexpected client ledger mode: %s", mode)
+	}
+
+	ledger := clientledger.NewClientLedger(
+		ctx,
+		logger,
+		accountantMetrics,
+		accountID,
+		mode,
+		reservationLedger,
+		onDemandLedger,
+		time.Now,
+		paymentVault,
+		30*time.Second,
+	)
+
+	return ledger, nil
+}
+
+func buildReservationLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID gethcommon.Address,
+	minNumSymbols uint32,
+) (*reservation.ReservationLedger, error) {
+	reservationData, err := paymentVault.GetReservation(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation: %w", err)
+	}
+	if reservationData == nil {
+		return nil, fmt.Errorf("no reservation found for account %s", accountID.Hex())
+	}
+
+	clientReservation, err := reservation.NewReservation(
+		reservationData.SymbolsPerSecond,
+		time.Unix(int64(reservationData.StartTimestamp), 0),
+		time.Unix(int64(reservationData.EndTimestamp), 0),
+		reservationData.QuorumNumbers,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation: %w", err)
+	}
+
+	reservationConfig, err := reservation.NewReservationLedgerConfig(
+		*clientReservation,
+		minNumSymbols,
+		true,
+		ratelimit.OverfillOncePermitted,
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		30*time.Second,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger config: %w", err)
+	}
+
+	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger: %w", err)
+	}
+
+	return reservationLedger, nil
+}
+
+func buildOnDemandLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID gethcommon.Address,
+	minNumSymbols uint32,
+	disperserClient *clientsv2.DisperserClient,
+) (*ondemand.OnDemandLedger, error) {
+	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get price per symbol: %w", err)
+	}
+
+	totalDeposits, err := paymentVault.GetTotalDeposit(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get total deposit from vault: %w", err)
+	}
+
+	paymentState, err := disperserClient.GetPaymentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get payment state from disperser: %w", err)
+	}
+
+	var cumulativePayment *big.Int
+	if paymentState.GetCumulativePayment() == nil {
+		cumulativePayment = big.NewInt(0)
+	} else {
+		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
+	}
+
+	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
+		totalDeposits,
+		new(big.Int).SetUint64(pricePerSymbol),
+		minNumSymbols,
+		cumulativePayment,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("on-demand ledger from value: %w", err)
+	}
+
+	return onDemandLedger, nil
 }

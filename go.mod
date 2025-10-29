@@ -42,10 +42,11 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ingonyama-zk/icicle/v3 v3.4.0
+	github.com/ingonyama-zk/icicle/v3 v3.9.2
 	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.0.85
+	github.com/oracle/oci-go-sdk/v65 v65.78.0
 	github.com/pingcap/errors v0.11.4
 	github.com/prometheus/client_golang v1.21.1
 	github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466
@@ -252,7 +253,7 @@ require (
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/term v0.33.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
-	golang.org/x/tools v0.35.0 // indirect
+	golang.org/x/tools v0.35.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20250528174236-200df99c418a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
 	google.golang.org/protobuf v1.36.6
@@ -275,3 +276,5 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 )
+
+require github.com/sony/gobreaker v0.5.0 // indirect

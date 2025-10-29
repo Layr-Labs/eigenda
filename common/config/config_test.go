@@ -6,27 +6,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/stretchr/testify/require"
 )
 
 type Foo struct {
-	String   string
-	Int      int
-	Int64    int64
-	Int32    int32
-	Int16    int16
-	Int8     int8
-	Uint     uint
-	Uint64   uint64
-	Uint32   uint32
-	Uint16   uint16
-	Uint8    uint8
-	Float64  float64
-	Float32  float32
-	Duration time.Duration
-	Bool     bool
-	Bar      Bar
-	Baz      *Baz
+	String                       string
+	Int                          int
+	Int64                        int64
+	Int32                        int32
+	Int16                        int16
+	Int8                         int8
+	Uint                         uint
+	Uint64                       uint64
+	Uint32                       uint32
+	Uint16                       uint16
+	Uint8                        uint8
+	Float64                      float64
+	Float32                      float32
+	Duration                     time.Duration
+	Bool                         bool
+	Bar                          Bar
+	Baz                          *Baz
+	ThisIsAFieldWithAComplexName string
 }
 
 func DefaultFoo() *Foo {
@@ -42,10 +44,11 @@ func (f *Foo) Verify() error {
 }
 
 type Bar struct {
-	A   string
-	B   int
-	C   bool
-	Baz *Baz
+	A                                  string
+	B                                  int
+	C                                  bool
+	Baz                                *Baz
+	ThisIsANestedFieldWithAComplexName int
 }
 
 func (b *Bar) Verify() error {
@@ -53,9 +56,10 @@ func (b *Bar) Verify() error {
 }
 
 type Baz struct {
-	X string
-	Y int
-	Z bool
+	X                           string
+	Y                           int
+	Z                           bool
+	ThisFieldIsNestedEvenDeeper float64
 }
 
 func (b *Baz) Verify() error {
@@ -66,7 +70,7 @@ func TestTOMLParsing(t *testing.T) {
 
 	configFile := "test/config.toml"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -107,7 +111,7 @@ func TestJSONParsing(t *testing.T) {
 
 	configFile := "test/config.json"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -149,7 +153,7 @@ func TestYAMLParsing(t *testing.T) {
 
 	configFile := "test/config.yaml"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -192,7 +196,7 @@ func TestTOMLConfigOverride(t *testing.T) {
 	configFile := "test/config.toml"
 	overrideFile := "test/config_override.toml"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -229,7 +233,7 @@ func TestJSONConfigOverride(t *testing.T) {
 	configFile := "test/config.json"
 	overrideFile := "test/config_override.json"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -272,7 +276,7 @@ func TestYAMLConfigOverride(t *testing.T) {
 	configFile := "test/config.yaml"
 	overrideFile := "test/config_override.yaml"
 
-	foo, err := ParseConfig(DefaultFoo, "FOO", configFile, overrideFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -313,7 +317,7 @@ func TestYAMLConfigOverride(t *testing.T) {
 func TestInvalidTOML(t *testing.T) {
 	configFile := "test/invalid_config.toml"
 
-	_, err := ParseConfig(DefaultFoo, "FOO", configFile)
+	_, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile)
 	require.Error(t, err)
 }
 
@@ -344,7 +348,7 @@ func TestDefaultValues(t *testing.T) {
 		}
 	}
 
-	foo, err := ParseConfig(constructor, "FOO", configFile)
+	foo, err := ParseConfig(common.TestLogger(t), constructor(), "FOO", nil, configFile)
 	require.NoError(t, err)
 
 	// Fields that are overridden by config_override.toml
@@ -397,7 +401,7 @@ func TestEnvironmentVariables(t *testing.T) {
 
 	require.NoError(t, os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored"))
 
-	foo, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, configFile)
 	require.NoError(t, err)
 
 	// Verify that environment variables have overridden the config file values.
@@ -443,7 +447,7 @@ func TestInvalidEnvironmentVariable(t *testing.T) {
 	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
 	require.NoError(t, os.Setenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED", "should not be ignored"))
 
-	_, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
+	_, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, configFile)
 	require.Error(t, err)
 
 	require.NoError(t, os.Unsetenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED"))
@@ -455,7 +459,7 @@ func TestVerificationFailure(t *testing.T) {
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "invalid")) // will cause verification to fail
 
-	_, err := ParseConfig(DefaultFoo, "PREFIX", configFile)
+	_, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, configFile)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "String may not be 'invalid'")
 }
@@ -476,7 +480,7 @@ func TestIgnoreEnvironmentVariables(t *testing.T) {
 
 	require.NoError(t, os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored"))
 
-	foo, err := ParseConfig(DefaultFoo, "", configFile) // intentionally empty prefix
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "", nil, configFile) // intentionally empty prefix
 	require.NoError(t, err)
 
 	// Verify that environment variables did not override the config file values.
@@ -513,4 +517,22 @@ func TestIgnoreEnvironmentVariables(t *testing.T) {
 	require.Equal(t, "baz X", foo.Baz.X) // from config
 	require.Equal(t, 27, foo.Baz.Y)      // from config
 	require.Equal(t, true, foo.Baz.Z)    // from config
+}
+
+func TestScreamingSnakeCaseFlag(t *testing.T) {
+
+	require.NoError(t, os.Setenv("TEST_THIS_IS_A_FIELD_WITH_A_COMPLEX_NAME", "value from env var"))
+	require.NoError(t, os.Setenv("TEST_BAR_THIS_IS_A_NESTED_FIELD_WITH_A_COMPLEX_NAME", "123"))
+	require.NoError(t, os.Setenv("TEST_BAR_BAZ_THIS_FIELD_IS_NESTED_EVEN_DEEPER", "456.789"))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "TEST", nil)
+	require.NoError(t, err)
+
+	require.Equal(t, "value from env var", foo.ThisIsAFieldWithAComplexName)
+	require.Equal(t, 123, foo.Bar.ThisIsANestedFieldWithAComplexName)
+	require.Equal(t, 456.789, foo.Bar.Baz.ThisFieldIsNestedEvenDeeper)
+
+	require.NoError(t, os.Unsetenv("TEST_THIS_IS_A_FIELD_WITH_A_COMPLEX_NAME"))
+	require.NoError(t, os.Unsetenv("TEST_BAR_THIS_IS_A_NESTED_FIELD_WITH_A_COMPLEX_NAME"))
+	require.NoError(t, os.Unsetenv("TEST_BAR_BAZ_THIS_FIELD_IS_NESTED_EVEN_DEEPER"))
 }

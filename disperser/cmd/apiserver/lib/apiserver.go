@@ -7,7 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
@@ -19,7 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -57,7 +56,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
 
-	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
+	objectStorageClient, err := blobstore.CreateObjectStorageClient(
+		context.Background(), config.BlobstoreConfig, config.AwsClientConfig, logger)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			Registry:    reg,
 			Backend:     blobstorev2.BackendDynamoDB,
 		})
-		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
+		blobStore := blobstorev2.NewBlobStore(bucketName, objectStorageClient, logger)
 
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
@@ -172,7 +172,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 	}
 
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
-	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+	blobStore := blobstore.NewSharedStorage(bucketName, objectStorageClient, blobMetadataStore, logger)
 
 	grpcMetrics := grpcprom.NewServerMetrics()
 	metrics := disperser.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)

@@ -24,6 +24,10 @@ The EigenDA public API is documented [here](https://docs.eigencloud.xyz/products
 
 If you want to be an EigenDA operator and run a node, please clone [Operator Setup Guide](https://github.com/Layr-Labs/eigenda-operator-setup) GitHub repo and follow the instructions there.
 
+## Repository Structure
+
+- **`./rust`** - Sovereign SDK EigenDA adapter: A data availability adapter implementation for [Sovereign SDK](https://github.com/Sovereign-Labs/sovereign-sdk) rollups that enables them to use EigenDA as their data availability layer.
+
 ## Contributing
 We welcome all contributions! There are many ways to contribute to the project, including but not limited to:
 
@@ -37,7 +41,30 @@ We welcome all contributions! There are many ways to contribute to the project, 
 
 We use [mise](https://mise.jdx.dev/) to manage dependencies in EigenDA. This is still a work in progress, as it currently only manages go and golangci-lint dependencies.
 The goal is to eventually get exact parity and reproducibility between our CI and local environments, so that we can reproduce and debug failing CI issues locally.
-To install dependencies using mise, first [install and activate mise](https://mise.jdx.dev/getting-started.html), and then run `mise install` in the root of the repository.
+
+To set up your development environment, first [install and activate mise](https://mise.jdx.dev/getting-started.html), then run:
+
+```bash
+mise install              # Install all development tools
+mise run install-hooks    # Install git pre-commit hooks
+```
+
+### Pre-commit Hooks
+
+We provide pre-commit hooks to automatically check your code before committing. These hooks run linting and formatting checks to catch issues early.
+
+The hooks are installed automatically when you run `mise run install-hooks` (see Dependency Management above).
+
+The pre-commit hook will run the following checks:
+- **Linting**: Runs `golangci-lint` to check code quality
+- **Go mod tidy check**: Ensures `go.mod` and `go.sum` are up to date
+- **Format checking**: Verifies Go and Solidity code formatting
+
+If any checks fail, the commit will be blocked. You can:
+- Fix the issues by running `make fmt` to auto-format code and `go mod tidy` if needed
+- Bypass the hooks (not recommended) using `git commit --no-verify`
+
+**Note**: You can also manually install/update hooks by running `./scripts/install-hooks.sh`
 
 ## Contact
 

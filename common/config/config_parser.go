@@ -4,30 +4,32 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 )
 
 // ParseConfig parses the configuration from the given paths and environment variables. Configuration files are
 // loaded in order, with later files overriding earlier ones. Environment variables are loaded last, and override values
-// from all configuration files. If there are default values in the config, the constructor should return an instance
-// initialized with those values.
+// from all configuration files. If there are default values in the config, those values should be in the provided cfg.
 func ParseConfig[T VerifiableConfig](
-	// A function that returns a new instance of the config struct to be populated.
-	// The struct should contain default values if any are desired.
-	constructor func() T,
+	// Used to log debug information about environment variables if something goes wrong.
+	logger logging.Logger,
+	// The configuration to populate, should already contain any default values.
+	cfg T,
 	// The prefix to use for environment variables. If empty, then environment variables are not read.
 	envPrefix string,
+	// A list of environment variables that should be ignored when sanity checking environment variables.
+	// Useful for situations where external systems set environment variables that would otherwise cause problems.
+	ignoredEnvVars []string,
 	// A list of zero or more paths to configuration files. Later files override earlier ones.
 	// If environment variables are read, they override all configuration files.
 	configPaths ...string,
 ) (T, error) {
-
-	cfg := constructor()
-
 	viperInstance := viper.New()
 
 	// Load each config file in order.
@@ -52,7 +54,7 @@ func ParseConfig[T VerifiableConfig](
 		}
 
 		// Make sure there aren't any invalid environment variables set.
-		err = checkForInvalidEnvVars(boundVars, envPrefix)
+		err = checkForInvalidEnvVars(logger, boundVars, envPrefix, ignoredEnvVars)
 		if err != nil {
 			var zero T
 			return zero, fmt.Errorf("invalid environment variables: %w", err)
@@ -141,7 +143,18 @@ func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
 //
 // This function returns a set containing the names of all environment variables that were bound. This is used
 // to detect unused environment variables (which are likely misconfigurations).
-func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[string]struct{}, error) {
+func bindEnvs(
+	// The viper instance that will parse environment variables.
+	v *viper.Viper,
+	// The prefix to use for environment variables.
+	prefix string,
+	// The struct to walk.
+	target any,
+	// The "path" to the current struct in the tree. This should be empty when calling this function initially.
+	// Each step in the path is the name of a field in the config struct.
+	path ...string,
+) (map[string]struct{}, error) {
+
 	boundVars := make(map[string]struct{})
 
 	targetValue := reflect.ValueOf(target)
@@ -154,8 +167,8 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 		if field.PkgPath != "" { // unexported
 			continue
 		}
-		name := strings.ToLower(field.Name)
-		keyPath := append(path, name)
+
+		keyPath := append(path, field.Name)
 
 		switch field.Type.Kind() { //nolint:exhaustive // only handling struct and pointer types
 
@@ -182,14 +195,14 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 				}
 			} else {
 				// Pointer to non-struct type, bind as regular field
-				env := prefix + "_" + strings.ToUpper(strings.ReplaceAll(strings.Join(keyPath, "_"), ".", "_"))
+				env := buildEnvVarName(prefix, keyPath...)
 				boundVars[env] = struct{}{}
 				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
 					return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
 				}
 			}
 		default:
-			env := prefix + "_" + strings.ToUpper(strings.ReplaceAll(strings.Join(keyPath, "_"), ".", "_"))
+			env := buildEnvVarName(prefix, keyPath...)
 			boundVars[env] = struct{}{}
 			if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
 				return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
@@ -200,15 +213,37 @@ func bindEnvs(v *viper.Viper, prefix string, target any, path ...string) (map[st
 	return boundVars, nil
 }
 
+// Derive the name of an environment variable from the given prefix and path.
+func buildEnvVarName(prefix string, path ...string) string {
+	sb := strings.Builder{}
+	sb.WriteString(prefix)
+
+	for _, p := range path {
+		sb.WriteString("_")
+		sb.WriteString(toScreamingSnakeCase(p))
+	}
+	return sb.String()
+}
+
 // checkForInvalidEnvVars checks for any environment variables with the given prefix that were not bound to any
 // configuration fields. This is used to detect misconfigurations where an environment variable is set, but it does
 // not correspond to any configuration field (e.g. due to a typo).
 //
 // This function returns an error if any invalid environment variables are found.
-func checkForInvalidEnvVars(boundVars map[string]struct{}, envPrefix string) error {
+func checkForInvalidEnvVars(
+	logger logging.Logger,
+	boundVars map[string]struct{},
+	envPrefix string,
+	ignoredEnvVars []string,
+) error {
 	if envPrefix == "" {
 		// Nothing we can do if there is no prefix.
 		return nil
+	}
+
+	ignoredSet := make(map[string]struct{}, len(ignoredEnvVars))
+	for _, v := range ignoredEnvVars {
+		ignoredSet[v] = struct{}{}
 	}
 
 	for _, env := range os.Environ() {
@@ -216,11 +251,36 @@ func checkForInvalidEnvVars(boundVars map[string]struct{}, envPrefix string) err
 		if len(parts) != 2 {
 			continue
 		}
+
 		key := parts[0]
 		if !strings.HasPrefix(key, envPrefix+"_") {
 			continue
 		}
+
+		if _, ok := ignoredSet[key]; ok {
+			// ignore this variable
+			continue
+		}
+
 		if _, ok := boundVars[key]; !ok {
+			sb := strings.Builder{}
+			sb.WriteString("environment variable ")
+			sb.WriteString(key)
+			sb.WriteString(" is not bound to any configuration field. Legal environment variables are:\n")
+
+			sortedVars := make([]string, 0, len(boundVars))
+			for k := range boundVars {
+				sortedVars = append(sortedVars, k)
+			}
+			slices.Sort(sortedVars)
+
+			for _, k := range sortedVars {
+				sb.WriteString("  - ")
+				sb.WriteString(k)
+				sb.WriteString("\n")
+			}
+			logger.Error(sb.String())
+
 			return fmt.Errorf("environment variable %q is not bound to any configuration field", key)
 		}
 	}

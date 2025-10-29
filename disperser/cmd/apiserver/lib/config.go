@@ -12,8 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/urfave/cli"
 )
 
@@ -80,24 +79,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 
-	kzgCommitterConfig := committer.Config{
-		SRSNumberToLoad:   ctx.GlobalUint64(kzg.SRSLoadingNumberFlagName),
-		G1SRSPath:         ctx.GlobalString(kzg.G1PathFlagName),
-		G2SRSPath:         ctx.GlobalString(kzg.G2PathFlagName),
-		G2TrailingSRSPath: ctx.GlobalString(kzg.G2TrailingPathFlagName),
-	}
+	kzgCommitterConfig := committer.ReadCLIConfig(ctx)
 	if version == uint(V2) {
-		if kzgCommitterConfig.G1SRSPath == "" {
-			return Config{}, fmt.Errorf("G1Path must be specified for disperser version 2")
-		}
-		if kzgCommitterConfig.G2SRSPath == "" {
-			return Config{}, fmt.Errorf("G2Path must be specified for disperser version 2")
-		}
-		if kzgCommitterConfig.G2TrailingSRSPath == "" {
-			return Config{}, fmt.Errorf("G2TrailingPath must be specified for disperser version 2")
-		}
-		if kzgCommitterConfig.SRSNumberToLoad <= 0 {
-			return Config{}, fmt.Errorf("SRSNumberToLoad must be specified for disperser version 2")
+		if err := kzgCommitterConfig.Verify(); err != nil {
+			return Config{}, fmt.Errorf("disperser version 2: kzg committer config verify: %w", err)
 		}
 	}
 
@@ -114,8 +99,12 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EnablePprof:           ctx.GlobalBool(flags.EnablePprof.Name),
 		},
 		BlobstoreConfig: blobstore.Config{
-			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
-			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			BucketName:       ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			TableName:        ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			Backend:          blobstore.ObjectStorageBackend(ctx.GlobalString(flags.ObjectStorageBackendFlag.Name)),
+			OCIRegion:        ctx.GlobalString(flags.OCIRegionFlag.Name),
+			OCICompartmentID: ctx.GlobalString(flags.OCICompartmentIDFlag.Name),
+			OCINamespace:     ctx.GlobalString(flags.OCINamespaceFlag.Name),
 		},
 		LoggerConfig: *loggerConfig,
 		MetricsConfig: disperser.MetricsConfig{

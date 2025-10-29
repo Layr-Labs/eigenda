@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
@@ -13,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestArbCustomDAIsValidHeaderByte(t *testing.T) {
+func TestArbCustomDAGetSupportedHeaderBytesMethod(t *testing.T) {
 	t.Parallel()
 
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
@@ -30,18 +31,15 @@ func TestArbCustomDAIsValidHeaderByte(t *testing.T) {
 	rpcClient, err := rpc.Dial(testSuite.ArbAddress())
 	require.NoError(t, err)
 
-	var validHeaderByteResult *arbitrum_altda.IsValidHeaderByteResult
-	err = rpcClient.Call(&validHeaderByteResult,
-		arbitrum_altda.MethodIsValidHeaderByte, arbitrum_altda.EigenDAV2MessageHeaderByte)
+	var supportedHeaderBytesResult *arbitrum_altda.SupportedHeaderBytesResult
+	err = rpcClient.Call(&supportedHeaderBytesResult,
+		arbitrum_altda.MethodGetSupportedHeaderBytes)
 	require.NoError(t, err)
-
-	var validHeaderByteFalseResult *arbitrum_altda.IsValidHeaderByteResult
-	err = rpcClient.Call(&validHeaderByteFalseResult, arbitrum_altda.MethodIsValidHeaderByte, 0x69)
-	require.NoError(t, err)
+	require.Equal(t, supportedHeaderBytesResult.HeaderBytes[0], uint8(commitments.ArbCustomDAHeaderByte))
 
 }
 
-func TestArbCustomDAStoreAndRecoverPayloadFromBatch(t *testing.T) {
+func TestArbCustomDAStoreAndRecoverMethods(t *testing.T) {
 	t.Parallel()
 
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
@@ -61,26 +59,24 @@ func TestArbCustomDAStoreAndRecoverPayloadFromBatch(t *testing.T) {
 	var storeResult *arbitrum_altda.StoreResult
 	seqMessageArg := "0xDEADBEEF"
 	timeoutArg := hexutil.Uint(200)
-	disableFallbackStoreDataOnChain := false
 
 	err = rpcClient.Call(&storeResult, arbitrum_altda.MethodStore,
 		seqMessageArg,
-		timeoutArg,
-		disableFallbackStoreDataOnChain)
+		timeoutArg)
 	require.NoError(t, err)
 
-	var recoverPayloadResult *arbitrum_altda.RecoverPayloadFromBatchResult
+	var recoverPayloadResult *arbitrum_altda.PayloadResult
 	batchNum := hexutil.Uint(0)
 	batchBlockHash := gethcommon.HexToHash("0x43")
-	preimageMap := new(arbitrum_altda.PreimagesMap)
-	validateSeqMsg := false
 
-	err = rpcClient.Call(&recoverPayloadResult, arbitrum_altda.MethodRecoverBatchFromPayload,
+	// pad 40 bytes for "message header"
+	seqMessage := hexutil.Bytes(make([]byte, 40))
+	seqMessage = append(seqMessage, storeResult.SerializedDACert...)
+
+	err = rpcClient.Call(&recoverPayloadResult, arbitrum_altda.MethodRecoverPayload,
 		batchNum,
 		batchBlockHash,
-		storeResult.SerializedDACert,
-		preimageMap,
-		validateSeqMsg,
+		seqMessage,
 	)
 	require.NoError(t, err)
 

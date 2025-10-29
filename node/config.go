@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
 	"github.com/docker/go-units"
 
@@ -251,12 +251,19 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	// Configuration options that require the Node Operator ECDSA key at runtime
 	registerNodeAtStart := ctx.GlobalBool(flags.RegisterAtNodeStartFlag.Name)
 	pubIPCheckInterval := ctx.GlobalDuration(flags.PubIPCheckIntervalFlag.Name)
-	needECDSAKey := registerNodeAtStart || pubIPCheckInterval > 0
+	ejectionDefenseEnabled := ctx.GlobalBool(flags.EjectionDefenseEnabledFlag.Name)
+	needECDSAKey := registerNodeAtStart || pubIPCheckInterval > 0 || ejectionDefenseEnabled
 	if registerNodeAtStart && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" || ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
 		return nil, fmt.Errorf("%s and %s are required if %s is enabled", flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name, flags.RegisterAtNodeStartFlag.Name)
 	}
 	if pubIPCheckInterval > 0 && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" || ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
 		return nil, fmt.Errorf("%s and %s are required if %s is > 0", flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name, flags.PubIPCheckIntervalFlag.Name)
+	}
+	if ejectionDefenseEnabled && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" ||
+		ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
+		return nil, fmt.Errorf("%s and %s are required if %s is enabled",
+			flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name,
+			flags.EjectionDefenseEnabledFlag.Name)
 	}
 
 	var ethClientConfig geth.EthClientConfig
@@ -393,7 +400,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	if paymentValidationEnabled {
 		reservationLedgerCacheConfig, err = reservationvalidation.NewReservationLedgerCacheConfig(
 			ctx.GlobalInt(flags.ReservationMaxLedgersFlag.Name),
-			ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
+			// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+			// instead of hardcoding. At that point, this field will be removed from the config struct
+			// entirely, and the value will be fetched dynamically at runtime.
+			90*time.Second,
 			// this is hardcoded: it's a parameter just in case, but it's never expected to change
 			ratelimit.OverfillOncePermitted,
 			ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),

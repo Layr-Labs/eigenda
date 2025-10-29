@@ -22,9 +22,9 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
@@ -184,7 +184,23 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 		Validator:      val,
 		ValidationPool: workerpool.New(1),
 	}
-	return grpc.NewServer(config, node, logger, ratelimiter, version.DefaultVersion())
+
+	// Create listeners with OS-allocated ports for testing
+	v1DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
+	v1RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
+	return grpc.NewServer(
+		config,
+		node,
+		logger,
+		ratelimiter,
+		version.DefaultVersion(),
+		v1DispersalListener,
+		v1RetrievalListener,
+	)
 }
 
 func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold uint8) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {

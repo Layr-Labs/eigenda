@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+import {ConfigRegistryTypes} from "src/core/libraries/v3/config-registry/ConfigRegistryTypes.sol";
+
 interface IEigenDAAddressDirectory {
     error AddressAlreadyExists(string name);
     error AddressDoesNotExist(string name);
@@ -41,79 +43,95 @@ interface IEigenDAAddressDirectory {
 }
 
 /// @title IEigenDAConfigRegistry
-/// @notice Interface for a configuration registry that allows adding, replacing, removing, and retrieving configuration entries by name.
-///         Supports both bytes32 and bytes types for configuration values, along with optional extra information.
-/// @dev    Contracts should use the bytes32 functions for gas efficiency.
+/// @notice Interface for a configuration registry that allows adding and retrieving configuration entries by name.
+///         Supports both bytes32 and bytes types for configuration values, and maintains a checkpointed structure for each configuration entry
+///         by an arbitrary activation key.
 interface IEigenDAConfigRegistry {
-    error ConfigAlreadyExists(string name);
-    error ConfigDoesNotExist(string name);
+    /// @notice Adds a 32 byte configuration value to the configuration registry.
+    /// @param name The name of the configuration entry.
+    /// @param activationKey The activation key for the configuration entry.
+    ///                      This is an arbitrary key defined by the caller to indicate when the configuration should become active.
+    /// @param value The 32 byte configuration value.
+    /// @dev The activationKey must be strictly greater than the last activationKey for the same name.
+    function addConfigBytes32(string memory name, uint256 activationKey, bytes32 value) external;
 
-    event ConfigBytes32Added(string name, bytes32 indexed key, bytes32 value, string extraInfo);
-    event ConfigBytesAdded(string name, bytes32 indexed key, bytes value, string extraInfo);
-    event ConfigBytes32Replaced(string name, bytes32 indexed key, bytes32 oldValue, bytes32 newValue, string extraInfo);
-    event ConfigBytesReplaced(string name, bytes32 indexed key, bytes oldValue, bytes newValue, string extraInfo);
-    event ConfigBytes32Removed(string name, bytes32 indexed key);
-    event ConfigBytesRemoved(string name, bytes32 indexed key);
+    /// @notice Adds a variable length byte configuration value to the configuration registry.
+    /// @param name The name of the configuration entry.
+    /// @param activationKey The activation key for the configuration entry.
+    ///                      This is an arbitrary key defined by the caller to indicate when the configuration should become active.
+    /// @param value The variable length byte configuration value.
+    /// @dev The activationKey must be strictly greater than the last activationKey for the same name.
+    function addConfigBytes(string memory name, uint256 activationKey, bytes memory value) external;
 
-    /// @notice Adds a new bytes32 configuration entry to the registry by name, along with optional extra info.
-    /// @dev Reverts if the entry already exists.
-    function addConfigBytes32(string memory name, bytes32 value, string memory extraInfo) external;
+    /// @notice Gets the number of checkpoints for a 32 byte configuration entry.
+    /// @param nameDigest The hash of the name of the configuration entry.
+    /// @return The number of checkpoints for the configuration entry.
+    function getNumCheckpointsBytes32(bytes32 nameDigest) external view returns (uint256);
 
-    /// @notice Adds a new bytes configuration entry to the registry by name, along with optional extra info.
-    /// @dev Reverts if the entry already exists.
-    function addConfigBytes(string memory name, bytes memory value, string memory extraInfo) external;
+    /// @notice Gets the number of checkpoints for a variable length byte configuration entry.
+    /// @param nameDigest The hash of the name of the configuration entry.
+    /// @return The number of checkpoints for the configuration entry.
+    function getNumCheckpointsBytes(bytes32 nameDigest) external view returns (uint256);
 
-    /// @notice Replaces an existing bytes32 configuration entry in the registry by name, along with optional extra info.
-    /// @dev Reverts if the entry does not exist.
-    function replaceConfigBytes32(string memory name, bytes32 value, string memory extraInfo) external;
+    /// @notice Gets the 32 byte configuration value at a specific index for a configuration entry.
+    /// @param nameDigest The hash of the name of the configuration entry.
+    /// @param index The index of the configuration value to retrieve.
+    /// @return The 32 byte configuration value at the specified index.
+    function getConfigBytes32(bytes32 nameDigest, uint256 index) external view returns (bytes32);
 
-    /// @notice Replaces an existing bytes configuration entry in the registry by name, along with optional extra info.
-    /// @dev Reverts if the entry does not exist.
-    function replaceConfigBytes(string memory name, bytes memory value, string memory extraInfo) external;
+    /// @notice Gets the variable length byte configuration value at a specific index for a configuration entry.
+    /// @param nameDigest The hash of the name of the configuration entry.
+    /// @param index The index of the configuration value to retrieve.
+    /// @return The variable length byte configuration value at the specified index.
+    function getConfigBytes(bytes32 nameDigest, uint256 index) external view returns (bytes memory);
 
-    /// @notice Removes an existing bytes32 configuration entry from the registry by name.
-    /// @dev Reverts if the entry does not exist.
-    function removeConfigBytes32(string memory name) external;
+    /// @notice Gets the activation key for a 32 byte configuration entry at a specific index.
+    /// @param nameDigest The hash of the name of the configuration entry.
+    /// @param index The index of the configuration value to retrieve the activation key for.
+    /// @return The activation key at the specified index.
+    function getActivationKeyBytes32(bytes32 nameDigest, uint256 index) external view returns (uint256);
 
-    /// @notice Removes an existing bytes configuration entry from the registry by name.
-    /// @dev Reverts if the entry does not exist.
-    function removeConfigBytes(string memory name) external;
+    /// @notice Gets the activation key for a variable length byte configuration entry at a specific index.
+    /// @param nameDigest The hash of the name of the configuration entry.
+    /// @param index The index of the configuration value to retrieve the activation key for.
+    /// @return The activation key at the specified index.
+    function getActivationKeyBytes(bytes32 nameDigest, uint256 index) external view returns (uint256);
 
-    /// @notice Gets the bytes32 configuration entry by name.
-    function getConfigBytes32(string memory name) external view returns (bytes32);
+    /// @notice Gets the full checkpoint (value and activation key) for a 32 byte configuration entry at a specific index.
+    /// @param nameDigest The hash of the name of the configuration entry.
+    /// @param index The index of the configuration value to retrieve the checkpoint for.
+    /// @return The full checkpoint (value and activation key) at the specified index.
+    function getCheckpointBytes32(bytes32 nameDigest, uint256 index)
+        external
+        view
+        returns (ConfigRegistryTypes.Bytes32Checkpoint memory);
 
-    /// @notice Gets the bytes configuration entry by name.
-    function getConfigBytes(string memory name) external view returns (bytes memory);
+    /// @notice Gets the full checkpoint (value and activation key) for a variable length byte configuration entry at a specific index.
+    /// @param nameDigest The hash of the name of the configuration entry.
+    /// @param index The index of the configuration value to retrieve the checkpoint for.
+    /// @return The full checkpoint (value and activation key) at the specified index.
+    function getCheckpointBytes(bytes32 nameDigest, uint256 index)
+        external
+        view
+        returns (ConfigRegistryTypes.BytesCheckpoint memory);
 
-    /// @notice Gets the extra info associated with a bytes32 configuration entry by name.
-    function getConfigBytes32ExtraInfo(string memory name) external view returns (string memory);
+    /// @notice Gets the name of a 32 byte configuration entry by its name digest.
+    /// @param nameDigest The hash of the name of the configuration entry.
+    /// @return The name of the configuration entry.
+    function getConfigNameBytes32(bytes32 nameDigest) external view returns (string memory);
 
-    /// @notice Gets the extra info associated with a bytes configuration entry by name.
-    function getConfigBytesExtraInfo(string memory name) external view returns (string memory);
+    /// @notice Gets the name of a variable length byte configuration entry by its name digest.
+    /// @param nameDigest The hash of the name of the configuration entry.
+    /// @return The name of the configuration entry.
+    function getConfigNameBytes(bytes32 nameDigest) external view returns (string memory);
 
-    /// @notice Gets the bytes32 configuration entry by keccak256 hash of the name.
-    function getConfigBytes32(bytes32 key) external view returns (bytes32);
+    /// @notice Gets all names of 32 byte configuration entries.
+    /// @return An array of all configuration entry names.
+    function getAllConfigNamesBytes32() external view returns (string[] memory);
 
-    /// @notice Gets the bytes configuration entry by keccak256 hash of the name.
-    function getConfigBytes(bytes32 key) external view returns (bytes memory);
-
-    /// @notice Gets the extra info associated with a bytes32 configuration entry by keccak256 hash of the name.
-    function getConfigBytes32ExtraInfo(bytes32 key) external view returns (string memory);
-
-    /// @notice Gets the extra info associated with a bytes configuration entry by keccak256 hash of the name.
-    function getConfigBytesExtraInfo(bytes32 key) external view returns (string memory);
-
-    /// @notice Gets the number of registered keys for bytes32 configuration entries.
-    function getNumRegisteredKeysBytes32() external view returns (uint256);
-
-    /// @notice Gets the number of registered keys for bytes configuration entries.
-    function getNumRegisteredKeysBytes() external view returns (uint256);
-
-    /// @notice Gets the registered key for bytes32 configuration entries at a specific index.
-    function getRegisteredKeyBytes32(uint256 index) external view returns (string memory);
-
-    /// @notice Gets the registered key for bytes configuration entries at a specific index.
-    function getRegisteredKeyBytes(uint256 index) external view returns (string memory);
+    /// @notice Gets all names of variable length byte configuration entries.
+    /// @return An array of all configuration entry names.
+    function getAllConfigNamesBytes() external view returns (string[] memory);
 }
 
 /// @notice Interface for the EigenDA Directory

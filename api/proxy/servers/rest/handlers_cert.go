@@ -17,11 +17,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const (
-	// limit requests to only 32 MiB to mitigate potential DoS attacks
-	maxPOSTRequestBodySize int64 = 1024 * 1024 * 32
-)
-
 // =================================================================================================
 // GET ROUTES
 // =================================================================================================
@@ -150,9 +145,10 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 		return proxyerrors.NewParsingError(
 			fmt.Errorf("failed to decode hex keccak commitment %s: %w", keccakCommitmentHex, err))
 	}
-	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
+
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, common.MaxServerPOSTRequestBodySize))
 	if err != nil {
-		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)
+		return proxyerrors.NewReadRequestBodyError(err, common.MaxServerPOSTRequestBodySize)
 	}
 
 	err = svr.keccakMgr.PutOPKeccakPairInS3(r.Context(), keccakCommitment, payload)
@@ -197,9 +193,9 @@ func (svr *Server) handlePostShared(
 		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
 	}
 
-	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, common.MaxServerPOSTRequestBodySize))
 	if err != nil {
-		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)
+		return proxyerrors.NewReadRequestBodyError(err, common.MaxServerPOSTRequestBodySize)
 	}
 
 	serializedCert, err := svr.certMgr.Put(r.Context(), payload)

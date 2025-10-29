@@ -47,7 +47,7 @@ type InfrastructureHarness struct {
 	// Operator related components
 	OperatorHarness OperatorHarness
 
-	// EigenDA components (includes relays)
+	// EigenDA V2 disperser components
 	DisperserHarness DisperserHarness
 
 	// Proxy
@@ -159,6 +159,39 @@ func (tc *TestHarness) UpdateReservationOnChain(
 	)
 	if err != nil {
 		return fmt.Errorf("set reservation: %w", err)
+	}
+
+	receipt, err := bind.WaitMined(t.Context(), tc.EthClient, tx)
+	if err != nil {
+		return fmt.Errorf("wait mined: %w", err)
+	}
+
+	if receipt.Status != 1 {
+		return fmt.Errorf("transaction failed")
+	}
+
+	return nil
+}
+
+// Makes an on-demand deposit for an account
+func (tc *TestHarness) DepositOnDemandOnChain(
+	t *testing.T,
+	accountID gethcommon.Address,
+	depositAmount *big.Int,
+) error {
+	opts, unlock := tc.GetDeployerTransactOpts()
+	defer unlock()
+
+	opts.Value = depositAmount
+	defer func() {
+		// Reset the value to nil after the transaction to avoid affecting subsequent transactions, since transact ops
+		// is being reused
+		opts.Value = nil
+	}()
+
+	tx, err := tc.PaymentVaultTransactor.DepositOnDemand(opts, accountID)
+	if err != nil {
+		return fmt.Errorf("deposit on demand: %w", err)
 	}
 
 	receipt, err := bind.WaitMined(t.Context(), tc.EthClient, tx)

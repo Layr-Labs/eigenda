@@ -13,12 +13,11 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -78,14 +77,8 @@ func NewEncoderServerV2(
 	}
 }
 
-func (s *EncoderServerV2) Start() error {
-	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("Could not start tcp listener: %v", err)
-	}
-
+// StartWithListener starts the server using the provided listener. This method will block until the server is stopped.
+func (s *EncoderServerV2) StartWithListener(listener net.Listener) error {
 	gs := grpc.NewServer(
 		grpc.UnaryInterceptor(
 			s.grpcMetrics.UnaryServerInterceptor(),
@@ -107,7 +100,7 @@ func (s *EncoderServerV2) Start() error {
 		gs.GracefulStop()
 	}
 
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	s.logger.Info("GRPC Listening", "address", listener.Addr().String())
 	return gs.Serve(listener)
 }
 
@@ -184,7 +177,11 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKe
 
 	// Encode the data
 	encodingStart := time.Now()
-	frames, err := s.prover.GetFrames(data, encodingParams)
+	dataFr, err := rs.ToFrArray(data)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert blob data to field elements: %v", err)
+	}
+	frames, _, err := s.prover.GetFrames(dataFr, encodingParams)
 	if err != nil {
 		s.logger.Error("failed to encode frames", "error", err)
 		return nil, status.Errorf(codes.Internal, "encoding failed: %v", err)
