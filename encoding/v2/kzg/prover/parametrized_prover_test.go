@@ -24,7 +24,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 
 	commitments, err := c.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
 	require.Nil(t, err)
-	frames, _, err := group.GetFrames(harness.paddedGettysburgAddressBytes, params)
+	frames, _, err := group.GetFrames(harness.paddedGettysburgAddressFrs, params)
 	require.Nil(t, err)
 
 	verifier, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
@@ -53,7 +53,7 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, p)
 
-	frames, _, err := group.GetFrames(harness.paddedGettysburgAddressBytes, params)
+	frames, _, err := group.GetFrames(harness.paddedGettysburgAddressFrs, params)
 	require.Nil(t, err)
 	require.NotNil(t, frames, err)
 
