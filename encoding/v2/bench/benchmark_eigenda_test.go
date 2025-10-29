@@ -3,6 +3,7 @@ package bench_test
 import (
 	"fmt"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -187,7 +188,7 @@ func benchmarkMultiproofGeneration(b *testing.B, encodingConfig encoding.Config)
 		// We don't have enough SRS points in resourcs/srs/g1.point to compute the largest SRSTables anyways.
 		// Note that we can't input 0 here because the prover checks that at least 1 point is loaded.
 		// TODO(samlaf): fix this. We should be able to not load any G1 points if we are preloading the SRSTables.
-		SRSNumberToLoad: 1,
+		SRSNumberToLoad: 1 << 19,
 		G1Path:          "../../../resources/srs/g1.point",
 		// make sure to run `make download_srs_tables` to have the SRSTables available here.
 		PreloadEncoder: true,
@@ -222,6 +223,56 @@ func benchmarkMultiproofGeneration(b *testing.B, encodingConfig encoding.Config)
 			for b.Loop() {
 				_, err = parametrizedProver.GetProofs(maxSizeBlobCoeffs[:rsExtendedBlobFrs])
 				require.NoError(b, err)
+			}
+		})
+	}
+}
+
+// This does both chunk and proof generation, in separate goroutines.
+// In a sense it combines both benchmarks above.
+func BenchmarkFrameGeneration(b *testing.B) {
+	proverConfig := prover.KzgConfig{
+		// The loaded G1 point is not used because we require the SRSTables to be preloaded for the benchmark.
+		// We don't have enough SRS points in resourcs/srs/g1.point to compute the largest SRSTables anyways.
+		// Note that we can't input 0 here because the prover checks that at least 1 point is loaded.
+		// TODO(samlaf): fix this. We should be able to not load any G1 points if we are preloading the SRSTables.
+		SRSNumberToLoad: 1 << 19,
+		G1Path:          "../../../resources/srs/g1.point",
+		// make sure to run `make download_srs_tables` to have the SRSTables available here.
+		PreloadEncoder: true,
+		CacheDir:       "../../../resources/srs/SRSTables",
+		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
+	}
+	b.Log("Reading precomputed SRSTables, this may take a while...")
+	// use a non-silent logger to see the "Multiproof Time Decomp" log lines.
+	p, err := prover.NewProver(common.TestLogger(b), &proverConfig, nil)
+	require.NoError(b, err)
+
+	rand := random.NewTestRandomNoPrint(1337)
+	maxSizeBlobCoeffs := rand.FrElements(1 << 22)
+
+	for _, blobPowerBytes := range []uint64{17, 20, 21, 24} {
+		b.Run("Multiproof_size_2^"+fmt.Sprint(blobPowerBytes)+"_bytes", func(b *testing.B) {
+			// Reed-Solomon encoding with 8x redundancy: 2^3 = 8
+			rsExtendedBlobPowerBytes := blobPowerBytes + 3
+			rsExtendedBlobPowerFrs := rsExtendedBlobPowerBytes - 5 // 32 bytes per Fr element
+			rsExtendedBlobFrs := uint64(1) << rsExtendedBlobPowerFrs
+			params := encoding.EncodingParams{
+				NumChunks:   8192,                           // blob_version=0
+				ChunkLength: max(1, rsExtendedBlobFrs/8192), // chosen such that numChunks*ChunkLength=rsExtendedBlobFrs
+			}
+
+			for b.Loop() {
+				wg := sync.WaitGroup{}
+				wg.Add(5)
+				for range 5 {
+					go func() {
+						defer wg.Done()
+						_, _, err = p.GetFrames(maxSizeBlobCoeffs[:rsExtendedBlobFrs], params)
+						require.NoError(b, err)
+					}()
+				}
+				wg.Wait()
 			}
 		})
 	}
