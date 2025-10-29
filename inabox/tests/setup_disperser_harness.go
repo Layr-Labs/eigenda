@@ -1189,9 +1189,20 @@ func startAPIServerV2(
 	)
 	mt.Start(ctx)
 
+	// Pre-create listener with port 0 (OS assigns random port)
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		_ = logFile.Close()
+		return nil, fmt.Errorf("failed to create listener for API server: %w", err)
+	}
+
+	// Extract the port assigned by the OS
+	assignedPort := listener.Addr().(*net.TCPAddr).Port
+	apiServerLogger.Info("Created listener for API server", "assigned_port", assignedPort)
+
 	// Create server config
 	serverConfig := disperser.ServerConfig{
-		GrpcPort:              "32005", // Use a specific port for API server
+		GrpcPort:              fmt.Sprintf("%d", assignedPort),
 		GrpcTimeout:           10 * time.Second,
 		MaxConnectionAge:      5 * time.Minute,
 		MaxConnectionAgeGrace: 30 * time.Second,
@@ -1227,21 +1238,23 @@ func startAPIServerV2(
 		false, // ReservedOnly
 		config.TestConfig.UseControllerMediatedPayments,
 		controllerAddress,
+		listener,
 	)
 	if err != nil {
+		_ = listener.Close()
 		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create API server v2: %w", err)
 	}
 
 	// Start API server in background
 	go func() {
-		apiServerLogger.Info("Starting API server v2", "port", serverConfig.GrpcPort, "logFile", logFilePath)
+		apiServerLogger.Info("Starting API server v2", "address", listener.Addr().String(), "logFile", logFilePath)
 		if err := apiServerV2.Start(ctx); err != nil {
 			apiServerLogger.Error("API server v2 failed", "error", err)
 		}
 	}()
 
-	actualAddress := fmt.Sprintf("localhost:%s", serverConfig.GrpcPort)
+	actualAddress := fmt.Sprintf("localhost:%d", assignedPort)
 	apiServerLogger.Info("API server v2 started successfully", "address", actualAddress, "logFile", logFilePath)
 
 	return &APIServerComponents{

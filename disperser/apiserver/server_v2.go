@@ -78,6 +78,10 @@ type DispersalServerV2 struct {
 	// Controller gRPC client connection and service client
 	controllerConnection *grpc.ClientConn
 	controllerClient     controller.ControllerServiceClient
+
+	// Pre-created listener for the gRPC server
+	listener   net.Listener
+	grpcServer *grpc.Server
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -98,7 +102,11 @@ func NewDispersalServerV2(
 	useControllerMediatedPayments bool,
 	// must be non-empty if useControllerMediatedPayments is true
 	controllerAddress string,
+	listener net.Listener,
 ) (*DispersalServerV2, error) {
+	if listener == nil {
+		return nil, errors.New("listener is required")
+	}
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
 	}
@@ -169,6 +177,7 @@ func NewDispersalServerV2(
 		useControllerMediatedPayments: useControllerMediatedPayments,
 		controllerConnection:          controllerConnection,
 		controllerClient:              controllerClient,
+		listener:                      listener,
 	}, nil
 }
 
@@ -185,26 +194,20 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		MaxConnectionAgeGrace: s.serverConfig.MaxConnectionAgeGrace,
 	})
 
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return errors.New("could not start tcp listener")
-	}
-
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(
+	s.grpcServer = grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			s.metrics.grpcMetrics.UnaryServerInterceptor(),
 		), opt, keepAliveConfig)
-	reflection.Register(gs)
-	pb.RegisterDisperserServer(gs, s)
+	reflection.Register(s.grpcServer)
+	pb.RegisterDisperserServer(s.grpcServer, s)
 
 	// Unimplemented v1 server for grpcurl/reflection support
-	pbv1.RegisterDisperserServer(gs, &DispersalServerV1{})
+	pbv1.RegisterDisperserServer(s.grpcServer, &DispersalServerV1{})
 
 	// Register Server for Health Checks
 	name := pb.Disperser_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, gs)
+	healthcheck.RegisterHealthServer(name, s.grpcServer)
 
 	if err := s.RefreshOnchainState(ctx); err != nil {
 		return fmt.Errorf("failed to refresh onchain quorum state: %w", err)
@@ -226,9 +229,9 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", listener.Addr().String())
+	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", s.listener.Addr().String())
 
-	if err := gs.Serve(listener); err != nil {
+	if err := s.grpcServer.Serve(s.listener); err != nil {
 		return errors.New("could not start GRPC server")
 	}
 
@@ -446,6 +449,16 @@ func (s *DispersalServerV2) getPaymentState(
 
 // Gracefully shuts down the server and closes any open connections
 func (s *DispersalServerV2) Stop() error {
+	if s.grpcServer != nil {
+		s.grpcServer.GracefulStop()
+	}
+
+	if s.listener != nil {
+		if err := s.listener.Close(); err != nil {
+			s.logger.Error("failed to close listener", "error", err)
+		}
+	}
+
 	if s.controllerConnection != nil {
 		if err := s.controllerConnection.Close(); err != nil {
 			s.logger.Error("failed to close controller connection", "error", err)
