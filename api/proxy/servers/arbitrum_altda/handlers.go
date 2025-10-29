@@ -113,17 +113,17 @@ type Handlers struct {
 	//       We should dig into this underlying logging and see if there's a way to intuitively override, disable,
 	//       or enforce consistency between log outputs.
 
-	log            logging.Logger
-	eigenDAManager *store.EigenDAManager
-  compatibilityCfg proxy_common.CompatibilityConfig
+	log              logging.Logger
+	eigenDAManager   *store.EigenDAManager
+	compatibilityCfg proxy_common.CompatibilityConfig
 }
 
 // NewHandlers is a constructor
 func NewHandlers(m *store.EigenDAManager, l logging.Logger, compatCfg proxy_common.CompatibilityConfig) IHandlers {
 	return &Handlers{
-		log:            l,
-		eigenDAManager: m,
-    compatibilityCfg: compatCfg,
+		log:              l,
+		eigenDAManager:   m,
+		compatibilityCfg: compatCfg,
 	}
 }
 
@@ -394,7 +394,9 @@ func (h *Handlers) GenerateCertificateValidityProof(
 	}, nil
 }
 
-// TODO(iquidus)
+// CompatibilityConfig returns compatibility values an external service can use to verify compatibility between
+// the proxy instance and itself. E.g version, recency window, apis enabled.
+// Note: This is not part of the Custom DA spec.
 func (h *Handlers) CompatibilityConfig(ctx context.Context) (*CompatibilityConfigResult, error) {
 	return &CompatibilityConfigResult{
 		CompatibilityConfig: h.compatibilityCfg,

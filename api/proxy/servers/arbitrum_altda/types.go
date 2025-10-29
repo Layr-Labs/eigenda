@@ -84,6 +84,8 @@ type GenerateCertificateValidityProofResult struct {
 	Proof hexutil.Bytes `json:"proof,omitempty"`
 }
 
+// CompatibilityConfigResult is the result struct used to check compatibility between the proxy instance and an
+// external service
 type CompatibilityConfigResult struct {
 	proxy_common.CompatibilityConfig
 }
