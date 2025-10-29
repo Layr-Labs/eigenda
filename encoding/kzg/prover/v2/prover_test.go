@@ -61,7 +61,7 @@ func TestEncoder(t *testing.T) {
 	for i, f := range frames {
 		chunks[i] = f.Coeffs
 	}
-	decoded, err := encoder.Decode(chunks, indices, maxInputSize, params)
+	decoded, err := encoder.Decode("blob", chunks, indices, maxInputSize, params)
 	require.NoError(t, err)
 	require.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 
@@ -80,7 +80,7 @@ func TestEncoder(t *testing.T) {
 	for i, f := range frames {
 		chunks[i] = f.Coeffs
 	}
-	decoded, err = encoder.Decode(chunks, indices, maxInputSize, params)
+	decoded, err = encoder.Decode("blob", chunks, indices, maxInputSize, params)
 	require.NoError(t, err)
 	require.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 }
@@ -119,7 +119,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		for i, f := range samples {
 			chunks[i] = f.Coeffs
 		}
-		data, err := encoder.Decode(chunks, indices, uint64(len(input)), params)
+		data, err := encoder.Decode("blob", chunks, indices, uint64(len(input)), params)
 		if err != nil {
 			t.Errorf("Error Decoding:\n Data:\n %q \n Err: %q", input, err)
 		}
