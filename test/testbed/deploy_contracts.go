@@ -302,6 +302,7 @@ type EigenDAContract struct {
 	CertVerifierLegacy     string `json:"eigenDALegacyCertVerifier"`
 	CertVerifier           string `json:"eigenDACertVerifier"`
 	CertVerifierRouter     string `json:"eigenDACertVerifierRouter"`
+	ArbProofValidator      string `json:"arbitrumProofValidator"`
 }
 
 // Stakes represents token staking configuration

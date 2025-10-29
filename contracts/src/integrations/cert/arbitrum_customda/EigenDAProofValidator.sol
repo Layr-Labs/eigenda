@@ -106,7 +106,7 @@ contract EigenDAProofValidator is ICustomDAProofValidator {
 
         // Certificate format is: [prefix(1), da_commitment_version(1), eigenda_cert_version(1), eigenda_cert_bytes(N)]
         // First byte must be 0x01 (CustomDA message header flag)
-        // Second byte must be 0x42 (EigenDAV2 message header flag)
+        // Second byte must be 0x00 (EigenDA DA Layer byte flag)
         // Third byte must be the EigenDA Cert version byte (dictated by the EigenDACertVerifier contract)
         // ... Could be beneficial to add an invariant against the cert verifier being used wrt the cert
         //     version being passed here

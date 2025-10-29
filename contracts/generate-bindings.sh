@@ -42,6 +42,7 @@ ABIGEN_V1_CONTRACTS=(
   "EigenDACertVerifier"
   "EigenDACertVerifierRouter"
   "IEigenDACertVerifierLegacy"
+  "EigenDAProofValidator"
   "EigenDAThresholdRegistry"
   "EigenDARelayRegistry"
   "IEigenDARelayRegistry"
