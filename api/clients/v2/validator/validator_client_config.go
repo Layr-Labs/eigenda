@@ -89,7 +89,7 @@ func DefaultClientConfig() *ValidatorClientConfig {
 		PessimisticTimeout:                10 * time.Second,
 		DownloadTimeout:                   120 * time.Second,
 		ControlLoopPeriod:                 1 * time.Second,
-		DetailedLogging:                   false,
+		DetailedLogging:                   true,
 		ConnectionPoolSize:                32,
 		ComputePoolSize:                   runtime.NumCPU(),
 		TimeSource:                        time.Now,
