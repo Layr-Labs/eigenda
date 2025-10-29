@@ -34,7 +34,7 @@ test-e2e-local:
 	BACKEND=memstore gotestsum --format testname -- -v -timeout 10m ./test/e2e -parallel 8
 
 # E2E tests using sepolia testnet backend. Also tests the standard client against the proxy.
-# If sepolia tests are failing, consider checking https://dora.holesky.ethpandaops.io/epochs for block production status.
+# If sepolia tests are failing, consider checking https://sepolia.etherscan.io/ for block production status.
 test-e2e-sepolia:
 	BACKEND=sepolia gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
