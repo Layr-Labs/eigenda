@@ -108,7 +108,7 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("failed to create router caller: %w", err)
 	}
 
-	testCtx.ArbProofValidator, err = proofvalidatorbindings.NewContractEigenDAProofValidatorCaller(
+	testCtx.ArbitrumEigenDAProofValidator, err = proofvalidatorbindings.NewContractEigenDAProofValidatorCaller(
 		gethcommon.HexToAddress(infra.TestConfig.EigenDA.ArbitrumProofValidator),
 		testCtx.EthClient)
 	if err != nil {

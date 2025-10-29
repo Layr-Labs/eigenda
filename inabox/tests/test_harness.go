@@ -81,7 +81,7 @@ type TestHarness struct {
 	EigenDACertVerifierRouter       *routerbindings.ContractEigenDACertVerifierRouterTransactor
 	EigenDACertVerifierRouterCaller *routerbindings.ContractEigenDACertVerifierRouterCaller
 	EigenDACertVerifierV1           *verifierv1bindings.ContractEigenDACertVerifierV1
-	ArbProofValidator               *proofvalidatorbindings.ContractEigenDAProofValidatorCaller
+	ArbitrumEigenDAProofValidator   *proofvalidatorbindings.ContractEigenDAProofValidatorCaller
 
 	// Retrieval clients
 	RetrievalClient            clients.RetrievalClient

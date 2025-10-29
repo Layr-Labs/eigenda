@@ -186,12 +186,12 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.NoError(t, err)
 
 	// for brevity, test the ARB proof validator contract which wraps around
-	// the CertVerifierRouter to validate a Custom DA Proof for happy path
+	// the CertVerifierRouter to validate a Custom DA Proof for happy && unhappy path
 
 	arbCertOneStepProof, err := serializeARBVerifyCertProof(cert4)
 	require.NoError(t, err)
 
-	passed, err := testHarness.ArbProofValidator.ValidateCertificate(&bind.CallOpts{}, arbCertOneStepProof)
+	passed, err := testHarness.ArbitrumEigenDAProofValidator.ValidateCertificate(&bind.CallOpts{}, arbCertOneStepProof)
 	require.NoError(t, err)
 	require.True(t, passed)
 	// now force verification to fail by modifying the cert contents
@@ -217,16 +217,19 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
 
+	// ensure ARB proof validator contract returns false for an invalid cert
 	arbCertOneStepProof, err = serializeARBVerifyCertProof(cert4)
 	require.NoError(t, err)
 
-	passed, err = testHarness.ArbProofValidator.ValidateCertificate(&bind.CallOpts{}, arbCertOneStepProof)
+	passed, err = testHarness.ArbitrumEigenDAProofValidator.ValidateCertificate(&bind.CallOpts{}, arbCertOneStepProof)
 	require.NoError(t, err)
 	require.False(t, passed)
 }
 
-// serializeARBVerifyCertProof returns
-// proof composition is [8-byte big-endian length] + ARB DA Commitment
+// serializeARBVerifyCertProof returns the proof bytes used for resolving a
+// VerifyDACert opcode dispute.
+//
+// the proof composition is [8-byte big-endian length] + ARB DA Commitment bytes
 func serializeARBVerifyCertProof(cert coretypes.EigenDACert) ([]byte, error) {
 	abiCertBytes, err := cert.Serialize(coretypes.CertSerializationABI)
 	if err != nil {
