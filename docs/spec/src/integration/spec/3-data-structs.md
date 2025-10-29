@@ -176,11 +176,7 @@ The resulting `blobKey` serves as the unique identifier for querying dispersal s
 
 #### Relationship to Other Data Structures
 
-The diagram below illustrates how `blobKey` relates to other core EigenDA data structures:
-
-![Data Structure Relationships](../../assets/integration/blob-key-relationships.png)
-
-The `BlobHeader` is hashed to produce the `blobKey`. A `BlobCertificate` wraps a `BlobHeader` along with signature and relay keys. The `BlobInclusionInfo` contains a `BlobCertificate` and is used to prove inclusion of that certificate in a batch via a Merkle proof. The `BatchHeader` contains a `batchRoot` which is the root of the Merkle tree whose leaves are hashes of `BlobCertificate`s.
+The `BlobHeader` is hashed to produce the `blobKey`. A `BlobCertificate` wraps a `BlobHeader` along with signature and relay keys. The `BlobInclusionInfo` contains a `BlobCertificate` and is used to prove inclusion of that certificate in a batch via a Merkle proof. The `BatchHeader` contains a `batchRoot` which is the root of the Merkle tree whose leaves are hashes of `BlobCertificate`s. The diagram in the [EigenDA Certificate](#eigenda-certificate-dacert) section below illustrates these relationships.
 
 #### Code References
 
