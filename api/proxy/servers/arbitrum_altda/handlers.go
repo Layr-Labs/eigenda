@@ -21,6 +21,8 @@ const (
 	// trustless integration
 	MethodGenerateReadPreimageProof = "daprovider_generateReadPreimageProof"
 	MethodGenerateCertValidityProof = "daprovider_generateCertificateValidityProof"
+	// compatibility config
+	MethodCompatibilityConfig = "daprovider_compatibilityConfig"
 )
 
 /*
@@ -76,6 +78,8 @@ type IHandlers interface {
 		ctx context.Context,
 		certificate hexutil.Bytes,
 	) (*GenerateCertificateValidityProofResult, error)
+
+	CompatibilityConfig(ctx context.Context) (*CompatibilityConfigResult, error)
 }
 
 // Handlers defines the Arbitrum ALT DA server spec's JSON RPC methods
@@ -105,12 +109,14 @@ type Handlers struct {
 	//       We should dig into this underlying logging and see if there's a way to intuitively override, disable,
 	//       or enforce consistency between log outputs.
 
-	eigenDAManager *store.EigenDAManager
+	eigenDAManager   *store.EigenDAManager
+	compatibilityCfg proxy_common.CompatibilityConfig
 }
 
-func NewHandlers(m *store.EigenDAManager) IHandlers {
+func NewHandlers(m *store.EigenDAManager, compatCfg proxy_common.CompatibilityConfig) IHandlers {
 	return &Handlers{
-		eigenDAManager: m,
+		eigenDAManager:   m,
+		compatibilityCfg: compatCfg,
 	}
 }
 
@@ -300,5 +306,12 @@ func (h *Handlers) GenerateCertificateValidityProof(
 ) (*GenerateCertificateValidityProofResult, error) {
 	return &GenerateCertificateValidityProofResult{
 		Proof: []byte{},
+	}, nil
+}
+
+// TODO(iquidus)
+func (h *Handlers) CompatibilityConfig(ctx context.Context) (*CompatibilityConfigResult, error) {
+	return &CompatibilityConfigResult{
+		CompatibilityConfig: h.compatibilityCfg,
 	}, nil
 }

@@ -59,7 +59,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 	defer ctxCancel()
 
 	var ethClient common_eigenda.EthClient
-	var chainID = "memstore"
+	var chainID = ""
 	var readOnlyMode = false
 	if !cfg.StoreBuilderConfig.MemstoreEnabled {
 		ethClient, chainID, err = common.BuildEthClient(
@@ -89,47 +89,51 @@ func StartProxyService(cliCtx *cli.Context) error {
 		return fmt.Errorf("build storage managers: %w", err)
 	}
 
-	// Construct and set the compatibility config for the rest server. This could not be done while reading configs
+	// Construct and the compatibility config for the rest and arb servers. This could not be done while reading configs
 	// as ChainID is fetched from the ethClient afterwards.
-	err = cfg.RestSvrCfg.BuildCompatibilityConfig(
+	compatibilityCfg, err := common.NewCompatibilityConfig(
 		Version,
 		chainID,
 		cfg.StoreBuilderConfig.ClientConfigV2,
 		readOnlyMode,
+		cfg.EnabledServersConfig.ToAPIStrings(),
 	)
 	if err != nil {
-		return fmt.Errorf("build compatibility config: %w", err)
-	}
-	// The rest server is always started to provide the /health and /config endpoints
-	restServer := rest.NewServer(cfg.RestSvrCfg, certMgr, keccakMgr, log, metrics)
-	router := mux.NewRouter()
-	restServer.RegisterRoutes(router)
-	if cfg.StoreBuilderConfig.MemstoreEnabled {
-		memconfig.NewHandlerHTTP(log, cfg.StoreBuilderConfig.MemstoreConfig).RegisterMemstoreConfigHandlers(router)
+		return fmt.Errorf("new compatibility config: %w", err)
 	}
 
-	restEnabledCfg := cfg.EnabledServersConfig.RestAPIConfig
-	if err := restServer.Start(router); err != nil {
-		return fmt.Errorf("start proxy rest server: %w", err)
-	}
-
-	log.Info("Started EigenDA Proxy REST ALT DA server",
-		string(enabled_apis.Admin), restEnabledCfg.Admin,
-		string(enabled_apis.StandardCommitment), restEnabledCfg.StandardCommitment,
-		string(enabled_apis.OpGenericCommitment), restEnabledCfg.OpGenericCommitment,
-		string(enabled_apis.OpKeccakCommitment), restEnabledCfg.OpKeccakCommitment)
-
-	defer func() {
-		if err := restServer.Stop(); err != nil {
-			log.Error("failed to stop REST ALT DA server", "err", err)
-		} else {
-			log.Info("Successfully shutdown REST ALT DA server")
+	if cfg.EnabledServersConfig.RestAPIConfig.DAEndpointEnabled() {
+		cfg.RestSvrCfg.CompatibilityCfg = compatibilityCfg
+		restServer := rest.NewServer(cfg.RestSvrCfg, certMgr, keccakMgr, log, metrics)
+		router := mux.NewRouter()
+		restServer.RegisterRoutes(router)
+		if cfg.StoreBuilderConfig.MemstoreEnabled {
+			memconfig.NewHandlerHTTP(log, cfg.StoreBuilderConfig.MemstoreConfig).RegisterMemstoreConfigHandlers(router)
 		}
 
-	}()
+		restEnabledCfg := cfg.EnabledServersConfig.RestAPIConfig
+		if err := restServer.Start(router); err != nil {
+			return fmt.Errorf("start proxy rest server: %w", err)
+		}
+
+		log.Info("Started EigenDA Proxy REST ALT DA server",
+			string(enabled_apis.Admin), restEnabledCfg.Admin,
+			string(enabled_apis.StandardCommitment), restEnabledCfg.StandardCommitment,
+			string(enabled_apis.OpGenericCommitment), restEnabledCfg.OpGenericCommitment,
+			string(enabled_apis.OpKeccakCommitment), restEnabledCfg.OpKeccakCommitment)
+
+		defer func() {
+			if err := restServer.Stop(); err != nil {
+				log.Error("failed to stop REST ALT DA server", "err", err)
+			} else {
+				log.Info("Successfully shutdown REST ALT DA server")
+			}
+
+		}()
+	}
 
 	if cfg.EnabledServersConfig.ArbCustomDA {
-		h := arbitrum_altda.NewHandlers(certMgr)
+		h := arbitrum_altda.NewHandlers(certMgr, compatibilityCfg)
 
 		arbitrumRpcServer, err := arbitrum_altda.NewServer(ctx, &cfg.ArbCustomDASvrCfg, h)
 		if err != nil {

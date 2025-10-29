@@ -71,12 +71,17 @@ func CreateTestSuite(
 	// 	configString,
 	// )
 
-	var restServer *rest.Server
-	var arbServer *arbitrum_altda.Server
-	var ethClient common_eigenda.EthClient
+	var (
+		restServer   *rest.Server
+		arbServer    *arbitrum_altda.Server
+		ethClient    common_eigenda.EthClient
+		readOnlyMode = false
+		chainID      = ""
+	)
 
 	if !appConfig.StoreBuilderConfig.MemstoreEnabled {
-		ec, _, err := common.BuildEthClient(
+		var err error
+		ethClient, chainID, err = common.BuildEthClient(
 			ctx,
 			logger,
 			appConfig.SecretConfig.EthRPCURL,
@@ -84,7 +89,6 @@ func CreateTestSuite(
 		if err != nil {
 			panic(fmt.Sprintf("build eth client: %v", err.Error()))
 		}
-		ethClient = ec
 	}
 
 	certMgr, keccakMgr, err := builder.BuildManagers(
@@ -100,7 +104,19 @@ func CreateTestSuite(
 		panic(fmt.Sprintf("build storage managers: %v", err.Error()))
 	}
 
+	compatibilityCfg, err := common.NewCompatibilityConfig(
+		"test",
+		chainID,
+		appConfig.StoreBuilderConfig.ClientConfigV2,
+		readOnlyMode,
+		appConfig.EnabledServersConfig.ToAPIStrings(),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("new compatibility config: %v", err.Error()))
+	}
+
 	if appConfig.EnabledServersConfig.RestAPIConfig.DAEndpointEnabled() {
+		appConfig.RestSvrCfg.CompatibilityCfg = compatibilityCfg
 		restServer = rest.NewServer(appConfig.RestSvrCfg, certMgr, keccakMgr, logger, metrics)
 		router := mux.NewRouter()
 		restServer.RegisterRoutes(router)
@@ -115,7 +131,7 @@ func CreateTestSuite(
 	}
 
 	if appConfig.EnabledServersConfig.ArbCustomDA {
-		arbHandlers := arbitrum_altda.NewHandlers(certMgr)
+		arbHandlers := arbitrum_altda.NewHandlers(certMgr, compatibilityCfg)
 		arbServer, err = arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
 		if err != nil {
 			panic(fmt.Sprintf("create arbitrum server: %v", err.Error()))

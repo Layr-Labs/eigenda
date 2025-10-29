@@ -3,6 +3,7 @@ package rest
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/urfave/cli/v2"
 )
@@ -66,6 +67,6 @@ func ReadConfig(ctx *cli.Context, apisEnabled *enablement.RestApisEnabled) Confi
 		APIsEnabled: apisEnabled,
 		// We can't set compatibility values until after configs have been read as
 		// ChainID requires an ethClient connection.
-		CompatibilityCfg: CompatibilityConfig{},
+		CompatibilityCfg: common.CompatibilityConfig{},
 	}
 }

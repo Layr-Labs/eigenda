@@ -1,6 +1,7 @@
 package arbitrum_altda
 
 import (
+	proxy_common "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
@@ -65,4 +66,8 @@ type GenerateReadPreimageProofResult struct {
 // respond with validity proof
 type GenerateCertificateValidityProofResult struct {
 	Proof hexutil.Bytes `json:"proof,omitempty"`
+}
+
+type CompatibilityConfigResult struct {
+	proxy_common.CompatibilityConfig
 }

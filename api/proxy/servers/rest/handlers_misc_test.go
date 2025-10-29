@@ -24,27 +24,33 @@ func TestConfigEndpoint(t *testing.T) {
 
 	t.Run("Success - Returns All CompatibilityConfig Fields", func(t *testing.T) {
 		// Setup test config with known values
-		apisEnabled := &enablement.RestApisEnabled{
+		apisEnabled := enablement.RestApisEnabled{
 			Admin:               true,
 			OpGenericCommitment: true,
 			OpKeccakCommitment:  true,
 			StandardCommitment:  true,
 		}
 
-		testCompatibilityConfig := CompatibilityConfig{
+		enabledServicesConfig := enablement.EnabledServersConfig{
+			Metric:        true,
+			ArbCustomDA:   true,
+			RestAPIConfig: apisEnabled,
+		}
+
+		testCompatibilityConfig := common.CompatibilityConfig{
 			Version:             "1.2.3",
 			ChainID:             "11155111",
 			DirectoryAddress:    "0x1234567890abcdef",
 			CertVerifierAddress: "0xfedcba0987654321",
 			MaxPayloadSizeBytes: 16777216, // 16 MiB
 			RecencyWindowSize:   100,
-			APIsEnabled:         apisEnabled.ToStringSlice(),
+			APIsEnabled:         enabledServicesConfig.ToAPIStrings(),
 		}
 
 		cfg := Config{
 			Host:             "localhost",
 			Port:             0,
-			APIsEnabled:      apisEnabled,
+			APIsEnabled:      &apisEnabled,
 			CompatibilityCfg: testCompatibilityConfig,
 		}
 
@@ -59,7 +65,7 @@ func TestConfigEndpoint(t *testing.T) {
 		require.Equal(t, http.StatusOK, rec.Code)
 		require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
 
-		var response CompatibilityConfig
+		var response common.CompatibilityConfig
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
 
@@ -71,39 +77,6 @@ func TestConfigEndpoint(t *testing.T) {
 		require.Equal(t, testCompatibilityConfig.MaxPayloadSizeBytes, response.MaxPayloadSizeBytes)
 		require.Equal(t, testCompatibilityConfig.RecencyWindowSize, response.RecencyWindowSize)
 		require.Equal(t, testCompatibilityConfig.APIsEnabled, response.APIsEnabled)
-	})
-
-	t.Run("Success - Config Endpoint Always Available", func(t *testing.T) {
-		// Unlike admin endpoints, /config should always be available
-		adminDisabledCfg := Config{
-			Host: "localhost",
-			Port: 0,
-			APIsEnabled: &enablement.RestApisEnabled{
-				Admin:               false,
-				OpGenericCommitment: false,
-				OpKeccakCommitment:  false,
-				StandardCommitment:  false,
-			},
-			CompatibilityCfg: CompatibilityConfig{
-				Version: "test-version",
-			},
-		}
-
-		req := httptest.NewRequest(http.MethodGet, "/config", nil)
-		rec := httptest.NewRecorder()
-
-		r := mux.NewRouter()
-		server := NewServer(adminDisabledCfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
-		server.RegisterRoutes(r)
-		r.ServeHTTP(rec, req)
-
-		// Should succeed even with admin endpoints disabled
-		require.Equal(t, http.StatusOK, rec.Code)
-
-		var response CompatibilityConfig
-		err := json.Unmarshal(rec.Body.Bytes(), &response)
-		require.NoError(t, err)
-		require.Equal(t, "test-version", response.Version)
 	})
 }
 
