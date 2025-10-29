@@ -40,10 +40,16 @@ func NewCompatibilityConfig(
 	readOnly bool,
 	APIsEnabled []string,
 ) (CompatibilityConfig, error) {
-	maxPayloadSize, err := codec.BlobSymbolsToMaxPayloadSize(
-		uint32(clientConfigV2.MaxBlobSizeBytes / encoding.BYTES_PER_SYMBOL))
-	if err != nil {
-		return CompatibilityConfig{}, fmt.Errorf("calculate max payload size: %w", err)
+	var maxPayloadSize uint32 = 0
+	// If the proxy is in v1 mode (soon to be removed) a v2 MaxBlobSizeBytes is not set.
+	if clientConfigV2.MaxBlobSizeBytes > 0 {
+		var err error
+		// BlobSymbolsToMaxPayloadSize returns an err if the given blob length symbols is 0
+		maxPayloadSize, err = codec.BlobSymbolsToMaxPayloadSize(
+			uint32(clientConfigV2.MaxBlobSizeBytes / encoding.BYTES_PER_SYMBOL))
+		if err != nil {
+			return CompatibilityConfig{}, fmt.Errorf("calculate max payload size: %w", err)
+		}
 	}
 
 	// Remove 'v' prefix from version string if present for compatibility with eigenda/common/version helper funcs
