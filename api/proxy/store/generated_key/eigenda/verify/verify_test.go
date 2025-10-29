@@ -328,8 +328,7 @@ func TestVerifySecurityParams(t *testing.T) {
 
 			// Create a minimal verifier with just the CertVerifier set
 			v := &Verifier{
-				cv:      tc.setupCV(),
-				holesky: tc.holesky,
+				cv: tc.setupCV(),
 			}
 
 			err := v.verifySecurityParams(tc.blobHeader, tc.batchHeader)
