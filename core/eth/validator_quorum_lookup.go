@@ -47,16 +47,13 @@ func NewValidatorQuorumLookup(
 	}, nil
 }
 
-// TODO test this by hand to verify behavior.
-
 func (v *validatorQuorumLookup) GetQuorumsForValidator(
 	ctx context.Context,
 	validatorID core.OperatorID,
 	referenceBlockNumber uint64,
 ) ([]core.QuorumID, error) {
 
-	blockNumber := big.NewInt(int64(referenceBlockNumber))
-
+	blockNumber := big.NewInt(0).SetUint64(referenceBlockNumber)
 	opts := &bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: blockNumber,
@@ -70,7 +67,9 @@ func (v *validatorQuorumLookup) GetQuorumsForValidator(
 
 	quorumIDs := make([]core.QuorumID, 0)
 
-	for i := 0; i <= 192; i++ {
+	// An implementation detail of the solidity: the number returned by the contract is a bitmap backed by a
+	// uint192, so we need to check each bit up to 192. If we check for higher bits, we will panic.
+	for i := 0; i < 192; i++ {
 		present := bigIntBitmap.Bit(i)
 		if present == 1 {
 			quorumID := core.QuorumID(i)

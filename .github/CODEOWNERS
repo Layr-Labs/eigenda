@@ -3,9 +3,6 @@
 /api/clients @Layr-Labs/eigenda-intg
 /api/proxy @Layr-Labs/eigenda-intg
 
-# Validator node
-/node @pschork
-
 # Contracts
 /contracts @pakim249CAL
 

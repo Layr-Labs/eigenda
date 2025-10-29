@@ -100,8 +100,8 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 		assignments[opID] = assignment
 	}
 
-	// Create the actual blob chunks using the prover
-	chunks, err := p.GetFrames(data, encodingParams)
+	// Create the actual blob frames using the prover
+	frames, _, err := p.GetFrames(data, encodingParams)
 	require.NoError(t, err)
 
 	// Store chunks by operator
@@ -109,7 +109,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	for opID, assignment := range assignments {
 		operatorChunks[opID] = make([]*encoding.Frame, assignment.NumChunks())
 		for i := uint32(0); i < assignment.NumChunks(); i++ {
-			operatorChunks[opID][i] = chunks[assignment.Indices[i]]
+			operatorChunks[opID][i] = frames[assignment.Indices[i]]
 		}
 	}
 

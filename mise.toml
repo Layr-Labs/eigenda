@@ -49,3 +49,7 @@ anvil = "ubi:foundry-rs/foundry[exe=anvil]"
 yarn = "https://github.com/mise-plugins/mise-yarn"
 protoc-gen-go = "go:google.golang.org/protobuf/cmd/protoc-gen-go"
 protoc-gen-go-grpc = "go:google.golang.org/grpc/cmd/protoc-gen-go-grpc"
+
+[tasks.install-hooks]
+description = "Install git pre-commit hooks"
+run = "./scripts/install-hooks.sh"
