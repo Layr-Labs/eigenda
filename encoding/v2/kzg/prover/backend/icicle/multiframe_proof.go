@@ -276,44 +276,63 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	toeplitzMatrixLen int,
 ) ([]bn254.G1Affine, time.Time, error) {
 	var p iciclebn254.Projective
-	var numChunksProjectivePointsOnDevice core.DeviceSlice
+	// we only allocate one large gpu memory for all operation, so it has to be large enough to cover all cases
+	// including the first and the second ECNTT
+	var bufferProjectivePointsOnDevice core.DeviceSlice
+	var secondECNTTDeviceSlice core.DeviceSlice
+	numPointsOnDevice := numChunks
 
-	_, err := numChunksProjectivePointsOnDevice.Malloc(p.Size(), numChunks)
+	// the size is twice because of the FFT trick on toeplitz matrix
+	firstECNTTLen := toeplitzMatrixLen * 2
+
+	// when first ecntt is larger than numChunk, we must allocate enough memory
+	// it happens if numChunks is equal of less than toeplitzMatrixLen
+	if numChunks < firstECNTTLen {
+		numPointsOnDevice = firstECNTTLen
+	}
+	_, err := bufferProjectivePointsOnDevice.Malloc(p.Size(), numPointsOnDevice)
 	if err != runtime.Success {
 		return nil, time.Time{}, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
 	}
 
-	// the size is twice because of the FFT trick on toeplitz matrix
-	firstECNTTLen := toeplitzMatrixLen * 2
-	// Device memory for first ecntt
-	firstECNTTDeviceSlice := numChunksProjectivePointsOnDevice.RangeTo(firstECNTTLen, false)
+	// specify device memory sluce for first ecntt
+	firstECNTTDeviceSlice := bufferProjectivePointsOnDevice.RangeTo(firstECNTTLen, false)
 	err = ecntt.ECNtt(batchPoints, core.KInverse, &c.NttCfg, firstECNTTDeviceSlice)
 	if err != runtime.Success {
 		return nil, time.Time{}, fmt.Errorf("inverse ecntt failed: %v", err.AsString())
 	}
 
-	// now only keep the toeplitzMatrixLen elements as they are, set the rest to zero.
-	// Zeros are the infinity points for G1Projective points
-	// unit in the Range function is measured by element size
-	infinityPointsOnDevice := numChunksProjectivePointsOnDevice.Range(toeplitzMatrixLen, numChunks, false)
-	infinityProjectivePoints := make([]iciclebn254.Projective, numChunks-toeplitzMatrixLen)
-	infinityPointsHost := core.HostSliceFromElements[iciclebn254.Projective](
-		infinityProjectivePoints[:numChunks-toeplitzMatrixLen],
-	)
-	// copy to device, but don't allocate memory
-	infinityPointsHost.CopyToDevice(&infinityPointsOnDevice, false)
-
-	// create output buffer
 	proofsBatchHost := make(core.HostSlice[iciclebn254.Projective], numChunks)
 
+	// if numChunk is smaller or equal to toeplitzMatrixLen, there is no need to set points to infinity
+	// otherwise set all points to infinity
+	if numChunks > toeplitzMatrixLen {
+		// now only keep the toeplitzMatrixLen elements as they are, set the rest to zero.
+		// Zeros are the infinity points for G1Projective points
+		// unit in the Range function is measured by element size
+		infinityPointsOnDevice := bufferProjectivePointsOnDevice.Range(toeplitzMatrixLen, numChunks, false)
+		infinityProjectivePoints := make([]iciclebn254.Projective, numChunks-toeplitzMatrixLen)
+		// explicitly sets all value to zero
+		// it does not work if we just initialize it, it is most likely due to all members of the struct
+		// would be initialized as 0, however, to have a projective point as inifity, Y needs to be 1
+		for i := range infinityProjectivePoints {
+			infinityProjectivePoints[i].Zero()
+		}
+		infinityPointsHost := core.HostSliceFromElements(infinityProjectivePoints)
+		// copy to device, but don't allocate memory
+		infinityPointsHost.CopyToDevice(&infinityPointsOnDevice, false)
+	}
+
+	secondECNTTDeviceSlice = bufferProjectivePointsOnDevice.RangeTo(numChunks, false)
+
 	// take the second ecntt
-	err = ecntt.ECNtt(numChunksProjectivePointsOnDevice, core.KForward, &c.NttCfg, proofsBatchHost)
+	err = ecntt.ECNtt(secondECNTTDeviceSlice, core.KForward, &c.NttCfg, proofsBatchHost)
 	if err != runtime.Success {
 		return nil, time.Time{}, fmt.Errorf("forward ecntt failed: %v", err.AsString())
 	}
 
 	// free intermediate GPU memory
-	numChunksProjectivePointsOnDevice.Free()
+	bufferProjectivePointsOnDevice.Free()
 
 	proofs := icicle.HostSliceIcicleProjectiveToGnarkAffine(proofsBatchHost, int(c.NumWorker))
 
