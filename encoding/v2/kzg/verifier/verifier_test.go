@@ -27,7 +27,7 @@ func TestVerifyFrames(t *testing.T) {
 	committer, err := committer.NewFromConfig(*harness.committerConfig)
 	require.Nil(t, err)
 
-	frames, _, err := proverGroup.GetFrames(harness.paddedGettysburgAddressFrs, params)
+	frames, _, err := proverGroup.GetFrames(t.Context(), harness.paddedGettysburgAddressFrs, params)
 	require.Nil(t, err)
 	commitments, err := committer.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
 	require.Nil(t, err)
@@ -65,7 +65,7 @@ func TestUniversalVerify(t *testing.T) {
 
 		commit, _, _, err := committer.GetCommitments(inputFr)
 		require.Nil(t, err)
-		frames, fIndices, err := group.GetFrames(harness.paddedGettysburgAddressFrs, params)
+		frames, fIndices, err := group.GetFrames(t.Context(), harness.paddedGettysburgAddressFrs, params)
 		require.Nil(t, err)
 
 		// create samples
@@ -112,7 +112,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 
 		commit, _, _, err := committer.GetCommitments(inputFr)
 		require.Nil(t, err)
-		frames, fIndices, err := group.GetFrames(harness.paddedGettysburgAddressFrs, params)
+		frames, fIndices, err := group.GetFrames(t.Context(), harness.paddedGettysburgAddressFrs, params)
 		require.Nil(t, err)
 
 		// create samples
@@ -178,7 +178,7 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 
 		commitments, err := committer.GetCommitmentsForPaddedLength(blob)
 		require.NoError(t, err)
-		frames, _, err := p.GetFrames(blobFr, params)
+		frames, _, err := p.GetFrames(t.Context(), blobFr, params)
 		require.NoError(t, err)
 
 		indices := make([]encoding.ChunkNumber, params.NumChunks)

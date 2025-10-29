@@ -239,7 +239,8 @@ func (e *Encoder) newEncoder(params encoding.EncodingParams) (*ParametrizedEncod
 		}
 		rsEncoderBackend = gnark.NewRSBackend(fs)
 	case encoding.IcicleBackend:
-		rsEncoderBackend, err = icicle.BuildRSBackend(e.logger, e.Config.GPUEnable, e.Config.GPUConcurrentFrameGenerationDangerous)
+		rsEncoderBackend, err = icicle.BuildRSBackend(
+			e.logger, e.Config.GPUEnable, e.Config.GPUConcurrentFrameGenerationDangerous)
 		if err != nil {
 			return nil, fmt.Errorf("build icicle rs backend: %w", err)
 		}

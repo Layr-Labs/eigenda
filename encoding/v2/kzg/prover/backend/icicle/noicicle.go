@@ -3,6 +3,7 @@
 package icicle
 
 import (
+	"context"
 	"errors"
 
 	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
@@ -17,7 +18,7 @@ import (
 type KzgMultiProofBackend struct{}
 
 func (*KzgMultiProofBackend) ComputeMultiFrameProofV2(
-	blobFr []fr.Element, numChunks, chunkLen, numWorker uint64,
+	_ context.Context, blobFr []fr.Element, numChunks, chunkLen, numWorker uint64,
 ) ([]bn254.G1Affine, error) {
 	// Not supported
 	return nil, errors.New("icicle backend called without icicle build tag")

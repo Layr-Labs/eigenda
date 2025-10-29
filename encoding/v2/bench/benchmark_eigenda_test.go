@@ -223,7 +223,7 @@ func benchmarkMultiproofGeneration(b *testing.B, encodingConfig encoding.Config)
 			require.NoError(b, err)
 
 			for b.Loop() {
-				_, err = parametrizedProver.GetProofs(maxSizeBlobCoeffs[:rsExtendedBlobFrs])
+				_, err = parametrizedProver.GetProofs(b.Context(), maxSizeBlobCoeffs[:rsExtendedBlobFrs])
 				require.NoError(b, err)
 			}
 		})
@@ -277,7 +277,7 @@ func BenchmarkFrameGeneration(b *testing.B) {
 				for range n {
 					go func() {
 						defer wg.Done()
-						_, _, err = p.GetFrames(maxSizeBlobCoeffs[:rsExtendedBlobFrs], params)
+						_, _, err = p.GetFrames(b.Context(), maxSizeBlobCoeffs[:rsExtendedBlobFrs], params)
 						require.NoError(b, err)
 					}()
 				}

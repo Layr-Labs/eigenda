@@ -45,7 +45,7 @@ func TestEncoder(t *testing.T) {
 	require.NoError(t, err)
 	gettysburgAddressFrs, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 	require.NoError(t, err)
-	frames, _, err := p.GetFrames(gettysburgAddressFrs, params)
+	frames, _, err := p.GetFrames(t.Context(), gettysburgAddressFrs, params)
 	require.NoError(t, err)
 
 	indices := []encoding.ChunkNumber{
@@ -105,7 +105,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		inputFr, err := rs.ToFrArray(input)
 		require.NoError(t, err)
 
-		frames, _, err := group.GetFrames(inputFr, params)
+		frames, _, err := group.GetFrames(t.Context(), inputFr, params)
 		require.NoError(t, err)
 
 		for _, frame := range frames {

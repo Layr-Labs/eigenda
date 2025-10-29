@@ -103,7 +103,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	// Create the actual blob frames using the prover
 	dataFr, err := rs.ToFrArray(data)
 	require.NoError(t, err)
-	frames, _, err := p.GetFrames(dataFr, encodingParams)
+	frames, _, err := p.GetFrames(t.Context(), dataFr, encodingParams)
 	require.NoError(t, err)
 
 	// Store chunks by operator

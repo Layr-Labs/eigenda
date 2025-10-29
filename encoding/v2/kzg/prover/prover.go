@@ -1,6 +1,7 @@
 package prover
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	gomath "math"
@@ -145,8 +146,9 @@ func NewProver(logger logging.Logger, kzgConfig *KzgConfig, encoderConfig *encod
 	return proverGroup, nil
 }
 
-func (e *Prover) GetFrames(inputFr []fr.Element, params encoding.EncodingParams) ([]*encoding.Frame, []uint32, error) {
-
+func (e *Prover) GetFrames(
+	ctx context.Context, inputFr []fr.Element, params encoding.EncodingParams,
+) ([]*encoding.Frame, []uint32, error) {
 	blobLength := uint64(math.NextPowOf2u32(uint32(len(inputFr))))
 	provingParams, err := BuildProvingParamsFromEncodingParams(params, blobLength)
 	if err != nil {
@@ -179,7 +181,7 @@ func (e *Prover) GetFrames(inputFr []fr.Element, params encoding.EncodingParams)
 	}()
 
 	getProofsStart := time.Now()
-	proofs, err := prover.GetProofs(inputFr)
+	proofs, err := prover.GetProofs(ctx, inputFr)
 	getProofsDuration := time.Since(getProofsStart)
 
 	// Wait for both chunks and frames to have finished generating

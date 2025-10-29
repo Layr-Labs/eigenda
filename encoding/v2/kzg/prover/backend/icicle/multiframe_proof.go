@@ -80,7 +80,7 @@ type WorkerResult struct {
 
 // This function supports batching over multiple blobs.
 // All blobs must have same size and concatenated passed as polyFr
-func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 
 	toeplitzMatrixLen := uint64(len(polyFr)) / chunkLen
@@ -104,7 +104,7 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 	// but we'd have to hardcode some approximation of the RAM usage per MSM/NTT, which feels
 	// very hardcoded and hardware dependent. For now opting to keep this simple.
 	// TODO(samlaf): rethink this approach.
-	p.GpuSemaphore.Acquire(context.TODO(), 1)
+	p.GpuSemaphore.Acquire(ctx, 1)
 	defer p.GpuSemaphore.Release(1)
 
 	wg := sync.WaitGroup{}
