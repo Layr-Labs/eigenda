@@ -88,7 +88,7 @@ func TestUniversalVerify(t *testing.T) {
 		}
 	}
 
-	require.True(t, v.UniversalVerifySubBatch(params, samples, numBlob) == nil, "universal batch verification failed\n")
+	require.NoError(t, v.UniversalVerifySubBatch(params, samples, numBlob))
 }
 
 func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {

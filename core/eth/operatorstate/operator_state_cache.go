@@ -12,6 +12,8 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
+// TODO(cody.littley): refactor this to use a pattern similar to the other micro utilities in the eth package.
+
 // the size of the index lock used by the OperatorStateCache
 const indexLockSize = 64
 
