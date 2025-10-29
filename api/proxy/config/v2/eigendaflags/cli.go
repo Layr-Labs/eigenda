@@ -188,8 +188,9 @@ See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/common/eigenda_ne
 for the exact values getting set by this flag. All of those values can also be manually
 set via their respective flags, and take precedence over the default values set by the network flag.
 If all of those other flags are manually configured, the network flag may be omitted. 
-Permitted EigenDANetwork values include %s, & %s.`,
+Permitted EigenDANetwork values include %s, %s, & %s.`,
 				common.MainnetEigenDANetwork,
+				common.HoodiTestnetEigenDANetwork,
 				common.SepoliaTestnetEigenDANetwork,
 			),
 			EnvVars:  []string{withEnvPrefix(envPrefix, "NETWORK")},
