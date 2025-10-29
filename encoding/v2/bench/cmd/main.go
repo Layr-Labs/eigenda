@@ -17,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	proverv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -205,7 +204,7 @@ func benchmarkEncodeAndVerify(
 	}
 
 	start := time.Now()
-	frames, _, err := p.GetFrames(rs.SerializeFieldElements(inputFr), params)
+	frames, _, err := p.GetFrames(inputFr, params)
 	if err != nil {
 		log.Fatal(err)
 	}
