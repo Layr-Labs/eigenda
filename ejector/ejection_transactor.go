@@ -88,6 +88,12 @@ func NewEjectionTransactor(
 	if privateKey == nil {
 		return nil, fmt.Errorf("privateKey must be non-nil")
 	}
+	if ejectionContractAddress == zeroAddress {
+		return nil, fmt.Errorf("ejectionContractAddress must be non-zero")
+	}
+	if registryCoordinatorAddress == zeroAddress {
+		return nil, fmt.Errorf("registryCoordinatorAddress must be non-zero")
+	}
 
 	caller, err := contractEigenDAEjectionManager.NewContractIEigenDAEjectionManagerCaller(
 		ejectionContractAddress, client)
@@ -166,6 +172,12 @@ func (e *ejectionTransactor) CompleteEjection(
 	if err != nil {
 		return fmt.Errorf("failed to get quorums for validator: %w", err)
 	}
+
+	if len(quorums) == 0 {
+		return fmt.Errorf("cannot complete ejection: validator %s is not present in any quorum at RBN %d",
+			idToEject.Hex(), rbn)
+	}
+
 	quorumBytes := eth.QuorumListToBytes(quorums)
 
 	opts := &bind.TransactOpts{
