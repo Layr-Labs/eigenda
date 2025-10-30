@@ -277,18 +277,11 @@ func newRetrievalWorker(
 		downloadOrder = append(downloadOrder, opID)
 	}
 
-	// Randomly shuffle download order. Map iteration is random(ish), but not completely random.
-	// It's more like a random order where you start in a random place and wrap around.
-	// TODO can we control this for unit tests?
+	// Randomly shuffle download order. Golang map iteration is random(ish), but not completely random.
+	// Map iteration order behaves like a random fixed ordering where you start in a random place and wrap around.
 	rand.Shuffle(len(downloadOrder), func(i, j int) {
 		downloadOrder[i], downloadOrder[j] = downloadOrder[j], downloadOrder[i]
 	})
-
-	// The retrieval worker uses two contexts. The downloadAndVerifyCtx is cancelled once a sufficient number
-	// of chunks have been downloaded and verified. This causes all ongoing downloads and verifications to be
-	// aborted (if possible), since they are not needed. There are other operations that require a context after
-	// the downloadAndVerifyCtx is cancelled, so we need to keep a reference the original context as well.
-	downloadAndVerifyCtx, downloadAndVerifyCancel := context.WithCancel(ctx)
 
 	validatorStatusMap := make(map[core.OperatorID]chunkStatus)
 	chunkStatusMap := make(map[uint32]chunkStatus)
@@ -314,6 +307,12 @@ func newRetrievalWorker(
 			"uniqueChunksWithAssignments", len(chunkStatusMap),
 		)
 	}
+
+	// The retrieval worker uses two contexts. The downloadAndVerifyCtx is cancelled once a sufficient number
+	// of chunks have been downloaded and verified. This causes all ongoing downloads and verifications to be
+	// aborted (if possible), since they are not needed. There are other operations that require a context after
+	// the downloadAndVerifyCtx is cancelled, so we need to keep a reference the original context as well.
+	downloadAndVerifyCtx, downloadAndVerifyCancel := context.WithCancel(ctx)
 
 	totalChunkCount := uint32(chunkStatusCounts[available])
 
