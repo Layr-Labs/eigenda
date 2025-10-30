@@ -223,6 +223,7 @@ func (pd *PayloadDisperser) buildEigenDACert(
 			// Regardless of whether the cert is invalid (400) or certVerifier contract has a bug (500),
 			// we send a failover signal. If we can't construct a valid cert after retrying a few times (proxy retry
 			// policy), then its safer for the rollup to failover to another DA layer.
+			pd.logger.Debug("DACert", "certificate", eigenDACert)
 			return nil, api.NewErrorFailover(fmt.Errorf("checkDACert failed with blobKey %v: %w", blobKey.Hex(), err))
 		}
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
