@@ -126,29 +126,30 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 // deserializeCertFromSequencerMsg reads the VersionedCert from the raw sequencer message provided
 // by the DA Client
 func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (certs.VersionedCert, error) {
-	if len(sequencerMsg) <= 42 {
+	if len(sequencerMsg) <= DACertOffset {
 		return certs.VersionedCert{},
-			fmt.Errorf("sequencer message expected to be >=42 bytes, got: %d", len(sequencerMsg))
+			fmt.Errorf("sequencer message expected to be >=%d bytes, got: %d",
+				DACertOffset, len(sequencerMsg))
 	}
 
-	seqMessageWithoutHeader := sequencerMsg[MessageHeaderOffset:]
+	daCommit := sequencerMsg[MessageHeaderOffset:]
 
-	daHeaderByte := seqMessageWithoutHeader[0]
+	daHeaderByte := daCommit[0]
 	if daHeaderByte != commitments.ArbCustomDAHeaderByte {
 		return certs.VersionedCert{},
 			fmt.Errorf("expected CustomDAHeader byte (%x) for 0th index byte of message, instead got: %x ",
 				commitments.ArbCustomDAHeaderByte, daHeaderByte)
 	}
 
-	daLayerByte := seqMessageWithoutHeader[1]
+	daLayerByte := daCommit[1]
 	if daLayerByte != commitments.EigenDALayerByte {
 		return certs.VersionedCert{},
 			fmt.Errorf("expected EigenDALayer byte (%x) for 1st index byte of message, instead got: %x ",
 				commitments.EigenDALayerByte, daLayerByte)
 	}
 
-	certVersionByte := seqMessageWithoutHeader[2]
-	versionedCert := certs.NewVersionedCert([]byte(seqMessageWithoutHeader[3:]), certs.VersionByte(certVersionByte))
+	certVersionByte := daCommit[2]
+	versionedCert := certs.NewVersionedCert([]byte(daCommit[DACommitPrefixBytes:]), certs.VersionByte(certVersionByte))
 	return versionedCert, nil
 }
 
