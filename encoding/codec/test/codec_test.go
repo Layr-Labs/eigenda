@@ -246,7 +246,7 @@ func TestPadUnpad(t *testing.T) {
 		paddedBytes := codec.PadPayload(originalBytes)
 		require.Equal(t, len(paddedBytes)%32, 0)
 
-		unpaddedBytes, err := codec.RemoveInternalPadding(paddedBytes)
+		unpaddedBytes, err := codec.CheckAndRemoveInternalPadding(paddedBytes)
 		require.Nil(t, err)
 
 		expectedUnpaddedLength, err := codec.GetUnpaddedDataLength(uint32(len(paddedBytes)))
@@ -258,5 +258,25 @@ func TestPadUnpad(t *testing.T) {
 		require.LessOrEqual(t, len(originalBytes), len(unpaddedBytes))
 
 		require.Equal(t, originalBytes, unpaddedBytes[:len(originalBytes)])
+	}
+}
+
+// TestDetectInvalidPad makes sure we catch incorrectly padded data whose first
+// byte in multiples of 32 bytes is not zero
+func TestDetectInvalidPad(t *testing.T) {
+	testRandom := random.NewTestRandom()
+	testIterations := 1000
+
+	for i := 0; i < testIterations; i++ {
+		originalBytes := testRandom.Bytes(1 + testRandom.Intn(1023))
+
+		paddedBytes := codec.PadPayload(originalBytes)
+
+		// first byte be non-zero violation
+		paddedBytes[0] = 1
+		require.Equal(t, len(paddedBytes)%32, 0)
+
+		_, err := codec.CheckAndRemoveInternalPadding(paddedBytes)
+		require.Error(t, err)
 	}
 }
