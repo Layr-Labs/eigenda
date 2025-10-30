@@ -34,7 +34,11 @@ type Config struct {
 	//
 	// For now we use this very coarse-grained approach, instead of using a RAM-usage based semaphore,
 	// because that would feel brittle and require approximations of RAM usage per MSM/NTT operation.
-	// We can rethink this abstraction later if needed.
+	// This would need to take into account RAM used by:
+	// - msm/ntt initialization (srs points and ntt roots that are kept on GPU)
+	// - msm as a fct of input size (see https://dev.ingonyama.com/api/cpp/msm#memory-usage-estimation)
+	// - ntt as a fct of input size (afaiu ntt uses input+output=2*input size in RAM)
+	// If we want to enable more optimal GPU usage, we should revisit this.
 	GPUConcurrentFrameGenerationDangerous int64
 }
 
