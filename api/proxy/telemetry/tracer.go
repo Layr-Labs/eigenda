@@ -44,14 +44,8 @@ func InitTracer(ctx context.Context, cfg Config) (func(context.Context) error, e
 	}
 
 	// Create tracer provider with sampling configuration
-	var sampler sdktrace.Sampler
-	if cfg.TraceSampleRate >= 1.0 {
-		sampler = sdktrace.AlwaysSample()
-	} else if cfg.TraceSampleRate <= 0.0 {
-		sampler = sdktrace.NeverSample()
-	} else {
-		sampler = sdktrace.TraceIDRatioBased(cfg.TraceSampleRate)
-	}
+	// TraceIDRatioBased handles edge cases: returns AlwaysSample for rate >= 1.0, NeverSample for rate <= 0.0
+	sampler := sdktrace.TraceIDRatioBased(cfg.TraceSampleRate)
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithSampler(sampler),
