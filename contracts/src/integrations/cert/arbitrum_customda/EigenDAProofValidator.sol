@@ -39,35 +39,37 @@ contract EigenDAProofValidator is ICustomDAProofValidator {
      * @return preimageChunk The 32-byte chunk at the specified offset
      */
 
-    function validateReadPreimage(bytes32 certHash, uint256 offset, bytes calldata proof)
+    function validateReadPreimage(bytes32 daCommitHash, uint256 offset, bytes calldata proof)
         external
         pure
         override
         returns (bytes memory preimageChunk)
     {
-        // Extract certificate size from proof
-        uint256 certSize;
+        // Extract DACommit size from proof
+        uint256 commitSize;
         assembly {
-            certSize := shr(192, calldataload(add(proof.offset, 0))) // Read 8 bytes
+            commitSize := shr(192, calldataload(add(proof.offset, 0))) // Read 8 bytes
         }
 
-        require(proof.length >= 8 + certSize, "Proof too short for certificate");
-        bytes calldata certificate = proof[8:8 + certSize];
+        require(proof.length >= 8 + commitSize, "Proof too short for certificate");
+        bytes calldata daCommitment = proof[8:8 + commitSize];
 
-        // Verify certificate hash matches what OSP validated
-        require(keccak256(certificate) == certHash, "Certificate hash mismatch");
+        // Verify daCommitment hash matches what OSP validated
+        require(keccak256(daCommitment) == daCommitHash, "DA Commit hash mismatch");
 
         // First byte must be 0x01 (CustomDA message header flag)
         require(certificate[0] == 0x01, "Invalid certificate header");
 
-        // Second byte must be 0x42 (EigenDA V2 message header flag)
-        require(certificate[1] == 0x42, "Invalid EigenDAV2 message header");
+        // Second byte must be 0x00 (EigenDA DA Layer byte)
+        require(certificate[1] == 0x00, "Invalid DA Layer byte");
 
         // TODO: Implement kzg proof deserialization and pairing check here.
         //       This will require reading the kzg data commitment from the DA Cert
         //       Blob Header which will require deserializing the cert into a structured
         //       Solidity type for adequate extraction
 
+        // Ensure we aren't proving past the max blob size
+        // TODO: will MaxBlobSize ever be defined onchain in the ConfigRegistry?
         require(offset < 16_233_000);
 
         bytes memory dummyReturnValue = hex"";
@@ -75,36 +77,36 @@ contract EigenDAProofValidator is ICustomDAProofValidator {
     }
 
     /**
-     * @notice Validates whether a certificate is well-formed and legitimate
-     * @dev The proof format is: [certSize(8), certificate, claimedValid(1)]
+     * @notice Validates whether a daCommit is well-formed and legitimate
+     * @dev The proof format is: [daCommitSize(8), daCommit, claimedValid(1)]
      *
      *
      *      Return vs Revert behavior:
      *      - Reverts when:
-     *        - Provided cert matches proven hash in the instruction (checked in hostio)
+     *        - Provided daCommit matches proven hash in the instruction (checked in hostio)
      *        - Claimed valid but is invalid and vice versa (checked in hostio)
      *      - Returns false when:
-     *        - Certificate is malformed, including wrong length
+     *        - daCommit is malformed, including wrong length
      *        - checkDACert call against EigenDACertVeriferRouter returns a status code != SUCCESS
      *
      *      - Returns true when:
      *        - checkDACert call against EigenDACertVeriferRouter returns a status code == SUCCESS
      *
-     * @param proof The proof data starting with [certSize(8), certificate, claimedValid(1)]
+     * @param proof The proof data starting with [daCommitSize(8), certificate, claimedValid(1)]
      * @return isValid True if the certificate is valid, false otherwise
      */
     function validateCertificate(bytes calldata proof) external view override returns (bool isValid) {
-        // Extract certificate size
+        // Extract daCommitment size from first 8 bytes of proof
         require(proof.length >= 8, "Proof too short");
 
-        uint256 certSize;
+        uint256 commitSize;
         assembly {
-            certSize := shr(192, calldataload(add(proof.offset, 0)))
+            commitSize := shr(192, calldataload(add(proof.offset, 0)))
         }
 
-        bytes calldata certificate = proof[8:8 + certSize];
+        bytes calldata daCommitment = proof[8:8 + commitSize];
 
-        // Certificate format is: [prefix(1), da_commitment_version(1), eigenda_cert_version(1), eigenda_cert_bytes(N)]
+        // DACommit format is: [prefix(1), da_commitment_version(1), eigenda_cert_version(1), eigenda_cert_bytes(N)]
         // First byte must be 0x01 (CustomDA message header flag)
         // Second byte must be 0x00 (EigenDA DA Layer byte flag)
         // Third byte must be the EigenDA Cert version byte (dictated by the EigenDACertVerifier contract)
@@ -112,6 +114,12 @@ contract EigenDAProofValidator is ICustomDAProofValidator {
         //     version being passed here
         //
         // The remaining N bytes are the EigenDA Certificate
+
+        // First byte must be 0x01 (CustomDA message header flag)
+        require(certificate[0] == 0x01, "Invalid certificate header");
+
+        // Second byte must be 0x00 (EigenDA DA Layer byte)
+        require(certificate[1] == 0x00, "Invalid DA Layer byte");
         //
         // Note: We return false for invalid certificates instead of reverting
         // because the certificate is already onchain. An honest validator must be able
@@ -120,6 +128,8 @@ contract EigenDAProofValidator is ICustomDAProofValidator {
         // correctness would be violated.
 
         uint8 statusCode = IEigenDACertVerifierRouter(eigenDACertVeriferRouter).checkDACert(certificate[3:]);
+
+        // TODO: it'd be nice to compare against actual enum defined in EigenDACertVerifier
         return statusCode == 1;
     }
 }
