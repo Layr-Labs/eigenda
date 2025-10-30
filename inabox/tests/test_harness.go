@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -108,6 +107,9 @@ type TestHarness struct {
 
 	// Chain ID for this test context
 	ChainID *big.Int
+
+	// API Server V2 address for the disperser
+	APIServerV2Address string
 }
 
 // Cleanup releases resources held by the TestHarness
@@ -243,9 +245,26 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("create blob request signer: %w", err)
 	}
 
+	if tc.APIServerV2Address == "" {
+		return nil, fmt.Errorf("APIServerV2Address not set in test harness")
+	}
+
+	// Parse hostname:port from the address
+	var hostname, port string
+	for i := len(tc.APIServerV2Address) - 1; i >= 0; i-- {
+		if tc.APIServerV2Address[i] == ':' {
+			hostname = tc.APIServerV2Address[:i]
+			port = tc.APIServerV2Address[i+1:]
+			break
+		}
+	}
+	if hostname == "" || port == "" {
+		return nil, fmt.Errorf("invalid APIServerAddress format (expected hostname:port): %s", tc.APIServerV2Address)
+	}
+
 	disperserClientConfig := &clientsv2.DisperserClientConfig{
-		Hostname: "localhost",
-		Port:     strconv.Itoa(int(config.APIServerPort)),
+		Hostname: hostname,
+		Port:     port,
 	}
 
 	accountId, err := signer.GetAccountID()

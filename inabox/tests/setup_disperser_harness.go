@@ -91,7 +91,8 @@ type DisperserHarness struct {
 	EncoderServerV2 *encoder.EncoderServerV2
 
 	// API Server V2
-	APIServerV2 *apiserver.DispersalServerV2
+	APIServerV2        *apiserver.DispersalServerV2
+	APIServerV2Address string
 
 	// Controller components
 	// TODO: Refactor into a single struct for controller components
@@ -289,6 +290,7 @@ func SetupDisperserHarness(
 		return nil, fmt.Errorf("failed to start API server v2: %w", err)
 	}
 	harness.APIServerV2 = apiServerComponents.Server
+	harness.APIServerV2Address = apiServerComponents.Address
 
 	// Start remaining binaries (disperser, batcher, etc.)
 	if config.TestConfig != nil {
