@@ -378,9 +378,9 @@ func TestOnDemandPaymentAuthorization(t *testing.T) {
 		},
 	}
 
-	require.True(t, authenticator.CheckOnDemandPaymentAuthorization(0, onDemandBatch))
-	require.True(t, authenticator.CheckOnDemandPaymentAuthorization(0, reservationBatch))
+	require.True(t, authenticator.IsDisperserAuthorized(0, onDemandBatch))
+	require.True(t, authenticator.IsDisperserAuthorized(0, reservationBatch))
 
-	require.False(t, authenticator.CheckOnDemandPaymentAuthorization(1, onDemandBatch))
-	require.True(t, authenticator.CheckOnDemandPaymentAuthorization(1, reservationBatch))
+	require.False(t, authenticator.IsDisperserAuthorized(1, onDemandBatch))
+	require.True(t, authenticator.IsDisperserAuthorized(1, reservationBatch))
 }

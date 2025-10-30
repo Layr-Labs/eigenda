@@ -192,7 +192,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
 		}
 
-		if !s.chunkAuthenticator.CheckOnDemandPaymentAuthorization(in.GetDisperserID(), batch) {
+		if !s.chunkAuthenticator.IsDisperserAuthorized(in.GetDisperserID(), batch) {
 			//nolint:wrapcheck
 			return nil, api.NewErrorPermissionDenied(
 				fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))

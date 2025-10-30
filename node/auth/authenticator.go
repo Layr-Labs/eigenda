@@ -25,11 +25,11 @@ type RequestAuthenticator interface {
 		request *grpc.StoreChunksRequest,
 		now time.Time) ([]byte, error)
 
-	// CheckOnDemandPaymentAuthorization returns true if the disperser is authorized to disperse the given batch.
+	// IsDisperserAuthorized returns true if the disperser is authorized to disperse the given batch.
 	// Returns true if the batch contains only reservation payments, or if the batch contains on-demand payments
 	// and the disperser is authorized to handle them. Returns false if the batch contains on-demand payments
 	// and the disperser is not authorized.
-	CheckOnDemandPaymentAuthorization(disperserID uint32, batch *corev2.Batch) bool
+	IsDisperserAuthorized(disperserID uint32, batch *corev2.Batch) bool
 }
 
 // keyWithTimeout is a key with that key's expiration time. After a key "expires", it should be reloaded
@@ -126,7 +126,7 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	return hash, nil
 }
 
-func (a *requestAuthenticator) CheckOnDemandPaymentAuthorization(disperserID uint32, batch *corev2.Batch) bool {
+func (a *requestAuthenticator) IsDisperserAuthorized(disperserID uint32, batch *corev2.Batch) bool {
 	hasOnDemand := false
 	for _, cert := range batch.BlobCertificates {
 		if cert.BlobHeader.PaymentMetadata.IsOnDemand() {
