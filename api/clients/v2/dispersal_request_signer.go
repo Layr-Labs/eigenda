@@ -59,14 +59,22 @@ func (c *DispersalRequestSignerConfig) Verify() error {
 	return nil
 }
 
-var _ DispersalRequestSigner = &requestSigner{}
-
-type requestSigner struct {
-	keyID      string
-	publicKey  *ecdsa.PublicKey
-	kmsClient  *kms.Client
-	privateKey *ecdsa.PrivateKey
+// kmsRequestSigner implements DispersalRequestSigner using AWS KMS.
+type kmsRequestSigner struct {
+	keyID     string
+	publicKey *ecdsa.PublicKey
+	kmsClient *kms.Client
 }
+
+var _ DispersalRequestSigner = &kmsRequestSigner{}
+
+// localRequestSigner implements DispersalRequestSigner using a local private key.
+type localRequestSigner struct {
+	privateKey *ecdsa.PrivateKey
+	publicKey  *ecdsa.PublicKey
+}
+
+var _ DispersalRequestSigner = &localRequestSigner{}
 
 // NewDispersalRequestSigner creates a new DispersalRequestSigner.
 func NewDispersalRequestSigner(
@@ -79,64 +87,88 @@ func NewDispersalRequestSigner(
 
 	// Use KMS if KeyID is provided
 	if config.KeyID != "" {
-		var kmsClient *kms.Client
-		if config.Endpoint != "" {
-			kmsClient = kms.New(kms.Options{
-				Region:       config.Region,
-				BaseEndpoint: aws.String(config.Endpoint),
-			})
-		} else {
-			// Load the AWS SDK configuration, which will automatically detect credentials
-			// from environment variables, IAM roles, or AWS config files
-			cfg, err := awsconfig.LoadDefaultConfig(ctx,
-				awsconfig.WithRegion(config.Region),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load AWS config: %w", err)
-			}
-			kmsClient = kms.NewFromConfig(cfg)
-		}
-
-		key, err := aws2.LoadPublicKeyKMS(ctx, kmsClient, config.KeyID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
-		}
-
-		return &requestSigner{
-			keyID:     config.KeyID,
-			publicKey: key,
-			kmsClient: kmsClient,
-		}, nil
+		return NewKMSDispersalRequestSigner(ctx, config)
 	}
 
 	// Use local private key
+	return NewLocalDispersalRequestSigner(config)
+}
+
+// NewKMSDispersalRequestSigner creates a new KMS-based DispersalRequestSigner.
+func NewKMSDispersalRequestSigner(
+	ctx context.Context,
+	config DispersalRequestSignerConfig,
+) (DispersalRequestSigner, error) {
+	var kmsClient *kms.Client
+	if config.Endpoint != "" {
+		kmsClient = kms.New(kms.Options{
+			Region:       config.Region,
+			BaseEndpoint: aws.String(config.Endpoint),
+		})
+	} else {
+		// Load the AWS SDK configuration, which will automatically detect credentials
+		// from environment variables, IAM roles, or AWS config files
+		cfg, err := awsconfig.LoadDefaultConfig(ctx,
+			awsconfig.WithRegion(config.Region),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		}
+		kmsClient = kms.NewFromConfig(cfg)
+	}
+
+	key, err := aws2.LoadPublicKeyKMS(ctx, kmsClient, config.KeyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
+	}
+
+	return &kmsRequestSigner{
+		keyID:     config.KeyID,
+		publicKey: key,
+		kmsClient: kmsClient,
+	}, nil
+}
+
+// NewLocalDispersalRequestSigner creates a new local private key-based DispersalRequestSigner.
+func NewLocalDispersalRequestSigner(
+	config DispersalRequestSignerConfig,
+) (DispersalRequestSigner, error) {
 	privateKey, err := crypto.HexToECDSA(config.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 
-	return &requestSigner{
+	return &localRequestSigner{
 		privateKey: privateKey,
 		publicKey:  &privateKey.PublicKey,
 	}, nil
 }
 
-func (s *requestSigner) SignStoreChunksRequest(ctx context.Context, request *grpc.StoreChunksRequest) ([]byte, error) {
+func (s *kmsRequestSigner) SignStoreChunksRequest(
+	ctx context.Context, 
+	request *grpc.StoreChunksRequest,
+) ([]byte, error) {
 	hash, err := hashing.HashStoreChunksRequest(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash request: %w", err)
 	}
 
-	if s.kmsClient != nil {
-		// Use KMS signing
-		signature, err := aws2.SignKMS(ctx, s.kmsClient, s.keyID, s.publicKey, hash)
-		if err != nil {
-			return nil, fmt.Errorf("failed to sign request: %w", err)
-		}
-		return signature, nil
+	signature, err := aws2.SignKMS(ctx, s.kmsClient, s.keyID, s.publicKey, hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+	return signature, nil
+}
+
+func (s *localRequestSigner) SignStoreChunksRequest(
+	ctx context.Context,
+	request *grpc.StoreChunksRequest,
+) ([]byte, error) {
+	hash, err := hashing.HashStoreChunksRequest(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash request: %w", err)
 	}
 
-	// Use local private key signing
 	signature, err := crypto.Sign(hash, s.privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
