@@ -161,7 +161,7 @@ func BenchmarkMultiproofGenerationIcicle(b *testing.B) {
 		b.Skip("code compiled without the icicle build tag")
 	}
 	encodingConfig := encoding.Config{
-		NumWorker:   uint64(runtime.NumCPU()),
+		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 		BackendType: encoding.IcicleBackend,
 		GPUEnable:   true,
 	}
@@ -170,7 +170,7 @@ func BenchmarkMultiproofGenerationIcicle(b *testing.B) {
 
 func BenchmarkMultiproofGenerationGnark(b *testing.B) {
 	encodingConfig := encoding.Config{
-		NumWorker:   uint64(runtime.NumCPU()),
+		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 		BackendType: encoding.GnarkBackend,
 		GPUEnable:   false,
 	}
@@ -246,7 +246,7 @@ func BenchmarkFrameGeneration(b *testing.B) {
 		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
 	}
 	encodingConfig := encoding.Config{
-		NumWorker:                             uint64(runtime.NumCPU()),
+		NumWorker:                             uint64(runtime.GOMAXPROCS(0)),
 		BackendType:                           encoding.IcicleBackend,
 		GPUEnable:                             true,
 		GPUConcurrentFrameGenerationDangerous: 20,
