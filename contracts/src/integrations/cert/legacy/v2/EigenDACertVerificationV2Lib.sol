@@ -55,7 +55,6 @@ library EigenDACertVerificationV2Lib {
         SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
         BLOB_QUORUMS_NOT_SUBSET, // Blob quorums not a subset of confirmed quorums
         REQUIRED_QUORUMS_NOT_SUBSET // Required quorums not a subset of blob quorums
-
     }
 
     function verifyDACertV2(
@@ -328,10 +327,13 @@ library EigenDACertVerificationV2Lib {
             signedQuorumNumbers = abi.encodePacked(signedQuorumNumbers, uint8(signedBatch.attestation.quorumNumbers[i]));
         }
 
-        OperatorStateRetriever.CheckSignaturesIndices memory checkSignaturesIndices = operatorStateRetriever
-            .getCheckSignaturesIndices(
-            registryCoordinator, signedBatch.batchHeader.referenceBlockNumber, signedQuorumNumbers, nonSignerOperatorIds
-        );
+        OperatorStateRetriever.CheckSignaturesIndices memory checkSignaturesIndices =
+            operatorStateRetriever.getCheckSignaturesIndices(
+                registryCoordinator,
+                signedBatch.batchHeader.referenceBlockNumber,
+                signedQuorumNumbers,
+                nonSignerOperatorIds
+            );
 
         nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = checkSignaturesIndices.nonSignerQuorumBitmapIndices;
         nonSignerStakesAndSignature.nonSignerPubkeys = signedBatch.attestation.nonSignerPubkeys;
