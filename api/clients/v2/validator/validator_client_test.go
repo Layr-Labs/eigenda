@@ -878,6 +878,7 @@ func TestForDoubleCountingBug(t *testing.T) {
 	// the set of operators we have verified the chunks of
 	verificationSet := sync.Map{}
 	mockDeserializer := &mock.MockChunkDeserializer{}
+	outerKey := blobKey
 	mockDeserializer.DeserializeAndVerifyFunction = func(
 		blobKey v2.BlobKey,
 		operatorID core.OperatorID,
@@ -887,7 +888,7 @@ func TestForDoubleCountingBug(t *testing.T) {
 	) ([]*encoding.Frame, error) {
 
 		// verify we have the expected blob key
-		require.Equal(t, blobKey, blobKey)
+		require.Equal(t, outerKey, blobKey)
 
 		// make sure this is for a valid operator ID
 		chunks, ok := operatorChunks[operatorID]
