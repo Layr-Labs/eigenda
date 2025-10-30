@@ -51,7 +51,7 @@ func (c AppConfig) Check() error {
 	return nil
 }
 
-func ReadAppConfig(ctx *cli.Context, version string) (AppConfig, error) {
+func ReadAppConfig(ctx *cli.Context) (AppConfig, error) {
 	storeBuilderConfig, err := builder.ReadConfig(ctx)
 	if err != nil {
 		return AppConfig{}, fmt.Errorf("read proxy config: %w", err)

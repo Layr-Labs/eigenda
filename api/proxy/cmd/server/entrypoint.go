@@ -37,7 +37,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 
 	log.Info("Starting EigenDA Proxy Service", "version", Version, "date", Date, "commit", Commit)
 
-	cfg, err := config.ReadAppConfig(cliCtx, Version)
+	cfg, err := config.ReadAppConfig(cliCtx)
 	if err != nil {
 		return fmt.Errorf("read cli config: %w", err)
 	}
@@ -89,7 +89,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 		return fmt.Errorf("build storage managers: %w", err)
 	}
 
-	// Construct and the compatibility config for the rest and arb servers. This could not be done while reading configs
+	// Construct the compatibility config for the rest and arb servers. This could not be done while reading configs
 	// as ChainID is fetched from the ethClient afterwards.
 	compatibilityCfg, err := common.NewCompatibilityConfig(
 		Version,

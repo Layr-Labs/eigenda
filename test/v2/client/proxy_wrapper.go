@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
-	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
@@ -38,7 +37,7 @@ func NewProxyWrapper(
 
 	registry := prometheus.NewRegistry()
 	proxyMetrics := proxymetrics.NewMetrics(registry)
-	ethClient, _, err := common.BuildEthClient(
+	ethClient, _, err := proxycommon.BuildEthClient(
 		ctx,
 		logger,
 		proxyConfig.SecretConfig.EthRPCURL,
