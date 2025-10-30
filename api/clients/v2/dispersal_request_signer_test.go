@@ -290,6 +290,203 @@ func TestLocalSignerWithBothKMSAndPrivateKey(t *testing.T) {
 	require.Error(t, err, "should fail when both KeyID and PrivateKey are specified")
 }
 
+func TestNewKMSDispersalRequestSignerDirect(t *testing.T) {
+	ctx := t.Context()
+	_ = setupLocalStack(t)
+
+	keyManager := kms.New(kms.Options{
+		Region:       region,
+		BaseEndpoint: aws.String(localstackHost),
+	})
+
+	// Create a test KMS key
+	keyID, _ := createTestKMSKey(t, ctx, keyManager)
+
+	// Test direct KMS factory function
+	signer, err := NewKMSDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:   region,
+		Endpoint: localstackHost,
+		KeyID:    keyID,
+	})
+	require.NoError(t, err, "failed to create KMS signer directly")
+	require.NotNil(t, signer, "signer should not be nil")
+}
+
+func TestNewLocalDispersalRequestSignerDirect(t *testing.T) {
+	// Generate a private key for testing
+	privateKey, err := crypto.GenerateKey()
+	require.NoError(t, err, "failed to generate test private key")
+	privateKeyHex := fmt.Sprintf("%x", crypto.FromECDSA(privateKey))
+
+	// Test direct local factory function
+	signer, err := NewLocalDispersalRequestSigner(DispersalRequestSignerConfig{
+		PrivateKey: privateKeyHex,
+	})
+	require.NoError(t, err, "failed to create local signer directly")
+	require.NotNil(t, signer, "signer should not be nil")
+}
+
+func TestNewKMSDispersalRequestSignerErrors(t *testing.T) {
+	ctx := t.Context()
+
+	tests := []struct {
+		name        string
+		config      DispersalRequestSignerConfig
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "invalid_region_empty",
+			config: DispersalRequestSignerConfig{
+				KeyID:    "test-key",
+				Region:   "",
+				Endpoint: localstackHost,
+			},
+			expectError: true,
+			errorMsg:    "should fail with empty region",
+		},
+		{
+			name: "invalid_kms_endpoint",
+			config: DispersalRequestSignerConfig{
+				KeyID:    "non-existent-key",
+				Region:   region,
+				Endpoint: "http://invalid-endpoint:9999",
+			},
+			expectError: true,
+			errorMsg:    "should fail with invalid endpoint",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewKMSDispersalRequestSigner(ctx, tt.config)
+			if tt.expectError {
+				require.Error(t, err, tt.errorMsg)
+			} else {
+				require.NoError(t, err, tt.errorMsg)
+			}
+		})
+	}
+}
+
+func TestNewLocalDispersalRequestSignerErrors(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      DispersalRequestSignerConfig
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "invalid_private_key_format",
+			config: DispersalRequestSignerConfig{
+				PrivateKey: "not-a-valid-hex-key",
+			},
+			expectError: true,
+			errorMsg:    "should fail with invalid hex format",
+		},
+		{
+			name: "empty_private_key",
+			config: DispersalRequestSignerConfig{
+				PrivateKey: "",
+			},
+			expectError: true,
+			errorMsg:    "should fail with empty private key",
+		},
+		{
+			name: "too_short_private_key",
+			config: DispersalRequestSignerConfig{
+				PrivateKey: "abc123",
+			},
+			expectError: true,
+			errorMsg:    "should fail with too short private key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewLocalDispersalRequestSigner(tt.config)
+			if tt.expectError {
+				require.Error(t, err, tt.errorMsg)
+			} else {
+				require.NoError(t, err, tt.errorMsg)
+			}
+		})
+	}
+}
+
+func TestDefaultDispersalRequestSignerConfig(t *testing.T) {
+	config := DefaultDispersalRequestSignerConfig()
+	
+	require.Equal(t, "us-east-1", config.Region, "default region should be us-east-1")
+	require.Equal(t, "", config.Endpoint, "default endpoint should be empty")
+	require.Equal(t, "", config.KeyID, "default KeyID should be empty")
+	require.Equal(t, "", config.PrivateKey, "default PrivateKey should be empty")
+}
+
+func TestDispersalRequestSignerConfigVerify(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      DispersalRequestSignerConfig
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid_kms_config",
+			config: DispersalRequestSignerConfig{
+				KeyID:  "test-key",
+				Region: "us-east-1",
+			},
+			expectError: false,
+			errorMsg:    "valid KMS config should pass",
+		},
+		{
+			name: "valid_local_config",
+			config: DispersalRequestSignerConfig{
+				PrivateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			},
+			expectError: false,
+			errorMsg:    "valid local config should pass",
+		},
+		{
+			name: "both_keyid_and_privatekey",
+			config: DispersalRequestSignerConfig{
+				KeyID:      "test-key",
+				PrivateKey: "test-private-key",
+				Region:     "us-east-1",
+			},
+			expectError: true,
+			errorMsg:    "should fail when both KeyID and PrivateKey are provided",
+		},
+		{
+			name: "neither_keyid_nor_privatekey",
+			config: DispersalRequestSignerConfig{
+				Region: "us-east-1",
+			},
+			expectError: true,
+			errorMsg:    "should fail when neither KeyID nor PrivateKey is provided",
+		},
+		{
+			name: "kms_without_region",
+			config: DispersalRequestSignerConfig{
+				KeyID: "test-key",
+			},
+			expectError: true,
+			errorMsg:    "should fail when using KMS without region",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Verify()
+			if tt.expectError {
+				require.Error(t, err, tt.errorMsg)
+			} else {
+				require.NoError(t, err, tt.errorMsg)
+			}
+		})
+	}
+}
+
 func TestLocalSignerSignatureVerification(t *testing.T) {
 	ctx := t.Context()
 	rand := random.NewTestRandom()
@@ -422,4 +619,176 @@ func TestLocalSignerSignatureVerification(t *testing.T) {
 		_, err = auth.VerifyStoreChunksRequest(publicAddress, request2)
 		require.Error(t, err, "first key should not verify signature from second key")
 	})
+}
+
+func TestKMSSignerEdgeCases(t *testing.T) {
+	ctx := t.Context()
+	_ = setupLocalStack(t)
+
+	keyManager := kms.New(kms.Options{
+		Region:       region,
+		BaseEndpoint: aws.String(localstackHost),
+	})
+
+	// Create a test KMS key
+	keyID, _ := createTestKMSKey(t, ctx, keyManager)
+
+	signer, err := NewKMSDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:   region,
+		Endpoint: localstackHost,
+		KeyID:    keyID,
+	})
+	require.NoError(t, err, "failed to create KMS signer")
+
+	// Note: nil request test omitted as it would cause panic in hashing function, 
+	// which is expected behavior (caller should not pass nil)
+
+	// Test with cancelled context
+	t.Run("cancelled_context", func(t *testing.T) {
+		cancelledCtx, cancel := context.WithCancel(ctx)
+		cancel() // Cancel immediately
+
+		rand := random.NewTestRandom()
+		request := auth.RandomStoreChunksRequest(rand)
+		request.Signature = nil
+
+		_, err := signer.SignStoreChunksRequest(cancelledCtx, request)
+		require.Error(t, err, "should fail with cancelled context")
+	})
+}
+
+func TestLocalSignerEdgeCases(t *testing.T) {
+	ctx := t.Context()
+	
+	// Generate a private key for testing
+	privateKey, err := crypto.GenerateKey()
+	require.NoError(t, err, "failed to generate test private key")
+	privateKeyHex := fmt.Sprintf("%x", crypto.FromECDSA(privateKey))
+
+	signer, err := NewLocalDispersalRequestSigner(DispersalRequestSignerConfig{
+		PrivateKey: privateKeyHex,
+	})
+	require.NoError(t, err, "failed to create local signer")
+
+	// Note: nil request test omitted as it would cause panic in hashing function, 
+	// which is expected behavior (caller should not pass nil)
+
+	// Test with cancelled context (should still work for local signing)
+	t.Run("cancelled_context", func(t *testing.T) {
+		cancelledCtx, cancel := context.WithCancel(ctx)
+		cancel() // Cancel immediately
+
+		rand := random.NewTestRandom()
+		request := auth.RandomStoreChunksRequest(rand)
+		request.Signature = nil
+
+		// Local signing should work even with cancelled context since it doesn't use network
+		signature, err := signer.SignStoreChunksRequest(cancelledCtx, request)
+		require.NoError(t, err, "local signing should work with cancelled context")
+		require.NotNil(t, signature, "signature should not be nil")
+		require.NotEmpty(t, signature, "signature should not be empty")
+	})
+}
+
+func TestSignerTypeAssertion(t *testing.T) {
+	ctx := t.Context()
+
+	// Test that KMS factory returns KMS signer
+	t.Run("kms_signer_type", func(t *testing.T) {
+		_ = setupLocalStack(t)
+		keyManager := kms.New(kms.Options{
+			Region:       region,
+			BaseEndpoint: aws.String(localstackHost),
+		})
+		keyID, _ := createTestKMSKey(t, ctx, keyManager)
+
+		signer, err := NewKMSDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+			Region:   region,
+			Endpoint: localstackHost,
+			KeyID:    keyID,
+		})
+		require.NoError(t, err, "failed to create KMS signer")
+
+		// Verify it's the correct concrete type
+		_, ok := signer.(*kmsRequestSigner)
+		require.True(t, ok, "should be kmsRequestSigner type")
+	})
+
+	// Test that local factory returns local signer
+	t.Run("local_signer_type", func(t *testing.T) {
+		privateKey, err := crypto.GenerateKey()
+		require.NoError(t, err, "failed to generate test private key")
+		privateKeyHex := fmt.Sprintf("%x", crypto.FromECDSA(privateKey))
+
+		signer, err := NewLocalDispersalRequestSigner(DispersalRequestSignerConfig{
+			PrivateKey: privateKeyHex,
+		})
+		require.NoError(t, err, "failed to create local signer")
+
+		// Verify it's the correct concrete type
+		_, ok := signer.(*localRequestSigner)
+		require.True(t, ok, "should be localRequestSigner type")
+	})
+}
+
+func TestNewDispersalRequestSignerRouting(t *testing.T) {
+	ctx := t.Context()
+
+	// Test routing to KMS signer
+	t.Run("routes_to_kms", func(t *testing.T) {
+		_ = setupLocalStack(t)
+		keyManager := kms.New(kms.Options{
+			Region:       region,
+			BaseEndpoint: aws.String(localstackHost),
+		})
+		keyID, _ := createTestKMSKey(t, ctx, keyManager)
+
+		signer, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+			Region:   region,
+			Endpoint: localstackHost,
+			KeyID:    keyID,
+		})
+		require.NoError(t, err, "should route to KMS signer")
+
+		// Verify it routed to the correct type
+		_, ok := signer.(*kmsRequestSigner)
+		require.True(t, ok, "should have routed to kmsRequestSigner")
+	})
+
+	// Test routing to local signer
+	t.Run("routes_to_local", func(t *testing.T) {
+		privateKey, err := crypto.GenerateKey()
+		require.NoError(t, err, "failed to generate test private key")
+		privateKeyHex := fmt.Sprintf("%x", crypto.FromECDSA(privateKey))
+
+		signer, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+			PrivateKey: privateKeyHex,
+		})
+		require.NoError(t, err, "should route to local signer")
+
+		// Verify it routed to the correct type
+		_, ok := signer.(*localRequestSigner)
+		require.True(t, ok, "should have routed to localRequestSigner")
+	})
+}
+
+func TestKMSSignerWithDefaultConfig(t *testing.T) {
+	ctx := t.Context()
+	_ = setupLocalStack(t)
+
+	keyManager := kms.New(kms.Options{
+		Region:       region,
+		BaseEndpoint: aws.String(localstackHost),
+	})
+
+	keyID, _ := createTestKMSKey(t, ctx, keyManager)
+
+	// Test KMS signer without custom endpoint (uses default AWS config loading)
+	_, err := NewKMSDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region: region,
+		KeyID:  keyID,
+		// No endpoint specified - should try to use default AWS config
+	})
+	// This will fail in test environment but we're testing the code path
+	require.Error(t, err, "should fail to load default AWS config in test environment")
 }

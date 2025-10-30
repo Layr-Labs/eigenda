@@ -145,7 +145,7 @@ func NewLocalDispersalRequestSigner(
 }
 
 func (s *kmsRequestSigner) SignStoreChunksRequest(
-	ctx context.Context, 
+	ctx context.Context,
 	request *grpc.StoreChunksRequest,
 ) ([]byte, error) {
 	hash, err := hashing.HashStoreChunksRequest(request)
