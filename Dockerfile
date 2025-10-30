@@ -121,9 +121,9 @@ ARG GITDATE
 WORKDIR /app/api/proxy
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-        go build -ldflags="-X main.Version=${SEMVER} \
-                       -X main.Commit=${GITCOMMIT} \
-                       -X main.Date=${GITDATE}" \
+        go build -ldflags="-X 'main.Version=${SEMVER}' \
+                       -X 'main.Commit=${GITCOMMIT}' \
+                       -X 'main.Date=${GITDATE}'" \
         -o ./bin/eigenda-proxy ./cmd/server
 
 # Final stages for each component
