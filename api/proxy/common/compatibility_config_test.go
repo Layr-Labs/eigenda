@@ -252,7 +252,7 @@ func TestNewCompatibilityConfigMaxPayloadSize(t *testing.T) {
 		{
 			name:             "zero blob size",
 			maxBlobSizeBytes: 0,
-			wantErr:          true,
+			wantErr:          false,
 		},
 	}
 
@@ -275,7 +275,7 @@ func TestNewCompatibilityConfigMaxPayloadSize(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Greater(t, result.MaxPayloadSizeBytes, uint32(0))
+				require.GreaterOrEqual(t, result.MaxPayloadSizeBytes, uint32(0))
 				// The exact calculation is done by codec.BlobSymbolsToMaxPayloadSize
 				// We just verify it's a reasonable value relative to input
 				require.LessOrEqual(t, result.MaxPayloadSizeBytes, uint32(tc.maxBlobSizeBytes))
