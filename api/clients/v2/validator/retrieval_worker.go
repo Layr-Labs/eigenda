@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -356,9 +357,9 @@ func newRetrievalWorker(
 	return worker, nil
 }
 
-// updateChunkStatus updates the status of a chunk from a given operator. It also updates the
+// updateValidatorStatus updates the status of a chunk from a given operator. It also updates the
 // counts of the various chunk statuses.
-func (w *retrievalWorker) updateChunkStatus(validatorId core.OperatorID, validatorStatus chunkStatus) {
+func (w *retrievalWorker) updateValidatorStatus(validatorId core.OperatorID, validatorStatus chunkStatus) {
 	w.validatorStatusMap[validatorId] = validatorStatus
 
 	assignments, ok := w.assignments[validatorId]
@@ -370,9 +371,7 @@ func (w *retrievalWorker) updateChunkStatus(validatorId core.OperatorID, validat
 
 	for _, chunkIndex := range assignments.Indices {
 		oldStatus, chunkHasStatus := w.chunkStatusMap[chunkIndex]
-		if !chunkHasStatus {
-			oldStatus = available
-		}
+		enforce.True(chunkHasStatus, "chunk %d has no status in chunkStatusMap", chunkIndex)
 
 		chunkOwner, hasOwner := w.chunkOwnerMap[chunkIndex]
 		if !hasOwner {
@@ -410,11 +409,6 @@ func (w *retrievalWorker) updateChunkStatus(validatorId core.OperatorID, validat
 			"verified", w.chunkStatusCounts[verified],
 		)
 	}
-}
-
-// getChunkStatus returns the status a validator's chunks.
-func (w *retrievalWorker) getChunkStatus(operatorID core.OperatorID) chunkStatus {
-	return w.validatorStatusMap[operatorID]
 }
 
 // getStatusCount returns the number of chunks with one of the given statuses.
@@ -485,7 +479,7 @@ func (w *retrievalWorker) checkPessimisticTimeout() {
 		operatorID := next.(*downloadStarted).operatorID
 		downloadStart := next.(*downloadStarted).downloadStart
 
-		if w.getChunkStatus(operatorID) != downloading {
+		if w.validatorStatusMap[operatorID] != downloading {
 			// The operator has finished downloading, we can remove it from the queue.
 			w.downloadsInProgressQueue.Dequeue()
 			continue
@@ -502,7 +496,7 @@ func (w *retrievalWorker) checkPessimisticTimeout() {
 			}
 			w.downloadsInProgressQueue.Dequeue()
 
-			w.updateChunkStatus(operatorID, pessimisticTimeout)
+			w.updateValidatorStatus(operatorID, pessimisticTimeout)
 		} else {
 			// The next download has not yet timed out.
 			break
@@ -519,14 +513,14 @@ func (w *retrievalWorker) handleCompletedDownload(message *downloadCompleted) {
 				"blobKey", w.blobKey.Hex())
 		}
 		w.downloadedChunksQueue.Enqueue(message)
-		w.updateChunkStatus(message.operatorID, downloaded)
+		w.updateValidatorStatus(message.operatorID, downloaded)
 	} else {
 		w.logger.Warn("failed to download chunk data",
 			"operator", message.operatorID.Hex(),
 			"blobKey", w.blobKey.Hex(),
 			"err", message.err)
 
-		w.updateChunkStatus(message.operatorID, failed)
+		w.updateValidatorStatus(message.operatorID, failed)
 	}
 }
 
@@ -539,14 +533,14 @@ func (w *retrievalWorker) handleVerificationCompleted(message *verificationCompl
 				"blobKey", w.blobKey.Hex())
 		}
 		w.verifiedChunksQueue.Enqueue(message)
-		w.updateChunkStatus(message.operatorID, verified)
+		w.updateValidatorStatus(message.operatorID, verified)
 	} else {
 		w.logger.Warn("failed to verify chunk data",
 			"operator", message.operatorID.Hex(),
 			"blobKey", w.blobKey.Hex(),
 			"err", message.err)
 
-		w.updateChunkStatus(message.operatorID, failed)
+		w.updateValidatorStatus(message.operatorID, failed)
 	}
 }
 
@@ -558,7 +552,7 @@ func (w *retrievalWorker) scheduleDownloads() {
 			break
 		}
 		operatorID := w.downloadOrder[w.nextDownloadIndex]
-		w.updateChunkStatus(operatorID, downloading)
+		w.updateValidatorStatus(operatorID, downloading)
 
 		w.connectionPool.Submit(func() {
 			w.downloadChunks(operatorID)
@@ -580,7 +574,7 @@ func (w *retrievalWorker) scheduleVerifications() {
 		reply := next.(*downloadCompleted).reply
 		operatorID := next.(*downloadCompleted).operatorID
 
-		w.updateChunkStatus(operatorID, verifying)
+		w.updateValidatorStatus(operatorID, verifying)
 
 		w.computePool.Submit(func() {
 			w.deserializeAndVerifyChunks(operatorID, reply)
