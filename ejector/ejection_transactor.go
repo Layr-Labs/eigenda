@@ -94,6 +94,9 @@ func NewEjectionTransactor(
 	if registryCoordinatorAddress == zeroAddress {
 		return nil, fmt.Errorf("registryCoordinatorAddress must be non-zero")
 	}
+	if chainID.Sign() <= 0 {
+		return nil, fmt.Errorf("invalid chainID: %s", chainID.String())
+	}
 
 	caller, err := contractEigenDAEjectionManager.NewContractIEigenDAEjectionManagerCaller(
 		ejectionContractAddress, client)
@@ -254,7 +257,8 @@ func (e *ejectionTransactor) IsValidatorPresentInAnyQuorum(
 
 func (e *ejectionTransactor) StartEjection(
 	ctx context.Context,
-	addressToEject gethcommon.Address) error {
+	addressToEject gethcommon.Address,
+) error {
 
 	rbn, err := e.referenceBlockProvider.GetReferenceBlockNumber(ctx)
 	if err != nil {
