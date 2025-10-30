@@ -93,6 +93,17 @@ const (
 	verified
 )
 
+// String representations of chunk statuses.
+var chunkStatusStrings = map[chunkStatus]string{
+	failed:             "failed",
+	pessimisticTimeout: "pessimisticTimeout",
+	available:          "available",
+	downloading:        "downloading",
+	downloaded:         "downloaded",
+	verifying:          "verifying",
+	verified:           "verified",
+}
+
 // Returns true if this status is better than the other status.
 func (s chunkStatus) isBetterThan(other chunkStatus) bool {
 	return s > other
@@ -202,7 +213,7 @@ type retrievalWorker struct {
 	//
 	// As a potential future optimization, we could keep track of the status of each chunk for each of the validators
 	// that chunk is assigned to. But this is quite complex, and so only tracking the best status via this owner map
-	//is sufficient for now.
+	// is sufficient for now.
 	chunkOwnerMap map[uint32]core.OperatorID
 }
 
@@ -292,6 +303,18 @@ func newRetrievalWorker(
 	}
 	chunkStatusCounts[available] = len(chunkStatusMap)
 
+	if len(chunkStatusMap) < int(minimumChunkCount) {
+		return nil, fmt.Errorf(
+			"not enough unique chunks assigned to meet minimumChunkCount: %d < %d",
+			len(chunkStatusMap), minimumChunkCount)
+	} else if config.DetailedLogging {
+		logger.Debug("initialized retrieval worker",
+			"blobKey", blobKey.Hex(),
+			"minimumChunkCount", minimumChunkCount,
+			"uniqueChunksWithAssignments", len(chunkStatusMap),
+		)
+	}
+
 	totalChunkCount := uint32(chunkStatusCounts[available])
 
 	targetDownloadCount := uint32(math.Ceil(float64(minimumChunkCount) * config.DownloadPessimism))
@@ -339,7 +362,14 @@ func newRetrievalWorker(
 func (w *retrievalWorker) updateChunkStatus(validatorId core.OperatorID, validatorStatus chunkStatus) {
 	w.validatorStatusMap[validatorId] = validatorStatus
 
-	for _, chunkIndex := range w.assignments[validatorId].Indices {
+	assignments, ok := w.assignments[validatorId]
+	if !ok {
+		// This validator has no assigned chunks
+		w.logger.Warnf("validator %s has no assigned chunks", validatorId.Hex())
+		return
+	}
+
+	for _, chunkIndex := range assignments.Indices {
 		oldStatus, chunkHasStatus := w.chunkStatusMap[chunkIndex]
 		if !chunkHasStatus {
 			oldStatus = available
@@ -367,6 +397,20 @@ func (w *retrievalWorker) updateChunkStatus(validatorId core.OperatorID, validat
 			w.chunkOwnerMap[chunkIndex] = validatorId
 		}
 	}
+
+	if w.config.DetailedLogging {
+		w.logger.Debug("updating chunk status counts",
+			"validatorId", validatorId.Hex(),
+			"validatorStatus", chunkStatusStrings[validatorStatus],
+			"failed", w.chunkStatusCounts[failed],
+			"pessimisticTimeout", w.chunkStatusCounts[pessimisticTimeout],
+			"available", w.chunkStatusCounts[available],
+			"downloading", w.chunkStatusCounts[downloading],
+			"downloaded", w.chunkStatusCounts[downloaded],
+			"verifying", w.chunkStatusCounts[verifying],
+			"verified", w.chunkStatusCounts[verified],
+		)
+	}
 }
 
 // getChunkStatus returns the status a validator's chunks.
@@ -376,7 +420,6 @@ func (w *retrievalWorker) getChunkStatus(operatorID core.OperatorID) chunkStatus
 
 // getStatusCount returns the number of chunks with one of the given statuses.
 func (w *retrievalWorker) getStatusCount(statuses ...chunkStatus) uint32 {
-
 	total := 0
 	for _, status := range statuses {
 		if count, ok := w.chunkStatusCounts[status]; ok {
