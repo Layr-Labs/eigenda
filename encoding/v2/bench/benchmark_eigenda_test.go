@@ -128,7 +128,8 @@ func benchmarkRSBackend(b *testing.B, rsBackend backend.RSEncoderBackend) {
 // evaluates to the chunk's data at the chunk's coset indices.
 func BenchmarkBlobToChunksEncoding(b *testing.B) {
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.SilentLogger(), cfg)
+	enc, err := rs.NewEncoder(common.SilentLogger(), cfg)
+	require.Nil(b, err)
 
 	for _, blobPower := range []uint64{17, 20, 21, 24} {
 		b.Run("Encode_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {

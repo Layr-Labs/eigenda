@@ -38,7 +38,8 @@ func TestEncoder(t *testing.T) {
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
 	require.NoError(t, err)
 
-	encoder := rs.NewEncoder(harness.logger, nil)
+	encoder, err := rs.NewEncoder(harness.logger, nil)
+	require.NoError(t, err)
 
 	params := encoding.ParamsFromMins(5, 5)
 	commitments, err := c.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
@@ -119,7 +120,8 @@ func FuzzOnlySystematic(f *testing.F) {
 		//sample the correct systematic frames
 		samples, indices := sampleFrames(frames, uint64(len(frames)))
 
-		encoder := rs.NewEncoder(harness.logger, nil)
+		encoder, err := rs.NewEncoder(harness.logger, nil)
+		require.NoError(t, err)
 		chunks := make([]rs.FrameCoeffs, len(samples))
 		for i, f := range samples {
 			chunks[i] = f.Coeffs

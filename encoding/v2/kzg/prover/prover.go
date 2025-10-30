@@ -118,7 +118,10 @@ func NewProver(logger logging.Logger, kzgConfig *KzgConfig, encoderConfig *encod
 		return nil, fmt.Errorf("failed to read G1 points: %w", err)
 	}
 
-	rsEncoder := rs.NewEncoder(logger, encoderConfig)
+	rsEncoder, err := rs.NewEncoder(logger, encoderConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rs encoder: %w", err)
+	}
 
 	proverGroup := &Prover{
 		logger:              logger,

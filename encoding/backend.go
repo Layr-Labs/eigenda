@@ -49,8 +49,11 @@ func (c *Config) Verify() error {
 	if c.BackendType != GnarkBackend && c.BackendType != IcicleBackend {
 		return fmt.Errorf("unsupported backend type: %s", c.BackendType)
 	}
-	if c.BackendType == IcicleBackend && c.GPUEnable && c.GPUConcurrentFrameGenerationDangerous <= 0 {
-		return fmt.Errorf("GPUConcurrentFrameGenerationDangerous must be greater than 0 when GPU is enabled with icicle backend")
+	if c.GPUEnable && c.BackendType == GnarkBackend {
+		return fmt.Errorf("GPUEnable cannot be true when BackendType is gnark")
+	}
+	if c.BackendType == IcicleBackend && c.GPUConcurrentFrameGenerationDangerous <= 0 {
+		return fmt.Errorf("GPUConcurrentFrameGenerationDangerous must be greater than 0 with icicle backend")
 	}
 	return nil
 }

@@ -27,9 +27,12 @@ type Encoder struct {
 }
 
 // NewEncoder creates a new encoder with the given options
-func NewEncoder(logger logging.Logger, config *encoding.Config) *Encoder {
+func NewEncoder(logger logging.Logger, config *encoding.Config) (*Encoder, error) {
 	if config == nil {
 		config = encoding.DefaultConfig()
+	}
+	if err := config.Verify(); err != nil {
+		return nil, fmt.Errorf("verify config: %w", err)
 	}
 
 	e := &Encoder{
@@ -39,7 +42,7 @@ func NewEncoder(logger logging.Logger, config *encoding.Config) *Encoder {
 		ParametrizedEncoder: make(map[encoding.EncodingParams]*ParametrizedEncoder),
 	}
 
-	return e
+	return e, nil
 }
 
 // just a wrapper to take bytes not Fr Element

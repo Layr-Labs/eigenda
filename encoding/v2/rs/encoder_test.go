@@ -24,7 +24,8 @@ func TestEncodeDecode_InvertsWhenSamplingAllFrames(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.TestLogger(t), cfg)
+	enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+	require.NoError(t, err)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
@@ -45,7 +46,8 @@ func TestEncodeDecode_InvertsWhenSamplingMissingFrame(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.TestLogger(t), cfg)
+	enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+	require.NoError(t, err)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
@@ -68,7 +70,8 @@ func TestEncodeDecode_InvertsWithMissingAndDuplicateFrames(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.TestLogger(t), cfg)
+	enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+	require.NoError(t, err)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
@@ -95,7 +98,8 @@ func TestEncodeDecode_InvertsWithMissingAndDuplicateFrames(t *testing.T) {
 func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.TestLogger(t), cfg)
+	enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+	require.NoError(t, err)
 
 	fmt.Println("Num Chunks: ", params.NumChunks)
 
@@ -117,7 +121,8 @@ func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 func TestEncodeDecode_ErrorsWhenNotEnoughSampledFramesWithDuplicates(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.TestLogger(t), cfg)
+	enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+	require.NoError(t, err)
 
 	fmt.Println("Num Chunks: ", params.NumChunks)
 
@@ -161,7 +166,8 @@ func FuzzOnlySystematic(f *testing.F) {
 
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
 		cfg := encoding.DefaultConfig()
-		enc := rs.NewEncoder(common.TestLogger(t), cfg)
+		enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+		require.NoError(t, err)
 
 		//encode the data
 		frames, _, err := enc.EncodeBytes(t.Context(), input, params)
