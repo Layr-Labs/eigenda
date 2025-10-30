@@ -89,7 +89,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 	encodingConfig := &encoding.Config{
 		BackendType:                           backendType,
 		GPUEnable:                             config.ServerConfig.GPUEnable,
-		GPUConcurrentFrameGenerationDangerous: config.ServerConfig.GPUConcurrentFrameGenerationDangerous,
+		GPUConcurrentFrameGenerationDangerous: int64(config.ServerConfig.MaxConcurrentRequestsDangerous),
 		NumWorker:                             config.EncoderConfig.NumWorker,
 	}
 

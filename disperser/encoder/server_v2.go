@@ -71,7 +71,7 @@ func NewEncoderServerV2(
 		prover:             prover,
 		metrics:            metrics,
 		grpcMetrics:        grpcMetrics,
-		concurrencyLimiter: make(chan struct{}, config.MaxConcurrentRequests),
+		concurrencyLimiter: make(chan struct{}, config.MaxConcurrentRequestsDangerous),
 		backlogLimiter:     make(chan struct{}, config.RequestQueueSize),
 		queueStats:         make(map[string]int),
 	}
@@ -209,7 +209,7 @@ func (s *EncoderServerV2) pushBacklogLimiter(blobSizeBytes int) error {
 		s.metrics.IncrementRateLimitedBlobRequestNum(blobSizeBytes)
 		s.logger.Warn("rate limiting as request queue is full",
 			"requestQueueSize", s.config.RequestQueueSize,
-			"maxConcurrentRequests", s.config.MaxConcurrentRequests)
+			"maxConcurrentRequests", s.config.MaxConcurrentRequestsDangerous)
 		return api.NewErrorResourceExhausted(fmt.Sprintf(
 			"request queue is full, max queue size: %d", s.config.RequestQueueSize))
 	}

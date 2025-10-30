@@ -38,6 +38,23 @@ type Config struct {
 	GPUConcurrentFrameGenerationDangerous int64
 }
 
+// TODO(samlaf): can't import config because of some insane circular dependency issues
+// Think this will go away after we remove V1 code.
+// var _ config.VerifiableConfig = (*Config)(nil)
+
+func (c *Config) Verify() error {
+	if c.NumWorker == 0 {
+		return fmt.Errorf("NumWorker must be greater than 0")
+	}
+	if c.BackendType != GnarkBackend && c.BackendType != IcicleBackend {
+		return fmt.Errorf("unsupported backend type: %s", c.BackendType)
+	}
+	if c.BackendType == IcicleBackend && c.GPUEnable && c.GPUConcurrentFrameGenerationDangerous <= 0 {
+		return fmt.Errorf("GPUConcurrentFrameGenerationDangerous must be greater than 0 when GPU is enabled with icicle backend")
+	}
+	return nil
+}
+
 // DefaultConfig returns a Config struct with default values.
 // If icicle is available (binary built with icicle tag), it sets the backend to icicle and enables GPU.
 // Make sure to set GPUEnable to false if you want to run on CPU only.

@@ -646,11 +646,11 @@ func startEncoderV2(
 
 	// Create encoder server config
 	serverConfig := encoder.ServerConfig{
-		MaxConcurrentRequests: 16,
-		RequestQueueSize:      32,
-		PreventReencoding:     true,
-		Backend:               "gnark",
-		GPUEnable:             false,
+		MaxConcurrentRequestsDangerous: 16,
+		RequestQueueSize:               32,
+		PreventReencoding:              true,
+		Backend:                        "gnark",
+		GPUEnable:                      false,
 	}
 
 	// Create encoder server
