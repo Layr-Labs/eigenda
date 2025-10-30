@@ -120,7 +120,8 @@ func PadPayload(inputData []byte) []byte {
 	return paddedOutput
 }
 
-// RemoveInternalPadding accepts an array of padded data, and removes the internal padding that was added in PadPayload
+// CheckAndRemoveInternalPadding accepts an array of padded data, and removes the internal padding that was added in
+// PadPayload
 //
 // This function assumes that the input aligns to 32 bytes. Since it is removing 1 byte for every 31 bytes kept, the
 // output from this function is not guaranteed to align to 32 bytes.
@@ -128,7 +129,9 @@ func PadPayload(inputData []byte) []byte {
 // NOTE: this method is a reimplementation of RemoveEmptyByteFromPaddedBytes, with one meaningful difference: this
 // function relies on the assumption that the input is aligned to encoding.BYTES_PER_SYMBOL, which makes the padding
 // removal logic simpler.
-func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
+//
+// In addition, this function rquires the first byte in every multiple of 32 bytes to be 0x00.
+func CheckAndRemoveInternalPadding(paddedData []byte) ([]byte, error) {
 	if len(paddedData)%encoding.BYTES_PER_SYMBOL != 0 {
 		return nil, fmt.Errorf(
 			"padded data (length %d) must be multiple of encoding.BYTES_PER_SYMBOL %d",
@@ -146,6 +149,12 @@ func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 	for i := 0; i < symbolCount; i++ {
 		dstIndex := i * bytesPerChunk
 		srcIndex := i*encoding.BYTES_PER_SYMBOL + 1
+
+		if paddedData[dstIndex] != 0x0 {
+			return nil, fmt.Errorf(
+				"the first byte of every encoding.BYTES_PER_SYMBOL in the padded data must be 0x00",
+			)
+		}
 
 		copy(outputData[dstIndex:dstIndex+bytesPerChunk], paddedData[srcIndex:srcIndex+bytesPerChunk])
 	}

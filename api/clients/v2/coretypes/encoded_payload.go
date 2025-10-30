@@ -128,7 +128,7 @@ func (ep *EncodedPayload) decodePayload(payloadLen uint32) ([]byte, error) {
 	body := ep.bytes[codec.EncodedPayloadHeaderLenBytes:]
 	// Decode the body by removing internal 0 byte padding (0x00 initial byte for every 32 byte chunk)
 	// The decodedBody should contain the payload bytes + potentially some external padding bytes.
-	decodedBody, err := codec.RemoveInternalPadding(body)
+	decodedBody, err := codec.CheckAndRemoveInternalPadding(body)
 	if err != nil {
 		return nil, fmt.Errorf("remove internal padding: %w", err)
 	}
