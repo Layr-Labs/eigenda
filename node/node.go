@@ -500,7 +500,12 @@ func (n *Node) startEjectionSentinel() error {
 		return fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
 	}
 
-	validatorAddress, err := eth.ValidatorIDToAddress(n.CTX, n.client, registryCoordinatorAddress, n.Config.ID)
+	validatorIdToAddress, err := eth.NewValidatorIDToAddressConverter(n.client, registryCoordinatorAddress)
+	if err != nil {
+		return fmt.Errorf("failed to create ValidatorIDToAddressConverter: %w", err)
+	}
+
+	validatorAddress, err := validatorIdToAddress.ValidatorIDToAddress(n.CTX, n.Config.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get validator address from ID: %w", err)
 	}

@@ -13,6 +13,7 @@ const (
 	RegistryCoordinator    ContractName = "REGISTRY_COORDINATOR"
 	RelayRegistry          ContractName = "RELAY_REGISTRY"
 	ServiceManager         ContractName = "SERVICE_MANAGER"
+	StakeRegistry          ContractName = "STAKE_REGISTRY"
 )
 
 // a list of all contracts currently known to the EigenDA offchain code.
@@ -24,4 +25,5 @@ var knownContracts = []ContractName{
 	RegistryCoordinator,
 	RelayRegistry,
 	ServiceManager,
+	StakeRegistry,
 }
