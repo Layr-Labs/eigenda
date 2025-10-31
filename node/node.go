@@ -506,7 +506,6 @@ func (n *Node) startEjectionSentinel() error {
 	}
 
 	validatorAddress, err := validatorIdToAddress.ValidatorIDToAddress(n.CTX, n.Config.ID)
-
 	if err != nil {
 		return fmt.Errorf("failed to get validator address from ID: %w", err)
 	}

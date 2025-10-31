@@ -54,6 +54,7 @@ func (v *validatorQuorumLookup) GetQuorumsForValidator(
 ) ([]core.QuorumID, error) {
 
 	blockNumber := big.NewInt(0).SetUint64(referenceBlockNumber)
+
 	opts := &bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: blockNumber,
