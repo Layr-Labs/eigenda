@@ -16,9 +16,9 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	encmock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -43,7 +43,6 @@ func makeTestProverV1(numPoint uint64) (*prover.Prover, encoder.ServerConfig) {
 
 	p, _ := prover.NewProver(kzgConfig, nil)
 	encoderServerConfig := encoder.ServerConfig{
-		GrpcPort:              "3000",
 		MaxConcurrentRequests: 16,
 		RequestPoolSize:       32,
 	}
@@ -104,7 +103,7 @@ func getTestData(t *testing.T) (core.Blob, encoding.EncodingParams) {
 		log.Fatal(err)
 	}
 
-	testEncodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+	testEncodingParams := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
 
 	return testBlob, testEncodingParams
 }
@@ -201,7 +200,6 @@ func TestThrottling(t *testing.T) {
 
 	mockEncoder.On("EncodeAndProve", mock.Anything, mock.Anything).Return(blobCommitment, []*encoding.Frame{}, nil)
 	encoderServerConfig := encoder.ServerConfig{
-		GrpcPort:              "3000",
 		MaxConcurrentRequests: concurrentRequests,
 		RequestPoolSize:       requestPoolSize,
 	}

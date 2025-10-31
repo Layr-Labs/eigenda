@@ -16,7 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -294,7 +294,7 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
-	commitments, err := s.prover.GetCommitmentsForPaddedLength(blob)
+	commitments, err := s.committer.GetCommitmentsForPaddedLength(blob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commitments: %w", err)
 	}

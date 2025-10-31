@@ -17,6 +17,12 @@
       "startBlock": 3379610
     }
   },
+  "preprod-hoodi": {
+    "PaymentVault": {
+      "address": "0x6E8772AE295BA1d3Cc89296ccDE017f91335594d",
+      "startBlock": 1274227
+    }
+  },
   "hoodi": {
     "PaymentVault": {
       "address": "0xc043730ec3069171961aB995801f230d70B2bFb2",

@@ -34,7 +34,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		"/"+
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
-			"{"+routingVarNameKeccakCommitmentHex+"}",
+			"{"+routingVarNameKeccakCommitmentHex+":[0-9a-fA-F]{64}}", // 32 byte hex string
 		middleware.WithCertMiddlewares(
 			svr.handleGetOPKeccakCommitment,
 			svr.log,
@@ -48,7 +48,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":01}"+ // 01 for generic commitments
 			"{da_layer_byte:[0-9a-fA-F]{2}}"+ // should always be 0x00 for eigenDA but we let others through to return a 404
-			"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
+			"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // Should be either 0x00 (v1), 0x01 (v2), 0x02 (v3) but we let others through to return a 404
 			"{"+routingVarNamePayloadHex+"}",
 		middleware.WithCertMiddlewares(
 			svr.handleGetOPGenericCommitment,
@@ -82,7 +82,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		"/"+
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
-			"{"+routingVarNameKeccakCommitmentHex+"}",
+			"{"+routingVarNameKeccakCommitmentHex+":[0-9a-fA-F]{64}}", // 32 byte hex string
 		middleware.WithCertMiddlewares(
 			svr.handlePostOPKeccakCommitment,
 			svr.log,
@@ -167,7 +167,6 @@ func parseReturnEncodedPayloadQueryParam(r *http.Request) bool {
 	if !exists || len(returnEncodedPayloadValues) == 0 {
 		return false
 	}
-	fmt.Println("returnEncodedPayloadValues:", returnEncodedPayloadValues)
 	returnEncodedPayload := strings.ToLower(returnEncodedPayloadValues[0])
 	if returnEncodedPayload == "" || returnEncodedPayload == "true" || returnEncodedPayload == "1" {
 		return true

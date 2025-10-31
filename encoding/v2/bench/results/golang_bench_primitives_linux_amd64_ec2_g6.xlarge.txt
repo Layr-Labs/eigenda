@@ -1,0 +1,21 @@
+2025/10/21 20:06:58 maxprocs: Leaving GOMAXPROCS=4: CPU quota undefined
+goos: linux
+goarch: amd64
+cpu: AMD EPYC 7R13 Processor
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^17_bytes-4         	     403	   2945464 ns/op	 1720471 B/op	      10 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^20_bytes-4         	      46	  24870250 ns/op	13648044 B/op	      12 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^21_bytes-4         	      22	  51735615 ns/op	27279533 B/op	      12 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^24_bytes-4         	       2	 607846598 ns/op	218120496 B/op	      15 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^17_bytes-4             	      13	  84504043 ns/op	  764413 B/op	     221 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^20_bytes-4             	       3	 377290551 ns/op	42896384 B/op	     289 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^21_bytes-4             	       2	 676357846 ns/op	82608152 B/op	     287 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^24_bytes-4             	       1	4694959590 ns/op	537946352 B/op	     251 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^17_bytes-4                   	      43	  24144254 ns/op	 5632104 B/op	   16431 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^20_bytes-4                   	       7	 150970427 ns/op	44682496 B/op	   16433 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^21_bytes-4                   	       3	 337415961 ns/op	95416157 B/op	   16433 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^24_bytes-4                   	       1	3349602742 ns/op	939881160 B/op	   16443 allocs/op
+BenchmarkMultiproofFrameGeneration/Multiproof_size_2^17_bytes-4          	       1	7960714613 ns/op	577189216 B/op	 3772629 allocs/op
+BenchmarkMultiproofFrameGeneration/Multiproof_size_2^20_bytes-4          	       1	11080152469 ns/op	746925312 B/op	 3772744 allocs/op
+BenchmarkMultiproofFrameGeneration/Multiproof_size_2^21_bytes-4          	       1	14227243431 ns/op	832124776 B/op	 3346914 allocs/op
+PASS
+ok  	command-line-arguments	433.726s

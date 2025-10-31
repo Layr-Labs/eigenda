@@ -26,8 +26,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node/ejection"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
@@ -208,8 +208,8 @@ func NewNode(
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
 
-	verifierV2Config := verifierv2.KzgConfigFromV1Config(&config.EncoderConfig)
-	verifierV2, err := verifierv2.NewVerifier(verifierV2Config, nil)
+	verifierV2Config := verifierv2.ConfigFromV1KzgConfig(&config.EncoderConfig)
+	verifierV2, err := verifierv2.NewVerifier(verifierV2Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create verifier: %w", err)
 	}
@@ -293,7 +293,7 @@ func NewNode(
 		client,
 		cst,
 		registryCoordinatorAddress,
-		config.operatorStateCacheSize)
+		config.OperatorStateCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create operator state cache: %w", err)
 	}
@@ -500,7 +500,12 @@ func (n *Node) startEjectionSentinel() error {
 		return fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
 	}
 
-	validatorAddress, err := eth.ValidatorIDToAddress(n.CTX, n.client, registryCoordinatorAddress, n.Config.ID)
+	validatorIdToAddress, err := eth.NewValidatorIDToAddressConverter(n.client, registryCoordinatorAddress)
+	if err != nil {
+		return fmt.Errorf("failed to create ValidatorIDToAddressConverter: %w", err)
+	}
+
+	validatorAddress, err := validatorIdToAddress.ValidatorIDToAddress(n.CTX, n.Config.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get validator address from ID: %w", err)
 	}

@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/urfave/cli"
 )
 
@@ -32,9 +32,9 @@ type Config struct {
 	MetricsConfig     disperser.MetricsConfig
 	RatelimiterConfig ratelimit.Config
 	RateConfig        apiserver.RateConfig
-	// ProverKzgConfig is only needed when DisperserVersion is V2.
+	// KzgCommitterConfig is only needed when DisperserVersion is V2.
 	// It's used by the grpc endpoint we expose to compute client commitments.
-	ProverKzgConfig               proverv2.KzgConfig
+	KzgCommitterConfig            committer.Config
 	EnableRatelimiter             bool
 	EnablePaymentMeterer          bool
 	ReservedOnly                  bool
@@ -79,19 +79,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 
-	proverKzgConfig := proverv2.ReadCLIConfig(ctx)
+	kzgCommitterConfig := committer.ReadCLIConfig(ctx)
 	if version == uint(V2) {
-		if proverKzgConfig.G1Path == "" {
-			return Config{}, fmt.Errorf("G1Path must be specified for disperser version 2")
-		}
-		if proverKzgConfig.G2Path == "" {
-			return Config{}, fmt.Errorf("G2Path must be specified for disperser version 2")
-		}
-		if proverKzgConfig.CacheDir == "" {
-			return Config{}, fmt.Errorf("CacheDir must be specified for disperser version 2")
-		}
-		if proverKzgConfig.SRSNumberToLoad <= 0 {
-			return Config{}, fmt.Errorf("SRSNumberToLoad must be specified for disperser version 2")
+		if err := kzgCommitterConfig.Verify(); err != nil {
+			return Config{}, fmt.Errorf("disperser version 2: kzg committer config verify: %w", err)
 		}
 	}
 
@@ -108,8 +99,12 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EnablePprof:           ctx.GlobalBool(flags.EnablePprof.Name),
 		},
 		BlobstoreConfig: blobstore.Config{
-			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
-			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			BucketName:       ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			TableName:        ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			Backend:          blobstore.ObjectStorageBackend(ctx.GlobalString(flags.ObjectStorageBackendFlag.Name)),
+			OCIRegion:        ctx.GlobalString(flags.OCIRegionFlag.Name),
+			OCICompartmentID: ctx.GlobalString(flags.OCICompartmentIDFlag.Name),
+			OCINamespace:     ctx.GlobalString(flags.OCINamespaceFlag.Name),
 		},
 		LoggerConfig: *loggerConfig,
 		MetricsConfig: disperser.MetricsConfig{
@@ -118,7 +113,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		RatelimiterConfig:             ratelimiterConfig,
 		RateConfig:                    rateConfig,
-		ProverKzgConfig:               proverKzgConfig,
+		KzgCommitterConfig:            kzgCommitterConfig,
 		EnableRatelimiter:             ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		EnablePaymentMeterer:          ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
 		ReservedOnly:                  ctx.GlobalBoolT(flags.ReservedOnly.Name),

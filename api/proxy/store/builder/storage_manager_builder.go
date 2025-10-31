@@ -31,6 +31,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -43,9 +44,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
-	kzgproverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	rsv2 "github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -105,16 +107,17 @@ func BuildManagers(
 
 	if v2Enabled {
 		log.Info("Building EigenDA v2 storage backend")
-		// kzgVerifier is only needed when validator retrieval is enabled
+		// kzgVerifier and encoder are only needed when validator retrieval is enabled
 		var kzgVerifier *kzgverifierv2.Verifier
 		if slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
-			kzgConfig := kzgverifierv2.KzgConfigFromV1Config(&config.KzgConfig)
-			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig, nil)
+			kzgConfig := kzgverifierv2.ConfigFromV1KzgConfig(&config.KzgConfig)
+			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig)
 			if err != nil {
 				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 			}
 		}
-		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier, registry)
+		eigenDAV2Store, err = buildEigenDAV2Backend(
+			ctx, log, config, secrets, rsv2.NewEncoder(log, nil), kzgVerifier, registry)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
 		}
@@ -122,7 +125,14 @@ func BuildManagers(
 
 	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store)
 	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store)
-	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks, config.StoreConfig.WriteOnCacheMiss)
+	secondary := secondary.NewSecondaryManager(
+		log,
+		metrics,
+		caches,
+		fallbacks,
+		config.StoreConfig.WriteOnCacheMiss,
+		config.StoreConfig.ErrorOnSecondaryInsertFailure,
+	)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
 		log.Info("Starting secondary write loop(s)", "count", config.StoreConfig.AsyncPutWorkers)
@@ -140,6 +150,7 @@ func BuildManagers(
 		"read_fallback", len(fallbacks) > 0,
 		"caching", len(caches) > 0,
 		"async_secondary_writes", (secondary.Enabled() && config.StoreConfig.AsyncPutWorkers > 0),
+		"error_on_secondary_insert_failure", config.StoreConfig.ErrorOnSecondaryInsertFailure,
 		"verify_v1_certs", config.VerifierConfigV1.VerifyCerts,
 	)
 
@@ -210,23 +221,22 @@ func buildEigenDAV2Backend(
 	log logging.Logger,
 	config Config,
 	secrets common.SecretConfigV2,
+	encoder *rsv2.Encoder,
 	kzgVerifier *kzgverifierv2.Verifier,
 	registry *prometheus.Registry,
 ) (common.EigenDAV2Store, error) {
-	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
-	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
-	// the underlying core library to be more flexible, but that is a larger change for another time. As a stopgap, we
-	// simply set this value to whatever it needs to be prior to using it.
-	kzgConfig := kzgproverv2.KzgConfigFromV1Config(&config.KzgConfig)
-	kzgConfig.LoadG2Points = true
-
-	kzgProver, err := kzgproverv2.NewProver(kzgConfig, nil)
+	kzgCommitter, err := committer.NewFromConfig(committer.Config{
+		G1SRSPath:         config.KzgConfig.G1Path,
+		G2SRSPath:         config.KzgConfig.G2Path,
+		G2TrailingSRSPath: config.KzgConfig.G2TrailingPath,
+		SRSNumberToLoad:   config.KzgConfig.SRSNumberToLoad,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("new KZG prover: %w", err)
+		return nil, fmt.Errorf("new kzg committer: %w", err)
 	}
 
 	if config.MemstoreEnabled {
-		return memstore_v2.New(ctx, log, config.MemstoreConfig, kzgProver.Srs.G1)
+		return memstore_v2.New(ctx, log, config.MemstoreConfig, kzgVerifier.G1SRS), nil
 	}
 
 	ethClient, err := buildEthClient(ctx, log, secrets, config.ClientConfigV2.EigenDANetwork)
@@ -335,7 +345,7 @@ func buildEigenDAV2Backend(
 				return nil, fmt.Errorf("get relay registry address: %w", err)
 			}
 			relayPayloadRetriever, err := buildRelayPayloadRetriever(
-				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, relayRegistryAddr, retrievalMetrics)
+				log, config.ClientConfigV2, ethClient, kzgVerifier.G1SRS, relayRegistryAddr, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
@@ -345,7 +355,7 @@ func buildEigenDAV2Backend(
 			validatorPayloadRetriever, err := buildValidatorPayloadRetriever(
 				log, config.ClientConfigV2, ethClient,
 				operatorStateRetrieverAddr, eigenDAServiceManagerAddr,
-				kzgVerifier, kzgProver.Srs.G1, retrievalMetrics)
+				encoder, kzgVerifier, kzgVerifier.G1SRS, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build validator payload retriever: %w", err)
 			}
@@ -360,30 +370,37 @@ func buildEigenDAV2Backend(
 		return nil, fmt.Errorf("no payload retrievers enabled, please enable at least one retriever type")
 	}
 
-	payloadDisperser, err := buildPayloadDisperser(
-		ctx,
-		log,
-		config.ClientConfigV2,
-		secrets,
-		ethClient,
-		kzgProver,
-		contractDirectory,
-		certVerifier,
-		operatorStateRetrieverAddr,
-		registryCoordinator,
-		registry,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("build payload disperser: %w", err)
+	var payloadDisperser *payloaddispersal.PayloadDisperser
+
+	if secrets.SignerPaymentKey == "" {
+		log.Warn("No SignerPaymentKey provided: EigenDA V2 backend configured in read-only mode")
+	} else {
+		log.Info("SignerPaymentKey available: EigenDA V2 backend configured with write support")
+		payloadDisperser, err = buildPayloadDisperser(
+			ctx,
+			log,
+			config.ClientConfigV2,
+			secrets,
+			ethClient,
+			kzgCommitter,
+			contractDirectory,
+			certVerifier,
+			operatorStateRetrieverAddr,
+			registryCoordinator,
+			registry,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("build payload disperser: %w", err)
+		}
 	}
 
 	eigenDAV2Store, err := eigenda_v2.NewStore(
 		log,
-		config.ClientConfigV2.PutTries,
-		config.ClientConfigV2.RBNRecencyWindowSize,
 		payloadDisperser,
-		retrievers,
+		config.ClientConfigV2.PutTries,
 		certVerifier,
+		config.ClientConfigV2.RBNRecencyWindowSize,
+		retrievers,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create v2 store: %w", err)
@@ -541,6 +558,7 @@ func buildValidatorPayloadRetriever(
 	ethClient common_eigenda.EthClient,
 	operatorStateRetrieverAddr geth_common.Address,
 	eigenDAServiceManagerAddr geth_common.Address,
+	encoder *rsv2.Encoder,
 	kzgVerifier *kzgverifierv2.Verifier,
 	g1Srs []bn254.G1Affine,
 	metrics metrics_v2.RetrievalMetricer,
@@ -560,6 +578,7 @@ func buildValidatorPayloadRetriever(
 		log,
 		ethReader,
 		chainState,
+		encoder,
 		kzgVerifier,
 		client_validator.DefaultClientConfig(),
 		nil,
@@ -586,7 +605,7 @@ func buildPayloadDisperser(
 	clientConfigV2 common.ClientConfigV2,
 	secrets common.SecretConfigV2,
 	ethClient common_eigenda.EthClient,
-	kzgProver *kzgproverv2.Prover,
+	kzgCommitter *committer.Committer,
 	contractDirectory *directory.ContractDirectory,
 	certVerifier *verification.CertVerifier,
 	operatorStateRetrieverAddr geth_common.Address,
@@ -624,7 +643,7 @@ func buildPayloadDisperser(
 		log,
 		&clientConfigV2.DisperserClientCfg,
 		signer,
-		kzgProver,
+		kzgCommitter,
 		accountant,
 		dispersalMetrics,
 	)
@@ -747,10 +766,11 @@ func buildReservationLedger(
 		// start full since reservation usage isn't persisted: assume the worst case (heavy usage before startup)
 		true,
 		// this is a parameter for flexibility, but there aren't plans to operate with anything other than this value
-		reservation.OverfillOncePermitted,
-		// TODO(litt3): is there a different place we should define this? hardcoding makes sense... it's just a
-		// question of *where*
-		time.Minute,
+		ratelimit.OverfillOncePermitted,
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		30*time.Second,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger config: %w", err)

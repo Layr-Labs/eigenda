@@ -1,0 +1,29 @@
+String: "this value came from config.yaml"
+Int: 200
+Int64: 201
+Int32: 203
+Int16: 204
+Int8: 105
+Uint: 206
+Uint64: 207
+Uint32: 208
+Uint16: 209
+Uint8: 210
+Float64: 211.11
+Float32: 212.12
+Duration: "33m"
+Bool: false
+
+Bar:
+  A: "yaml bar A"
+  B: 225
+  C: true
+  Baz:
+    X: "yaml barD baz X"
+    Y: 226
+    Z: false
+
+Baz:
+  X: "yaml baz X"
+  Y: 227
+  Z: true

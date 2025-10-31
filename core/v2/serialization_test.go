@@ -7,7 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,7 +35,7 @@ func TestPaymentHash(t *testing.T) {
 
 func TestBlobKeyFromHeader(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestBatchHeaderSerialization(t *testing.T) {
 
 func TestBlobCertHash(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestBlobCertHash(t *testing.T) {
 
 func TestBlobCertSerialization(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}

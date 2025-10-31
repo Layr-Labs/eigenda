@@ -26,11 +26,16 @@ import (
 type Store struct {
 	log logging.Logger
 
+	// Dispersal related fields. disperser is optional, and PUT routes will return 500s if not set.
+	disperser *payloaddispersal.PayloadDisperser
 	// Number of times to try blob dispersals:
 	// - If > 0: Try N times total
 	// - If < 0: Retry indefinitely until success
 	// - If = 0: Not permitted
 	putTries int
+
+	// Verification related fields.
+	certVerifier *verification.CertVerifier
 	// Allowed distance (in L1 blocks) between the eigenDA cert's reference block number (RBN)
 	// and the L1 block number at which the cert was included in the rollup's batch inbox.
 	// If cert.L1InclusionBlock > batch.RBN + rbnRecencyWindowSize, an
@@ -38,20 +43,19 @@ type Store struct {
 	// This check is optional and will be skipped when rbnRecencyWindowSize is set to 0.
 	rbnRecencyWindowSize uint64
 
-	disperser    *payloaddispersal.PayloadDisperser
-	retrievers   []clients.PayloadRetriever
-	certVerifier *verification.CertVerifier
+	// Retrieval related fields.
+	retrievers []clients.PayloadRetriever
 }
 
 var _ common.EigenDAV2Store = (*Store)(nil)
 
 func NewStore(
 	log logging.Logger,
-	putTries int,
-	rbnRecencyWindowSize uint64,
 	disperser *payloaddispersal.PayloadDisperser,
-	retrievers []clients.PayloadRetriever,
+	putTries int,
 	certVerifier *verification.CertVerifier,
+	rbnRecencyWindowSize uint64,
+	retrievers []clients.PayloadRetriever,
 ) (*Store, error) {
 	if putTries == 0 {
 		return nil, fmt.Errorf(
@@ -126,6 +130,9 @@ func (e Store) Get(ctx context.Context, versionedCert certs.VersionedCert, retur
 // Put disperses a blob for some pre-image and returns the associated RLP encoded certificate commit.
 // TODO: Client polling for different status codes, Mapping status codes to 503 failover
 func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
+	if e.disperser == nil {
+		return nil, fmt.Errorf("PUT routes are disabled, did you provide a signer private key?")
+	}
 	e.log.Debug("Dispersing payload to EigenDA V2 network")
 
 	// TODO: https://github.com/Layr-Labs/eigenda/issues/1271
@@ -227,7 +234,7 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert certs.VersionedCert
 		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACertV2)
 		if err != nil {
 			return coretypes.NewCertParsingFailedError(
-				hex.EncodeToString(versionedCert.SerializedCert), fmt.Sprintf("RLP decoding EigenDA v1 cert: %v", err))
+				hex.EncodeToString(versionedCert.SerializedCert), fmt.Sprintf("RLP decoding EigenDA v2 cert: %v", err))
 		}
 
 		referenceBlockNumber = eigenDACertV2.ReferenceBlockNumber()

@@ -1,29 +1,29 @@
 package integration_test
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"testing"
 
+	integration "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // Global infrastructure that is shared across all tests
-var globalInfra *InfrastructureHarness
+var globalInfra *integration.InfrastructureHarness
 
 // Configuration constants from command line flags
 var (
-	templateName      string
-	testName          string
-	inMemoryBlobStore bool
+	templateName string
+	testName     string
 )
 
 func init() {
 	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
-	flag.BoolVar(&inMemoryBlobStore, "inMemoryBlobStore", false, "whether to use in-memory blob store")
 }
 
 func TestMain(m *testing.M) {
@@ -58,14 +58,15 @@ func setupSuite(logger logging.Logger) error {
 	logger.Info("bootstrapping test environment")
 
 	// Setup the global infrastructure
-	config := &InfrastructureConfig{
-		TemplateName:      templateName,
-		TestName:          testName,
-		InMemoryBlobStore: inMemoryBlobStore,
-		Logger:            logger,
+	config := &integration.InfrastructureConfig{
+		TemplateName: templateName,
+		TestName:     testName,
+		Logger:       logger,
+		RelayCount:   4,
+		RootPath:     "../../",
 	}
 	var err error
-	globalInfra, err = SetupGlobalInfrastructure(config)
+	globalInfra, err = integration.SetupInfrastructure(context.Background(), config)
 	if err != nil {
 		return fmt.Errorf("failed to setup global infrastructure: %w", err)
 	}
@@ -78,7 +79,7 @@ func teardownSuite(logger logging.Logger) {
 
 	// Teardown the global infrastructure
 	if globalInfra != nil {
-		TeardownGlobalInfrastructure(globalInfra)
+		integration.TeardownInfrastructure(globalInfra)
 	}
 
 	logger.Info("Teardown completed")

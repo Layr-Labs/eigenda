@@ -117,7 +117,7 @@ litt-unit-tests:
 fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=1m ./common
 	go test --fuzz=FuzzBlobConversion -fuzztime=1m ./api/clients/v2/coretypes
-	go test --fuzz=FuzzOnlySystematic -fuzztime=1m ./encoding/kzg/prover/v2
+	go test --fuzz=FuzzOnlySystematic -fuzztime=1m ./encoding/v2/kzg/prover
 
 # Integration tests use mocks
 integration-tests:
@@ -144,3 +144,7 @@ semver:
 ##### Proxies to other local Makefiles #####
 mdbook-serve:
 	$(MAKE) -C docs/spec serve
+
+# Generates documentation for configuration files.
+document-config:
+	cd common/config/doc_generator && go run .

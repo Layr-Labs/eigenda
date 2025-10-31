@@ -715,13 +715,16 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 
 	d, err := controller.NewDispatcher(
 		&controller.DispatcherConfig{
-			PullInterval:            1 * time.Second,
-			FinalizationBlockDelay:  finalizationBlockDelay,
-			AttestationTimeout:      1 * time.Second,
-			BatchAttestationTimeout: 2 * time.Second,
-			SignatureTickInterval:   1 * time.Second,
-			NumRequestRetries:       3,
-			MaxBatchSize:            maxBatchSize,
+			PullInterval:              1 * time.Second,
+			FinalizationBlockDelay:    finalizationBlockDelay,
+			AttestationTimeout:        1 * time.Second,
+			BatchMetadataUpdatePeriod: 1 * time.Minute,
+			BatchAttestationTimeout:   2 * time.Second,
+			SignatureTickInterval:     1 * time.Second,
+			NumRequestRetries:         3,
+			MaxBatchSize:              maxBatchSize,
+			NumConcurrentRequests:     10,
+			NodeClientCacheSize:       10,
 		}, blobMetadataStore,
 		pool,
 		mockChainState,

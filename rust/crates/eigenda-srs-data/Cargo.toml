@@ -1,0 +1,12 @@
+[package]
+edition = "2024"
+name = "eigenda-srs-data"
+version = "0.1.0"
+
+[dependencies]
+ark-bn254 = { workspace = true, features = ["curve"] }
+rust-kzg-bn254-prover = { workspace = true }
+
+[build-dependencies]
+ark-bn254 = { workspace = true }
+rust-kzg-bn254-prover = { workspace = true }

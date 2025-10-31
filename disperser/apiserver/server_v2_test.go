@@ -25,7 +25,7 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -54,7 +54,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	commitments, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	require.NoError(t, err)
@@ -121,7 +121,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	data2 = codec.ConvertByPaddingEmptyByte(data2)
-	commitments, err = prover.GetCommitmentsForPaddedLength(data2)
+	commitments, err = committer.GetCommitmentsForPaddedLength(data2)
 	require.NoError(t, err)
 	commitmentProto, err = commitments.ToProtobuf()
 	require.NoError(t, err)
@@ -182,7 +182,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	require.NoError(t, err)
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	commitments, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	require.NoError(t, err)
@@ -328,7 +328,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	_, err = rand.Read(data)
 	require.NoError(t, err)
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err = prover.GetCommitmentsForPaddedLength(data)
+	commitments, err = committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	commitmentProto, err = commitments.ToProtobuf()
 	require.NoError(t, err)
@@ -472,7 +472,7 @@ func TestV2GetBlobCommitment(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commit, err := prover.GetCommitmentsForPaddedLength(data)
+	commit, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	reply, err := c.DispersalServerV2.GetBlobCommitment(ctx, &pbv2.BlobCommitmentRequest{
 		Blob: data,
@@ -579,7 +579,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		chainReader,
 		meterer,
 		auth.NewBlobRequestAuthenticator(),
-		prover,
+		committer,
 		10,
 		time.Hour,
 		logger,
@@ -624,7 +624,7 @@ func TestInvalidLength(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	commitments, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 
 	// Length we are commiting to should be a power of 2.
@@ -675,7 +675,7 @@ func TestTooShortCommitment(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	commitments, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 
 	// Length we are commiting to should be a power of 2.

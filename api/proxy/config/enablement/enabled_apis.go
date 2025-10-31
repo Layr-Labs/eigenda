@@ -80,8 +80,8 @@ type API string
 
 const (
 	Admin               API = "admin"
-	OpKeccakCommitment  API = "op-generic"
-	OpGenericCommitment API = "op-keccak"
+	OpKeccakCommitment  API = "op-keccak"
+	OpGenericCommitment API = "op-generic"
 	StandardCommitment  API = "standard"
 	ArbCustomDAServer   API = "arb"
 	MetricsServer       API = "metrics"

@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -171,16 +173,18 @@ func (r *TestRandom) IOReader() io.Reader {
 	return &randIOReader{r}
 }
 
-// ECDSA generates a random ECDSA key. Note that the returned keys are not deterministic due to limitations
-// **intentionally** imposed by the Go standard libraries. (╯°□°)╯︵ ┻━┻
+// Generates and returns a random Ethereum address with corresponding private key.
+// Note that the returned keys are not deterministic due to limitations **intentionally** imposed by the
+// Go standard libraries. (╯°□°)╯︵ ┻━┻
 //
 // NOT CRYPTOGRAPHICALLY SECURE!!! FOR TESTING PURPOSES ONLY. DO NOT USE THESE KEYS FOR SECURITY PURPOSES.
-func (r *TestRandom) ECDSA() (*ecdsa.PublicKey, *ecdsa.PrivateKey, error) {
+func (r *TestRandom) EthAccount() (gethcommon.Address, *ecdsa.PrivateKey, error) {
 	key, err := ecdsa.GenerateKey(crypto.S256(), crand.Reader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate key: %w", err)
+		return gethcommon.Address{}, nil, fmt.Errorf("failed to generate key: %w", err)
 	}
-	return &key.PublicKey, key, nil
+	address := crypto.PubkeyToAddress(key.PublicKey)
+	return address, key, nil
 }
 
 // BLS generates a random BLS key pair.
@@ -249,4 +253,46 @@ func (r *TestRandom) Float64Range(min, max float64) float64 {
 // DurationRange generates a random time.Duration between min (inclusive) and max (exclusive).
 func (r *TestRandom) DurationRange(min time.Duration, max time.Duration) time.Duration {
 	return time.Duration(r.Int63n(int64(max-min))) + min
+}
+
+// Address generates a random Ethereum address.
+func (r *TestRandom) Address() gethcommon.Address {
+	return gethcommon.BytesToAddress(r.Bytes(20))
+}
+
+// FrElements generates a slice of num random field elements.
+// FrElements will panic if some error happens with the random source.
+// TODO: this doesnt use TestRandom's source of randomness, fix that.
+func (r *TestRandom) FrElements(num uint64) []fr.Element {
+	elements := make([]fr.Element, num)
+	for i := range num {
+		elements[i].MustSetRandom()
+	}
+	return elements
+}
+
+// G1Points generates a slice of num random G1 points.
+func (r *TestRandom) G1Points(num uint64) ([]bn254.G1Affine, error) {
+	points := make([]bn254.G1Affine, num)
+	var err error
+	for i := range num {
+		points[i], err = bn254.EncodeToG1(r.Bytes(fr.Bytes), []byte("random on g1"))
+		if err != nil {
+			return nil, fmt.Errorf("encode to g1: %w", err)
+		}
+	}
+	return points, nil
+}
+
+// G2Points generates a slice of num random G2 points.
+func (r *TestRandom) G2Points(num uint64) ([]bn254.G2Affine, error) {
+	points := make([]bn254.G2Affine, num)
+	var err error
+	for i := range num {
+		points[i], err = bn254.EncodeToG2(r.Bytes(fr.Bytes), []byte("random on g2"))
+		if err != nil {
+			return nil, fmt.Errorf("encode to g2: %w", err)
+		}
+	}
+	return points, nil
 }

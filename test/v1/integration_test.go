@@ -34,10 +34,10 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/Layr-Labs/eigenda/retriever"
@@ -148,8 +148,13 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	store := inmem.NewBlobStore()
 	dis := mustMakeDisperser(t, cst, store)
+
+	// Create listener for encoder server
+	encoderListener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", encoderPort))
+	require.NoError(t, err)
+
 	go func() {
-		_ = dis.encoderServer.Start()
+		_ = dis.encoderServer.StartWithListener(encoderListener)
 	}()
 	t.Cleanup(func() {
 		dis.encoderServer.Close()
@@ -345,7 +350,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	encodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+	encodingParams := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
 	require.NoError(t, err)
 	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_SYMBOL)
 	require.NoError(t, err)
@@ -436,7 +441,6 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 
 	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
 	grpcEncoder := encoder.NewEncoderServer(encoder.ServerConfig{
-		GrpcPort:              encoderPort,
 		MaxConcurrentRequests: 16,
 		RequestPoolSize:       32,
 	}, logger, p0, metrics, grpcprom.NewServerMetrics())
@@ -646,7 +650,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.Opera
 				return w.Result(), nil
 			}), "custom", "")
 
-		n := &node.Node{
+		node := &node.Node{
 			Config:                  config,
 			Logger:                  logger,
 			KeyPair:                 op.KeyPair,
@@ -669,20 +673,40 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.Opera
 		reader := &coremock.MockWriter{}
 		reader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
-		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter, version.DefaultVersion())
+		// Create listeners with OS-allocated ports for testing
+		v1DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+		v1RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+		v2DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+		v2RetrievalListener, err := net.Listen("tcp", "0.0.0.0:0")
+		require.NoError(t, err)
+
+		serverV1 := nodegrpc.NewServer(
+			config,
+			node,
+			logger,
+			rateLimiter,
+			version.DefaultVersion(),
+			v1DispersalListener,
+			v1RetrievalListener,
+		)
 		serverV2, err := nodegrpc.NewServerV2(
 			ctx,
 			config,
-			n,
+			node,
 			logger,
 			rateLimiter,
 			prometheus.NewRegistry(),
 			reader,
-			version.DefaultVersion())
+			version.DefaultVersion(),
+			v2DispersalListener,
+			v2RetrievalListener)
 		require.NoError(t, err)
 
 		ops[id] = TestOperator{
-			Node:     n,
+			Node:     node,
 			ServerV1: serverV1,
 			ServerV2: serverV2,
 		}

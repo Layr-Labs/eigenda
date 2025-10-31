@@ -22,9 +22,9 @@ import (
 	contractIEigenDACertTypeBindings "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/test"
 	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -111,20 +111,17 @@ func buildCertFromBlobBytes(
 	relayKeys []core.RelayKey,
 ) (core.BlobKey, *coretypes.EigenDACertV3) {
 
-	kzgConfig := &proverv2.KzgConfig{
-		G1Path:          "../../../../resources/srs/g1.point",
-		G2Path:          "../../../../resources/srs/g2.point",
-		G2TrailingPath:  "../../../../resources/srs/g2.trailing.point",
-		CacheDir:        "../../../../resources/srs/SRSTables",
-		SRSNumberToLoad: 3000,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
+	committerConfig := committer.Config{
+		G1SRSPath:         "../../../../resources/srs/g1.point",
+		G2SRSPath:         "../../../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../../../resources/srs/g2.trailing.point",
+		SRSNumberToLoad:   4096,
 	}
 
-	prover, err := proverv2.NewProver(kzgConfig, nil)
+	committer, err := committer.NewFromConfig(committerConfig)
 	require.NoError(t, err)
 
-	commitments, err := prover.GetCommitmentsForPaddedLength(blobBytes)
+	commitments, err := committer.GetCommitmentsForPaddedLength(blobBytes)
 	require.NoError(t, err)
 
 	commitmentsProto, err := commitments.ToProtobuf()

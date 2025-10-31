@@ -167,69 +167,71 @@ func deploySubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, pa
 	config.Logger.Info("Deploying Subgraph", "path", path, "startBlock", startBlock)
 
 	subgraphPath := filepath.Join(config.RootPath, "subgraphs", path)
-	if err := os.Chdir(subgraphPath); err != nil {
-		return fmt.Errorf("error changing directories: %w", err)
-	}
+	subgraphsRootPath := filepath.Join(config.RootPath, "subgraphs")
 
-	// Log the current working directory (absolute path)
-	if cwd, err := os.Getwd(); err == nil && config.Logger != nil {
-		config.Logger.Info("Successfully changed to absolute path", "path", cwd)
+	// Install dependencies in the parent subgraphs directory first
+	config.Logger.Debug("Installing parent subgraphs dependencies")
+	if err := execYarnCmd("install", subgraphsRootPath, config.Logger); err != nil {
+		return fmt.Errorf("failed to install parent subgraphs dependencies: %w", err)
 	}
 
 	config.Logger.Debug("Executing bash command", "command", `cp "./templates/subgraph.yaml" "./"`)
-	if err := execBashCmd(`cp "./templates/subgraph.yaml" "./"`); err != nil {
+	if err := execBashCmd(`cp "./templates/subgraph.yaml" "./"`, subgraphPath, config.Logger); err != nil {
 		return fmt.Errorf("failed to copy subgraph.yaml: %w", err)
 	}
 
 	config.Logger.Debug("Executing bash command", "command", `cp "./templates/networks.json" "./"`)
-	if err := execBashCmd(`cp "./templates/networks.json" "./"`); err != nil {
+	if err := execBashCmd(`cp "./templates/networks.json" "./"`, subgraphPath, config.Logger); err != nil {
 		return fmt.Errorf("failed to copy networks.json: %w", err)
 	}
 
-	if err := updateSubgraph(config, updater, startBlock); err != nil {
+	if err := updateSubgraph(config, updater, startBlock, subgraphPath); err != nil {
 		return fmt.Errorf("failed to update subgraph: %w", err)
 	}
 
 	config.Logger.Debug("Executing yarn install")
-	if err := execYarnCmd("install"); err != nil {
+	if err := execYarnCmd("install", subgraphPath, config.Logger); err != nil {
 		return fmt.Errorf("failed to execute yarn install: %w", err)
 	}
 
 	config.Logger.Debug("Executing yarn codegen")
-	if err := execYarnCmd("codegen"); err != nil {
+	if err := execYarnCmd("codegen", subgraphPath, config.Logger); err != nil {
 		return fmt.Errorf("failed to execute yarn codegen: %w", err)
 	}
 
 	config.Logger.Debug("Executing yarn remove-local")
-	if err := execYarnCmd("remove-local"); err != nil {
+	if err := execYarnCmd("remove-local", subgraphPath, config.Logger); err != nil {
 		return fmt.Errorf("failed to execute yarn remove-local: %w", err)
 	}
 
 	config.Logger.Debug("Executing yarn create-local")
-	if err := execYarnCmd("create-local"); err != nil {
+	if err := execYarnCmd("create-local", subgraphPath, config.Logger); err != nil {
 		return fmt.Errorf("failed to execute yarn create-local: %w", err)
 	}
 
 	config.Logger.Debug("Executing yarn deploy-local")
-	if err := execYarnCmd("deploy-local", "--version-label", "v0.0.1"); err != nil {
+	if err := execYarnCmd("deploy-local", subgraphPath, config.Logger, "--version-label", "v0.0.1"); err != nil {
 		return fmt.Errorf("failed to execute yarn deploy-local: %w", err)
 	}
 
 	return nil
 }
 
-func updateSubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, startBlock int) error {
+func updateSubgraph(
+	config SubgraphDeploymentConfig,
+	updater SubgraphUpdater,
+	startBlock int,
+	subgraphPath string,
+) error {
 	const (
 		networkFile  = "networks.json"
 		subgraphFile = "subgraph.yaml"
 	)
 
-	// Log the current working directory (absolute path)
-	if cwd, err := os.Getwd(); err == nil && config.Logger != nil {
-		config.Logger.Info("Current working directory", "path", cwd)
-	}
+	networkFilePath := filepath.Join(subgraphPath, networkFile)
+	subgraphFilePath := filepath.Join(subgraphPath, subgraphFile)
 
-	networkData, err := os.ReadFile(networkFile)
+	networkData, err := os.ReadFile(networkFilePath)
 	if err != nil {
 		return fmt.Errorf("error reading networks.json: %w", err)
 	}
@@ -244,14 +246,14 @@ func updateSubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, st
 		return fmt.Errorf("error marshaling networks.json: %w", err)
 	}
 
-	if err := os.WriteFile(networkFile, networkJson, 0644); err != nil {
+	if err := os.WriteFile(networkFilePath, networkJson, 0644); err != nil {
 		return fmt.Errorf("error writing networks.json: %w", err)
 	}
 	if config.Logger != nil {
 		config.Logger.Info("networks.json written")
 	}
 
-	subgraphTemplateData, err := os.ReadFile(subgraphFile)
+	subgraphTemplateData, err := os.ReadFile(subgraphFilePath)
 	if err != nil {
 		return fmt.Errorf("error reading subgraph.yaml: %w", err)
 	}
@@ -265,7 +267,7 @@ func updateSubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, st
 	if err != nil {
 		return fmt.Errorf("error marshaling subgraph: %w", err)
 	}
-	if err := os.WriteFile(subgraphFile, subgraphYaml, 0644); err != nil {
+	if err := os.WriteFile(subgraphFilePath, subgraphYaml, 0644); err != nil {
 		return fmt.Errorf("error writing subgraph.yaml: %w", err)
 	}
 
@@ -275,11 +277,12 @@ func updateSubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, st
 
 // Helper functions for executing commands
 
-func execYarnCmd(command string, args ...string) error {
-	args = append([]string{command}, args...)
-	cmd := exec.Command("yarn", args...)
+func execYarnCmd(command string, workingDir string, logger logging.Logger, args ...string) error {
+	cmdArgs := append([]string{command}, args...)
+	cmd := exec.Command("yarn", cmdArgs...)
+	cmd.Dir = workingDir
 
-	fmt.Println("Executing command:", cmd.String())
+	logger.Debug("Executing yarn command", "command", cmd.String(), "workingDir", workingDir)
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -288,14 +291,18 @@ func execYarnCmd(command string, args ...string) error {
 
 	err := cmd.Run()
 	if err != nil {
+		logger.Error("Yarn command failed", "stdout", out.String(), "stderr", stderr.String())
 		return fmt.Errorf("failed to execute yarn command: %w", err)
 	}
 
 	return nil
 }
 
-func execBashCmd(command string) error {
+func execBashCmd(command string, workingDir string, logger logging.Logger) error {
 	cmd := exec.Command("bash", "-c", command)
+	cmd.Dir = workingDir
+
+	logger.Debug("Executing bash command", "command", command, "workingDir", workingDir)
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -304,6 +311,7 @@ func execBashCmd(command string) error {
 
 	err := cmd.Run()
 	if err != nil {
+		logger.Error("Bash command failed", "stdout", out.String(), "stderr", stderr.String())
 		return fmt.Errorf("failed to execute bash command: %w", err)
 	}
 
