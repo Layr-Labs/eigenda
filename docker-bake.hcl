@@ -268,6 +268,11 @@ target "blobapi" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "blobapi"
+  args       = {
+    SEMVER    = "${SEMVER}"
+    GITCOMMIT = "${GIT_SHORT_SHA}"
+    GITDATE   = "${GITDATE}"
+  }
   tags       = ["${REGISTRY}/${REPO}/blobapi:${BUILD_TAG}"]
 }
 

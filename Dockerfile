@@ -105,12 +105,15 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # BlobAPI (Combined API Server and Relay) build stage
 FROM common-builder AS blobapi-builder
+ARG SEMVER
+ARG GITCOMMIT
+ARG GITDATE
 WORKDIR /app/disperser
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go build -ldflags="-X main.version=${SEMVER} \
-                       -X main.gitCommit=${GITCOMMIT} \
-                       -X main.gitDate=${GITDATE}" \
+    go build -ldflags="-X 'main.version=${SEMVER}' \
+                       -X 'main.gitCommit=${GITCOMMIT}' \
+                       -X 'main.gitDate=${GITDATE}'" \
         -o ./bin/blobapi ./cmd/blobapi
 
 # Proxy build stage
