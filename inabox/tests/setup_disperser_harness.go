@@ -433,6 +433,11 @@ func startRelayWithListener(
 	if err != nil {
 		return nil, fmt.Errorf("failed to open relay log file: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			_ = logFile.Close()
+		}
+	}()
 
 	// Create relay logger config for file output
 	loggerConfig := common.LoggerConfig{
@@ -451,21 +456,18 @@ func startRelayWithListener(
 	// Create logger
 	logger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Create DynamoDB client
 	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
 	// Create S3 client
 	s3Client, err := s3.NewClient(ctx, awsConfig, logger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
@@ -491,7 +493,6 @@ func startRelayWithListener(
 		config.TestConfig.EigenDA.OperatorStateRetriever,
 		config.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create eth writer: %w", err)
 	}
 
@@ -516,7 +517,6 @@ func startRelayWithListener(
 		listener,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create relay server: %w", err)
 	}
 
@@ -568,6 +568,11 @@ func startEncoder(
 	if err != nil {
 		return nil, fmt.Errorf("failed to open encoder log file: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			_ = logFile.Close()
+		}
+	}()
 
 	// Create encoder logger config for file output
 	loggerConfig := common.LoggerConfig{
@@ -583,7 +588,6 @@ func startEncoder(
 	// Create logger
 	encoderLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
@@ -593,7 +597,6 @@ func startEncoder(
 	// Create S3 client
 	s3Client, err := s3.NewClient(ctx, awsConfig, encoderLogger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
@@ -611,7 +614,6 @@ func startEncoder(
 	// Get SRS paths using the utility function
 	g1Path, _, _, err := getSRSPaths()
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}
 
@@ -635,7 +637,6 @@ func startEncoder(
 
 	prover, err := prover.NewProver(encoderLogger, &kzgConfig, encodingConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create prover: %w", err)
 	}
 
@@ -669,7 +670,6 @@ func startEncoder(
 	// Pre-create listener with port 0 (OS assigns random port)
 	listener, err := net.Listen("tcp", "0.0.0.0:0")
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create listener for encoder: %w", err)
 	}
 
@@ -720,6 +720,11 @@ func startController(
 	if err != nil {
 		return nil, fmt.Errorf("failed to open controller log file: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			_ = logFile.Close()
+		}
+	}()
 
 	// Create controller logger config for file output
 	loggerConfig := common.LoggerConfig{
@@ -735,7 +740,6 @@ func startController(
 	// Create logger
 	controllerLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
@@ -745,7 +749,6 @@ func startController(
 	// Create DynamoDB client
 	dynamoClient, err := dynamodb.NewClient(awsConfig, controllerLogger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
@@ -766,7 +769,6 @@ func startController(
 			KeyID:    config.TestConfig.DisperserKMSKeyID,
 		})
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dispersal request signer: %w", err)
 	}
 
@@ -803,7 +805,6 @@ func startController(
 		config.TestConfig.EigenDA.OperatorStateRetriever,
 		config.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
@@ -813,7 +814,6 @@ func startController(
 	// Create encoder client
 	encoderClient, err := encoder.NewEncoderClientV2(encodingManagerConfig.EncoderAddress)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create encoder client: %w", err)
 	}
 
@@ -832,14 +832,12 @@ func startController(
 		controllerLivenessChan,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create encoding manager: %w", err)
 	}
 
 	// Create signature aggregator
 	sigAgg, err := core.NewStdSignatureAggregator(controllerLogger, chainReader)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create signature aggregator: %w", err)
 	}
 
@@ -857,7 +855,6 @@ func startController(
 		controllerLogger,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create node client manager: %w", err)
 	}
 
@@ -872,7 +869,6 @@ func startController(
 		dispatcherConfig.FinalizationBlockDelay,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
@@ -899,25 +895,21 @@ func startController(
 		controllerLivenessChan,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dispatcher: %w", err)
 	}
 
 	// Recover state before starting
 	if err := controller.RecoverState(ctx, metadataStore, controllerLogger); err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to recover state: %w", err)
 	}
 
 	// Start encoding manager
 	if err := encodingManager.Start(ctx); err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to start encoding manager: %w", err)
 	}
 
 	// Start dispatcher
 	if err := dispatcher.Start(ctx); err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to start dispatcher: %w", err)
 	}
 
@@ -936,7 +928,6 @@ func startController(
 			gethcommon.HexToAddress(config.TestConfig.EigenDA.EigenDADirectory),
 		)
 		if err != nil {
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create contract directory: %w", err)
 		}
 
@@ -956,16 +947,19 @@ func startController(
 			metricsRegistry,
 		)
 		if err != nil {
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)
 		}
 
 		// Pre-create listener with port 0 (OS assigns random port)
 		listener, err := net.Listen("tcp", "0.0.0.0:0")
 		if err != nil {
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create listener for controller: %w", err)
 		}
+		defer func() {
+			if err != nil {
+				_ = listener.Close()
+			}
+		}()
 
 		// Extract the port assigned by the OS
 		assignedPort := listener.Addr().(*net.TCPAddr).Port
@@ -981,8 +975,6 @@ func startController(
 			3*time.Minute,
 		)
 		if err != nil {
-			_ = listener.Close()
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create gRPC server config: %w", err)
 		}
 
@@ -991,8 +983,6 @@ func startController(
 			true, // EnablePaymentAuthentication
 		)
 		if err != nil {
-			_ = listener.Close()
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create server config: %w", err)
 		}
 
@@ -1006,8 +996,6 @@ func startController(
 			listener,
 		)
 		if err != nil {
-			_ = listener.Close()
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create gRPC server: %w", err)
 		}
 
@@ -1061,6 +1049,11 @@ func startAPIServer(
 	if err != nil {
 		return nil, fmt.Errorf("failed to open API server log file: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			_ = logFile.Close()
+		}
+	}()
 
 	// Create API server logger config for file output
 	loggerConfig := common.LoggerConfig{
@@ -1076,7 +1069,6 @@ func startAPIServer(
 	// Create logger
 	apiServerLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
@@ -1086,14 +1078,12 @@ func startAPIServer(
 	// Create DynamoDB client
 	dynamoClient, err := dynamodb.NewClient(awsConfig, apiServerLogger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
 	// Create S3 client
 	s3Client, err := s3.NewClient(ctx, awsConfig, apiServerLogger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
@@ -1114,7 +1104,6 @@ func startAPIServer(
 	// Create committer
 	g1Path, g2Path, g2TrailingPath, err := getSRSPaths()
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}
 
@@ -1127,7 +1116,6 @@ func startAPIServer(
 
 	kzgCommitter, err := committer.NewFromConfig(committerConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create committer: %w", err)
 	}
 
@@ -1138,7 +1126,6 @@ func startAPIServer(
 		config.TestConfig.EigenDA.OperatorStateRetriever,
 		config.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
@@ -1162,11 +1149,9 @@ func startAPIServer(
 
 	paymentChainState, err := meterer.NewOnchainPaymentState(ctx, chainReader, apiServerLogger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create onchain payment state: %w", err)
 	}
 	if err := paymentChainState.RefreshOnchainPaymentState(ctx); err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 	}
 
@@ -1180,7 +1165,6 @@ func startAPIServer(
 		apiServerLogger,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create offchain store: %w", err)
 	}
 
@@ -1195,9 +1179,13 @@ func startAPIServer(
 	// Pre-create listener with port 0 (OS assigns random port)
 	listener, err := net.Listen("tcp", "0.0.0.0:0")
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create listener for API server: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			_ = listener.Close()
+		}
+	}()
 
 	// Extract the port assigned by the OS
 	assignedPort := listener.Addr().(*net.TCPAddr).Port
@@ -1244,8 +1232,6 @@ func startAPIServer(
 		listener,
 	)
 	if err != nil {
-		_ = listener.Close()
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create API server: %w", err)
 	}
 
