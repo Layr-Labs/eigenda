@@ -40,12 +40,18 @@ func NewServer(
 	logger logging.Logger,
 	metricsRegistry *prometheus.Registry,
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler,
+	listener net.Listener,
 ) (*Server, error) {
+	if listener == nil {
+		return nil, fmt.Errorf("listener is required")
+	}
+
 	replayGuardian := replay.NewReplayGuardian(time.Now, config.RequestMaxPastAge, config.RequestMaxFutureAge)
 
 	return &Server{
 		config:                      config,
 		logger:                      logger,
+		listener:                    listener,
 		metrics:                     metrics.NewServerMetrics(metricsRegistry, logger),
 		paymentAuthorizationHandler: paymentAuthorizationHandler,
 		replayGuardian:              replayGuardian,
@@ -57,13 +63,6 @@ func (s *Server) Start() error {
 	if !s.config.EnableServer {
 		return fmt.Errorf("controller gRPC server is disabled")
 	}
-
-	addr := fmt.Sprintf("0.0.0.0:%d", s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("start tcp listener: %w", err)
-	}
-	s.listener = listener
 
 	var opts []grpc.ServerOption
 	opts = append(opts, s.metrics.GetGRPCServerOption())
@@ -83,9 +82,9 @@ func (s *Server) Start() error {
 	controller.RegisterControllerServiceServer(s.server, s)
 	healthcheck.RegisterHealthServer(controller.ControllerService_ServiceDesc.ServiceName, s.server)
 
-	s.logger.Infof("gRPC server listening at %v", listener.Addr().String())
+	s.logger.Infof("gRPC server listening at %v", s.listener.Addr().String())
 
-	err = s.server.Serve(listener)
+	err := s.server.Serve(s.listener)
 	if err != nil {
 		return fmt.Errorf("serve: %w", err)
 	}

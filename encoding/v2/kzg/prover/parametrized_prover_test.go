@@ -7,7 +7,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +24,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 
 	commitments, err := c.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
 	require.Nil(t, err)
-	frames, err := group.GetFrames(harness.paddedGettysburgAddressBytes, params)
+	frames, _, err := group.GetFrames(t.Context(), harness.paddedGettysburgAddressFrs, params)
 	require.Nil(t, err)
 
 	verifier, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
@@ -46,17 +45,15 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
-
-	p, err := group.GetKzgProver(params)
+	blobLength := uint64(encoding.GetBlobLengthPowerOf2(uint32(len(harness.paddedGettysburgAddressBytes))))
+	provingParams, err := prover.BuildProvingParamsFromEncodingParams(params, blobLength)
+	require.Nil(t, err)
+	p, err := group.GetKzgProver(params, provingParams)
 
 	require.Nil(t, err)
 	require.NotNil(t, p)
 
-	// Convert to inputFr
-	inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
-	require.Nil(t, err)
-
-	frames, _, err := p.GetFrames(inputFr)
+	frames, _, err := group.GetFrames(t.Context(), harness.paddedGettysburgAddressFrs, params)
 	require.Nil(t, err)
 	require.NotNil(t, frames, err)
 
@@ -68,5 +65,5 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, frame)
 
-	assert.Equal(t, *frame, frames[0])
+	assert.Equal(t, *frame, *frames[0])
 }

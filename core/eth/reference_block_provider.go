@@ -1,8 +1,10 @@
-package metadata
+package eth
 
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -12,7 +14,7 @@ import (
 // block number never goes backwards, regardless of whatever the chain is doing. (Note that this invariant is not
 // guaranteed after the software is restarted.)
 //
-// This utility is not thread safe.
+// This utility is thread safe.
 type ReferenceBlockProvider interface {
 	// GetReferenceBlockNumber returns a reference block number, based on the current chain height and the
 	// configured offset. Value returned will only go forwards, never backwards.
@@ -34,6 +36,9 @@ type referenceBlockProvider struct {
 
 	// Used to prevent the reference block number from going backwards.
 	previousReferenceBlockNumber uint64
+
+	// Used to make the provider thread safe.
+	lock sync.Mutex
 }
 
 // NewReferenceBlockProvider creates a new ReferenceBlockProvider instance.
@@ -51,6 +56,9 @@ func NewReferenceBlockProvider(
 }
 
 func (r *referenceBlockProvider) GetReferenceBlockNumber(ctx context.Context) (uint64, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	latestHeader, err := r.contractBackend.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get latest block header: %w", err)
@@ -76,4 +84,60 @@ func (r *referenceBlockProvider) GetReferenceBlockNumber(ctx context.Context) (u
 
 	r.previousReferenceBlockNumber = newReferenceBlockNumber
 	return newReferenceBlockNumber, nil
+}
+
+var _ ReferenceBlockProvider = (*periodicReferenceBlockProvider)(nil)
+
+// A ReferenceBlockProvider implementation that periodically updates the reference block number once in a while,
+// but otherwise just returns the last value it saw.
+//
+// This utility is thread safe.
+type periodicReferenceBlockProvider struct {
+	base ReferenceBlockProvider
+
+	// The most recently fetched reference block number.
+	currentReferenceBlockNumber uint64
+
+	// The time between updates to the reference block number.
+	updatePeriod time.Duration
+
+	// The last time we updated the reference block number.
+	lastUpdate time.Time
+
+	// Used to make the provider thread safe.
+	lock sync.Mutex
+}
+
+// NewPeriodicReferenceBlockProvider creates a new ReferenceBlockProvider that wraps the given base
+// ReferenceBlockProvider. The returned implementation will only call the base provider once every updatePeriod, and
+// will return the last value it saw in between updates.
+func NewPeriodicReferenceBlockProvider(
+	base ReferenceBlockProvider,
+	updatePeriod time.Duration,
+) (ReferenceBlockProvider, error) {
+
+	if updatePeriod < 0 {
+		return nil, fmt.Errorf("updatePeriod must be positive")
+	}
+
+	return &periodicReferenceBlockProvider{
+		base:         base,
+		updatePeriod: updatePeriod,
+		lastUpdate:   time.Time{},
+	}, nil
+}
+
+func (p *periodicReferenceBlockProvider) GetReferenceBlockNumber(ctx context.Context) (uint64, error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if time.Since(p.lastUpdate) >= p.updatePeriod {
+		rbn, err := p.base.GetReferenceBlockNumber(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get reference block number: %w", err)
+		}
+		p.currentReferenceBlockNumber = rbn
+		p.lastUpdate = time.Now()
+	}
+	return p.currentReferenceBlockNumber, nil
 }

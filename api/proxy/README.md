@@ -384,6 +384,8 @@ A normal (non-archival) Ethereum node is sufficient for running the proxy with c
 1. immutable (eg: [securityThresholds](https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L30)), or
 2. are upgradeable but have all the historical versions available in contract storage (eg: [versioninedBlobParams](https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L27))
 
+The proxy interacts with a single RPC endpoint. Load-balancing and/or failover behavior should be handled by an external proxy, e.g: [erpc](https://github.com/erpc/erpc)
+
 #### SRS Points
 
 In order to compute (and in our current implementation also verify) KZG commitments, G1 SRS points of size equivalent to the blob size are needed. The points must be loaded into the binary by using the [--eigenda.g1-path](https://github.com/Layr-Labs/eigenda/blob/86e27fa0342f4638a356ba9738cf998374889ee3/api/proxy/store/generated_key/eigenda/verify/cli.go#L67) flag. A 32MiB G1 SRS file is available under [./resources/g1.point](./resources/g1.point). This file is also copied inside our distributed [docker images](https://github.com/Layr-Labs/eigenda-proxy/pkgs/container/eigenda-proxy), at [\<WORKDIR\>/resources/g1.point](https://github.com/Layr-Labs/eigenda/blob/86e27fa0342f4638a356ba9738cf998374889ee3/Dockerfile#L184). The `--eigenda.g1-path` flag's default value is the relative path `resources/g1.point`, which will work when running the binary from the repo's root directory, as well as inside the container.

@@ -271,6 +271,12 @@ function start_detached_for_tests {
     done
 
     for FILE in $(ls $testpath/envs/enc*.env); do
+        # Skip enc1 - it runs as a goroutine in tests (encoder v2)
+        if [[ "$FILE" == *"enc1.env" ]]; then
+            echo "Skipping enc1 (encoder v2 running as goroutine in tests)"
+            continue
+        fi
+
         set -a
         source $FILE
         set +a
@@ -305,15 +311,8 @@ function start_detached_for_tests {
         pids="$pids $pid"
     done
 
-    for FILE in $(ls $testpath/envs/controller*.env); do
-        set -a
-        source $FILE
-        set +a
-        ../disperser/bin/controller > $testpath/logs/controller.log 2>&1 &
-
-        pid="$!"
-        pids="$pids $pid"
-    done
+    # Skip controller - it runs as a goroutine in tests
+    echo "Skipping controller (running as goroutine in tests)"
 
     # Skip relay nodes - they run as goroutines in tests
     echo "Skipping relay nodes (running as goroutines in tests)"

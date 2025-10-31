@@ -5,8 +5,9 @@ import {IRegistryCoordinator, EigenDARegistryCoordinator} from "src/core/EigenDA
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-import {IPauserRegistry} from
-    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
+import {
+    IPauserRegistry
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {IEjectionManager} from "lib/eigenlayer-middleware/src/interfaces/IEjectionManager.sol";
 import "forge-std/StdToml.sol";
 import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
@@ -64,11 +65,7 @@ library InitParamsLib {
         }
     }
 
-    function strategyParams(string memory configData)
-        internal
-        pure
-        returns (IStakeRegistry.StrategyParams[][] memory)
-    {
+    function strategyParams(string memory configData) internal pure returns (IStakeRegistry.StrategyParams[][] memory) {
         bytes memory strategyConfigsRaw =
             stdToml.parseRaw(configData, ".initParams.middleware.registryCoordinator.strategyParams");
         return abi.decode(strategyConfigsRaw, (IStakeRegistry.StrategyParams[][]));
@@ -80,9 +77,10 @@ library InitParamsLib {
     }
 
     function quorumConfirmationThresholdPercentages(string memory configData) internal pure returns (bytes memory) {
-        return stdToml.readBytes(
-            configData, ".initParams.eigenDA.thresholdRegistry.quorumConfirmationThresholdPercentages"
-        );
+        return
+            stdToml.readBytes(
+                configData, ".initParams.eigenDA.thresholdRegistry.quorumConfirmationThresholdPercentages"
+            );
     }
 
     function quorumNumbersRequired(string memory configData) internal pure returns (bytes memory) {

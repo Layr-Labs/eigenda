@@ -37,6 +37,15 @@ func NewProxyWrapper(
 
 	registry := prometheus.NewRegistry()
 	proxyMetrics := proxymetrics.NewMetrics(registry)
+	ethClient, _, err := proxycommon.BuildEthClient(
+		ctx,
+		logger,
+		proxyConfig.SecretConfig.EthRPCURL,
+		proxyConfig.StoreBuilderConfig.ClientConfigV2.EigenDANetwork,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build eth client: %w", err)
+	}
 
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
@@ -45,7 +54,8 @@ func NewProxyWrapper(
 		proxyConfig.StoreBuilderConfig,
 		proxyConfig.SecretConfig,
 		registry,
-		false,
+		ethClient,
+		false, // tracing disabled
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build store manager: %w", err)

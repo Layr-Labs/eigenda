@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
+	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 )
@@ -69,8 +71,25 @@ func CreateTestSuite(
 	// 	configString,
 	// )
 
-	var restServer *rest.Server
-	var arbServer *arbitrum_altda.Server
+	var (
+		restServer   *rest.Server
+		arbServer    *arbitrum_altda.Server
+		ethClient    common_eigenda.EthClient
+		readOnlyMode = false
+		chainID      = ""
+	)
+
+	if !appConfig.StoreBuilderConfig.MemstoreEnabled {
+		var err error
+		ethClient, chainID, err = common.BuildEthClient(
+			ctx,
+			logger,
+			appConfig.SecretConfig.EthRPCURL,
+			appConfig.StoreBuilderConfig.ClientConfigV2.EigenDANetwork)
+		if err != nil {
+			panic(fmt.Sprintf("build eth client: %v", err.Error()))
+		}
+	}
 
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
@@ -79,13 +98,26 @@ func CreateTestSuite(
 		appConfig.StoreBuilderConfig,
 		appConfig.SecretConfig,
 		nil,
+		ethClient,
 		false, // tracing disabled for tests
 	)
 	if err != nil {
 		panic(fmt.Sprintf("build storage managers: %v", err.Error()))
 	}
 
-	if appConfig.EnabledServersConfig.RestAPIConfig.Enabled() {
+	compatibilityCfg, err := common.NewCompatibilityConfig(
+		"test",
+		chainID,
+		appConfig.StoreBuilderConfig.ClientConfigV2,
+		readOnlyMode,
+		appConfig.EnabledServersConfig.ToAPIStrings(),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("new compatibility config: %v", err.Error()))
+	}
+
+	if appConfig.EnabledServersConfig.RestAPIConfig.DAEndpointEnabled() {
+		appConfig.RestSvrCfg.CompatibilityCfg = compatibilityCfg
 		restServer = rest.NewServer(appConfig.RestSvrCfg, certMgr, keccakMgr, logger, metrics)
 		router := mux.NewRouter()
 		restServer.RegisterRoutes(router)
@@ -100,7 +132,7 @@ func CreateTestSuite(
 	}
 
 	if appConfig.EnabledServersConfig.ArbCustomDA {
-		arbHandlers := arbitrum_altda.NewHandlers(certMgr)
+		arbHandlers := arbitrum_altda.NewHandlers(certMgr, logger, compatibilityCfg)
 		arbServer, err = arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
 		if err != nil {
 			panic(fmt.Sprintf("create arbitrum server: %v", err.Error()))
@@ -112,7 +144,7 @@ func CreateTestSuite(
 	}
 
 	kill := func() {
-		if appConfig.EnabledServersConfig.RestAPIConfig.Enabled() {
+		if appConfig.EnabledServersConfig.RestAPIConfig.DAEndpointEnabled() {
 			if err := restServer.Stop(); err != nil {
 				logger.Error("failed to stop proxy server", "err", err)
 			}

@@ -42,7 +42,7 @@ type Server struct {
 }
 
 // NewServer constructs the RPC server
-func NewServer(ctx context.Context, cfg *Config, h *Handlers) (*Server, error) {
+func NewServer(ctx context.Context, cfg *Config, h IHandlers) (*Server, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port))
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on tcp: %w", err)

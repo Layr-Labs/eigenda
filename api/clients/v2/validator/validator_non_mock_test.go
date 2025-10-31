@@ -13,6 +13,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -39,9 +40,11 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	ctx := t.Context()
 
 	// Set up KZG components (prover, committer and verifier)
-	p, c, v, err := makeTestEncodingComponents()
+	p, c, v, err := makeTestEncodingComponents(t)
 	require.NoError(t, err)
-	encoder := rs.NewEncoder(logger, nil)
+	logger := common.TestLogger(t)
+	encoder, err := rs.NewEncoder(logger, nil)
+	require.NoError(t, err)
 
 	// Set up test environment
 	rand := testrandom.NewTestRandom()
@@ -100,8 +103,10 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 		assignments[opID] = assignment
 	}
 
-	// Create the actual blob chunks using the prover
-	chunks, err := p.GetFrames(data, encodingParams)
+	// Create the actual blob frames using the prover
+	dataFr, err := rs.ToFrArray(data)
+	require.NoError(t, err)
+	frames, _, err := p.GetFrames(ctx, dataFr, encodingParams)
 	require.NoError(t, err)
 
 	// Store chunks by operator
@@ -109,7 +114,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	for opID, assignment := range assignments {
 		operatorChunks[opID] = make([]*encoding.Frame, assignment.NumChunks())
 		for i := uint32(0); i < assignment.NumChunks(); i++ {
-			operatorChunks[opID][i] = chunks[assignment.Indices[i]]
+			operatorChunks[opID][i] = frames[assignment.Indices[i]]
 		}
 	}
 
@@ -210,7 +215,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 }
 
 // makeTestEncodingComponents makes a KZG prover, committer and verifier
-func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
+func makeTestEncodingComponents(t *testing.T) (*prover.Prover, *committer.Committer, *verifier.Verifier, error) {
 	c, err := committer.NewFromConfig(committer.Config{
 		SRSNumberToLoad:   8192,
 		G1SRSPath:         "../../../../resources/srs/g1.point",
@@ -228,6 +233,7 @@ func makeTestEncodingComponents() (*prover.Prover, *committer.Committer, *verifi
 		CacheDir:        "../../../../resources/srs/SRSTables",
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
+	logger := common.TestLogger(t)
 	p, err := prover.NewProver(logger, proverConfig, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("new prover: %w", err)

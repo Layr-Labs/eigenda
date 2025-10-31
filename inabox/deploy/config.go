@@ -234,7 +234,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_ONCHAIN_STATE_REFRESH_INTERVAL: "1s",
 	}
 
-	if env.UseControllerMediatedPayments {
+	if env.UseNewPayments {
 		v.DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS = "true"
 	} else {
 		v.DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS = "false"
@@ -367,7 +367,7 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
 	}
 
-	if env.UseControllerMediatedPayments {
+	if env.UseNewPayments {
 		v.CONTROLLER_GRPC_SERVER_ENABLE = "true"
 		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "true"
 		v.CONTROLLER_GRPC_PORT = fmt.Sprintf("%d", controllerGrpcPort)

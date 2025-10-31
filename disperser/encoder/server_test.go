@@ -43,9 +43,8 @@ func makeTestProverV1(numPoint uint64) (*prover.Prover, encoder.ServerConfig) {
 
 	p, _ := prover.NewProver(kzgConfig, nil)
 	encoderServerConfig := encoder.ServerConfig{
-		GrpcPort:              "3000",
-		MaxConcurrentRequests: 16,
-		RequestPoolSize:       32,
+		MaxConcurrentRequestsDangerous: 16,
+		RequestPoolSize:                32,
 	}
 
 	return p, encoderServerConfig
@@ -201,9 +200,8 @@ func TestThrottling(t *testing.T) {
 
 	mockEncoder.On("EncodeAndProve", mock.Anything, mock.Anything).Return(blobCommitment, []*encoding.Frame{}, nil)
 	encoderServerConfig := encoder.ServerConfig{
-		GrpcPort:              "3000",
-		MaxConcurrentRequests: concurrentRequests,
-		RequestPoolSize:       requestPoolSize,
+		MaxConcurrentRequestsDangerous: concurrentRequests,
+		RequestPoolSize:                requestPoolSize,
 	}
 	s := encoder.NewEncoderServer(encoderServerConfig, logger, mockEncoder, metrics, nil)
 	testBlobData, testEncodingParams := getTestData(t)

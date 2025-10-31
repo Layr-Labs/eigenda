@@ -20,9 +20,10 @@ import (
 
 // Config ... Config for the proxy HTTP server
 type Config struct {
-	Host        string
-	Port        int
-	APIsEnabled *enablement.RestApisEnabled
+	Host             string
+	Port             int
+	APIsEnabled      *enablement.RestApisEnabled
+	CompatibilityCfg common.CompatibilityConfig
 }
 
 type Server struct {
@@ -120,7 +121,7 @@ func (svr *Server) Port() int {
 func parseCertVersion(w http.ResponseWriter, r *http.Request) (certs.VersionByte, error) {
 	vars := mux.Vars(r)
 	// only GET routes use gorilla parsed vars to separate header bytes from the raw commitment bytes.
-	// POST routes parse them by hand because they neeed to send the entire
+	// POST routes parse them by hand because they need to send the entire
 	// request (including the type/version header bytes) to the server.
 	// TODO: perhaps for consistency we should also use gorilla vars for POST routes,
 	// and then just reconstruct the full commitment in the handlers?

@@ -225,10 +225,9 @@ func createTestComponents(t *testing.T) *testComponents {
 	chunkStoreWriter := chunkstore.NewChunkWriter(logger, s3Client, s3BucketName, 512*1024)
 	chunkStoreReader := chunkstore.NewChunkReader(logger, s3Client, s3BucketName)
 	encoderServer := encoder.NewEncoderServerV2(encoder.ServerConfig{
-		GrpcPort:              "8080",
-		MaxConcurrentRequests: 10,
-		RequestQueueSize:      5,
-		PreventReencoding:     true,
+		MaxConcurrentRequestsDangerous: 10,
+		RequestQueueSize:               5,
+		PreventReencoding:              true,
 	}, blobStore, chunkStoreWriter, logger, prover, metrics, grpcMetrics)
 
 	return &testComponents{

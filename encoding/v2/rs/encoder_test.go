@@ -24,11 +24,12 @@ func TestEncodeDecode_InvertsWhenSamplingAllFrames(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.TestLogger(t), cfg)
+	enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+	require.NoError(t, err)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
-	frames, _, err := enc.Encode(inputFr, params)
+	frames, _, err := enc.Encode(t.Context(), inputFr, params)
 	assert.Nil(t, err)
 
 	// sample some Frames
@@ -45,11 +46,12 @@ func TestEncodeDecode_InvertsWhenSamplingMissingFrame(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.TestLogger(t), cfg)
+	enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+	require.NoError(t, err)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
-	frames, _, err := enc.Encode(inputFr, params)
+	frames, _, err := enc.Encode(t.Context(), inputFr, params)
 	assert.Nil(t, err)
 
 	// sample some Frames
@@ -68,11 +70,12 @@ func TestEncodeDecode_InvertsWithMissingAndDuplicateFrames(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.TestLogger(t), cfg)
+	enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+	require.NoError(t, err)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
-	frames, _, err := enc.Encode(inputFr, params)
+	frames, _, err := enc.Encode(t.Context(), inputFr, params)
 	assert.Nil(t, err)
 
 	assert.EqualValues(t, len(frames), numSys+numPar)
@@ -95,13 +98,14 @@ func TestEncodeDecode_InvertsWithMissingAndDuplicateFrames(t *testing.T) {
 func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.TestLogger(t), cfg)
+	enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+	require.NoError(t, err)
 
 	fmt.Println("Num Chunks: ", params.NumChunks)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
-	frames, _, err := enc.Encode(inputFr, params)
+	frames, _, err := enc.Encode(t.Context(), inputFr, params)
 	assert.Nil(t, err)
 
 	// sample some Frames
@@ -117,13 +121,14 @@ func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 func TestEncodeDecode_ErrorsWhenNotEnoughSampledFramesWithDuplicates(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.TestLogger(t), cfg)
+	enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+	require.NoError(t, err)
 
 	fmt.Println("Num Chunks: ", params.NumChunks)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
-	frames, _, err := enc.Encode(inputFr, params)
+	frames, _, err := enc.Encode(t.Context(), inputFr, params)
 	assert.Nil(t, err)
 
 	// sample some Frames
@@ -161,10 +166,11 @@ func FuzzOnlySystematic(f *testing.F) {
 
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
 		cfg := encoding.DefaultConfig()
-		enc := rs.NewEncoder(common.TestLogger(t), cfg)
+		enc, err := rs.NewEncoder(common.TestLogger(t), cfg)
+		require.NoError(t, err)
 
 		//encode the data
-		frames, _, err := enc.EncodeBytes(input, params)
+		frames, _, err := enc.EncodeBytes(t.Context(), input, params)
 		if err != nil {
 			t.Errorf("Error Encoding:\n Data:\n %q \n Err: %q", input, err)
 		}

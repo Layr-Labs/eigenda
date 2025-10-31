@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+# Pre-commit hook for EigenDA
+# This hook runs linting and formatting checks before allowing a commit.
+# To bypass this hook, use: git commit --no-verify
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo -e "${YELLOW}Running pre-commit checks...${NC}"
+
+# Get the root directory of the repository
+# This works correctly in both regular repos and git worktrees
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# Change to the repository root
+cd "$REPO_ROOT"
+
+# Check that required tools are available
+if ! command -v golangci-lint &> /dev/null; then
+    echo -e "${RED}Error: golangci-lint is not installed or not in PATH${NC}"
+    echo "Please ensure your mise environment is properly configured."
+    echo "Run: mise install && mise activate"
+    echo "See: https://mise.jdx.dev/"
+    exit 1
+fi
+
+if ! command -v go &> /dev/null; then
+    echo -e "${RED}Error: go is not installed or not in PATH${NC}"
+    echo "Please ensure your mise environment is properly configured."
+    echo "Run: mise install && mise activate"
+    echo "See: https://mise.jdx.dev/"
+    exit 1
+fi
+
+# Run make lint (includes golangci-lint and go mod tidy check)
+echo -e "\n${YELLOW}Running 'make lint'...${NC}"
+if make lint; then
+    echo -e "${GREEN}✓ Lint checks passed${NC}"
+else
+    echo -e "${RED}✗ Lint checks failed${NC}"
+    exit 1
+fi
+
+# Run make fmt-check
+echo -e "\n${YELLOW}Running 'make fmt-check'...${NC}"
+if make fmt-check; then
+    echo -e "${GREEN}✓ Format checks passed${NC}"
+else
+    echo -e "${RED}✗ Format checks failed${NC}"
+    echo -e "${YELLOW}Tip: Run 'make fmt' to auto-format code${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}All pre-commit checks passed!${NC}"
+exit 0

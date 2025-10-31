@@ -111,11 +111,16 @@ func (bnm *BlockNumberMonitor) WaitForBlockNumber(ctx context.Context, targetBlo
 
 			if polling {
 				blockNumber, err := bnm.ethClient.BlockNumber(ctx)
+
 				if err != nil {
-					err := fmt.Errorf("get block number from eth client: %w", err)
-					span.RecordError(err)
-					span.SetStatus(codes.Error, "failed to get block number")
-					return err
+					bnm.logger.Debug(
+						"ethClient.BlockNumber returned an error",
+						"targetBlockNumber", targetBlockNumber,
+						"latestBlockNumber", bnm.latestBlockNumber.Load(),
+						"error", err)
+
+					// tolerate some failures here. if failure continues for too long, it will be caught by the timeout
+					continue
 				}
 
 				bnm.latestBlockNumber.Store(blockNumber)

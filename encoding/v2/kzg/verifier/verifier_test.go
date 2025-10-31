@@ -27,7 +27,7 @@ func TestVerifyFrames(t *testing.T) {
 	committer, err := committer.NewFromConfig(*harness.committerConfig)
 	require.Nil(t, err)
 
-	frames, err := proverGroup.GetFrames(harness.paddedGettysburgAddressBytes, params)
+	frames, _, err := proverGroup.GetFrames(t.Context(), harness.paddedGettysburgAddressFrs, params)
 	require.Nil(t, err)
 	commitments, err := committer.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
 	require.Nil(t, err)
@@ -56,8 +56,6 @@ func TestUniversalVerify(t *testing.T) {
 	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
-	prover, err := group.GetKzgProver(params)
-	require.Nil(t, err)
 
 	numBlob := 5
 	samples := make([]encoding.Sample, 0)
@@ -67,7 +65,7 @@ func TestUniversalVerify(t *testing.T) {
 
 		commit, _, _, err := committer.GetCommitments(inputFr)
 		require.Nil(t, err)
-		frames, fIndices, err := prover.GetFrames(inputFr)
+		frames, fIndices, err := group.GetFrames(t.Context(), harness.paddedGettysburgAddressFrs, params)
 		require.Nil(t, err)
 
 		// create samples
@@ -82,7 +80,7 @@ func TestUniversalVerify(t *testing.T) {
 
 			sample := encoding.Sample{
 				Commitment:      (*encoding.G1Commitment)(commit),
-				Chunk:           &f,
+				Chunk:           f,
 				BlobIndex:       z,
 				AssignmentIndex: encoding.ChunkNumber(i),
 			}
@@ -90,7 +88,7 @@ func TestUniversalVerify(t *testing.T) {
 		}
 	}
 
-	require.True(t, v.UniversalVerifySubBatch(params, samples, numBlob) == nil, "universal batch verification failed\n")
+	require.NoError(t, v.UniversalVerifySubBatch(params, samples, numBlob))
 }
 
 func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
@@ -105,8 +103,6 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
-	prover, err := group.GetKzgProver(params)
-	require.NoError(t, err)
 
 	numBlob := 5
 	samples := make([]encoding.Sample, 0)
@@ -116,7 +112,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 
 		commit, _, _, err := committer.GetCommitments(inputFr)
 		require.Nil(t, err)
-		frames, fIndices, err := prover.GetFrames(inputFr)
+		frames, fIndices, err := group.GetFrames(t.Context(), harness.paddedGettysburgAddressFrs, params)
 		require.Nil(t, err)
 
 		// create samples
@@ -131,7 +127,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 
 			sample := encoding.Sample{
 				Commitment:      (*encoding.G1Commitment)(commit),
-				Chunk:           &f,
+				Chunk:           f,
 				BlobIndex:       z,
 				AssignmentIndex: encoding.ChunkNumber(i),
 			}
@@ -177,10 +173,12 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 		blob := make([]byte, blobSize)
 		_, err = rand.Read(blob)
 		require.NoError(t, err)
+		blobFr, err := rs.ToFrArray(blob)
+		require.NoError(t, err)
 
 		commitments, err := committer.GetCommitmentsForPaddedLength(blob)
 		require.NoError(t, err)
-		frames, err := p.GetFrames(blob, params)
+		frames, _, err := p.GetFrames(t.Context(), blobFr, params)
 		require.NoError(t, err)
 
 		indices := make([]encoding.ChunkNumber, params.NumChunks)

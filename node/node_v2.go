@@ -19,7 +19,7 @@ type requestMetadata struct {
 	assignment     corev2.Assignment
 }
 type relayRequest struct {
-	chunkRequests []*relay.ChunkRequestByIndex
+	chunkRequests []*relay.ChunkRequestByRange
 	metadata      []*requestMetadata
 }
 type response struct {
@@ -84,24 +84,66 @@ func (n *Node) DetermineChunkLocations(
 		req, ok := relayRequests[relayKey]
 		if !ok {
 			req = &relayRequest{
-				chunkRequests: make([]*relay.ChunkRequestByIndex, 0),
+				chunkRequests: make([]*relay.ChunkRequestByRange, 0),
 				metadata:      make([]*requestMetadata, 0),
 			}
 			relayRequests[relayKey] = req
 		}
 		// Chunks from one blob are requested to the same relay
-		req.chunkRequests = append(req.chunkRequests, &relay.ChunkRequestByIndex{
-			BlobKey: blobKey,
-			Indices: assgn.Indices,
-		})
-		req.metadata = append(req.metadata, &requestMetadata{
-			blobShardIndex: i,
-			assignment:     assgn,
-		})
+		rangeRequests := convertIndicesToRangeRequests(blobKey, assgn.Indices)
+		req.chunkRequests = append(req.chunkRequests, rangeRequests...)
 
+		// Code expects one metadata entry per range request
+		for range rangeRequests {
+			req.metadata = append(req.metadata, &requestMetadata{
+				blobShardIndex: i,
+				assignment:     assgn,
+			})
+		}
 	}
 
 	return downloadSizeInBytes, relayRequests, nil
+}
+
+// Given a list of chunk indices we want to download, create a list of relay requests by range.
+// Although indices may not be contiguous, it is safe to assume that they will be "mostly contiguous".
+// In practice, we should expect to see at most one continuous range of indices per quorum.
+//
+// Important: the provided indices MUST be in (mostly) sorted order in order to collapse into ranges correctly.
+// Unsorted indices may lead to a very large number of range requests being generated. The current chunk assignment
+// logic produces mostly sorted indices, so this is not an issue at present.
+//
+// Eventually, the assignment logic ought to be refactored to return ranges of chunks instead of individual
+// indices, but the required changes are non-trivial.
+func convertIndicesToRangeRequests(blobKey corev2.BlobKey, indices []uint32) []*relay.ChunkRequestByRange {
+	requests := make([]*relay.ChunkRequestByRange, 0)
+	if len(indices) == 0 {
+		return requests
+	}
+
+	startIndex := indices[0]
+	for i := 1; i < len(indices); i++ {
+		if indices[i] != indices[i-1]+1 {
+			// break in continuity, create a request for the previous range
+			request := &relay.ChunkRequestByRange{
+				BlobKey: blobKey,
+				Start:   startIndex,       // inclusive
+				End:     indices[i-1] + 1, // exclusive
+			}
+			requests = append(requests, request)
+			startIndex = indices[i]
+		}
+	}
+
+	// add the last range
+	request := &relay.ChunkRequestByRange{
+		BlobKey: blobKey,
+		Start:   startIndex,                  // inclusive
+		End:     indices[len(indices)-1] + 1, // exclusive
+	}
+	requests = append(requests, request)
+
+	return requests
 }
 
 // This method takes a "download plan" from DetermineChunkLocations() and downloads the chunks from the relays.
@@ -138,7 +180,7 @@ func (n *Node) DownloadChunksFromRelays(
 		n.DownloadPool.Submit(func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
-			bundles, err := relayClient.GetChunksByIndex(ctxTimeout, relayKey, req.chunkRequests)
+			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
 			if err != nil {
 				n.Logger.Errorf("failed to get chunks from relays: %v", err)
 				bundleChan <- response{
