@@ -18,7 +18,13 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
+
+var certBuilderTracer = otel.Tracer("github.com/Layr-Labs/eigenda/api/clients/v2/cert_builder")
 
 type CertBuilder struct {
 	logger                  logging.Logger
@@ -68,11 +74,26 @@ func (cb *CertBuilder) BuildCert(
 	certVersion coretypes.CertificateVersion,
 	blobStatusReply *disperser.BlobStatusReply,
 ) (coretypes.EigenDACert, error) {
+	ctx, span := certBuilderTracer.Start(ctx, "CertBuilder.BuildCert",
+		trace.WithAttributes(
+			attribute.Int("cert_version", int(certVersion))))
+	defer span.End()
+
 	switch certVersion {
 	case coretypes.VersionThreeCert:
-		return cb.buildEigenDAV3Cert(ctx, blobStatusReply)
+		cert, err := cb.buildEigenDAV3Cert(ctx, blobStatusReply)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "failed to build v3 cert")
+			return nil, err
+		}
+		span.SetStatus(codes.Ok, "cert built successfully")
+		return cert, nil
 	default:
-		return nil, fmt.Errorf("unsupported EigenDA cert version: %d", certVersion)
+		err := fmt.Errorf("unsupported EigenDA cert version: %d", certVersion)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "unsupported cert version")
+		return nil, err
 	}
 }
 
@@ -81,17 +102,25 @@ func (cb *CertBuilder) buildEigenDAV3Cert(
 	ctx context.Context,
 	blobStatusReply *disperser.BlobStatusReply,
 ) (*coretypes.EigenDACertV3, error) {
+	ctx, span := certBuilderTracer.Start(ctx, "CertBuilder.buildEigenDAV3Cert")
+	defer span.End()
+
 	nonSignerStakesAndSignature, err := cb.getNonSignerStakesAndSignature(
 		ctx, blobStatusReply.GetSignedBatch())
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to get non signer stakes and signature")
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
 	}
 
 	eigenDACert, err := coretypes.NewEigenDACertV3(blobStatusReply, nonSignerStakesAndSignature)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to create eigenda v3 cert")
 		return nil, fmt.Errorf("build eigenda v3 cert: %w", err)
 	}
 
+	span.SetStatus(codes.Ok, "v3 cert built successfully")
 	return eigenDACert, nil
 }
 
@@ -101,9 +130,14 @@ func (cb *CertBuilder) getNonSignerStakesAndSignature(
 	ctx context.Context,
 	signedBatch *disperser.SignedBatch,
 ) (*certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature, error) {
+	ctx, span := certBuilderTracer.Start(ctx, "CertBuilder.getNonSignerStakesAndSignature")
+	defer span.End()
+
 	// 1 - Pre-process inputs for operator state retriever call
 	signedBatchBinding, err := coretypes.SignedBatchProtoToV2CertBinding(signedBatch)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to convert signed batch")
 		return nil, fmt.Errorf("convert signed batch: %w", err)
 	}
 
@@ -119,18 +153,22 @@ func (cb *CertBuilder) getNonSignerStakesAndSignature(
 	// 2b - cast []uint32 to []byte for quorum numbers
 	quorumNumbers, err := coretypes.QuorumNumbersUint32ToUint8(signedBatchBinding.Attestation.QuorumNumbers)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to convert quorum numbers")
 		return nil, fmt.Errorf("convert quorum numbers: %w", err)
 	}
 
 	// use the reference block # from the disperser generated signed batch header
 	// for referencing operator states at a specific block checkpoint
 	rbn := signedBatch.GetHeader().GetReferenceBlockNumber()
+	span.SetAttributes(attribute.Int64("reference_block_number", int64(rbn)))
 
 	// 3 - call operator state retriever to fetch signature indices
 	nonSignerOperatorIDsHex := make([]string, len(nonSignerOperatorIDs))
 	for i, id := range nonSignerOperatorIDs {
 		nonSignerOperatorIDsHex[i] = "0x" + hex.EncodeToString(id[:])
 	}
+	span.SetAttributes(attribute.Int("non_signer_count", len(nonSignerOperatorIDs)))
 	checkSigIndices, err := cb.opsrCaller.GetCheckSignaturesIndices(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(rbn))},
 		cb.registryCoordinatorAddr, uint32(rbn), quorumNumbers, nonSignerOperatorIDs)
 	if err != nil {
@@ -144,6 +182,8 @@ func (cb *CertBuilder) getNonSignerStakesAndSignature(
 			"quorumNumbers", "0x"+hex.EncodeToString(quorumNumbers),
 			"nonSignerOperatorIDs", "["+strings.Join(nonSignerOperatorIDsHex, ",")+"]",
 		)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "eth call failed: GetCheckSignaturesIndices")
 		return nil, fmt.Errorf("check sig indices call: %w", err)
 	}
 
@@ -176,6 +216,7 @@ func (cb *CertBuilder) getNonSignerStakesAndSignature(
 	}
 
 	// 5 - construct non signer stakes and signature
+	span.SetStatus(codes.Ok, "non signer stakes and signature retrieved successfully")
 	return &certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature{
 		NonSignerQuorumBitmapIndices: checkSigIndices.NonSignerQuorumBitmapIndices,
 		NonSignerPubkeys:             nonSignerPubKeysBN254,
