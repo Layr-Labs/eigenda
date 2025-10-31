@@ -1,4 +1,4 @@
-package aws
+package aws_test
 
 import (
 	"context"
@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/aws"
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	s3common "github.com/Layr-Labs/eigenda/common/s3"
+	"github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigenda/test/testbed"
@@ -46,7 +47,7 @@ func setupLocalStackTest(t *testing.T) s3common.S3Client {
 		_ = localstackContainer.Terminate(ctx)
 	})
 
-	config := aws.DefaultClientConfig()
+	config := commonaws.DefaultClientConfig()
 	config.EndpointURL = localstackHost
 	config.Region = "us-east-1"
 
@@ -55,7 +56,7 @@ func setupLocalStackTest(t *testing.T) s3common.S3Client {
 	err = os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
 	require.NoError(t, err, "failed to set AWS_SECRET_ACCESS_KEY")
 
-	client, err := NewAwsS3Client(
+	client, err := aws.NewAwsS3Client(
 		ctx,
 		logger,
 		config.EndpointURL,

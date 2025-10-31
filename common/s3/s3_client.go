@@ -1,6 +1,14 @@
 package s3
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+var (
+	// ErrObjectNotFound is returned when an object is not found in the storage backend
+	ErrObjectNotFound = errors.New("object not found")
+)
 
 // S3Client encapsulates the functionality of talking to AWS S3 (or an S3 mimic service).
 type S3Client interface {

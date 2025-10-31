@@ -77,7 +77,12 @@ type blobResultOrError struct {
 
 var _ disperser.BlobStore = (*SharedBlobStore)(nil)
 
-func NewSharedStorage(bucketName string, s3Client s3.Client, blobMetadataStore *BlobMetadataStore, logger logging.Logger) *SharedBlobStore {
+func NewSharedStorage(
+	bucketName string,
+	s3Client s3.S3Client,
+	blobMetadataStore *BlobMetadataStore,
+	logger logging.Logger,
+) *SharedBlobStore {
 	return &SharedBlobStore{
 		bucketName:        bucketName,
 		s3Client:          s3Client,

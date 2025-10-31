@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	s3common "github.com/Layr-Labs/eigenda/common/s3"
+	s3aws "github.com/Layr-Labs/eigenda/common/s3/aws"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
@@ -31,7 +31,7 @@ const (
 	bucket         = "eigen-test"
 )
 
-func setupLocalStackTest(t *testing.T) s3.Client {
+func setupLocalStackTest(t *testing.T) s3common.S3Client {
 	t.Helper()
 
 	ctx := t.Context()
@@ -60,7 +60,16 @@ func setupLocalStackTest(t *testing.T) s3.Client {
 	err = os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
 	require.NoError(t, err, "failed to set AWS_SECRET_ACCESS_KEY")
 
-	client, err := s3.NewClient(ctx, *config, logger)
+	client, err := s3aws.NewAwsS3Client(
+		ctx,
+		logger,
+		config.EndpointURL,
+		config.Region,
+		config.FragmentParallelismFactor,
+		config.FragmentParallelismConstant,
+		"localstack",
+		"localstack",
+	)
 	require.NoError(t, err, "failed to create S3 client")
 
 	err = client.CreateBucket(ctx, bucket)
@@ -94,7 +103,7 @@ func getProofs(t *testing.T, count int) []*encoding.Proof {
 	return proofs
 }
 
-func runRandomProofsTest(t *testing.T, client s3.Client) {
+func runRandomProofsTest(t *testing.T, client s3common.S3Client) {
 	t.Helper()
 	ctx := t.Context()
 
@@ -150,7 +159,7 @@ func generateRandomFrameCoeffs(
 	return frames
 }
 
-func runRandomCoefficientsTest(t *testing.T, client s3.Client) {
+func runRandomCoefficientsTest(t *testing.T, client s3common.S3Client) {
 	t.Helper()
 	ctx := t.Context()
 

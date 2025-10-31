@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"sync"
 
@@ -23,9 +24,8 @@ const (
 )
 
 var (
-	once              sync.Once
-	ref               *awsS3Client
-	ErrObjectNotFound = errors.New("object not found")
+	once sync.Once
+	ref  *awsS3Client
 )
 
 // An implementation of s3common.S3Client using AWS S3.
@@ -140,7 +140,7 @@ func (s *awsS3Client) DownloadObject(ctx context.Context, bucket string, key str
 	}
 
 	if buffer == nil || len(buffer.Bytes()) == 0 {
-		return nil, ErrObjectNotFound
+		return nil, s3common.ErrObjectNotFound
 	}
 
 	return buffer.Bytes(), nil
@@ -154,7 +154,7 @@ func (s *awsS3Client) HeadObject(ctx context.Context, bucket string, key string)
 	if err != nil {
 		var notFound *types.NotFound
 		if ok := errors.As(err, &notFound); ok {
-			return nil, ErrObjectNotFound
+			return nil, s3common.ErrObjectNotFound
 		}
 		return nil, err
 	}
@@ -325,7 +325,11 @@ func (s *awsS3Client) FragmentedDownloadObject(
 		return nil, ctx.Err()
 	}
 
-	return s3common.RecombineFragments(fragments)
+	data, err := s3common.RecombineFragments(fragments)
+	if err != nil {
+		return nil, fmt.Errorf("failed to recombine fragments: %w", err)
+	}
+	return data, nil
 
 }
 

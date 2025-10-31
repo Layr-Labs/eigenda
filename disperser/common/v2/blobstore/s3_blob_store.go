@@ -43,7 +43,7 @@ func (b *BlobStore) StoreBlob(ctx context.Context, key corev2.BlobKey, data []by
 // GetBlob retrieves a blob from the blob store
 func (b *BlobStore) GetBlob(ctx context.Context, key corev2.BlobKey) ([]byte, error) {
 	data, err := b.s3Client.DownloadObject(ctx, b.bucketName, s3common.ScopedBlobKey(key))
-	if errors.Is(err, s3.ErrObjectNotFound) {
+	if errors.Is(err, s3common.ErrObjectNotFound) {
 		b.logger.Warnf("blob not found in bucket %s: %s", b.bucketName, key)
 		return nil, ErrBlobNotFound
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/s3"
 	"github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/common/s3/oci"
@@ -14,12 +15,21 @@ import (
 func CreateObjectStorageClient(
 	ctx context.Context,
 	config Config,
-	awsConfig aws.ClientConfig,
-	logger logging.Logger) (s3.Client, error) {
+	awsConfig commonaws.ClientConfig,
+	logger logging.Logger) (s3.S3Client, error) {
 
 	switch config.Backend {
 	case S3Backend:
-		client, err := s3.NewClient(ctx, awsConfig, logger)
+		client, err := aws.NewAwsS3Client(
+			ctx,
+			logger,
+			awsConfig.EndpointURL,
+			awsConfig.Region,
+			awsConfig.FragmentParallelismFactor,
+			awsConfig.FragmentParallelismConstant,
+			awsConfig.AccessKey,
+			awsConfig.SecretAccessKey,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create S3 client: %w", err)
 		}

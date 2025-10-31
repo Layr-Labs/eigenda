@@ -17,10 +17,6 @@ import (
 	"github.com/oracle/oci-go-sdk/v65/objectstorage"
 )
 
-var (
-	ErrObjectNotFound = errors.New("object not found")
-)
-
 // ObjectStorageConfig holds configuration for OCI Object Storage
 type ObjectStorageConfig struct {
 	Namespace                   string
@@ -134,7 +130,7 @@ func (c *ociClient) DownloadObject(ctx context.Context, bucket string, key strin
 	}
 
 	if len(data) == 0 {
-		return nil, ErrObjectNotFound
+		return nil, s3common.ErrObjectNotFound
 	}
 
 	return data, nil
@@ -151,7 +147,7 @@ func (c *ociClient) HeadObject(ctx context.Context, bucket string, key string) (
 	if err != nil {
 		// Check if it's a 404 error
 		if response.RawResponse != nil && response.RawResponse.StatusCode == 404 {
-			return nil, ErrObjectNotFound
+			return nil, s3common.ErrObjectNotFound
 		}
 		return nil, fmt.Errorf("failed to head object: %w", err)
 	}
