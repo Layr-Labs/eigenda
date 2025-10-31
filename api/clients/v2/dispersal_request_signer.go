@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 )
 
@@ -23,9 +24,11 @@ type DispersalRequestSigner interface {
 }
 
 type DispersalRequestSignerConfig struct {
-	// KeyID is the AWS KMS key identifier used for signing requests. Required.
+	// KeyID is the AWS KMS key identifier used for signing requests. Optional if PrivateKey is provided.
 	KeyID string
-	// Region is the AWS region where the KMS key is located (e.g., "us-east-1"). Required.
+	// PrivateKey is a hex-encoded private key for local signing (without 0x prefix). Optional if KeyID is provided.
+	PrivateKey string
+	// Region is the AWS region where the KMS key is located (e.g., "us-east-1"). Required if using KMS.
 	Region string
 	// Endpoint is an optional custom AWS KMS endpoint URL. If empty, the standard AWS KMS endpoint is used.
 	// This is primarily useful for testing with LocalStack or other custom KMS implementations. Default is empty.
@@ -43,23 +46,35 @@ func DefaultDispersalRequestSignerConfig() DispersalRequestSignerConfig {
 
 // Verify checks that the configuration is valid, returning an error if it is not.
 func (c *DispersalRequestSignerConfig) Verify() error {
-	if c.KeyID == "" {
-		return errors.New("KeyID is required")
+	if c.KeyID == "" && c.PrivateKey == "" {
+		return errors.New("either KeyID or PrivateKey is required")
 	}
-	if c.Region == "" {
-		return errors.New("Region is required")
+	if c.KeyID != "" && c.PrivateKey != "" {
+		return errors.New("KeyID and PrivateKey cannot be specified together")
+	}
+	if c.KeyID != "" && c.Region == "" {
+		return errors.New("Region is required when using KMS")
 	}
 
 	return nil
 }
 
-var _ DispersalRequestSigner = &requestSigner{}
-
-type requestSigner struct {
+// kmsRequestSigner implements DispersalRequestSigner using AWS KMS.
+type kmsRequestSigner struct {
 	keyID     string
 	publicKey *ecdsa.PublicKey
 	kmsClient *kms.Client
 }
+
+var _ DispersalRequestSigner = &kmsRequestSigner{}
+
+// localRequestSigner implements DispersalRequestSigner using a local private key.
+type localRequestSigner struct {
+	privateKey *ecdsa.PrivateKey
+	publicKey  *ecdsa.PublicKey
+}
+
+var _ DispersalRequestSigner = &localRequestSigner{}
 
 // NewDispersalRequestSigner creates a new DispersalRequestSigner.
 func NewDispersalRequestSigner(
@@ -70,6 +85,20 @@ func NewDispersalRequestSigner(
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
+	// Use KMS if KeyID is provided
+	if config.KeyID != "" {
+		return NewKMSDispersalRequestSigner(ctx, config)
+	}
+
+	// Use local private key
+	return NewLocalDispersalRequestSigner(config)
+}
+
+// NewKMSDispersalRequestSigner creates a new KMS-based DispersalRequestSigner.
+func NewKMSDispersalRequestSigner(
+	ctx context.Context,
+	config DispersalRequestSignerConfig,
+) (DispersalRequestSigner, error) {
 	var kmsClient *kms.Client
 	if config.Endpoint != "" {
 		kmsClient = kms.New(kms.Options{
@@ -93,14 +122,32 @@ func NewDispersalRequestSigner(
 		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
 	}
 
-	return &requestSigner{
+	return &kmsRequestSigner{
 		keyID:     config.KeyID,
 		publicKey: key,
 		kmsClient: kmsClient,
 	}, nil
 }
 
-func (s *requestSigner) SignStoreChunksRequest(ctx context.Context, request *grpc.StoreChunksRequest) ([]byte, error) {
+// NewLocalDispersalRequestSigner creates a new local private key-based DispersalRequestSigner.
+func NewLocalDispersalRequestSigner(
+	config DispersalRequestSignerConfig,
+) (DispersalRequestSigner, error) {
+	privateKey, err := crypto.HexToECDSA(config.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	return &localRequestSigner{
+		privateKey: privateKey,
+		publicKey:  &privateKey.PublicKey,
+	}, nil
+}
+
+func (s *kmsRequestSigner) SignStoreChunksRequest(
+	ctx context.Context,
+	request *grpc.StoreChunksRequest,
+) ([]byte, error) {
 	hash, err := hashing.HashStoreChunksRequest(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash request: %w", err)
@@ -110,6 +157,21 @@ func (s *requestSigner) SignStoreChunksRequest(ctx context.Context, request *grp
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
+	return signature, nil
+}
 
+func (s *localRequestSigner) SignStoreChunksRequest(
+	ctx context.Context,
+	request *grpc.StoreChunksRequest,
+) ([]byte, error) {
+	hash, err := hashing.HashStoreChunksRequest(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash request: %w", err)
+	}
+
+	signature, err := crypto.Sign(hash, s.privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
 	return signature, nil
 }
