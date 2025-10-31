@@ -45,32 +45,26 @@ func StartProxyService(cliCtx *cli.Context) error {
 		return err
 	}
 
-	// Initialize OpenTelemetry tracing
-	telemetryCfg := telemetry.ReadConfig(cliCtx)
-	if err := telemetryCfg.Verify(); err != nil {
-		return fmt.Errorf("invalid telemetry config: %w", err)
-	}
-
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
 
-	shutdownTracer, err := telemetry.InitTracer(ctx, telemetryCfg)
+	shutdownTracer, err := telemetry.InitTracer(ctx, cfg.TelemetryConfig)
 	if err != nil {
 		return fmt.Errorf("initialize tracer: %w", err)
 	}
 	defer func() {
-		if err := shutdownTracer(context.Background()); err != nil {
+		if err := shutdownTracer(ctx); err != nil {
 			log.Error("failed to shutdown tracer", "err", err)
-		} else if telemetryCfg.Enabled {
+		} else if cfg.TelemetryConfig.Enabled {
 			log.Info("Successfully shutdown OpenTelemetry tracer")
 		}
 	}()
 
-	if telemetryCfg.Enabled {
+	if cfg.TelemetryConfig.Enabled {
 		log.Info("OpenTelemetry tracing enabled",
-			"service", telemetryCfg.ServiceName,
-			"endpoint", telemetryCfg.ExporterEndpoint,
-			"sample_rate", telemetryCfg.TraceSampleRate)
+			"service", cfg.TelemetryConfig.ServiceName,
+			"endpoint", cfg.TelemetryConfig.ExporterEndpoint,
+			"sample_rate", cfg.TelemetryConfig.TraceSampleRate)
 	}
 	configString, err := cfg.StoreBuilderConfig.ToString()
 	if err != nil {
@@ -89,7 +83,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 		cfg.StoreBuilderConfig,
 		cfg.SecretConfig,
 		registry,
-		telemetryCfg.Enabled,
+		cfg.TelemetryConfig.Enabled,
 	)
 	if err != nil {
 		return fmt.Errorf("build storage managers: %w", err)

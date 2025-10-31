@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
+	"github.com/Layr-Labs/eigenda/api/proxy/telemetry"
 	"github.com/urfave/cli/v2"
 )
 
@@ -25,6 +26,7 @@ type AppConfig struct {
 	ArbCustomDASvrCfg arbitrum_altda.Config
 	RestSvrCfg        rest.Config
 	MetricsSvrConfig  metrics.Config
+	TelemetryConfig   telemetry.Config
 }
 
 // Check checks critical config invariants and returns an error
@@ -48,6 +50,11 @@ func (c AppConfig) Check() error {
 		return fmt.Errorf("check enabled APIs: %w", err)
 	}
 
+	err = c.TelemetryConfig.Verify()
+	if err != nil {
+		return fmt.Errorf("check telemetry config: %w", err)
+	}
+
 	return nil
 }
 
@@ -67,5 +74,6 @@ func ReadAppConfig(ctx *cli.Context) (AppConfig, error) {
 		ArbCustomDASvrCfg: arbitrum_altda.ReadConfig(ctx),
 		RestSvrCfg:        rest.ReadConfig(ctx, &enabledServersCfg.RestAPIConfig),
 		MetricsSvrConfig:  metrics.ReadConfig(ctx),
+		TelemetryConfig:   telemetry.ReadConfig(ctx),
 	}, nil
 }
