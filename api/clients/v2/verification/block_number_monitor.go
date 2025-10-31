@@ -8,7 +8,14 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
+
+var blockNumberMonitorTracer = otel.Tracer(
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/block_number_monitor")
 
 // BlockNumberMonitor is a utility for waiting for a certain ethereum block number
 //
@@ -53,13 +60,22 @@ func NewBlockNumberMonitor(
 // poll the internal eth client for the most recent block number. The goroutine responsible for polling at a given time
 // updates an atomic integer, so that all goroutines may check the most recent block without duplicating work.
 func (bnm *BlockNumberMonitor) WaitForBlockNumber(ctx context.Context, targetBlockNumber uint64) error {
+	ctx, span := blockNumberMonitorTracer.Start(ctx, "BlockNumberMonitor.WaitForBlockNumber",
+		trace.WithAttributes(
+			attribute.Int64("target_block_number", int64(targetBlockNumber))))
+	defer span.End()
+
 	if bnm.pollIntervalDuration <= 0 {
-		return fmt.Errorf(
+		err := fmt.Errorf(
 			"pollIntervalDuration is <= 0: you ought to be using the provided constructor, which checks this")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid poll interval")
+		return err
 	}
 
 	if bnm.latestBlockNumber.Load() >= targetBlockNumber {
 		// immediately return if the local client isn't behind the target block number
+		span.SetStatus(codes.Ok, "block number already reached")
 		return nil
 	}
 
@@ -76,11 +92,15 @@ func (bnm *BlockNumberMonitor) WaitForBlockNumber(ctx context.Context, targetBlo
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf(
+			err := fmt.Errorf(
 				"timed out waiting for block number %d (latest block number observed was %d): %w",
 				targetBlockNumber, bnm.latestBlockNumber.Load(), ctx.Err())
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "timeout waiting for block number")
+			return err
 		case <-ticker.C:
 			if bnm.latestBlockNumber.Load() >= targetBlockNumber {
+				span.SetStatus(codes.Ok, "block number reached")
 				return nil
 			}
 
@@ -105,8 +125,10 @@ func (bnm *BlockNumberMonitor) WaitForBlockNumber(ctx context.Context, targetBlo
 				}
 
 				bnm.latestBlockNumber.Store(blockNumber)
+				span.SetAttributes(attribute.Int64("actual_block_number", int64(blockNumber)))
 
 				if blockNumber >= targetBlockNumber {
+					span.SetStatus(codes.Ok, "block number reached")
 					return nil
 				}
 			}

@@ -28,26 +28,34 @@ services:
   eigenda_proxy:
     depends_on:
       - minio-init
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/layr-labs/eigenda-proxy:dev
     container_name: eigenda-proxy
     environment:
       - EIGENDA_PROXY_LOG_LEVEL=debug
       - EIGENDA_PROXY_ADDR=0.0.0.0
       - EIGENDA_PROXY_PORT=4242
-      ## Turn this off to talk to actual eigenda network
-      - EIGENDA_PROXY_MEMSTORE_ENABLED=true
-      - EIGENDA_PROXY_MEMSTORE_EXPIRATION=45m
-      - EIGENDA_PROXY_EIGENDA_CERT_VERIFICATION_DISABLED=true
-      - EIGENDA_PROXY_EIGENDA_SIGNER_PRIVATE_KEY_HEX=${PRIVATE_KEY}
-      - EIGENDA_PROXY_EIGENDA_DISPERSER_RPC=disperser-holesky.eigenda.xyz:443
-      - EIGENDA_PROXY_EIGENDA_SERVICE_MANAGER_ADDR=0xD4A7E1Bd8015057293f0D0A557088c286942e84b
-      - EIGENDA_PROXY_EIGENDA_ETH_RPC=https://ethereum-holesky-rpc.publicnode.com
-      - EIGENDA_PROXY_EIGENDA_ETH_CONFIRMATION_DEPTH=0
+      - EIGENDA_PROXY_APIS_TO_ENABLE=op-generic,standard,metrics
       - EIGENDA_PROXY_METRICS_ADDR=0.0.0.0
-      - EIGENDA_PROXY_METRICS_ENABLED=true
       - EIGENDA_PROXY_METRICS_PORT=7300
+
+      ## Storage Configuration
+      - EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE=V2
+      - EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V2
+
+      ## Memstore (for testing, turn off to use actual eigenda network)
+      ## NOTE: When memstore is enabled, traces will NOT work because memstore
+      ## bypasses the real V2 clients that have tracing instrumentation.
+      - EIGENDA_PROXY_MEMSTORE_ENABLED=false
+      - EIGENDA_PROXY_MEMSTORE_EXPIRATION=45m
+
+      ## V2 Configuration
+      - EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX=${PRIVATE_KEY}
+      - EIGENDA_PROXY_EIGENDA_V2_ETH_RPC=${HOODI_RPC_URL}
+      - EIGENDA_PROXY_EIGENDA_V2_NETWORK=hoodi_testnet
+      - EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH=16MiB
+      - EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR=0xe0F78542A950A8695f43B19Ad1Db654249e12643
+      - EIGENDA_PROXY_EIGENDA_V2_RBN_RECENCY_WINDOW_SIZE=0
+      
       ## S3
       - EIGENDA_PROXY_S3_CREDENTIAL_TYPE=static
       - EIGENDA_PROXY_S3_ACCESS_KEY_ID=minioadmin
@@ -60,9 +68,28 @@ services:
       ## Secondary routing
       - EIGENDA_PROXY_STORAGE_FALLBACK_TARGETS=s3
 
+      ## OpenTelemetry Tracing
+      - EIGENDA_PROXY_OTEL_ENABLED=true
+      - EIGENDA_PROXY_OTEL_SERVICE_NAME=eigenda-proxy
+      - EIGENDA_PROXY_OTEL_EXPORTER_OTLP_ENDPOINT=tempo:4318
+      - EIGENDA_PROXY_OTEL_EXPORTER_OTLP_INSECURE=true
+      - EIGENDA_PROXY_OTEL_TRACE_SAMPLE_RATE=1.0
+
     ports:
       - 4242:4242
       - 7300:7300
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./monitor/tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"   # tempo http
+      - "4317:4317"   # otlp grpc
+      - "4318:4318"   # otlp http
 
   prometheus:
     image: prom/prometheus:latest
@@ -86,7 +113,9 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - prometheus
+      - tempo
 
 volumes:
   grafana-data:
+  tempo-data:
   minio_data:

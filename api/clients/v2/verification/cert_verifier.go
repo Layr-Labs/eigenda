@@ -15,7 +15,11 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
+
+var tracer = otel.Tracer("github.com/Layr-Labs/eigenda/api/clients/v2/verification")
 
 // CertVerifier is responsible for making eth calls against version agnostic CertVerifier contracts to ensure
 // cryptographic and structural integrity of EigenDA certificate types.
@@ -58,6 +62,9 @@ func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) error {
+	ctx, span := tracer.Start(ctx, "CertVerifier.CheckDACert")
+	defer span.End()
+
 	// 1 - Normalize cert to V3
 	certV3 := NormalizeCertV3(cert)
 
@@ -125,6 +132,9 @@ func (cv *CertVerifier) EstimateGasCheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) (uint64, error) {
+	ctx, span := tracer.Start(ctx, "CertVerifier.EstimateGasCheckDACert")
+	defer span.End()
+
 	// Normalize cert to V3
 	certV3 := NormalizeCertV3(cert)
 
@@ -179,6 +189,8 @@ func (cv *CertVerifier) EstimateGasCheckDACert(
 // cert verifier, and cache the result for future use.
 func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, error) {
 	// get the latest cert verifier address from the address provider
+	ctx, span := tracer.Start(ctx, "CertVerifier.GetQuorumNumbersRequired")
+	defer span.End()
 
 	blockNum, err := cv.ethClient.BlockByNumber(ctx, nil)
 	if err != nil {
@@ -193,6 +205,7 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, 
 	// if the quorum numbers for the active cert verifier address have already been cached, return them immediately
 	cachedQuorumNumbers, ok := cv.requiredQuorums.Load(certVerifierAddress)
 	if ok {
+		span.SetAttributes(attribute.Bool("cache.hit", true))
 		castQuorums, ok := cachedQuorumNumbers.([]uint8)
 		if !ok {
 			return nil, fmt.Errorf("expected quorum numbers to be []uint8")
@@ -201,6 +214,7 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, 
 	}
 
 	// quorum numbers weren't cached, so proceed to fetch them
+	span.SetAttributes(attribute.Bool("cache.hit", false))
 	certVerifierCaller, err := cv.getVerifierCallerFromAddress(certVerifierAddress)
 	if err != nil {
 		return nil, fmt.Errorf("get verifier caller from address: %w", err)
@@ -249,6 +263,9 @@ func (cv *CertVerifier) getVerifierCallerFromAddress(
 // verifier which corresponds to the input reference block number. Otherwise, this method will query the confirmation
 // threshold and cache the result for future use.
 func (cv *CertVerifier) GetConfirmationThreshold(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
+	ctx, span := tracer.Start(ctx, "CertVerifier.GetConfirmationThreshold")
+	defer span.End()
+
 	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return 0, fmt.Errorf("get cert verifier address: %w", err)
@@ -257,6 +274,7 @@ func (cv *CertVerifier) GetConfirmationThreshold(ctx context.Context, referenceB
 	// if the confirmation threshold for the active cert verifier address has already been cached, return it immediately
 	cachedThreshold, ok := cv.confirmationThresholds.Load(certVerifierAddress)
 	if ok {
+		span.SetAttributes(attribute.Bool("cache.hit", true))
 		castThreshold, ok := cachedThreshold.(uint8)
 		if !ok {
 			return 0, fmt.Errorf("expected confirmation threshold to be uint8")
@@ -265,6 +283,7 @@ func (cv *CertVerifier) GetConfirmationThreshold(ctx context.Context, referenceB
 	}
 
 	// confirmation threshold wasn't cached, so proceed to fetch it
+	span.SetAttributes(attribute.Bool("cache.hit", false))
 	certVerifierCaller, err := cv.getVerifierCallerFromAddress(certVerifierAddress)
 	if err != nil {
 		return 0, fmt.Errorf("get verifier caller from address: %w", err)
@@ -286,6 +305,9 @@ func (cv *CertVerifier) GetConfirmationThreshold(ctx context.Context, referenceB
 // verifier which corresponds to the input reference block number. Otherwise, this method will query the version
 // and cache the result for future use.
 func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
+	ctx, span := tracer.Start(ctx, "CertVerifier.GetCertVersion")
+	defer span.End()
+
 	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return 0, fmt.Errorf("get cert verifier address: %w", err)
@@ -294,6 +316,7 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 	// if the version for the active cert verifier address has already been cached, return it immediately
 	cachedVersion, ok := cv.versions.Load(certVerifierAddress)
 	if ok {
+		span.SetAttributes(attribute.Bool("cache.hit", true))
 		castVersion, ok := cachedVersion.(uint8)
 		if !ok {
 			return 0, fmt.Errorf("expected version to be uint64")
@@ -302,6 +325,7 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 	}
 
 	// version wasn't cached, so proceed to fetch it
+	span.SetAttributes(attribute.Bool("cache.hit", false))
 	certVerifierCaller, err := cv.getVerifierCallerFromAddress(certVerifierAddress)
 	if err != nil {
 		return 0, fmt.Errorf("get verifier caller from address: %w", err)

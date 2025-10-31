@@ -8,4 +8,4 @@ scrape_configs:
   - job_name: "eigenda-proxy"
     static_configs:
       # configure this to point to the target eigenda-proxy instance's metrics port
-      - targets: ["localhost:7300"]
+      - targets: ["eigenda_proxy:7300"]

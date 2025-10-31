@@ -2,6 +2,7 @@ apiVersion: 1
 
 deleteDatasources:
 - name: 'Prometheus'
+- name: 'Tempo'
 
 datasources:
 - access: 'proxy'
@@ -13,3 +14,21 @@ datasources:
   type: 'prometheus'
   url: 'http://prometheus:9090'
   version: 1
+
+- access: 'proxy'
+  editable: true
+  is_default: false
+  name: 'Tempo'
+  uid: 'tempo-datasource'
+  org_id: 1
+  type: 'tempo'
+  url: 'http://tempo:3200'
+  version: 1
+  jsonData:
+    tracesToLogs:
+      datasourceUid: 'ddshms3dlineoe'
+      tags: ['job', 'instance']
+    nodeGraph:
+      enabled: true
+    serviceMap:
+      datasourceUid: 'ddshms3dlineoe'

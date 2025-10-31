@@ -161,6 +161,7 @@ func NewTestClient(
 		kzgCommitter,
 		accountant,
 		metricsv2.NoopDispersalMetrics,
+		false,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)

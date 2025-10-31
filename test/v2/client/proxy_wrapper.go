@@ -55,6 +55,7 @@ func NewProxyWrapper(
 		proxyConfig.SecretConfig,
 		registry,
 		ethClient,
+		false, // tracing disabled
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build store manager: %w", err)

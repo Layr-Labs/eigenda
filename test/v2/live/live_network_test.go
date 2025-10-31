@@ -460,6 +460,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 		nil,
 		accountant,
 		metrics.NoopDispersalMetrics,
+		false,
 	)
 	require.NoError(t, err)
 

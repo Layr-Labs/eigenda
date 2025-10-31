@@ -99,6 +99,7 @@ func CreateTestSuite(
 		appConfig.SecretConfig,
 		nil,
 		ethClient,
+		false, // tracing disabled for tests
 	)
 	if err != nil {
 		panic(fmt.Sprintf("build storage managers: %v", err.Error()))

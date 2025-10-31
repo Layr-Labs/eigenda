@@ -286,7 +286,8 @@ func createDisperserClient(
 		signer,
 		kzgCommitter,
 		nil,
-		metrics.NoopDispersalMetrics)
+		metrics.NoopDispersalMetrics,
+		false)
 }
 
 func createKzgVerifier() (*verifier.Verifier, error) {

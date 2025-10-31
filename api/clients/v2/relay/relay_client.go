@@ -287,7 +287,8 @@ func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.Rel
 		return fmt.Errorf("get relay url for key %d: %w", key, err)
 	}
 
-	dialOptions := clients.GetGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
+	// TODO: RelayClient is not set up to use tracing, so tracing is disabled by default
+	dialOptions := clients.GetGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize, false)
 
 	pool, err := common.NewGRPCClientPool(
 		c.logger,

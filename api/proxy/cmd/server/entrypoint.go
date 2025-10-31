@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
+	"github.com/Layr-Labs/eigenda/api/proxy/telemetry"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
@@ -45,6 +46,28 @@ func StartProxyService(cliCtx *cli.Context) error {
 	if err := cfg.Check(); err != nil {
 		return err
 	}
+
+	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
+	defer ctxCancel()
+
+	shutdownTracer, err := telemetry.InitTracer(ctx, cfg.TelemetryConfig)
+	if err != nil {
+		return fmt.Errorf("initialize tracer: %w", err)
+	}
+	defer func() {
+		if err := shutdownTracer(ctx); err != nil {
+			log.Error("failed to shutdown tracer", "err", err)
+		} else if cfg.TelemetryConfig.Enabled {
+			log.Info("Successfully shutdown OpenTelemetry tracer")
+		}
+	}()
+
+	if cfg.TelemetryConfig.Enabled {
+		log.Info("OpenTelemetry tracing enabled",
+			"service", cfg.TelemetryConfig.ServiceName,
+			"endpoint", cfg.TelemetryConfig.ExporterEndpoint,
+			"sample_rate", cfg.TelemetryConfig.TraceSampleRate)
+	}
 	configString, err := cfg.StoreBuilderConfig.ToString()
 	if err != nil {
 		return fmt.Errorf("convert config json to string: %w", err)
@@ -54,9 +77,6 @@ func StartProxyService(cliCtx *cli.Context) error {
 
 	registry := prometheus.NewRegistry()
 	metrics := proxy_metrics.NewMetrics(registry)
-
-	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
-	defer ctxCancel()
 
 	var ethClient common_eigenda.EthClient
 	var chainID = ""
@@ -84,6 +104,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 		cfg.SecretConfig,
 		registry,
 		ethClient,
+		cfg.TelemetryConfig.Enabled,
 	)
 	if err != nil {
 		return fmt.Errorf("build storage managers: %w", err)
