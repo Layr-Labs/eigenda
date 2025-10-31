@@ -79,7 +79,7 @@ func NewEncoderServer(
 		metrics:     metrics,
 		grpcMetrics: grpcMetrics,
 
-		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
+		runningRequests: make(chan struct{}, config.MaxConcurrentRequestsDangerous),
 		requestPool:     make(chan blobRequest, config.RequestPoolSize),
 		queueStats:      make(map[string]int),
 	}
@@ -126,7 +126,7 @@ func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobReques
 		s.queueLock.Unlock()
 	default:
 		s.metrics.IncrementRateLimitedBlobRequestNum(blobSize)
-		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
+		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequestsDangerous)
 		return nil, errors.New("too many requests")
 	}
 
