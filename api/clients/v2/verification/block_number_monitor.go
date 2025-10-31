@@ -14,7 +14,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-var blockNumberMonitorTracer = otel.Tracer("github.com/Layr-Labs/eigenda/api/clients/v2/verification/block_number_monitor")
+var blockNumberMonitorTracer = otel.Tracer(
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/block_number_monitor")
 
 // BlockNumberMonitor is a utility for waiting for a certain ethereum block number
 //
