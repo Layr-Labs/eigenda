@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/rand"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -73,9 +75,15 @@ chunks to enter this state.
 // chunkStatus is the status of a chunk download/verification from a particular validator.
 type chunkStatus int
 
+// Chunk statuses are ordered from worst to best. Do not change the order of these statuses without understanding
+// the consequences.
 const (
+	// chunks that have failed to be downloaded or verified
+	failed chunkStatus = iota
+	// chunks that have timed of the pessimistic download timeout, but still may be downloaded successfully
+	pessimisticTimeout
 	// chunks that can be downloaded
-	available chunkStatus = iota
+	available
 	// chunks that are currently being downloaded
 	downloading
 	// chunks that have been downloaded
@@ -84,11 +92,23 @@ const (
 	verifying
 	// chunks that have been verified
 	verified
-	// chunks that have failed to be downloaded or verified
-	failed
-	// chunks that have timed of the pessimistic download timeout, but still may be downloaded successfully
-	pessimisticTimeout
 )
+
+// String representations of chunk statuses.
+var chunkStatusStrings = map[chunkStatus]string{
+	failed:             "failed",
+	pessimisticTimeout: "pessimisticTimeout",
+	available:          "available",
+	downloading:        "downloading",
+	downloaded:         "downloaded",
+	verifying:          "verifying",
+	verified:           "verified",
+}
+
+// Returns true if this status is better than the other status.
+func (s chunkStatus) isBetterThan(other chunkStatus) bool {
+	return s > other
+}
 
 // TODO(cody.littley): the following improvements can be made in the future
 //  - check to see if it's faster to send the bare minimum number of chunks to decoding, modify code accordingly
@@ -176,21 +196,26 @@ type retrievalWorker struct {
 	// Contains chunks that have been verified.
 	verifiedChunksQueue queues.Queue
 
-	// The status of the chunks from each validator. The key is the operator ID, and the value is the
-	// status of the chunks.
-	chunkStatusMap map[core.OperatorID]chunkStatus
+	// The status of the chunks from each validator. The key is the validator ID, and the value is the
+	// status for all chunks assigned to that validator.
+	validatorStatusMap map[core.OperatorID]chunkStatus
+
+	// The status of each individual chunk.
+	chunkStatusMap map[uint32]chunkStatus
 
 	// Counts the number of chunks in each status.
 	chunkStatusCounts map[chunkStatus]int
 
-	// For the purposes of retrieving this blob, the validator that we have decided to mark as being the "owner".
-	// Although it's possible that a particular chunk might be available from more than one validator, we only
-	// ever attempt to fetch any particular chunk from a single source.
-	// Our assignment scheme allows for chunk indices to be assigned to multiple validators. The retrieval worker
-	// will track only a single status for each chunk index, by assigning each chunk index to a single validator.
-	// When a validator's status is updated, we only update the status for the chunks for which it is the owner.
-	// Redundant chunks may be downloaded and verified by the worker, but they will not count toward status counts.
-	chunkOwner map[uint32]core.OperatorID
+	// The current "owner" of a chunk. A chunk's owner is defined as the validator that is assigned the chunk,
+	// and has reached the "best" status so far. One validator may steal ownership from another validator if it
+	// reaches a better status. If the owner of a chunk transitions to a worse status, the chunk remains owned by that
+	// validator until another validator reaches a better status. A validator that is not the owner of a chunk may
+	// never cause the status of that chunk to get "worse".
+	//
+	// As a potential future optimization, we could keep track of the status of each chunk for each of the validators
+	// that chunk is assigned to. But this is quite complex, and so only tracking the best status via this owner map
+	// is sufficient for now.
+	chunkOwnerMap map[uint32]core.OperatorID
 }
 
 // downloadStarted is used to signal that a download of chunk data has been initiated.
@@ -253,26 +278,42 @@ func newRetrievalWorker(
 		downloadOrder = append(downloadOrder, opID)
 	}
 
+	// Randomly shuffle download order. Golang map iteration is random(ish), but not completely random.
+	// Map iteration order behaves like a random fixed ordering where you start in a random place and wrap around.
+	rand.Shuffle(len(downloadOrder), func(i, j int) {
+		downloadOrder[i], downloadOrder[j] = downloadOrder[j], downloadOrder[i]
+	})
+
+	validatorStatusMap := make(map[core.OperatorID]chunkStatus)
+	chunkStatusMap := make(map[uint32]chunkStatus)
+	chunkStatusCounts := make(map[chunkStatus]int)
+	chunkOwnerMap := make(map[uint32]core.OperatorID)
+
+	for _, opID := range downloadOrder {
+		for _, index := range assignments[opID].Indices {
+			chunkStatusMap[index] = available
+		}
+		validatorStatusMap[opID] = available
+	}
+	chunkStatusCounts[available] = len(chunkStatusMap)
+
+	if len(chunkStatusMap) < int(minimumChunkCount) {
+		return nil, fmt.Errorf(
+			"not enough unique chunks assigned to meet minimumChunkCount: %d < %d",
+			len(chunkStatusMap), minimumChunkCount)
+	} else if config.DetailedLogging {
+		logger.Debug("initialized retrieval worker",
+			"blobKey", blobKey.Hex(),
+			"minimumChunkCount", minimumChunkCount,
+			"uniqueChunksWithAssignments", len(chunkStatusMap),
+		)
+	}
+
 	// The retrieval worker uses two contexts. The downloadAndVerifyCtx is cancelled once a sufficient number
 	// of chunks have been downloaded and verified. This causes all ongoing downloads and verifications to be
 	// aborted (if possible), since they are not needed. There are other operations that require a context after
 	// the downloadAndVerifyCtx is cancelled, so we need to keep a reference the original context as well.
 	downloadAndVerifyCtx, downloadAndVerifyCancel := context.WithCancel(ctx)
-
-	chunkStatusMap := make(map[core.OperatorID]chunkStatus)
-	chunkOwner := make(map[uint32]core.OperatorID)
-	chunkStatusCounts := make(map[chunkStatus]int)
-
-	for _, opID := range downloadOrder {
-		for _, index := range assignments[opID].Indices {
-			_, ok := chunkOwner[index]
-			if !ok {
-				chunkStatusCounts[available]++
-				chunkOwner[index] = opID
-			}
-		}
-		chunkStatusMap[opID] = available
-	}
 
 	totalChunkCount := uint32(chunkStatusCounts[available])
 
@@ -302,9 +343,10 @@ func newRetrievalWorker(
 		verifiedChunksQueue:       linkedlistqueue.New(),
 		downloadOrder:             downloadOrder,
 		totalChunkCount:           totalChunkCount,
+		validatorStatusMap:        validatorStatusMap,
 		chunkStatusMap:            chunkStatusMap,
 		chunkStatusCounts:         chunkStatusCounts,
-		chunkOwner:                chunkOwner,
+		chunkOwnerMap:             chunkOwnerMap,
 		targetDownloadCount:       targetDownloadCount,
 		targetVerifiedCount:       targetVerifiedCount,
 		validatorGRPCManager:      validatorGRPCManager,
@@ -315,42 +357,62 @@ func newRetrievalWorker(
 	return worker, nil
 }
 
-// updateChunkStatus updates the status of a chunk from a given operator. It also updates the
+// updateValidatorStatus updates the status of a chunk from a given operator. It also updates the
 // counts of the various chunk statuses.
-func (w *retrievalWorker) updateChunkStatus(operatorID core.OperatorID, status chunkStatus) {
+func (w *retrievalWorker) updateValidatorStatus(validatorId core.OperatorID, validatorStatus chunkStatus) {
+	w.validatorStatusMap[validatorId] = validatorStatus
 
-	oldStatus, ok := w.chunkStatusMap[operatorID]
-	w.chunkStatusMap[operatorID] = status
+	assignments, ok := w.assignments[validatorId]
+	if !ok {
+		// This validator has no assigned chunks
+		w.logger.Warnf("validator %s has no assigned chunks", validatorId.Hex())
+		return
+	}
 
-	numChunks := 0
-	for _, index := range w.assignments[operatorID].Indices {
-		_, ok := w.chunkOwner[index]
-		// If the new status is verified and the oldStatus is anything else, we move the chunk to the current operator
-		// as a new owner.
-		// TODO(@cody-littley): When setting a chunk to failed, if there is any other validator assigned to the chunk with a non-failed status,
-		// we should shift ownership to that validator.
-		if !ok || (status == verified && oldStatus != verified) {
-			w.chunkOwner[index] = operatorID
+	for _, chunkIndex := range assignments.Indices {
+		oldStatus, chunkHasStatus := w.chunkStatusMap[chunkIndex]
+		enforce.True(chunkHasStatus, "chunk %d has no status in chunkStatusMap", chunkIndex)
+
+		currentChunkOwner, hasOwner := w.chunkOwnerMap[chunkIndex]
+		if !hasOwner {
+			// If this chunk has no owner, take ownership
+			w.chunkOwnerMap[chunkIndex] = validatorId
+			currentChunkOwner = validatorId
 		}
-		if w.chunkOwner[index] == operatorID {
-			numChunks++
+
+		if validatorStatus.isBetterThan(oldStatus) || currentChunkOwner == validatorId {
+			// There are two conditions where we update the chunk status:
+			// 1. The validator reporting the status change owns the chunk
+			// 2. The validator reporting the status change has a better status than the current chunk status
+			//    (it will "steal" ownership of the chunk in this case)
+
+			w.chunkStatusMap[chunkIndex] = validatorStatus
+
+			w.chunkStatusCounts[oldStatus]--
+			w.chunkStatusCounts[validatorStatus]++
+
+			// The owner is always the latest validator to update the chunk status
+			w.chunkOwnerMap[chunkIndex] = validatorId
 		}
 	}
 
-	if ok {
-		w.chunkStatusCounts[oldStatus] -= numChunks
+	if w.config.DetailedLogging {
+		w.logger.Debug("updating chunk status counts",
+			"validatorId", validatorId.Hex(),
+			"validatorStatus", chunkStatusStrings[validatorStatus],
+			"failed", w.chunkStatusCounts[failed],
+			"pessimisticTimeout", w.chunkStatusCounts[pessimisticTimeout],
+			"available", w.chunkStatusCounts[available],
+			"downloading", w.chunkStatusCounts[downloading],
+			"downloaded", w.chunkStatusCounts[downloaded],
+			"verifying", w.chunkStatusCounts[verifying],
+			"verified", w.chunkStatusCounts[verified],
+		)
 	}
-	w.chunkStatusCounts[status] += numChunks
-}
-
-// getChunkStatus returns the status of a chunk from a given operator.
-func (w *retrievalWorker) getChunkStatus(operatorID core.OperatorID) chunkStatus {
-	return w.chunkStatusMap[operatorID]
 }
 
 // getStatusCount returns the number of chunks with one of the given statuses.
 func (w *retrievalWorker) getStatusCount(statuses ...chunkStatus) uint32 {
-
 	total := 0
 	for _, status := range statuses {
 		if count, ok := w.chunkStatusCounts[status]; ok {
@@ -417,7 +479,7 @@ func (w *retrievalWorker) checkPessimisticTimeout() {
 		operatorID := next.(*downloadStarted).operatorID
 		downloadStart := next.(*downloadStarted).downloadStart
 
-		if w.getChunkStatus(operatorID) != downloading {
+		if w.validatorStatusMap[operatorID] != downloading {
 			// The operator has finished downloading, we can remove it from the queue.
 			w.downloadsInProgressQueue.Dequeue()
 			continue
@@ -434,7 +496,7 @@ func (w *retrievalWorker) checkPessimisticTimeout() {
 			}
 			w.downloadsInProgressQueue.Dequeue()
 
-			w.updateChunkStatus(operatorID, pessimisticTimeout)
+			w.updateValidatorStatus(operatorID, pessimisticTimeout)
 		} else {
 			// The next download has not yet timed out.
 			break
@@ -451,14 +513,14 @@ func (w *retrievalWorker) handleCompletedDownload(message *downloadCompleted) {
 				"blobKey", w.blobKey.Hex())
 		}
 		w.downloadedChunksQueue.Enqueue(message)
-		w.updateChunkStatus(message.operatorID, downloaded)
+		w.updateValidatorStatus(message.operatorID, downloaded)
 	} else {
 		w.logger.Warn("failed to download chunk data",
 			"operator", message.operatorID.Hex(),
 			"blobKey", w.blobKey.Hex(),
 			"err", message.err)
 
-		w.updateChunkStatus(message.operatorID, failed)
+		w.updateValidatorStatus(message.operatorID, failed)
 	}
 }
 
@@ -471,14 +533,14 @@ func (w *retrievalWorker) handleVerificationCompleted(message *verificationCompl
 				"blobKey", w.blobKey.Hex())
 		}
 		w.verifiedChunksQueue.Enqueue(message)
-		w.updateChunkStatus(message.operatorID, verified)
+		w.updateValidatorStatus(message.operatorID, verified)
 	} else {
 		w.logger.Warn("failed to verify chunk data",
 			"operator", message.operatorID.Hex(),
 			"blobKey", w.blobKey.Hex(),
 			"err", message.err)
 
-		w.updateChunkStatus(message.operatorID, failed)
+		w.updateValidatorStatus(message.operatorID, failed)
 	}
 }
 
@@ -490,7 +552,7 @@ func (w *retrievalWorker) scheduleDownloads() {
 			break
 		}
 		operatorID := w.downloadOrder[w.nextDownloadIndex]
-		w.updateChunkStatus(operatorID, downloading)
+		w.updateValidatorStatus(operatorID, downloading)
 
 		w.connectionPool.Submit(func() {
 			w.downloadChunks(operatorID)
@@ -512,7 +574,7 @@ func (w *retrievalWorker) scheduleVerifications() {
 		reply := next.(*downloadCompleted).reply
 		operatorID := next.(*downloadCompleted).operatorID
 
-		w.updateChunkStatus(operatorID, verifying)
+		w.updateValidatorStatus(operatorID, verifying)
 
 		w.computePool.Submit(func() {
 			w.deserializeAndVerifyChunks(operatorID, reply)
