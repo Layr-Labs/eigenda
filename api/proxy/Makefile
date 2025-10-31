@@ -15,7 +15,7 @@ clean:
 
 docker-build:
 	# we only use this to build the docker image locally, so we give it the dev tag as a reminder
-	cd ../.. && docker buildx bake proxy --load
+	cd ../.. && SEMVER=$(GIT_TAG) GIT_SHORT_SHA=$(GIT_COMMIT) GITDATE=$(BUILD_TIME) docker buildx bake proxy --load
 
 run-memstore-server: build
 	./bin/eigenda-proxy --memstore.enabled --metrics.enabled  --storage.backends-to-enable v2
