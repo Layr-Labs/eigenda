@@ -128,6 +128,9 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		r.HandleFunc("/admin/eigenda-dispersal-backend", svr.handleGetEigenDADispersalBackend).Methods("GET")
 		r.HandleFunc("/admin/eigenda-dispersal-backend", svr.handleSetEigenDADispersalBackend).Methods("PUT")
 	}
+
+	// proxy compatibility config endpoint
+	r.HandleFunc("/config", svr.handleGetCompatibilityConfig).Methods("GET")
 }
 
 func notCommitmentModeStandard(r *http.Request, _ *mux.RouteMatch) bool {

@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -168,7 +169,9 @@ func prepareBlobs(
 
 		params, err := corev2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
 		require.NoError(t, err)
-		frames, _, err := p.GetFrames(blob, params)
+		blobFr, err := rs.ToFrArray(blob)
+		require.NoError(t, err)
+		frames, _, err := p.GetFrames(ctx, blobFr, params)
 		require.NoError(t, err)
 		state, err := cst.GetOperatorState(ctx, uint(referenceBlockNumber), header.QuorumNumbers)
 

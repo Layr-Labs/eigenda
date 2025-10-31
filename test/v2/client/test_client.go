@@ -325,7 +325,10 @@ func NewTestClient(
 		NumWorker:       32,
 	}
 	verifierKzgConfig := verifier.ConfigFromV1KzgConfig(kzgConfig)
-	encoder := rs.NewEncoder(logger, nil)
+	encoder, err := rs.NewEncoder(logger, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create encoder: %w", err)
+	}
 	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)

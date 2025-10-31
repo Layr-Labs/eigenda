@@ -38,12 +38,15 @@ func TestEncoder(t *testing.T) {
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig)
 	require.NoError(t, err)
 
-	encoder := rs.NewEncoder(harness.logger, nil)
+	encoder, err := rs.NewEncoder(harness.logger, nil)
+	require.NoError(t, err)
 
 	params := encoding.ParamsFromMins(5, 5)
 	commitments, err := c.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
 	require.NoError(t, err)
-	frames, _, err := p.GetFrames(harness.paddedGettysburgAddressBytes, params)
+	gettysburgAddressFrs, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
+	require.NoError(t, err)
+	frames, _, err := p.GetFrames(t.Context(), gettysburgAddressFrs, params)
 	require.NoError(t, err)
 
 	indices := []encoding.ChunkNumber{
@@ -100,7 +103,10 @@ func FuzzOnlySystematic(f *testing.F) {
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
 
 		//encode the data
-		frames, _, err := group.GetFrames(input, params)
+		inputFr, err := rs.ToFrArray(input)
+		require.NoError(t, err)
+
+		frames, _, err := group.GetFrames(t.Context(), inputFr, params)
 		require.NoError(t, err)
 
 		for _, frame := range frames {
@@ -114,7 +120,8 @@ func FuzzOnlySystematic(f *testing.F) {
 		//sample the correct systematic frames
 		samples, indices := sampleFrames(frames, uint64(len(frames)))
 
-		encoder := rs.NewEncoder(harness.logger, nil)
+		encoder, err := rs.NewEncoder(harness.logger, nil)
+		require.NoError(t, err)
 		chunks := make([]rs.FrameCoeffs, len(samples))
 		for i, f := range samples {
 			chunks[i] = f.Coeffs

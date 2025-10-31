@@ -268,6 +268,11 @@ target "blobapi" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "blobapi"
+  args       = {
+    SEMVER    = "${SEMVER}"
+    GITCOMMIT = "${GIT_SHORT_SHA}"
+    GITDATE   = "${GITDATE}"
+  }
   tags       = ["${REGISTRY}/${REPO}/blobapi:${BUILD_TAG}"]
 }
 
@@ -284,6 +289,11 @@ target "proxy" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "proxy"
+  args       = {
+    SEMVER    = "${SEMVER}"
+    GITCOMMIT = "${GIT_SHORT_SHA}"
+    GITDATE   = "${GITDATE}"
+  }
   # We push to layr-labs/ directly instead of layr-labs/eigenda/ for historical reasons,
   # since proxy was previously in its own repo: https://github.com/Layr-Labs/eigenda-proxy
   tags       = ["${REGISTRY}/layr-labs/eigenda-proxy:${BUILD_TAG}"]

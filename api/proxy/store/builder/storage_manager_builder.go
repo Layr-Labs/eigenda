@@ -30,7 +30,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	"github.com/prometheus/client_golang/prometheus"
@@ -64,6 +63,7 @@ func BuildManagers(
 	config Config,
 	secrets common.SecretConfigV2,
 	registry *prometheus.Registry,
+	ethClient common_eigenda.EthClient,
 ) (*store.EigenDAManager, *store.KeccakManager, error) {
 	var err error
 	var s3Store *s3.Store
@@ -116,8 +116,12 @@ func BuildManagers(
 				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 			}
 		}
+		encoder, err := rsv2.NewEncoder(log, nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("new v2 encoder: %w", err)
+		}
 		eigenDAV2Store, err = buildEigenDAV2Backend(
-			ctx, log, config, secrets, rsv2.NewEncoder(log, nil), kzgVerifier, registry)
+			ctx, log, config, secrets, encoder, kzgVerifier, registry, ethClient)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
 		}
@@ -224,6 +228,7 @@ func buildEigenDAV2Backend(
 	encoder *rsv2.Encoder,
 	kzgVerifier *kzgverifierv2.Verifier,
 	registry *prometheus.Registry,
+	ethClient common_eigenda.EthClient,
 ) (common.EigenDAV2Store, error) {
 	kzgCommitter, err := committer.NewFromConfig(committer.Config{
 		G1SRSPath:         config.KzgConfig.G1Path,
@@ -237,11 +242,6 @@ func buildEigenDAV2Backend(
 
 	if config.MemstoreEnabled {
 		return memstore_v2.New(ctx, log, config.MemstoreConfig, kzgVerifier.G1SRS), nil
-	}
-
-	ethClient, err := buildEthClient(ctx, log, secrets, config.ClientConfigV2.EigenDANetwork)
-	if err != nil {
-		return nil, fmt.Errorf("build eth client: %w", err)
 	}
 
 	routerOrImmutableVerifierAddr := geth_common.HexToAddress(config.ClientConfigV2.EigenDACertVerifierOrRouterAddress)
@@ -401,6 +401,9 @@ func buildEigenDAV2Backend(
 		certVerifier,
 		config.ClientConfigV2.RBNRecencyWindowSize,
 		retrievers,
+		// PayloadDisperserCfg.ContractCallTimeout is set by the --eigenda.v2.contract-call-timeout flag, the value
+		// is not read into any other configs. For simplicity the PayloadDisperserCfg value is reused here.
+		config.ClientConfigV2.PayloadDisperserCfg.ContractCallTimeout,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create v2 store: %w", err)
@@ -455,44 +458,6 @@ func buildEigenDAV1Backend(
 		log,
 		storeConfig,
 	)
-}
-
-func buildEthClient(ctx context.Context, log logging.Logger, secretConfigV2 common.SecretConfigV2,
-	expectedNetwork common.EigenDANetwork) (common_eigenda.EthClient, error) {
-	gethCfg := geth.EthClientConfig{
-		RPCURLs: []string{secretConfigV2.EthRPCURL},
-	}
-
-	ethClient, err := geth.NewClient(gethCfg, geth_common.Address{}, 0, log)
-	if err != nil {
-		return nil, fmt.Errorf("create geth client: %w", err)
-	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	chainID, err := ethClient.ChainID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get chain ID from ETH RPC: %w", err)
-	}
-
-	log.Infof("Using chain id: %d", chainID.Uint64())
-
-	// Validate that the chain ID matches the expected network
-	if expectedNetwork != "" {
-		actualNetworks, err := common.EigenDANetworksFromChainID(chainID.String())
-		if err != nil {
-			return nil, fmt.Errorf("unknown chain ID %s: %w", chainID.String(), err)
-		}
-		if !slices.Contains(actualNetworks, expectedNetwork) {
-			return nil, fmt.Errorf("network mismatch: expected %s (based on configuration), but ETH RPC "+
-				"returned chain ID %s which corresponds to %s",
-				expectedNetwork, chainID.String(), actualNetworks)
-		}
-
-		log.Infof("Detected EigenDA network: %s. Will use for reading network default values if overrides "+
-			"aren't provided.", expectedNetwork.String())
-	}
-
-	return ethClient, nil
 }
 
 func buildRelayPayloadRetriever(

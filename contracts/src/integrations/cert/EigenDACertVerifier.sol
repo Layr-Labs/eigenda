@@ -62,7 +62,6 @@ contract EigenDACertVerifier is
         UNUSED_HISTORICAL_REQUIRED_QUORUMS_NOT_SUBSET,
         INVALID_CERT, // 400: Certificate is invalid due to some revert from the verification library
         INTERNAL_ERROR // 500: Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
-
     }
 
     constructor(
@@ -118,12 +117,14 @@ contract EigenDACertVerifier is
         // between different execution environments: EVM running onchain during optimistic rollup fraud proofs, zkVM, eth-call with higher gas limit.
         try this.checkDACertReverts(daCert) {
             return uint8(StatusCode.SUCCESS);
-        } catch Error(string memory) /*reason*/ {
+        } catch Error(string memory) {
+            /*reason*/
             // This matches any require(..., "string reason") revert that is pre custom errors,
             // which many of our current eigenlayer-middleware dependencies like the BLSSignatureChecker still use. See:
             // https://github.com/Layr-Labs/eigenlayer-middleware/blob/fe5834371caed60c1d26ab62b5519b0cbdcb42fa/src/BLSSignatureChecker.sol#L96
             return uint8(StatusCode.INVALID_CERT);
-        } catch Panic(uint256) /*errorCode*/ {
+        } catch Panic(uint256) {
+            /*errorCode*/
             // This matches any panic (e.g. arithmetic overflow, division by zero, invalid array access, etc.),
             // which means a bug or misconfiguration of the CertVerifier contract itself.
             return uint8(StatusCode.INTERNAL_ERROR);
