@@ -188,7 +188,7 @@ func NewTestConfig(
 		WriteThreadCount:              0,
 		WriteOnCacheMiss:              false,
 		ErrorOnSecondaryInsertFailure: false,
-		ClientLedgerMode:              clientledger.ClientLedgerModeLegacy,
+		ClientLedgerMode:              clientledger.ClientLedgerModeReservationOnly,
 		VaultMonitorInterval:          30 * time.Second,
 	}
 }
