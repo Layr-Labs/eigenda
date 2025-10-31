@@ -128,7 +128,7 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("setup payment vault transactor: %w", err)
 	}
 
-	testCtx.APIServerV2Address = infra.DisperserHarness.APIServerV2Address
+	testCtx.APIServerAddress = infra.DisperserHarness.APIServerAddress
 
 	if err := setupDefaultPayloadDisperser(ctx, testCtx, infra); err != nil {
 		return nil, fmt.Errorf("setup default payload disperser: %w", err)
@@ -303,7 +303,7 @@ func setupDefaultPayloadDisperser(
 	infra *InfrastructureHarness,
 ) error {
 	// default value for the private key is the one that has the reservation pre-registered on-chain
-	// APIServerAddress will be automatically populated from testHarness.APIServerV2Address
+	// APIServerAddress will be automatically populated from testHarness.APIServerAddress
 	config := GetDefaultTestPayloadDisperserConfig()
 	payloadDisperser, err := testHarness.CreatePayloadDisperser(ctx, infra.Logger, config)
 	if err != nil {
