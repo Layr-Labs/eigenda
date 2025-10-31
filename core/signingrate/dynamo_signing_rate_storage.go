@@ -14,6 +14,98 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// DynamoDB Storage Structure Documentation
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+//
+// ## What We're Storing
+//
+// This storage layer persists signing rate buckets (SigningRateBucket objects) to DynamoDB.
+// Each bucket represents a time window containing signing rate data. We need to:
+//   1. Store new buckets as they're created
+//   2. Retrieve all buckets that ended after a specific time (for loading historical data)
+//
+// ## DynamoDB Basics
+//
+// DynamoDB is a NoSQL key-value database. Unlike SQL databases with tables and flexible queries,
+// DynamoDB has strict requirements about how you access data:
+//
+// **Primary Key (Partition Key)**
+//   - Every table MUST have a primary key that uniquely identifies each item (row)
+//   - You can retrieve items directly by their primary key (very fast, single-digit millisecond)
+//   - You CANNOT query by other attributes without creating indexes
+//
+// **Global Secondary Index (GSI)**
+//   - A GSI is an alternative "view" of your table with a different key structure
+//   - Lets you query the table using different attributes than the primary key
+//   - GSIs MUST have a partition key, and optionally a sort key for range queries
+//   - GSIs duplicate your data (managed automatically by DynamoDB)
+//
+// **Important Constraint**: All DynamoDB queries MUST specify a partition key value.
+//   - You cannot do a "scan all items where X > Y" without a partition key
+//   - This is a fundamental DynamoDB limitation/design choice for "performance"
+//   - Since we don't have a natural partition key for our query pattern, this code
+//     uses a hacky workaround (explained below).
+//
+// ## Our Table Structure
+//
+// **Main Table:**
+//   - Primary Key: StartTimestamp (when the bucket started)
+//     * This makes sense because each bucket has a unique start time
+//     * Allows us to store/retrieve specific buckets efficiently
+//   - Other Attributes:
+//     * EndTimestamp: When the bucket ended
+//     * Payload: The serialized protobuf data (the actual bucket contents)
+//     * PayloadType: A dummy constant value (used as a dummy partition key, explained below)
+//
+// **Global Secondary Index (EndTimestampIndex):**
+//   - Partition Key: PayloadType (always set to "Payload" - a constant dummy value)
+//   - Sort Key: EndTimestamp (allows range queries like "EndTimestamp > X")
+//
+// ## Why This Design?
+//
+// **Problem**: We need to query "all buckets where EndTimestamp > X" to load historical data.
+//   - We can't use the main table because its key is StartTimestamp
+//   - DynamoDB won't let us query by EndTimestamp without an index
+//
+// **Solution**: Create a Global Secondary Index with EndTimestamp as the sort key.
+//   - But GSIs require a partition key (DynamoDB rule)
+//   - We don't have a natural partition key for this query pattern
+//
+// **The Dummy Partition Key Trick**:
+//   - We create an artificial attribute called PayloadType that's always "Payload"
+//   - Every item gets the same PayloadType value
+//   - This puts all items in the same partition for the GSI
+//   - Now we can query: "PayloadType = 'Payload' AND EndTimestamp > X"
+//
+// **Why Zero-Pad Timestamps?**
+//   - DynamoDB sorts strings lexicographically (like dictionary order)
+//   - "9" > "10" in string comparison, but 9 < 10 numerically
+//   - Zero-padding ensures string sort order matches numerical order
+//   - "0009" < "0010" (correct!)
+//   - We pad to 20 digits to handle the full uint64 range
+//
+// ## Example Query Flow
+//
+// To load all buckets ending after time T:
+//   1. Query the EndTimestampIndex GSI
+//   2. Condition: PayloadType = "Payload" AND EndTimestamp > timestampToString(T)
+//   3. DynamoDB returns matching items ordered by EndTimestamp
+//   4. We deserialize the Payload attribute to get the bucket objects
+//   5. Sort by StartTimestamp for deterministic ordering (EndTimestamp may not be unique)
+//
+// ## Data Format
+//
+// Each item in the table looks like:
+//   {
+//     "StartTimestamp": "00000000001234567890",  // Primary key (zero-padded)
+//     "EndTimestamp":   "00000000001234568890",  // Used for range queries (zero-padded)
+//     "PayloadType":    "Payload",               // Dummy partition key (always "Payload")
+//     "Payload":        <binary protobuf data>   // Serialized SigningRateBucket
+//   }
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
 const (
 	// DynamoDB attribute names - these define the column names in our table
 	attrStartTimestamp = "StartTimestamp" // Primary key: when the bucket started (unique identifier)
