@@ -27,19 +27,19 @@ import (
 // The problem is that the cleanup logic sometimes randomly fails to free docker ports, so subsequent setups fail.
 // Once we figure out why resources aren't being freed, then these tests will be runnable the "normal" way.
 
-func TestLegacyController(t *testing.T) {
+func TestLegacyPayments(t *testing.T) {
 	// manual test for now
 	test.SkipInCI(t)
-	testWithControllerMode(t, false)
+	testWithPaymentMode(t, false)
 }
 
-func TestNewController(t *testing.T) {
+func TestNewPayments(t *testing.T) {
 	// manual test for now
 	test.SkipInCI(t)
-	testWithControllerMode(t, true)
+	testWithPaymentMode(t, true)
 }
 
-func testWithControllerMode(t *testing.T, controllerUseNewPayments bool) {
+func testWithPaymentMode(t *testing.T, useNewPayments bool) {
 	// Save current working directory. The setup process in its current form changes working directory, which causes
 	// subsequent executions to fail, since the process relies on relative paths. This is a workaround for now: we just
 	// capture the original working directory, and switch back to it as a cleanup step.
@@ -52,12 +52,12 @@ func testWithControllerMode(t *testing.T, controllerUseNewPayments bool) {
 	})
 
 	infraConfig := &integration.InfrastructureConfig{
-		TemplateName:             "testconfig-anvil.yaml",
-		TestName:                 "",
-		Logger:                   test.GetLogger(),
-		RootPath:                 "../../../",
-		RelayCount:               4,
-		ControllerUseNewPayments: controllerUseNewPayments,
+		TemplateName:   "testconfig-anvil.yaml",
+		TestName:       "",
+		Logger:         test.GetLogger(),
+		RootPath:       "../../../",
+		RelayCount:     4,
+		UseNewPayments: useNewPayments,
 	}
 
 	infra, err := integration.SetupInfrastructure(t.Context(), infraConfig)

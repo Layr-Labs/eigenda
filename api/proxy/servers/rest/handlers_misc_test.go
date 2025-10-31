@@ -16,6 +16,70 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+func TestConfigEndpoint(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
+	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
+
+	t.Run("Success - Returns All CompatibilityConfig Fields", func(t *testing.T) {
+		// Setup test config with known values
+		apisEnabled := enablement.RestApisEnabled{
+			Admin:               true,
+			OpGenericCommitment: true,
+			OpKeccakCommitment:  true,
+			StandardCommitment:  true,
+		}
+
+		enabledServicesConfig := enablement.EnabledServersConfig{
+			Metric:        true,
+			ArbCustomDA:   true,
+			RestAPIConfig: apisEnabled,
+		}
+
+		testCompatibilityConfig := common.CompatibilityConfig{
+			Version:             "1.2.3",
+			ChainID:             "11155111",
+			DirectoryAddress:    "0x1234567890abcdef",
+			CertVerifierAddress: "0xfedcba0987654321",
+			MaxPayloadSizeBytes: 16777216, // 16 MiB
+			RecencyWindowSize:   100,
+			APIsEnabled:         enabledServicesConfig.ToAPIStrings(),
+		}
+
+		cfg := Config{
+			Host:             "localhost",
+			Port:             0,
+			APIsEnabled:      &apisEnabled,
+			CompatibilityCfg: testCompatibilityConfig,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/config", nil)
+		rec := httptest.NewRecorder()
+
+		r := mux.NewRouter()
+		server := NewServer(cfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+		server.RegisterRoutes(r)
+		r.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+		var response common.CompatibilityConfig
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		// Verify all fields
+		require.Equal(t, testCompatibilityConfig.Version, response.Version)
+		require.Equal(t, testCompatibilityConfig.ChainID, response.ChainID)
+		require.Equal(t, testCompatibilityConfig.DirectoryAddress, response.DirectoryAddress)
+		require.Equal(t, testCompatibilityConfig.CertVerifierAddress, response.CertVerifierAddress)
+		require.Equal(t, testCompatibilityConfig.MaxPayloadSizeBytes, response.MaxPayloadSizeBytes)
+		require.Equal(t, testCompatibilityConfig.RecencyWindowSize, response.RecencyWindowSize)
+		require.Equal(t, testCompatibilityConfig.APIsEnabled, response.APIsEnabled)
+	})
+}
+
 func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
