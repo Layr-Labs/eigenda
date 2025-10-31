@@ -100,6 +100,36 @@ type DisperserHarness struct {
 	ControllerServer *server.Server
 }
 
+// TODO: Consider refactoring these component structs into the underlying packages (relay, encoder, controller,
+// apiserver). This would reduce maintenance burden on tests - if the production code changes, the component structs
+// would be updated alongside it. Currently these exist here because production code runs each service as a separate
+// binary, while the test harness runs them as goroutines and needs to return/track the created objects.
+
+// RelayComponents contains the components created by startRelays
+type RelayComponents struct {
+	Servers []*relay.Server
+}
+
+// EncoderComponents contains the components created by startEncoderV2
+type EncoderComponents struct {
+	Server  *encoder.EncoderServerV2
+	Address string
+}
+
+// ControllerComponents contains the components created by startController
+type ControllerComponents struct {
+	EncodingManager  *controller.EncodingManager
+	Dispatcher       *controller.Dispatcher
+	ControllerServer *server.Server
+	Address          string
+}
+
+// APIServerComponents contains the components created by startAPIServerV2
+type APIServerComponents struct {
+	Server  *apiserver.DispersalServerV2
+	Address string
+}
+
 // setupLocalStackResources initializes LocalStack and deploys AWS resources
 func setupLocalStackResources(
 	ctx context.Context,
@@ -214,42 +244,51 @@ func SetupDisperserHarness(
 
 	// Start relay goroutines if relay count is specified
 	if config.RelayCount > 0 {
-		if err := startRelays(ctx, logger, ethClient, harness, config); err != nil {
+		relayComponents, err := startRelays(ctx, logger, ethClient, harness.LocalStack, config)
+		if err != nil {
 			return nil, fmt.Errorf("failed to start relays: %w", err)
 		}
+		harness.RelayServers = relayComponents.Servers
 	} else {
 		logger.Warn("Relay count is not specified, skipping relay setup")
 	}
 
 	// Start encoder v2 goroutine
-	encoderAddress, err := startEncoderV2(ctx, harness, config)
+	encoderComponents, err := startEncoderV2(ctx, harness.LocalStack, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start encoder v2: %w", err)
 	}
+	harness.EncoderServerV2 = encoderComponents.Server
+	encoderAddress := encoderComponents.Address
 
 	// Start controller goroutine
-	controllerAddress, err := startController(
+	controllerComponents, err := startController(
 		ctx,
 		ethClient,
 		config.OperatorStateSubgraphURL,
 		encoderAddress,
-		harness,
+		harness.LocalStack,
 		config,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start controller: %w", err)
 	}
+	harness.EncodingManager = controllerComponents.EncodingManager
+	harness.Dispatcher = controllerComponents.Dispatcher
+	harness.ControllerServer = controllerComponents.ControllerServer
 
 	// Start API server v2 goroutine
-	if _, err := startAPIServerV2(
+	apiServerComponents, err := startAPIServerV2(
 		ctx,
 		ethClient,
-		controllerAddress,
-		harness,
+		controllerComponents.Address,
+		harness.LocalStack,
 		config,
-	); err != nil {
+	)
+	if err != nil {
 		return nil, fmt.Errorf("failed to start API server v2: %w", err)
 	}
+	harness.APIServerV2 = apiServerComponents.Server
 
 	// Start remaining binaries (disperser, batcher, etc.)
 	if config.TestConfig != nil {
@@ -271,9 +310,9 @@ func startRelays(
 	ctx context.Context,
 	logger logging.Logger,
 	ethClient common.EthClient,
-	harness *DisperserHarness,
+	localStack *testbed.LocalStackContainer,
 	config DisperserHarnessConfig,
-) error {
+) (*RelayComponents, error) {
 	logger.Info("Pre-creating listeners for relay goroutines", "count", config.RelayCount)
 
 	// Pre-create all listeners with port 0 (OS assigns ports)
@@ -290,7 +329,7 @@ func startRelays(
 					logger.Warn("Failed to close listener for relay", "index", j, "error", err)
 				}
 			}
-			return fmt.Errorf("failed to create listener for relay %d: %w", i, err)
+			return nil, fmt.Errorf("failed to create listener for relay %d: %w", i, err)
 		}
 		listeners[i] = listener
 
@@ -308,24 +347,27 @@ func startRelays(
 	}
 
 	// Now start each relay with its pre-created listener
+	relayServers := make([]*relay.Server, 0, config.RelayCount)
 	for i, listener := range listeners {
-		instance, err := startRelayWithListener(ctx, ethClient, i, listener, harness, config)
+		instance, err := startRelayWithListener(ctx, ethClient, i, listener, localStack, config)
 		if err != nil {
 			// Clean up any relays we started and all remaining listeners
-			stopAllRelays(harness.RelayServers, logger)
+			stopAllRelays(relayServers, logger)
 			for j := i; j < len(listeners); j++ {
 				err := listeners[j].Close()
 				if err != nil {
 					logger.Warn("Failed to close listener for relay", "index", j, "error", err)
 				}
 			}
-			return fmt.Errorf("failed to start relay %d (%s): %w", i, assignedURLs[i], err)
+			return nil, fmt.Errorf("failed to start relay %d (%s): %w", i, assignedURLs[i], err)
 		}
-		harness.RelayServers = append(harness.RelayServers, instance)
+		relayServers = append(relayServers, instance)
 		logger.Info("Started relay", "index", i, "url", assignedURLs[i])
 	}
 
-	return nil
+	return &RelayComponents{
+		Servers: relayServers,
+	}, nil
 }
 
 // Cleanup releases resources held by the DisperserHarness (excluding shared network)
@@ -374,7 +416,7 @@ func startRelayWithListener(
 	ethClient common.EthClient,
 	relayIndex int,
 	listener net.Listener,
-	harness *DisperserHarness,
+	localStack *testbed.LocalStackContainer,
 	config DisperserHarnessConfig,
 ) (*relay.Server, error) {
 	// Create logs directory
@@ -402,7 +444,7 @@ func startRelayWithListener(
 	}
 
 	// Create AWS clients using LocalStack container's configuration
-	awsConfig := harness.LocalStack.GetAWSClientConfig()
+	awsConfig := localStack.GetAWSClientConfig()
 
 	// Create logger
 	logger, err := common.NewLogger(&loggerConfig)
@@ -503,26 +545,26 @@ func stopAllRelays(servers []*relay.Server, logger logging.Logger) {
 	}
 }
 
-// startEncoderV2 starts the encoder v2 server as a goroutine and returns its actual address
+// startEncoderV2 starts the encoder v2 server as a goroutine and returns the encoder components
 func startEncoderV2(
 	ctx context.Context,
-	harness *DisperserHarness,
+	localStack *testbed.LocalStackContainer,
 	config DisperserHarnessConfig,
-) (string, error) {
+) (*EncoderComponents, error) {
 	if config.TestConfig == nil {
-		return "", fmt.Errorf("test config is required to start encoder v2")
+		return nil, fmt.Errorf("test config is required to start encoder v2")
 	}
 
 	// Create logs directory
 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create logs directory: %w", err)
+		return nil, fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
 	logFilePath := fmt.Sprintf("%s/enc1.log", logsDir)
 	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return "", fmt.Errorf("failed to open encoder log file: %w", err)
+		return nil, fmt.Errorf("failed to open encoder log file: %w", err)
 	}
 
 	// Create encoder logger config for file output
@@ -540,17 +582,17 @@ func startEncoderV2(
 	encoderLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create logger: %w", err)
+		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Create AWS clients using LocalStack container's configuration
-	awsConfig := harness.LocalStack.GetAWSClientConfig()
+	awsConfig := localStack.GetAWSClientConfig()
 
 	// Create S3 client
 	s3Client, err := s3.NewClient(ctx, awsConfig, encoderLogger)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create s3 client: %w", err)
+		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
 	// Create metrics registry
@@ -568,7 +610,7 @@ func startEncoderV2(
 	g1Path, _, _, err := getSRSPaths()
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to determine SRS file paths: %w", err)
+		return nil, fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}
 
 	// Construct cache directory path from g1Path
@@ -592,7 +634,7 @@ func startEncoderV2(
 	proverV2, err := prover.NewProver(encoderLogger, &kzgConfig, encodingConfig)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create prover: %w", err)
+		return nil, fmt.Errorf("failed to create prover: %w", err)
 	}
 
 	// Create blob store
@@ -626,7 +668,7 @@ func startEncoderV2(
 	listener, err := net.Listen("tcp", "0.0.0.0:0")
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create listener for encoder v2: %w", err)
+		return nil, fmt.Errorf("failed to create listener for encoder v2: %w", err)
 	}
 
 	// Extract the port assigned by the OS
@@ -643,38 +685,38 @@ func startEncoderV2(
 		}
 	}()
 
-	// Store encoder in harness
-	harness.EncoderServerV2 = encoderServerV2
-
 	encoderLogger.Info("Encoder v2 server started successfully", "address", assignedAddress, "logFile", logFilePath)
 
-	return assignedAddress, nil
+	return &EncoderComponents{
+		Server:  encoderServerV2,
+		Address: assignedAddress,
+	}, nil
 }
 
 // startController starts the controller components (encoding manager and dispatcher)
-// and returns the controller gRPC server address
+// and returns the controller components
 func startController(
 	ctx context.Context,
 	ethClient common.EthClient,
 	operatorStateSubgraphURL string,
 	encoderAddress string,
-	harness *DisperserHarness,
+	localStack *testbed.LocalStackContainer,
 	config DisperserHarnessConfig,
-) (string, error) {
+) (*ControllerComponents, error) {
 	if config.TestConfig == nil {
-		return "", fmt.Errorf("test config is required to start controller")
+		return nil, fmt.Errorf("test config is required to start controller")
 	}
 
 	// Create logs directory
 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create logs directory: %w", err)
+		return nil, fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
 	logFilePath := fmt.Sprintf("%s/controller.log", logsDir)
 	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return "", fmt.Errorf("failed to open controller log file: %w", err)
+		return nil, fmt.Errorf("failed to open controller log file: %w", err)
 	}
 
 	// Create controller logger config for file output
@@ -692,17 +734,17 @@ func startController(
 	controllerLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create logger: %w", err)
+		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Create AWS clients using LocalStack container's configuration
-	awsConfig := harness.LocalStack.GetAWSClientConfig()
+	awsConfig := localStack.GetAWSClientConfig()
 
 	// Create DynamoDB client
 	dynamoClient, err := dynamodb.NewClient(awsConfig, controllerLogger)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create dynamodb client: %w", err)
+		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
 	// Create metrics registry
@@ -723,7 +765,7 @@ func startController(
 		})
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create dispersal request signer: %w", err)
+		return nil, fmt.Errorf("failed to create dispersal request signer: %w", err)
 	}
 
 	// Build encoding manager configs
@@ -760,7 +802,7 @@ func startController(
 		config.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create chain reader: %w", err)
+		return nil, fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
 	// Create heartbeat channel
@@ -770,7 +812,7 @@ func startController(
 	encoderClient, err := encoder.NewEncoderClientV2(encodingManagerConfig.EncoderAddress)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create encoder client: %w", err)
+		return nil, fmt.Errorf("failed to create encoder client: %w", err)
 	}
 
 	// Create encoding manager with workerpool and blob set
@@ -789,14 +831,14 @@ func startController(
 	)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create encoding manager: %w", err)
+		return nil, fmt.Errorf("failed to create encoding manager: %w", err)
 	}
 
 	// Create signature aggregator
 	sigAgg, err := core.NewStdSignatureAggregator(controllerLogger, chainReader)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create signature aggregator: %w", err)
+		return nil, fmt.Errorf("failed to create signature aggregator: %w", err)
 	}
 
 	// Create dispatcher pool
@@ -814,7 +856,7 @@ func startController(
 	)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create node client manager: %w", err)
+		return nil, fmt.Errorf("failed to create node client manager: %w", err)
 	}
 
 	// Create batch metadata manager
@@ -829,7 +871,7 @@ func startController(
 	)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create batch metadata manager: %w", err)
+		return nil, fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
 	// Create beforeDispatch callback to remove blobs from encoding manager's set
@@ -856,36 +898,30 @@ func startController(
 	)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create dispatcher: %w", err)
+		return nil, fmt.Errorf("failed to create dispatcher: %w", err)
 	}
 
 	// Recover state before starting
 	if err := controller.RecoverState(ctx, metadataStore, controllerLogger); err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to recover state: %w", err)
+		return nil, fmt.Errorf("failed to recover state: %w", err)
 	}
 
 	// Start encoding manager
 	if err := encodingManager.Start(ctx); err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to start encoding manager: %w", err)
+		return nil, fmt.Errorf("failed to start encoding manager: %w", err)
 	}
 
 	// Start dispatcher
 	if err := dispatcher.Start(ctx); err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to start dispatcher: %w", err)
+		return nil, fmt.Errorf("failed to start dispatcher: %w", err)
 	}
 
-	// Store components in harness
-	harness.EncodingManager = encodingManager
-	harness.Dispatcher = dispatcher
-
-	// TODO(dmanc): Implement dynamic port allocation with net.Listen("tcp", "0.0.0.0:0")
-	// to match the pattern used by encoder v2 and relays. For now, we hardcode port 30000.
-	controllerAddress := "localhost:30000"
-
 	// Build and start gRPC server if payments are enabled
+	var controllerServer *server.Server
+	var controllerAddress string
 	if config.TestConfig.UseControllerMediatedPayments {
 		controllerLogger.Info("UseControllerMediatedPayments enabled - starting gRPC server")
 
@@ -898,7 +934,7 @@ func startController(
 		)
 		if err != nil {
 			_ = logFile.Close()
-			return "", fmt.Errorf("failed to create contract directory: %w", err)
+			return nil, fmt.Errorf("failed to create contract directory: %w", err)
 		}
 
 		// Build payment authorization handler
@@ -918,21 +954,33 @@ func startController(
 		)
 		if err != nil {
 			_ = logFile.Close()
-			return "", fmt.Errorf("failed to build payment authorization handler: %w", err)
+			return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)
 		}
+
+		// Pre-create listener with port 0 (OS assigns random port)
+		listener, err := net.Listen("tcp", "0.0.0.0:0")
+		if err != nil {
+			_ = logFile.Close()
+			return nil, fmt.Errorf("failed to create listener for controller: %w", err)
+		}
+
+		// Extract the port assigned by the OS
+		assignedPort := listener.Addr().(*net.TCPAddr).Port
+		controllerLogger.Info("Created listener for controller", "assigned_port", assignedPort)
 
 		// Create server config
 		grpcServerConfig, err := common.NewGRPCServerConfig(
 			true,
-			30000, // TODO(dmanc): Extract port from listener instead when implementing dynamic allocation
+			uint16(assignedPort),
 			1024*1024,
 			5*time.Minute,
 			5*time.Minute,
 			3*time.Minute,
 		)
 		if err != nil {
+			_ = listener.Close()
 			_ = logFile.Close()
-			return "", fmt.Errorf("failed to create gRPC server config: %w", err)
+			return nil, fmt.Errorf("failed to create gRPC server config: %w", err)
 		}
 
 		serverConfig, err := server.NewConfig(
@@ -940,8 +988,9 @@ func startController(
 			true, // EnablePaymentAuthentication
 		)
 		if err != nil {
+			_ = listener.Close()
 			_ = logFile.Close()
-			return "", fmt.Errorf("failed to create server config: %w", err)
+			return nil, fmt.Errorf("failed to create server config: %w", err)
 		}
 
 		// Create and start gRPC server
@@ -951,53 +1000,63 @@ func startController(
 			controllerLogger,
 			metricsRegistry,
 			paymentAuthorizationHandler,
+			listener,
 		)
 		if err != nil {
+			_ = listener.Close()
 			_ = logFile.Close()
-			return "", fmt.Errorf("failed to create gRPC server: %w", err)
+			return nil, fmt.Errorf("failed to create gRPC server: %w", err)
 		}
 
 		go func() {
-			controllerLogger.Info("Starting controller gRPC server", "port", serverConfig.GrpcPort)
+			controllerLogger.Info("Starting controller gRPC server", "address", listener.Addr().String())
 			if err := grpcServer.Start(); err != nil {
 				controllerLogger.Error("gRPC server failed", "error", err)
 			}
 		}()
 
-		harness.ControllerServer = grpcServer
-		controllerLogger.Info("Controller gRPC server started successfully")
+		controllerServer = grpcServer
+		controllerAddress = fmt.Sprintf("localhost:%d", assignedPort)
+		controllerLogger.Info("Controller gRPC server started successfully", "address", controllerAddress)
 	} else {
+		// When server is disabled, use empty address
+		controllerAddress = ""
 		controllerLogger.Info("UseControllerMediatedPayments disabled - controller will not have server")
 	}
 
 	controllerLogger.Info("Controller components started successfully",
 		"address", controllerAddress, "logFile", logFilePath)
 
-	return controllerAddress, nil
+	return &ControllerComponents{
+		EncodingManager:  encodingManager,
+		Dispatcher:       dispatcher,
+		ControllerServer: controllerServer,
+		Address:          controllerAddress,
+	}, nil
 }
 
-// startAPIServerV2 starts the API server v2 as a goroutine and returns its actual address
+// startAPIServerV2 starts the API server v2 as a goroutine and returns the API server components
 func startAPIServerV2(
 	ctx context.Context,
 	ethClient common.EthClient,
 	controllerAddress string,
-	harness *DisperserHarness,
+	localStack *testbed.LocalStackContainer,
 	config DisperserHarnessConfig,
-) (string, error) {
+) (*APIServerComponents, error) {
 	if config.TestConfig == nil {
-		return "", fmt.Errorf("test config is required to start API server v2")
+		return nil, fmt.Errorf("test config is required to start API server v2")
 	}
 
 	// Create logs directory
 	logsDir := fmt.Sprintf("testdata/%s/logs", config.TestName)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create logs directory: %w", err)
+		return nil, fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
 	logFilePath := fmt.Sprintf("%s/apiserver_v2.log", logsDir)
 	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return "", fmt.Errorf("failed to open API server log file: %w", err)
+		return nil, fmt.Errorf("failed to open API server log file: %w", err)
 	}
 
 	// Create API server logger config for file output
@@ -1015,24 +1074,24 @@ func startAPIServerV2(
 	apiServerLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create logger: %w", err)
+		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Create AWS clients using LocalStack container's configuration
-	awsConfig := harness.LocalStack.GetAWSClientConfig()
+	awsConfig := localStack.GetAWSClientConfig()
 
 	// Create DynamoDB client
 	dynamoClient, err := dynamodb.NewClient(awsConfig, apiServerLogger)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create dynamodb client: %w", err)
+		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
 	// Create S3 client
 	s3Client, err := s3.NewClient(ctx, awsConfig, apiServerLogger)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create s3 client: %w", err)
+		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
 	// Create metrics registry
@@ -1053,7 +1112,7 @@ func startAPIServerV2(
 	g1Path, g2Path, g2TrailingPath, err := getSRSPaths()
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to determine SRS file paths: %w", err)
+		return nil, fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}
 
 	committerConfig := committer.Config{
@@ -1066,7 +1125,7 @@ func startAPIServerV2(
 	kzgCommitter, err := committer.NewFromConfig(committerConfig)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create committer: %w", err)
+		return nil, fmt.Errorf("failed to create committer: %w", err)
 	}
 
 	// Create chain reader
@@ -1077,7 +1136,7 @@ func startAPIServerV2(
 		config.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create chain reader: %w", err)
+		return nil, fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
 	// Create blob request authenticator
@@ -1101,11 +1160,11 @@ func startAPIServerV2(
 	paymentChainState, err := meterer.NewOnchainPaymentState(ctx, chainReader, apiServerLogger)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create onchain payment state: %w", err)
+		return nil, fmt.Errorf("failed to create onchain payment state: %w", err)
 	}
 	if err := paymentChainState.RefreshOnchainPaymentState(ctx); err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
+		return nil, fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 	}
 
 	// Use the standard v2 payment table prefix
@@ -1119,7 +1178,7 @@ func startAPIServerV2(
 	)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create offchain store: %w", err)
+		return nil, fmt.Errorf("failed to create offchain store: %w", err)
 	}
 
 	mt := meterer.NewMeterer(
@@ -1157,7 +1216,7 @@ func startAPIServerV2(
 		blobStore,
 		metadataStore,
 		chainReader,
-		mt, // meterer (nil when using controller-mediated payments, otherwise legacy meterer)
+		mt,
 		authenticator,
 		kzgCommitter,
 		maxNumSymbolsPerBlob,
@@ -1171,7 +1230,7 @@ func startAPIServerV2(
 	)
 	if err != nil {
 		_ = logFile.Close()
-		return "", fmt.Errorf("failed to create API server v2: %w", err)
+		return nil, fmt.Errorf("failed to create API server v2: %w", err)
 	}
 
 	// Start API server in background
@@ -1182,11 +1241,11 @@ func startAPIServerV2(
 		}
 	}()
 
-	// Store server in harness
-	harness.APIServerV2 = apiServerV2
+	actualAddress := fmt.Sprintf("localhost:%s", serverConfig.GrpcPort)
+	apiServerLogger.Info("API server v2 started successfully", "address", actualAddress, "logFile", logFilePath)
 
-	grpcAddress := fmt.Sprintf("localhost:%s", serverConfig.GrpcPort)
-	apiServerLogger.Info("API server v2 started successfully", "address", grpcAddress, "logFile", logFilePath)
-
-	return grpcAddress, nil
+	return &APIServerComponents{
+		Server:  apiServerV2,
+		Address: actualAddress,
+	}, nil
 }

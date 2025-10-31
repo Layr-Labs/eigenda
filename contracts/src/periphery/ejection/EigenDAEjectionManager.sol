@@ -114,8 +114,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         BN254.G1Point memory sigma,
         address recipient
     ) external {
-        address blsApkRegistry =
-            IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME.getKey());
+        address blsApkRegistry = IEigenDADirectory(_addressDirectory)
+            .getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME.getKey());
 
         (BN254.G1Point memory apk,) = IBLSApkRegistry(blsApkRegistry).getRegisteredPubkey(operator);
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
@@ -218,9 +218,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
 
     /// @notice Attempts to eject an operator. If the ejection fails, it catches the error and does nothing.
     function _tryEjectOperator(address operator, bytes memory quorums) internal {
-        address registryCoordinator = IEigenDADirectory(_addressDirectory).getAddress(
-            AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME.getKey()
-        );
+        address registryCoordinator = IEigenDADirectory(_addressDirectory)
+            .getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME.getKey());
         try IRegistryCoordinator(registryCoordinator).ejectOperator(operator, quorums) {} catch {}
     }
 
@@ -243,8 +242,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         BN254.G2Point memory apkG2,
         BN254.G1Point memory sigma
     ) internal view {
-        address signatureVerifier =
-            IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME.getKey());
+        address signatureVerifier = IEigenDADirectory(_addressDirectory)
+            .getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME.getKey());
         (bool paired, bool valid) =
             BLSSignatureChecker(signatureVerifier).trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
         require(paired, "EigenDAEjectionManager: Pairing failed");
@@ -254,8 +253,9 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     function _onlyOwner(address sender) internal view virtual {
         require(
             IAccessControl(
-                IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
-            ).hasRole(AccessControlConstants.OWNER_ROLE, sender),
+                    IEigenDADirectory(_addressDirectory)
+                        .getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
+                ).hasRole(AccessControlConstants.OWNER_ROLE, sender),
             "EigenDAEjectionManager: Caller is not the owner"
         );
     }
@@ -263,8 +263,9 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     function _onlyEjector(address sender) internal view virtual {
         require(
             IAccessControl(
-                IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
-            ).hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
+                    IEigenDADirectory(_addressDirectory)
+                        .getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
+                ).hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
             "EigenDAEjectionManager: Caller is not an ejector"
         );
     }
