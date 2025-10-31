@@ -373,14 +373,14 @@ func (w *retrievalWorker) updateValidatorStatus(validatorId core.OperatorID, val
 		oldStatus, chunkHasStatus := w.chunkStatusMap[chunkIndex]
 		enforce.True(chunkHasStatus, "chunk %d has no status in chunkStatusMap", chunkIndex)
 
-		chunkOwner, hasOwner := w.chunkOwnerMap[chunkIndex]
+		currentChunkOwner, hasOwner := w.chunkOwnerMap[chunkIndex]
 		if !hasOwner {
 			// If this chunk has no owner, take ownership
 			w.chunkOwnerMap[chunkIndex] = validatorId
-			chunkOwner = validatorId
+			currentChunkOwner = validatorId
 		}
 
-		if validatorStatus.isBetterThan(oldStatus) || chunkOwner == validatorId {
+		if validatorStatus.isBetterThan(oldStatus) || currentChunkOwner == validatorId {
 			// There are two conditions where we update the chunk status:
 			// 1. The validator reporting the status change owns the chunk
 			// 2. The validator reporting the status change has a better status than the current chunk status
