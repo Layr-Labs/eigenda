@@ -450,18 +450,13 @@ func (s *DispersalServerV2) getPaymentState(
 // Gracefully shuts down the server and closes any open connections
 func (s *DispersalServerV2) Stop() error {
 	if s.grpcServer != nil {
+		// GracefulStop will close the listener that was passed to Serve()
 		s.grpcServer.GracefulStop()
-	}
-
-	if s.listener != nil {
-		if err := s.listener.Close(); err != nil {
-			s.logger.Error("failed to close listener", "error", err)
-		}
 	}
 
 	if s.controllerConnection != nil {
 		if err := s.controllerConnection.Close(); err != nil {
-			s.logger.Error("failed to close controller connection", "error", err)
+			return fmt.Errorf("failed to close controller connection: %w", err)
 		}
 	}
 	return nil
