@@ -76,7 +76,7 @@ var (
 	MaxConcurrentRequestsFlag = cli.IntFlag{
 		Name: common.PrefixFlag(FlagPrefix, "max-concurrent-requests"),
 		Usage: "maximum number of concurrent requests. " +
-			"This also sets the weight of the GPU semaphore when using EigenDA V2 with GPU is enabled " +
+			"This also sets the weight of the GPU semaphore when using EigenDA V2 with GPU enabled " +
 			"(Backend=icicle and GPUEnable=true). " +
 			"Chunk generation (encoding/v2/rs) and multiproofs generation (encoding/v2/kzg/prover) " +
 			"each have their own separate semaphore which is weighted using this value. " +
