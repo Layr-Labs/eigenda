@@ -27,8 +27,8 @@ type ObjectStorageConfig struct {
 	FragmentParallelismFactor   int
 }
 
-// ociClient implements the S3 Client interface using OCI Object Storage
-type ociClient struct {
+// ociS3Client implements the S3 Client interface using OCI Object Storage
+type ociS3Client struct {
 	cfg                 *ObjectStorageConfig
 	objectStorageClient objectstorage.ObjectStorageClient
 
@@ -38,10 +38,10 @@ type ociClient struct {
 	logger logging.Logger
 }
 
-var _ s3common.S3Client = (*ociClient)(nil)
+var _ s3common.S3Client = (*ociS3Client)(nil)
 
-// NewObjectStorageClient creates a new OCI Object Storage client that implements the S3 Client interface
-func NewObjectStorageClient(
+// NewOciS3Client creates a new OCI Object Storage client that implements the S3 Client interface
+func NewOciS3Client(
 	ctx context.Context,
 	cfg ObjectStorageConfig,
 	logger logging.Logger) (s3common.S3Client, error) {
@@ -93,7 +93,7 @@ func NewObjectStorageClient(
 	for i := 0; i < workers; i++ {
 		limiter <- struct{}{}
 	}
-	return &ociClient{
+	return &ociS3Client{
 		cfg:                 &finalCfg,
 		objectStorageClient: objectStorageClient,
 		concurrencyLimiter:  limiter,
@@ -107,7 +107,7 @@ func NewObjectStorageClient(
 // around the OCI SDK. The utility functions (GetFragmentCount, RecombineFragments) and
 // config processing in NewObjectStorageClient have good coverage where it matters.
 
-func (c *ociClient) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
+func (c *ociS3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
 	getObjectRequest := objectstorage.GetObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -136,7 +136,7 @@ func (c *ociClient) DownloadObject(ctx context.Context, bucket string, key strin
 	return data, nil
 }
 
-func (c *ociClient) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
+func (c *ociS3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
 	headObjectRequest := objectstorage.HeadObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -155,7 +155,7 @@ func (c *ociClient) HeadObject(ctx context.Context, bucket string, key string) (
 	return response.ContentLength, nil
 }
 
-func (c *ociClient) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
+func (c *ociS3Client) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
 	putObjectRequest := objectstorage.PutObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -172,7 +172,7 @@ func (c *ociClient) UploadObject(ctx context.Context, bucket string, key string,
 	return nil
 }
 
-func (c *ociClient) DeleteObject(ctx context.Context, bucket string, key string) error {
+func (c *ociS3Client) DeleteObject(ctx context.Context, bucket string, key string) error {
 	deleteObjectRequest := objectstorage.DeleteObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -187,7 +187,7 @@ func (c *ociClient) DeleteObject(ctx context.Context, bucket string, key string)
 	return nil
 }
 
-func (c *ociClient) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3common.ListedObject, error) {
+func (c *ociS3Client) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3common.ListedObject, error) {
 	listObjectsRequest := objectstorage.ListObjectsRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -219,7 +219,7 @@ func (c *ociClient) ListObjects(ctx context.Context, bucket string, prefix strin
 	return objects, nil
 }
 
-func (c *ociClient) CreateBucket(ctx context.Context, bucket string) error {
+func (c *ociS3Client) CreateBucket(ctx context.Context, bucket string) error {
 	createBucketRequest := objectstorage.CreateBucketRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		CreateBucketDetails: objectstorage.CreateBucketDetails{
@@ -237,7 +237,7 @@ func (c *ociClient) CreateBucket(ctx context.Context, bucket string) error {
 	return nil
 }
 
-func (c *ociClient) FragmentedUploadObject(
+func (c *ociS3Client) FragmentedUploadObject(
 	ctx context.Context,
 	bucket string,
 	key string,
@@ -274,7 +274,7 @@ func (c *ociClient) FragmentedUploadObject(
 }
 
 // fragmentedWriteTask writes a single fragment to OCI Object Storage.
-func (c *ociClient) fragmentedWriteTask(
+func (c *ociS3Client) fragmentedWriteTask(
 	ctx context.Context,
 	resultChannel chan error,
 	fragment *s3common.Fragment,
@@ -292,7 +292,7 @@ func (c *ociClient) fragmentedWriteTask(
 	resultChannel <- err
 }
 
-func (c *ociClient) FragmentedDownloadObject(
+func (c *ociS3Client) FragmentedDownloadObject(
 	ctx context.Context,
 	bucket string,
 	key string,
@@ -348,7 +348,7 @@ type readResult struct {
 }
 
 // readTask reads a single fragment from OCI Object Storage.
-func (c *ociClient) readTask(
+func (c *ociS3Client) readTask(
 	ctx context.Context,
 	resultChannel chan *readResult,
 	bucket string,

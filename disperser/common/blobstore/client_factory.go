@@ -43,7 +43,7 @@ func CreateObjectStorageClient(
 			FragmentParallelismConstant: awsConfig.FragmentParallelismConstant,
 			FragmentParallelismFactor:   awsConfig.FragmentParallelismFactor,
 		}
-		client, err := oci.NewObjectStorageClient(ctx, ociConfig, logger)
+		client, err := oci.NewOciS3Client(ctx, ociConfig, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OCI object storage client: %w", err)
 		}

@@ -727,7 +727,7 @@ func TestNewObjectStorageClient(t *testing.T) {
 	logger := &mockLogger{}
 
 	// This test will fail in CI without OCI credentials, but demonstrates the interface
-	client, err := NewObjectStorageClient(ctx, config, logger)
+	client, err := NewOciS3Client(ctx, config, logger)
 	if err != nil {
 		// We expect an error in test environment without OCI setup
 		assert.Contains(t, err.Error(), "failed to create OCI Object Storage client")
@@ -749,7 +749,7 @@ func TestNewObjectStorageClient_FragmentParallelismConstant(t *testing.T) {
 	ctx := context.Background()
 	logger := &mockLogger{}
 
-	client, err := NewObjectStorageClient(ctx, config, logger)
+	client, err := NewOciS3Client(ctx, config, logger)
 	// We expect this to fail due to auth, but the config processing should work
 	assert.Error(t, err)
 	assert.Nil(t, client)
@@ -764,7 +764,7 @@ func TestNewObjectStorageClient_FragmentParallelismFactor(t *testing.T) {
 	ctx := context.Background()
 	logger := &mockLogger{}
 
-	client, err := NewObjectStorageClient(ctx, config, logger)
+	client, err := NewOciS3Client(ctx, config, logger)
 	// We expect this to fail due to auth, but the config processing should work
 	assert.Error(t, err)
 	assert.Nil(t, client)
@@ -777,7 +777,7 @@ func TestNewObjectStorageClient_DefaultWorkers(t *testing.T) {
 	ctx := context.Background()
 	logger := &mockLogger{}
 
-	client, err := NewObjectStorageClient(ctx, config, logger)
+	client, err := NewOciS3Client(ctx, config, logger)
 	// We expect this to fail due to auth, but the config processing should work
 	assert.Error(t, err)
 	assert.Nil(t, client)
@@ -822,7 +822,7 @@ func TestNewObjectStorageClient_EnvVarFallbacks(t *testing.T) {
 	ctx := context.Background()
 	logger := &mockLogger{}
 
-	client, err := NewObjectStorageClient(ctx, config, logger)
+	client, err := NewOciS3Client(ctx, config, logger)
 	// We expect this to fail due to auth, but the env var processing should work
 	assert.Error(t, err)
 	assert.Nil(t, client)
@@ -1408,7 +1408,7 @@ func TestObjectStorageConfig_WorkerCalculations(t *testing.T) {
 			logger := &mockLogger{}
 
 			// Test that the config is processed (even though client creation will fail)
-			client, err := NewObjectStorageClient(ctx, config, logger)
+			client, err := NewOciS3Client(ctx, config, logger)
 			assert.Error(t, err) // Expected due to auth failure
 			assert.Nil(t, client)
 			assert.Contains(t, err.Error(), "failed to create OCI Object Storage client")
@@ -1446,7 +1446,7 @@ func TestOCIClient_ConcurrencyLimiter(t *testing.T) {
 		}
 
 		// Test client creation logic - will fail at OCI auth (expected)
-		_, err := NewObjectStorageClient(context.Background(), cfg, &mockLogger{})
+		_, err := NewOciS3Client(context.Background(), cfg, &mockLogger{})
 		assert.Error(t, err) // Expected due to missing OCI credentials
 		assert.Contains(t, err.Error(), "failed to create OCI Object Storage client")
 	})
