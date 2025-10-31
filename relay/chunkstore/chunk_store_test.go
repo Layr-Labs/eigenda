@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	s3common "github.com/Layr-Labs/eigenda/common/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
@@ -129,7 +129,7 @@ func TestRandomProofs(t *testing.T) {
 	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
-		client := mock.NewS3Client()
+		client := s3common.NewMockS3Client()
 		runRandomProofsTest(t, client)
 	})
 
@@ -197,7 +197,7 @@ func TestRandomCoefficients(t *testing.T) {
 	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
-		client := mock.NewS3Client()
+		client := s3common.NewMockS3Client()
 		runRandomCoefficientsTest(t, client)
 	})
 
@@ -209,7 +209,7 @@ func TestRandomCoefficients(t *testing.T) {
 
 func TestCheckProofCoefficientsExist(t *testing.T) {
 	random.InitializeRandom()
-	client := mock.NewS3Client()
+	client := s3common.NewMockS3Client()
 
 	chunkSize := uint64(rand.Intn(1024) + 100)
 	fragmentSize := int(chunkSize / 2)

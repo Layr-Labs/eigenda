@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	s3common "github.com/Layr-Labs/eigenda/common/s3"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	oraclecommon "github.com/oracle/oci-go-sdk/v65/common"
 	"github.com/oracle/oci-go-sdk/v65/common/auth"
@@ -42,13 +42,13 @@ type ociClient struct {
 	logger logging.Logger
 }
 
-var _ s3.Client = (*ociClient)(nil)
+var _ s3common.S3Client = (*ociClient)(nil)
 
 // NewObjectStorageClient creates a new OCI Object Storage client that implements the S3 Client interface
 func NewObjectStorageClient(
 	ctx context.Context,
 	cfg ObjectStorageConfig,
-	logger logging.Logger) (s3.Client, error) {
+	logger logging.Logger) (s3common.S3Client, error) {
 
 	// Create OCI configuration provider using workload identity
 	configProvider, err := auth.OkeWorkloadIdentityConfigurationProvider()
@@ -191,7 +191,7 @@ func (c *ociClient) DeleteObject(ctx context.Context, bucket string, key string)
 	return nil
 }
 
-func (c *ociClient) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3.Object, error) {
+func (c *ociClient) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3common.ListedObject, error) {
 	listObjectsRequest := objectstorage.ListObjectsRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -204,7 +204,7 @@ func (c *ociClient) ListObjects(ctx context.Context, bucket string, prefix strin
 		return nil, fmt.Errorf("failed to list objects from OCI: %w", err)
 	}
 
-	objects := make([]s3.Object, 0, len(response.Objects))
+	objects := make([]s3common.ListedObject, 0, len(response.Objects))
 	for _, object := range response.Objects {
 		var size int64 = 0
 		if object.Size != nil {
@@ -214,7 +214,7 @@ func (c *ociClient) ListObjects(ctx context.Context, bucket string, prefix strin
 		if object.Name != nil {
 			key = *object.Name
 		}
-		objects = append(objects, s3.Object{
+		objects = append(objects, s3common.ListedObject{
 			Key:  key,
 			Size: size,
 		})
@@ -248,7 +248,7 @@ func (c *ociClient) FragmentedUploadObject(
 	data []byte,
 	fragmentSize int) error {
 
-	fragments, err := s3.BreakIntoFragments(key, data, fragmentSize)
+	fragments, err := s3common.BreakIntoFragments(key, data, fragmentSize)
 	if err != nil {
 		return fmt.Errorf("failed to break data into fragments: %w", err)
 	}
@@ -281,7 +281,7 @@ func (c *ociClient) FragmentedUploadObject(
 func (c *ociClient) fragmentedWriteTask(
 	ctx context.Context,
 	resultChannel chan error,
-	fragment *s3.Fragment,
+	fragment *s3common.Fragment,
 	bucket string) {
 
 	putObjectRequest := objectstorage.PutObjectRequest{
@@ -311,7 +311,7 @@ func (c *ociClient) FragmentedDownloadObject(
 		return nil, errors.New("fragmentSize must be greater than 0")
 	}
 
-	fragmentKeys, err := s3.GetFragmentKeys(key, GetFragmentCount(fileSize, fragmentSize))
+	fragmentKeys, err := s3common.GetFragmentKeys(key, GetFragmentCount(fileSize, fragmentSize))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fragment keys: %w", err)
 	}
@@ -329,7 +329,7 @@ func (c *ociClient) FragmentedDownloadObject(
 		}()
 	}
 
-	fragments := make([]*s3.Fragment, len(fragmentKeys))
+	fragments := make([]*s3common.Fragment, len(fragmentKeys))
 	for i := 0; i < len(fragmentKeys); i++ {
 		result := <-resultChannel
 		if result.err != nil {
@@ -347,7 +347,7 @@ func (c *ociClient) FragmentedDownloadObject(
 
 // readResult is the result of a read task.
 type readResult struct {
-	fragment *s3.Fragment
+	fragment *s3common.Fragment
 	err      error
 }
 
@@ -387,7 +387,7 @@ func (c *ociClient) readTask(
 		return
 	}
 
-	result.fragment = &s3.Fragment{
+	result.fragment = &s3common.Fragment{
 		FragmentKey: key,
 		Data:        data,
 		Index:       index,
@@ -409,7 +409,7 @@ func GetFragmentCount(fileSize int, fragmentSize int) int {
 
 // recombineFragments recombines fragments into a single file.
 // Returns an error if any fragments are missing.
-func RecombineFragments(fragments []*s3.Fragment) ([]byte, error) {
+func RecombineFragments(fragments []*s3common.Fragment) ([]byte, error) {
 	if len(fragments) == 0 {
 		return nil, fmt.Errorf("no fragments")
 	}

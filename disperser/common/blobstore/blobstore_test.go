@@ -10,7 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
-	awsmock "github.com/Layr-Labs/eigenda/common/aws/mock"
+	s3common "github.com/Layr-Labs/eigenda/common/s3"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/test"
@@ -32,7 +32,7 @@ var (
 		},
 		Data: []byte("test"),
 	}
-	s3Client   = awsmock.NewS3Client()
+	s3Client   = s3common.NewMockS3Client()
 	bucketName = "test-eigenda-blobstore"
 	blobHash   = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 	blobSize   = uint(len(blob.Data))

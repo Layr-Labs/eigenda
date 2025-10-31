@@ -10,8 +10,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	commonaws "github.com/Layr-Labs/eigenda/common/s3/aws"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
@@ -67,7 +67,16 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
+	s3Client, err := commonaws.NewAwsS3Client(
+		context.Background(),
+		logger,
+		config.AwsClientConfig.EndpointURL,
+		config.AwsClientConfig.Region,
+		config.AwsClientConfig.FragmentParallelismFactor,
+		config.AwsClientConfig.FragmentParallelismConstant,
+		config.AwsClientConfig.AccessKey,
+		config.AwsClientConfig.SecretAccessKey,
+	)
 	if err != nil {
 		return err
 	}

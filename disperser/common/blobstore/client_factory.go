@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/oci"
+	"github.com/Layr-Labs/eigenda/common/s3"
+	"github.com/Layr-Labs/eigenda/common/s3/aws"
+	"github.com/Layr-Labs/eigenda/common/s3/oci"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
