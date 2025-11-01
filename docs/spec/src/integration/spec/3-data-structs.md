@@ -24,7 +24,7 @@ The header carries metadata needed to decode back to the original payload. Becau
 
 Version 0x0 specifies the following transformation from the original payload to a sequence of field element:
 - For every 31 bytes of the payload, insert a zero byte to produce a 32-byte value that is a valid field element.
-- Pad the final chunk so the payload length is a multiple of 32 bytes, and ensure the encoded payload comprises a power-of-two number of 32-byte field elements (32, 64, 128, 256, …) to match EigenDA blob sizing. We recommend to use 0 for all padding for encoded payload.
+- Further pad the output above so the final length is a multiple of 32 bytes, and comprises a power-of-two number of 32-byte field elements (32, 64, 128, 256, …) to match EigenDA blob sizing. The padding must ensure in the final output the first byte in every multiple of 32 bytes is zero. We recommend to use 0 for all padding to satisfy the requirement.
 
 ```solidity
 [0x00, version_byte, big-endian uint32 len(payload), 0x00, 0x00,...] +
