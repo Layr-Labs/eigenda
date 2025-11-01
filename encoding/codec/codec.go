@@ -56,9 +56,9 @@ func ConvertByPaddingEmptyByte(data []byte) []byte {
 // For the reminder of the input, the first byte is taken out, and the rest is appended to
 // the output.
 //
-// TODO (litt3): usage of this function should be migrated to use RemoveInternalPadding instead. I've left it unchanged
+// TODO (litt3): usage of this function should be migrated to use CheckAndRemoveInternalPadding instead. I've left
 //
-//	for now, since v1 logic and tests rely on the specific assumptions of this implementation.
+// it unchanged for now, since v1 logic and tests rely on the specific assumptions of this implementation.
 func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
 	dataSize := len(data)
 	parseSize := encoding.BYTES_PER_SYMBOL
@@ -130,7 +130,7 @@ func PadPayload(inputData []byte) []byte {
 // function relies on the assumption that the input is aligned to encoding.BYTES_PER_SYMBOL, which makes the padding
 // removal logic simpler.
 //
-// In addition, this function rquires the first byte in every multiple of 32 bytes to be 0x00.
+// In addition, this function requires the first byte in every multiple of 32 bytes to be 0x00.
 func CheckAndRemoveInternalPadding(paddedData []byte) ([]byte, error) {
 	if len(paddedData)%encoding.BYTES_PER_SYMBOL != 0 {
 		return nil, fmt.Errorf(
@@ -150,9 +150,10 @@ func CheckAndRemoveInternalPadding(paddedData []byte) ([]byte, error) {
 		dstIndex := i * bytesPerChunk
 		srcIndex := i*encoding.BYTES_PER_SYMBOL + 1
 
-		if paddedData[dstIndex] != 0x0 {
+		if paddedData[i*encoding.BYTES_PER_SYMBOL] != 0x0 {
 			return nil, fmt.Errorf(
-				"the first byte of every encoding.BYTES_PER_SYMBOL in the padded data must be 0x00",
+				"the first byte in the %d-th multiple of encoding.BYTES_PER_SYMBOL is a non-zero byte value %v",
+				i, paddedData[i*encoding.BYTES_PER_SYMBOL],
 			)
 		}
 
@@ -208,7 +209,7 @@ func GetPaddedDataLength(inputLen uint32) uint32 {
 
 // GetUnpaddedDataLength accepts the length of an array that has been padded with [PadPayload]
 //
-// It returns what the length of the output array would be if you called [RemoveInternalPadding] on it,
+// It returns what the length of the output array would be if you called [CheckAndRemoveInternalPadding] on it,
 // or an error if inputLen is not a multiple of [encoding.BYTES_PER_SYMBOL].
 func GetUnpaddedDataLength(inputLen uint32) (uint32, error) {
 	if inputLen%encoding.BYTES_PER_SYMBOL != 0 {

@@ -1,10 +1,10 @@
 package v2
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
@@ -84,8 +84,11 @@ func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.Blo
 	if err != nil {
 		return nil, err
 	}
-	restored := bytes.TrimRight(data, "\x00")
-	restored = codec.RemoveEmptyByteFromPaddedBytes(restored)
+
+	restored, err := codec.CheckAndRemoveInternalPadding(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove internal padding from blob data: %w", err)
+	}
 
 	return &pb.BlobReply{
 		Data: restored,

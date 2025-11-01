@@ -253,7 +253,8 @@ func TestPadUnpad(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, expectedUnpaddedLength, uint32(len(unpaddedBytes)))
 
-		// unpadded payload may have up to 31 extra trailing zeros, since RemoveInternalPadding doesn't consider these
+		// unpadded payload may have up to 31 extra trailing zeros, since CheckAndRemoveInternalPadding
+		// doesn't consider these
 		require.Greater(t, len(originalBytes), len(unpaddedBytes)-32)
 		require.LessOrEqual(t, len(originalBytes), len(unpaddedBytes))
 
@@ -268,12 +269,14 @@ func TestDetectInvalidPad(t *testing.T) {
 	testIterations := 1000
 
 	for i := 0; i < testIterations; i++ {
-		originalBytes := testRandom.Bytes(1 + testRandom.Intn(1023))
+		originalBytes := testRandom.Bytes(64 + testRandom.Intn(1023))
 
 		paddedBytes := codec.PadPayload(originalBytes)
 
-		// first byte be non-zero violation
-		paddedBytes[0] = 1
+		corruptionIndex := testRandom.Int32Range(0, int32(len(paddedBytes)/32)) * 32
+
+		// first byte of some field element be non-zero violation
+		paddedBytes[corruptionIndex] = 1
 		require.Equal(t, len(paddedBytes)%32, 0)
 
 		_, err := codec.CheckAndRemoveInternalPadding(paddedBytes)
