@@ -149,7 +149,7 @@ func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (
 	}
 
 	certVersionByte := daCommit[2]
-	versionedCert := certs.NewVersionedCert([]byte(daCommit[DACommitPrefixBytes:]), certs.VersionByte(certVersionByte))
+	versionedCert := certs.NewVersionedCert([]byte(daCommit[DACommitPrefixBytes+1:]), certs.VersionByte(certVersionByte))
 	return versionedCert, nil
 }
 
@@ -309,7 +309,7 @@ func (h *Handlers) CollectPreimages(
 
 	// Record the mapping from certificate hash to actual payload data
 	// This is what the replay binary expects: keccak256(certificate) -> payload
-	certHash := crypto.Keccak256Hash(sequencerMsg[40:])
+	certHash := crypto.Keccak256Hash(sequencerMsg[MessageHeaderOffset:])
 	preimageRecorder(certHash, payload, CustomDAPreimageType)
 
 	return &PreimagesResult{

@@ -34,7 +34,7 @@ const (
 		5. AfterDelayedMessages (bytes 32-39) - Number of delayed messages processed
 	*/
 
-	// Offset used to determine to MessageHeader
+	// Offset used to determine the MessageHeader
 	MessageHeaderOffset = 40
 
 	// Number of DA Commitment encoding bytes prefixed to the DA Cert bytes
