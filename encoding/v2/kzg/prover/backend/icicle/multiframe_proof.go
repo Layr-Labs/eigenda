@@ -283,8 +283,6 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	// we only allocate one large gpu memory for all operation, so it has to be large enough to cover all cases
 	// including the first and the second ECNTT
 	var bufferProjectivePointsOnDevice core.DeviceSlice
-	// free intermediate GPU memory
-	defer bufferProjectivePointsOnDevice.Free()
 
 	numPointsOnDevice := numChunks
 
@@ -300,6 +298,8 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	if err != runtime.Success {
 		return nil, time.Time{}, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
 	}
+	// free intermediate GPU memory
+	defer bufferProjectivePointsOnDevice.Free()
 
 	// specify device memory sluce for first ecntt
 	firstECNTTDeviceSlice := bufferProjectivePointsOnDevice.RangeTo(firstECNTTLen, false)
