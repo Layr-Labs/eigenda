@@ -43,7 +43,7 @@ func NewBlobDecoder(encoder *rs.Encoder) BlobDecoder {
 }
 
 func (d *blobDecoder) DecodeBlob(
-	_ v2.BlobKey, // used for unit tests
+	blobKey v2.BlobKey, // used for unit tests
 	chunks []*encoding.Frame,
 	indices []encoding.ChunkNumber,
 	encodingParams *encoding.EncodingParams,
@@ -55,6 +55,7 @@ func (d *blobDecoder) DecodeBlob(
 	}
 
 	blob, err := d.encoder.Decode(
+		blobKey.Hex(),
 		frames,
 		indices,
 		uint64(blobCommitments.Length)*encoding.BYTES_PER_SYMBOL,

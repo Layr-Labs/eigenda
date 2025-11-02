@@ -117,7 +117,12 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 // Perhaps Decode could take an iterator that produces one FrameCoeffs at a time?
 // That way we could pass either chunks (frameCoeffs) or frames.
 func (e *Encoder) Decode(
-	frames []FrameCoeffs, indices []encoding.ChunkNumber, maxInputSize uint64, params encoding.EncodingParams,
+	// A string that identifies the data being decoded. Used for more informative error messages.
+	identifier string,
+	frames []FrameCoeffs,
+	indices []encoding.ChunkNumber,
+	maxInputSize uint64,
+	params encoding.EncodingParams,
 ) ([]byte, error) {
 	// Get encoder
 	g, err := e.getRsEncoder(params)
@@ -140,7 +145,10 @@ func (e *Encoder) Decode(
 
 	numSys := encoding.GetNumSys(maxInputSize, g.Params.ChunkLength)
 	if uint64(len(frameMap)) < numSys {
-		return nil, errors.New("number of frame must be sufficient")
+		return nil, fmt.Errorf(
+			"insufficient number of unique frames to recover data for %s: "+
+				"have %d, need %d, number before deduplication %d",
+			identifier, len(frameMap), numSys, len(frames))
 	}
 
 	samples := make([]*fr.Element, g.Params.NumEvaluations())
@@ -181,13 +189,13 @@ func (e *Encoder) Decode(
 			g.Fs.ZeroPolyViaMultiplication,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("recover polynomial from samples: %w", err)
+			return nil, fmt.Errorf("recover polynomial from samples for %s: %w", identifier, err)
 		}
 	}
 
 	reconstructedPoly, err := g.Fs.FFT(reconstructedData, true)
 	if err != nil {
-		return nil, fmt.Errorf("inverse fft on reconstructed data: %w", err)
+		return nil, fmt.Errorf("inverse fft on reconstructed data for %s: %w", identifier, err)
 	}
 
 	data := ToByteArray(reconstructedPoly, maxInputSize)

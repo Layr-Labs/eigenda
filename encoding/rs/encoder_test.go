@@ -33,7 +33,7 @@ func TestEncodeDecode_InvertsWhenSamplingAllFrames(t *testing.T) {
 
 	// sample some Frames
 	samples, indices := sampleFrames(frames, uint64(len(frames)))
-	data, err := enc.Decode(samples, indices, uint64(len(GETTYSBURG_ADDRESS_BYTES)), params)
+	data, err := enc.Decode("blob", samples, indices, uint64(len(GETTYSBURG_ADDRESS_BYTES)), params)
 
 	require.Nil(t, err)
 	require.NotNil(t, data)
@@ -54,7 +54,7 @@ func TestEncodeDecode_InvertsWhenSamplingMissingFrame(t *testing.T) {
 
 	// sample some Frames
 	samples, indices := sampleFrames(frames, uint64(len(frames)-1))
-	data, err := enc.Decode(samples, indices, uint64(len(GETTYSBURG_ADDRESS_BYTES)), params)
+	data, err := enc.Decode("blob", samples, indices, uint64(len(GETTYSBURG_ADDRESS_BYTES)), params)
 
 	require.Nil(t, err)
 	require.NotNil(t, data)
@@ -84,7 +84,7 @@ func TestEncodeDecode_InvertsWithMissingAndDuplicateFrames(t *testing.T) {
 	samples = append(samples, samples[0:2]...)
 	indices = append(indices, indices[0:2]...)
 
-	data, err := enc.Decode(samples, indices, uint64(len(GETTYSBURG_ADDRESS_BYTES)), params)
+	data, err := enc.Decode("blob", samples, indices, uint64(len(GETTYSBURG_ADDRESS_BYTES)), params)
 
 	require.Nil(t, err)
 	require.NotNil(t, data)
@@ -106,7 +106,7 @@ func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 
 	// sample some Frames
 	samples, indices := sampleFrames(frames, uint64(len(frames)-2))
-	data, err := enc.Decode(samples, indices, uint64(len(GETTYSBURG_ADDRESS_BYTES)), params)
+	data, err := enc.Decode("blob", samples, indices, uint64(len(GETTYSBURG_ADDRESS_BYTES)), params)
 
 	require.Nil(t, data)
 	require.NotNil(t, err)
@@ -133,7 +133,7 @@ func TestEncodeDecode_ErrorsWhenNotEnoughSampledFramesWithDuplicates(t *testing.
 	samples = append(samples, samples[0:2]...)
 	indices = append(indices, indices[0:2]...)
 
-	data, err := enc.Decode(samples, indices, uint64(len(GETTYSBURG_ADDRESS_BYTES)), params)
+	data, err := enc.Decode("blob", samples, indices, uint64(len(GETTYSBURG_ADDRESS_BYTES)), params)
 
 	require.Nil(t, data)
 	require.NotNil(t, err)
@@ -172,7 +172,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		//sample the correct systematic Frames
 		samples, indices := sampleFrames(frames, uint64(len(frames)))
 
-		data, err := enc.Decode(samples, indices, uint64(len(input)), params)
+		data, err := enc.Decode("blob", samples, indices, uint64(len(input)), params)
 		if err != nil {
 			t.Errorf("Error Decoding:\n Data:\n %q \n Err: %q", input, err)
 		}

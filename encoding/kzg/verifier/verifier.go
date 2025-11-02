@@ -170,7 +170,7 @@ func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumb
 		frames[i] = chunks[i].Coeffs
 	}
 
-	return v.encoder.Decode(frames, toUint64Array(indices), maxInputSize, params)
+	return v.encoder.Decode("blob", frames, toUint64Array(indices), maxInputSize, params)
 }
 
 func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {

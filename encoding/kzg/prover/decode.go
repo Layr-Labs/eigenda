@@ -11,5 +11,5 @@ func (g *ParametrizedProver) Decode(frames []enc.Frame, indices []uint64, maxInp
 		rsFrames[ind] = frame.Coeffs
 	}
 
-	return g.Encoder.Decode(rsFrames, indices, maxInputSize, g.EncodingParams)
+	return g.Encoder.Decode("blob", rsFrames, indices, maxInputSize, g.EncodingParams)
 }
