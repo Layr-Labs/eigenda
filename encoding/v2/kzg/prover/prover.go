@@ -197,12 +197,12 @@ func (e *Prover) GetFrames(
 			len(encodeResult.chunks), len(proofs))
 	}
 
-	e.logger.Info("Frame process details",
+	e.logger.Info("Frame process details (milliseconds)",
 		"input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
 		"num_chunks", params.NumChunks,
 		"chunk_length", params.ChunkLength,
-		"rs_encode_duration", encodeResult.duration,
-		"multi_proof_duration", getProofsDuration,
+		"rs_encode_duration", encodeResult.duration.Milliseconds(),
+		"multi_proof_duration", getProofsDuration.Milliseconds(),
 	)
 
 	frames := make([]*encoding.Frame, len(proofs))

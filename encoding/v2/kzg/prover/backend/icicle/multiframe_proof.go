@@ -154,6 +154,7 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 			icicleErr = err
 			return
 		}
+		secondECNttDone = time.Now()
 	})
 
 	wg.Wait()
@@ -164,12 +165,12 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 
 	end := time.Now()
 
-	p.Logger.Info("Multiproof Time Decomp",
-		"total", end.Sub(begin),
-		"preproc", preprocessDone.Sub(begin),
-		"msm", msmDone.Sub(preprocessDone),
-		"fft1", firstECNttDone.Sub(msmDone),
-		"fft2", secondECNttDone.Sub(firstECNttDone),
+	p.Logger.Info("Multiproof Time Decomp (ms)",
+		"total", end.Sub(begin).Milliseconds(),
+		"preproc", preprocessDone.Sub(begin).Milliseconds(),
+		"msm", msmDone.Sub(preprocessDone).Milliseconds(),
+		"fft1", firstECNttDone.Sub(msmDone).Milliseconds(),
+		"fft2", secondECNttDone.Sub(firstECNttDone).Milliseconds(),
 	)
 
 	return proofs, nil
@@ -307,6 +308,7 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	if err != runtime.Success {
 		return nil, time.Time{}, fmt.Errorf("inverse ecntt failed: %v", err.AsString())
 	}
+	firstECNTTDone := time.Now()
 
 	proofsBatchHost := make(core.HostSlice[iciclebn254.Projective], numChunks)
 
@@ -339,5 +341,5 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 
 	proofs := icicle.HostSliceIcicleProjectiveToGnarkAffine(proofsBatchHost, int(c.NumWorker))
 
-	return proofs, time.Time{}, nil
+	return proofs, firstECNTTDone, nil
 }
