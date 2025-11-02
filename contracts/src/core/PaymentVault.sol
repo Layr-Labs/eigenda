@@ -104,6 +104,8 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
     }
 
     function withdrawERC20(IERC20 _token, uint256 _amount) external onlyOwner {
+        // forge-lint: disable-next-item(erc20-unchecked-transfer)
+        // We assume `_token` is a valid ERC20 token.
         _token.transfer(owner(), _amount);
     }
 
@@ -116,9 +118,10 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         require(total == 100, "sum of quorumSplits must be 100");
     }
 
+    // forge-lint: disable-next-item(unsafe-typecast)
     function _deposit(address _account, uint256 _amount) internal {
         require(_amount <= type(uint80).max, "amount must be less than or equal to 80 bits");
-        onDemandPayments[_account].totalDeposit += uint80(_amount);
+        onDemandPayments[_account].totalDeposit += uint80(_amount); // Typecast is checked above.
         emit OnDemandPaymentUpdated(_account, uint80(_amount), onDemandPayments[_account].totalDeposit);
     }
 

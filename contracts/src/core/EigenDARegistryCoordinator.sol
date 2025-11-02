@@ -132,13 +132,15 @@ contract EigenDARegistryCoordinator is
 
         // Register the operator in each of the registry contracts and update the operator's
         // quorum bitmap and registration status
-        uint32[] memory numOperatorsPerQuorum = _registerOperator({
+        uint32[] memory numOperatorsPerQuorum =
+        _registerOperator({
             operator: msg.sender,
             operatorId: operatorId,
             quorumNumbers: quorumNumbers,
             socket: socket,
             operatorSignature: operatorSignature
-        }).numOperatorsPerQuorum;
+        })
+        .numOperatorsPerQuorum;
 
         // For each quorum, validate that the new operator count does not exceed the maximum
         // If it does, churns the operator with the lowest stake via an exhaustive search through the operator set.
@@ -183,8 +185,7 @@ contract EigenDARegistryCoordinator is
         bytes memory quorumNumbers = new bytes(1);
         quorumNumbers[0] = bytes1(uint8(quorumNumber));
         _deregisterOperator({
-            operator: blsApkRegistry().pubkeyHashToOperator(operatorToChurn),
-            quorumNumbers: quorumNumbers
+            operator: blsApkRegistry().pubkeyHashToOperator(operatorToChurn), quorumNumbers: quorumNumbers
         });
     }
 
@@ -618,11 +619,10 @@ contract EigenDARegistryCoordinator is
 
         if (historyLength == 0) {
             // No prior bitmap history - push our first entry
-            _operatorBitmapHistory[operatorId].push(
+            _operatorBitmapHistory[operatorId]
+            .push(
                 QuorumBitmapUpdate({
-                    updateBlockNumber: uint32(block.number),
-                    nextUpdateBlockNumber: 0,
-                    quorumBitmap: newBitmap
+                    updateBlockNumber: uint32(block.number), nextUpdateBlockNumber: 0, quorumBitmap: newBitmap
                 })
             );
         } else {
@@ -637,11 +637,10 @@ contract EigenDARegistryCoordinator is
                 lastUpdate.quorumBitmap = newBitmap;
             } else {
                 lastUpdate.nextUpdateBlockNumber = uint32(block.number);
-                _operatorBitmapHistory[operatorId].push(
+                _operatorBitmapHistory[operatorId]
+                .push(
                     QuorumBitmapUpdate({
-                        updateBlockNumber: uint32(block.number),
-                        nextUpdateBlockNumber: 0,
-                        quorumBitmap: newBitmap
+                        updateBlockNumber: uint32(block.number), nextUpdateBlockNumber: 0, quorumBitmap: newBitmap
                     })
                 );
             }
@@ -673,6 +672,8 @@ contract EigenDARegistryCoordinator is
 
         // Traverse the operator's bitmap history in reverse, returning the first index
         // corresponding to an update made before or at `blockNumber`
+        // forge-lint: disable-next-item(unsafe-typecast)
+        // TODO(clandestine): Revisit this typecast.
         for (uint256 i = 0; i < length; i++) {
             index = uint32(length - i - 1);
 

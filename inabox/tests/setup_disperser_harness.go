@@ -121,6 +121,7 @@ type ControllerComponents struct {
 	EncodingManager  *controller.EncodingManager
 	Dispatcher       *controller.Dispatcher
 	ControllerServer *server.Server
+	Address          string
 }
 
 // APIServerComponents contains the components created by startAPIServerV2
@@ -277,11 +278,10 @@ func SetupDisperserHarness(
 	harness.ControllerServer = controllerComponents.ControllerServer
 
 	// Start API server v2 goroutine
-	controllerAddress := "localhost:30000" // Controller gRPC server address
 	apiServerComponents, err := startAPIServerV2(
 		ctx,
 		ethClient,
-		controllerAddress,
+		controllerComponents.Address,
 		harness.LocalStack,
 		config,
 	)
@@ -921,6 +921,7 @@ func startController(
 
 	// Build and start gRPC server if payments are enabled
 	var controllerServer *server.Server
+	var controllerAddress string
 	if config.TestConfig.UseControllerMediatedPayments {
 		controllerLogger.Info("UseControllerMediatedPayments enabled - starting gRPC server")
 
@@ -956,16 +957,28 @@ func startController(
 			return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)
 		}
 
+		// Pre-create listener with port 0 (OS assigns random port)
+		listener, err := net.Listen("tcp", "0.0.0.0:0")
+		if err != nil {
+			_ = logFile.Close()
+			return nil, fmt.Errorf("failed to create listener for controller: %w", err)
+		}
+
+		// Extract the port assigned by the OS
+		assignedPort := listener.Addr().(*net.TCPAddr).Port
+		controllerLogger.Info("Created listener for controller", "assigned_port", assignedPort)
+
 		// Create server config
 		grpcServerConfig, err := common.NewGRPCServerConfig(
 			true,
-			30000, // TODO(dmanc): Extract port from listener instead when implementing dynamic allocation
+			uint16(assignedPort),
 			1024*1024,
 			5*time.Minute,
 			5*time.Minute,
 			3*time.Minute,
 		)
 		if err != nil {
+			_ = listener.Close()
 			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create gRPC server config: %w", err)
 		}
@@ -975,6 +988,7 @@ func startController(
 			true, // EnablePaymentAuthentication
 		)
 		if err != nil {
+			_ = listener.Close()
 			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create server config: %w", err)
 		}
@@ -986,28 +1000,29 @@ func startController(
 			controllerLogger,
 			metricsRegistry,
 			paymentAuthorizationHandler,
+			listener,
 		)
 		if err != nil {
+			_ = listener.Close()
 			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create gRPC server: %w", err)
 		}
 
 		go func() {
-			controllerLogger.Info("Starting controller gRPC server", "port", serverConfig.GrpcPort)
+			controllerLogger.Info("Starting controller gRPC server", "address", listener.Addr().String())
 			if err := grpcServer.Start(); err != nil {
 				controllerLogger.Error("gRPC server failed", "error", err)
 			}
 		}()
 
 		controllerServer = grpcServer
-		controllerLogger.Info("Controller gRPC server started successfully")
+		controllerAddress = fmt.Sprintf("localhost:%d", assignedPort)
+		controllerLogger.Info("Controller gRPC server started successfully", "address", controllerAddress)
 	} else {
+		// When server is disabled, use empty address
+		controllerAddress = ""
 		controllerLogger.Info("UseControllerMediatedPayments disabled - controller will not have server")
 	}
-
-	// TODO(dmanc): Implement dynamic port allocation with net.Listen("tcp", "0.0.0.0:0")
-	// to match the pattern used by encoder v2 and relays. For now, we hardcode port 30000.
-	controllerAddress := "localhost:30000"
 
 	controllerLogger.Info("Controller components started successfully",
 		"address", controllerAddress, "logFile", logFilePath)
@@ -1016,6 +1031,7 @@ func startController(
 		EncodingManager:  encodingManager,
 		Dispatcher:       dispatcher,
 		ControllerServer: controllerServer,
+		Address:          controllerAddress,
 	}, nil
 }
 
