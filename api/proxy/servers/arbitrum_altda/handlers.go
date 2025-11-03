@@ -132,7 +132,7 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (certs.VersionedCert, error) {
 	if len(sequencerMsg) <= DACertOffset {
 		return certs.VersionedCert{},
-			fmt.Errorf("sequencer message expected to be >=%d bytes, got: %d",
+			fmt.Errorf("sequencer message expected to be >%d bytes, got: %d",
 				DACertOffset, len(sequencerMsg))
 	}
 
