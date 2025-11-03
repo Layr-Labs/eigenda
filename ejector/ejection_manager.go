@@ -301,6 +301,9 @@ func (em *ejectionManager) cleanUpFailedEjection(
 }
 
 // Get the leaky bucket for a specific quorum, creating it if it doesn't already exist.
+//
+// Note: this method must accept an external time instead of using em.timeSource() directly. The external
+// context needs to use a specific time between multiple function calls, and so we have to pass it in.
 func (em *ejectionManager) getLeakyBucketForQuorum(now time.Time, qid core.QuorumID) *ratelimit.LeakyBucket {
 	leakyBucket, ok := em.quorumRateLimits[qid]
 

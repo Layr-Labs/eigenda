@@ -71,10 +71,9 @@ type EjectorConfig struct {
 	// The period at which to periodically attempt to finalize ejections that have been started.
 	EjectionFinalizationPeriod time.Duration
 
-	// The number of blocks to wait before using a reference block number for quorum. That is to say, do not always
-	// use the latest block number we know about, but rather use the block number that is sufficiently old as to make
-	// choosing the wrong fork unlikely. If this config value is X, and we know about block 100, we will use a RBN
-	// 100-X.
+	// The number of blocks to wait before using a reference block number. That is to say, do not always
+	// read data from the latest block  we know about, but rather read from a block that is sufficiently old as to make
+	// choosing the wrong fork unlikely.
 	ReferenceBlockNumberOffset uint64
 
 	// The interval at which to poll for a new reference block number.
@@ -164,7 +163,7 @@ func DefaultEjectorConfig() *EjectorConfig {
 		DataApiTimeout:                       60 * time.Second,
 		EthRpcRetryCount:                     3,
 		EthBlockConfirmations:                0,
-		ReferenceBlockNumberOffset:           10,
+		ReferenceBlockNumberOffset:           64,
 		ReferenceBlockNumberPollInterval:     10 * time.Second,
 		ChainDataCacheSize:                   1024,
 		LogOutputType:                        string(common.JSONLogFormat),

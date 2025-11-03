@@ -2,6 +2,7 @@ package ejector
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -148,7 +149,7 @@ func (e *Ejector) evaluateValidator(signingRate *validator.ValidatorSigningRate)
 	}
 
 	if len(signingRate.GetValidatorId()) != 32 {
-		return fmt.Errorf("invalid validator ID length: %d", len(signingRate.GetValidatorId()))
+		return fmt.Errorf("invalid validator ID %s, length is not 32", hex.EncodeToString(signingRate.GetValidatorId()))
 	}
 
 	validatorID := core.OperatorID(signingRate.GetValidatorId()[:])
