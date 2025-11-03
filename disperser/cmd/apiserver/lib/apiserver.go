@@ -3,6 +3,7 @@ package lib
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
@@ -168,6 +169,13 @@ func RunDisperserServer(ctx *cli.Context) error {
 			controllerClient = controller.NewControllerServiceClient(connection)
 		}
 
+		// Create listener for the gRPC server
+		addr := fmt.Sprintf("%s:%s", "0.0.0.0", config.ServerConfig.GrpcPort)
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("failed to create listener: %w", err)
+		}
+
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			blobStore,
@@ -185,6 +193,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			config.UseControllerMediatedPayments,
 			controllerConnection,
 			controllerClient,
+			listener,
 		)
 		if err != nil {
 			return err

@@ -17,19 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const (
-	// trusted integration
-	MethodGetSupportedHeaderBytes = "daprovider_getSupportedHeaderBytes"
-	MethodStore                   = "daprovider_store"
-	MethodRecoverPayload          = "daprovider_recoverPayload"
-	MethodCollectPreimages        = "daprovider_collectPreimages"
-	// trustless integration
-	MethodGenerateReadPreimageProof = "daprovider_generateReadPreimageProof"
-	MethodGenerateCertValidityProof = "daprovider_generateCertificateValidityProof"
-	// compatibility config
-	MethodCompatibilityConfig = "daprovider_compatibilityConfig"
-)
-
 /*
 	This is a (hopefully) comprehensive handlers blue print for introducing a new ALT DA server type
 	that's compatible with Arbitrum's upcoming Custom DA spec.
@@ -41,7 +28,8 @@ const (
 	TODO: Method implementations:
 		[X] GetSupportedHeaderBytes // trusted integration
 		[-] Store // trusted integration
-		[-] RecoverPayloadFromBatch // trusted integration
+		[X] RecoveryPayload // trusted integration
+		[-] CollectPreimages // trusted integration
 		[ ] GenerateProof // trustless AND secure integration
 		[ ] GenerateCertificateValidityProof // trustless AND secure integration
 */
@@ -142,39 +130,40 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 // deserializeCertFromSequencerMsg reads the VersionedCert from the raw sequencer message provided
 // by the DA Client
 func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (certs.VersionedCert, error) {
-	if len(sequencerMsg) <= 42 {
+	if len(sequencerMsg) <= DACertOffset {
 		return certs.VersionedCert{},
-			fmt.Errorf("sequencer message expected to be >=42 bytes, got: %d", len(sequencerMsg))
+			fmt.Errorf("sequencer message expected to be >%d bytes, got: %d",
+				DACertOffset, len(sequencerMsg))
 	}
 
-	seqMessageWithoutHeader := sequencerMsg[40:]
+	daCommit := sequencerMsg[MessageHeaderOffset:]
 
-	daHeaderByte := seqMessageWithoutHeader[0]
+	daHeaderByte := daCommit[0]
 	if daHeaderByte != commitments.ArbCustomDAHeaderByte {
 		return certs.VersionedCert{},
 			fmt.Errorf("expected CustomDAHeader byte (%x) for 0th index byte of message, instead got: %x ",
 				commitments.ArbCustomDAHeaderByte, daHeaderByte)
 	}
 
-	daLayerByte := seqMessageWithoutHeader[1]
+	daLayerByte := daCommit[1]
 	if daLayerByte != commitments.EigenDALayerByte {
 		return certs.VersionedCert{},
 			fmt.Errorf("expected EigenDALayer byte (%x) for 1st index byte of message, instead got: %x ",
 				commitments.EigenDALayerByte, daLayerByte)
 	}
 
-	certVersionByte := seqMessageWithoutHeader[2]
-	versionedCert := certs.NewVersionedCert([]byte(seqMessageWithoutHeader[3:]), certs.VersionByte(certVersionByte))
+	certVersionByte := daCommit[2]
+	versionedCert := certs.NewVersionedCert([]byte(daCommit[DACommitPrefixBytes+1:]), certs.VersionByte(certVersionByte))
 	return versionedCert, nil
 }
 
 // logMethodCall logs the method call with timing information and allows caller to pass in
 // method specific log context
-func (h *Handlers) logMethodCall(methodName string, logValue ...string) func() {
+func (h *Handlers) logMethodCall(method string, logValue ...string) func() {
 	start := time.Now()
 
 	return func() {
-		h.log.Info(methodName, "ns", time.Since(start).Nanoseconds(), logValue)
+		h.log.Info(method, "ns", time.Since(start).Nanoseconds(), logValue)
 	}
 }
 
@@ -196,9 +185,11 @@ func (h *Handlers) RecoverPayload(
 	callBack := h.logMethodCall(MethodRecoverPayload, "sequencer_message", sequencerMsg.String())
 	defer callBack()
 
+	// if the DA Cert fails to be deserialized from the SequencerMessage
+	// then it is treated as a DerivationError
 	daCert, err := h.deserializeCertFromSequencerMsg(sequencerMsg)
 	if err != nil {
-		return nil, fmt.Errorf("deserialize cert: %w", err)
+		return nil, nil
 	}
 
 	payload, err := h.eigenDAManager.Get(ctx, daCert, proxy_common.GETOpts{})
@@ -284,6 +275,12 @@ func (h *Handlers) Store(
 //
 //	@return preimages_result: preimage mapping that contains EigenDA V2 entry
 //	@return error: a structured error message (if applicable)
+//
+// TODO: Figure out whether there's value in determining "invalid cert" errors here.
+//
+//	In theory this is only ever be callable when a DA Cert is validated by the ValidateCert
+//	opcode and is assumed to be correct and the associated blob is assumed to be available
+//	making validation signaling not needed.
 func (h *Handlers) CollectPreimages(
 	ctx context.Context,
 	batchNum hexutil.Uint64,
@@ -316,7 +313,7 @@ func (h *Handlers) CollectPreimages(
 
 	// Record the mapping from certificate hash to actual payload data
 	// This is what the replay binary expects: keccak256(certificate) -> payload
-	certHash := crypto.Keccak256Hash(sequencerMsg[40:])
+	certHash := crypto.Keccak256Hash(sequencerMsg[MessageHeaderOffset:])
 	preimageRecorder(certHash, payload, CustomDAPreimageType)
 
 	return &PreimagesResult{

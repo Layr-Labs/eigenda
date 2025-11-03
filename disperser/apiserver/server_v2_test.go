@@ -526,6 +526,10 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 	}, nil)
 
+	// Create listener for test server
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
 	// Create mock controller client that always authorizes payments
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -558,6 +562,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		true,  // use new payment system
 		nil,   // controllerConnection - not needed for unit tests
 		mockControllerClient,
+		listener,
 	)
 	require.NoError(t, err)
 

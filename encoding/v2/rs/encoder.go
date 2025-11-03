@@ -1,6 +1,7 @@
 package rs
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -26,9 +27,12 @@ type Encoder struct {
 }
 
 // NewEncoder creates a new encoder with the given options
-func NewEncoder(logger logging.Logger, config *encoding.Config) *Encoder {
+func NewEncoder(logger logging.Logger, config *encoding.Config) (*Encoder, error) {
 	if config == nil {
 		config = encoding.DefaultConfig()
+	}
+	if err := config.Verify(); err != nil {
+		return nil, fmt.Errorf("verify config: %w", err)
 	}
 
 	e := &Encoder{
@@ -38,23 +42,27 @@ func NewEncoder(logger logging.Logger, config *encoding.Config) *Encoder {
 		ParametrizedEncoder: make(map[encoding.EncodingParams]*ParametrizedEncoder),
 	}
 
-	return e
+	return e, nil
 }
 
 // just a wrapper to take bytes not Fr Element
-func (g *Encoder) EncodeBytes(inputBytes []byte, params encoding.EncodingParams) ([]FrameCoeffs, []uint32, error) {
+func (g *Encoder) EncodeBytes(
+	ctx context.Context, inputBytes []byte, params encoding.EncodingParams,
+) ([]FrameCoeffs, []uint32, error) {
 	inputFr, err := ToFrArray(inputBytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
 	}
-	return g.Encode(inputFr, params)
+	return g.Encode(ctx, inputFr, params)
 }
 
 // Encode function takes input in unit of Fr Element and creates a list of FramesCoeffs,
 // which each contain a list of multireveal interpolating polynomial coefficients.
 // A slice of uint32 is also returned, which corresponds to which leading coset
 // root of unity the frame is proving against. This can be deduced from a frame's index.
-func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) ([]FrameCoeffs, []uint32, error) {
+func (g *Encoder) Encode(
+	ctx context.Context, inputFr []fr.Element, params encoding.EncodingParams,
+) ([]FrameCoeffs, []uint32, error) {
 	start := time.Now()
 	intermediate := time.Now()
 
@@ -72,7 +80,7 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 
 	intermediate = time.Now()
 
-	polyEvals, err := encoder.rsEncoderBackend.ExtendPolyEval(pdCoeffs)
+	polyEvals, err := encoder.rsEncoderBackend.ExtendPolyEvalV2(ctx, pdCoeffs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reed-solomon extend poly evals, %w", err)
 	}
@@ -239,7 +247,8 @@ func (e *Encoder) newEncoder(params encoding.EncodingParams) (*ParametrizedEncod
 		}
 		rsEncoderBackend = gnark.NewRSBackend(fs)
 	case encoding.IcicleBackend:
-		rsEncoderBackend, err = icicle.BuildRSBackend(e.logger, e.Config.GPUEnable)
+		rsEncoderBackend, err = icicle.BuildRSBackend(
+			e.logger, e.Config.GPUEnable, e.Config.GPUConcurrentFrameGenerationDangerous)
 		if err != nil {
 			return nil, fmt.Errorf("build icicle rs backend: %w", err)
 		}

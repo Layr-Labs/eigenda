@@ -128,6 +128,8 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("setup payment vault transactor: %w", err)
 	}
 
+	testCtx.APIServerAddress = infra.DisperserHarness.APIServerAddress
+
 	if err := setupDefaultPayloadDisperser(ctx, testCtx, infra); err != nil {
 		return nil, fmt.Errorf("setup default payload disperser: %w", err)
 	}
@@ -229,7 +231,10 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 	}
 
 	// Setup V2 retrieval clients
-	encoder := rsv2.NewEncoder(infraHarness.Logger, nil)
+	encoder, err := rsv2.NewEncoder(infraHarness.Logger, nil)
+	if err != nil {
+		return fmt.Errorf("new v2 encoder: %w", err)
+	}
 	kzgVerifierV2, err := verifierv2.NewVerifier(verifierv2.ConfigFromV1KzgConfig(kzgConfig))
 	if err != nil {
 		return fmt.Errorf("new verifier v2: %w", err)
@@ -298,6 +303,7 @@ func setupDefaultPayloadDisperser(
 	infra *InfrastructureHarness,
 ) error {
 	// default value for the private key is the one that has the reservation pre-registered on-chain
+	// APIServerAddress will be automatically populated from testHarness.APIServerAddress
 	config := GetDefaultTestPayloadDisperserConfig()
 	payloadDisperser, err := testHarness.CreatePayloadDisperser(ctx, infra.Logger, config)
 	if err != nil {
