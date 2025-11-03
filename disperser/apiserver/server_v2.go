@@ -75,7 +75,6 @@ type DispersalServerV2 struct {
 	useControllerMediatedPayments bool
 
 	// Exists as a member variable so that the connection can be closed inside Stop().
-	// May be nil if useControllerMediatedPayments is false
 	controllerConnection *grpc.ClientConn
 
 	// Client for making gRPC calls to the controller.
