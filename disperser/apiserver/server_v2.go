@@ -26,7 +26,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
@@ -75,9 +74,13 @@ type DispersalServerV2 struct {
 	// TODO(litt3): this field should be removed once the migration to the new payments system is complete
 	useControllerMediatedPayments bool
 
-	// Controller gRPC client connection and service client
+	// Exists as a member variable so that the connection can be closed inside Stop().
+	// May be nil if useControllerMediatedPayments is false
 	controllerConnection *grpc.ClientConn
-	controllerClient     controller.ControllerServiceClient
+
+	// Client for making gRPC calls to the controller.
+	// May be nil if useControllerMediatedPayments is false
+	controllerClient controller.ControllerServiceClient
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -96,8 +99,10 @@ func NewDispersalServerV2(
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
 	useControllerMediatedPayments bool,
-	// must be non-empty if useControllerMediatedPayments is true
-	controllerAddress string,
+	// May be nil if useControllerMediatedPayments is false
+	controllerConnection *grpc.ClientConn,
+	// May be nil if useControllerMediatedPayments is false
+	controllerClient controller.ControllerServiceClient,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
@@ -126,24 +131,11 @@ func NewDispersalServerV2(
 
 	logger := _logger.With("component", "DispersalServerV2")
 
-	var controllerConnection *grpc.ClientConn
-	var controllerClient controller.ControllerServiceClient
 	if useControllerMediatedPayments {
-		if controllerAddress == "" {
-			return nil, errors.New("controller address is required to use new payment system")
+		if controllerClient == nil {
+			return nil, errors.New("controller client is required when using controller-mediated payments")
 		}
-
-		connection, err := grpc.NewClient(
-			controllerAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("create controller connection: %w", err)
-		}
-		controllerConnection = connection
-		controllerClient = controller.NewControllerServiceClient(connection)
-
-		logger.Info("Using controller-based payment system", "controller", controllerAddress)
+		logger.Info("Using controller-based payment system")
 	} else {
 		logger.Info("Using legacy payment metering system")
 	}
