@@ -99,9 +99,7 @@ func NewDispersalServerV2(
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
 	useControllerMediatedPayments bool,
-	// May be nil if useControllerMediatedPayments is false
 	controllerConnection *grpc.ClientConn,
-	// May be nil if useControllerMediatedPayments is false
 	controllerClient controller.ControllerServiceClient,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
