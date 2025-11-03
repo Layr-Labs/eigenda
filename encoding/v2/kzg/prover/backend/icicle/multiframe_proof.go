@@ -165,12 +165,12 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 
 	end := time.Now()
 
-	p.Logger.Info("Multiproof Time Decomp (ms)",
+	p.Logger.Info("Multiproof Time Decomp (microseconds)",
 		"total", end.Sub(begin).Milliseconds(),
-		"preproc", preprocessDone.Sub(begin).Milliseconds(),
-		"msm", msmDone.Sub(preprocessDone).Milliseconds(),
-		"fft1", firstECNttDone.Sub(msmDone).Milliseconds(),
-		"fft2", secondECNttDone.Sub(firstECNttDone).Milliseconds(),
+		"preproc", preprocessDone.Sub(begin).Microseconds(),
+		"msm", msmDone.Sub(preprocessDone).Microseconds(),
+		"fft1", firstECNttDone.Sub(msmDone).Microseconds(),
+		"fft2", secondECNttDone.Sub(firstECNttDone).Microseconds(),
 	)
 
 	return proofs, nil
