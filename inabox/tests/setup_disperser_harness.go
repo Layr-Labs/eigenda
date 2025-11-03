@@ -1219,7 +1219,6 @@ func startAPIServer(
 	var controllerClient grpccontroller.ControllerServiceClient
 	if config.TestConfig.UseNewPayments {
 		if controllerAddress == "" {
-			_ = logFile.Close()
 			return nil, fmt.Errorf("controller address is empty but UseNewPayments is true")
 		}
 		connection, err := grpc.NewClient(
@@ -1227,7 +1226,6 @@ func startAPIServer(
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		)
 		if err != nil {
-			_ = logFile.Close()
 			return nil, fmt.Errorf("create controller connection: %w", err)
 		}
 		controllerConnection = connection
