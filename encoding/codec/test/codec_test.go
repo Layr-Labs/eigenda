@@ -246,7 +246,7 @@ func TestPadUnpad(t *testing.T) {
 		paddedBytes := codec.PadPayload(originalBytes)
 		require.Equal(t, len(paddedBytes)%32, 0)
 
-		unpaddedBytes, err := codec.CheckAndRemoveInternalPadding(paddedBytes)
+		unpaddedBytes, err := codec.CheckAndRemoveInternalPadding(paddedBytes, uint32(len(originalBytes)))
 		require.Nil(t, err)
 
 		expectedUnpaddedLength, err := codec.GetUnpaddedDataLength(uint32(len(paddedBytes)))
@@ -279,7 +279,7 @@ func TestDetectInvalidPad(t *testing.T) {
 		paddedBytes[corruptionIndex] = 1
 		require.Equal(t, len(paddedBytes)%32, 0)
 
-		_, err := codec.CheckAndRemoveInternalPadding(paddedBytes)
+		_, err := codec.CheckAndRemoveInternalPadding(paddedBytes, uint32(len(originalBytes)))
 		require.Error(t, err)
 	}
 }

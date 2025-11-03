@@ -120,8 +120,8 @@ func PadPayload(inputData []byte) []byte {
 	return paddedOutput
 }
 
-// CheckAndRemoveInternalPadding accepts an array of padded data, and removes the internal padding that was added in
-// PadPayload
+// CheckAndRemoveInternalFieldElementPadding accepts an array of padded data, then checks and removes the internal
+// padding that was added to make every 32 bytes be a valid field element.
 //
 // This function assumes that the input aligns to 32 bytes. Since it is removing 1 byte for every 31 bytes kept, the
 // output from this function is not guaranteed to align to 32 bytes.
@@ -131,7 +131,7 @@ func PadPayload(inputData []byte) []byte {
 // removal logic simpler.
 //
 // In addition, this function requires the first byte in every multiple of 32 bytes to be 0x00.
-func CheckAndRemoveInternalPadding(paddedData []byte) ([]byte, error) {
+func CheckAndRemoveInternalFieldElementPadding(paddedData []byte) ([]byte, error) {
 	if len(paddedData)%encoding.BYTES_PER_SYMBOL != 0 {
 		return nil, fmt.Errorf(
 			"padded data (length %d) must be multiple of encoding.BYTES_PER_SYMBOL %d",
@@ -161,6 +161,39 @@ func CheckAndRemoveInternalPadding(paddedData []byte) ([]byte, error) {
 	}
 
 	return outputData, nil
+}
+
+// CheckAndRemoveInternalPadding accepts an array of padded data, then checks and removes all the padding that was
+// added to the payload in order to make every 32 bytes a valid field element in the final output, and to make
+// the length of the output to hold a power of 2 field elements i.e (32, 64, 128,...) bytes.
+//
+// This function checks all the padding must be 0.
+func CheckAndRemoveInternalPadding(paddedData []byte, payloadLen uint32) ([]byte, error) {
+	decodedPayloadWithPadding, err := CheckAndRemoveInternalFieldElementPadding(paddedData)
+	if err != nil {
+		return nil, fmt.Errorf("padding check failed for ensuring every 32 bytes is a valid field element: %w", err)
+	}
+
+	// data length is checked when constructing an encoded payload. If this error is encountered, that means there
+	// must be a flaw in the logic at construction time (or someone was bad and didn't use the proper construction
+	// methods)
+	if uint32(len(decodedPayloadWithPadding)) < payloadLen {
+		return nil, fmt.Errorf(
+			"length of unpadded data %d is less than length claimed in encoded payload header %d."+
+				"this should neverhappen", uint32(len(decodedPayloadWithPadding)), payloadLen)
+	}
+
+	// ensure all the padding bytes in the encoded payload are zero. This is accomplished by first checking that the
+	// first byte of every multiple of 32 bytes is zero, and then verifying that all remaining bytes beyond the useful
+	// payload length are also zero with the following loop.
+	for _, b := range decodedPayloadWithPadding[payloadLen:] {
+		if b != 0x0 {
+			return nil, fmt.Errorf("padding on encoded payload must be 0 instead we got 0x%02x", b)
+		}
+	}
+
+	return decodedPayloadWithPadding[0:payloadLen], nil
+
 }
 
 // PayloadSizeToBlobSize takes a payload size in bytes and returns the corresponding blob size in bytes.

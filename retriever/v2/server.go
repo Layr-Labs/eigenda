@@ -85,7 +85,7 @@ func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.Blo
 		return nil, err
 	}
 
-	restored, err := codec.CheckAndRemoveInternalPadding(data)
+	restored, err := codec.CheckAndRemoveInternalFieldElementPadding(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to remove internal padding from blob data: %w", err)
 	}

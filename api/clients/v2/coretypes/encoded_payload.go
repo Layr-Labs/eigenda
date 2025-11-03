@@ -128,20 +128,12 @@ func (ep *EncodedPayload) decodePayload(payloadLen uint32) ([]byte, error) {
 	body := ep.bytes[codec.EncodedPayloadHeaderLenBytes:]
 	// Decode the body by removing internal 0 byte padding (0x00 initial byte for every 32 byte chunk)
 	// The decodedBody should contain the payload bytes + potentially some external padding bytes.
-	decodedBody, err := codec.CheckAndRemoveInternalPadding(body)
+	decodedPayload, err := codec.CheckAndRemoveInternalPadding(body, payloadLen)
 	if err != nil {
 		return nil, fmt.Errorf("remove internal padding: %w", err)
 	}
 
-	// data length is checked when constructing an encoded payload. If this error is encountered, that means there
-	// must be a flaw in the logic at construction time (or someone was bad and didn't use the proper construction methods)
-	if uint32(len(decodedBody)) < payloadLen {
-		return nil, fmt.Errorf(
-			"length of unpadded data %d is less than length claimed in encoded payload header %d. this should never happen",
-			uint32(len(decodedBody)), payloadLen)
-	}
-
-	return Payload(decodedBody[0:payloadLen]), nil
+	return Payload(decodedPayload), nil
 }
 
 // checkLenInvariant checks whether the encoded payload satisfies its length invariant.
