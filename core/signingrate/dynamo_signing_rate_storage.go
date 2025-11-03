@@ -194,7 +194,7 @@ func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *vali
 		// SET expression updates/creates the specified attributes
 		// This is DynamoDB's expression language for atomic updates
 		UpdateExpression: aws.String(fmt.Sprintf("SET %s = %s, %s = %s, %s = %s",
-			attrPayload, placeholderPayload,           // Store serialized bucket data
+			attrPayload, placeholderPayload, // Store serialized bucket data
 			attrEndTimestamp, placeholderEndTimestamp, // Store end timestamp for range queries
 			attrPayloadType, placeholderPayloadType)), // Store dummy partition key for Global Secondary Index
 
@@ -262,8 +262,8 @@ func (d *dynamoSigningRateStorage) LoadBuckets(
 		// Format: "partition_key = value AND sort_key > value"
 		// We must specify the partition key (PayloadType) and can add range conditions on sort key (EndTimestamp)
 		KeyConditionExpression: aws.String(fmt.Sprintf("%s = %s AND %s > %s",
-			attrPayloadType, placeholderPayloadType,   // PayloadType = "Payload" (dummy partition)
-			attrEndTimestamp, placeholderStart)),       // EndTimestamp > startTimestamp
+			attrPayloadType, placeholderPayloadType, // PayloadType = "Payload" (dummy partition)
+			attrEndTimestamp, placeholderStart)), // EndTimestamp > startTimestamp
 
 		// Parameterized values for the query conditions (prevents injection attacks)
 		ExpressionAttributeValues: map[string]types.AttributeValue{
