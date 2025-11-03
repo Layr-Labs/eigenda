@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
 )
 
@@ -69,6 +70,13 @@ type ControllerConfig struct {
 	// NodeClientCacheSize is the maximum number of node clients to cache for reuse.
 	// Must be at least 1.
 	NodeClientCacheSize int
+
+	// Configuration for the controller's gRPC server.
+	GrpcServerConfig common.GRPCServerConfig
+
+	// If true, use the new payment authentication system running on the controller.
+	// If false, payment authentication is disabled and request validation will always fail
+	EnablePaymentAuthentication bool
 }
 
 func (c *ControllerConfig) Verify() error {
@@ -151,5 +159,6 @@ func (c *ControllerConfig) GetName() string {
 func (c *ControllerConfig) GetPackagePaths() []string {
 	return []string{
 		"github.com/Layr-Labs/eigenda/disperser/controller",
+		"github.com/Layr-Labs/eigenda/common",
 	}
 }
