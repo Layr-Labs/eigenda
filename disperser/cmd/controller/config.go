@@ -25,7 +25,7 @@ const MaxUint16 = ^uint16(0)
 
 type Config struct {
 	EncodingManagerConfig controller.EncodingManagerConfig
-	DispatcherConfig      controller.DispatcherConfig
+	DispatcherConfig      controller.ControllerConfig
 
 	DynamoDBTableName string
 
@@ -153,7 +153,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
 		},
-		DispatcherConfig: controller.DispatcherConfig{
+		DispatcherConfig: controller.ControllerConfig{
 			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
 			FinalizationBlockDelay:                ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
 			AttestationTimeout:                    ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),

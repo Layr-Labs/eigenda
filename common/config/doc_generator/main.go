@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/enforce"
+	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/ejector"
 	"github.com/Layr-Labs/eigenda/test/v2/load"
 )
@@ -16,4 +17,7 @@ func main() {
 
 	err = config.DocumentConfig(ejector.NewRootEjectorConfig, configDocsDir, true)
 	enforce.NilError(err, "failed to generate docs for the ejector config")
+
+	err = config.DocumentConfig(controller.DefaultControllerConfig, configDocsDir, true)
+	enforce.NilError(err, "failed to generate docs for the controller config")
 }

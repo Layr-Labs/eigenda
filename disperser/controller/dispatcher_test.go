@@ -714,7 +714,7 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		metadata.NewBatchMetadata(referenceBlockNumber, operatorState))
 
 	d, err := controller.NewDispatcher(
-		&controller.DispatcherConfig{
+		&controller.ControllerConfig{
 			PullInterval:              1 * time.Second,
 			FinalizationBlockDelay:    finalizationBlockDelay,
 			AttestationTimeout:        1 * time.Second,
