@@ -105,6 +105,13 @@ func (svr *Server) handleSetEigenDADispersalBackend(w http.ResponseWriter, r *ht
 	svr.writeJSON(w, r, response)
 }
 
+// handleGetCompatibilityConfig handles the GET request to return the proxy compatibility config.
+// This endpoint returns the proxy version, and any info that may be valuable to
+// external services (e.g recency window size), to ensure correct configuration on both sides.
+func (svr *Server) handleGetCompatibilityConfig(w http.ResponseWriter, r *http.Request) {
+	svr.writeJSON(w, r, svr.config.CompatibilityCfg)
+}
+
 func (svr *Server) writeJSON(w http.ResponseWriter, r *http.Request, response interface{}) {
 	jsonData, err := json.Marshal(response)
 	if err != nil {

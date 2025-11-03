@@ -25,13 +25,12 @@ var (
 	}
 	networkFlag = &cli.StringFlag{
 		Name: "network",
-		Usage: fmt.Sprintf(`The EigenDA network to discover (one of: %s, %s, %s, %s).
+		Usage: fmt.Sprintf(`The EigenDA network to discover (one of: %s, %s, %s).
 Must match the chain-id of the ethereum rpc url provided. Used to select the hardcoded default EigenDADirectory address.
 That address can be overridden by providing the --%s flag.`,
 			proxycmn.MainnetEigenDANetwork,
-			proxycmn.HoleskyTestnetEigenDANetwork,
-			proxycmn.HoleskyPreprodEigenDANetwork,
 			proxycmn.SepoliaTestnetEigenDANetwork,
+			proxycmn.HoodiTestnetEigenDANetwork,
 			discoverAddressFlag.Name,
 		),
 		Required: true,

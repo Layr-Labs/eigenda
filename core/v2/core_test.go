@@ -171,7 +171,7 @@ func prepareBlobs(
 		require.NoError(t, err)
 		blobFr, err := rs.ToFrArray(blob)
 		require.NoError(t, err)
-		frames, _, err := p.GetFrames(blobFr, params)
+		frames, _, err := p.GetFrames(ctx, blobFr, params)
 		require.NoError(t, err)
 		state, err := cst.GetOperatorState(ctx, uint(referenceBlockNumber), header.QuorumNumbers)
 
