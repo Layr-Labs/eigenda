@@ -87,11 +87,12 @@ type DisperserHarness struct {
 	// Relay
 	RelayServers []*relay.Server
 
-	// Encoder V2
-	EncoderServerV2 *encoder.EncoderServerV2
+	// Encoder
+	EncoderServer *encoder.EncoderServerV2
 
-	// API Server V2
-	APIServerV2 *apiserver.DispersalServerV2
+	// API Server
+	APIServer        *apiserver.DispersalServerV2
+	APIServerAddress string
 
 	// Controller components
 	// TODO: Refactor into a single struct for controller components
@@ -110,7 +111,7 @@ type RelayComponents struct {
 	Servers []*relay.Server
 }
 
-// EncoderComponents contains the components created by startEncoderV2
+// EncoderComponents contains the components created by startEncoder
 type EncoderComponents struct {
 	Server  *encoder.EncoderServerV2
 	Address string
@@ -124,7 +125,7 @@ type ControllerComponents struct {
 	Address          string
 }
 
-// APIServerComponents contains the components created by startAPIServerV2
+// APIServerComponents contains the components created by startAPIServer
 type APIServerComponents struct {
 	Server  *apiserver.DispersalServerV2
 	Address string
@@ -253,12 +254,12 @@ func SetupDisperserHarness(
 		logger.Warn("Relay count is not specified, skipping relay setup")
 	}
 
-	// Start encoder v2 goroutine
-	encoderComponents, err := startEncoderV2(ctx, harness.LocalStack, config)
+	// Start encoder goroutine
+	encoderComponents, err := startEncoder(ctx, harness.LocalStack, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start encoder v2: %w", err)
+		return nil, fmt.Errorf("failed to start encoder: %w", err)
 	}
-	harness.EncoderServerV2 = encoderComponents.Server
+	harness.EncoderServer = encoderComponents.Server
 	encoderAddress := encoderComponents.Address
 
 	// Start controller goroutine
@@ -277,8 +278,8 @@ func SetupDisperserHarness(
 	harness.Dispatcher = controllerComponents.Dispatcher
 	harness.ControllerServer = controllerComponents.ControllerServer
 
-	// Start API server v2 goroutine
-	apiServerComponents, err := startAPIServerV2(
+	// Start API server goroutine
+	apiServerComponents, err := startAPIServer(
 		ctx,
 		ethClient,
 		controllerComponents.Address,
@@ -286,9 +287,10 @@ func SetupDisperserHarness(
 		config,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start API server v2: %w", err)
+		return nil, fmt.Errorf("failed to start API server: %w", err)
 	}
-	harness.APIServerV2 = apiServerComponents.Server
+	harness.APIServer = apiServerComponents.Server
+	harness.APIServerAddress = apiServerComponents.Address
 
 	// Start remaining binaries (disperser, batcher, etc.)
 	if config.TestConfig != nil {
@@ -298,7 +300,7 @@ func SetupDisperserHarness(
 			return nil, fmt.Errorf("could not generate environment variables: %w", err)
 		}
 
-		// Start binaries for tests, will skip churner, operators, encoder v2, controller, and relays
+		// Start binaries for tests, will skip churner, operators, encoder, controller, and relays
 		config.TestConfig.StartBinaries(true)
 	}
 
@@ -372,17 +374,17 @@ func startRelays(
 
 // Cleanup releases resources held by the DisperserHarness (excluding shared network)
 func (dh *DisperserHarness) Cleanup(ctx context.Context, logger logging.Logger) {
-	// Stop encoder v2 server
-	if dh.EncoderServerV2 != nil {
-		logger.Info("Stopping encoder v2 server")
-		dh.EncoderServerV2.Close()
+	// Stop encoder server
+	if dh.EncoderServer != nil {
+		logger.Info("Stopping encoder server")
+		dh.EncoderServer.Close()
 	}
 
-	// Stop API server v2
-	if dh.APIServerV2 != nil {
-		logger.Info("Stopping API server v2")
-		if err := dh.APIServerV2.Stop(); err != nil {
-			logger.Error("Failed to stop API server v2", "error", err)
+	// Stop API server
+	if dh.APIServer != nil {
+		logger.Info("Stopping API server")
+		if err := dh.APIServer.Stop(); err != nil {
+			logger.Error("Failed to stop API server", "error", err)
 		}
 	}
 
@@ -431,6 +433,11 @@ func startRelayWithListener(
 	if err != nil {
 		return nil, fmt.Errorf("failed to open relay log file: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			_ = logFile.Close()
+		}
+	}()
 
 	// Create relay logger config for file output
 	loggerConfig := common.LoggerConfig{
@@ -449,14 +456,12 @@ func startRelayWithListener(
 	// Create logger
 	logger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Create DynamoDB client
 	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
@@ -472,7 +477,6 @@ func startRelayWithListener(
 		awsConfig.SecretAccessKey,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
@@ -498,7 +502,6 @@ func startRelayWithListener(
 		config.TestConfig.EigenDA.OperatorStateRetriever,
 		config.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create eth writer: %w", err)
 	}
 
@@ -523,7 +526,6 @@ func startRelayWithListener(
 		listener,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create relay server: %w", err)
 	}
 
@@ -554,14 +556,14 @@ func stopAllRelays(servers []*relay.Server, logger logging.Logger) {
 	}
 }
 
-// startEncoderV2 starts the encoder v2 server as a goroutine and returns the encoder components
-func startEncoderV2(
+// startEncoder starts the encoder server as a goroutine and returns the encoder components
+func startEncoder(
 	ctx context.Context,
 	localStack *testbed.LocalStackContainer,
 	config DisperserHarnessConfig,
 ) (*EncoderComponents, error) {
 	if config.TestConfig == nil {
-		return nil, fmt.Errorf("test config is required to start encoder v2")
+		return nil, fmt.Errorf("test config is required to start encoder")
 	}
 
 	// Create logs directory
@@ -575,6 +577,11 @@ func startEncoderV2(
 	if err != nil {
 		return nil, fmt.Errorf("failed to open encoder log file: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			_ = logFile.Close()
+		}
+	}()
 
 	// Create encoder logger config for file output
 	loggerConfig := common.LoggerConfig{
@@ -590,7 +597,6 @@ func startEncoderV2(
 	// Create logger
 	encoderLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
@@ -609,7 +615,6 @@ func startEncoderV2(
 		awsConfig.SecretAccessKey,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
@@ -627,7 +632,6 @@ func startEncoderV2(
 	// Get SRS paths using the utility function
 	g1Path, _, _, err := getSRSPaths()
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}
 
@@ -649,9 +653,8 @@ func startEncoderV2(
 		NumWorker:   1,
 	}
 
-	proverV2, err := prover.NewProver(encoderLogger, &kzgConfig, encodingConfig)
+	prover, err := prover.NewProver(encoderLogger, &kzgConfig, encodingConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create prover: %w", err)
 	}
 
@@ -672,12 +675,12 @@ func startEncoderV2(
 	}
 
 	// Create encoder server
-	encoderServerV2 := encoder.NewEncoderServerV2(
+	encoderServer := encoder.NewEncoderServerV2(
 		serverConfig,
 		blobStore,
 		chunkWriter,
 		encoderLogger,
-		proverV2,
+		prover,
 		encoderMetrics,
 		grpcMetrics,
 	)
@@ -685,28 +688,27 @@ func startEncoderV2(
 	// Pre-create listener with port 0 (OS assigns random port)
 	listener, err := net.Listen("tcp", "0.0.0.0:0")
 	if err != nil {
-		_ = logFile.Close()
-		return nil, fmt.Errorf("failed to create listener for encoder v2: %w", err)
+		return nil, fmt.Errorf("failed to create listener for encoder: %w", err)
 	}
 
 	// Extract the port assigned by the OS
 	assignedPort := listener.Addr().(*net.TCPAddr).Port
 	assignedAddress := fmt.Sprintf("localhost:%d", assignedPort)
 
-	encoderLogger.Info("Created listener for encoder v2", "assigned_port", assignedPort, "address", assignedAddress)
+	encoderLogger.Info("Created listener for encoder", "assigned_port", assignedPort, "address", assignedAddress)
 
 	// Start encoder server in background
 	go func() {
-		encoderLogger.Info("Starting encoder v2 server", "address", listener.Addr().String(), "logFile", logFilePath)
-		if err := encoderServerV2.StartWithListener(listener); err != nil {
-			encoderLogger.Error("Encoder v2 server failed", "error", err)
+		encoderLogger.Info("Starting encoder server", "address", listener.Addr().String(), "logFile", logFilePath)
+		if err := encoderServer.StartWithListener(listener); err != nil {
+			encoderLogger.Error("Encoder server failed", "error", err)
 		}
 	}()
 
-	encoderLogger.Info("Encoder v2 server started successfully", "address", assignedAddress, "logFile", logFilePath)
+	encoderLogger.Info("Encoder server started successfully", "address", assignedAddress, "logFile", logFilePath)
 
 	return &EncoderComponents{
-		Server:  encoderServerV2,
+		Server:  encoderServer,
 		Address: assignedAddress,
 	}, nil
 }
@@ -736,6 +738,11 @@ func startController(
 	if err != nil {
 		return nil, fmt.Errorf("failed to open controller log file: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			_ = logFile.Close()
+		}
+	}()
 
 	// Create controller logger config for file output
 	loggerConfig := common.LoggerConfig{
@@ -751,7 +758,6 @@ func startController(
 	// Create logger
 	controllerLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
@@ -761,7 +767,6 @@ func startController(
 	// Create DynamoDB client
 	dynamoClient, err := dynamodb.NewClient(awsConfig, controllerLogger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
@@ -782,7 +787,6 @@ func startController(
 			KeyID:    config.TestConfig.DisperserKMSKeyID,
 		})
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dispersal request signer: %w", err)
 	}
 
@@ -819,7 +823,6 @@ func startController(
 		config.TestConfig.EigenDA.OperatorStateRetriever,
 		config.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
@@ -829,7 +832,6 @@ func startController(
 	// Create encoder client
 	encoderClient, err := encoder.NewEncoderClientV2(encodingManagerConfig.EncoderAddress)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create encoder client: %w", err)
 	}
 
@@ -848,14 +850,12 @@ func startController(
 		controllerLivenessChan,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create encoding manager: %w", err)
 	}
 
 	// Create signature aggregator
 	sigAgg, err := core.NewStdSignatureAggregator(controllerLogger, chainReader)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create signature aggregator: %w", err)
 	}
 
@@ -873,7 +873,6 @@ func startController(
 		controllerLogger,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create node client manager: %w", err)
 	}
 
@@ -888,7 +887,6 @@ func startController(
 		dispatcherConfig.FinalizationBlockDelay,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
@@ -915,25 +913,21 @@ func startController(
 		controllerLivenessChan,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dispatcher: %w", err)
 	}
 
 	// Recover state before starting
 	if err := controller.RecoverState(ctx, metadataStore, controllerLogger); err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to recover state: %w", err)
 	}
 
 	// Start encoding manager
 	if err := encodingManager.Start(ctx); err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to start encoding manager: %w", err)
 	}
 
 	// Start dispatcher
 	if err := dispatcher.Start(ctx); err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to start dispatcher: %w", err)
 	}
 
@@ -952,7 +946,6 @@ func startController(
 			gethcommon.HexToAddress(config.TestConfig.EigenDA.EigenDADirectory),
 		)
 		if err != nil {
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create contract directory: %w", err)
 		}
 
@@ -972,16 +965,19 @@ func startController(
 			metricsRegistry,
 		)
 		if err != nil {
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)
 		}
 
 		// Pre-create listener with port 0 (OS assigns random port)
 		listener, err := net.Listen("tcp", "0.0.0.0:0")
 		if err != nil {
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create listener for controller: %w", err)
 		}
+		defer func() {
+			if err != nil {
+				_ = listener.Close()
+			}
+		}()
 
 		// Extract the port assigned by the OS
 		assignedPort := listener.Addr().(*net.TCPAddr).Port
@@ -997,8 +993,6 @@ func startController(
 			3*time.Minute,
 		)
 		if err != nil {
-			_ = listener.Close()
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create gRPC server config: %w", err)
 		}
 
@@ -1007,8 +1001,6 @@ func startController(
 			true, // EnablePaymentAuthentication
 		)
 		if err != nil {
-			_ = listener.Close()
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create server config: %w", err)
 		}
 
@@ -1022,8 +1014,6 @@ func startController(
 			listener,
 		)
 		if err != nil {
-			_ = listener.Close()
-			_ = logFile.Close()
 			return nil, fmt.Errorf("failed to create gRPC server: %w", err)
 		}
 
@@ -1054,8 +1044,8 @@ func startController(
 	}, nil
 }
 
-// startAPIServerV2 starts the API server v2 as a goroutine and returns the API server components
-func startAPIServerV2(
+// startAPIServer starts the API server as a goroutine and returns the API server components
+func startAPIServer(
 	ctx context.Context,
 	ethClient common.EthClient,
 	controllerAddress string,
@@ -1063,7 +1053,7 @@ func startAPIServerV2(
 	config DisperserHarnessConfig,
 ) (*APIServerComponents, error) {
 	if config.TestConfig == nil {
-		return nil, fmt.Errorf("test config is required to start API server v2")
+		return nil, fmt.Errorf("test config is required to start API server")
 	}
 
 	// Create logs directory
@@ -1072,11 +1062,16 @@ func startAPIServerV2(
 		return nil, fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
-	logFilePath := fmt.Sprintf("%s/apiserver_v2.log", logsDir)
+	logFilePath := fmt.Sprintf("%s/apiserver.log", logsDir)
 	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open API server log file: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			_ = logFile.Close()
+		}
+	}()
 
 	// Create API server logger config for file output
 	loggerConfig := common.LoggerConfig{
@@ -1092,7 +1087,6 @@ func startAPIServerV2(
 	// Create logger
 	apiServerLogger, err := common.NewLogger(&loggerConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
@@ -1102,7 +1096,6 @@ func startAPIServerV2(
 	// Create DynamoDB client
 	dynamoClient, err := dynamodb.NewClient(awsConfig, apiServerLogger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create dynamodb client: %w", err)
 	}
 
@@ -1118,7 +1111,6 @@ func startAPIServerV2(
 		awsConfig.SecretAccessKey,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
@@ -1139,7 +1131,6 @@ func startAPIServerV2(
 	// Create committer
 	g1Path, g2Path, g2TrailingPath, err := getSRSPaths()
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}
 
@@ -1152,7 +1143,6 @@ func startAPIServerV2(
 
 	kzgCommitter, err := committer.NewFromConfig(committerConfig)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create committer: %w", err)
 	}
 
@@ -1163,7 +1153,6 @@ func startAPIServerV2(
 		config.TestConfig.EigenDA.OperatorStateRetriever,
 		config.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
@@ -1187,11 +1176,9 @@ func startAPIServerV2(
 
 	paymentChainState, err := meterer.NewOnchainPaymentState(ctx, chainReader, apiServerLogger)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create onchain payment state: %w", err)
 	}
 	if err := paymentChainState.RefreshOnchainPaymentState(ctx); err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 	}
 
@@ -1205,7 +1192,6 @@ func startAPIServerV2(
 		apiServerLogger,
 	)
 	if err != nil {
-		_ = logFile.Close()
 		return nil, fmt.Errorf("failed to create offchain store: %w", err)
 	}
 
@@ -1217,9 +1203,24 @@ func startAPIServerV2(
 	)
 	mt.Start(ctx)
 
+	// Pre-create listener with port 0 (OS assigns random port)
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create listener for API server: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = listener.Close()
+		}
+	}()
+
+	// Extract the port assigned by the OS
+	assignedPort := listener.Addr().(*net.TCPAddr).Port
+	apiServerLogger.Info("Created listener for API server", "assigned_port", assignedPort)
+
 	// Create server config
 	serverConfig := disperser.ServerConfig{
-		GrpcPort:              "32005", // Use a specific port for API server
+		GrpcPort:              fmt.Sprintf("%d", assignedPort),
 		GrpcTimeout:           10 * time.Second,
 		MaxConnectionAge:      5 * time.Minute,
 		MaxConnectionAgeGrace: 30 * time.Second,
@@ -1237,9 +1238,9 @@ func startAPIServerV2(
 	// Onchain state refresh interval
 	onchainStateRefreshInterval := 1 * time.Second
 
-	// Create API server v2
+	// Create API server
 	// Note: meterer is nil when using controller-mediated payments, otherwise it's the legacy meterer
-	apiServerV2, err := apiserver.NewDispersalServerV2(
+	apiServer, err := apiserver.NewDispersalServerV2(
 		serverConfig,
 		blobStore,
 		metadataStore,
@@ -1255,25 +1256,25 @@ func startAPIServerV2(
 		false, // ReservedOnly
 		config.TestConfig.UseNewPayments,
 		controllerAddress,
+		listener,
 	)
 	if err != nil {
-		_ = logFile.Close()
-		return nil, fmt.Errorf("failed to create API server v2: %w", err)
+		return nil, fmt.Errorf("failed to create API server: %w", err)
 	}
 
 	// Start API server in background
 	go func() {
-		apiServerLogger.Info("Starting API server v2", "port", serverConfig.GrpcPort, "logFile", logFilePath)
-		if err := apiServerV2.Start(ctx); err != nil {
-			apiServerLogger.Error("API server v2 failed", "error", err)
+		apiServerLogger.Info("Starting API server", "address", listener.Addr().String(), "logFile", logFilePath)
+		if err := apiServer.Start(ctx); err != nil {
+			apiServerLogger.Error("API server failed", "error", err)
 		}
 	}()
 
-	actualAddress := fmt.Sprintf("localhost:%s", serverConfig.GrpcPort)
-	apiServerLogger.Info("API server v2 started successfully", "address", actualAddress, "logFile", logFilePath)
+	actualAddress := fmt.Sprintf("localhost:%d", assignedPort)
+	apiServerLogger.Info("API server started successfully", "address", actualAddress, "logFile", logFilePath)
 
 	return &APIServerComponents{
-		Server:  apiServerV2,
+		Server:  apiServer,
 		Address: actualAddress,
 	}, nil
 }

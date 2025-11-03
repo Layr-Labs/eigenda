@@ -578,6 +578,10 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 	}, nil)
 
+	// Create listener for test server
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
 	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
 			GrpcPort:    "51002",
@@ -600,6 +604,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		false, // enable both reservation and on-demand
 		false, // use old style payments
 		"",    // No controller client in tests
+		listener,
 	)
 	require.NoError(t, err)
 
