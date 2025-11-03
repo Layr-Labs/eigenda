@@ -62,7 +62,6 @@ type S3Client interface {
 		fragmentSize int) ([]byte, error)
 }
 
-
 type ListedObject struct {
 	Key  string
 	Size int64
