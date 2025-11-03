@@ -2,6 +2,7 @@ package arbitrum_altda
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"time"
@@ -15,6 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
@@ -115,6 +118,7 @@ type Handlers struct {
 
 	log              logging.Logger
 	eigenDAManager   *store.EigenDAManager
+	ethClient        ethclient.Client
 	compatibilityCfg proxy_common.CompatibilityConfig
 }
 
@@ -178,6 +182,29 @@ func (h *Handlers) logMethodCall(methodName string, logValue ...string) func() {
 	}
 }
 
+func (h *Handlers) verifyDACertRecency(batchBlockHash common.Hash, sequencerMsg hexutil.Bytes) error {
+	l1InclusionBlock, err := h.ethClient.BlockByHash(context.Background(), batchBlockHash)
+	if err != nil {
+		return fmt.Errorf("failed to get L1 inclusion block header for hash %x: %w", batchBlockHash, err)
+	}
+
+	certInclusionBlockNumber := l1InclusionBlock.Number().Uint64()
+	minL1Block := binary.BigEndian.Uint64(sequencerMsg[16:23])
+	// TODO: check upper bound here
+	rbn := binary.BigEndian.Uint64(sequencerMsg[42+64 : 42+96])
+
+	if certInclusionBlockNumber < rbn {
+		return fmt.Errorf("certInclusionBlock < rbn check failed with rbn=%d and certInclusionBlock=%d", rbn,
+			certInclusionBlockNumber)
+	}
+
+	if rbn < minL1Block {
+		return fmt.Errorf("rbn < minL1Block check failed with rbn=%d and minL1Block=%d", rbn, minL1Block)
+	}
+
+	return nil
+}
+
 // RecoverPayload is used to fetch the rollup payload of
 // of the dispersed batch provided the DA Cert bytes.
 //
@@ -199,6 +226,11 @@ func (h *Handlers) RecoverPayload(
 	daCert, err := h.deserializeCertFromSequencerMsg(sequencerMsg)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize cert: %w", err)
+	}
+
+	err = h.verifyDACertRecency(batchBlockHash, sequencerMsg)
+	if err != nil {
+		return nil, nil
 	}
 
 	payload, err := h.eigenDAManager.Get(ctx, daCert, proxy_common.GETOpts{})
@@ -229,9 +261,6 @@ func (h *Handlers) RecoverPayload(
 //
 //	@return bytes: Arbitrum Custom DA commitment bytes
 //	@return error: a structured error message (if applicable)
-//
-// TODO: Determine the encoding standard to use for the returned DA Commitment. It's assumed that an EigenDAV2 message
-// header byte will be prefixed. We can likely reuse the Standard Commitment mode but will require some analysis.
 //
 // TODO: Add processing for client provided timeout value
 func (h *Handlers) Store(
@@ -300,14 +329,6 @@ func (h *Handlers) CollectPreimages(
 
 	payload, err := h.eigenDAManager.Get(ctx, daCert, proxy_common.GETOpts{})
 	if err != nil {
-		var dpError *coretypes.DerivationError
-		if errors.As(err, &dpError) {
-			// returning nil for the batch payload indicates to the
-			// nitro derivation pipeline to "discard" this batch and move
-			// onto the next DA Cert in the Sequencer Inbox
-			return nil, nil
-		}
-
 		return nil, fmt.Errorf("get rollup payload from DA Cert: %w", err)
 	}
 
@@ -318,6 +339,20 @@ func (h *Handlers) CollectPreimages(
 	// This is what the replay binary expects: keccak256(certificate) -> payload
 	certHash := crypto.Keccak256Hash(sequencerMsg[40:])
 	preimageRecorder(certHash, payload, CustomDAPreimageType)
+
+	// Now fetch the L1InclusionBlock and inject the header into preimage oracle
+	// for ingestion by nitro replay binary to securely perform provable recency check
+	l1InclusionBlock, err := h.ethClient.BlockByHash(ctx, batchBlockHash)
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch l1 inclusion block header: %w", err)
+	}
+
+	headerBytes, err := rlp.EncodeToBytes(l1InclusionBlock.Header())
+	if err != nil {
+		return nil, fmt.Errorf("could not RLP encode header bytes: %w", err)
+	}
+
+	preimageRecorder(batchBlockHash, headerBytes, Keccak256PreimageType)
 
 	return &PreimagesResult{
 		Preimages: preimages,
