@@ -213,13 +213,17 @@ func createValidatorPayloadRetriever(
 	}
 
 	clientConfig := validator.DefaultClientConfig()
+	encoder, err := rs.NewEncoder(logger, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create rs encoder: %w", err)
+	}
 
 	// Create the retrieval client for fetching blobs from DA nodes
 	retrievalClient := validator.NewValidatorClient(
 		logger,
 		ethReader,
 		chainState,
-		rs.NewEncoder(logger, nil),
+		encoder,
 		kzgVerifier,
 		clientConfig,
 		nil,

@@ -44,7 +44,7 @@ A `payload` consists of an arbitrary byte array. The DisperseBlob endpoint accep
 
 ### Disperser polling
 
-The [`DisperseBlob`](../../protobufs/generated/eigenda-protos.md#disperser) method takes a `blob` and `blob_header` as input. Under the hood, the disperser performs the following steps:
+The [`DisperseBlob`](../../protobufs/generated/eigenda-protos.md#disperser) method takes a `blob` and `blob_header` as input. The hash of the `blob_header` (known as the [`blobKey`](./3-data-structs.md#blobkey-blob-header-hash)) serves as a unique identifier for tracking the dispersal status. Under the hood, the disperser performs the following steps:
 
 1. **Batching**: The blob is aggregated into a Merkle tree along with other blobs.
 2. **Reed-Solomon Encoding**: The blob is erasure-coded into chunks for fault tolerance.
@@ -178,7 +178,7 @@ There are two main blob retrieval paths:
 1. **decentralized retrieval:** retrieve erasure coded chunks from Validators and recreate the `blob` from them.
 2. **centralized retrieval:** the same [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) that Validators use to download chunks, can also be used to retrieve full blobs.
 
-EigenDA V2 has a new [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) for retrieving blobs from the disperser. The `GetBlob` method takes a `blob_key` as input, which is a synonym for `blob_header_hash`. Note that `BlobCertificate` (different from `DACert`!) contains an array of `relay_keys`, which are the relays that can serve that specific blob. A relay’s URL can be retrieved from the [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/9a4bdc099b98f6e5116b11778f0cf1466f13779c/contracts/src/core/EigenDARelayRegistry.sol#L35) function on the EigenDARelayRegistry.sol contract.
+EigenDA V2 has a new [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) for retrieving blobs from the disperser. The `GetBlob` method takes a `blob_key` as input, which is the [`blobKey`](./3-data-structs.md#blobkey-blob-header-hash) (also known as `blob_header_hash`) computed from the `BlobHeader`. Note that `BlobCertificate` (**different** from `DACert`) contains an array of `relay_keys`, which are the relays that can serve that specific blob. A relay's URL can be retrieved from the [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/9a4bdc099b98f6e5116b11778f0cf1466f13779c/contracts/src/core/EigenDARelayRegistry.sol#L35) function on the EigenDARelayRegistry.sol contract.
 
 ### Decoding
 

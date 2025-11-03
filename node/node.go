@@ -322,9 +322,11 @@ func NewNode(
 		if err != nil {
 			return nil, fmt.Errorf("create reservation payment validator: %w", err)
 		}
-		logger.Debug("Reservation payment validation ENABLED")
+		logger.Info("Payment validation ENABLED",
+			"paymentVaultAddress", paymentVaultAddress.Hex(),
+			"updateInterval", config.ReservationLedgerCacheConfig.UpdateInterval)
 	} else {
-		logger.Debug("Reservation payment validation DISABLED")
+		logger.Info("Payment validation DISABLED")
 	}
 
 	n := &Node{

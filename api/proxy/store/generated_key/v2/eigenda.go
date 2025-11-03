@@ -45,6 +45,9 @@ type Store struct {
 
 	// Retrieval related fields.
 	retrievers []clients.PayloadRetriever
+
+	// Timeout used for contract calls
+	contractCallTimeout time.Duration
 }
 
 var _ common.EigenDAV2Store = (*Store)(nil)
@@ -56,6 +59,7 @@ func NewStore(
 	certVerifier *verification.CertVerifier,
 	rbnRecencyWindowSize uint64,
 	retrievers []clients.PayloadRetriever,
+	contractCallTimeout time.Duration,
 ) (*Store, error) {
 	if putTries == 0 {
 		return nil, fmt.Errorf(
@@ -69,6 +73,7 @@ func NewStore(
 		disperser:            disperser,
 		retrievers:           retrievers,
 		certVerifier:         certVerifier,
+		contractCallTimeout:  contractCallTimeout,
 	}, nil
 }
 
@@ -264,8 +269,11 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert certs.VersionedCert
 		return err
 	}
 
+	timeoutCtx, cancel := context.WithTimeout(ctx, e.contractCallTimeout)
+	defer cancel()
+
 	// verify cert via simulation call to verifier contract
-	err = e.certVerifier.CheckDACert(ctx, sumDACert)
+	err = e.certVerifier.CheckDACert(timeoutCtx, sumDACert)
 	if err != nil {
 		var certVerifierInvalidCertErr *verification.CertVerifierInvalidCertError
 		if errors.As(err, &certVerifierInvalidCertErr) {

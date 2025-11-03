@@ -3,6 +3,8 @@
 package backend
 
 import (
+	"context"
+
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/backend/gnark"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover/backend/icicle"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -12,7 +14,9 @@ import (
 // Proof device represents a backend capable of computing KZG multiproofs.
 type KzgMultiProofsBackendV2 interface {
 	// the length of blobFr must be power of 2
-	ComputeMultiFrameProofV2(blobFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error)
+	ComputeMultiFrameProofV2(
+		ctx context.Context, blobFr []fr.Element, numChunks, chunkLen, numWorker uint64,
+	) ([]bn254.G1Affine, error)
 }
 
 // We implement two backends: gnark and icicle.

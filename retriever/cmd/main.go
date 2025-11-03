@@ -129,7 +129,10 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 2 {
-		encoder := rsv2.NewEncoder(logger, nil)
+		encoder, err := rsv2.NewEncoder(logger, nil)
+		if err != nil {
+			log.Fatalln("new v2 encoder", err)
+		}
 		kzgConfig := verifierv2.ConfigFromV1KzgConfig(&config.EncoderConfig)
 		verifier, err := verifierv2.NewVerifier(kzgConfig)
 		if err != nil {

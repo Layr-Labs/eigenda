@@ -43,7 +43,8 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	p, c, v, err := makeTestEncodingComponents(t)
 	require.NoError(t, err)
 	logger := common.TestLogger(t)
-	encoder := rs.NewEncoder(logger, nil)
+	encoder, err := rs.NewEncoder(logger, nil)
+	require.NoError(t, err)
 
 	// Set up test environment
 	rand := testrandom.NewTestRandom()
@@ -105,7 +106,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	// Create the actual blob frames using the prover
 	dataFr, err := rs.ToFrArray(data)
 	require.NoError(t, err)
-	frames, _, err := p.GetFrames(dataFr, encodingParams)
+	frames, _, err := p.GetFrames(ctx, dataFr, encodingParams)
 	require.NoError(t, err)
 
 	// Store chunks by operator
