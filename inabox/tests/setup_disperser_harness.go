@@ -774,10 +774,10 @@ func startController(
 	encodingManagerConfig.AvailableRelays = availableRelays
 	encodingManagerConfig.EncoderAddress = encoderAddress
 
-	// Build dispatcher configs
-	dispatcherConfig := controller.DefaultControllerConfig()
-	dispatcherConfig.FinalizationBlockDelay = 5
-	dispatcherConfig.BatchMetadataUpdatePeriod = 100 * time.Millisecond
+	// Build controller config
+	controllerConfig := controller.DefaultControllerConfig()
+	controllerConfig.FinalizationBlockDelay = 5
+	controllerConfig.BatchMetadataUpdatePeriod = 100 * time.Millisecond
 
 	// Chain state config
 	chainStateConfig := thegraph.Config{
@@ -842,7 +842,7 @@ func startController(
 	}
 
 	// Create dispatcher pool
-	dispatcherPool := workerpool.New(dispatcherConfig.NumConcurrentRequests)
+	dispatcherPool := workerpool.New(controllerConfig.NumConcurrentRequests)
 
 	// Create indexed chain state
 	chainState := eth.NewChainState(chainReader, ethClient)
@@ -850,7 +850,7 @@ func startController(
 
 	// Create node client manager
 	nodeClientManager, err := controller.NewNodeClientManager(
-		dispatcherConfig.NodeClientCacheSize,
+		controllerConfig.NodeClientCacheSize,
 		requestSigner,
 		controllerLogger,
 	)
@@ -866,8 +866,8 @@ func startController(
 		ethClient,
 		ics,
 		gethcommon.HexToAddress(config.TestConfig.EigenDA.RegistryCoordinator),
-		dispatcherConfig.BatchMetadataUpdatePeriod,
-		dispatcherConfig.FinalizationBlockDelay,
+		controllerConfig.BatchMetadataUpdatePeriod,
+		controllerConfig.FinalizationBlockDelay,
 	)
 	if err != nil {
 		_ = logFile.Close()
@@ -883,7 +883,7 @@ func startController(
 
 	// Create dispatcher
 	dispatcher, err := controller.NewDispatcher(
-		dispatcherConfig,
+		controllerConfig,
 		metadataStore,
 		dispatcherPool,
 		ics,
@@ -947,7 +947,7 @@ func startController(
 		paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
 			ctx,
 			controllerLogger,
-			*paymentAuthConfig,
+			paymentAuthConfig,
 			contractDirectory,
 			ethClient,
 			dynamoClient.GetAwsClient(),
@@ -968,36 +968,12 @@ func startController(
 		// Extract the port assigned by the OS
 		assignedPort := listener.Addr().(*net.TCPAddr).Port
 		controllerLogger.Info("Created listener for controller", "assigned_port", assignedPort)
-
-		// Create server config
-		grpcServerConfig, err := common.NewGRPCServerConfig(
-			true,
-			uint16(assignedPort),
-			1024*1024,
-			5*time.Minute,
-			5*time.Minute,
-			3*time.Minute,
-		)
-		if err != nil {
-			_ = listener.Close()
-			_ = logFile.Close()
-			return nil, fmt.Errorf("failed to create gRPC server config: %w", err)
-		}
-
-		serverConfig, err := server.NewConfig(
-			grpcServerConfig,
-			true, // EnablePaymentAuthentication
-		)
-		if err != nil {
-			_ = listener.Close()
-			_ = logFile.Close()
-			return nil, fmt.Errorf("failed to create server config: %w", err)
-		}
+		controllerConfig.GrpcPort = uint16(assignedPort)
 
 		// Create and start gRPC server
 		grpcServer, err := server.NewServer(
 			ctx,
-			serverConfig,
+			controllerConfig,
 			controllerLogger,
 			metricsRegistry,
 			paymentAuthorizationHandler,

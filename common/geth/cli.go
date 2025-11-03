@@ -14,8 +14,8 @@ var (
 )
 
 type EthClientConfig struct {
-	RPCURLs          []string
-	PrivateKeyString string
+	RPCURLs          []string `docs:"required"`
+	PrivateKeyString string   `docs:"required"`
 	NumConfirmations int
 	NumRetries       int
 }

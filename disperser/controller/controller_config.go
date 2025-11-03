@@ -2,11 +2,16 @@ package controller
 
 import (
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
+	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/config"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 )
 
 var _ config.DocumentedConfig = &ControllerConfig{}
@@ -71,12 +76,81 @@ type ControllerConfig struct {
 	// Must be at least 1.
 	NodeClientCacheSize int
 
-	// Configuration for the controller's gRPC server.
-	GrpcServerConfig common.GRPCServerConfig
-
 	// If true, use the new payment authentication system running on the controller.
 	// If false, payment authentication is disabled and request validation will always fail
 	EnablePaymentAuthentication bool
+
+	// Enables/disables the gRPC server
+	EnableGrpcServer bool
+
+	// Port that the gRPC server listens on
+	GrpcPort uint16
+
+	// Maximum size of a gRPC message that the server will accept (in bytes)
+	MaxGrpcMessageSize uint32
+
+	// Maximum time a connection can be idle before it is closed.
+	MaxIdleConnectionAge time.Duration
+
+	// Maximum age of a request in the past that the server will accept.
+	// Requests older than this will be rejected to prevent replay attacks.
+	RequestMaxPastAge time.Duration
+
+	// Maximum age of a request in the future that the server will accept.
+	// Requests with timestamps too far in the future will be rejected.
+	RequestMaxFutureAge time.Duration
+
+	// Configurations for the encoding manager (i.e. for talking to encoders).
+	EncodingManagerConfig EncodingManagerConfig
+
+	// The name of the DynamoDB table to use for storing blob metadata.
+	DynamoDBTableName string `docs:"required"`
+
+	// Configurations for the Ethereum client.
+	EthClientConfig geth.EthClientConfig
+
+	// Configuration for the AWS client. TODO
+	AwsClientConfig aws.ClientConfig
+
+	// If true, disables signing of disperser store chunks.
+	DisperserStoreChunksSigningDisabled bool
+
+	// Configuration for the dispersal request signer.
+	DispersalRequestSignerConfig *clients.DispersalRequestSignerConfig
+
+	// The format for logging output ('text' or 'json').
+	LogFormat string
+
+	// The logging level.
+	// LevelDebug Level = -4
+	// LevelInfo  Level = 0
+	// LevelWarn  Level = 4
+	// LevelError Level = 8
+	LogLevel int
+
+	// The duration between indexer pulls
+	IndexerPullInterval time.Duration
+
+	// Configuration for The Graph client.
+	ChainStateConfig thegraph.Config
+
+	// Whether to use The Graph for chain state queries.
+	UseGraph bool
+
+	// The EigenDA contract directory address.
+	EigenDAContractDirectoryAddress string `docs:"required"`
+
+	// The port to expose metrics on.
+	MetricsPort int
+
+	// The path for the controller readiness probe.
+	ControllerReadinessProbePath string
+
+	// Configuration for the heartbeat monitor.
+	HeartbeatMonitorConfig *healthcheck.HeartbeatMonitorConfig
+
+	// Configuration for payment authorization.
+	PaymentAuthorizationConfig *PaymentAuthorizationConfig
 }
 
 func (c *ControllerConfig) Verify() error {
@@ -127,6 +201,21 @@ func (c *ControllerConfig) Verify() error {
 	if c.NodeClientCacheSize < 1 {
 		return fmt.Errorf("NodeClientCacheSize must be at least 1, got %d", c.NodeClientCacheSize)
 	}
+
+	if c.EnableGrpcServer {
+		if c.MaxGrpcMessageSize < 0 {
+			return fmt.Errorf("max grpc message size must be >= 0, got %d", c.MaxGrpcMessageSize)
+		}
+		if c.MaxIdleConnectionAge < 0 {
+			return fmt.Errorf("max idle connection age must be >= 0, got %v", c.MaxIdleConnectionAge)
+		}
+		if c.RequestMaxPastAge < 0 {
+			return fmt.Errorf("request max past age must be >= 0, got %v", c.RequestMaxPastAge)
+		}
+		if c.RequestMaxFutureAge < 0 {
+			return fmt.Errorf("request max future age must be >= 0, got %v", c.RequestMaxFutureAge)
+		}
+	}
 	return nil
 }
 
@@ -145,6 +234,39 @@ func DefaultControllerConfig() *ControllerConfig {
 		SignificantSigningMetricsThresholds:   []string{"0.55", "0.67"},
 		NumConcurrentRequests:                 600,
 		NodeClientCacheSize:                   400,
+		EnablePaymentAuthentication:           true,
+		EnableGrpcServer:                      true,
+		GrpcPort:                              32010,
+		MaxGrpcMessageSize:                    1024 * 1024, // 1 MB
+		MaxIdleConnectionAge:                  5 * time.Minute,
+		RequestMaxPastAge:                     5 * time.Minute,
+		RequestMaxFutureAge:                   3 * time.Minute,
+		EncodingManagerConfig:                 *DefaultEncodingManagerConfig(),
+		EthClientConfig: geth.EthClientConfig{
+			NumConfirmations: 10,
+			NumRetries:       2,
+		},
+		AwsClientConfig: aws.ClientConfig{
+			FragmentParallelismFactor:   8,
+			FragmentParallelismConstant: 0,
+		},
+		DisperserStoreChunksSigningDisabled: false,
+		DispersalRequestSignerConfig:        &clients.DispersalRequestSignerConfig{},
+		LogFormat:                           "json",
+		LogLevel:                            int(slog.LevelDebug),
+		IndexerPullInterval:                 1 * time.Second,
+		ChainStateConfig: thegraph.Config{ // TODO what defaults?
+			PullInterval: 2 * time.Second,
+			MaxRetries:   5,
+		},
+		UseGraph:                     true,
+		MetricsPort:                  9101,
+		ControllerReadinessProbePath: "/tmp/controller-ready",
+		HeartbeatMonitorConfig: &healthcheck.HeartbeatMonitorConfig{
+			FilePath:         "/tmp/controller-health",
+			MaxStallDuration: 4 * time.Minute,
+		},
+		PaymentAuthorizationConfig: DefaultPaymentAuthorizationConfig(),
 	}
 }
 

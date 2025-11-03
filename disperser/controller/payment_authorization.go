@@ -61,7 +61,7 @@ func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
 func BuildPaymentAuthorizationHandler(
 	ctx context.Context,
 	logger logging.Logger,
-	config PaymentAuthorizationConfig,
+	config *PaymentAuthorizationConfig,
 	contractDirectory *directory.ContractDirectory,
 	ethClient common.EthClient,
 	awsDynamoClient *awsdynamodb.Client,

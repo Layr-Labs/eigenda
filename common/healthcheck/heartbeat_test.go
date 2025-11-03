@@ -51,7 +51,7 @@ func TestHeartbeatMonitor_WritesSummaryAndStops(t *testing.T) {
 		err := healthcheck.NewHeartbeatMonitor(
 			logger,
 			ch,
-			healthcheck.HeartbeatMonitorConfig{
+			&healthcheck.HeartbeatMonitorConfig{
 				FilePath:         fpath,
 				MaxStallDuration: 50 * time.Millisecond,
 			},
@@ -99,7 +99,7 @@ func TestHeartbeatMonitor_StallWarning(t *testing.T) {
 		err := healthcheck.NewHeartbeatMonitor(
 			logger,
 			ch,
-			healthcheck.HeartbeatMonitorConfig{
+			&healthcheck.HeartbeatMonitorConfig{
 				FilePath:         fpath,
 				MaxStallDuration: 20 * time.Millisecond,
 			},

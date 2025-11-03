@@ -49,7 +49,7 @@ type HeartbeatMessage struct {
 func NewHeartbeatMonitor(
 	logger logging.Logger,
 	livenessChan <-chan HeartbeatMessage,
-	config HeartbeatMonitorConfig,
+	config *HeartbeatMonitorConfig,
 ) error {
 	if err := config.Verify(); err != nil {
 		return fmt.Errorf("invalid config: %w", err)
