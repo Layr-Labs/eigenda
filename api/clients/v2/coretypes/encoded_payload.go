@@ -121,6 +121,13 @@ func (ep *EncodedPayload) decodeHeader() (uint32, error) {
 	default:
 		return 0, fmt.Errorf("unknown encoded payload header version: %x", ep.bytes[1])
 	}
+
+	for _, b := range ep.bytes[6:codec.EncodedPayloadHeaderLenBytes] {
+		if b != 0x00 {
+			return 0, fmt.Errorf("padding in encoded payload header must be 0x00: %x", b)
+		}
+	}
+
 	return payloadLength, nil
 }
 
