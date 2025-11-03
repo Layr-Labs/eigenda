@@ -51,7 +51,7 @@ func NewChunkDeserializer(
 }
 
 // assume all the chunks come from one blob. In theory, universal verification
-// work as long as alll chunk lengths are equal, we can find the right root of
+// works as long as all chunk lengths are equal, and we can find the right root of
 // unities.
 func (d *chunkDeserializer) DeserializeAndVerify(
 	_ v2.BlobKey, // used for unit tests
@@ -89,12 +89,12 @@ func (d *chunkDeserializer) DeserializeAndVerify(
 	}
 
 	// verify all chunks for operator using universal verification, it reduces the complexity from
-	// n*m to n + m, where n is the number of chunk, and m is the length of chunk in field elements
+	// n*m to n + m, where n is the number of chunks, and m is the length of each chunk in field elements
 	// For theory, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240
 	err := d.verifier.UniversalVerifySubBatch(
 		*encodingParams,
 		samples,
-		1, // only verify for one blob
+		1, // only verify one blob
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify chunks from operator %s: %w", operatorID.Hex(), err)
