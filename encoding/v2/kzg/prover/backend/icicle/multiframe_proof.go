@@ -119,9 +119,28 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 			}
 		}()
 
-		sumVec, err := p.msmBatchOnDevice(flattenCoeffStoreFr, p.FlatFFTPointsT, int(toeplitzMatrixLen)*2)
-		if err != nil {
-			icicleErr = fmt.Errorf("msm error: %w", err)
+		var projectivePoint iciclebn254.Projective
+		var sumVec core.DeviceSlice
+
+		_, mallocErr := sumVec.Malloc(projectivePoint.Size(), int(toeplitzMatrixLen)*2)
+		if mallocErr != runtime.Success {
+			icicleErr = fmt.Errorf("allocating bytes on device failed: %v", mallocErr.AsString())
+			return
+		}
+		defer sumVec.Free()
+
+		// The msm is computed synchronously (default config value is async=false).
+		// We could possibly share the same stream as the ecntt use (c.NttCfg.StreamHandle).
+		// TODO(samlaf): rethink how we use streams and async computations in general.
+		msmCfg := msm.GetDefaultMSMConfig()
+		msmCfg.AreScalarsMontgomeryForm = true
+		frsHostOrDeviceSlice := core.HostSliceFromElements(flattenCoeffStoreFr)
+		// TODO(samlaf): we could send the srs table points to the device once in the constructor
+		// and keep a deviceSlice pointer to it.
+		g1PointsHostSlice := core.HostSliceFromElements(p.FlatFFTPointsT)
+		msmErr := msm.Msm(frsHostOrDeviceSlice, g1PointsHostSlice, &msmCfg, sumVec)
+		if msmErr != runtime.Success {
+			icicleErr = fmt.Errorf("msm error: %v", msmErr.AsString())
 			return
 		}
 
@@ -131,6 +150,11 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 		p.NttCfg.BatchSize = int32(1)
 		// run two ecntt in one function, the first and second ecntt operates on the same device slice
 		proofs, firstECNttDone, err = p.twoEcnttOnDevice(sumVec, int(numChunks), int(toeplitzMatrixLen))
+		if err != nil {
+			icicleErr = err
+			return
+		}
+		secondECNttDone = time.Now()
 	})
 
 	wg.Wait()
@@ -141,12 +165,12 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 
 	end := time.Now()
 
-	p.Logger.Info("Multiproof Time Decomp",
-		"total", end.Sub(begin),
-		"preproc", preprocessDone.Sub(begin),
-		"msm", msmDone.Sub(preprocessDone),
-		"fft1", firstECNttDone.Sub(msmDone),
-		"fft2", secondECNttDone.Sub(firstECNttDone),
+	p.Logger.Info("Multiproof Time Decomp (microseconds)",
+		"total", end.Sub(begin).Milliseconds(),
+		"preproc", preprocessDone.Sub(begin).Microseconds(),
+		"msm", msmDone.Sub(preprocessDone).Microseconds(),
+		"fft1", firstECNttDone.Sub(msmDone).Microseconds(),
+		"fft2", secondECNttDone.Sub(firstECNttDone).Microseconds(),
 	)
 
 	return proofs, nil
@@ -246,36 +270,6 @@ func (p *KzgMultiProofBackend) getSlicesCoeff(polyFr []fr.Element, dimE, j, l ui
 	return out, nil
 }
 
-// MsmBatchOnDevice function supports batch across blobs.
-// totalSize is the number of output points, which equals to numPoly * 2 * dimE , dimE is number of chunks.
-// Returns a deviceSlice of G1 points, which must be freed by the caller.
-func (c *KzgMultiProofBackend) msmBatchOnDevice(frs []fr.Element, g1Points []iciclebn254.Affine, totalSize int) (core.DeviceSlice, error) {
-
-	var p iciclebn254.Projective
-	var out core.DeviceSlice
-
-	_, err := out.Malloc(p.Size(), totalSize)
-	if err != runtime.Success {
-		return out, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
-	}
-
-	// The msm is computed synchronously (default config value is async=false).
-	// We could possibly share the same stream as the ecntt use (c.NttCfg.StreamHandle).
-	// TODO(samlaf): rethink how we use streams and async computations in general.
-	msmCfg := msm.GetDefaultMSMConfig()
-	msmCfg.AreScalarsMontgomeryForm = true
-	frsHostOrDeviceSlice := core.HostSliceFromElements(frs)
-	// TODO(samlaf): we could send the srs table points to the device once in the constructor
-	// and keep a deviceSlice pointer to it.
-	g1PointsHostSlice := core.HostSliceFromElements(g1Points)
-	err = msm.Msm(frsHostOrDeviceSlice, g1PointsHostSlice, &msmCfg, out)
-	if err != runtime.Success {
-		return out, fmt.Errorf("msm error: %v", err.AsString())
-	}
-
-	return out, nil
-}
-
 // twoEcnttOnDevice takes the first ecntt to generate the kzg proofs. Only the first half of the result
 // are considered kzg proof, and it comes from the Toeplitz trick, readers can refer to
 // https://alinush.github.io/2020/03/19/multiplying-a-vector-by-a-toeplitz-matrix.html
@@ -290,7 +284,7 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	// we only allocate one large gpu memory for all operation, so it has to be large enough to cover all cases
 	// including the first and the second ECNTT
 	var bufferProjectivePointsOnDevice core.DeviceSlice
-	var secondECNTTDeviceSlice core.DeviceSlice
+
 	numPointsOnDevice := numChunks
 
 	// the size is twice because of the FFT trick on toeplitz matrix
@@ -305,6 +299,8 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	if err != runtime.Success {
 		return nil, time.Time{}, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
 	}
+	// free intermediate GPU memory
+	defer bufferProjectivePointsOnDevice.Free()
 
 	// specify device memory sluce for first ecntt
 	firstECNTTDeviceSlice := bufferProjectivePointsOnDevice.RangeTo(firstECNTTLen, false)
@@ -312,6 +308,7 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	if err != runtime.Success {
 		return nil, time.Time{}, fmt.Errorf("inverse ecntt failed: %v", err.AsString())
 	}
+	firstECNTTDone := time.Now()
 
 	proofsBatchHost := make(core.HostSlice[iciclebn254.Projective], numChunks)
 
@@ -334,7 +331,7 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 		infinityPointsHost.CopyToDevice(&infinityPointsOnDevice, false)
 	}
 
-	secondECNTTDeviceSlice = bufferProjectivePointsOnDevice.RangeTo(numChunks, false)
+	secondECNTTDeviceSlice := bufferProjectivePointsOnDevice.RangeTo(numChunks, false)
 
 	// take the second ecntt
 	err = ecntt.ECNtt(secondECNTTDeviceSlice, core.KForward, &c.NttCfg, proofsBatchHost)
@@ -342,10 +339,7 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 		return nil, time.Time{}, fmt.Errorf("forward ecntt failed: %v", err.AsString())
 	}
 
-	// free intermediate GPU memory
-	bufferProjectivePointsOnDevice.Free()
-
 	proofs := icicle.HostSliceIcicleProjectiveToGnarkAffine(proofsBatchHost, int(c.NumWorker))
 
-	return proofs, time.Time{}, nil
+	return proofs, firstECNTTDone, nil
 }
