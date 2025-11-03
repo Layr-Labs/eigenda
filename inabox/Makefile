@@ -10,10 +10,10 @@ run-e2e-tests:
 # be removed as soon as we figure out why in-test teardown isn't always succeeding.
 run-payments-tests:
 	@for test in \
-		TestLegacyController \
-		TestNewController; do \
+		TestLegacyPayments \
+		TestNewPayments; do \
 		echo "Running $$test..."; \
-		if ! gotestsum --format pkgname-and-test-fails -- ./tests/payments -run "^$$test$$" -parallel=3; then \
+		if ! gotestsum --format pkgname-and-test-fails -- ./tests/payments -run "^$$test$$" -parallel=9; then \
 			echo "❌ TEST FAILED: $$test"; \
 			$(MAKE) -s stop-inabox; \
 			exit 1; \

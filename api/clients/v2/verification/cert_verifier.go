@@ -2,6 +2,7 @@ package verification
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"sync"
 
@@ -96,6 +97,8 @@ func (cv *CertVerifier) CheckDACert(
 		Data: callMsgBytes,
 	}, nil)
 	if err != nil {
+		cv.logger.Error("certVerifier checkDACert call failed", "to", certVerifierAddr,
+			"calldata", hex.EncodeToString(callMsgBytes), "abi-encoded-cert", hex.EncodeToString(certBytes))
 		return &CertVerifierInternalError{Msg: "checkDACert eth call", Err: err}
 	}
 

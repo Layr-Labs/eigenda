@@ -2,8 +2,9 @@
 pragma solidity ^0.8.9;
 
 import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
-import {IPauserRegistry} from
-    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
+import {
+    IPauserRegistry
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {
     ServiceManagerBase,
     IAVSDirectory,
@@ -51,10 +52,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__avsDirectory, __rewardsCoordinator, __registryCoordinator, __stakeRegistry)
         EigenDAServiceManagerStorage(
-            __eigenDAThresholdRegistry,
-            __eigenDARelayRegistry,
-            __paymentVault,
-            __eigenDADisperserRegistry
+            __eigenDAThresholdRegistry, __eigenDARelayRegistry, __paymentVault, __eigenDADisperserRegistry
         )
     {
         _disableInitializers();
@@ -105,8 +103,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         bytes32 reducedBatchHeaderHash = keccak256(
             abi.encode(
                 DATypesV1.ReducedBatchHeader({
-                    blobHeadersRoot: batchHeader.blobHeadersRoot,
-                    referenceBlockNumber: batchHeader.referenceBlockNumber
+                    blobHeadersRoot: batchHeader.blobHeadersRoot, referenceBlockNumber: batchHeader.referenceBlockNumber
                 })
             )
         );
