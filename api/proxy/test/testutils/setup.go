@@ -45,16 +45,6 @@ const (
 
 	// CertVerifier and SvcManager addresses are still specified by hand for V1.
 	// Probably not worth the effort to force use of EigenDADirectory for V1.
-	disperserPreprodHostname   = "disperser-preprod-holesky.eigenda.xyz"
-	preprodEigenDADirectory    = "0xfB676e909f376efFDbDee7F17342aCF55f6Ec502"
-	preprodCertVerifierAddress = "0xCCFE3d87fB7D369f1eeE65221a29A83f1323043C"
-	preprodSvcManagerAddress   = "0x54A03db2784E3D0aCC08344D05385d0b62d4F432"
-
-	disperserTestnetHostname   = "disperser-testnet-holesky.eigenda.xyz"
-	testnetEigenDADirectory    = "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE"
-	testnetCertVerifierAddress = "0xd305aeBcdEc21D00fDF8796CE37d0e74836a6B6e"
-	testnetSvcManagerAddress   = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
-
 	disperserSepoliaHostname   = "disperser-testnet-sepolia.eigenda.xyz"
 	sepoliaEigenDADirectory    = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 	sepoliaCertVerifierAddress = "0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429"
@@ -105,19 +95,13 @@ func startMinIOContainer() error {
 type Backend int
 
 const (
-	TestnetBackend Backend = iota + 1
-	PreprodBackend
-	SepoliaBackend
+	SepoliaBackend Backend = iota + 1
 	MemstoreBackend
 )
 
 // ParseBackend converts a string to a Backend enum (case insensitive)
 func ParseBackend(inputString string) (Backend, error) {
 	switch strings.ToLower(inputString) {
-	case "testnet":
-		return TestnetBackend, nil
-	case "preprod":
-		return PreprodBackend, nil
 	case "sepolia":
 		return SepoliaBackend, nil
 	case "memstore":
@@ -242,16 +226,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	switch testCfg.Backend {
 	case MemstoreBackend:
 		break // no need to set these fields for local tests
-	case PreprodBackend:
-		disperserHostname = disperserPreprodHostname
-		certVerifierAddress = preprodCertVerifierAddress
-		svcManagerAddress = preprodSvcManagerAddress
-		eigenDADirectory = preprodEigenDADirectory
-	case TestnetBackend:
-		disperserHostname = disperserTestnetHostname
-		certVerifierAddress = testnetCertVerifierAddress
-		svcManagerAddress = testnetSvcManagerAddress
-		eigenDADirectory = testnetEigenDADirectory
 	case SepoliaBackend:
 		disperserHostname = disperserSepoliaHostname
 		certVerifierAddress = sepoliaCertVerifierAddress

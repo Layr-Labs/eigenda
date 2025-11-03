@@ -421,7 +421,7 @@ Use the provided `make` targets to run them with different backends:
 | Command | Description |
 |----------|--------------|
 | `make test-e2e-local` | Runs E2E tests against a local **memstore** backend (fast, isolated). |
-| `make test-e2e-sepolia` | Same as testnet but runs on **Sepolia** network. |
+| `make test-e2e-sepolia` | Same as local but runs against **Sepolia** network. |
 
 All commands execute `./test/e2e` with environment-specific settings and output via [gotestsum](https://github.com/gotestyourself/gotestsum).
 

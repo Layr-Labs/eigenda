@@ -517,7 +517,7 @@ func testProxyMemConfigClientCanGetAndPatch(t *testing.T, dispersalBackend commo
 
 	useMemstore := testutils.GetBackend() == testutils.MemstoreBackend
 	if !useMemstore {
-		t.Skip("test can't be run against holesky since read failure case can't be manually triggered")
+		t.Skip("test can't be ran against testnet backend since read failure case can't be manually triggered")
 	}
 
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
@@ -612,10 +612,6 @@ func TestInterleavedVersions(t *testing.T) {
 }
 
 func TestMaxBlobSizeV1(t *testing.T) {
-	if testutils.GetBackend() == testutils.PreprodBackend {
-		t.Skip("Preprod for v1 has a stricter blob size than normal.")
-	}
-
 	testMaxBlobSize(t, common.V1EigenDABackend)
 }
 

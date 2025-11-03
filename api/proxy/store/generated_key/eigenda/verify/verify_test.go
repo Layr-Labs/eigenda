@@ -299,27 +299,6 @@ func TestVerifySecurityParams(t *testing.T) {
 			expectError: true,
 			errorMsg:    "quorum 1 is required but not present in confirmed quorums",
 		},
-		{
-			name: "holesky special case - only quorum 0 required for specific block range",
-			blobHeader: BlobHeader{
-				QuorumBlobParams: []QuorumBlobParam{
-					{QuorumNumber: 0, AdversaryThresholdPercentage: 33, ConfirmationThresholdPercentage: 50},
-				},
-			},
-			batchHeader: &disperser.BatchHeader{
-				QuorumNumbers:           []byte{0},
-				QuorumSignedPercentages: []byte{60},
-				ReferenceBlockNumber:    2955000, // In the special block range [2950000, 2960000)
-			},
-			setupCV: func() *CertVerifier {
-				return &CertVerifier{
-					quorumAdversaryThresholds: map[uint8]uint8{0: 33, 1: 33},
-					quorumsRequired:           []uint8{0, 1}, // Would normally require both
-				}
-			},
-			holesky:     true,
-			expectError: false,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -328,8 +307,7 @@ func TestVerifySecurityParams(t *testing.T) {
 
 			// Create a minimal verifier with just the CertVerifier set
 			v := &Verifier{
-				cv:      tc.setupCV(),
-				holesky: tc.holesky,
+				cv: tc.setupCV(),
 			}
 
 			err := v.verifySecurityParams(tc.blobHeader, tc.batchHeader)

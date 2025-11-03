@@ -20,11 +20,10 @@ var (
 		Usage: fmt.Sprintf(`The EigenDA network that is being used. 
 See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/common/eigenda_network.go
 for the exact values getting set by this flag. Permitted EigenDANetwork values include 
-%s, %s, %s, & %s.`,
+%s, %s, & %s.`,
 			proxycommon.MainnetEigenDANetwork,
-			proxycommon.HoleskyTestnetEigenDANetwork,
-			proxycommon.HoleskyPreprodEigenDANetwork,
 			proxycommon.SepoliaTestnetEigenDANetwork,
+			proxycommon.HoodiTestnetEigenDANetwork,
 		),
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_NETWORK"),
