@@ -34,7 +34,7 @@ func (s *MockS3Client) DownloadObject(ctx context.Context, bucket string, key st
 	s.Called["DownloadObject"]++
 	data, ok := s.bucket[key]
 	if !ok {
-		return []byte{}, fmt.Errorf("not found: %s", key)
+		return []byte{}, ErrObjectNotFound
 	}
 	return data, nil
 }
@@ -43,7 +43,7 @@ func (s *MockS3Client) HeadObject(ctx context.Context, bucket string, key string
 	s.Called["HeadObject"]++
 	data, ok := s.bucket[key]
 	if !ok {
-		return nil, fmt.Errorf("not found: %s", key)
+		return nil, ErrObjectNotFound
 	}
 	size := int64(len(data))
 	return &size, nil
@@ -130,7 +130,7 @@ func (s *MockS3Client) FragmentedDownloadObject(
 	for _, fragmentKey := range fragmentKeys {
 		fragmentData, ok := s.bucket[fragmentKey]
 		if !ok {
-			return nil, fmt.Errorf("fragment not found: %s", fragmentKey)
+			return nil, ErrObjectNotFound
 		}
 		data = append(data, fragmentData...)
 	}
