@@ -4,6 +4,8 @@ The assignment module determines how encoded blob chunks are allocated to valida
 
 The assignment module is implemented in `core/v2/assignment.go`. For blobs dispersed to multiple quorums, the algorithm employs overlap optimization to minimize storage requirements while maintaining security guarantees. 
 
+![image](../../assets/assignment-module.png)
+
 ### Chunk Assignment Algorithm within One Quorum
 
 The chunk assignment scheme assigns encoded chunks to validators proportionally to their stake, ensuring that any coalition of validators with sufficient combined stake can reconstruct the blob.
