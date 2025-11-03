@@ -3,7 +3,6 @@ pragma solidity ^0.8.9;
 
 library AddressDirectoryConstants {
     /// PROXY ADMIN
-
     string internal constant PROXY_ADMIN_NAME = "PROXY_ADMIN";
 
     /// CORE

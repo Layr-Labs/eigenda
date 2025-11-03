@@ -1,6 +1,7 @@
 package prover
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common/math"
@@ -23,7 +24,7 @@ type ParametrizedProver struct {
 
 // The inputFr has not been padded to the next power of 2 field of elements. But ComputeMultiFrameProofV2
 // requires it.
-func (g *ParametrizedProver) GetProofs(inputFr []fr.Element) ([]encoding.Proof, error) {
+func (g *ParametrizedProver) GetProofs(ctx context.Context, inputFr []fr.Element) ([]encoding.Proof, error) {
 	// get the blob length
 	blobLength := uint64(math.NextPowOf2u32(uint32(len(inputFr))))
 	// pad inputFr to BlobLength if it is not power of 2, which encodes the RS redundancy
@@ -31,7 +32,7 @@ func (g *ParametrizedProver) GetProofs(inputFr []fr.Element) ([]encoding.Proof, 
 	copy(paddedCoeffs, inputFr)
 
 	proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(
-		paddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.computeMultiproofNumWorker)
+		ctx, paddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.computeMultiproofNumWorker)
 	if err != nil {
 		return nil, fmt.Errorf("compute multi frame proof: %w", err)
 	}

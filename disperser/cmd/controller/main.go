@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -277,18 +278,26 @@ func RunController(cliCtx *cli.Context) error {
 			logger.Warn("Payment authentication DISABLED - payment requests will fail")
 		}
 
+		// Create listener for the gRPC server
+		addr := fmt.Sprintf("0.0.0.0:%d", config.ServerConfig.GrpcPort)
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("failed to create listener: %w", err)
+		}
+
 		grpcServer, err := server.NewServer(
 			ctx,
 			config.ServerConfig,
 			logger,
 			metricsRegistry,
-			paymentAuthorizationHandler)
+			paymentAuthorizationHandler,
+			listener)
 		if err != nil {
 			return fmt.Errorf("create gRPC server: %w", err)
 		}
 
 		go func() {
-			logger.Info("Starting controller gRPC server", "port", config.ServerConfig.GrpcPort)
+			logger.Info("Starting controller gRPC server", "address", listener.Addr().String())
 			if err := grpcServer.Start(); err != nil {
 				panic(fmt.Sprintf("gRPC server failed: %v", err))
 			}

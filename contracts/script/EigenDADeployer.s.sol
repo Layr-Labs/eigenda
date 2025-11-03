@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {PauserRegistry} from
-    "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
+import {
+    PauserRegistry
+} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {BLSApkRegistry} from "../lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
@@ -116,6 +117,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         address tokenOwner,
         uint256 maxOperatorCount
     ) internal {
+        if (maxOperatorCount > type(uint32).max) revert(); // Sanity check.
+
         StrategyConfig[] memory strategyConfigs = new StrategyConfig[](numStrategies);
         // deploy a token and create a strategy config for each token
         for (uint8 i = 0; i < numStrategies; i++) {
@@ -281,8 +284,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 new IRegistryCoordinator.OperatorSetParam[](numStrategies);
             for (uint256 i = 0; i < numStrategies; i++) {
                 // hard code these for now
+                // forge-lint: disable-next-item(unsafe-typecast)
                 operatorSetParams[i] = IRegistryCoordinator.OperatorSetParam({
-                    maxOperatorCount: uint32(maxOperatorCount),
+                    maxOperatorCount: uint32(maxOperatorCount), // Typecast is checked above.
                     kickBIPsOfOperatorStake: 11000, // an operator needs to have kickBIPsOfOperatorStake / 10000 times the stake of the operator with the least stake to kick them out
                     kickBIPsOfTotalStake: 1001 // an operator needs to have less than kickBIPsOfTotalStake / 10000 of the total stake to be kicked out
                 });
@@ -294,8 +298,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             for (uint256 i = 0; i < numStrategies; i++) {
                 strategyAndWeightingMultipliers[i] = new IStakeRegistry.StrategyParams[](1);
                 strategyAndWeightingMultipliers[i][0] = IStakeRegistry.StrategyParams({
-                    strategy: IStrategy(address(deployedStrategyArray[i])),
-                    multiplier: 1 ether
+                    strategy: IStrategy(address(deployedStrategyArray[i])), multiplier: 1 ether
                 });
             }
 

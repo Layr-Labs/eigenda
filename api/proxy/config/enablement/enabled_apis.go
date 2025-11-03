@@ -18,6 +18,7 @@ type EnabledServersConfig struct {
 
 // RestApisEnabled stores boolean fields that dictate which
 // commitment modes and routes to support.
+// Note: /config and /health endpoints are always enabled.
 // TODO: Add support for a `read-only` mode
 type RestApisEnabled struct {
 	Admin               bool
@@ -26,18 +27,42 @@ type RestApisEnabled struct {
 	StandardCommitment  bool
 }
 
-func (e *RestApisEnabled) Enabled() bool {
+func (e *RestApisEnabled) DAEndpointEnabled() bool {
 	return e.OpGenericCommitment ||
 		e.OpKeccakCommitment || e.StandardCommitment
 }
 
 // Check ... Ensures that expression of the enabled API set is correct
 func (e EnabledServersConfig) Check() error {
-	if !e.RestAPIConfig.Enabled() && !e.ArbCustomDA {
+	if !e.RestAPIConfig.DAEndpointEnabled() && !e.ArbCustomDA {
 		return fmt.Errorf("an `arb` or REST ALT DA Server api type must be provided to start application")
 	}
 
 	return nil
+}
+
+// ToAPIStrings returns a string slice containing only the APIs enabled
+func (e EnabledServersConfig) ToAPIStrings() []string {
+	enabled := []string{}
+	if e.Metric {
+		enabled = append(enabled, string(MetricsServer))
+	}
+	if e.ArbCustomDA {
+		enabled = append(enabled, string(ArbCustomDAServer))
+	}
+	if e.RestAPIConfig.Admin {
+		enabled = append(enabled, string(Admin))
+	}
+	if e.RestAPIConfig.OpGenericCommitment {
+		enabled = append(enabled, string(OpGenericCommitment))
+	}
+	if e.RestAPIConfig.OpKeccakCommitment {
+		enabled = append(enabled, string(OpKeccakCommitment))
+	}
+	if e.RestAPIConfig.StandardCommitment {
+		enabled = append(enabled, string(StandardCommitment))
+	}
+	return enabled
 }
 
 // APIStringsToEnabledServersConfig takes a dynamic array of strings provided from user CLI

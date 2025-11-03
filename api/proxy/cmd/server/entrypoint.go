@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_logging "github.com/Layr-Labs/eigenda/api/proxy/logging"
@@ -12,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
+	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli/v2"
@@ -56,6 +58,24 @@ func StartProxyService(cliCtx *cli.Context) error {
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
 
+	var ethClient common_eigenda.EthClient
+	var chainID = ""
+	var readOnlyMode = false
+	if !cfg.StoreBuilderConfig.MemstoreEnabled {
+		ethClient, chainID, err = common.BuildEthClient(
+			ctx,
+			log,
+			cfg.SecretConfig.EthRPCURL,
+			cfg.StoreBuilderConfig.ClientConfigV2.EigenDANetwork,
+		)
+		if err != nil {
+			return fmt.Errorf("build eth client: %w", err)
+		}
+		// if the backend is not memstore, and no signer payment key is set
+		// then we are in read-only mode
+		readOnlyMode = cfg.SecretConfig.SignerPaymentKey == ""
+	}
+
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
 		log,
@@ -63,20 +83,35 @@ func StartProxyService(cliCtx *cli.Context) error {
 		cfg.StoreBuilderConfig,
 		cfg.SecretConfig,
 		registry,
+		ethClient,
 	)
 	if err != nil {
 		return fmt.Errorf("build storage managers: %w", err)
 	}
 
-	restServer := rest.NewServer(cfg.RestSvrCfg, certMgr, keccakMgr, log, metrics)
-	router := mux.NewRouter()
-	restServer.RegisterRoutes(router)
-	if cfg.StoreBuilderConfig.MemstoreEnabled {
-		memconfig.NewHandlerHTTP(log, cfg.StoreBuilderConfig.MemstoreConfig).RegisterMemstoreConfigHandlers(router)
+	// Construct the compatibility config for the rest and arb servers. This could not be done while reading configs
+	// as ChainID is fetched from the ethClient afterwards.
+	compatibilityCfg, err := common.NewCompatibilityConfig(
+		Version,
+		chainID,
+		cfg.StoreBuilderConfig.ClientConfigV2,
+		readOnlyMode,
+		cfg.EnabledServersConfig.ToAPIStrings(),
+	)
+	if err != nil {
+		return fmt.Errorf("new compatibility config: %w", err)
 	}
 
-	restEnabledCfg := cfg.EnabledServersConfig.RestAPIConfig
-	if restEnabledCfg.Enabled() {
+	if cfg.EnabledServersConfig.RestAPIConfig.DAEndpointEnabled() {
+		cfg.RestSvrCfg.CompatibilityCfg = compatibilityCfg
+		restServer := rest.NewServer(cfg.RestSvrCfg, certMgr, keccakMgr, log, metrics)
+		router := mux.NewRouter()
+		restServer.RegisterRoutes(router)
+		if cfg.StoreBuilderConfig.MemstoreEnabled {
+			memconfig.NewHandlerHTTP(log, cfg.StoreBuilderConfig.MemstoreConfig).RegisterMemstoreConfigHandlers(router)
+		}
+
+		restEnabledCfg := cfg.EnabledServersConfig.RestAPIConfig
 		if err := restServer.Start(router); err != nil {
 			return fmt.Errorf("start proxy rest server: %w", err)
 		}
@@ -98,7 +133,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 	}
 
 	if cfg.EnabledServersConfig.ArbCustomDA {
-		h := arbitrum_altda.NewHandlers(certMgr, log)
+		h := arbitrum_altda.NewHandlers(certMgr, log, compatibilityCfg)
 
 		arbitrumRpcServer, err := arbitrum_altda.NewServer(ctx, &cfg.ArbCustomDASvrCfg, h)
 		if err != nil {

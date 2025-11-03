@@ -237,7 +237,10 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 	}
 
 	// Setup V2 retrieval clients
-	encoder := rsv2.NewEncoder(infraHarness.Logger, nil)
+	encoder, err := rsv2.NewEncoder(infraHarness.Logger, nil)
+	if err != nil {
+		return fmt.Errorf("new v2 encoder: %w", err)
+	}
 	kzgVerifierV2, err := verifierv2.NewVerifier(verifierv2.ConfigFromV1KzgConfig(kzgConfig))
 	if err != nil {
 		return fmt.Errorf("new verifier v2: %w", err)
