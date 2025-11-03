@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
-	"github.com/Layr-Labs/eigenda/api/grpc/controller"
+	cgrpc "github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/replay"
+	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -23,9 +24,9 @@ import (
 
 // The controller GRPC server
 type Server struct {
-	controller.UnimplementedControllerServiceServer
+	cgrpc.UnimplementedControllerServiceServer
 
-	config                      Config
+	config                      *controller.ControllerConfig
 	logger                      logging.Logger
 	server                      *grpc.Server
 	listener                    net.Listener
@@ -36,7 +37,7 @@ type Server struct {
 
 func NewServer(
 	ctx context.Context,
-	config Config,
+	config *controller.ControllerConfig,
 	logger logging.Logger,
 	metricsRegistry *prometheus.Registry,
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler,
@@ -60,15 +61,15 @@ func NewServer(
 
 // Start the server. Blocks until the server is stopped.
 func (s *Server) Start() error {
-	if !s.config.EnableServer {
+	if !s.config.EnableGrpcServer {
 		return fmt.Errorf("controller gRPC server is disabled")
 	}
 
 	var opts []grpc.ServerOption
 	opts = append(opts, s.metrics.GetGRPCServerOption())
 
-	if s.config.MaxGRPCMessageSize > 0 {
-		opts = append(opts, grpc.MaxRecvMsgSize(s.config.MaxGRPCMessageSize))
+	if s.config.MaxGrpcMessageSize > 0 {
+		opts = append(opts, grpc.MaxRecvMsgSize(int(s.config.MaxGrpcMessageSize)))
 	}
 
 	if s.config.MaxIdleConnectionAge > 0 {
@@ -79,8 +80,8 @@ func (s *Server) Start() error {
 
 	s.server = grpc.NewServer(opts...)
 	reflection.Register(s.server)
-	controller.RegisterControllerServiceServer(s.server, s)
-	healthcheck.RegisterHealthServer(controller.ControllerService_ServiceDesc.ServiceName, s.server)
+	cgrpc.RegisterControllerServiceServer(s.server, s)
+	healthcheck.RegisterHealthServer(cgrpc.ControllerService_ServiceDesc.ServiceName, s.server)
 
 	s.logger.Infof("gRPC server listening at %v", s.listener.Addr().String())
 
@@ -107,8 +108,8 @@ func (s *Server) Stop() {
 // Handles an AuthorizePaymentRequest
 func (s *Server) AuthorizePayment(
 	ctx context.Context,
-	request *controller.AuthorizePaymentRequest,
-) (*controller.AuthorizePaymentResponse, error) {
+	request *cgrpc.AuthorizePaymentRequest,
+) (*cgrpc.AuthorizePaymentResponse, error) {
 	if s.paymentAuthorizationHandler == nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf(
 			"payment authorization handler not configured, request=%s", request.String()))

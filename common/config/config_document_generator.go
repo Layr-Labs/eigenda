@@ -172,7 +172,7 @@ func parseStructGodocs(filePath string, lineNumber int) (map[string]string, erro
 			continue
 		}
 
-		if strings.Contains(line, "}") {
+		if strings.Contains(line, "}") && !strings.HasPrefix(line, "//") {
 			// Anonymous (i.e. nested) structs are prohibited, so we can assume this is the end of the struct.
 			break
 		}
