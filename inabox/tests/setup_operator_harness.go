@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node"
@@ -215,6 +216,21 @@ func (oh *OperatorHarness) startOperator(
 
 	// TODO(dmanc): In addition to loggers, we should have a centralized place for creating
 	// configuration and injecting it into the harness config.
+
+	var reservationLedgerCacheConfig reservationvalidation.ReservationLedgerCacheConfig
+	if oh.testConfig.UseNewPayments {
+		var err error
+		reservationLedgerCacheConfig, err = reservationvalidation.NewReservationLedgerCacheConfig(
+			1024,
+			90*time.Second,
+			ratelimit.OverfillOncePermitted,
+			1*time.Second, // Matches controller and API server update interval
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create reservation ledger cache config: %w", err)
+		}
+	}
+
 	nodeConfig := &node.Config{
 		Hostname:                       "localhost",
 		RetrievalPort:                  retrievalPort,
@@ -282,6 +298,8 @@ func (oh *OperatorHarness) startOperator(
 		GetChunksColdCacheReadLimitMB:       1 * units.GiB / units.MiB,
 		GetChunksColdBurstLimitMB:           1 * units.GiB / units.MiB,
 		GRPCMsgSizeLimitV2:                  1024 * 1024 * 300,
+		EnablePaymentValidation:             oh.testConfig.UseNewPayments,
+		ReservationLedgerCacheConfig:        reservationLedgerCacheConfig,
 	}
 
 	// Create operator logger

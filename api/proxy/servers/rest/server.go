@@ -20,9 +20,10 @@ import (
 
 // Config ... Config for the proxy HTTP server
 type Config struct {
-	Host        string
-	Port        int
-	APIsEnabled *enablement.RestApisEnabled
+	Host             string
+	Port             int
+	APIsEnabled      *enablement.RestApisEnabled
+	CompatibilityCfg common.CompatibilityConfig
 }
 
 type Server struct {

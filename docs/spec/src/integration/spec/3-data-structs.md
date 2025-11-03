@@ -62,7 +62,7 @@ An `encodedPayload` can thus be transformed into a `blob` directly or optionally
 
 ### BlobHeader
 
-The `blobHeader` is submitted alongside the `blob` as part of the `DisperseBlob` request, and the hash of its ABI encoding (`blobKey`, also known as `blobHeaderHash`) serves as a unique identifier for a blob dispersal. This identifier is used to retrieve the blob.
+The `blobHeader` is submitted alongside the `blob` as part of the `DisperseBlob` request, and the hash of its ABI encoding ([`blobKey`](#blobkey-blob-header-hash), also known as `blobHeaderHash`) serves as a unique identifier for a blob dispersal. This identifier is used to retrieve the blob.
 
 The `BlobHeader` contains four main sections that must be constructed. It is passed into the `DisperseBlobRequest` and is signed over for payment authorization.
 
@@ -126,7 +126,87 @@ Users who want to pay-per-blob need to set the cumulative_payment. `timestamp` i
 
 **NOTE:** There will be a lot of subtleties added to this logic with the new separate-payment-per-quorum model that is actively being worked on.
 
-An RPC call to the Disperser’s `GetPaymentState` method can be made to query the current state of an `account_id`. A client can query for this information on startup, cache it, and then update it manually when making dispersals. In this way, it can keep track of its reserved bandwidth usage and current cumulative_payment and set them correctly for subsequent dispersals.
+An RPC call to the Disperser's `GetPaymentState` method can be made to query the current state of an `account_id`. A client can query for this information on startup, cache it, and then update it manually when making dispersals. In this way, it can keep track of its reserved bandwidth usage and current cumulative_payment and set them correctly for subsequent dispersals.
+
+### BlobKey (Blob Header Hash)
+
+The `blobKey` (also known as `blob_header_hash` or `blobHeaderHash`) serves as the _primary lookup key_ throughout the EigenDA system. It uniquely identifies a blob dispersal and is used for querying dispersal status, retrieving blobs from the network, and linking blobs to their certificates. The `blobKey` is computed as the keccak256 hash of the ABI-encoded `BlobHeader`, and is cryptographically equivalent to the `blob_header_hash` used in on-chain verification.
+
+#### Computing the BlobKey
+
+The hashing follows a nested structure. The inner hash covers the blob's content and dispersal requirements (version, quorums, commitment), which is then combined with the payment metadata hash. This ensures that each dispersal request produces a unique `blobKey`, even when dispersing identical blob content. The disperser enforces this uniqueness; attempting to disperse a blob with a previously used `blobKey` will result in rejection:
+
+```solidity
+blobKey = keccak256(
+    abi.encode(
+        keccak256(abi.encode(blobHeader.version, blobHeader.quorumNumbers, blobHeader.commitment)),
+        blobHeader.paymentHeaderHash
+    )
+)
+```
+
+**Note:** The `paymentHeaderHash` is the keccak256 hash of the `PaymentHeader` structure (described in the [BlobHeader](#blobheader) section above). The payment metadata is hashed separately to enable efficient on-chain verification while keeping payment details compact. Additionally, `quorumNumbers` are sorted in ascending order before hashing to ensure consistency regardless of the order in which quorums are specified.
+
+When a rollup receives an encoded DA commitment from the proxy, the `blobKey` can be extracted by deserializing the BlobCertificate from the commitment payload, extracting its BlobHeader, and computing the hash as shown above.
+
+In the standard dispersal flow, the disperser computes the `blobKey` and returns it to the client in the `DisperseBlobReply`. Clients may independently compute the `blobKey` for verification purposes or when extracting it from a certificate. The Go and Solidity implementations provided enable both client-side and on-chain computation.
+
+#### Example
+
+For illustrative purposes, consider a blob dispersal with the following parameters:
+- `version`: `0x0001`
+- `quorumNumbers`: `[0, 1]` (sorted)
+- `commitment`: Cryptographic commitment to the blob data (G1 point and G2 length commitment)
+- `paymentHeaderHash`: `0x1234...` (32-byte hash of the PaymentHeader)
+
+The `blobKey` computation proceeds in two steps:
+1. **Compute inner hash** of core dispersal parameters:
+   ```
+   innerHash = keccak256(abi.encode(version, quorumNumbers, commitment))
+   ```
+   This produces a 32-byte hash representing the blob's content and dispersal requirements.
+
+2. **Compute outer hash** combining inner hash with payment:
+   ```
+   blobKey = keccak256(abi.encode(innerHash, paymentHeaderHash))
+   ```
+   This produces the final 32-byte `blobKey`.
+
+The resulting `blobKey` serves as the unique identifier for querying dispersal status with `GetBlobStatus`, retrieving chunks from validators via `GetChunks`, or fetching the full blob from relays via `GetBlob`.
+
+#### Relationship to Other Data Structures
+
+The `BlobHeader` is hashed to produce the `blobKey`. A `BlobCertificate` wraps a `BlobHeader` along with signature and relay keys. The `BlobInclusionInfo` contains a `BlobCertificate` and is used to prove inclusion of that certificate in a batch via a Merkle proof. The `BatchHeader` contains a `batchRoot` which is the root of the Merkle tree whose leaves are hashes of `BlobCertificate`s. The diagram in the [EigenDA Certificate](#eigenda-certificate-dacert) section below illustrates these relationships.
+
+#### Code References
+
+The Solidity implementation can be found in [`hashBlobHeaderV2()`](https://github.com/Layr-Labs/eigenda/blob/d73a9fa66a44dd2cfd334dcb83614cd5c1c5e005/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L324).
+
+The Go implementation is available in [`ComputeBlobKey()`](https://github.com/Layr-Labs/eigenda/blob/d73a9fa66a44dd2cfd334dcb83614cd5c1c5e005/core/v2/serialization.go#L42).
+
+The EigenDA Go client demonstrates best practices for `blobKey` verification in [`verifyReceivedBlobKey()`](https://github.com/Layr-Labs/eigenda/blob/6be8c9352c8e73c9f4f0ba00560ff3230bbba822/api/clients/v2/payloaddispersal/payload_disperser.go#L370-L400). After receiving a `DisperseBlobReply`, clients should verify that the disperser didn't modify the `BlobHeader` by computing the `blobKey` locally and comparing it with the returned value.
+
+#### Usage
+
+The `blobKey` is a central identifier used throughout the **dispersal** and **retrieval** process:
+
+- **Dispersal phase:**
+  The disperser's `DisperseBlob` method returns a `blobKey`. Clients then use this `blobKey` with `GetBlobStatus` to check when dispersal is complete
+  (see [Disperser polling](./5-lifecycle-phases.md#disperser-polling)).
+
+- **Centralized retrieval:**
+  The Relay API's `GetBlob` method uses the `blobKey` as its main lookup parameter to retrieve the full blob from relay servers
+  (see [Retrieval Paths](./5-lifecycle-phases.md#retrieval-paths)).
+
+- **Decentralized retrieval:**
+  Validators' `GetChunks` method uses the `blobKey` to retrieve erasure-coded chunks directly from validator nodes. Clients can reconstruct the full blob from these chunks
+  (see [Retrieval Paths](./5-lifecycle-phases.md#retrieval-paths)).
+
+- **Peripheral APIs:**
+  Both the Data API and the Blob Explorer rely on `blobKey` as the **primary identifier** for querying blob metadata and status.
+
+- **Verification:**
+  The `blobKey` connects each blob to its certificate, ensuring that the certificate corresponds to the correct blob.
 
 ### EigenDA Certificate (`DACert`)
 

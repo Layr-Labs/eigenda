@@ -74,8 +74,14 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
 	MaxConcurrentRequestsFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-requests"),
-		Usage:    "maximum number of concurrent requests",
+		Name: common.PrefixFlag(FlagPrefix, "max-concurrent-requests"),
+		Usage: "maximum number of concurrent requests. " +
+			"This also sets the weight of the GPU semaphore when using EigenDA V2 with GPU enabled " +
+			"(Backend=icicle and GPUEnable=true). " +
+			"Chunk generation (encoding/v2/rs) and multiproofs generation (encoding/v2/kzg/prover) " +
+			"each have their own separate semaphore which is weighted using this value. " +
+			"WARNING: setting this value too high may lead to out-of-memory errors on the GPU. " +
+			"If this ever happens, the GPU device needs to be rebooted as it can be left in a bad state.",
 		Required: false,
 		Value:    16,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONCURRENT_REQUESTS"),
