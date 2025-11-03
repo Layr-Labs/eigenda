@@ -646,11 +646,11 @@ func startEncoderV2(
 
 	// Create encoder server config
 	serverConfig := encoder.ServerConfig{
-		MaxConcurrentRequests: 16,
-		RequestQueueSize:      32,
-		PreventReencoding:     true,
-		Backend:               "gnark",
-		GPUEnable:             false,
+		MaxConcurrentRequestsDangerous: 16,
+		RequestQueueSize:               32,
+		PreventReencoding:              true,
+		Backend:                        "gnark",
+		GPUEnable:                      false,
 	}
 
 	// Create encoder server
@@ -922,8 +922,9 @@ func startController(
 	// Build and start gRPC server if payments are enabled
 	var controllerServer *server.Server
 	var controllerAddress string
-	if config.TestConfig.UseControllerMediatedPayments {
-		controllerLogger.Info("UseControllerMediatedPayments enabled - starting gRPC server")
+	//nolint:nestif // Complex nested block is temporary until old payment system is removed
+	if config.TestConfig.UseNewPayments {
+		controllerLogger.Info("UseNewPayments enabled - starting gRPC server")
 
 		// Create contract directory
 		contractDirectory, err := directory.NewContractDirectory(
@@ -1021,7 +1022,7 @@ func startController(
 	} else {
 		// When server is disabled, use empty address
 		controllerAddress = ""
-		controllerLogger.Info("UseControllerMediatedPayments disabled - controller will not have server")
+		controllerLogger.Info("UseNewPayments disabled - controller will not have server")
 	}
 
 	controllerLogger.Info("Controller components started successfully",
@@ -1147,7 +1148,7 @@ func startAPIServerV2(
 
 	// Create meterer
 	// Note: The meterer is always created to serve GetPaymentState calls, even when using
-	// controller-mediated payments. The UseControllerMediatedPayments flag controls which
+	// controller-mediated payments. The UseNewPayments flag controls which
 	// payment system is used for authorization during dispersals, but doesn't affect
 	// whether the meterer is available for querying payment state.
 	apiServerLogger.Info("Creating meterer")
@@ -1225,7 +1226,7 @@ func startAPIServerV2(
 		metricsRegistry,
 		metricsConfig,
 		false, // ReservedOnly
-		config.TestConfig.UseControllerMediatedPayments,
+		config.TestConfig.UseNewPayments,
 		controllerAddress,
 	)
 	if err != nil {

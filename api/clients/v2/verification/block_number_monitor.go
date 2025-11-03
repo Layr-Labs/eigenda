@@ -92,11 +92,6 @@ func (bnm *BlockNumberMonitor) WaitForBlockNumber(ctx context.Context, targetBlo
 
 			if polling {
 				blockNumber, err := bnm.ethClient.BlockNumber(ctx)
-				if err != nil {
-					return fmt.Errorf("get block number from eth client: %w", err)
-				}
-
-				bnm.latestBlockNumber.Store(blockNumber)
 
 				if err != nil {
 					bnm.logger.Debug(
@@ -108,6 +103,8 @@ func (bnm *BlockNumberMonitor) WaitForBlockNumber(ctx context.Context, targetBlo
 					// tolerate some failures here. if failure continues for too long, it will be caught by the timeout
 					continue
 				}
+
+				bnm.latestBlockNumber.Store(blockNumber)
 
 				if blockNumber >= targetBlockNumber {
 					return nil

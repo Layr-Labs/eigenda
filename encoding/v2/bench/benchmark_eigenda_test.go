@@ -88,7 +88,9 @@ func BenchmarkRSBackendIcicle(b *testing.B) {
 	if !icicle.IsAvailable {
 		b.Skip("code compiled without the icicle build tag")
 	}
-	icicleBackend, err := rsicicle.BuildRSBackend(common.SilentLogger(), true)
+	// Change this value to allow more encodings to run in parallel on the GPU.
+	gpuConcurrentEncodings := int64(1)
+	icicleBackend, err := rsicicle.BuildRSBackend(common.SilentLogger(), true, gpuConcurrentEncodings)
 	require.NoError(b, err)
 	benchmarkRSBackend(b, icicleBackend)
 }
@@ -111,7 +113,7 @@ func benchmarkRSBackend(b *testing.B, rsBackend backend.RSEncoderBackend) {
 			// run multiple goroutines in parallel to better utilize the GPU
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
-					_, err := rsBackend.ExtendPolyEval(blobCoeffs[:numFrs])
+					_, err := rsBackend.ExtendPolyEvalV2(b.Context(), blobCoeffs[:numFrs])
 					require.NoError(b, err)
 				}
 			})
@@ -126,7 +128,8 @@ func benchmarkRSBackend(b *testing.B, rsBackend backend.RSEncoderBackend) {
 // evaluates to the chunk's data at the chunk's coset indices.
 func BenchmarkBlobToChunksEncoding(b *testing.B) {
 	cfg := encoding.DefaultConfig()
-	enc := rs.NewEncoder(common.SilentLogger(), cfg)
+	enc, err := rs.NewEncoder(common.SilentLogger(), cfg)
+	require.Nil(b, err)
 
 	for _, blobPower := range []uint64{17, 20, 21, 24} {
 		b.Run("Encode_size_2^"+fmt.Sprint(blobPower)+"_bytes", func(b *testing.B) {
@@ -145,7 +148,7 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 			require.Nil(b, err)
 
 			for b.Loop() {
-				_, _, err = enc.Encode(blob, params)
+				_, _, err = enc.Encode(b.Context(), blob, params)
 				require.Nil(b, err)
 			}
 		})
@@ -159,7 +162,7 @@ func BenchmarkMultiproofGenerationIcicle(b *testing.B) {
 		b.Skip("code compiled without the icicle build tag")
 	}
 	encodingConfig := encoding.Config{
-		NumWorker:   uint64(runtime.NumCPU()),
+		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 		BackendType: encoding.IcicleBackend,
 		GPUEnable:   true,
 	}
@@ -168,7 +171,7 @@ func BenchmarkMultiproofGenerationIcicle(b *testing.B) {
 
 func BenchmarkMultiproofGenerationGnark(b *testing.B) {
 	encodingConfig := encoding.Config{
-		NumWorker:   uint64(runtime.NumCPU()),
+		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 		BackendType: encoding.GnarkBackend,
 		GPUEnable:   false,
 	}
@@ -221,7 +224,7 @@ func benchmarkMultiproofGeneration(b *testing.B, encodingConfig encoding.Config)
 			require.NoError(b, err)
 
 			for b.Loop() {
-				_, err = parametrizedProver.GetProofs(maxSizeBlobCoeffs[:rsExtendedBlobFrs])
+				_, err = parametrizedProver.GetProofs(b.Context(), maxSizeBlobCoeffs[:rsExtendedBlobFrs])
 				require.NoError(b, err)
 			}
 		})
@@ -243,9 +246,15 @@ func BenchmarkFrameGeneration(b *testing.B) {
 		CacheDir:       "../../../resources/srs/SRSTables",
 		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
 	}
+	encodingConfig := encoding.Config{
+		NumWorker:                             uint64(runtime.GOMAXPROCS(0)),
+		BackendType:                           encoding.IcicleBackend,
+		GPUEnable:                             true,
+		GPUConcurrentFrameGenerationDangerous: 20,
+	}
 	b.Log("Reading precomputed SRSTables, this may take a while...")
 	// use a non-silent logger to see the "Multiproof Time Decomp" log lines.
-	p, err := prover.NewProver(common.TestLogger(b), &proverConfig, nil)
+	p, err := prover.NewProver(common.TestLogger(b), &proverConfig, &encodingConfig)
 	require.NoError(b, err)
 
 	rand := random.NewTestRandomNoPrint(1337)
@@ -263,12 +272,13 @@ func BenchmarkFrameGeneration(b *testing.B) {
 			}
 
 			for b.Loop() {
+				n := 20
 				wg := sync.WaitGroup{}
-				wg.Add(5)
-				for range 5 {
+				wg.Add(n)
+				for range n {
 					go func() {
 						defer wg.Done()
-						_, _, err = p.GetFrames(maxSizeBlobCoeffs[:rsExtendedBlobFrs], params)
+						_, _, err = p.GetFrames(b.Context(), maxSizeBlobCoeffs[:rsExtendedBlobFrs], params)
 						require.NoError(b, err)
 					}()
 				}

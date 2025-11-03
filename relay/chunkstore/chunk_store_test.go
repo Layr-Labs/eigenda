@@ -145,7 +145,7 @@ func generateRandomFrameCoeffs(
 	size int,
 	params encoding.EncodingParams) []rs.FrameCoeffs {
 
-	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(random.RandomBytes(size)), params)
+	frames, _, err := encoder.EncodeBytes(t.Context(), codec.ConvertByPaddingEmptyByte(random.RandomBytes(size)), params)
 	require.NoError(t, err, "failed to encode bytes into frame coefficients")
 	return frames
 }
@@ -158,7 +158,8 @@ func runRandomCoefficientsTest(t *testing.T, client s3.Client) {
 	fragmentSize := int(chunkSize / 2)
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
-	encoder := rs.NewEncoder(logger, cfg)
+	encoder, err := rs.NewEncoder(logger, cfg)
+	require.NoError(t, err)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, client, bucket)
@@ -216,7 +217,8 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
-	encoder := rs.NewEncoder(logger, cfg)
+	encoder, err := rs.NewEncoder(logger, cfg)
+	require.NoError(t, err)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	ctx := t.Context()

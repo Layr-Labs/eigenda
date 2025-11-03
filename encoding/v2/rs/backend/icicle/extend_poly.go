@@ -3,9 +3,11 @@
 package icicle
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
+	_ "github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -13,6 +15,7 @@ import (
 	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ntt"
 	icicle_runtime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -20,12 +23,14 @@ const (
 )
 
 type RSBackend struct {
-	NttCfg  core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
-	Device  icicle_runtime.Device
-	GpuLock sync.Mutex
+	NttCfg core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
+	Device icicle_runtime.Device
+	// request-weighted semaphore.
+	// See [encoding.Config.GPUConcurrentFrameGenerationDangerous] for more details.
+	GpuSemaphore *semaphore.Weighted
 }
 
-func BuildRSBackend(logger logging.Logger, enableGPU bool) (*RSBackend, error) {
+func BuildRSBackend(logger logging.Logger, enableGPU bool, gpuConcurrentEncodings int64) (*RSBackend, error) {
 	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
 		Logger:    logger,
 		GPUEnable: enableGPU,
@@ -36,22 +41,24 @@ func BuildRSBackend(logger logging.Logger, enableGPU bool) (*RSBackend, error) {
 		return nil, fmt.Errorf("setup icicle device: %w", err)
 	}
 	return &RSBackend{
-		NttCfg: icicleDevice.NttCfg,
-		Device: icicleDevice.Device,
+		NttCfg:       icicleDevice.NttCfg,
+		Device:       icicleDevice.Device,
+		GpuSemaphore: semaphore.NewWeighted(gpuConcurrentEncodings),
 	}, nil
 }
 
 // Encoding Reed Solomon using FFT
-func (g *RSBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
-	// We lock the GPU here to avoid concurrent NTT calls.
-	// This is WAY too conservative, and we could achieve way better throughput by submitting multiple
-	// NTT jobs in parallel to the GPU, but the issue is that icicle doesn't have nice backpressure,
-	// and the GPU kernel just panics if too many jobs are submitted at once.
-	// TODO(samlaf): add some kind of job queue, backpressure, exponential backoff,
-	// or whatever to allow maximizing GPU utilization.
-	// See https://github.com/Layr-Labs/eigenda/pull/2214 for more details.
-	g.GpuLock.Lock()
-	defer g.GpuLock.Unlock()
+func (g *RSBackend) ExtendPolyEvalV2(ctx context.Context, coeffs []fr.Element) ([]fr.Element, error) {
+	// We acquire a semaphore here to avoid too many concurrent NTT calls.
+	// This is a very unideal and coarse grain solution, but unfortunately
+	// icicle doesn't have nice backpressure, and the GPU kernel just panics if RAM is exhausted.
+	// In its current implementation, icicle's NTT kernel takes RAM = input+output size.
+	// We could use a finer-grained semaphore that calculates the RAM usage per request,
+	// but this would feel very hardcoded and hardware dependent (although we can request RAM available on the device
+	// dynamically using icicle APIs). For now opting to keep this simple.
+	// TODO(samlaf): rethink this approach.
+	g.GpuSemaphore.Acquire(ctx, 1)
+	defer g.GpuSemaphore.Release(1)
 
 	// coeffs will be moved to device memory inside Ntt function,
 	// and the result copied back into outputEvals.

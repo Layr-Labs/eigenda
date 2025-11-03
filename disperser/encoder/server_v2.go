@@ -71,7 +71,7 @@ func NewEncoderServerV2(
 		prover:             prover,
 		metrics:            metrics,
 		grpcMetrics:        grpcMetrics,
-		concurrencyLimiter: make(chan struct{}, config.MaxConcurrentRequests),
+		concurrencyLimiter: make(chan struct{}, config.MaxConcurrentRequestsDangerous),
 		backlogLimiter:     make(chan struct{}, config.RequestQueueSize),
 		queueStats:         make(map[string]int),
 	}
@@ -181,7 +181,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKe
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert blob data to field elements: %v", err)
 	}
-	frames, _, err := s.prover.GetFrames(dataFr, encodingParams)
+	frames, _, err := s.prover.GetFrames(ctx, dataFr, encodingParams)
 	if err != nil {
 		s.logger.Error("failed to encode frames", "error", err)
 		return nil, status.Errorf(codes.Internal, "encoding failed: %v", err)
@@ -209,7 +209,7 @@ func (s *EncoderServerV2) pushBacklogLimiter(blobSizeBytes int) error {
 		s.metrics.IncrementRateLimitedBlobRequestNum(blobSizeBytes)
 		s.logger.Warn("rate limiting as request queue is full",
 			"requestQueueSize", s.config.RequestQueueSize,
-			"maxConcurrentRequests", s.config.MaxConcurrentRequests)
+			"maxConcurrentRequests", s.config.MaxConcurrentRequestsDangerous)
 		return api.NewErrorResourceExhausted(fmt.Sprintf(
 			"request queue is full, max queue size: %d", s.config.RequestQueueSize))
 	}
