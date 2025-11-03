@@ -56,6 +56,8 @@ const (
 	// trustless integration
 	MethodGenerateReadPreimageProof = "daprovider_generateReadPreimageProof"
 	MethodGenerateCertValidityProof = "daprovider_generateCertificateValidityProof"
+	// compatibility check
+	MethodCompatibilityConfig = "daprovider_compatibilityConfig"
 )
 
 type PreimageType uint8
