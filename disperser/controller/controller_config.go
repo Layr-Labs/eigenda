@@ -282,5 +282,12 @@ func (c *ControllerConfig) GetPackagePaths() []string {
 	return []string{
 		"github.com/Layr-Labs/eigenda/disperser/controller",
 		"github.com/Layr-Labs/eigenda/common",
+		"github.com/Layr-Labs/eigenda/common/geth",
+		"github.com/Layr-Labs/eigenda/common/healthcheck",
+		"github.com/Layr-Labs/eigenda/core/thegraph",
+		"github.com/Layr-Labs/eigenda/common/aws",
+		"github.com/Layr-Labs/eigenda/api/clients/v2",
+		"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation",
+		"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation",
 	}
 }

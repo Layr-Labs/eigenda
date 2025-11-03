@@ -14,10 +14,14 @@ var (
 )
 
 type EthClientConfig struct {
-	RPCURLs          []string `docs:"required"`
-	PrivateKeyString string   `docs:"required"`
+	// RPCURLs is a list of RPC URLs to connect to the Ethereum network.
+	RPCURLs []string `docs:"required"`
+	// PrivateKeyString is the private key used for signing transactions.
+	PrivateKeyString string `docs:"required"`
+	// NumConfirmations is the number of confirmations to wait for when submitting write transactions.
 	NumConfirmations int
-	NumRetries       int
+	// NumRetries is the number of retries for RPC calls in case of failure.
+	NumRetries int
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {
