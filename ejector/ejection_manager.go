@@ -136,21 +136,21 @@ func (em *ejectionManager) BeginEjection(
 
 	// Check to see if the validator is blacklisted.
 	if _, blacklisted := em.ejectionBlacklist[validatorAddress]; blacklisted {
-		em.logger.Infof("validator %s is blacklisted from ejection, will not begin ejection",
+		em.logger.Debugf("validator %s is blacklisted from ejection, will not begin ejection",
 			validatorAddress.Hex())
 		return
 	}
 
 	// Check to see if we are already in the process of ejecting this validator.
 	if _, ejectionAlreadyBeingTracked := em.ejectionsInProgress[validatorAddress]; ejectionAlreadyBeingTracked {
-		em.logger.Infof("ejection already in progress for validator %s, will not begin ejection",
+		em.logger.Debugf("ejection already in progress for validator %s, will not begin ejection",
 			validatorAddress.Hex())
 		return
 	}
 
 	// Check to see if we have recently attempted to eject this validator.
 	if _, recentlyEjected := em.recentEjectionTimes[validatorAddress]; recentlyEjected {
-		em.logger.Infof("recent ejection attempt for validator %s, will not begin ejection",
+		em.logger.Debugf("recent ejection attempt for validator %s, will not begin ejection",
 			validatorAddress.Hex())
 		return
 	}
@@ -164,7 +164,7 @@ func (em *ejectionManager) BeginEjection(
 	}
 	if ejectionStartedOnchain {
 		// An ejection is already in progress onchain. Record it, and we can try to finalize it later.
-		em.logger.Infof("ejection already in progress on-chain for validator %s, "+
+		em.logger.Debugf("ejection already in progress on-chain for validator %s, "+
 			"will not begin ejection but will attempt to finalize",
 			validatorAddress.Hex())
 
@@ -257,7 +257,7 @@ func (em *ejectionManager) checkRateLimits(
 	now := em.timeSource()
 	permittedQuorums := make([]core.QuorumID, 0, len(stakeFractions))
 	for qid, stake := range stakeFractions {
-		leakyBucket := em.getLeakyBucketForQuorum(qid)
+		leakyBucket := em.getLeakyBucketForQuorum(now, qid)
 
 		allowed, err := leakyBucket.Fill(now, stake)
 
@@ -269,7 +269,7 @@ func (em *ejectionManager) checkRateLimits(
 			// We will need to undo all previous fills before bailing out.
 			for _, quorumID := range permittedQuorums {
 				stakeToUndo := stakeFractions[quorumID]
-				leakyBucketToUndo := em.getLeakyBucketForQuorum(quorumID)
+				leakyBucketToUndo := em.getLeakyBucketForQuorum(now, quorumID)
 				err = leakyBucketToUndo.RevertFill(now, stakeToUndo)
 				enforce.NilError(err, "should be impossible")
 			}
@@ -292,7 +292,7 @@ func (em *ejectionManager) cleanUpFailedEjection(
 ) {
 	now := em.timeSource()
 	for qid, stake := range stakeFractions {
-		leakyBucket := em.getLeakyBucketForQuorum(qid)
+		leakyBucket := em.getLeakyBucketForQuorum(now, qid)
 		err := leakyBucket.RevertFill(now, stake)
 		enforce.NilError(err, "should be impossible")
 	}
@@ -301,7 +301,10 @@ func (em *ejectionManager) cleanUpFailedEjection(
 }
 
 // Get the leaky bucket for a specific quorum, creating it if it doesn't already exist.
-func (em *ejectionManager) getLeakyBucketForQuorum(qid core.QuorumID) *ratelimit.LeakyBucket {
+//
+// Note: this method must accept an external time instead of using em.timeSource() directly. The external
+// context needs to use a specific time between multiple function calls, and so we have to pass it in.
+func (em *ejectionManager) getLeakyBucketForQuorum(now time.Time, qid core.QuorumID) *ratelimit.LeakyBucket {
 	leakyBucket, ok := em.quorumRateLimits[qid]
 
 	if !ok {
@@ -311,7 +314,7 @@ func (em *ejectionManager) getLeakyBucketForQuorum(qid core.QuorumID) *ratelimit
 			em.config.EjectionThrottleTimePeriod,
 			em.config.StartEjectionThrottleFull,
 			ratelimit.OverfillOncePermitted,
-			em.timeSource())
+			now)
 		em.quorumRateLimits[qid] = leakyBucket
 
 		enforce.NilError(err, "should be impossible, leaky bucket parameters are pre-validated")
