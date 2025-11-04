@@ -1,89 +1,17 @@
 package signingrate
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
-	commonaws "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/test/testbed"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
-
-// setupDynamoClient sets up a DynamoDB client connected to Localstack for testing.
-func setupDynamoClient(t *testing.T) (client *dynamodb.Client, cleanup func()) {
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
-	localstackPort := 4573
-
-	var localstackContainer *testbed.LocalStackContainer
-	var deployLocalStack bool
-
-	ctx := t.Context()
-
-	if os.Getenv("DEPLOY_LOCALSTACK") != "false" {
-		deployLocalStack = true
-		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
-			ExposeHostPort: true,
-			HostPort:       fmt.Sprintf("%d", localstackPort),
-			Services:       []string{"dynamodb"},
-			Logger:         logger,
-		})
-		require.NoError(t, err)
-	} else {
-		// localstack is already deployed
-		portString := os.Getenv("LOCALSTACK_PORT")
-		require.NoError(t, err)
-		localstackPort, err = strconv.Atoi(portString)
-		require.NoError(t, err)
-	}
-
-	clientConfig := commonaws.ClientConfig{
-		Region:          "us-east-1",
-		AccessKey:       "localstack",
-		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%d", localstackPort),
-	}
-
-	awsConfig := aws.Config{
-		Region: clientConfig.Region,
-		Credentials: aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
-			return aws.Credentials{
-				AccessKeyID:     clientConfig.AccessKey,
-				SecretAccessKey: clientConfig.SecretAccessKey,
-			}, nil
-		}),
-		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(
-			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-				if clientConfig.EndpointURL != "" {
-					return aws.Endpoint{
-						PartitionID:   "aws",
-						URL:           clientConfig.EndpointURL,
-						SigningRegion: clientConfig.Region,
-					}, nil
-				}
-				return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-			}),
-	}
-	client = dynamodb.NewFromConfig(awsConfig)
-
-	return client, func() {
-		if deployLocalStack {
-			_ = localstackContainer.Terminate(ctx)
-		}
-	}
-}
 
 // simulateRandomSigningRateActivity simulates random signing activity on the given tracker. Does not attempt to
 // advance time.
@@ -164,7 +92,7 @@ func TestSigningRateStorage(t *testing.T) {
 
 	rand := random.NewTestRandom()
 
-	dynamoClient, cleanup := setupDynamoClient(t)
+	dynamoClient, cleanup := test.GetOrDeployLocalstack()
 	defer cleanup()
 
 	tableName := "TestSigningRateStorage"
