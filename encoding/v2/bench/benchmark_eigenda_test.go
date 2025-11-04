@@ -239,18 +239,20 @@ func BenchmarkFrameGenerationIcicle(b *testing.B) {
 		b.Skip("code compiled without the icicle build tag")
 	}
 	encodingConfig := encoding.Config{
-		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
-		BackendType: encoding.IcicleBackend,
-		GPUEnable:   true,
+		NumWorker:                             uint64(runtime.GOMAXPROCS(0)),
+		BackendType:                           encoding.IcicleBackend,
+		GPUEnable:                             true,
+		GPUConcurrentFrameGenerationDangerous: 20,
 	}
 	benchmarkFrameGeneration(b, encodingConfig)
 }
 
 func BenchmarkFrameGenerationGnark(b *testing.B) {
 	encodingConfig := encoding.Config{
-		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
-		BackendType: encoding.GnarkBackend,
-		GPUEnable:   false,
+		NumWorker:                             uint64(runtime.GOMAXPROCS(0)),
+		BackendType:                           encoding.GnarkBackend,
+		GPUEnable:                             false,
+		GPUConcurrentFrameGenerationDangerous: 20,
 	}
 	benchmarkFrameGeneration(b, encodingConfig)
 }
