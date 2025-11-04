@@ -3,6 +3,7 @@ package lib
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -148,6 +149,13 @@ func RunDisperserServer(ctx *cli.Context) error {
 		})
 		blobStore := blobstorev2.NewBlobStore(bucketName, objectStorageClient, logger)
 
+		// Create listener for the gRPC server
+		addr := fmt.Sprintf("%s:%s", "0.0.0.0", config.ServerConfig.GrpcPort)
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("failed to create listener: %w", err)
+		}
+
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			blobStore,
@@ -164,6 +172,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			config.ReservedOnly,
 			config.UseControllerMediatedPayments,
 			config.ControllerAddress,
+			listener,
 		)
 		if err != nil {
 			return err
