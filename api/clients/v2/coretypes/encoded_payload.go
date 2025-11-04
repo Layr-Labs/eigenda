@@ -218,7 +218,7 @@ func checkAndRemoveInternalPadding(body []byte, payloadLen uint32) ([]byte, erro
 	if uint32(len(decodedPayloadWithPadding)) < payloadLen {
 		return nil, fmt.Errorf(
 			"length of unpadded data %d is less than length claimed in encoded payload header %d."+
-				"this should neverhappen", uint32(len(decodedPayloadWithPadding)), payloadLen)
+				"this should never happen", uint32(len(decodedPayloadWithPadding)), payloadLen)
 	}
 
 	// ensure all the padding in the unreturned data part are zero. Combining with the field element padding check
