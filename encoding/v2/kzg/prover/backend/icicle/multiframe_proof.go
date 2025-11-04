@@ -91,9 +91,18 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, num
 	var proofs []bn254.G1Affine
 	var icicleErr error
 
-	// GPU operations
-	p.GpuLock.Lock()
-	defer p.GpuLock.Unlock()
+	// We acquire a semaphore here to avoid too many concurrent GPU requests,
+	// each of which does 1 MSM + 2 NTTs. This is a very unideal and coarse grain solution, but unfortunately
+	// icicle doesn't have nice backpressure, and the GPU kernel just panics if RAM is exhausted.
+	// We could use a finer-grained semaphore that calculates the RAM usage per request,
+	// but we'd have to hardcode some approximation of the RAM usage per MSM/NTT, which feels
+	// very hardcoded and hardware dependent. For now opting to keep this simple.
+	// TODO(samlaf): rethink this approach.
+	err = p.GpuSemaphore.Acquire(ctx, 1)
+	if err != nil {
+		return nil, fmt.Errorf("acquiring GPU semaphore: %w", err)
+	}
+	defer p.GpuSemaphore.Release(1)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
