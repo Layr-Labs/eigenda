@@ -16,6 +16,8 @@ import (
 type ReservationLedger struct {
 	config ReservationLedgerConfig
 
+	timeSource func() time.Time
+
 	// synchronizes access to the underlying leaky bucket algorithm
 	lock sync.Mutex
 
@@ -26,15 +28,14 @@ type ReservationLedger struct {
 // Creates a new reservation ledger, which represents the reservation of a single user with a [LeakyBucket]
 func NewReservationLedger(
 	config ReservationLedgerConfig,
-	// now should be from a source that includes monotonic timestamp for best results
-	now time.Time,
+	timeSource func() time.Time,
 ) (*ReservationLedger, error) {
 	leakyBucket, err := ratelimit.NewLeakyBucket(
 		float64(config.reservation.symbolsPerSecond),
 		config.bucketCapacityDuration,
 		config.startFull,
 		config.overfillBehavior,
-		now,
+		timeSource(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new leaky bucket: %w", err)
@@ -42,6 +43,7 @@ func NewReservationLedger(
 
 	return &ReservationLedger{
 		config:      config,
+		timeSource:  timeSource,
 		leakyBucket: leakyBucket,
 	}, nil
 }
@@ -53,18 +55,13 @@ func NewReservationLedger(
 // Returns (false, 0, error) if an error occurs. Possible errors include:
 //   - [QuorumNotPermittedError]: one or more of the requested quorums are not permitted by the reservation
 //   - [TimeOutOfRangeError]: the dispersal time is outside the reservation's valid time range
-//   - [TimeMovedBackwardError]: current time is before a previously observed time (only possible if input time
-//     instances don't included monotonic timestamps)
+//   - [TimeMovedBackwardError]: current time is before a previously observed time
 //   - Generic errors for all other unexpected behavior
 //
 // The remainingCapacity is the amount of space left in the bucket after the operation (in symbols).
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
 // failed debit doesn't count against the meter.
 func (rl *ReservationLedger) Debit(
-	// now should be from a source that includes monotonic timestamp for best results.
-	// This a local time from the perspective of the entity that owns this ledger instance, to be used with the local
-	// leaky bucket: it should NOT be sourced from the PaymentHeader
-	now time.Time,
 	// the timestamp included, or planned to be included, in the PaymentHeader
 	dispersalTime time.Time,
 	// the number of symbols to debit
@@ -88,6 +85,10 @@ func (rl *ReservationLedger) Debit(
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
+	// Get current time within the locked section. Otherwise, it's possible for concurrent calls
+	// to have out-of-order timestamps
+	now := rl.timeSource()
+
 	success, err := rl.leakyBucket.Fill(now, float64(billableSymbols))
 	if err != nil {
 		return false, 0, fmt.Errorf("fill: %w", err)
@@ -106,11 +107,13 @@ func (rl *ReservationLedger) Debit(
 // being clamped to 0.
 //
 // Returns the remaining capacity in the bucket after the revert operation.
-func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) (float64, error) {
+func (rl *ReservationLedger) RevertDebit(symbolCount uint32) (float64, error) {
 	billableSymbols := payments.CalculateBillableSymbols(symbolCount, rl.config.minNumSymbols)
 
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
+
+	now := rl.timeSource()
 
 	err := rl.leakyBucket.RevertFill(now, float64(billableSymbols))
 	if err != nil {
@@ -123,12 +126,11 @@ func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) (flo
 }
 
 // Checks if the underlying leaky bucket is empty.
-//
-// This method cannot be used as an oracle to determine whether the bucket will be empty at some point in the future:
-// it causes the ledger to update it's internal state, so only an *honest* representation of "now" should be provided.
-func (rl *ReservationLedger) IsBucketEmpty(now time.Time) bool {
+func (rl *ReservationLedger) IsBucketEmpty() bool {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
+
+	now := rl.timeSource()
 
 	// Intentionally ignore the error here, can only happen if time moved backwards.
 	fillLevel, _ := rl.leakyBucket.GetFillLevel(now)
@@ -147,7 +149,7 @@ func (rl *ReservationLedger) IsBucketEmpty(now time.Time) bool {
 //   - newReservation is nil
 //   - the new reservation configuration is invalid
 //   - there's an error creating the new leaky bucket
-func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation, now time.Time) error {
+func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation) error {
 	if newReservation == nil {
 		return fmt.Errorf("newReservation cannot be nil")
 	}
@@ -171,6 +173,8 @@ func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation, now 
 		return fmt.Errorf("new reservation ledger config: %w", err)
 	}
 	rl.config = *newConfig
+
+	now := rl.timeSource()
 
 	err = rl.leakyBucket.Reconfigure(
 		float64(newConfig.reservation.symbolsPerSecond),

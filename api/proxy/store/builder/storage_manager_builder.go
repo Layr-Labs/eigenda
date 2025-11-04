@@ -624,7 +624,6 @@ func buildPayloadDisperser(
 		accountId,
 		contractDirectory,
 		accountantMetrics,
-		time.Now,
 		disperserClient,
 	)
 	if err != nil {
@@ -704,7 +703,6 @@ func buildReservationLedger(
 	ctx context.Context,
 	paymentVault payments.PaymentVault,
 	accountID geth_common.Address,
-	now time.Time,
 	minNumSymbols uint32,
 ) (*reservation.ReservationLedger, error) {
 	reservationData, err := paymentVault.GetReservation(ctx, accountID)
@@ -741,7 +739,7 @@ func buildReservationLedger(
 		return nil, fmt.Errorf("new reservation ledger config: %w", err)
 	}
 
-	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, now)
+	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, time.Now)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger: %w", err)
 	}
@@ -802,7 +800,6 @@ func buildClientLedger(
 	accountID geth_common.Address,
 	contractDirectory *directory.ContractDirectory,
 	accountantMetrics metrics_v2.AccountantMetricer,
-	getNow func() time.Time,
 	disperserClient *clients_v2.DisperserClient,
 ) (*clientledger.ClientLedger, error) {
 	if config.ClientLedgerMode == clientledger.ClientLedgerModeLegacy {
@@ -818,8 +815,6 @@ func buildClientLedger(
 		return nil, fmt.Errorf("new payment vault: %w", err)
 	}
 
-	now := getNow()
-
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get min num symbols: %w", err)
@@ -831,7 +826,7 @@ func buildClientLedger(
 	case clientledger.ClientLedgerModeLegacy:
 		panic("impossible case- this is checked at the start of the method")
 	case clientledger.ClientLedgerModeReservationOnly:
-		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, now, minNumSymbols)
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
 		if err != nil {
 			return nil, fmt.Errorf("build reservation ledger: %w", err)
 		}
@@ -842,7 +837,7 @@ func buildClientLedger(
 		}
 
 	case clientledger.ClientLedgerModeReservationAndOnDemand:
-		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, now, minNumSymbols)
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
 		if err != nil {
 			return nil, fmt.Errorf("build reservation ledger: %w", err)
 		}
@@ -863,7 +858,7 @@ func buildClientLedger(
 		config.ClientLedgerMode,
 		reservationLedger,
 		onDemandLedger,
-		getNow,
+		time.Now,
 		paymentVault,
 		config.VaultMonitorInterval,
 	)

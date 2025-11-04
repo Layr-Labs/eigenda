@@ -175,8 +175,7 @@ func (c *ReservationLedgerCache) GetOrCreate(
 		return nil, fmt.Errorf("new reservation ledger config: %w", err)
 	}
 
-	now := c.timeSource()
-	newLedger, err := reservation.NewReservationLedger(*reservationLedgerConfig, now)
+	newLedger, err := reservation.NewReservationLedger(*reservationLedgerConfig, c.timeSource)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger: %w", err)
 	}
@@ -208,8 +207,7 @@ func (c *ReservationLedgerCache) updateReservation(
 		return nil
 	}
 
-	now := c.timeSource()
-	return ledger.UpdateReservation(newReservation, now)
+	return ledger.UpdateReservation(newReservation)
 }
 
 // Called when an item is evicted from the LRU cache.
@@ -224,7 +222,7 @@ func (c *ReservationLedgerCache) handleEviction(
 
 	c.metrics.IncrementEvictions()
 
-	if reservationLedger.IsBucketEmpty(c.timeSource()) {
+	if reservationLedger.IsBucketEmpty() {
 		c.logger.Debugf("evicted account %s from LRU reservation ledger cache", accountID.Hex())
 		return
 	}
