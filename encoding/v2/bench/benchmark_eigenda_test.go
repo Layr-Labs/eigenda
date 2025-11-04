@@ -212,28 +212,52 @@ func benchmarkMultiproofGeneration(b *testing.B, encodingConfig encoding.Config)
 			rsExtendedBlobPowerBytes := blobPowerBytes + 3
 			rsExtendedBlobPowerFrs := rsExtendedBlobPowerBytes - 5 // 32 bytes per Fr element
 			rsExtendedBlobFrs := uint64(1) << rsExtendedBlobPowerFrs
+			blobFrs := uint64(1) << (blobPowerBytes - 5) // original blob size in field elements
 			params := encoding.EncodingParams{
 				NumChunks:   8192,                           // blob_version=0
 				ChunkLength: max(1, rsExtendedBlobFrs/8192), // chosen such that numChunks*ChunkLength=rsExtendedBlobFrs
 			}
 			provingParams := prover.ProvingParams{
-				BlobLength:  1 << (blobPowerBytes - 5),
+				BlobLength:  blobFrs,
 				ChunkLength: max(1, rsExtendedBlobFrs/8192), // chosen such that numChunks*ChunkLength=rsExtendedBlobFrs
 			}
 			parametrizedProver, err := p.GetKzgProver(params, provingParams)
 			require.NoError(b, err)
 
 			for b.Loop() {
-				_, err = parametrizedProver.GetProofs(b.Context(), maxSizeBlobCoeffs[:rsExtendedBlobFrs])
+				_, err = parametrizedProver.GetProofs(b.Context(), maxSizeBlobCoeffs[:blobFrs])
 				require.NoError(b, err)
 			}
 		})
 	}
 }
 
+// TODO(samlaf): maybe move this to benchmark_icicle_test.go file?
+// That file is currently metal only, we should generalize it.
+func BenchmarkFrameGenerationIcicle(b *testing.B) {
+	if !icicle.IsAvailable {
+		b.Skip("code compiled without the icicle build tag")
+	}
+	encodingConfig := encoding.Config{
+		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
+		BackendType: encoding.IcicleBackend,
+		GPUEnable:   true,
+	}
+	benchmarkFrameGeneration(b, encodingConfig)
+}
+
+func BenchmarkFrameGenerationGnark(b *testing.B) {
+	encodingConfig := encoding.Config{
+		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
+		BackendType: encoding.GnarkBackend,
+		GPUEnable:   false,
+	}
+	benchmarkFrameGeneration(b, encodingConfig)
+}
+
 // This does both chunk and proof generation, in separate goroutines.
 // In a sense it combines both benchmarks above.
-func BenchmarkFrameGeneration(b *testing.B) {
+func benchmarkFrameGeneration(b *testing.B, encodingConfig encoding.Config) {
 	proverConfig := prover.KzgConfig{
 		// The loaded G1 point is not used because we require the SRSTables to be preloaded for the benchmark.
 		// We don't have enough SRS points in resourcs/srs/g1.point to compute the largest SRSTables anyways.
@@ -246,12 +270,7 @@ func BenchmarkFrameGeneration(b *testing.B) {
 		CacheDir:       "../../../resources/srs/SRSTables",
 		NumWorker:      uint64(runtime.GOMAXPROCS(0)),
 	}
-	encodingConfig := encoding.Config{
-		NumWorker:                             uint64(runtime.GOMAXPROCS(0)),
-		BackendType:                           encoding.IcicleBackend,
-		GPUEnable:                             true,
-		GPUConcurrentFrameGenerationDangerous: 20,
-	}
+
 	b.Log("Reading precomputed SRSTables, this may take a while...")
 	// use a non-silent logger to see the "Multiproof Time Decomp" log lines.
 	p, err := prover.NewProver(common.TestLogger(b), &proverConfig, &encodingConfig)
@@ -266,6 +285,7 @@ func BenchmarkFrameGeneration(b *testing.B) {
 			rsExtendedBlobPowerBytes := blobPowerBytes + 3
 			rsExtendedBlobPowerFrs := rsExtendedBlobPowerBytes - 5 // 32 bytes per Fr element
 			rsExtendedBlobFrs := uint64(1) << rsExtendedBlobPowerFrs
+			blobFrs := uint64(1) << (blobPowerBytes - 5) // original blob size in field elements
 			params := encoding.EncodingParams{
 				NumChunks:   8192,                           // blob_version=0
 				ChunkLength: max(1, rsExtendedBlobFrs/8192), // chosen such that numChunks*ChunkLength=rsExtendedBlobFrs
@@ -278,7 +298,7 @@ func BenchmarkFrameGeneration(b *testing.B) {
 				for range n {
 					go func() {
 						defer wg.Done()
-						_, _, err = p.GetFrames(b.Context(), maxSizeBlobCoeffs[:rsExtendedBlobFrs], params)
+						_, _, err = p.GetFrames(b.Context(), maxSizeBlobCoeffs[:blobFrs], params)
 						require.NoError(b, err)
 					}()
 				}
