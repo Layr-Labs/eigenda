@@ -104,7 +104,7 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 	// but we'd have to hardcode some approximation of the RAM usage per MSM/NTT, which feels
 	// very hardcoded and hardware dependent. For now opting to keep this simple.
 	// TODO(samlaf): rethink this approach.
-	err := p.GpuSemaphore.Acquire(ctx, 1)
+	err = p.GpuSemaphore.Acquire(ctx, 1)
 	if err != nil {
 		return nil, fmt.Errorf("acquiring GPU semaphore: %w", err)
 	}
