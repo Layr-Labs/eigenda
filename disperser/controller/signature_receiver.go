@@ -72,6 +72,9 @@ type signatureReceiver struct {
 
 	// The number of errors encountered while processing SigningMessages.
 	errorCount int
+
+	// The size of the batch being signed, in bytes.
+	batchSizeBytes uint64
 }
 
 // ReceiveSignatures receives SigningMessages over the signingMessageChan, and yields QuorumAttestations produced
@@ -95,6 +98,7 @@ func ReceiveSignatures(
 	signingMessageChan chan core.SigningMessage,
 	tickInterval time.Duration,
 	significantSigningThresholdFraction float64,
+	batchSizeBytes uint64,
 ) (chan *core.QuorumAttestation, error) {
 	sortedQuorumIDs, err := getSortedQuorumIDs(indexedOperatorState)
 	if err != nil {
@@ -130,6 +134,7 @@ func ReceiveSignatures(
 		significantSigningThresholdFraction:    significantSigningThresholdFraction,
 		significantSigningThresholdReachedTime: significantSigningThresholdReachedTime,
 		ticker:                                 time.NewTicker(tickInterval),
+		batchSizeBytes:                         batchSizeBytes,
 	}
 
 	attestationChan := make(chan *core.QuorumAttestation, len(indexedOperatorState.IndexedOperators))
@@ -177,7 +182,23 @@ forLoop:
 				break forLoop
 			}
 
-			sr.handleNextSignature(signingMessage, attestationChan)
+			isValid := sr.handleNextSignature(signingMessage, attestationChan)
+
+			for quorumId, opInfo := range sr.indexedOperatorState.Operators {
+
+				totalStake := sr.indexedOperatorState.Totals[quorumId].Stake
+				validatorStake := opInfo[signingMessage.Operator].Stake
+				stakeFraction := getFraction(validatorStake, totalStake)
+
+				sr.metrics.ReportValidatorSigningResult(
+					signingMessage.Operator,
+					stakeFraction,
+					sr.batchSizeBytes,
+					quorumId,
+					isValid,
+				)
+			}
+
 		// The ticker case is intentionally ordered after the message receiving case. If there are SigningMessages
 		// waiting to be handled, we shouldn't delay their processing for the sake of yielding a QuorumAttestation.
 		// The most likely time for there to be a backlog of SigningMessages is early-on in the signature gathering
@@ -191,10 +212,11 @@ forLoop:
 	sr.buildAndSubmitAttestation(attestationChan)
 }
 
+// Handle the next signing message. Returns true if the signing message was processed successfully, false otherwise.
 func (sr *signatureReceiver) handleNextSignature(
 	signingMessage core.SigningMessage,
 	attestationChan chan *core.QuorumAttestation,
-) {
+) bool {
 
 	if signingMessage.TimeReceived.IsZero() {
 		sr.logger.Errorf("signing message from %s time received is zero in batch %s. "+
@@ -211,7 +233,7 @@ func (sr *signatureReceiver) handleNextSignature(
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
 			"operatorID", signingMessage.Operator.Hex(),
 			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
-		return
+		return false
 	}
 
 	if seen := sr.signatureMessageReceived[signingMessage.Operator]; seen {
@@ -219,7 +241,7 @@ func (sr *signatureReceiver) handleNextSignature(
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
 			"operatorID", signingMessage.Operator.Hex(),
 			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
-		return
+		return false
 	}
 
 	// this map records messages received, whether the messages are valid or not
@@ -233,7 +255,7 @@ func (sr *signatureReceiver) handleNextSignature(
 			"operatorID", signingMessage.Operator.Hex(),
 			"attestationLatencyMs", signingMessage.AttestationLatencyMs,
 			"error", err)
-		return
+		return false
 	}
 
 	sr.validSignerMap[signingMessage.Operator] = true
@@ -245,6 +267,8 @@ func (sr *signatureReceiver) handleNextSignature(
 		// Delay the next tick since we just submitted an attestation.
 		sr.ticker.Reset(sr.tickInterval)
 	}
+
+	return true
 }
 
 // getSortedQuorumIDs returns a sorted slice of QuorumIDs from the state
@@ -478,16 +502,15 @@ func getSignedPercentage(signedStake *big.Int, totalStake *big.Int) uint8 {
 	return quorumThreshold
 }
 
-// getSignedFraction accepts the signedStake and the totalStake. It returns a float64 representing the fraction
-// of the total stake that has signed, as a fraction between 0.0 and 1.0.
-func getSignedFraction(signedStake *big.Int, totalStake *big.Int) float64 {
-	if totalStake.Cmp(big.NewInt(0)) == 0 {
+// getFraction returns a fraction (as a float64) representing part / whole.
+func getFraction(part *big.Int, whole *big.Int) float64 {
+	if whole.Cmp(big.NewInt(0)) == 0 {
 		// avoid dividing by 0
 		return 0.0
 	}
 
-	signedStakeFloat := new(big.Float).SetInt(signedStake)
-	totalStakeFloat := new(big.Float).SetInt(totalStake)
+	signedStakeFloat := new(big.Float).SetInt(part)
+	totalStakeFloat := new(big.Float).SetInt(whole)
 
 	fraction, _ := new(big.Float).Quo(signedStakeFloat, totalStakeFloat).Float64()
 
@@ -510,7 +533,7 @@ func (sr *signatureReceiver) checkSigningPercentage(quorumID core.QuorumID) bool
 		return false
 	}
 
-	signedFraction := getSignedFraction(sr.stakeSigned[quorumID], sr.indexedOperatorState.Totals[quorumID].Stake)
+	signedFraction := getFraction(sr.stakeSigned[quorumID], sr.indexedOperatorState.Totals[quorumID].Stake)
 	// check if the significantSigningThresholdFraction has been crossed, and record the time if it has
 	if signedFraction >= sr.significantSigningThresholdFraction {
 		// Record the time when the threshold was first crossed

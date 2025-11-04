@@ -490,7 +490,8 @@ func (d *Dispatcher) HandleSignatures(
 		batchData.BatchHeaderHash,
 		sigChan,
 		d.DispatcherConfig.SignatureTickInterval,
-		d.DispatcherConfig.SignificantSigningThresholdFraction)
+		d.DispatcherConfig.SignificantSigningThresholdFraction,
+		batchData.BatchSizeBytes)
 	if err != nil {
 		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
 
@@ -528,7 +529,7 @@ func (d *Dispatcher) HandleSignatures(
 	// Update global signing metrics.
 	for quorumID := range batchData.OperatorState.Operators {
 		signingFraction := float64(finalAttestation.QuorumResults[quorumID].PercentSigned) / 100.0
-		d.metrics.reportSigningThreshold(
+		d.metrics.ReportGlobalSigningThreshold(
 			quorumID,
 			batchData.BatchSizeBytes,
 			signingFraction)

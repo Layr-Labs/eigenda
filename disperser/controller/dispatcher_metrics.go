@@ -36,9 +36,6 @@ type dispatcherMetrics struct {
 	validatorSignedByteCount    *prometheus.CounterVec
 	validatorUnsignedBatchCount *prometheus.CounterVec
 	validatorUnsignedByteCount  *prometheus.CounterVec
-	validatorTimeoutBatchCount  *prometheus.CounterVec
-	validatorTimeoutByteCount   *prometheus.CounterVec
-	validatorSigningLatency     *prometheus.SummaryVec
 
 	globalSignedBatchCount   *prometheus.CounterVec
 	globalUnsignedBatchCount *prometheus.CounterVec
@@ -210,7 +207,8 @@ func newDispatcherMetrics(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
 			Name:      "validator_signed_byte_count",
-			Help:      "Total number of bytes successfully signed by validators",
+			Help: "Total number of bytes successfully signed by validators, " +
+				"equal to size of signed batch times stake fraction",
 		},
 		signingRateLabels,
 	)
@@ -219,7 +217,8 @@ func newDispatcherMetrics(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
 			Name:      "validator_unsigned_batch_count",
-			Help:      "Total number of batches that validators failed to sign",
+			Help: "Total number of batches that validators failed to sign, " +
+				"equal to size of unsigned batch times stake fraction",
 		},
 		signingRateLabels,
 	)
@@ -229,34 +228,6 @@ func newDispatcherMetrics(
 			Namespace: controllerNamespace,
 			Name:      "validator_unsigned_byte_count",
 			Help:      "Total number of bytes that validators failed to sign",
-		},
-		signingRateLabels,
-	)
-
-	validatorTimeoutBatchCount := promauto.With(registry).NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: controllerNamespace,
-			Name:      "validator_timeout_batch_count",
-			Help:      "Total number of batches that validators failed to sign due to timeout",
-		},
-		signingRateLabels,
-	)
-
-	validatorTimeoutByteCount := promauto.With(registry).NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: controllerNamespace,
-			Name:      "validator_timeout_byte_count",
-			Help:      "Total number of bytes that validators failed to sign due to timeout",
-		},
-		signingRateLabels,
-	)
-
-	validatorSigningLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  controllerNamespace,
-			Name:       "validator_signing_latency_seconds",
-			Help:       "Latency for validators to sign batches",
-			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 		signingRateLabels,
 	)
@@ -327,9 +298,6 @@ func newDispatcherMetrics(
 		validatorSignedByteCount:        validatorSignedByteCount,
 		validatorUnsignedBatchCount:     validatorUnsignedBatchCount,
 		validatorUnsignedByteCount:      validatorUnsignedByteCount,
-		validatorTimeoutBatchCount:      validatorTimeoutBatchCount,
-		validatorTimeoutByteCount:       validatorTimeoutByteCount,
-		validatorSigningLatency:         validatorSigningLatency,
 		collectDetailedValidatorMetrics: collectDetailedValidatorMetrics,
 		globalSignedBatchCount:          globalSignedBatchCount,
 		globalUnsignedBatchCount:        globalUnsignedBatchCount,
@@ -436,7 +404,7 @@ func (m *dispatcherMetrics) reportBlobSetSize(size int) {
 	m.blobSetSize.WithLabelValues().Set(float64(size))
 }
 
-func (m *dispatcherMetrics) reportSigningThreshold(
+func (m *dispatcherMetrics) ReportGlobalSigningThreshold(
 	quorumID core.QuorumID,
 	batchSizeBytes uint64,
 	signingFraction float64,
@@ -477,48 +445,27 @@ func (m *dispatcherMetrics) newSendToValidatorProbe() *common.SequenceProbe {
 	return m.sendToValidatorStageTimer.NewSequence()
 }
 
-// Report a successful signing event for a validator.
-func (m *dispatcherMetrics) ReportValidatorSigningSuccess(
+// Report the result of an attempted signing event for a validator.
+func (m *dispatcherMetrics) ReportValidatorSigningResult(
 	id core.OperatorID,
+	stakeFraction float64,
 	batchSize uint64,
-	signingLatency time.Duration,
-	quorums []core.QuorumID,
+	quorum core.QuorumID,
+	success bool,
 ) {
-
 	if m == nil || !m.collectDetailedValidatorMetrics {
 		return
 	}
 
-	for _, quorum := range quorums {
-		label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
+	label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
 
+	if success {
 		m.validatorSignedBatchCount.With(label).Add(1)
-		m.validatorSignedByteCount.With(label).Add(float64(batchSize))
-		m.validatorSigningLatency.With(label).Observe(signingLatency.Seconds())
-	}
-
-}
-
-// Report a failed signing event for a validator.
-func (m *dispatcherMetrics) ReportValidatorSigningFailure(
-	id core.OperatorID,
-	batchSize uint64,
-	timeout bool,
-	quorums []core.QuorumID,
-) {
-
-	if m == nil || !m.collectDetailedValidatorMetrics {
-		return
-	}
-
-	for _, quorum := range quorums {
-		label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
-
+		m.validatorSignedByteCount.With(label).Add(float64(batchSize) * stakeFraction)
+	} else {
 		m.validatorUnsignedBatchCount.With(label).Add(1)
-		m.validatorUnsignedByteCount.With(label).Add(float64(batchSize))
-		if timeout {
-			m.validatorTimeoutBatchCount.With(label).Add(1)
-			m.validatorTimeoutByteCount.With(label).Add(float64(batchSize))
-		}
+		m.validatorUnsignedByteCount.With(label).Add(float64(batchSize) * stakeFraction)
 	}
+
+	// TODO(cody.littley): consider measuring per-validator latency
 }
