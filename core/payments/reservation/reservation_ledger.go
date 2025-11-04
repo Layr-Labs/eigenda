@@ -56,7 +56,8 @@ func NewReservationLedger(
 // Returns (false, 0, error) if an error occurs. Possible errors include:
 //   - [QuorumNotPermittedError]: one or more of the requested quorums are not permitted by the reservation
 //   - [TimeOutOfRangeError]: the dispersal time is outside the reservation's valid time range
-//   - [TimeMovedBackwardError]: current time is before a previously observed time
+//   - [TimeMovedBackwardError]: current time is before a previously observed time (only possible if input time source
+//     doesn't provide monotonic timestamps)
 //   - Generic errors for all other unexpected behavior
 //
 // The remainingCapacity is the amount of space left in the bucket after the operation (in symbols).
