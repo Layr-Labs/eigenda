@@ -62,9 +62,10 @@ const (
 
 type PreimageType uint8
 
-// The ALT DA server only cares about type 3 Custom DA preimage types
+// The ALT DA server only cares about type 1 and 2 preimages
 const (
-	CustomDAPreimageType PreimageType = 3
+	Keccak256PreimageType PreimageType = 0
+	CustomDAPreimageType  PreimageType = 3
 )
 
 // TODO: Reduce this mapping logic to be less generalized to
