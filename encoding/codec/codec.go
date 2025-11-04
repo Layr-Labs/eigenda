@@ -56,9 +56,9 @@ func ConvertByPaddingEmptyByte(data []byte) []byte {
 // For the reminder of the input, the first byte is taken out, and the rest is appended to
 // the output.
 //
-// TODO (litt3): usage of this function should be migrated to use CheckAndRemoveInternalPadding instead. I've left
+// TODO (litt3): usage of this function should be migrated to use CheckAndRemoveInternalFieldElementPadding instead.
 //
-// it unchanged for now, since v1 logic and tests rely on the specific assumptions of this implementation.
+// I've left it unchanged for now, since v1 logic and tests rely on the specific assumptions of this implementation.
 func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
 	dataSize := len(data)
 	parseSize := encoding.BYTES_PER_SYMBOL
@@ -209,8 +209,8 @@ func GetPaddedDataLength(inputLen uint32) uint32 {
 
 // GetUnpaddedDataLength accepts the length of an array that has been padded with [PadPayload]
 //
-// It returns what the length of the output array would be if you called [CheckAndRemoveInternalPadding] on it,
-// or an error if inputLen is not a multiple of [encoding.BYTES_PER_SYMBOL].
+// It returns what the length of the output array would be if you called [CheckAndRemoveInternalFieldElementPadding]
+// on it, or an error if inputLen is not a multiple of [encoding.BYTES_PER_SYMBOL].
 func GetUnpaddedDataLength(inputLen uint32) (uint32, error) {
 	if inputLen%encoding.BYTES_PER_SYMBOL != 0 {
 		return 0, fmt.Errorf(
