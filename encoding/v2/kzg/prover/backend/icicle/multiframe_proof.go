@@ -21,6 +21,7 @@ import (
 	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ecntt"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/msm"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ntt"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
@@ -39,7 +40,6 @@ type KzgMultiProofBackend struct {
 	// and keep a deviceSlice pointer to it. This would require a destructor to free the device memory.
 	// Also need to account how much memory this would use over all parametrized provers.
 	FlatFFTPointsT []iciclebn254.Affine
-	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	Device         runtime.Device
 	NumWorker      uint64
 	// request-weighted semaphore.
@@ -67,7 +67,6 @@ func NewMultiProofBackend(logger logging.Logger,
 		Logger:         logger,
 		Fs:             fs,
 		FlatFFTPointsT: icicleDevice.FlatFFTPointsT,
-		NttCfg:         icicleDevice.NttCfg,
 		Device:         icicleDevice.Device,
 		GpuSemaphore:   semaphore.NewWeighted(gpuConcurrentProofs),
 		NumWorker:      numWorker,
@@ -119,21 +118,36 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 			}
 		}()
 
+		// Create a new stream for this operation to allow concurrent GPU operations
+		// without interference. Each stream can execute independently.
+		stream, streamErr := runtime.CreateStream()
+		if streamErr != runtime.Success {
+			icicleErr = fmt.Errorf("failed to create stream: %v", streamErr.AsString())
+			return
+		}
+		defer func() {
+			// Synchronize stream to ensure all GPU operations complete before cleanup
+			syncErr := runtime.SynchronizeStream(stream)
+			if syncErr != runtime.Success {
+				p.Logger.Warn("stream synchronization failed during cleanup", "error", syncErr.AsString())
+			}
+			runtime.DestroyStream(stream)
+		}()
+
 		var projectivePoint iciclebn254.Projective
 		var sumVec core.DeviceSlice
 
-		_, mallocErr := sumVec.Malloc(projectivePoint.Size(), int(toeplitzMatrixLen)*2)
+		_, mallocErr := sumVec.MallocAsync(projectivePoint.Size(), int(toeplitzMatrixLen)*2, stream)
 		if mallocErr != runtime.Success {
 			icicleErr = fmt.Errorf("allocating bytes on device failed: %v", mallocErr.AsString())
 			return
 		}
-		defer sumVec.Free()
+		defer sumVec.FreeAsync(stream)
 
-		// The msm is computed synchronously (default config value is async=false).
-		// We could possibly share the same stream as the ecntt use (c.NttCfg.StreamHandle).
-		// TODO(samlaf): rethink how we use streams and async computations in general.
 		msmCfg := msm.GetDefaultMSMConfig()
 		msmCfg.AreScalarsMontgomeryForm = true
+		msmCfg.IsAsync = true
+		msmCfg.StreamHandle = stream
 		frsHostOrDeviceSlice := core.HostSliceFromElements(flattenCoeffStoreFr)
 		// TODO(samlaf): we could send the srs table points to the device once in the constructor
 		// and keep a deviceSlice pointer to it.
@@ -146,10 +160,8 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 
 		msmDone = time.Now()
 
-		// Compute the first ecntt, and set new batch size for ntt
-		p.NttCfg.BatchSize = int32(1)
 		// run two ecntt in one function, the first and second ecntt operates on the same device slice
-		proofs, firstECNttDone, err = p.twoEcnttOnDevice(sumVec, int(numChunks), int(toeplitzMatrixLen))
+		proofs, firstECNttDone, err = p.twoEcnttOnDevice(sumVec, int(numChunks), int(toeplitzMatrixLen), stream)
 		if err != nil {
 			icicleErr = err
 			return
@@ -279,7 +291,12 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	batchPoints core.DeviceSlice,
 	numChunks int,
 	toeplitzMatrixLen int,
+	stream runtime.Stream,
 ) ([]bn254.G1Affine, time.Time, error) {
+	// Create NTT config for ECNTT operations
+	nttCfg := ntt.GetDefaultNttConfig()
+	nttCfg.IsAsync = true
+	nttCfg.StreamHandle = stream
 	var p iciclebn254.Projective
 	// we only allocate one large gpu memory for all operation, so it has to be large enough to cover all cases
 	// including the first and the second ECNTT
@@ -295,16 +312,16 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	if numChunks < firstECNTTLen {
 		numPointsOnDevice = firstECNTTLen
 	}
-	_, err := bufferProjectivePointsOnDevice.Malloc(p.Size(), numPointsOnDevice)
+
+	_, err := bufferProjectivePointsOnDevice.MallocAsync(p.Size(), numPointsOnDevice, nttCfg.StreamHandle)
 	if err != runtime.Success {
 		return nil, time.Time{}, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
 	}
-	// free intermediate GPU memory
-	defer bufferProjectivePointsOnDevice.Free()
+	defer bufferProjectivePointsOnDevice.FreeAsync(nttCfg.StreamHandle)
 
-	// specify device memory sluce for first ecntt
+	// specify device memory slice for first ecntt
 	firstECNTTDeviceSlice := bufferProjectivePointsOnDevice.RangeTo(firstECNTTLen, false)
-	err = ecntt.ECNtt(batchPoints, core.KInverse, &c.NttCfg, firstECNTTDeviceSlice)
+	err = ecntt.ECNtt(batchPoints, core.KInverse, &nttCfg, firstECNTTDeviceSlice)
 	if err != runtime.Success {
 		return nil, time.Time{}, fmt.Errorf("inverse ecntt failed: %v", err.AsString())
 	}
@@ -328,15 +345,21 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 		}
 		infinityPointsHost := core.HostSliceFromElements(infinityProjectivePoints)
 		// copy to device, but don't allocate memory
-		infinityPointsHost.CopyToDevice(&infinityPointsOnDevice, false)
+		infinityPointsHost.CopyToDeviceAsync(&infinityPointsOnDevice, nttCfg.StreamHandle, false)
 	}
 
 	secondECNTTDeviceSlice := bufferProjectivePointsOnDevice.RangeTo(numChunks, false)
 
 	// take the second ecntt
-	err = ecntt.ECNtt(secondECNTTDeviceSlice, core.KForward, &c.NttCfg, proofsBatchHost)
+	err = ecntt.ECNtt(secondECNTTDeviceSlice, core.KForward, &nttCfg, proofsBatchHost)
 	if err != runtime.Success {
 		return nil, time.Time{}, fmt.Errorf("forward ecntt failed: %v", err.AsString())
+	}
+
+	// Synchronize stream to ensure async ECNTT completes before converting results
+	syncErr := runtime.SynchronizeStream(stream)
+	if syncErr != runtime.Success {
+		return nil, time.Time{}, fmt.Errorf("stream synchronization failed: %v", syncErr.AsString())
 	}
 
 	proofs := icicle.HostSliceIcicleProjectiveToGnarkAffine(proofsBatchHost, int(c.NumWorker))
