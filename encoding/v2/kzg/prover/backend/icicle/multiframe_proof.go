@@ -128,8 +128,8 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 		defer func() {
 			// Synchronize stream to ensure all GPU operations complete before cleanup
 			syncErr := runtime.SynchronizeStream(stream)
-			if syncErr != runtime.Success && icicleErr == nil {
-				icicleErr = fmt.Errorf("stream synchronization failed: %v", syncErr.AsString())
+			if syncErr != runtime.Success {
+				p.Logger.Warn("stream synchronization failed during cleanup", "error", syncErr.AsString())
 			}
 			runtime.DestroyStream(stream)
 		}()
@@ -160,14 +160,8 @@ func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, pol
 
 		msmDone = time.Now()
 
-		// Create NTT config for ECNTT operations
-		nttCfg := ntt.GetDefaultNttConfig()
-		nttCfg.IsAsync = true
-		nttCfg.Ordering = core.KNN
-		nttCfg.StreamHandle = stream
-		nttCfg.BatchSize = int32(1)
 		// run two ecntt in one function, the first and second ecntt operates on the same device slice
-		proofs, firstECNttDone, err = p.twoEcnttOnDevice(sumVec, int(numChunks), int(toeplitzMatrixLen), nttCfg)
+		proofs, firstECNttDone, err = p.twoEcnttOnDevice(sumVec, int(numChunks), int(toeplitzMatrixLen), stream)
 		if err != nil {
 			icicleErr = err
 			return
@@ -297,8 +291,12 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 	batchPoints core.DeviceSlice,
 	numChunks int,
 	toeplitzMatrixLen int,
-	nttCfg core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32],
+	stream runtime.Stream,
 ) ([]bn254.G1Affine, time.Time, error) {
+	// Create NTT config for ECNTT operations
+	nttCfg := ntt.GetDefaultNttConfig()
+	nttCfg.IsAsync = true
+	nttCfg.StreamHandle = stream
 	var p iciclebn254.Projective
 	// we only allocate one large gpu memory for all operation, so it has to be large enough to cover all cases
 	// including the first and the second ECNTT

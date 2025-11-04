@@ -92,9 +92,7 @@ func (g *RSBackend) ExtendPolyEvalV2(ctx context.Context, coeffs []fr.Element) (
 		// Create NTT config for this operation
 		cfg := ntt.GetDefaultNttConfig()
 		cfg.IsAsync = true
-		cfg.Ordering = core.KNN
 		cfg.StreamHandle = stream
-		cfg.BatchSize = int32(1)
 		nttErr := ntt.Ntt(coeffsSlice, core.KForward, &cfg, outputEvals)
 		if nttErr != icicle_runtime.Success {
 			icicleErr = fmt.Errorf("NTT operation failed: %v", nttErr.AsString())
