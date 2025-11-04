@@ -356,6 +356,12 @@ func (c *KzgMultiProofBackend) twoEcnttOnDevice(
 		return nil, time.Time{}, fmt.Errorf("forward ecntt failed: %v", err.AsString())
 	}
 
+	// Synchronize stream to ensure async ECNTT completes before converting results
+	syncErr := runtime.SynchronizeStream(stream)
+	if syncErr != runtime.Success {
+		return nil, time.Time{}, fmt.Errorf("stream synchronization failed: %v", syncErr.AsString())
+	}
+
 	proofs := icicle.HostSliceIcicleProjectiveToGnarkAffine(proofsBatchHost, int(c.NumWorker))
 
 	return proofs, firstECNTTDone, nil
