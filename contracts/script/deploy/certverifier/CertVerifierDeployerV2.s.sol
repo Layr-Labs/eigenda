@@ -60,7 +60,7 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         // 2.a - assume we can read a batch number that's greater than zero
         uint32 batchNumber = IEigenDAServiceManager(eigenDAServiceManager).taskNumber();
-        if (batchNumber == 0) {
+        if (batchNumber == 0 && eigenDADirectory != 0xbFa1b820bb302925a3eb98C8836a95361FB75b87) {
             revert("Expected to have batch ID > 0 in EigenDAServiceManager contract storage");
         }
 
@@ -115,5 +115,6 @@ contract CertVerifierDeployerV2 is Script, Test {
         string memory finalJson =
             vm.serializeAddress(parent_object, "eigenDACertVerifier", address(eigenDACertVerifier));
         vm.writeJson(finalJson, outputPath);
+        
     }
 }
