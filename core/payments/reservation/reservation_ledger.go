@@ -28,6 +28,7 @@ type ReservationLedger struct {
 // Creates a new reservation ledger, which represents the reservation of a single user with a [LeakyBucket]
 func NewReservationLedger(
 	config ReservationLedgerConfig,
+	// timeSource should be capable of providing monotonic timestamps for best results
 	timeSource func() time.Time,
 ) (*ReservationLedger, error) {
 	leakyBucket, err := ratelimit.NewLeakyBucket(
