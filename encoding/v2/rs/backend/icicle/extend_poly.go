@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ntt"
 	icicle_runtime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 	"golang.org/x/sync/semaphore"
@@ -23,7 +22,6 @@ const (
 )
 
 type RSBackend struct {
-	NttCfg core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	Device icicle_runtime.Device
 	// request-weighted semaphore.
 	// See [encoding.Config.GPUConcurrentFrameGenerationDangerous] for more details.
@@ -41,7 +39,6 @@ func BuildRSBackend(logger logging.Logger, enableGPU bool, gpuConcurrentEncoding
 		return nil, fmt.Errorf("setup icicle device: %w", err)
 	}
 	return &RSBackend{
-		NttCfg:       icicleDevice.NttCfg,
 		Device:       icicleDevice.Device,
 		GpuSemaphore: semaphore.NewWeighted(gpuConcurrentEncodings),
 	}, nil
@@ -76,11 +73,33 @@ func (g *RSBackend) ExtendPolyEvalV2(ctx context.Context, coeffs []fr.Element) (
 			}
 		}()
 
-		cfg := g.NttCfg
-		// We just perform the NTT synchronously here; we have nothing to do while waiting.
-		cfg.IsAsync = false
+		// Create a new stream for this operation to allow concurrent GPU operations
+		// without interference. Each stream can execute independently.
+		stream, err := icicle_runtime.CreateStream()
+		if err != icicle_runtime.Success {
+			icicleErr = fmt.Errorf("failed to create stream: %v", err.AsString())
+			return
+		}
+		defer func() {
+			// Synchronize stream to ensure all GPU operations complete before cleanup
+			syncErr := icicle_runtime.SynchronizeStream(stream)
+			if syncErr != icicle_runtime.Success && icicleErr == nil {
+				icicleErr = fmt.Errorf("stream synchronization failed: %v", syncErr.AsString())
+			}
+			icicle_runtime.DestroyStream(stream)
+		}()
+
+		// Create NTT config for this operation
+		cfg := ntt.GetDefaultNttConfig()
+		cfg.IsAsync = true
+		cfg.Ordering = core.KNN
+		cfg.StreamHandle = stream
 		cfg.BatchSize = int32(1)
-		ntt.Ntt(coeffsSlice, core.KForward, &cfg, outputEvals)
+		nttErr := ntt.Ntt(coeffsSlice, core.KForward, &cfg, outputEvals)
+		if nttErr != icicle_runtime.Success {
+			icicleErr = fmt.Errorf("NTT operation failed: %v", nttErr.AsString())
+			return
+		}
 	})
 	wg.Wait()
 
