@@ -77,7 +77,7 @@ type DispatcherConfig struct {
 	SignificantSigningThresholdFraction float64
 
 	// Whether or not to collect detailed validator signing metrics.
-	CollectDetailedValidatorSigningMetrics bool // TODO flag
+	CollectDetailedValidatorSigningMetrics bool
 
 	// NumConcurrentRequests is the size of the worker pool for processing dispersal requests concurrently.
 	// Must be at least 1.

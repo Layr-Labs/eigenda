@@ -177,6 +177,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NODE_CLIENT_CACHE_NUM_ENTRIES"),
 		Value:    400,
 	}
+	DetailedValidatorMetricsFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "detailed-validator-metrics"),
+		Usage:    "Whether to collect detailed validator metrics",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DETAILED_VALIDATOR_METRICS"),
+	}
 	MaxBatchSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-batch-size"),
 		Usage:    "Max number of blobs to disperse in a batch",
@@ -364,6 +370,7 @@ var optionalFlags = []cli.Flag{
 	OnDemandPaymentsLedgerCacheSizeFlag,
 	ReservationPaymentsLedgerCacheSizeFlag,
 	PaymentVaultUpdateIntervalFlag,
+	DetailedValidatorMetricsFlag,
 }
 
 var Flags []cli.Flag
