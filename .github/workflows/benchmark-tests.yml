@@ -1,0 +1,76 @@
+name: benchmark-tests
+
+# TODO: Implement benchstat comparison workflow to catch performance regressions
+# This would involve:
+# 1. Running benchmarks on base branch
+# 2. Running benchmarks on PR branch
+# 3. Using benchstat to compare results
+# 4. Failing CI if performance degrades beyond threshold (e.g., >10%)
+
+# TODO: Add icicle benchmarks to this workflow (requires GPU runners).
+
+on:
+  pull_request:
+    paths:
+      - 'encoding/v2/**'
+      - 'common/**'
+      - 'api/clients/codecs/**'
+      - 'api/clients/v2/coretypes/**'
+
+env:
+  MISE_VERSION: 2024.12.14
+
+jobs:
+  benchmark-primitives:
+    name: Benchmark encoding primitives
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout EigenDA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+
+      - name: Run primitives benchmarks
+        run: |
+          cd encoding/v2/bench
+          go test -benchmem -bench=. -run=^$ benchmark_primitives_test.go
+
+  benchmark-eigenda:
+    name: Benchmark EigenDA encoding operations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout EigenDA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+
+      - name: Download SRS tables
+        run: |
+          cd encoding/v2/bench
+          make download_srs_tables
+
+      - name: Run eigenda benchmarks
+        run: |
+          cd encoding/v2/bench
+          # Note: ICICLE benchmarks will be skipped since ubuntu runners don't have GPUs
+          go test -benchmem -bench=. -run=^$ benchmark_eigenda_test.go
+
+  benchmark-tests:
+    name: Benchmark Tests
+    runs-on: ubuntu-latest
+    needs: [benchmark-primitives, benchmark-eigenda]
+    if: always()
+    steps:
+      - name: Check benchmark results
+        run: |
+          if [[ "${{ needs.benchmark-primitives.result }}" != "success" || "${{ needs.benchmark-eigenda.result }}" != "success" ]]; then
+            echo "One or more benchmark jobs failed"
+            exit 1
+          fi
+          echo "All benchmark jobs passed successfully"
