@@ -52,10 +52,10 @@ type signatureReceiver struct {
 
 	// significantSigningThresholdPercentage is a configurable "important" signing threshold. Right now, it's being
 	// used to track signing metrics, to understand system performance. If the value is 0, then special handling for
-	// the threshold is disabled.
+	// the threshold is disabled. A number between 0.0 and 1.0.
 	// TODO (litt3): this might eventually be used to cause special case handling at an "important" threshold, e.g.
 	//  "update the attestation as soon as the threshold is reached."
-	significantSigningThresholdPercentage uint8
+	significantSigningThresholdFraction float64
 
 	// significantSigningThresholdReachedTime tracks when each quorum's signing percentage first reached or exceeded the
 	// significantSigningThresholdPercentage
@@ -94,7 +94,7 @@ func ReceiveSignatures(
 	batchHeaderHash [32]byte,
 	signingMessageChan chan core.SigningMessage,
 	tickInterval time.Duration,
-	significantSigningThresholdPercentage uint8,
+	significantSigningThresholdFraction float64,
 ) (chan *core.QuorumAttestation, error) {
 	sortedQuorumIDs, err := getSortedQuorumIDs(indexedOperatorState)
 	if err != nil {
@@ -127,7 +127,7 @@ func ReceiveSignatures(
 		signingMessageChan:                     signingMessageChan,
 		quorumIDs:                              sortedQuorumIDs,
 		tickInterval:                           tickInterval,
-		significantSigningThresholdPercentage:  significantSigningThresholdPercentage,
+		significantSigningThresholdFraction:    significantSigningThresholdFraction,
 		significantSigningThresholdReachedTime: significantSigningThresholdReachedTime,
 		ticker:                                 time.NewTicker(tickInterval),
 	}
@@ -478,12 +478,28 @@ func getSignedPercentage(signedStake *big.Int, totalStake *big.Int) uint8 {
 	return quorumThreshold
 }
 
+// getSignedFraction accepts the signedStake and the totalStake. It returns a float64 representing the fraction
+// of the total stake that has signed, as a fraction between 0.0 and 1.0.
+func getSignedFraction(signedStake *big.Int, totalStake *big.Int) float64 {
+	if totalStake.Cmp(big.NewInt(0)) == 0 {
+		// avoid dividing by 0
+		return 0.0
+	}
+
+	signedStakeFloat := new(big.Float).SetInt(signedStake)
+	totalStakeFloat := new(big.Float).SetInt(totalStake)
+
+	fraction, _ := new(big.Float).Quo(signedStakeFloat, totalStakeFloat).Float64()
+
+	return fraction
+}
+
 // checkSigningPercentage checks if the signing percentage for a quorum meets or exceeds the configured
 // significantSigningThresholdPercentage, and records the time when the threshold was first crossed
 // Returns true if the threshold was crossed, false otherwise. If called after the threshold was crossed, this
 // method always returns false.
 func (sr *signatureReceiver) checkSigningPercentage(quorumID core.QuorumID) bool {
-	if sr.significantSigningThresholdPercentage == 0 {
+	if sr.significantSigningThresholdFraction == 0.0 {
 		// if significantSigningThresholdPercentage is 0, skip
 		return false
 	}
@@ -494,9 +510,9 @@ func (sr *signatureReceiver) checkSigningPercentage(quorumID core.QuorumID) bool
 		return false
 	}
 
-	signedPercentage := getSignedPercentage(sr.stakeSigned[quorumID], sr.indexedOperatorState.Totals[quorumID].Stake)
-	// check if the significantSigningThresholdPercentage has been crossed, and record the time if it has
-	if signedPercentage >= sr.significantSigningThresholdPercentage {
+	signedFraction := getSignedFraction(sr.stakeSigned[quorumID], sr.indexedOperatorState.Totals[quorumID].Stake)
+	// check if the significantSigningThresholdFraction has been crossed, and record the time if it has
+	if signedFraction >= sr.significantSigningThresholdFraction {
 		// Record the time when the threshold was first crossed
 		sr.significantSigningThresholdReachedTime[quorumID] = time.Now()
 		return true

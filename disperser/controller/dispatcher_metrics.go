@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -16,7 +15,6 @@ const controllerNamespace = "eigenda_dispatcher"
 
 // dispatcherMetrics is a struct that holds the metrics for the dispatcher.
 type dispatcherMetrics struct {
-	sendChunksRetryCount         *prometheus.GaugeVec
 	processSigningMessageLatency *prometheus.SummaryVec
 	signingMessageChannelLatency *prometheus.SummaryVec
 	attestationUpdateLatency     *prometheus.SummaryVec
@@ -28,19 +26,28 @@ type dispatcherMetrics struct {
 	updateBatchStatusLatency     *prometheus.SummaryVec
 	blobE2EDispersalLatency      *prometheus.SummaryVec
 	completedBlobs               *prometheus.CounterVec
-	attestation                  *prometheus.GaugeVec
 	blobSetSize                  *prometheus.GaugeVec
 	batchStageTimer              *common.StageTimer
 	sendToValidatorStageTimer    *common.StageTimer
-	importantSigningThresholds   []float64
-	signatureThresholds          *prometheus.CounterVec
-	signedBatchCount             *prometheus.CounterVec
-	signedByteCount              *prometheus.CounterVec
-	unsignedBatchCount           *prometheus.CounterVec
-	unsignedByteCount            *prometheus.CounterVec
-	timeoutBatchCount            *prometheus.CounterVec
-	timeoutByteCount             *prometheus.CounterVec
-	signingLatency               *prometheus.SummaryVec
+
+	minimumSigningThreshold float64
+
+	validatorSignedBatchCount   *prometheus.CounterVec
+	validatorSignedByteCount    *prometheus.CounterVec
+	validatorUnsignedBatchCount *prometheus.CounterVec
+	validatorUnsignedByteCount  *prometheus.CounterVec
+	validatorTimeoutBatchCount  *prometheus.CounterVec
+	validatorTimeoutByteCount   *prometheus.CounterVec
+	validatorSigningLatency     *prometheus.SummaryVec
+
+	globalSignedBatchCount   *prometheus.CounterVec
+	globalUnsignedBatchCount *prometheus.CounterVec
+	globalSignedByteCount    *prometheus.CounterVec
+	globalUnsignedByteCount  *prometheus.CounterVec
+
+	globalSigningFractionHistogram *prometheus.HistogramVec
+
+	collectDetailedValidatorMetrics bool
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
@@ -49,31 +56,18 @@ type dispatcherMetrics struct {
 // A count of batches meeting each specified threshold is reported as a metric.
 func newDispatcherMetrics(
 	registry *prometheus.Registry,
-	importantSigningThresholds []float64,
+	// The minimum fraction of signers for a batch to be considered properly signed. Any fraction greater
+	// than or equal to this value is considered a successful signing.
+	minimumSigningThreshold float64,
+	// If true, collect detailed per-validator metrics. This can be disabled if the volume of data
+	// produced is too high.
+	collectDetailedValidatorMetrics bool,
 ) (*dispatcherMetrics, error) {
 	if registry == nil {
 		return nil, nil
 	}
 
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
-
-	attestation := promauto.With(registry).NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: controllerNamespace,
-			Name:      "attestation",
-			Help:      "number of signers and non-signers for the batch",
-		},
-		[]string{"type", "quorum"},
-	)
-
-	sendChunksRetryCount := promauto.With(registry).NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: controllerNamespace,
-			Name:      "send_chunks_retry_count",
-			Help:      "The number of times chunks were retried to be sent (part of HandleBatch()).",
-		},
-		[]string{},
-	)
 
 	processSigningMessageLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
@@ -201,34 +195,9 @@ func newDispatcherMetrics(
 		"send_to_validator",
 		false)
 
-	// Verify that thresholds are sane
-	for _, threshold := range importantSigningThresholds {
-		if threshold < 0 || threshold > 1 {
-			return nil, fmt.Errorf("threshold %f is not between 0.0 and 1.0", threshold)
-		}
-	}
-	sort.Float64s(importantSigningThresholds)
-
-	// Add thresholds for 0.0 and 1.0, if missing.
-	if len(importantSigningThresholds) == 0 || importantSigningThresholds[0] != 0.0 {
-		importantSigningThresholds = append([]float64{0.0}, importantSigningThresholds...)
-	}
-	if importantSigningThresholds[len(importantSigningThresholds)-1] != 1.0 {
-		importantSigningThresholds = append(importantSigningThresholds, 1.0)
-	}
-
-	batchSigningThresholdCount := promauto.With(registry).NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: controllerNamespace,
-			Name:      "batch_signing_threshold_count",
-			Help:      "A count of batches that have reached various signature thresholds.",
-		},
-		[]string{"quorum", "threshold"},
-	)
-
 	signingRateLabels := []string{"id", "quorum"}
 
-	signedBatchCount := promauto.With(registry).NewCounterVec(
+	validatorSignedBatchCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
 			Name:      "validator_signed_batch_count",
@@ -237,7 +206,7 @@ func newDispatcherMetrics(
 		signingRateLabels,
 	)
 
-	signedByteCount := promauto.With(registry).NewCounterVec(
+	validatorSignedByteCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
 			Name:      "validator_signed_byte_count",
@@ -246,7 +215,7 @@ func newDispatcherMetrics(
 		signingRateLabels,
 	)
 
-	unsignedBatchCount := promauto.With(registry).NewCounterVec(
+	validatorUnsignedBatchCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
 			Name:      "validator_unsigned_batch_count",
@@ -255,7 +224,7 @@ func newDispatcherMetrics(
 		signingRateLabels,
 	)
 
-	unsignedByteCount := promauto.With(registry).NewCounterVec(
+	validatorUnsignedByteCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
 			Name:      "validator_unsigned_byte_count",
@@ -264,7 +233,7 @@ func newDispatcherMetrics(
 		signingRateLabels,
 	)
 
-	timeoutBatchCount := promauto.With(registry).NewCounterVec(
+	validatorTimeoutBatchCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
 			Name:      "validator_timeout_batch_count",
@@ -273,7 +242,7 @@ func newDispatcherMetrics(
 		signingRateLabels,
 	)
 
-	timeoutByteCount := promauto.With(registry).NewCounterVec(
+	validatorTimeoutByteCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
 			Name:      "validator_timeout_byte_count",
@@ -282,7 +251,7 @@ func newDispatcherMetrics(
 		signingRateLabels,
 	)
 
-	signingLatency := promauto.With(registry).NewSummaryVec(
+	validatorSigningLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  controllerNamespace,
 			Name:       "validator_signing_latency_seconds",
@@ -292,40 +261,82 @@ func newDispatcherMetrics(
 		signingRateLabels,
 	)
 
-	return &dispatcherMetrics{
-		sendChunksRetryCount:         sendChunksRetryCount,
-		processSigningMessageLatency: processSigningMessageLatency,
-		signingMessageChannelLatency: signingMessageChannelLatency,
-		attestationUpdateLatency:     attestationUpdateLatency,
-		attestationBuildingLatency:   attestationBuildingLatency,
-		thresholdSignedToDoneLatency: thresholdSignedToDoneLatency,
-		aggregateSignaturesLatency:   aggregateSignaturesLatency,
-		putAttestationLatency:        putAttestationLatency,
-		attestationUpdateCount:       attestationUpdateCount,
-		updateBatchStatusLatency:     updateBatchStatusLatency,
-		blobE2EDispersalLatency:      blobE2EDispersalLatency,
-		completedBlobs:               completedBlobs,
-		attestation:                  attestation,
-		blobSetSize:                  blobSetSize,
-		batchStageTimer:              batchStageTimer,
-		sendToValidatorStageTimer:    sendToValidatorStageTimer,
-		importantSigningThresholds:   importantSigningThresholds,
-		signatureThresholds:          batchSigningThresholdCount,
-		signedBatchCount:             signedBatchCount,
-		signedByteCount:              signedByteCount,
-		unsignedBatchCount:           unsignedBatchCount,
-		unsignedByteCount:            unsignedByteCount,
-		timeoutBatchCount:            timeoutBatchCount,
-		timeoutByteCount:             timeoutByteCount,
-		signingLatency:               signingLatency,
-	}, nil
-}
+	globalSignedBatchCount := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: controllerNamespace,
+			Name:      "global_signed_batch_count",
+			Help:      "Total number of batches successfully signed by a critical mass of validators",
+		},
+		[]string{"quorum"},
+	)
 
-func (m *dispatcherMetrics) reportSendChunksRetryCount(retries float64) {
-	if m == nil {
-		return
-	}
-	m.sendChunksRetryCount.WithLabelValues().Set(retries)
+	globalUnsignedBatchCount := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: controllerNamespace,
+			Name:      "global_unsigned_batch_count",
+			Help:      "Total number of batches that were not signed by a critical mass of validators",
+		},
+		[]string{"quorum"},
+	)
+
+	globalSignedByteCount := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: controllerNamespace,
+			Name:      "global_signed_byte_count",
+			Help:      "Total number of bytes successfully signed by a critical mass of validators",
+		},
+		[]string{"quorum"},
+	)
+
+	globalUnsignedByteCount := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: controllerNamespace,
+			Name:      "global_unsigned_byte_count",
+			Help:      "Total number of bytes that were not signed by a critical mass of validators",
+		},
+		[]string{"quorum"},
+	)
+
+	globalSigningFractionHistogram := promauto.With(registry).NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: controllerNamespace,
+			Name:      "global_signing_fraction_histogram",
+			Help:      "Histogram of the fraction of validators that signed each batch",
+			Buckets:   prometheus.LinearBuckets(0.0, 0.05, 21),
+		},
+		[]string{"quorum"},
+	)
+
+	return &dispatcherMetrics{
+		processSigningMessageLatency:    processSigningMessageLatency,
+		signingMessageChannelLatency:    signingMessageChannelLatency,
+		attestationUpdateLatency:        attestationUpdateLatency,
+		attestationBuildingLatency:      attestationBuildingLatency,
+		thresholdSignedToDoneLatency:    thresholdSignedToDoneLatency,
+		aggregateSignaturesLatency:      aggregateSignaturesLatency,
+		putAttestationLatency:           putAttestationLatency,
+		attestationUpdateCount:          attestationUpdateCount,
+		updateBatchStatusLatency:        updateBatchStatusLatency,
+		blobE2EDispersalLatency:         blobE2EDispersalLatency,
+		completedBlobs:                  completedBlobs,
+		blobSetSize:                     blobSetSize,
+		batchStageTimer:                 batchStageTimer,
+		sendToValidatorStageTimer:       sendToValidatorStageTimer,
+		minimumSigningThreshold:         minimumSigningThreshold,
+		validatorSignedBatchCount:       validatorSignedBatchCount,
+		validatorSignedByteCount:        validatorSignedByteCount,
+		validatorUnsignedBatchCount:     validatorUnsignedBatchCount,
+		validatorUnsignedByteCount:      validatorUnsignedByteCount,
+		validatorTimeoutBatchCount:      validatorTimeoutBatchCount,
+		validatorTimeoutByteCount:       validatorTimeoutByteCount,
+		validatorSigningLatency:         validatorSigningLatency,
+		collectDetailedValidatorMetrics: collectDetailedValidatorMetrics,
+		globalSignedBatchCount:          globalSignedBatchCount,
+		globalUnsignedBatchCount:        globalUnsignedBatchCount,
+		globalSignedByteCount:           globalSignedByteCount,
+		globalUnsignedByteCount:         globalUnsignedByteCount,
+		globalSigningFractionHistogram:  globalSigningFractionHistogram,
+	}, nil
 }
 
 func (m *dispatcherMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
@@ -425,63 +436,27 @@ func (m *dispatcherMetrics) reportBlobSetSize(size int) {
 	m.blobSetSize.WithLabelValues().Set(float64(size))
 }
 
-func (m *dispatcherMetrics) reportAttestation(
-	operatorCount map[core.QuorumID]int,
-	signerCount map[core.QuorumID]int,
-	quorumResults map[core.QuorumID]*core.QuorumResult,
+func (m *dispatcherMetrics) reportSigningThreshold(
+	quorumID core.QuorumID,
+	batchSizeBytes uint64,
+	signingFraction float64,
 ) {
-
 	if m == nil {
 		return
-	}
-
-	for quorumID, count := range operatorCount {
-		quorumStr := fmt.Sprintf("%d", quorumID)
-		signers, ok := signerCount[quorumID]
-		if !ok {
-			continue
-		}
-		nonSigners := count - signers
-		quorumResult, ok := quorumResults[quorumID]
-		if !ok {
-			continue
-		}
-
-		m.attestation.WithLabelValues("signers", quorumStr).Set(float64(signers))
-		m.attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
-		m.attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
-
-		m.reportSigningThreshold(quorumID, float64(quorumResult.PercentSigned)/100.0)
-	}
-}
-
-func (m *dispatcherMetrics) reportSigningThreshold(quorumID core.QuorumID, signingFraction float64) {
-	if m == nil {
-		return
-	}
-
-	// First, determine the threshold to report. In order to be reported as threshold X, the signing fraction
-	// must be greater than or equal to X, but strictly less than the next highest threshold.
-	//
-	// For example, let's say important thresholds are [0, 0.55, 0.67, 0.80, 1.0]
-	// 0.55 signing -> threshold 0.55 (>= 0.55 but < 0.67)
-	// 0.56 signing -> threshold 0.55 (>= 0.55 but < 0.67)
-	// 0.66 signing -> threshold 0.55 (>= 0.55 but < 0.67)
-	// 0.67 signing -> threshold 0.67 (>= 0.67 but < 0.80)
-
-	var threshold float64
-	for i := len(m.importantSigningThresholds) - 1; i >= 0; i-- {
-		candidateThreshold := m.importantSigningThresholds[i]
-		if candidateThreshold <= signingFraction {
-			threshold = candidateThreshold
-			break
-		}
 	}
 
 	quorumString := fmt.Sprintf("%d", quorumID)
-	thresholdString := fmt.Sprintf("%f", threshold)
+	labels := prometheus.Labels{"quorum": quorumString}
 
-	m.signatureThresholds.WithLabelValues(quorumString, thresholdString).Inc()
+	if signingFraction >= m.minimumSigningThreshold {
+		m.globalSignedBatchCount.With(labels).Inc()
+		m.globalSignedByteCount.With(labels).Add(float64(batchSizeBytes))
+	} else {
+		m.globalUnsignedBatchCount.With(labels).Inc()
+		m.globalUnsignedByteCount.With(labels).Add(float64(batchSizeBytes))
+	}
+
+	m.globalSigningFractionHistogram.With(labels).Observe(signingFraction)
 }
 
 func (m *dispatcherMetrics) newBatchProbe() *common.SequenceProbe {
@@ -503,45 +478,47 @@ func (m *dispatcherMetrics) newSendToValidatorProbe() *common.SequenceProbe {
 }
 
 // Report a successful signing event for a validator.
-func (m *dispatcherMetrics) ReportSigningSuccess(
+func (m *dispatcherMetrics) ReportValidatorSigningSuccess(
 	id core.OperatorID,
 	batchSize uint64,
 	signingLatency time.Duration,
-	quorums []core.QuorumID) {
+	quorums []core.QuorumID,
+) {
 
-	if m == nil {
+	if m == nil || !m.collectDetailedValidatorMetrics {
 		return
 	}
 
 	for _, quorum := range quorums {
 		label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
 
-		m.signedBatchCount.With(label).Add(1)
-		m.signedByteCount.With(label).Add(float64(batchSize))
-		m.signingLatency.With(label).Observe(signingLatency.Seconds())
+		m.validatorSignedBatchCount.With(label).Add(1)
+		m.validatorSignedByteCount.With(label).Add(float64(batchSize))
+		m.validatorSigningLatency.With(label).Observe(signingLatency.Seconds())
 	}
 
 }
 
 // Report a failed signing event for a validator.
-func (m *dispatcherMetrics) ReportSigningFailure(
+func (m *dispatcherMetrics) ReportValidatorSigningFailure(
 	id core.OperatorID,
 	batchSize uint64,
 	timeout bool,
-	quorums []core.QuorumID) {
+	quorums []core.QuorumID,
+) {
 
-	if m == nil {
+	if m == nil || !m.collectDetailedValidatorMetrics {
 		return
 	}
 
 	for _, quorum := range quorums {
 		label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
 
-		m.unsignedBatchCount.With(label).Add(1)
-		m.unsignedByteCount.With(label).Add(float64(batchSize))
+		m.validatorUnsignedBatchCount.With(label).Add(1)
+		m.validatorUnsignedByteCount.With(label).Add(float64(batchSize))
 		if timeout {
-			m.timeoutBatchCount.With(label).Add(1)
-			m.timeoutByteCount.With(label).Add(float64(batchSize))
+			m.validatorTimeoutBatchCount.With(label).Add(1)
+			m.validatorTimeoutByteCount.With(label).Add(float64(batchSize))
 		}
 	}
 }

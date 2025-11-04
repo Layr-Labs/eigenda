@@ -230,21 +230,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "HEARTBEAT_MAX_STALL_DURATION"),
 		Value:    4 * time.Minute,
 	}
-	SignificantSigningThresholdPercentageFlag = cli.UintFlag{
-		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-percentage"),
-		Usage: "Percentage of stake that represents a 'significant' signing threshold. Currently used to track" +
+	SignificantSigningThresholdFractionFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-fraction"),
+		Usage: "Fraction of stake that represents a 'significant' signing threshold. Currently used to track" +
 			" metrics to better understand signing behavior.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_PERCENTAGE"),
-		Value:    55,
-	}
-	defaultSigningThresholds                cli.StringSlice = []string{"0.55", "0.67"}
-	SignificantSigningMetricsThresholdsFlag                 = cli.StringSliceFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "significant-signing-thresholds"),
-		Usage:    "Significant signing thresholds for metrics, each must be between 0.0 and 1.0",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_METRICS_THRESHOLDS"),
-		Value:    &defaultSigningThresholds,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_FRACTION"),
+		Value:    0.55,
 	}
 	GrpcServerEnableFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-server-enable"),
@@ -358,8 +350,7 @@ var optionalFlags = []cli.Flag{
 	ControllerReadinessProbePathFlag,
 	ControllerHealthProbePathFlag,
 	ControllerHeartbeatMaxStallDurationFlag,
-	SignificantSigningThresholdPercentageFlag,
-	SignificantSigningMetricsThresholdsFlag,
+	SignificantSigningThresholdFractionFlag,
 	EigenDAContractDirectoryAddressFlag,
 	BatchMetadataUpdatePeriodFlag,
 	GrpcServerEnableFlag,
