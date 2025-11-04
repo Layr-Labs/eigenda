@@ -54,7 +54,10 @@ func (g *RSBackend) ExtendPolyEvalV2(ctx context.Context, coeffs []fr.Element) (
 	// but this would feel very hardcoded and hardware dependent (although we can request RAM available on the device
 	// dynamically using icicle APIs). For now opting to keep this simple.
 	// TODO(samlaf): rethink this approach.
-	g.GpuSemaphore.Acquire(ctx, 1)
+	err := g.GpuSemaphore.Acquire(ctx, 1)
+	if err != nil {
+		return nil, fmt.Errorf("acquiring GPU semaphore: %w", err)
+	}
 	defer g.GpuSemaphore.Release(1)
 
 	// coeffs will be moved to device memory inside Ntt function,
