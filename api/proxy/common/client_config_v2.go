@@ -56,11 +56,6 @@ type ClientConfigV2 struct {
 	EigenDANetwork EigenDANetwork
 
 	// Determines which payment mechanism to use
-	//
-	// There is no default value for this field: users must explicitly state the type of payments they wish to use.
-	// Though it would be potentially possible to make some inferences about what the user likely wants to use based on
-	// PaymentVault state, this is risky since a misconfiguration could, for example, cause a user to burn through
-	// backup on-demand funds when they actually wanted to be using a reservation.
 	ClientLedgerMode clientledger.ClientLedgerMode
 
 	// VaultMonitorInterval is how often to check for payment vault updates

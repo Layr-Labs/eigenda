@@ -218,8 +218,8 @@ This check is optional and will be skipped when set to 0.`,
 		&cli.StringFlag{
 			Name: ClientLedgerModeFlagName,
 			Usage: "Payment mode for the client. Options: 'legacy' (old bin-based payment logic, slated for " +
-				"deprecation), 'reservation-only', 'on-demand-only', 'reservation-and-on-demand'. This is a required " +
-				"field.",
+				"deprecation), 'reservation-only', 'on-demand-only', 'reservation-and-on-demand'.",
+			Value:    "reservation-only",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CLIENT_LEDGER_MODE")},
 			Category: category,
 			Required: false,
