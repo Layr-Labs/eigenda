@@ -131,10 +131,13 @@ func (ep *EncodedPayload) decodeHeader() (uint32, error) {
 	return payloadLength, nil
 }
 
-// decodePayload decodes the body by checking and removing internal 0 byte padding, that include both the
-// padding added to make every multiple of 32 bytes a valid Field elements and
-// the padding added to make encoded payload contain a power of 2 number of Field elements.
-// it returns error if any padding is non-zero, or the body contains insufficient number of bytes for payload length.
+// decodePayload decodes the body by checking for and removing internal zero-byte padding,
+// including both:
+//   - padding added to make each 32-byte chunk a valid field element, and
+//   - padding added to make the encoded payload contain a power-of-two number of field elements.
+//
+// It returns an error if any padding bytes are non-zero, or if the body contains insufficient amount of
+// data required for the payload length.
 func (ep *EncodedPayload) decodePayload(payloadLen uint32) ([]byte, error) {
 	body := ep.bytes[codec.EncodedPayloadHeaderLenBytes:]
 	// Decode the body by removing 0x00 initial padding byte for every 32 byte chunk
