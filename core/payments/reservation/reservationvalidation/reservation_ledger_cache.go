@@ -207,7 +207,12 @@ func (c *ReservationLedgerCache) updateReservation(
 		return nil
 	}
 
-	return ledger.UpdateReservation(newReservation)
+	err := ledger.UpdateReservation(newReservation)
+	if err != nil {
+		return fmt.Errorf("update reservation: %w", err)
+	}
+
+	return nil
 }
 
 // Called when an item is evicted from the LRU cache.
