@@ -81,7 +81,7 @@ func newTestServer(t *testing.T) *retriever.Server {
 func TestRetrieveBlob(t *testing.T) {
 	ctx := t.Context()
 	server := newTestServer(t)
-	data := codec.PadPayload(gettysburgAddressBytes)
+	data := codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes)
 	retrievalClient.On(
 		"GetBlob",
 		mock.Anything,
@@ -137,5 +137,5 @@ func TestRetrieveBlob(t *testing.T) {
 		QuorumId:             0,
 	})
 	require.NoError(t, err)
-	require.Equal(t, gettysburgAddressBytes, retrievalReply.GetData()[:len(gettysburgAddressBytes)])
+	require.Equal(t, gettysburgAddressBytes, retrievalReply.GetData())
 }
