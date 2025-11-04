@@ -253,7 +253,7 @@ func TestPadUnpad(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, expectedUnpaddedLength, uint32(len(unpaddedBytes)))
 
-		// unpadded payload may have up to 31 extra trailing zeros, since CheckAndRemoveInternalPadding
+		// unpadded payload may have up to 31 extra trailing zeros, since CheckAndRemoveInternalFieldElementPadding
 		// doesn't consider these
 		require.Greater(t, len(originalBytes), len(unpaddedBytes)-32)
 		require.LessOrEqual(t, len(originalBytes), len(unpaddedBytes))

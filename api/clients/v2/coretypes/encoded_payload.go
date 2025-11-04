@@ -133,8 +133,9 @@ func (ep *EncodedPayload) decodeHeader() (uint32, error) {
 
 func (ep *EncodedPayload) decodePayload(payloadLen uint32) ([]byte, error) {
 	body := ep.bytes[codec.EncodedPayloadHeaderLenBytes:]
-	// Decode the body by removing internal 0 byte padding (0x00 initial byte for every 32 byte chunk)
-	// The decodedBody should contain the payload bytes + potentially some external padding bytes.
+	// Decode the body by checking and removing internal 0 byte padding, that include both the
+	// padding added to make every multiple of 32 bytes a valid field element and
+	// the padding added to make encoded payload contain a power of 2 number of Field elements.
 	decodedPayload, err := checkAndRemoveInternalPadding(body, payloadLen)
 	if err != nil {
 		return nil, fmt.Errorf("remove internal padding: %w", err)
@@ -203,8 +204,10 @@ func fftSettingsFromBlobLengthSymbols(blobLengthSymbols uint32) *fft.FFTSettings
 // the length of the output to hold a power of 2 field elements i.e (32, 64, 128,...) bytes.
 //
 // This function checks all the padding must be 0.
-func checkAndRemoveInternalPadding(paddedData []byte, payloadLen uint32) ([]byte, error) {
-	decodedPayloadWithPadding, err := codec.CheckAndRemoveInternalFieldElementPadding(paddedData)
+func checkAndRemoveInternalPadding(body []byte, payloadLen uint32) ([]byte, error) {
+	// Decode the body by removing 0x00 initial padding byte for every 32 byte chunk
+	// The decodedPayloadWithPadding should contain the payload bytes + potentially some external padding bytes.
+	decodedPayloadWithPadding, err := codec.CheckAndRemoveInternalFieldElementPadding(body)
 	if err != nil {
 		return nil, fmt.Errorf("padding check failed for ensuring every 32 bytes is a valid field element: %w", err)
 	}
@@ -218,9 +221,8 @@ func checkAndRemoveInternalPadding(paddedData []byte, payloadLen uint32) ([]byte
 				"this should neverhappen", uint32(len(decodedPayloadWithPadding)), payloadLen)
 	}
 
-	// ensure all the padding bytes in the encoded payload are zero. This is accomplished by first checking that the
-	// first byte of every multiple of 32 bytes is zero, and then verifying that all remaining bytes beyond the useful
-	// payload length are also zero with the following loop.
+	// ensure all the padding in the unreturned data part are zero. Combining with the field element padding check
+	// above, they ensure all the padding must be zero.
 	for _, b := range decodedPayloadWithPadding[payloadLen:] {
 		if b != 0x0 {
 			return nil, fmt.Errorf("padding on encoded payload must be 0 instead we got 0x%02x", b)
