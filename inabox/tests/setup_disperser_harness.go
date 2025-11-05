@@ -14,8 +14,8 @@ import (
 	grpccontroller "github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	awss3 "github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/core"
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -469,7 +469,16 @@ func startRelayWithListener(
 	}
 
 	// Create S3 client
-	s3Client, err := s3.NewClient(ctx, awsConfig, logger)
+	s3Client, err := awss3.NewAwsS3Client(
+		ctx,
+		logger,
+		awsConfig.EndpointURL,
+		awsConfig.Region,
+		awsConfig.FragmentParallelismFactor,
+		awsConfig.FragmentParallelismConstant,
+		awsConfig.AccessKey,
+		awsConfig.SecretAccessKey,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
@@ -598,7 +607,16 @@ func startEncoder(
 	awsConfig := localStack.GetAWSClientConfig()
 
 	// Create S3 client
-	s3Client, err := s3.NewClient(ctx, awsConfig, encoderLogger)
+	s3Client, err := awss3.NewAwsS3Client(
+		ctx,
+		encoderLogger,
+		awsConfig.EndpointURL,
+		awsConfig.Region,
+		awsConfig.FragmentParallelismFactor,
+		awsConfig.FragmentParallelismConstant,
+		awsConfig.AccessKey,
+		awsConfig.SecretAccessKey,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
@@ -1085,7 +1103,16 @@ func startAPIServer(
 	}
 
 	// Create S3 client
-	s3Client, err := s3.NewClient(ctx, awsConfig, apiServerLogger)
+	s3Client, err := awss3.NewAwsS3Client(
+		ctx,
+		apiServerLogger,
+		awsConfig.EndpointURL,
+		awsConfig.Region,
+		awsConfig.FragmentParallelismFactor,
+		awsConfig.FragmentParallelismConstant,
+		awsConfig.AccessKey,
+		awsConfig.SecretAccessKey,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}

@@ -15,7 +15,7 @@ import (
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	awss3 "github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -458,7 +458,16 @@ func newTestServerV2(t *testing.T) *testComponents {
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
-	s3Client, err := s3.NewClient(ctx, awsConfig, logger)
+	s3Client, err := awss3.NewAwsS3Client(
+		ctx,
+		logger,
+		awsConfig.EndpointURL,
+		awsConfig.Region,
+		awsConfig.FragmentParallelismFactor,
+		awsConfig.FragmentParallelismConstant,
+		awsConfig.AccessKey,
+		awsConfig.SecretAccessKey,
+	)
 	require.NoError(t, err)
 	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
 	require.NoError(t, err)

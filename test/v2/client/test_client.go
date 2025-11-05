@@ -1056,7 +1056,7 @@ func buildReservationLedger(
 		return nil, fmt.Errorf("new reservation ledger config: %w", err)
 	}
 
-	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, time.Now())
+	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, time.Now)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger: %w", err)
 	}
