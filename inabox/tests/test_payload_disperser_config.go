@@ -24,7 +24,7 @@ type TestPayloadDisperserConfig struct {
 // vault.
 func GetDefaultTestPayloadDisperserConfig() TestPayloadDisperserConfig {
 	return TestPayloadDisperserConfig{
-		ClientLedgerMode: clientledger.ClientLedgerModeLegacy,
+		ClientLedgerMode: clientledger.ClientLedgerModeReservationOnly,
 		PrivateKey:       "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded",
 	}
 }
