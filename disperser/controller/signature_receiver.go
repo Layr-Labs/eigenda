@@ -186,8 +186,27 @@ forLoop:
 
 			for quorumId, opInfo := range sr.indexedOperatorState.Operators {
 
-				totalStake := sr.indexedOperatorState.Totals[quorumId].Stake
-				validatorStake := opInfo[signingMessage.Operator].Stake
+				quorumTotals, ok := sr.indexedOperatorState.Totals[quorumId]
+				if !ok {
+					// This triggers in some unit tests
+					sr.logger.Error("could not find total stake for quorum",
+						"quorumID", quorumId,
+						"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]))
+					continue
+				}
+				totalStake := quorumTotals.Stake
+
+				validatorInfo, ok := opInfo[signingMessage.Operator]
+				if !ok {
+					// This triggers in some unit tests
+					sr.logger.Error("could not find validator stake for operator in quorum",
+						"quorumID", quorumId,
+						"operatorID", signingMessage.Operator.Hex(),
+						"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]))
+					continue
+				}
+				validatorStake := validatorInfo.Stake
+
 				stakeFraction := getFraction(validatorStake, totalStake)
 
 				sr.metrics.ReportValidatorSigningResult(
