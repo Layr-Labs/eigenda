@@ -89,7 +89,7 @@ func TestHandlerGet(t *testing.T) {
 			url:  fmt.Sprintf("/get/0x010000%s", testCommitStr),
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().
-					Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, fmt.Errorf("internal error"))
 			},
 			expectedCode: http.StatusInternalServerError,
@@ -100,7 +100,7 @@ func TestHandlerGet(t *testing.T) {
 			url:  fmt.Sprintf("/get/0x010000%s", testCommitStr),
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().
-					Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return([]byte(testCommitStr), nil)
 			},
 			expectedCode: http.StatusOK,
@@ -113,7 +113,7 @@ func TestHandlerGet(t *testing.T) {
 			url:  fmt.Sprintf("/get/0x010000%s?l1_inclusion_block_number=100", testCommitStr),
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().
-					Get(gomock.Any(), gomock.Any(), gomock.Eq(common.GETOpts{L1InclusionBlockNum: 100})).
+					Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(common.GETOpts{L1InclusionBlockNum: 100})).
 					Return([]byte(testCommitStr), nil)
 			},
 			expectedCode: http.StatusOK,
@@ -170,6 +170,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().Put(
 					gomock.Any(),
+					gomock.Any(),
 					gomock.Any()).Return([]byte(testCommitStr), nil)
 			},
 			expectedCode: http.StatusOK,
@@ -193,6 +194,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 			body: []byte("some data that will successfully be written to EigenDA"),
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().Put(
+					gomock.Any(),
 					gomock.Any(),
 					gomock.Any()).Return([]byte(testCommitStr), nil)
 			},
@@ -290,7 +292,7 @@ func TestHandlerPutErrors(t *testing.T) {
 			t.Run(tt.name+" / "+mode.name, func(t *testing.T) {
 				t.Log(tt.name + " / " + mode.name)
 				mockEigenDAManager.EXPECT().
-					Put(gomock.Any(), gomock.Any()).
+					Put(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, tt.mockEigenDAManagerPutReturnedErr)
 
 				req := httptest.NewRequest(
