@@ -37,6 +37,12 @@ test-e2e-local:
 test-e2e-hoodi:
 	BACKEND=hoodi-testnet gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
+# E2E tests using hoodi preprod backend. this is expected to fail since retrieval ingress is turned off.
+# this is useful for testing CertVerifier deployments in the hood-preprod and serves utility as a validation
+# tool which is why it will never be ran in monorepo CI.
+test-e2e-hoodi-preprod:
+	BACKEND=hoodi-testnet gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
+
 # E2E tests using sepolia testnet backend. Also tests the standard client against the proxy.
 # If sepolia tests are failing, consider checking https://sepolia.etherscan.io/ for block production status.
 test-e2e-sepolia:
