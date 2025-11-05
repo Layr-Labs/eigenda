@@ -96,6 +96,10 @@ func (cfg *ClientConfigV2) Check() error {
 		return fmt.Errorf("PutTries==0 is not permitted. >0 means 'try N times', <0 means 'retry indefinitely'")
 	}
 
+	if cfg.ClientLedgerMode == "" {
+		return fmt.Errorf("client ledger mode must be specified")
+	}
+
 	if cfg.VaultMonitorInterval < 0 {
 		return fmt.Errorf("vault monitor interval cannot be negative")
 	}

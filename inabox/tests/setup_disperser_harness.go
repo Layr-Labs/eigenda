@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	grpccontroller "github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -42,6 +43,8 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/testcontainers/testcontainers-go"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // DisperserHarnessConfig contains the configuration for setting up the disperser harness
@@ -1239,6 +1242,24 @@ func startAPIServer(
 	// Onchain state refresh interval
 	onchainStateRefreshInterval := 1 * time.Second
 
+	// Create controller client if using new payments
+	var controllerConnection *grpc.ClientConn
+	var controllerClient grpccontroller.ControllerServiceClient
+	if config.TestConfig.UseNewPayments {
+		if controllerAddress == "" {
+			return nil, fmt.Errorf("controller address is empty but UseNewPayments is true")
+		}
+		connection, err := grpc.NewClient(
+			controllerAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("create controller connection: %w", err)
+		}
+		controllerConnection = connection
+		controllerClient = grpccontroller.NewControllerServiceClient(connection)
+	}
+
 	// Create API server
 	// Note: meterer is nil when using controller-mediated payments, otherwise it's the legacy meterer
 	apiServer, err := apiserver.NewDispersalServerV2(
@@ -1254,9 +1275,10 @@ func startAPIServer(
 		apiServerLogger,
 		metricsRegistry,
 		metricsConfig,
-		false, // ReservedOnly
-		config.TestConfig.UseNewPayments,
-		controllerAddress,
+		false,                            // ReservedOnly
+		config.TestConfig.UseNewPayments, // useControllerMediatedPayments
+		controllerConnection,
+		controllerClient,
 		listener,
 	)
 	if err != nil {

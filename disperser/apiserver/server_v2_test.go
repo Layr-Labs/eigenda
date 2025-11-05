@@ -10,6 +10,8 @@ import (
 	"time"
 
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
+	controllermocks "github.com/Layr-Labs/eigenda/api/grpc/controller/mocks"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -33,6 +35,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	tmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/peer"
 )
 
@@ -125,52 +128,6 @@ func TestV2DisperseBlob(t *testing.T) {
 	require.NoError(t, err)
 	commitmentProto, err = commitments.ToProtobuf()
 	require.NoError(t, err)
-	blobHeaderProto2 := &pbcommonv2.BlobHeader{
-		Version:       0,
-		QuorumNumbers: []uint32{0, 1},
-		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID.Hex(),
-			Timestamp:         5,
-			CumulativePayment: big.NewInt(100).Bytes(),
-		},
-	}
-	blobHeader2, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto2)
-	require.NoError(t, err)
-	sig2, err := signer.SignBlobRequest(blobHeader2)
-	require.NoError(t, err)
-
-	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data2,
-		Signature:  sig2,
-		BlobHeader: blobHeaderProto2,
-	})
-	require.Nil(t, reply)
-	require.ErrorContains(t, err, "failed to update cumulative payment: insufficient cumulative payment increment")
-
-	// request with on-demand payments in reserved only mode
-	c.DispersalServerV2.ReservedOnly = true
-	ondemandReqProto := &pbcommonv2.BlobHeader{
-		Version:       0,
-		QuorumNumbers: []uint32{0, 1},
-		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID.Hex(),
-			Timestamp:         0,
-			CumulativePayment: big.NewInt(500).Bytes(),
-		},
-	}
-	blobHeader, err = corev2.BlobHeaderFromProtobuf(ondemandReqProto)
-	require.NoError(t, err)
-	sig, err = signer.SignBlobRequest(blobHeader)
-	require.NoError(t, err)
-
-	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  sig,
-		BlobHeader: ondemandReqProto,
-	})
-	require.ErrorContains(t, err, "on-demand payments are not supported by reserved-only mode disperser")
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
@@ -582,6 +539,15 @@ func newTestServerV2(t *testing.T) *testComponents {
 	listener, err := net.Listen("tcp", "0.0.0.0:0")
 	require.NoError(t, err)
 
+	// Create mock controller client that always authorizes payments
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockControllerClient := controllermocks.NewMockControllerServiceClient(mockCtrl)
+	mockControllerClient.EXPECT().
+		AuthorizePayment(gomock.Any(), gomock.Any()).
+		Return(&controller.AuthorizePaymentResponse{}, nil).
+		AnyTimes()
+
 	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
 			GrpcPort:    "51002",
@@ -602,8 +568,9 @@ func newTestServerV2(t *testing.T) *testComponents {
 			EnableMetrics: false,
 		},
 		false, // enable both reservation and on-demand
-		false, // use old style payments
-		"",    // No controller client in tests
+		true,  // use new payment system
+		nil,   // controllerConnection - not needed for unit tests
+		mockControllerClient,
 		listener,
 	)
 	require.NoError(t, err)
