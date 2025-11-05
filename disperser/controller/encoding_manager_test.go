@@ -545,18 +545,30 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 
 	livenessChan := make(chan healthcheck.HeartbeatMessage, 100)
 
-	em, err := controller.NewEncodingManager(&controller.EncodingManagerConfig{
-		PullInterval:                1 * time.Second,
-		EncodingRequestTimeout:      5 * time.Second,
-		StoreTimeout:                5 * time.Second,
-		NumEncodingRetries:          1,
-		NumRelayAssignment:          2,
-		AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
-		MaxNumBlobsPerIteration:     5,
-		OnchainStateRefreshInterval: onchainRefreshInterval,
-		NumConcurrentRequests:       5,
-		EncoderAddress:              "localhost:50051", // Encoder is mocked in the test so this doesn't matter
-	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry(), blobSet, livenessChan)
+	em, err := controller.NewEncodingManager(
+		&controller.EncodingManagerConfig{
+			PullInterval:                1 * time.Second,
+			EncodingRequestTimeout:      5 * time.Second,
+			StoreTimeout:                5 * time.Second,
+			NumEncodingRetries:          1,
+			NumRelayAssignment:          2,
+			AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
+			MaxNumBlobsPerIteration:     5,
+			OnchainStateRefreshInterval: onchainRefreshInterval,
+			NumConcurrentRequests:       5,
+			EncoderAddress:              "localhost:50051",
+			MaxDispersalAge:             45 * time.Second,
+		},
+		time.Now,
+		blobMetadataStore,
+		pool,
+		encodingClient,
+		chainReader,
+		logger,
+		prometheus.NewRegistry(),
+		blobSet,
+		livenessChan,
+	)
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(ctx, 2*onchainRefreshInterval)

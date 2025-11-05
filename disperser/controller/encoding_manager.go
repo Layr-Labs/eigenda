@@ -62,6 +62,17 @@ type EncodingManagerConfig struct {
 	// NumConcurrentRequests is the size of the worker pool for processing encoding requests concurrently.
 	// Must be at least 1.
 	NumConcurrentRequests int
+
+	// MaxDispersalAge is the maximum age a dispersal request can be before it is discarded.
+	// Dispersals older than this duration are marked as Failed and not processed.
+	//
+	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
+	// client at dispersal request creation time (in nanoseconds since Unix epoch).
+	//
+	// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used instead of including
+	// in this config + hardcoding. At that point, this field will be removed from the config struct entirely, and the
+	// value will be fetched dynamically at runtime.
+	MaxDispersalAge time.Duration
 }
 
 var _ config.VerifiableConfig = &EncodingManagerConfig{}
@@ -76,6 +87,7 @@ func DefaultEncodingManagerConfig() *EncodingManagerConfig {
 		OnchainStateRefreshInterval: 1 * time.Hour,
 		NumConcurrentRequests:       250,
 		NumRelayAssignment:          1,
+		MaxDispersalAge:             45 * time.Second,
 	}
 }
 
@@ -115,6 +127,9 @@ func (c *EncodingManagerConfig) Verify() error {
 	if c.EncoderAddress == "" {
 		return fmt.Errorf("EncoderAddress cannot be empty")
 	}
+	if c.MaxDispersalAge <= 0 {
+		return fmt.Errorf("MaxDispersalAge must be positive, got %v", c.MaxDispersalAge)
+	}
 	return nil
 }
 
@@ -130,6 +145,7 @@ type EncodingManager struct {
 	encodingClient    disperser.EncoderClientV2
 	chainReader       core.Reader
 	logger            logging.Logger
+	getNow            func() time.Time
 
 	// state
 	cursor                *blobstore.StatusIndexCursor
@@ -145,6 +161,7 @@ type EncodingManager struct {
 
 func NewEncodingManager(
 	config *EncodingManagerConfig,
+	getNow func() time.Time,
 	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	encodingClient disperser.EncoderClientV2,
@@ -160,6 +177,7 @@ func NewEncodingManager(
 
 	return &EncodingManager{
 		EncodingManagerConfig:  config,
+		getNow:                 getNow,
 		blobMetadataStore:      blobMetadataStore,
 		pool:                   pool,
 		encodingClient:         encodingClient,
@@ -235,6 +253,49 @@ func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.Blo
 	return dedupedBlobs
 }
 
+// filterStaleBlobs filters out dispersals that are older than maxDispersalAge.
+// Stale dispersals are marked as Failed in the metadata store.
+func (e *EncodingManager) filterStaleBlobs(ctx context.Context, blobMetadatas []*v2.BlobMetadata) []*v2.BlobMetadata {
+	freshBlobs := make([]*v2.BlobMetadata, 0, len(blobMetadatas))
+	now := e.getNow()
+
+	for _, blob := range blobMetadatas {
+		dispersalTime := time.Unix(0, blob.BlobHeader.PaymentMetadata.Timestamp)
+		age := now.Sub(dispersalTime)
+
+		if age <= e.MaxDispersalAge {
+			freshBlobs = append(freshBlobs, blob)
+			continue
+		}
+
+		e.metrics.reportStaleDispersal()
+
+		blobKey, err := blob.BlobHeader.BlobKey()
+		if err != nil {
+			e.logger.Errorf("compute blob key for stale blob: %w", err)
+			continue
+		}
+
+		e.logger.Warnf(
+			"discarding stale dispersal: blobKey=%s dispersalAge=%s maxAge=%s dispersalTime=%s",
+			blobKey.Hex(),
+			age.String(),
+			e.MaxDispersalAge.String(),
+			dispersalTime.Format(time.RFC3339),
+		)
+
+		// Update status to Failed
+		storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
+		err = e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Failed)
+		cancel()
+		if err != nil {
+			e.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
+		}
+	}
+
+	return freshBlobs
+}
+
 // HandleBatch handles a batch of blobs to encode
 // It retrieves a batch of blobs from the blob metadata store, encodes them, and updates their status
 // It also creates BlobCertificates and stores them in the blob metadata store
@@ -251,6 +312,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	}
 
 	blobMetadatas = e.dedupBlobs(blobMetadatas)
+	blobMetadatas = e.filterStaleBlobs(ctx, blobMetadatas)
 	e.metrics.reportBlobSetSize(e.blobSet.Size())
 	if len(blobMetadatas) == 0 {
 		return errNoBlobsToEncode
