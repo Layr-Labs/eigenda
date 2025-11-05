@@ -88,7 +88,7 @@ contract CertVerifierRouterDeployer is Script, Test {
             // 1) the cert verifier's dependencies appear correctly initialized
             address thresholdRegistry = address(IEigenDACertVerifier(certVerifier).eigenDAThresholdRegistry());
             bytes memory nextBlobVersionCalldata = abi.encodeWithSelector(bytes4(keccak256("nextBlobVersion()")));
-            (bool success, bytes memory returnData) = thresholdRegistry.call(nextBlobVersionCalldata);
+            (bool success, ) = thresholdRegistry.call(nextBlobVersionCalldata);
             require(success, "nextBlobVersion() call failed");
 
             address serviceManager = address(IEigenDACertVerifier(certVerifier).eigenDASignatureVerifier());
