@@ -37,6 +37,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
+      - uses: taiki-e/install-action@cargo-machete
       - run: make lint
 
   test:
@@ -50,15 +51,6 @@ jobs:
           workspaces: rust
       - run: cargo test --lib --bins --all-features
       - run: cargo test --doc --all-features
-
-  unused-deps:
-    name: Unused Dependencies
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@cargo-machete
-      - run: cargo machete
 
   feature-combinations:
     name: Feature Combinations
