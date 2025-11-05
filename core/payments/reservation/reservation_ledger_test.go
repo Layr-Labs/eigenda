@@ -15,7 +15,7 @@ func TestDebit(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 		currentTime := startTime
 		getNow := func() time.Time { return currentTime }
-		ledger := createTestLedger(t, getNow, 100, false, startTime)
+		ledger := createTestLedger(t, getNow, 100, false)
 
 		currentTime = currentTime.Add(time.Hour)
 
@@ -33,7 +33,7 @@ func TestDebit(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 		currentTime := startTime
 		getNow := func() time.Time { return currentTime }
-		ledger := createTestLedger(t, getNow, 100, false, startTime)
+		ledger := createTestLedger(t, getNow, 100, false)
 
 		currentTime = currentTime.Add(time.Hour)
 
@@ -53,7 +53,7 @@ func TestDebit(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 		currentTime := startTime
 		getNow := func() time.Time { return currentTime }
-		ledger := createTestLedger(t, getNow, 100, false, startTime)
+		ledger := createTestLedger(t, getNow, 100, false)
 
 		// before reservation start
 		currentTime = startTime.Add(-time.Hour)
@@ -85,7 +85,7 @@ func TestDebit(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 		currentTime := startTime
 		getNow := func() time.Time { return currentTime }
-		ledger := createTestLedger(t, getNow, 100, false, startTime)
+		ledger := createTestLedger(t, getNow, 100, false)
 
 		currentTime = currentTime.Add(time.Hour)
 
@@ -106,7 +106,7 @@ func TestRevertDebit(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 		currentTime := startTime
 		getNow := func() time.Time { return currentTime }
-		ledger := createTestLedger(t, getNow, 100, false, startTime)
+		ledger := createTestLedger(t, getNow, 100, false)
 
 		currentTime = currentTime.Add(time.Hour)
 
@@ -129,7 +129,7 @@ func TestRevertDebit(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 		currentTime := startTime
 		getNow := func() time.Time { return currentTime }
-		ledger := createTestLedger(t, getNow, 100, false, startTime)
+		ledger := createTestLedger(t, getNow, 100, false)
 
 		currentTime = currentTime.Add(time.Hour)
 
@@ -153,7 +153,7 @@ func TestUpdateReservation(t *testing.T) {
 	startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 	currentTime := startTime
 	getNow := func() time.Time { return currentTime }
-	ledger := createTestLedger(t, getNow, 100, false, startTime)
+	ledger := createTestLedger(t, getNow, 100, false)
 
 	currentTime = currentTime.Add(time.Hour)
 
@@ -242,14 +242,13 @@ func createTestLedger(
 	getNow func() time.Time,
 	symbolsPerSecond uint64,
 	startFull bool,
-	startTime time.Time,
 ) *ReservationLedger {
 	t.Helper()
 
-	endTime := startTime.Add(24 * time.Hour)
+	endTime := getNow().Add(24 * time.Hour)
 	permittedQuorums := []core.QuorumID{0, 1}
 
-	reservation, err := NewReservation(symbolsPerSecond, startTime, endTime, permittedQuorums)
+	reservation, err := NewReservation(symbolsPerSecond, getNow(), endTime, permittedQuorums)
 	require.NoError(t, err)
 
 	config, err := NewReservationLedgerConfig(
