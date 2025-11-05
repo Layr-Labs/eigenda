@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
@@ -107,6 +108,7 @@ func (svr *Server) handleGetShared(
 	payloadOrEncodedPayload, err := svr.certMgr.Get(
 		r.Context(),
 		versionedCert,
+		coretypes.CertSerializationRLP,
 		common.GETOpts{
 			L1InclusionBlockNum:  l1InclusionBlockNum,
 			ReturnEncodedPayload: returnEncodedPayload,
@@ -198,7 +200,7 @@ func (svr *Server) handlePostShared(
 		return proxyerrors.NewReadRequestBodyError(err, common.MaxServerPOSTRequestBodySize)
 	}
 
-	serializedCert, err := svr.certMgr.Put(r.Context(), payload)
+	serializedCert, err := svr.certMgr.Put(r.Context(), payload, coretypes.CertSerializationRLP)
 	if err != nil {
 		return fmt.Errorf("post request failed: %w", err)
 	}

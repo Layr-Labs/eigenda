@@ -43,17 +43,17 @@ func TestGetSet(t *testing.T) {
 	)
 
 	expected := []byte(testPreimage)
-	key, err := msV2.Put(t.Context(), expected)
+	key, err := msV2.Put(t.Context(), expected, coretypes.CertSerializationRLP)
 	require.NoError(t, err)
 
 	cert := certs.NewVersionedCert(key, coretypes.VersionThreeCert)
 
-	actual, err := msV2.Get(t.Context(), cert, false)
+	actual, err := msV2.Get(t.Context(), cert, coretypes.CertSerializationRLP, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
 
 	// Test getting the encoded payload
-	encodedPayload, err := msV2.Get(t.Context(), cert, true)
+	encodedPayload, err := msV2.Get(t.Context(), cert, coretypes.CertSerializationRLP, true)
 	require.NoError(t, err)
 	require.NotEqual(t, expected, encodedPayload)
 }

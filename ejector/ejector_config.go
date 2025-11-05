@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
 )
 
@@ -69,21 +70,30 @@ type EjectorConfig struct {
 
 	// The period at which to periodically attempt to finalize ejections that have been started.
 	EjectionFinalizationPeriod time.Duration
-}
 
-var _ config.VerifiableConfig = (*EjectorSecretConfig)(nil)
+	// The number of blocks to wait before using a reference block number. That is to say, do not always
+	// read data from the latest block  we know about, but rather read from a block that is sufficiently old as to make
+	// choosing the wrong fork unlikely.
+	ReferenceBlockNumberOffset uint64
 
-// Configuration for secrets used by the ejector.
-type EjectorSecretConfig struct {
-	// The Ethereum RPC URL(s) to use for connecting to the blockchain.
-	EthRpcUrls []string `docs:"required"`
+	// The interval at which to poll for a new reference block number.
+	ReferenceBlockNumberPollInterval time.Duration
 
-	// The private key to use for signing ejection transactions.
-	PrivateKey string `docs:"required"`
+	// The size for the caches for on-chain data.
+	ChainDataCacheSize uint64
+
+	// The output type for logs, must be "json" or "text".
+	LogOutputType string
+
+	// Whether to enable color in log output (only applies to text output).
+	LogColor bool
+
+	// If non-zero, this value will be used as the gas limit for transactions, overriding the gas estimation.
+	MaxGasOverride uint64
 }
 
 // Create a new root ejector config with default values.
-func NewRootEjectorConfig() *RootEjectorConfig {
+func DefaultRootEjectorConfig() *RootEjectorConfig {
 	return &RootEjectorConfig{
 		Config: DefaultEjectorConfig(),
 		Secret: &EjectorSecretConfig{},
@@ -116,6 +126,28 @@ func (e *RootEjectorConfig) Verify() error {
 	return nil
 }
 
+var _ config.VerifiableConfig = (*EjectorSecretConfig)(nil)
+
+// Configuration for secrets used by the ejector.
+type EjectorSecretConfig struct {
+	// The Ethereum RPC URL(s) to use for connecting to the blockchain.
+	EthRpcUrls []string `docs:"required"`
+
+	// The private key to use for signing ejection transactions, in hex.
+	// Do not include the '0x' prefix.
+	PrivateKey string `docs:"required"`
+}
+
+func (c *EjectorSecretConfig) Verify() error {
+	if len(c.EthRpcUrls) == 0 {
+		return fmt.Errorf("invalid Ethereum RPC URLs: must provide at least one URL")
+	}
+	if c.PrivateKey == "" {
+		return fmt.Errorf("invalid private key")
+	}
+	return nil
+}
+
 // DefaultEjectorConfig returns a default configuration for the ejector.
 func DefaultEjectorConfig() *EjectorConfig {
 	return &EjectorConfig{
@@ -131,6 +163,12 @@ func DefaultEjectorConfig() *EjectorConfig {
 		DataApiTimeout:                       60 * time.Second,
 		EthRpcRetryCount:                     3,
 		EthBlockConfirmations:                0,
+		ReferenceBlockNumberOffset:           64,
+		ReferenceBlockNumberPollInterval:     10 * time.Second,
+		ChainDataCacheSize:                   1024,
+		LogOutputType:                        string(common.JSONLogFormat),
+		LogColor:                             false,
+		MaxGasOverride:                       10_000_000,
 	}
 }
 
@@ -172,15 +210,21 @@ func (c *EjectorConfig) Verify() error {
 		return fmt.Errorf("invalid data API URL: %s", c.DataApiUrl)
 	}
 
-	return nil
-}
+	if c.DataApiTimeout <= 0 {
+		return fmt.Errorf("invalid data API timeout: %s", c.DataApiTimeout)
+	}
 
-func (c *EjectorSecretConfig) Verify() error {
-	if len(c.EthRpcUrls) == 0 {
-		return fmt.Errorf("invalid Ethereum RPC URLs: must provide at least one URL")
+	if c.EjectionFinalizationPeriod <= 0 {
+		return fmt.Errorf("invalid ejection finalization period: %s", c.EjectionFinalizationPeriod)
 	}
-	if c.PrivateKey == "" {
-		return fmt.Errorf("invalid private key")
+
+	if c.ReferenceBlockNumberPollInterval <= 0 {
+		return fmt.Errorf("invalid reference block number poll interval: %s", c.ReferenceBlockNumberPollInterval)
 	}
+
+	if c.ChainDataCacheSize <= 0 {
+		return fmt.Errorf("invalid chain data cache size: %d", c.ChainDataCacheSize)
+	}
+
 	return nil
 }

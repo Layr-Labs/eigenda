@@ -7,8 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -103,13 +101,6 @@ func (c *validatorClient) GetBlob(
 
 	probe := c.metrics.newGetBlobProbe()
 	defer probe.End()
-
-	probe.SetStage("verify_commitment")
-	commitmentBatch := []encoding.BlobCommitments{blobHeader.BlobCommitments}
-	err := committer.VerifyCommitEquivalenceBatch(commitmentBatch)
-	if err != nil {
-		return nil, err
-	}
 
 	probe.SetStage("get_operator_state")
 	operatorState, err := c.chainState.GetOperatorStateWithSocket(
