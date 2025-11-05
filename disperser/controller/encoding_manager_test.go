@@ -515,12 +515,64 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
 
+func TestEncodingManagerFilterStaleBlobs(t *testing.T) {
+	ctx := t.Context()
+	now := time.Now()
+
+	staleBlobKey, staleBlobHeader := newBlobWithDispersalTime(t, now.Add(-time.Minute).UnixNano(), []core.QuorumID{0, 1})
+	freshBlobKey, freshBlobHeader := newBlobWithDispersalTime(t, now.UnixNano(), []core.QuorumID{0, 1})
+
+	staleMetadata := &commonv2.BlobMetadata{
+		BlobHeader: staleBlobHeader,
+		BlobStatus: commonv2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+	freshMetadata := &commonv2.BlobMetadata{
+		BlobHeader: freshBlobHeader,
+		BlobStatus: commonv2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+
+	err := blobMetadataStore.PutBlobMetadata(ctx, staleMetadata)
+	require.NoError(t, err)
+	err = blobMetadataStore.PutBlobMetadata(ctx, freshMetadata)
+	require.NoError(t, err)
+
+	c := newTestComponents(t, false)
+	c.BlobSet.On("Contains", mock.Anything).Return(false)
+	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
+		TotalChunkSizeBytes: 100,
+		FragmentSizeBytes:   1024 * 1024 * 4,
+	}, nil)
+
+	err = c.EncodingManager.HandleBatch(ctx)
+	require.NoError(t, err)
+	c.Pool.StopWait()
+
+	fetchedStaleMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, staleBlobKey)
+	require.NoError(t, err)
+	require.Equal(t, commonv2.Failed, fetchedStaleMetadata.BlobStatus)
+
+	fetchedFreshMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, freshBlobKey)
+	require.NoError(t, err)
+	require.Equal(t, commonv2.Encoded, fetchedFreshMetadata.BlobStatus)
+
+	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 1)
+	c.BlobSet.AssertCalled(t, "AddBlob", freshBlobKey)
+	c.BlobSet.AssertNotCalled(t, "AddBlob", staleBlobKey)
+
+	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{staleBlobKey, freshBlobKey}, nil)
+}
+
 func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 	t.Helper()
 	ctx := t.Context()
 	logger := test.GetLogger()
-	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	// require.NoError(t, err)
 	var pool common.WorkerPool
 	var mockP *commonmock.MockWorkerpool
 	if mockPool {

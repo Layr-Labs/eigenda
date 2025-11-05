@@ -192,6 +192,15 @@ func teardown() {
 
 func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *corev2.BlobHeader) {
 	t.Helper()
+	return newBlobWithDispersalTime(t, time.Now().UnixNano(), quorumNumbers)
+}
+
+func newBlobWithDispersalTime(
+	t *testing.T,
+	dispersalTime int64,
+	quorumNumbers []core.QuorumID,
+) (corev2.BlobKey, *corev2.BlobHeader) {
+	t.Helper()
 
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
@@ -208,7 +217,7 @@ func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *core
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			Timestamp:         time.Now().UnixNano(),
+			Timestamp:         dispersalTime,
 			CumulativePayment: cumulativePayment,
 		},
 	}
