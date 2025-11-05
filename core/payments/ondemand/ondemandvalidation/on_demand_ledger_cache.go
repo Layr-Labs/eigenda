@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -63,6 +64,15 @@ func NewOnDemandLedgerCache(
 
 	if dynamoClient == nil {
 		return nil, errors.New("dynamo client must be non-nil")
+	}
+
+	// Verify the on-demand table exists before proceeding
+	_, err := dynamoClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String(config.OnDemandTableName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("on-demand table '%s' does not exist or cannot be accessed: %w",
+			config.OnDemandTableName, err)
 	}
 
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
