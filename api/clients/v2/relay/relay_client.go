@@ -192,6 +192,8 @@ func (c *relayClient) GetChunksByRange(
 		return nil, err
 	}
 
+	clients.SimulateLatency(ctx, *c.config.OperatorID)
+
 	res, err := client.GetChunks(ctx, request)
 	if err != nil {
 		return nil, err

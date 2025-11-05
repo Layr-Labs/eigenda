@@ -386,7 +386,7 @@ func (d *Dispatcher) HandleBatch(
 			for i = 0; i < d.NumRequestRetries+1; i++ {
 				validatorProbe.SetStage("send_chunks")
 
-				sig, err := d.sendChunks(ctx, client, batch)
+				sig, err := d.sendChunks(ctx, client, batch, opID)
 				lastErr = err
 				if err == nil {
 					validatorProbe.SetStage("put_dispersal_response")
@@ -857,13 +857,14 @@ func (d *Dispatcher) sendChunks(
 	ctx context.Context,
 	client clients.NodeClient,
 	batch *corev2.Batch,
+	validatorID core.OperatorID,
 ) (*core.Signature, error) {
 
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, d.AttestationTimeout)
 
 	defer cancel()
 
-	sig, err := client.StoreChunks(ctxWithTimeout, batch)
+	sig, err := client.StoreChunks(ctxWithTimeout, batch, validatorID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store chunks: %w", err)
 	}

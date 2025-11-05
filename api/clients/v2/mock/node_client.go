@@ -19,7 +19,8 @@ func NewNodeClient() *MockNodeClient {
 	return &MockNodeClient{}
 }
 
-func (c *MockNodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*core.Signature, error) {
+func (c *MockNodeClient) StoreChunks(
+	ctx context.Context, batch *corev2.Batch, validatorID core.OperatorID) (*core.Signature, error) {
 	args := c.Called()
 	var signature *core.Signature
 	if args.Get(0) != nil {

@@ -22,7 +22,7 @@ type NodeClientConfig struct {
 }
 
 type NodeClient interface {
-	StoreChunks(ctx context.Context, certs *corev2.Batch) (*core.Signature, error)
+	StoreChunks(ctx context.Context, certs *corev2.Batch, validatorID core.OperatorID) (*core.Signature, error)
 	Close() error
 }
 
@@ -54,7 +54,11 @@ func NewNodeClient(config *NodeClientConfig, requestSigner DispersalRequestSigne
 	}, nil
 }
 
-func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*core.Signature, error) {
+func (c *nodeClient) StoreChunks(
+	ctx context.Context,
+	batch *corev2.Batch,
+	validatorID core.OperatorID,
+) (*core.Signature, error) {
 	if len(batch.BlobCertificates) == 0 {
 		return nil, fmt.Errorf("no blob certificates in the batch")
 	}
@@ -88,6 +92,8 @@ func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*cor
 		}
 		request.Signature = signature
 	}
+
+	SimulateLatency(ctx, validatorID)
 
 	// Call the gRPC method to store chunks
 	response, err := c.dispersalClient.StoreChunks(ctx, request)
