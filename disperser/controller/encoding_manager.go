@@ -238,62 +238,72 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 	return nil
 }
 
-func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.BlobMetadata {
-	dedupedBlobs := make([]*v2.BlobMetadata, 0)
-	for _, blob := range blobMetadatas {
-		key, err := blob.BlobHeader.BlobKey()
-		if err != nil {
-			e.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt)
-			continue
-		}
-		if !e.blobSet.Contains(key) {
-			dedupedBlobs = append(dedupedBlobs, blob)
-		}
-	}
-	return dedupedBlobs
-}
-
-// filterStaleBlobs filters out dispersals that are older than maxDispersalAge.
-// Stale dispersals are marked as Failed in the metadata store.
-func (e *EncodingManager) filterStaleBlobs(ctx context.Context, blobMetadatas []*v2.BlobMetadata) []*v2.BlobMetadata {
-	freshBlobs := make([]*v2.BlobMetadata, 0, len(blobMetadatas))
+// filterStaleAndDedupBlobs filters out stale and duplicate blob.
+func (e *EncodingManager) filterStaleAndDedupBlobs(
+	ctx context.Context,
+	inputMetadatas []*v2.BlobMetadata,
+) []*v2.BlobMetadata {
+	outputMetadatas := make([]*v2.BlobMetadata, 0, len(inputMetadatas))
 	now := e.getNow()
 
-	for _, blob := range blobMetadatas {
-		dispersalTime := time.Unix(0, blob.BlobHeader.PaymentMetadata.Timestamp)
-		age := now.Sub(dispersalTime)
-
-		if age <= e.MaxDispersalAge {
-			freshBlobs = append(freshBlobs, blob)
+	for _, metadata := range inputMetadatas {
+		blobKey, err := metadata.BlobHeader.BlobKey()
+		if err != nil {
+			e.logger.Errorf("compute blob key: %w", err)
+			// we must discard if we cannot compute key, since it's used for deduplication
 			continue
 		}
 
-		e.metrics.reportStaleDispersal()
-
-		blobKey, err := blob.BlobHeader.BlobKey()
-		if err != nil {
-			e.logger.Errorf("compute blob key for stale blob: %w", err)
+		if e.isBlobStale(ctx, blobKey, now, metadata.BlobHeader.PaymentMetadata.Timestamp) {
+			// discard stale blob
 			continue
 		}
 
-		e.logger.Warnf(
-			"discarding stale dispersal: blobKey=%s dispersalAge=%s maxAge=%s dispersalTime=%s",
-			blobKey.Hex(),
-			age.String(),
-			e.MaxDispersalAge.String(),
-			dispersalTime.Format(time.RFC3339),
-		)
-
-		// Update status to Failed
-		storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
-		err = e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Failed)
-		cancel()
-		if err != nil {
-			e.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
+		if e.blobSet.Contains(blobKey) {
+			// discard duplicate blob
+			continue
 		}
+
+		outputMetadatas = append(outputMetadatas, metadata)
 	}
 
-	return freshBlobs
+	return outputMetadatas
+}
+
+// Checks if a blob is older than MaxDispersalAge and handles it accordingly.
+// If the blob is stale, it increments metrics, logs a warning, and updates the database status to Failed.
+// Returns true if the blob is stale, otherwise false.
+func (e *EncodingManager) isBlobStale(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	now time.Time,
+	dispersalTimestamp int64,
+) bool {
+	dispersalTime := time.Unix(0, dispersalTimestamp)
+	dispersalAge := now.Sub(dispersalTime)
+
+	if dispersalAge <= e.MaxDispersalAge {
+		return false
+	}
+
+	e.metrics.reportStaleDispersal()
+
+	e.logger.Warnf(
+		"discarding stale dispersal: blobKey=%s dispersalAge=%s maxAge=%s dispersalTime=%s",
+		blobKey.Hex(),
+		dispersalAge.String(),
+		e.MaxDispersalAge.String(),
+		dispersalTime.Format(time.RFC3339),
+	)
+
+	storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
+	err := e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Failed)
+	cancel()
+	if err != nil {
+		e.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
+	}
+
+	return true
 }
 
 // HandleBatch handles a batch of blobs to encode
@@ -311,8 +321,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		return err
 	}
 
-	blobMetadatas = e.dedupBlobs(blobMetadatas)
-	blobMetadatas = e.filterStaleBlobs(ctx, blobMetadatas)
+	blobMetadatas = e.filterStaleAndDedupBlobs(ctx, blobMetadatas)
 	e.metrics.reportBlobSetSize(e.blobSet.Size())
 	if len(blobMetadatas) == 0 {
 		return errNoBlobsToEncode
