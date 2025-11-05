@@ -1,6 +1,7 @@
 package reservation
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -31,6 +32,10 @@ func NewReservationLedger(
 	// timeSource should be capable of providing monotonic timestamps for best results
 	timeSource func() time.Time,
 ) (*ReservationLedger, error) {
+	if timeSource == nil {
+		return nil, errors.New("timeSource must be non-nil")
+	}
+
 	leakyBucket, err := ratelimit.NewLeakyBucket(
 		float64(config.reservation.symbolsPerSecond),
 		config.bucketCapacityDuration,
@@ -105,7 +110,7 @@ func (rl *ReservationLedger) Debit(
 //
 // Note that this method doesn't reset the state of the ledger to be the same as when the debit was made: it just
 // "refunds" the amount of symbols that were originally debited. Since the leaky bucket backing the reservation can't
-// get emptier than "empty", it may be the case that only a portion of the debit is reverted, with the final capacity
+// get emptier than "empty", it may be the case that only a portion of the debit is reverted, with the final fill level
 // being clamped to 0.
 //
 // Returns the remaining capacity in the bucket after the revert operation.

@@ -59,8 +59,6 @@ func NewClientLedger(
 	reservationLedger *reservation.ReservationLedger,
 	// may be nil if clientLedgerMode is configured to not use on-demand payments
 	onDemandLedger *ondemand.OnDemandLedger,
-	// Should be a timesource which includes monotonic timestamps, for best results. Otherwise, reservation payments
-	// may occasionally fail due to NTP adjustments
 	getNow func() time.Time,
 	// provides access to payment vault contract
 	paymentVault payments.PaymentVault,
