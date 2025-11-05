@@ -18,7 +18,7 @@ import (
 type signatureReceiver struct {
 	logger logging.Logger
 	// metrics may be nil, in which case no metrics will be reported
-	metrics *dispatcherMetrics
+	metrics *controllerMetrics
 
 	// indexedOperatorState contains operator information including pubkeys, stakes, and quorum membership
 	indexedOperatorState *core.IndexedOperatorState
@@ -92,7 +92,7 @@ type signatureReceiver struct {
 func ReceiveSignatures(
 	ctx context.Context,
 	logger logging.Logger,
-	metrics *dispatcherMetrics,
+	metrics *controllerMetrics,
 	indexedOperatorState *core.IndexedOperatorState,
 	batchHeaderHash [32]byte,
 	signingMessageChan chan core.SigningMessage,

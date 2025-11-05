@@ -155,7 +155,7 @@ type Dispatcher struct {
 	aggregator        core.SignatureAggregator
 	nodeClientManager NodeClientManager
 	logger            logging.Logger
-	metrics           *dispatcherMetrics
+	metrics           *controllerMetrics
 
 	cursor *blobstore.StatusIndexCursor
 
@@ -204,7 +204,7 @@ func NewDispatcher(
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	metrics, err := newDispatcherMetrics(
+	metrics, err := newControllerMetrics(
 		registry,
 		config.SignificantSigningThresholdFraction,
 		config.CollectDetailedValidatorSigningMetrics)
@@ -534,6 +534,22 @@ func (d *Dispatcher) HandleSignatures(
 			batchData.BatchSizeBytes,
 			signingFraction)
 	}
+
+	// Track legacy attestation metrics. This can be removed once we modify alerts to use other metrics.
+	operatorCount := make(map[core.QuorumID]int)
+	signerCount := make(map[core.QuorumID]int)
+	for quorumID, opState := range batchData.OperatorState.Operators {
+		operatorCount[quorumID] = len(opState)
+		if _, ok := signerCount[quorumID]; !ok {
+			signerCount[quorumID] = 0
+		}
+		for opID := range opState {
+			if _, ok := finalAttestation.SignerMap[opID]; ok {
+				signerCount[quorumID]++
+			}
+		}
+	}
+	d.metrics.reportAttestation(operatorCount, signerCount, finalAttestation.QuorumResults)
 
 	return nil
 }

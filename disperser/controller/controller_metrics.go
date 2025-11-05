@@ -11,10 +11,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+// "dispatcher" is an unfortunate prefix, but since changing it will break many dashboards and alerts,
+// we will keep it for now.
 const controllerNamespace = "eigenda_dispatcher"
 
-// dispatcherMetrics is a struct that holds the metrics for the dispatcher.
-type dispatcherMetrics struct {
+// controllerMetrics is a struct that holds the metrics for the controller.
+type controllerMetrics struct {
 	processSigningMessageLatency *prometheus.SummaryVec
 	signingMessageChannelLatency *prometheus.SummaryVec
 	attestationUpdateLatency     *prometheus.SummaryVec
@@ -26,6 +28,7 @@ type dispatcherMetrics struct {
 	updateBatchStatusLatency     *prometheus.SummaryVec
 	blobE2EDispersalLatency      *prometheus.SummaryVec
 	completedBlobs               *prometheus.CounterVec
+	attestation                  *prometheus.GaugeVec
 	blobSetSize                  *prometheus.GaugeVec
 	batchStageTimer              *common.StageTimer
 	sendToValidatorStageTimer    *common.StageTimer
@@ -47,11 +50,8 @@ type dispatcherMetrics struct {
 	collectDetailedValidatorMetrics bool
 }
 
-// NewDispatcherMetrics sets up metrics for the dispatcher.
-//
-// importantSigningThresholds is a list of meaningful thresholds. Thresholds should be between 0.0 and 1.0.
-// A count of batches meeting each specified threshold is reported as a metric.
-func newDispatcherMetrics(
+// Sets up metrics for the controller.
+func newControllerMetrics(
 	registry *prometheus.Registry,
 	// The minimum fraction of signers for a batch to be considered properly signed. Any fraction greater
 	// than or equal to this value is considered a successful signing.
@@ -59,12 +59,24 @@ func newDispatcherMetrics(
 	// If true, collect detailed per-validator metrics. This can be disabled if the volume of data
 	// produced is too high.
 	collectDetailedValidatorMetrics bool,
-) (*dispatcherMetrics, error) {
+) (*controllerMetrics, error) {
 	if registry == nil {
 		return nil, nil
 	}
 
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
+
+	// This metric is a loaded footgun, since it obscures quite a lot of information about what's happening
+	// in the system. New metrics replace this, however we need to keep it around until alerts and dashboards
+	// are configured to use the new metrics.
+	attestation := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: controllerNamespace,
+			Name:      "attestation",
+			Help:      "number of signers and non-signers for the batch",
+		},
+		[]string{"type", "quorum"},
+	)
 
 	processSigningMessageLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
@@ -78,9 +90,10 @@ func newDispatcherMetrics(
 
 	signingMessageChannelLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  controllerNamespace,
-			Name:       "signing_message_channel_latency_ms",
-			Help:       "The time a signing message sits in the channel waiting to be processed (part of HandleSignatures()).",
+			Namespace: controllerNamespace,
+			Name:      "signing_message_channel_latency_ms",
+			Help: "The time a signing message sits in the channel " +
+				"waiting to be processed (part of HandleSignatures()).",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -88,9 +101,10 @@ func newDispatcherMetrics(
 
 	attestationUpdateLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  controllerNamespace,
-			Name:       "attestation_update_latency_ms",
-			Help:       "The time between the signature receiver yielding attestations (part of HandleSignatures()).",
+			Namespace: controllerNamespace,
+			Name:      "attestation_update_latency_ms",
+			Help: "The time between the signature receiver yielding " +
+				"attestations (part of HandleSignatures()).",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -98,9 +112,10 @@ func newDispatcherMetrics(
 
 	attestationBuildingLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  controllerNamespace,
-			Name:       "attestation_building_latency_ms",
-			Help:       "The time it takes for the signature receiver to build and send a single attestation (part of HandleSignatures()).",
+			Namespace: controllerNamespace,
+			Name:      "attestation_building_latency_ms",
+			Help: "The time it takes for the signature receiver to build and " +
+				"send a single attestation (part of HandleSignatures()).",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -278,7 +293,7 @@ func newDispatcherMetrics(
 		[]string{"quorum"},
 	)
 
-	return &dispatcherMetrics{
+	return &controllerMetrics{
 		processSigningMessageLatency:    processSigningMessageLatency,
 		signingMessageChannelLatency:    signingMessageChannelLatency,
 		attestationUpdateLatency:        attestationUpdateLatency,
@@ -290,6 +305,7 @@ func newDispatcherMetrics(
 		updateBatchStatusLatency:        updateBatchStatusLatency,
 		blobE2EDispersalLatency:         blobE2EDispersalLatency,
 		completedBlobs:                  completedBlobs,
+		attestation:                     attestation,
 		blobSetSize:                     blobSetSize,
 		batchStageTimer:                 batchStageTimer,
 		sendToValidatorStageTimer:       sendToValidatorStageTimer,
@@ -307,35 +323,35 @@ func newDispatcherMetrics(
 	}, nil
 }
 
-func (m *dispatcherMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
+func (m *controllerMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.processSigningMessageLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportSigningMessageChannelLatency(duration time.Duration) {
+func (m *controllerMetrics) reportSigningMessageChannelLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.signingMessageChannelLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportAttestationUpdateLatency(duration time.Duration) {
+func (m *controllerMetrics) reportAttestationUpdateLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.attestationUpdateLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportAttestationBuildingLatency(duration time.Duration) {
+func (m *controllerMetrics) reportAttestationBuildingLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.attestationBuildingLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
+func (m *controllerMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
 	if m == nil {
 		return
 	}
@@ -343,42 +359,42 @@ func (m *dispatcherMetrics) reportThresholdSignedToDoneLatency(quorumID core.Quo
 		common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportAggregateSignaturesLatency(duration time.Duration) {
+func (m *controllerMetrics) reportAggregateSignaturesLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.aggregateSignaturesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportPutAttestationLatency(duration time.Duration) {
+func (m *controllerMetrics) reportPutAttestationLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.putAttestationLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportAttestationUpdateCount(attestationCount float64) {
+func (m *controllerMetrics) reportAttestationUpdateCount(attestationCount float64) {
 	if m == nil {
 		return
 	}
 	m.attestationUpdateCount.WithLabelValues().Observe(attestationCount)
 }
 
-func (m *dispatcherMetrics) reportUpdateBatchStatusLatency(duration time.Duration) {
+func (m *controllerMetrics) reportUpdateBatchStatusLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.updateBatchStatusLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportE2EDispersalLatency(duration time.Duration) {
+func (m *controllerMetrics) reportE2EDispersalLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.blobE2EDispersalLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
+func (m *controllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
 	if m == nil {
 		return
 	}
@@ -397,14 +413,42 @@ func (m *dispatcherMetrics) reportCompletedBlob(size int, status dispv2.BlobStat
 	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
 }
 
-func (m *dispatcherMetrics) reportBlobSetSize(size int) {
+func (m *controllerMetrics) reportBlobSetSize(size int) {
 	if m == nil {
 		return
 	}
 	m.blobSetSize.WithLabelValues().Set(float64(size))
 }
 
-func (m *dispatcherMetrics) ReportGlobalSigningThreshold(
+func (m *controllerMetrics) reportAttestation(
+	operatorCount map[core.QuorumID]int,
+	signerCount map[core.QuorumID]int,
+	quorumResults map[core.QuorumID]*core.QuorumResult,
+) {
+
+	if m == nil {
+		return
+	}
+
+	for quorumID, count := range operatorCount {
+		quorumStr := fmt.Sprintf("%d", quorumID)
+		signers, ok := signerCount[quorumID]
+		if !ok {
+			continue
+		}
+		nonSigners := count - signers
+		quorumResult, ok := quorumResults[quorumID]
+		if !ok {
+			continue
+		}
+
+		m.attestation.WithLabelValues("signers", quorumStr).Set(float64(signers))
+		m.attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
+		m.attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
+	}
+}
+
+func (m *controllerMetrics) ReportGlobalSigningThreshold(
 	quorumID core.QuorumID,
 	batchSizeBytes uint64,
 	signingFraction float64,
@@ -427,7 +471,7 @@ func (m *dispatcherMetrics) ReportGlobalSigningThreshold(
 	m.globalSigningFractionHistogram.With(labels).Observe(signingFraction)
 }
 
-func (m *dispatcherMetrics) newBatchProbe() *common.SequenceProbe {
+func (m *controllerMetrics) newBatchProbe() *common.SequenceProbe {
 	if m == nil {
 		// A sequence probe becomes a no-op when nil.
 		return nil
@@ -436,7 +480,7 @@ func (m *dispatcherMetrics) newBatchProbe() *common.SequenceProbe {
 	return m.batchStageTimer.NewSequence()
 }
 
-func (m *dispatcherMetrics) newSendToValidatorProbe() *common.SequenceProbe {
+func (m *controllerMetrics) newSendToValidatorProbe() *common.SequenceProbe {
 	if m == nil {
 		// A sequence probe becomes a no-op when nil.
 		return nil
@@ -446,7 +490,7 @@ func (m *dispatcherMetrics) newSendToValidatorProbe() *common.SequenceProbe {
 }
 
 // Report the result of an attempted signing event for a validator.
-func (m *dispatcherMetrics) ReportValidatorSigningResult(
+func (m *controllerMetrics) ReportValidatorSigningResult(
 	id core.OperatorID,
 	stakeFraction float64,
 	batchSize uint64,
