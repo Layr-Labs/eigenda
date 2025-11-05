@@ -54,11 +54,6 @@ const (
 	hoodiEigenDADirectory    = "0x5a44e56e88abcf610c68340c6814ae7f5c4369fd"
 	hoodiCertVerifierAddress = "0xD82d14F1c6d1403E95Cd9EC40CBb6463E27C1c5F"
 	hoodiSvcManagerAddress   = "0x3FF2204A567C15dC3731140B95362ABb4b17d8ED"
-
-	disperserHoodiPreprodHostname   = "disperser-v2-preprod-hoodi.eigenda.xyz"
-	hoodiPreprodEigenDADirectory    = "0xbFa1b820bb302925a3eb98C8836a95361FB75b87"
-	hoodiPreprodCertVerifierAddress = "0xb64101890d15499790d665f9863ede1278ce553d"
-	hoodiPreprodSvcManagerAddress   = "0x9F3A67f1b56d0B21115A54356c02B2d77f39EA8a"
 )
 
 var (
@@ -108,16 +103,20 @@ const (
 	SepoliaBackend Backend = iota + 1
 	MemstoreBackend
 	HoodiTestnetBackend
-	HoodiPreprodBackend
 )
 
+// Looking forward to the day this function can be obliterated.....
 func (b Backend) SupportsEigenDAV1() bool {
 	switch b {
-	case HoodiTestnetBackend, HoodiPreprodBackend:
+	// NOTE: technically HoodiTestnetBackend supports V1 but why do we care to test it?
+	case HoodiTestnetBackend:
 		return false
 
-	default:
+	case SepoliaBackend, MemstoreBackend:
 		return true
+
+	default:
+		panic("unknown backend type")
 
 	}
 }
@@ -131,8 +130,6 @@ func ParseBackend(inputString string) (Backend, error) {
 		return MemstoreBackend, nil
 	case "hoodi-testnet":
 		return HoodiTestnetBackend, nil
-	case "hoodi-preprod":
-		return HoodiPreprodBackend, nil
 
 	default:
 		return 0, fmt.Errorf("invalid backend: %s", inputString)
@@ -266,11 +263,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		svcManagerAddress = hoodiSvcManagerAddress
 		eigenDADirectory = hoodiEigenDADirectory
 
-	case HoodiPreprodBackend:
-		disperserHostname = disperserHoodiPreprodHostname
-		certVerifierAddress = hoodiPreprodCertVerifierAddress
-		svcManagerAddress = hoodiPreprodSvcManagerAddress
-		eigenDADirectory = hoodiPreprodEigenDADirectory
 	default:
 		panic("Unsupported backend")
 	}

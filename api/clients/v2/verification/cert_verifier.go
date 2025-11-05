@@ -96,9 +96,6 @@ func (cv *CertVerifier) CheckDACert(
 		To:   &certVerifierAddr,
 		Data: callMsgBytes,
 	}, nil)
-	// cv.logger.Info("certVerifier checkDACert call failed", "to", certVerifierAddr,
-	// 	"calldata", hex.EncodeToString(callMsgBytes), "abi-encoded-cert", hex.EncodeToString(certBytes))
-	// panic("bleh")
 	if err != nil {
 		cv.logger.Error("certVerifier checkDACert call failed", "to", certVerifierAddr,
 			"calldata", hex.EncodeToString(callMsgBytes), "abi-encoded-cert", hex.EncodeToString(certBytes))
