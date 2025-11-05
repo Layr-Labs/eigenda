@@ -4,7 +4,7 @@ This directory contains the deployment script for the EigenDACertVerifierRouter 
 
 ## Overview
 
-The EigenDACertVerifierRouter is a routing contract that directs certificate verification requests to the appropriate cert verifier contract based on the reference block number (RBN) in the certificate. This contract is deployed as implementation behind an Open Zepellin [ERC1967](https://eips.ethereum.org/EIPS/eip-1967) proxy.
+The EigenDACertVerifierRouter is a routing contract that directs certificate verification requests to the appropriate cert verifier contract based on the reference block number (RBN) in the certificate. This contract is deployed as implementation behind an OpenZeppelin [ERC1967](https://eips.ethereum.org/EIPS/eip-1967) proxy.
 
 
 ## Deployment
