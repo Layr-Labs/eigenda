@@ -34,7 +34,7 @@ test-e2e-local:
 	BACKEND=memstore gotestsum --format testname -- -v -timeout 10m ./test/e2e -parallel 8
 
 # E2E tests using hoodi testnet backend.
-test-e2e-hoodi:
+test-e2e-hoodi-testnet:
 	BACKEND=hoodi-testnet gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
 # E2E tests using hoodi preprod backend. this is expected to fail since retrieval ingress is turned off.

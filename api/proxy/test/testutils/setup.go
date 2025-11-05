@@ -50,10 +50,10 @@ const (
 	sepoliaCertVerifierAddress = "0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429"
 	sepoliaSvcManagerAddress   = "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764"
 
-	disperserHoodiHostname   = "disperser-hoodi.eigenda.xyz"
-	hoodiEigenDADirectory    = "0x5a44e56e88abcf610c68340c6814ae7f5c4369fd"
-	hoodiCertVerifierAddress = "0xD82d14F1c6d1403E95Cd9EC40CBb6463E27C1c5F"
-	hoodiSvcManagerAddress   = "0x3FF2204A567C15dC3731140B95362ABb4b17d8ED"
+	disperserHoodiTestnetHostname   = "disperser-hoodi.eigenda.xyz"
+	hoodiTestnetEigenDADirectory    = "0x5a44e56e88abcf610c68340c6814ae7f5c4369fd"
+	hoodiTestnetCertVerifierAddress = "0xD82d14F1c6d1403E95Cd9EC40CBb6463E27C1c5F"
+	hoodiTestnetSvcManagerAddress   = "0x3FF2204A567C15dC3731140B95362ABb4b17d8ED"
 
 	disperserHoodiPreprodHostname   = "disperser-v2-preprod-hoodi.eigenda.xyz"
 	hoodiPreprodEigenDADirectory    = "0xbFa1b820bb302925a3eb98C8836a95361FB75b87"
@@ -145,7 +145,7 @@ func ParseBackend(inputString string) (Backend, error) {
 func GetBackend() Backend {
 	backend, err := ParseBackend(os.Getenv(backendEnvVar))
 	if err != nil {
-		panic(fmt.Sprintf("BACKEND must be = memstore|hoodi|sepolia. parse backend error: %v", err))
+		panic(fmt.Sprintf("BACKEND must be = memstore|hoodi-testnet|hoodi-preprod|sepolia. parse backend error: %v", err))
 	}
 	return backend
 }
@@ -264,10 +264,10 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		eigenDADirectory = sepoliaEigenDADirectory
 
 	case HoodiTestnetBackend:
-		disperserHostname = disperserHoodiHostname
-		certVerifierAddress = hoodiCertVerifierAddress
-		svcManagerAddress = hoodiSvcManagerAddress
-		eigenDADirectory = hoodiEigenDADirectory
+		disperserHostname = disperserHoodiTestnetHostname
+		certVerifierAddress = hoodiTestnetCertVerifierAddress
+		svcManagerAddress = hoodiTestnetSvcManagerAddress
+		eigenDADirectory = hoodiTestnetEigenDADirectory
 
 	case HoodiPreprodBackend:
 		disperserHostname = disperserHoodiPreprodHostname

@@ -102,7 +102,7 @@ jobs:
           working_directory: api/proxy
       - run: go mod download
         working-directory: api/proxy
-      - run: make test-e2e-hoodi
+      - run: make test-e2e-hoodi-testnet
         working-directory: api/proxy
         env:
           SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_HOODI_PRIVATE_KEY }}
