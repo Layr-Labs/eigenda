@@ -238,7 +238,7 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 	return nil
 }
 
-// filterStaleAndDedupBlobs filters out stale and duplicate blob.
+// Iterates over the input metadata slice, and returns a new slice with stale and duplicate metadatas filtered out
 func (e *EncodingManager) filterStaleAndDedupBlobs(
 	ctx context.Context,
 	inputMetadatas []*v2.BlobMetadata,
