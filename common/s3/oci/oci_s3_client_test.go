@@ -10,7 +10,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/s3"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/oracle/oci-go-sdk/v65/objectstorage"
 	"github.com/stretchr/testify/assert"
@@ -149,7 +149,7 @@ func (c *testOciClient) DownloadObject(ctx context.Context, bucket string, key s
 	}
 
 	if len(data) == 0 {
-		return nil, ErrObjectNotFound
+		return nil, s3.ErrObjectNotFound
 	}
 
 	return data, nil
@@ -210,7 +210,7 @@ func (c *testOciClient) DeleteObject(ctx context.Context, bucket string, key str
 	return nil
 }
 
-func (c *testOciClient) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3.Object, error) {
+func (c *testOciClient) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3.ListedObject, error) {
 	<-c.concurrencyLimiter
 	defer func() { c.concurrencyLimiter <- struct{}{} }()
 
@@ -225,9 +225,9 @@ func (c *testOciClient) ListObjects(ctx context.Context, bucket string, prefix s
 		return nil, fmt.Errorf("failed to list objects from bucket %s with prefix %s: %w", bucket, prefix, err)
 	}
 
-	objects := make([]s3.Object, len(response.Objects))
+	objects := make([]s3.ListedObject, len(response.Objects))
 	for i, obj := range response.Objects {
-		objects[i] = s3.Object{
+		objects[i] = s3.ListedObject{
 			Key:  *obj.Name,
 			Size: *obj.Size,
 		}
@@ -361,7 +361,7 @@ func TestOCIClient_DownloadObject_EmptyData(t *testing.T) {
 
 	_, err := client.DownloadObject(ctx, bucket, key)
 
-	assert.Equal(t, ErrObjectNotFound, err)
+	assert.Equal(t, s3.ErrObjectNotFound, err)
 	mockClient.AssertExpectations(t)
 }
 
@@ -459,8 +459,8 @@ func TestOCIClient_ListObjects(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Len(t, objects, 2)
-	assert.Equal(t, s3.Object{Key: "object1", Size: 100}, objects[0])
-	assert.Equal(t, s3.Object{Key: "object2", Size: 200}, objects[1])
+	assert.Equal(t, s3.ListedObject{Key: "object1", Size: 100}, objects[0])
+	assert.Equal(t, s3.ListedObject{Key: "object2", Size: 200}, objects[1])
 	mockClient.AssertExpectations(t)
 }
 
@@ -727,7 +727,7 @@ func TestNewObjectStorageClient(t *testing.T) {
 	logger := &mockLogger{}
 
 	// This test will fail in CI without OCI credentials, but demonstrates the interface
-	client, err := NewObjectStorageClient(ctx, config, logger)
+	client, err := NewOciS3Client(ctx, config, logger)
 	if err != nil {
 		// We expect an error in test environment without OCI setup
 		assert.Contains(t, err.Error(), "failed to create OCI Object Storage client")
@@ -749,7 +749,7 @@ func TestNewObjectStorageClient_FragmentParallelismConstant(t *testing.T) {
 	ctx := context.Background()
 	logger := &mockLogger{}
 
-	client, err := NewObjectStorageClient(ctx, config, logger)
+	client, err := NewOciS3Client(ctx, config, logger)
 	// We expect this to fail due to auth, but the config processing should work
 	assert.Error(t, err)
 	assert.Nil(t, client)
@@ -764,7 +764,7 @@ func TestNewObjectStorageClient_FragmentParallelismFactor(t *testing.T) {
 	ctx := context.Background()
 	logger := &mockLogger{}
 
-	client, err := NewObjectStorageClient(ctx, config, logger)
+	client, err := NewOciS3Client(ctx, config, logger)
 	// We expect this to fail due to auth, but the config processing should work
 	assert.Error(t, err)
 	assert.Nil(t, client)
@@ -777,7 +777,7 @@ func TestNewObjectStorageClient_DefaultWorkers(t *testing.T) {
 	ctx := context.Background()
 	logger := &mockLogger{}
 
-	client, err := NewObjectStorageClient(ctx, config, logger)
+	client, err := NewOciS3Client(ctx, config, logger)
 	// We expect this to fail due to auth, but the config processing should work
 	assert.Error(t, err)
 	assert.Nil(t, client)
@@ -822,7 +822,7 @@ func TestNewObjectStorageClient_EnvVarFallbacks(t *testing.T) {
 	ctx := context.Background()
 	logger := &mockLogger{}
 
-	client, err := NewObjectStorageClient(ctx, config, logger)
+	client, err := NewOciS3Client(ctx, config, logger)
 	// We expect this to fail due to auth, but the env var processing should work
 	assert.Error(t, err)
 	assert.Nil(t, client)
@@ -861,7 +861,7 @@ func (c *testableOciClient) DownloadObject(ctx context.Context, bucket string, k
 	}
 
 	if len(data) == 0 {
-		return nil, ErrObjectNotFound
+		return nil, s3.ErrObjectNotFound
 	}
 
 	return data, nil
@@ -878,7 +878,7 @@ func (c *testableOciClient) HeadObject(ctx context.Context, bucket string, key s
 	if err != nil {
 		// Check if it's a 404 error
 		if response.RawResponse != nil && response.RawResponse.StatusCode == 404 {
-			return nil, ErrObjectNotFound
+			return nil, s3.ErrObjectNotFound
 		}
 		return nil, fmt.Errorf("failed to head object: %w", err)
 	}
@@ -918,7 +918,7 @@ func (c *testableOciClient) DeleteObject(ctx context.Context, bucket string, key
 	return nil
 }
 
-func (c *testableOciClient) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3.Object, error) {
+func (c *testableOciClient) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3.ListedObject, error) {
 	listObjectsRequest := objectstorage.ListObjectsRequest{
 		NamespaceName: &c.cfg.Namespace,
 		BucketName:    &bucket,
@@ -931,7 +931,7 @@ func (c *testableOciClient) ListObjects(ctx context.Context, bucket string, pref
 		return nil, fmt.Errorf("failed to list objects from OCI: %w", err)
 	}
 
-	objects := make([]s3.Object, 0, len(response.Objects))
+	objects := make([]s3.ListedObject, 0, len(response.Objects))
 	for _, object := range response.Objects {
 		var size int64 = 0
 		if object.Size != nil {
@@ -941,7 +941,7 @@ func (c *testableOciClient) ListObjects(ctx context.Context, bucket string, pref
 		if object.Name != nil {
 			key = *object.Name
 		}
-		objects = append(objects, s3.Object{
+		objects = append(objects, s3.ListedObject{
 			Key:  key,
 			Size: size,
 		})
@@ -1051,7 +1051,7 @@ func TestOciClient_DownloadObject_EmptyData(t *testing.T) {
 
 	_, err := client.DownloadObject(ctx, bucket, key)
 
-	assert.Equal(t, ErrObjectNotFound, err)
+	assert.Equal(t, s3.ErrObjectNotFound, err)
 	mockClient.AssertExpectations(t)
 }
 
@@ -1111,7 +1111,7 @@ func TestOciClient_HeadObject_NotFound(t *testing.T) {
 
 	_, err := client.HeadObject(ctx, bucket, key)
 
-	assert.Equal(t, ErrObjectNotFound, err)
+	assert.Equal(t, s3.ErrObjectNotFound, err)
 	mockClient.AssertExpectations(t)
 }
 
@@ -1242,8 +1242,8 @@ func TestOciClient_ListObjects(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Len(t, objects, 2)
-	assert.Equal(t, s3.Object{Key: "object1", Size: 100}, objects[0])
-	assert.Equal(t, s3.Object{Key: "object2", Size: 200}, objects[1])
+	assert.Equal(t, s3.ListedObject{Key: "object1", Size: 100}, objects[0])
+	assert.Equal(t, s3.ListedObject{Key: "object2", Size: 200}, objects[1])
 	mockClient.AssertExpectations(t)
 }
 
@@ -1273,7 +1273,7 @@ func TestOciClient_ListObjects_NilValues(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Len(t, objects, 1)
-	assert.Equal(t, s3.Object{Key: "", Size: 0}, objects[0])
+	assert.Equal(t, s3.ListedObject{Key: "", Size: 0}, objects[0])
 	mockClient.AssertExpectations(t)
 }
 
@@ -1408,7 +1408,7 @@ func TestObjectStorageConfig_WorkerCalculations(t *testing.T) {
 			logger := &mockLogger{}
 
 			// Test that the config is processed (even though client creation will fail)
-			client, err := NewObjectStorageClient(ctx, config, logger)
+			client, err := NewOciS3Client(ctx, config, logger)
 			assert.Error(t, err) // Expected due to auth failure
 			assert.Nil(t, client)
 			assert.Contains(t, err.Error(), "failed to create OCI Object Storage client")
@@ -1446,7 +1446,7 @@ func TestOCIClient_ConcurrencyLimiter(t *testing.T) {
 		}
 
 		// Test client creation logic - will fail at OCI auth (expected)
-		_, err := NewObjectStorageClient(context.Background(), cfg, &mockLogger{})
+		_, err := NewOciS3Client(context.Background(), cfg, &mockLogger{})
 		assert.Error(t, err) // Expected due to missing OCI credentials
 		assert.Contains(t, err.Error(), "failed to create OCI Object Storage client")
 	})

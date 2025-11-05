@@ -17,40 +17,40 @@ func TestGetFragmentCount(t *testing.T) {
 	// Test a file smaller than a fragment
 	fileSize := rand.Intn(100) + 100
 	fragmentSize := fileSize * 2
-	fragmentCount := getFragmentCount(fileSize, fragmentSize)
+	fragmentCount := GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, 1, fragmentCount)
 
 	// Test a file that can fit in a single fragment
 	fileSize = rand.Intn(100) + 100
 	fragmentSize = fileSize
-	fragmentCount = getFragmentCount(fileSize, fragmentSize)
+	fragmentCount = GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, 1, fragmentCount)
 
 	// Test a file that is one byte larger than a fragment
 	fileSize = rand.Intn(100) + 100
 	fragmentSize = fileSize - 1
-	fragmentCount = getFragmentCount(fileSize, fragmentSize)
+	fragmentCount = GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, 2, fragmentCount)
 
 	// Test a file that is one less than a multiple of the fragment size
 	fragmentSize = rand.Intn(100) + 100
 	expectedFragmentCount := rand.Intn(10) + 1
 	fileSize = fragmentSize*expectedFragmentCount - 1
-	fragmentCount = getFragmentCount(fileSize, fragmentSize)
+	fragmentCount = GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, expectedFragmentCount, fragmentCount)
 
 	// Test a file that is a multiple of the fragment size
 	fragmentSize = rand.Intn(100) + 100
 	expectedFragmentCount = rand.Intn(10) + 1
 	fileSize = fragmentSize * expectedFragmentCount
-	fragmentCount = getFragmentCount(fileSize, fragmentSize)
+	fragmentCount = GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, expectedFragmentCount, fragmentCount)
 
 	// Test a file that is one more than a multiple of the fragment size
 	fragmentSize = rand.Intn(100) + 100
 	expectedFragmentCount = rand.Intn(10) + 2
 	fileSize = fragmentSize*(expectedFragmentCount-1) + 1
-	fragmentCount = getFragmentCount(fileSize, fragmentSize)
+	fragmentCount = GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, expectedFragmentCount, fragmentCount)
 }
 
@@ -63,7 +63,7 @@ func TestKeyBody(t *testing.T) {
 		key := random.RandomString(keyLength)
 		fragmentCount := rand.Intn(10) + 10
 		fragmentIndex := rand.Intn(fragmentCount)
-		fragmentKey, err := getFragmentKey(key, fragmentCount, fragmentIndex)
+		fragmentKey, err := GetFragmentKey(key, fragmentCount, fragmentIndex)
 		assert.NoError(t, err)
 
 		parts := strings.Split(fragmentKey, "-")
@@ -81,7 +81,7 @@ func TestKeyIndex(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		fragmentCount := rand.Intn(10) + 10
 		index := rand.Intn(fragmentCount)
-		fragmentKey, err := getFragmentKey(random.RandomString(10), fragmentCount, index)
+		fragmentKey, err := GetFragmentKey(random.RandomString(10), fragmentCount, index)
 		assert.NoError(t, err)
 
 		parts := strings.Split(fragmentKey, "-")
@@ -99,7 +99,7 @@ func TestKeyPostfix(t *testing.T) {
 	segmentCount := rand.Intn(10) + 10
 
 	for i := 0; i < segmentCount; i++ {
-		fragmentKey, err := getFragmentKey(random.RandomString(10), segmentCount, i)
+		fragmentKey, err := GetFragmentKey(random.RandomString(10), segmentCount, i)
 		assert.NoError(t, err)
 
 		if i == segmentCount-1 {
@@ -136,7 +136,7 @@ func TestGetFragmentKeys(t *testing.T) {
 	assert.Equal(t, fragmentCount, len(fragmentKeys))
 
 	for i := 0; i < fragmentCount; i++ {
-		expectedKey, err := getFragmentKey(fileKey, fragmentCount, i)
+		expectedKey, err := GetFragmentKey(fileKey, fragmentCount, i)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedKey, fragmentKeys[i])
 
@@ -163,12 +163,12 @@ func TestGetFragments(t *testing.T) {
 
 	fragments, err := BreakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
-	assert.Equal(t, getFragmentCount(len(data), fragmentSize), len(fragments))
+	assert.Equal(t, GetFragmentCount(len(data), fragmentSize), len(fragments))
 
 	totalSize := 0
 
 	for i, fragment := range fragments {
-		fragmentKey, err := getFragmentKey(fileKey, len(fragments), i)
+		fragmentKey, err := GetFragmentKey(fileKey, len(fragments), i)
 		assert.NoError(t, err)
 		assert.Equal(t, fragmentKey, fragment.FragmentKey)
 
@@ -196,7 +196,7 @@ func TestGetFragmentsSmallFile(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
 
-	fragmentKey, err := getFragmentKey(fileKey, 1, 0)
+	fragmentKey, err := GetFragmentKey(fileKey, 1, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, fragmentKey, fragments[0].FragmentKey)
 	assert.Equal(t, data, fragments[0].Data)
@@ -214,7 +214,7 @@ func TestGetFragmentsExactlyOnePerfectlySizedFile(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
 
-	fragmentKey, err := getFragmentKey(fileKey, 1, 0)
+	fragmentKey, err := GetFragmentKey(fileKey, 1, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, fragmentKey, fragments[0].FragmentKey)
 	assert.Equal(t, data, fragments[0].Data)
@@ -230,7 +230,7 @@ func TestRecombineFragments(t *testing.T) {
 
 	fragments, err := BreakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
-	recombinedData, err := recombineFragments(fragments)
+	recombinedData, err := RecombineFragments(fragments)
 	assert.NoError(t, err)
 	assert.Equal(t, data, recombinedData)
 
@@ -240,7 +240,7 @@ func TestRecombineFragments(t *testing.T) {
 		fragments[i], fragments[j] = fragments[j], fragments[i]
 	}
 
-	recombinedData, err = recombineFragments(fragments)
+	recombinedData, err = RecombineFragments(fragments)
 	assert.NoError(t, err)
 	assert.Equal(t, data, recombinedData)
 }
@@ -255,7 +255,7 @@ func TestRecombineFragmentsSmallFile(t *testing.T) {
 	fragments, err := BreakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
-	recombinedData, err := recombineFragments(fragments)
+	recombinedData, err := RecombineFragments(fragments)
 	assert.NoError(t, err)
 	assert.Equal(t, data, recombinedData)
 }
@@ -273,7 +273,7 @@ func TestMissingFragment(t *testing.T) {
 	fragmentIndexToSkip := rand.Intn(len(fragments))
 	fragments = append(fragments[:fragmentIndexToSkip], fragments[fragmentIndexToSkip+1:]...)
 
-	_, err = recombineFragments(fragments[:len(fragments)-1])
+	_, err = RecombineFragments(fragments[:len(fragments)-1])
 	assert.Error(t, err)
 }
 
@@ -288,7 +288,7 @@ func TestMissingFinalFragment(t *testing.T) {
 	assert.NoError(t, err)
 	fragments = fragments[:len(fragments)-1]
 
-	_, err = recombineFragments(fragments)
+	_, err = RecombineFragments(fragments)
 	assert.Error(t, err)
 }
 
