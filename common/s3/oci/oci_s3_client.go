@@ -136,6 +136,45 @@ func (c *ociS3Client) DownloadObject(ctx context.Context, bucket string, key str
 	return data, nil
 }
 
+func (c *ociS3Client) DownloadPartialObject(
+	ctx context.Context,
+	bucket string,
+	key string,
+	startIndex int64,
+	endIndex int64,
+) ([]byte, error) {
+
+	rangeString := fmt.Sprintf("bytes=%d-%d", startIndex, endIndex-1)
+
+	getObjectRequest := objectstorage.GetObjectRequest{
+		NamespaceName: oraclecommon.String(c.cfg.Namespace),
+		BucketName:    oraclecommon.String(bucket),
+		ObjectName:    oraclecommon.String(key),
+		Range:         oraclecommon.String(rangeString),
+	}
+
+	response, err := c.objectStorageClient.GetObject(ctx, getObjectRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object from OCI: %w", err)
+	}
+	defer func() {
+		if closeErr := response.Content.Close(); closeErr != nil {
+			c.logger.Warn("Failed to close response body", "error", closeErr)
+		}
+	}()
+
+	data, err := io.ReadAll(response.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read object content: %w", err)
+	}
+
+	if len(data) == 0 {
+		return nil, s3common.ErrObjectNotFound
+	}
+
+	return data, nil
+}
+
 func (c *ociS3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
 	headObjectRequest := objectstorage.HeadObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),

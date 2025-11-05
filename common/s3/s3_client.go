@@ -13,14 +13,25 @@ var (
 // S3Client encapsulates the functionality of talking to AWS S3 (or an S3 mimic service).
 type S3Client interface {
 
-	// DownloadObject downloads an object from S3.
-	DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error)
-
 	// HeadObject retrieves the size of an object in S3. Returns error if the object does not exist.
 	HeadObject(ctx context.Context, bucket string, key string) (*int64, error)
 
 	// UploadObject uploads an object to S3.
 	UploadObject(ctx context.Context, bucket string, key string, data []byte) error
+
+	// DownloadObject downloads an object from S3.
+	DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error)
+
+	// Download part of the object, specified by startIndex (inclusive) and endIndex (exclusive).
+	DownloadPartialObject(
+		ctx context.Context,
+		bucket string,
+		key string,
+		// inclusive
+		startIndex int64,
+		// exclusive
+		endIndex int64,
+	) ([]byte, error)
 
 	// DeleteObject deletes an object from S3.
 	DeleteObject(ctx context.Context, bucket string, key string) error

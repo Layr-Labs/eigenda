@@ -146,6 +146,46 @@ func (s *awsS3Client) DownloadObject(ctx context.Context, bucket string, key str
 	return buffer.Bytes(), nil
 }
 
+func (s *awsS3Client) DownloadPartialObject(
+	ctx context.Context,
+	bucket string,
+	key string,
+	startIndex int64,
+	endIndex int64) ([]byte, error) {
+
+	rangeHeader := fmt.Sprintf("bytes=%d-%d", startIndex, endIndex-1)
+
+	objectSize := defaultBlobBufferSizeByte
+	size, err := s.HeadObject(ctx, bucket, key)
+	if err == nil {
+		objectSize = int(*size)
+	}
+	buffer := manager.NewWriteAtBuffer(make([]byte, 0, objectSize))
+
+	var partMiBs int64 = 10
+	downloader := manager.NewDownloader(s.s3Client, func(d *manager.Downloader) {
+		// 10MB per part
+		d.PartSize = partMiBs * 1024 * 1024
+		// The number of goroutines to spin up in parallel per call to Upload when sending parts
+		d.Concurrency = 3
+	})
+
+	_, err = downloader.Download(ctx, buffer, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+		Range:  aws.String(rangeHeader),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to download partial object: %w", err)
+	}
+
+	if buffer == nil || len(buffer.Bytes()) == 0 {
+		return nil, s3common.ErrObjectNotFound
+	}
+
+	return buffer.Bytes(), nil
+}
+
 func (s *awsS3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
 	output, err := s.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
