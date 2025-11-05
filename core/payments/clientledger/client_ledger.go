@@ -59,8 +59,6 @@ func NewClientLedger(
 	reservationLedger *reservation.ReservationLedger,
 	// may be nil if clientLedgerMode is configured to not use on-demand payments
 	onDemandLedger *ondemand.OnDemandLedger,
-	// Should be a timesource which includes monotonic timestamps, for best results. Otherwise, reservation payments
-	// may occasionally fail due to NTP adjustments
 	getNow func() time.Time,
 	// provides access to payment vault contract
 	paymentVault payments.PaymentVault,
@@ -165,13 +163,11 @@ func (cl *ClientLedger) Debit(
 
 // Used by ClientLedger instances where only reservation payments are configured.
 func (cl *ClientLedger) debitReservationOnly(
-	now time.Time,
+	dispersalTime time.Time,
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
-	// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
-	// dispersal time when constructing the payment header, and it does so with its conception of "now"
-	success, remainingCapacity, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
+	success, remainingCapacity, err := cl.reservationLedger.Debit(dispersalTime, blobLengthSymbols, quorums)
 	if err != nil {
 		var timeMovedBackwardErr *ratelimit.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
@@ -201,7 +197,7 @@ func (cl *ClientLedger) debitReservationOnly(
 			blobLengthSymbols, blobLengthSymbols*encoding.BYTES_PER_SYMBOL)
 	}
 
-	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
+	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, dispersalTime, nil)
 	enforce.NilError(err, "new payment metadata")
 	return paymentMetadata, nil
 }
@@ -247,13 +243,11 @@ func (cl *ClientLedger) debitOnDemandOnly(
 // lacks capacity.
 func (cl *ClientLedger) debitReservationOrOnDemand(
 	ctx context.Context,
-	now time.Time,
+	dispersalTime time.Time,
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
-	// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
-	// dispersal time when constructing the payment header, and it does so with its conception of "now"
-	success, remainingCapacity, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
+	success, remainingCapacity, err := cl.reservationLedger.Debit(dispersalTime, blobLengthSymbols, quorums)
 	if err != nil {
 		var timeMovedBackwardErr *ratelimit.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
@@ -277,7 +271,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	cl.accountantMetricer.RecordReservationPayment(remainingCapacity)
 
 	if success {
-		paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
+		paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, dispersalTime, nil)
 		enforce.NilError(err, "new payment metadata")
 		return paymentMetadata, nil
 	}
@@ -297,7 +291,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 		panic(fmt.Sprintf("on-demand debit failed: %v", err))
 	}
 
-	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
+	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, dispersalTime, cumulativePayment)
 	enforce.NilError(err, "new payment metadata")
 
 	cl.accountantMetricer.RecordCumulativePayment(cumulativePayment)
@@ -327,7 +321,7 @@ func (cl *ClientLedger) RevertDebit(
 		enforce.NotNil(cl.reservationLedger,
 			"payment metadata is for a reservation payment, but ReservationLedger is nil")
 
-		remainingCapacity, err := cl.reservationLedger.RevertDebit(cl.getNow(), blobSymbolCount)
+		remainingCapacity, err := cl.reservationLedger.RevertDebit(blobSymbolCount)
 		if err != nil {
 			return fmt.Errorf("revert reservation debit: %w", err)
 		}
@@ -347,7 +341,7 @@ func (cl *ClientLedger) GetAccountsToUpdate() []gethcommon.Address {
 func (cl *ClientLedger) UpdateReservation(accountID gethcommon.Address, newReservation *reservation.Reservation) error {
 	enforce.Equals(cl.accountID, accountID, "attempted to update reservation for the wrong account")
 
-	err := cl.reservationLedger.UpdateReservation(newReservation, cl.getNow())
+	err := cl.reservationLedger.UpdateReservation(newReservation)
 	if err != nil {
 		return fmt.Errorf("update reservation: %w", err)
 	}
