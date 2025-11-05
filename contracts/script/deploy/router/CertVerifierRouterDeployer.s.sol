@@ -76,27 +76,25 @@ contract CertVerifierRouterDeployer is Script, Test {
     }
 
     function setABNConfigs(string memory configData) internal {
-
         bytes memory raw = stdJson.parseRaw(configData, ".initABNConfigs");
         ABNConfig[] memory configs = abi.decode(raw, (ABNConfig[]));
         for (uint256 i; i < configs.length; i++) {
             uint32 blockNumber = configs[i].blockNumber;
             address certVerifier = configs[i].certVerifier;
-            
+
             // run user input safety checks
             //
             // 1) the cert verifier's dependencies appear correctly initialized
             address thresholdRegistry = address(IEigenDACertVerifier(certVerifier).eigenDAThresholdRegistry());
             bytes memory nextBlobVersionCalldata = abi.encodeWithSelector(bytes4(keccak256("nextBlobVersion()")));
-            (bool success, ) = thresholdRegistry.call(nextBlobVersionCalldata);
+            (bool success,) = thresholdRegistry.call(nextBlobVersionCalldata);
             require(success, "nextBlobVersion() call failed");
 
             address serviceManager = address(IEigenDACertVerifier(certVerifier).eigenDASignatureVerifier());
             // 2) the signature verifier address can be cast to IServiceManager
             bytes memory taskNumberCalldata = abi.encodeWithSelector(bytes4(keccak256("taskNumber()")));
-            (success, ) = serviceManager.call(taskNumberCalldata);
+            (success,) = serviceManager.call(taskNumberCalldata);
             require(success, "taskNumber() call failed");
-
 
             // 2) ensure no duplicate block numbers
             require(!seenBlockNumbers[blockNumber], "Duplicate block number detected");
