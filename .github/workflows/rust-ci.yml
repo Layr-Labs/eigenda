@@ -6,12 +6,12 @@ permissions:
 on:
   pull_request:
     paths:
-      - 'rust/**'
+      - "rust/**"
   push:
     branches:
       - master
     paths:
-      - 'rust/**'
+      - "rust/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
@@ -26,39 +26,18 @@ defaults:
     working-directory: rust
 
 jobs:
-  check:
-    name: Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust
-      - run: cargo check --all-targets --all-features
-
-  fmt:
-    name: Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: rustfmt
-      - run: cargo fmt --all -- --check
-
-  clippy:
-    name: Clippy
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: "rustfmt, clippy"
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
-      - run: cargo clippy --all-targets --all-features -- -D warnings -D missing-docs
+      - run: make lint
 
   test:
     name: Test
