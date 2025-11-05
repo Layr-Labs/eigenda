@@ -254,7 +254,7 @@ func (e *EncodingManager) filterStaleAndDedupBlobs(
 			continue
 		}
 
-		if e.isBlobStale(ctx, blobKey, now, metadata.BlobHeader.PaymentMetadata.Timestamp) {
+		if e.checkAndHandleStaleBlob(ctx, blobKey, now, metadata.BlobHeader.PaymentMetadata.Timestamp) {
 			// discard stale blob
 			continue
 		}
@@ -273,7 +273,7 @@ func (e *EncodingManager) filterStaleAndDedupBlobs(
 // Checks if a blob is older than MaxDispersalAge and handles it accordingly.
 // If the blob is stale, it increments metrics, logs a warning, and updates the database status to Failed.
 // Returns true if the blob is stale, otherwise false.
-func (e *EncodingManager) isBlobStale(
+func (e *EncodingManager) checkAndHandleStaleBlob(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	now time.Time,
