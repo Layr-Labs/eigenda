@@ -56,9 +56,9 @@ func ConvertByPaddingEmptyByte(data []byte) []byte {
 // For the reminder of the input, the first byte is taken out, and the rest is appended to
 // the output.
 //
-// TODO (litt3): usage of this function should be migrated to use RemoveInternalPadding instead. I've left it unchanged
+// TODO (litt3): usage of this function should be migrated to use CheckAndRemoveInternalFieldElementPadding instead.
 //
-//	for now, since v1 logic and tests rely on the specific assumptions of this implementation.
+// I've left it unchanged for now, since v1 logic and tests rely on the specific assumptions of this implementation.
 func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
 	dataSize := len(data)
 	parseSize := encoding.BYTES_PER_SYMBOL
@@ -120,7 +120,8 @@ func PadPayload(inputData []byte) []byte {
 	return paddedOutput
 }
 
-// RemoveInternalPadding accepts an array of padded data, and removes the internal padding that was added in PadPayload
+// CheckAndRemoveInternalFieldElementPadding accepts an array of padded data, then checks and removes the internal
+// padding that was added to make every 32 bytes be a valid field element.
 //
 // This function assumes that the input aligns to 32 bytes. Since it is removing 1 byte for every 31 bytes kept, the
 // output from this function is not guaranteed to align to 32 bytes.
@@ -128,7 +129,9 @@ func PadPayload(inputData []byte) []byte {
 // NOTE: this method is a reimplementation of RemoveEmptyByteFromPaddedBytes, with one meaningful difference: this
 // function relies on the assumption that the input is aligned to encoding.BYTES_PER_SYMBOL, which makes the padding
 // removal logic simpler.
-func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
+//
+// In addition, this function requires the first byte in every multiple of 32 bytes to be 0x00.
+func CheckAndRemoveInternalFieldElementPadding(paddedData []byte) ([]byte, error) {
 	if len(paddedData)%encoding.BYTES_PER_SYMBOL != 0 {
 		return nil, fmt.Errorf(
 			"padded data (length %d) must be multiple of encoding.BYTES_PER_SYMBOL %d",
@@ -146,6 +149,13 @@ func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 	for i := 0; i < symbolCount; i++ {
 		dstIndex := i * bytesPerChunk
 		srcIndex := i*encoding.BYTES_PER_SYMBOL + 1
+
+		if paddedData[i*encoding.BYTES_PER_SYMBOL] != 0x0 {
+			return nil, fmt.Errorf(
+				"the first byte in the %d-th multiple of encoding.BYTES_PER_SYMBOL is a non-zero byte value %v",
+				i, paddedData[i*encoding.BYTES_PER_SYMBOL],
+			)
+		}
 
 		copy(outputData[dstIndex:dstIndex+bytesPerChunk], paddedData[srcIndex:srcIndex+bytesPerChunk])
 	}
@@ -199,8 +209,8 @@ func GetPaddedDataLength(inputLen uint32) uint32 {
 
 // GetUnpaddedDataLength accepts the length of an array that has been padded with [PadPayload]
 //
-// It returns what the length of the output array would be if you called [RemoveInternalPadding] on it,
-// or an error if inputLen is not a multiple of [encoding.BYTES_PER_SYMBOL].
+// It returns what the length of the output array would be if you called [CheckAndRemoveInternalFieldElementPadding]
+// on it, or an error if inputLen is not a multiple of [encoding.BYTES_PER_SYMBOL].
 func GetUnpaddedDataLength(inputLen uint32) (uint32, error) {
 	if inputLen%encoding.BYTES_PER_SYMBOL != 0 {
 		return 0, fmt.Errorf(

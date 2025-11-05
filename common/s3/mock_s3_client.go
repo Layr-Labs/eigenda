@@ -1,22 +1,20 @@
-package mock
+package s3
 
 import (
 	"context"
 	"errors"
 	"strings"
-
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 )
 
-type S3Client struct {
+type MockS3Client struct {
 	bucket map[string][]byte
 	Called map[string]int
 }
 
-var _ s3.Client = (*S3Client)(nil)
+var _ S3Client = (*MockS3Client)(nil)
 
-func NewS3Client() *S3Client {
-	return &S3Client{
+func NewMockS3Client() *MockS3Client {
+	return &MockS3Client{
 		bucket: make(map[string][]byte),
 		Called: map[string]int{
 			"DownloadObject":           0,
@@ -31,61 +29,66 @@ func NewS3Client() *S3Client {
 	}
 }
 
-func (s *S3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
+func (s *MockS3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
 	s.Called["DownloadObject"]++
 	data, ok := s.bucket[key]
 	if !ok {
-		return []byte{}, s3.ErrObjectNotFound
+		return []byte{}, ErrObjectNotFound
 	}
 	return data, nil
 }
 
-func (s *S3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
+func (s *MockS3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
 	s.Called["HeadObject"]++
 	data, ok := s.bucket[key]
 	if !ok {
-		return nil, s3.ErrObjectNotFound
+		return nil, ErrObjectNotFound
 	}
 	size := int64(len(data))
 	return &size, nil
 }
 
-func (s *S3Client) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
+func (s *MockS3Client) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
 	s.Called["UploadObject"]++
 	s.bucket[key] = data
 	return nil
 }
 
-func (s *S3Client) DeleteObject(ctx context.Context, bucket string, key string) error {
+func (s *MockS3Client) DeleteObject(ctx context.Context, bucket string, key string) error {
 	s.Called["DeleteObject"]++
 	delete(s.bucket, key)
 	return nil
 }
 
-func (s *S3Client) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3.Object, error) {
+func (s *MockS3Client) ListObjects(
+	ctx context.Context,
+	bucket string,
+	prefix string,
+) ([]ListedObject, error) {
+
 	s.Called["ListObjects"]++
-	objects := make([]s3.Object, 0, 1000)
+	objects := make([]ListedObject, 0, 1000)
 	for k, v := range s.bucket {
 		if strings.HasPrefix(k, prefix) {
-			objects = append(objects, s3.Object{Key: k, Size: int64(len(v))})
+			objects = append(objects, ListedObject{Key: k, Size: int64(len(v))})
 		}
 	}
 	return objects, nil
 }
 
-func (s *S3Client) CreateBucket(ctx context.Context, bucket string) error {
+func (s *MockS3Client) CreateBucket(ctx context.Context, bucket string) error {
 	s.Called["CreateBucket"]++
 	return nil
 }
 
-func (s *S3Client) FragmentedUploadObject(
+func (s *MockS3Client) FragmentedUploadObject(
 	ctx context.Context,
 	bucket string,
 	key string,
 	data []byte,
 	fragmentSize int) error {
 	s.Called["FragmentedUploadObject"]++
-	fragments, err := s3.BreakIntoFragments(key, data, fragmentSize)
+	fragments, err := BreakIntoFragments(key, data, fragmentSize)
 	if err != nil {
 		return err
 	}
@@ -95,7 +98,7 @@ func (s *S3Client) FragmentedUploadObject(
 	return nil
 }
 
-func (s *S3Client) FragmentedDownloadObject(
+func (s *MockS3Client) FragmentedDownloadObject(
 	ctx context.Context,
 	bucket string,
 	key string,
@@ -117,7 +120,7 @@ func (s *S3Client) FragmentedDownloadObject(
 	} else {
 		count = fileSize/fragmentSize + 1
 	}
-	fragmentKeys, err := s3.GetFragmentKeys(key, count)
+	fragmentKeys, err := GetFragmentKeys(key, count)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +129,7 @@ func (s *S3Client) FragmentedDownloadObject(
 	for _, fragmentKey := range fragmentKeys {
 		fragmentData, ok := s.bucket[fragmentKey]
 		if !ok {
-			return nil, s3.ErrObjectNotFound
+			return nil, ErrObjectNotFound
 		}
 		data = append(data, fragmentData...)
 	}
