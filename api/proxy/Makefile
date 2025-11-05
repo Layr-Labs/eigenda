@@ -38,7 +38,7 @@ test-e2e-hoodi:
 	BACKEND=hoodi-testnet gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
 # E2E tests using hoodi preprod backend. this is expected to fail since retrieval ingress is turned off.
-# this is useful for testing CertVerifier deployments in the hood-preprod and serves utility as a validation
+# this is useful for testing CertVerifier deployments in the hoodi-preprod and serves utility as a validation
 # tool which is why it will never be ran in monorepo CI.
 test-e2e-hoodi-preprod:
 	BACKEND=hoodi-preprod gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
