@@ -1,3 +1,5 @@
+//! Integration tests combining all other eigenda-related crates.
+
 mod common;
 
 use bytes::Bytes;
