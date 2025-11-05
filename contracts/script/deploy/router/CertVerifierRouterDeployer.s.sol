@@ -96,11 +96,11 @@ contract CertVerifierRouterDeployer is Script, Test {
             (success,) = serviceManager.call(taskNumberCalldata);
             require(success, "taskNumber() call failed");
 
-            // 2) ensure no duplicate block numbers
+            // 3) ensure no duplicate block numbers
             require(!seenBlockNumbers[blockNumber], "Duplicate block number detected");
             seenBlockNumbers[blockNumber] = true;
 
-            // Defensive check: ensure no duplicate cert verifiers
+            // 4) ensure no duplicate cert verifiers
             require(!seenCertVerifiers[certVerifier], "Duplicate cert verifier detected");
             seenCertVerifiers[certVerifier] = true;
 
