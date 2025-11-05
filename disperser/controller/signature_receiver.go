@@ -75,6 +75,9 @@ type signatureReceiver struct {
 
 	// The size of the batch being signed, in bytes.
 	batchSizeBytes uint64
+
+	// The most recently yielded attestation.
+	latestAttestation *core.QuorumAttestation
 }
 
 // ReceiveSignatures receives SigningMessages over the signingMessageChan, and yields QuorumAttestations produced
@@ -146,14 +149,11 @@ func ReceiveSignatures(
 // receiveSigningMessages receives SigningMessages, and sends QuorumAttestations to the input attestationChan
 func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attestationChan chan *core.QuorumAttestation) {
 	defer sr.ticker.Stop()
-	defer close(attestationChan)
-
-	// the number of attestations submitted by this method
 	defer func() {
-		if sr.metrics != nil {
-			sr.reportThresholdSignedToDoneLatency()
-			sr.metrics.reportAttestationUpdateCount(float64(sr.attestationUpdateCount))
-		}
+		close(attestationChan)
+
+		// Now that we have finished receiving signatures, report metrics for the batch.
+		sr.reportBatchMetrics()
 	}()
 
 	sr.attestationUpdateStart = time.Now()
@@ -182,41 +182,7 @@ forLoop:
 				break forLoop
 			}
 
-			isValid := sr.handleNextSignature(signingMessage, attestationChan)
-
-			for quorumId, opInfo := range sr.indexedOperatorState.Operators {
-
-				quorumTotals, ok := sr.indexedOperatorState.Totals[quorumId]
-				if !ok {
-					// This triggers in some unit tests
-					sr.logger.Error("could not find total stake for quorum",
-						"quorumID", quorumId,
-						"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]))
-					continue
-				}
-				totalStake := quorumTotals.Stake
-
-				validatorInfo, ok := opInfo[signingMessage.Operator]
-				if !ok {
-					// This triggers in some unit tests
-					sr.logger.Error("could not find validator stake for operator in quorum",
-						"quorumID", quorumId,
-						"operatorID", signingMessage.Operator.Hex(),
-						"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]))
-					continue
-				}
-				validatorStake := validatorInfo.Stake
-
-				stakeFraction := getFraction(validatorStake, totalStake)
-
-				sr.metrics.ReportValidatorSigningResult(
-					signingMessage.Operator,
-					stakeFraction,
-					sr.batchSizeBytes,
-					quorumId,
-					isValid,
-				)
-			}
+			sr.handleNextSignature(signingMessage, attestationChan)
 
 		// The ticker case is intentionally ordered after the message receiving case. If there are SigningMessages
 		// waiting to be handled, we shouldn't delay their processing for the sake of yielding a QuorumAttestation.
@@ -235,7 +201,7 @@ forLoop:
 func (sr *signatureReceiver) handleNextSignature(
 	signingMessage core.SigningMessage,
 	attestationChan chan *core.QuorumAttestation,
-) bool {
+) {
 
 	if signingMessage.TimeReceived.IsZero() {
 		sr.logger.Errorf("signing message from %s time received is zero in batch %s. "+
@@ -252,7 +218,7 @@ func (sr *signatureReceiver) handleNextSignature(
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
 			"operatorID", signingMessage.Operator.Hex(),
 			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
-		return false
+		return
 	}
 
 	if seen := sr.signatureMessageReceived[signingMessage.Operator]; seen {
@@ -260,7 +226,7 @@ func (sr *signatureReceiver) handleNextSignature(
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
 			"operatorID", signingMessage.Operator.Hex(),
 			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
-		return false
+		return
 	}
 
 	// this map records messages received, whether the messages are valid or not
@@ -274,7 +240,7 @@ func (sr *signatureReceiver) handleNextSignature(
 			"operatorID", signingMessage.Operator.Hex(),
 			"attestationLatencyMs", signingMessage.AttestationLatencyMs,
 			"error", err)
-		return false
+		return
 	}
 
 	sr.validSignerMap[signingMessage.Operator] = true
@@ -287,7 +253,7 @@ func (sr *signatureReceiver) handleNextSignature(
 		sr.ticker.Reset(sr.tickInterval)
 	}
 
-	return true
+	return
 }
 
 // getSortedQuorumIDs returns a sorted slice of QuorumIDs from the state
@@ -411,13 +377,15 @@ func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *cor
 		validSignerMapCopy[operatorID] = signed
 	}
 
-	attestationChan <- &core.QuorumAttestation{
+	attestation := &core.QuorumAttestation{
 		QuorumAggPubKey:  quorumAggPubKeyCopy,
 		SignersAggPubKey: aggregateSignersG2PubKeysCopy,
 		AggSignature:     aggregateSignaturesCopy,
 		QuorumResults:    quorumResults,
 		SignerMap:        validSignerMapCopy,
 	}
+	sr.latestAttestation = attestation
+	attestationChan <- attestation
 
 	if sr.metrics != nil {
 		sr.metrics.reportAttestationUpdateLatency(time.Since(sr.attestationUpdateStart))
@@ -528,10 +496,10 @@ func getFraction(part *big.Int, whole *big.Int) float64 {
 		return 0.0
 	}
 
-	signedStakeFloat := new(big.Float).SetInt(part)
-	totalStakeFloat := new(big.Float).SetInt(whole)
+	partFloat := new(big.Float).SetInt(part)
+	totalFloat := new(big.Float).SetInt(whole)
 
-	fraction, _ := new(big.Float).Quo(signedStakeFloat, totalStakeFloat).Float64()
+	fraction, _ := new(big.Float).Quo(partFloat, totalFloat).Float64()
 
 	return fraction
 }
@@ -626,4 +594,99 @@ func (sr *signatureReceiver) debugEquivalenceError(
 			"pubkeyComputedViaSubtraction", aggregateSignersG1PubKey.Serialize(),
 		)
 	}
+}
+
+// This method should be called when the controller is finished collecting signatures for a batch.
+func (sr *signatureReceiver) reportBatchMetrics() {
+	if sr.metrics == nil {
+		return
+	}
+
+	sr.reportThresholdSignedToDoneLatency()
+	sr.metrics.reportAttestationUpdateCount(float64(sr.attestationUpdateCount))
+
+	finalAttestation := sr.latestAttestation
+	if finalAttestation == nil {
+		sr.logger.Errorf("no final attestation to report metrics for batch %s",
+			hex.EncodeToString(sr.batchHeaderHash[:]))
+		return
+	}
+
+	batchHeaderHashString := hex.EncodeToString(sr.batchHeaderHash[:])
+
+	// Update global signing metrics.
+	for quorumID := range sr.indexedOperatorState.Operators {
+		quorumResults, ok := finalAttestation.QuorumResults[quorumID]
+		if !ok {
+			// Some unit tests trigger this
+			sr.logger.Errorf("missing quorum results for quorum %d in final attestation for batch %s",
+				quorumID, batchHeaderHashString)
+			continue
+		}
+
+		signingFraction := float64(quorumResults.PercentSigned) / 100.0
+		sr.metrics.ReportGlobalSigningThreshold(
+			quorumID,
+			sr.batchSizeBytes,
+			signingFraction)
+	}
+
+	// Update per-validator metrics
+	for quorumID, validatorsInQuorum := range sr.indexedOperatorState.Operators {
+
+		quorumTotals, ok := sr.indexedOperatorState.Totals[quorumID]
+		if !ok {
+			sr.logger.Errorf("missing quorum totals for quorum %d in final attestation for batch %s",
+				quorumID, batchHeaderHashString)
+			continue
+		}
+		quorumStake := quorumTotals.Stake
+
+		for operatorID := range validatorsInQuorum {
+			_, signed := sr.validSignerMap[operatorID]
+
+			quorumInfo, ok := sr.indexedOperatorState.Operators[quorumID]
+			if !ok {
+				sr.logger.Errorf("missing quorum info for quorum %d in final attestation for batch %s",
+					quorumID, batchHeaderHashString)
+				continue
+			}
+
+			validatorInfo, ok := quorumInfo[operatorID]
+			if !ok {
+				sr.logger.Errorf(
+					"missing validator info for operator %s in quorum %d in final attestation for batch %s",
+					operatorID.Hex(), quorumID, batchHeaderHashString)
+				continue
+			}
+
+			validatorStake := validatorInfo.Stake
+
+			stakeFraction := getFraction(validatorStake, quorumStake)
+
+			sr.metrics.ReportValidatorSigningResult(
+				operatorID,
+				stakeFraction,
+				sr.batchSizeBytes,
+				quorumID,
+				signed,
+			)
+		}
+	}
+
+	// Track legacy attestation metrics. This can be removed once we modify alerts to use other metrics.
+	operatorCount := make(map[core.QuorumID]int)
+	signerCount := make(map[core.QuorumID]int)
+	for quorumID, opState := range sr.indexedOperatorState.Operators {
+		operatorCount[quorumID] = len(opState)
+		if _, ok := signerCount[quorumID]; !ok {
+			signerCount[quorumID] = 0
+		}
+		for opID := range opState {
+			if _, ok := finalAttestation.SignerMap[opID]; ok {
+				signerCount[quorumID]++
+			}
+		}
+	}
+	sr.metrics.reportLegacyAttestation(operatorCount, signerCount, finalAttestation.QuorumResults)
 }

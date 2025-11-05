@@ -526,31 +526,6 @@ func (d *Dispatcher) HandleSignatures(
 		return fmt.Errorf("update batch status: %w", err)
 	}
 
-	// Update global signing metrics.
-	for quorumID := range batchData.OperatorState.Operators {
-		signingFraction := float64(finalAttestation.QuorumResults[quorumID].PercentSigned) / 100.0
-		d.metrics.ReportGlobalSigningThreshold(
-			quorumID,
-			batchData.BatchSizeBytes,
-			signingFraction)
-	}
-
-	// Track legacy attestation metrics. This can be removed once we modify alerts to use other metrics.
-	operatorCount := make(map[core.QuorumID]int)
-	signerCount := make(map[core.QuorumID]int)
-	for quorumID, opState := range batchData.OperatorState.Operators {
-		operatorCount[quorumID] = len(opState)
-		if _, ok := signerCount[quorumID]; !ok {
-			signerCount[quorumID] = 0
-		}
-		for opID := range opState {
-			if _, ok := finalAttestation.SignerMap[opID]; ok {
-				signerCount[quorumID]++
-			}
-		}
-	}
-	d.metrics.reportAttestation(operatorCount, signerCount, finalAttestation.QuorumResults)
-
 	return nil
 }
 

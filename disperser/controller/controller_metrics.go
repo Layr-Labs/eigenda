@@ -64,6 +64,10 @@ func newControllerMetrics(
 		return nil, nil
 	}
 
+	if minimumSigningThreshold < 0.0 || minimumSigningThreshold > 1.0 {
+		return nil, fmt.Errorf("invalid minimum signing threshold: %f", minimumSigningThreshold)
+	}
+
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
 	// This metric is a loaded footgun, since it obscures quite a lot of information about what's happening
@@ -420,7 +424,7 @@ func (m *controllerMetrics) reportBlobSetSize(size int) {
 	m.blobSetSize.WithLabelValues().Set(float64(size))
 }
 
-func (m *controllerMetrics) reportAttestation(
+func (m *controllerMetrics) reportLegacyAttestation(
 	operatorCount map[core.QuorumID]int,
 	signerCount map[core.QuorumID]int,
 	quorumResults map[core.QuorumID]*core.QuorumResult,
