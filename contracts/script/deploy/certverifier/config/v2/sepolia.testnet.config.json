@@ -6,5 +6,5 @@
     },
     
     "quorumNumbersRequired": "0x0001",
-    "recencyWindow": 0
+    "recencyWindow": 14400
 }
