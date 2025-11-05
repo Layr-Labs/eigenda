@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
+import {IEigenDACertVerifier} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
+import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
@@ -33,6 +35,10 @@ contract CertVerifierRouterDeployer is Script, Test {
     address proxyAdmin;
     uint32[] initABNs;
     address[] initCertVerifiers;
+
+    // Mappings for efficient duplicate detection
+    mapping(uint32 => bool) private seenBlockNumbers;
+    mapping(address => bool) private seenCertVerifiers;
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
         // 1. Read the configuration from the JSON input file
@@ -70,11 +76,38 @@ contract CertVerifierRouterDeployer is Script, Test {
     }
 
     function setABNConfigs(string memory configData) internal {
+
         bytes memory raw = stdJson.parseRaw(configData, ".initABNConfigs");
         ABNConfig[] memory configs = abi.decode(raw, (ABNConfig[]));
         for (uint256 i; i < configs.length; i++) {
-            initABNs[i] = configs[i].blockNumber;
-            initCertVerifiers[i] = configs[i].certVerifier;
+            uint32 blockNumber = configs[i].blockNumber;
+            address certVerifier = configs[i].certVerifier;
+            
+            // run user input safety checks
+            //
+            // 1) the cert verifier's dependencies appear correctly initialized
+            address thresholdRegistry = address(IEigenDACertVerifier(certVerifier).eigenDAThresholdRegistry());
+            bytes memory nextBlobVersionCalldata = abi.encodeWithSelector(bytes4(keccak256("nextBlobVersion()")));
+            (bool success, bytes memory returnData) = thresholdRegistry.call(nextBlobVersionCalldata);
+            require(success, "nextBlobVersion() call failed");
+
+            address serviceManager = address(IEigenDACertVerifier(certVerifier).eigenDASignatureVerifier());
+            // 2) the signature verifier address can be cast to IServiceManager
+            bytes memory taskNumberCalldata = abi.encodeWithSelector(bytes4(keccak256("taskNumber()")));
+            (success, ) = serviceManager.call(taskNumberCalldata);
+            require(success, "taskNumber() call failed");
+
+
+            // 2) ensure no duplicate block numbers
+            require(!seenBlockNumbers[blockNumber], "Duplicate block number detected");
+            seenBlockNumbers[blockNumber] = true;
+
+            // Defensive check: ensure no duplicate cert verifiers
+            require(!seenCertVerifiers[certVerifier], "Duplicate cert verifier detected");
+            seenCertVerifiers[certVerifier] = true;
+
+            initABNs.push(blockNumber);
+            initCertVerifiers.push(certVerifier);
         }
     }
 }

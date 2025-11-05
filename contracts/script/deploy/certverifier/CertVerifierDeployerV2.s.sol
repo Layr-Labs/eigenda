@@ -58,7 +58,8 @@ contract CertVerifierDeployerV2 is Script, Test {
             revert("EigenDAServiceManager contract address not set in provided EigenDADirectory contract");
         }
 
-        // 2.a - assume we can read a batch number that's greater than zero
+        // 2.a - assume we can probe the batchNumber view call for a return value that's greater than 0
+        //       indicative of legacy EigenDAV1 batching
         uint32 batchNumber = IEigenDAServiceManager(eigenDAServiceManager).taskNumber();
         if (batchNumber == 0) {
             revert("Expected to have batch ID > 0 in EigenDAServiceManager contract storage");
