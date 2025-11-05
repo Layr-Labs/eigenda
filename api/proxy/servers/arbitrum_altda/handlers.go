@@ -192,7 +192,7 @@ func (h *Handlers) RecoverPayload(
 		return nil, nil
 	}
 
-	payload, err := h.eigenDAManager.Get(ctx, daCert, proxy_common.GETOpts{})
+	payload, err := h.eigenDAManager.Get(ctx, daCert, coretypes.CertSerializationABI, proxy_common.GETOpts{})
 	if err != nil {
 		var dpError *coretypes.DerivationError
 		if errors.As(err, &dpError) {
@@ -242,10 +242,7 @@ func (h *Handlers) Store(
 		return nil, fmt.Errorf("received empty rollup payload")
 	}
 
-	// TODO: These "certBytes" should be ABI encoded before publishing to SequencerInbox
-	//       since the byte committed to onchain are the same bytes being referenced during the
-	//       one step proof
-	certBytes, err := h.eigenDAManager.Put(ctx, message)
+	certBytes, err := h.eigenDAManager.Put(ctx, message, coretypes.CertSerializationABI)
 	if err != nil {
 		return nil, fmt.Errorf("put rollup payload: %w", err)
 	}
@@ -295,7 +292,8 @@ func (h *Handlers) CollectPreimages(
 		return nil, fmt.Errorf("deserialize cert: %w", err)
 	}
 
-	payload, err := h.eigenDAManager.Get(ctx, daCert, proxy_common.GETOpts{})
+	payload, err := h.eigenDAManager.Get(ctx, daCert,
+		coretypes.CertSerializationABI, proxy_common.GETOpts{})
 	if err != nil {
 		var dpError *coretypes.DerivationError
 		if errors.As(err, &dpError) {
