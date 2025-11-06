@@ -569,9 +569,9 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "IGNORE_VERSION_FOR_EJECTION_DEFENSE"),
 	}
-	EnablePaymentValidationFlag = cli.BoolFlag{
+	EnablePaymentValidationFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-payment-validation"),
-		Usage:    "Whether the validator should perform payment validation. Temporary flag that will be removed once the new payments system is fully in place.",
+		Usage:    "Whether the validator should perform payment validation. Temporary flag that will be removed once the new payments system is fully in place. default: true.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PAYMENT_VALIDATION"),
 	}

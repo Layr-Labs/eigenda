@@ -187,7 +187,7 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 	// Get ledger for account A and perform a debit
 	ledgerA, err := ledgerCache.GetOrCreate(ctx, accountA)
 	require.NoError(t, err)
-	success, _, err := ledgerA.Debit(testTime, testTime, uint32(9), []uint8{0})
+	success, _, err := ledgerA.Debit(testTime, uint32(9), []uint8{0})
 	require.NoError(t, err)
 	require.True(t, success, "first debit from account A should succeed")
 
@@ -210,7 +210,7 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 	require.Same(t, ledgerA, ledgerAReloaded, "ledger A should not have been evicted, same object should be returned")
 
 	// Account A should still have its previous debit of 9 symbols
-	success, _, err = ledgerAReloaded.Debit(testTime, testTime, uint32(1), []uint8{0})
+	success, _, err = ledgerAReloaded.Debit(testTime, uint32(1), []uint8{0})
 	require.NoError(t, err)
 	require.False(t, success, "second debit from account A should fail - it is over capacity")
 
@@ -225,7 +225,7 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 
 	// wait for the monitor to pick up the reservation update
 	test.AssertEventuallyTrue(t, func() bool {
-		success, _, err := ledgerAReloaded.Debit(testTime, testTime, uint32(4), []uint8{0})
+		success, _, err := ledgerAReloaded.Debit(testTime, uint32(4), []uint8{0})
 		return err == nil && success
 	}, time.Second)
 }

@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	grpccontroller "github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	awss3 "github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/core"
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -42,6 +43,8 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/testcontainers/testcontainers-go"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // DisperserHarnessConfig contains the configuration for setting up the disperser harness
@@ -466,7 +469,16 @@ func startRelayWithListener(
 	}
 
 	// Create S3 client
-	s3Client, err := s3.NewClient(ctx, awsConfig, logger)
+	s3Client, err := awss3.NewAwsS3Client(
+		ctx,
+		logger,
+		awsConfig.EndpointURL,
+		awsConfig.Region,
+		awsConfig.FragmentParallelismFactor,
+		awsConfig.FragmentParallelismConstant,
+		awsConfig.AccessKey,
+		awsConfig.SecretAccessKey,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
@@ -595,7 +607,16 @@ func startEncoder(
 	awsConfig := localStack.GetAWSClientConfig()
 
 	// Create S3 client
-	s3Client, err := s3.NewClient(ctx, awsConfig, encoderLogger)
+	s3Client, err := awss3.NewAwsS3Client(
+		ctx,
+		encoderLogger,
+		awsConfig.EndpointURL,
+		awsConfig.Region,
+		awsConfig.FragmentParallelismFactor,
+		awsConfig.FragmentParallelismConstant,
+		awsConfig.AccessKey,
+		awsConfig.SecretAccessKey,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
@@ -1082,7 +1103,16 @@ func startAPIServer(
 	}
 
 	// Create S3 client
-	s3Client, err := s3.NewClient(ctx, awsConfig, apiServerLogger)
+	s3Client, err := awss3.NewAwsS3Client(
+		ctx,
+		apiServerLogger,
+		awsConfig.EndpointURL,
+		awsConfig.Region,
+		awsConfig.FragmentParallelismFactor,
+		awsConfig.FragmentParallelismConstant,
+		awsConfig.AccessKey,
+		awsConfig.SecretAccessKey,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create s3 client: %w", err)
 	}
@@ -1211,6 +1241,24 @@ func startAPIServer(
 	// Onchain state refresh interval
 	onchainStateRefreshInterval := 1 * time.Second
 
+	// Create controller client if using new payments
+	var controllerConnection *grpc.ClientConn
+	var controllerClient grpccontroller.ControllerServiceClient
+	if config.TestConfig.UseNewPayments {
+		if controllerAddress == "" {
+			return nil, fmt.Errorf("controller address is empty but UseNewPayments is true")
+		}
+		connection, err := grpc.NewClient(
+			controllerAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("create controller connection: %w", err)
+		}
+		controllerConnection = connection
+		controllerClient = grpccontroller.NewControllerServiceClient(connection)
+	}
+
 	// Create API server
 	// Note: meterer is nil when using controller-mediated payments, otherwise it's the legacy meterer
 	apiServer, err := apiserver.NewDispersalServerV2(
@@ -1226,9 +1274,10 @@ func startAPIServer(
 		apiServerLogger,
 		metricsRegistry,
 		metricsConfig,
-		false, // ReservedOnly
-		config.TestConfig.UseNewPayments,
-		controllerAddress,
+		false,                            // ReservedOnly
+		config.TestConfig.UseNewPayments, // useControllerMediatedPayments
+		controllerConnection,
+		controllerClient,
 		listener,
 	)
 	if err != nil {

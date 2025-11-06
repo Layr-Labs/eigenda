@@ -166,6 +166,10 @@ library InitParamsLib {
         return quorumNumbersRequiredBytes;
     }
 
+    function certVerifierRecencyWindow(string memory configData) internal pure returns (uint32) {
+        return uint32(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.recencyWindow"));
+    }
+
     function dispersers(string memory configData) internal pure returns (address[] memory) {
         return stdToml.readAddressArray(configData, ".initParams.eigenDA.disperser.dispersers");
     }

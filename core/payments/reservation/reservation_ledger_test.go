@@ -13,12 +13,14 @@ import (
 func TestDebit(t *testing.T) {
 	t.Run("successful debit", func(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-		ledger := createTestLedger(t, 100, false, startTime)
-		dispersalTime := startTime.Add(time.Hour)
+		currentTime := startTime
+		getNow := func() time.Time { return currentTime }
+		ledger := createTestLedger(t, getNow, 100, false)
+
+		currentTime = currentTime.Add(time.Hour)
 
 		success, remainingCapacity, err := ledger.Debit(
-			startTime,
-			dispersalTime,
+			currentTime,
 			50,
 			[]core.QuorumID{0},
 		)
@@ -29,12 +31,14 @@ func TestDebit(t *testing.T) {
 
 	t.Run("invalid quorum", func(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-		ledger := createTestLedger(t, 100, false, startTime)
-		dispersalTime := startTime.Add(time.Hour)
+		currentTime := startTime
+		getNow := func() time.Time { return currentTime }
+		ledger := createTestLedger(t, getNow, 100, false)
+
+		currentTime = currentTime.Add(time.Hour)
 
 		success, _, err := ledger.Debit(
-			startTime,
-			dispersalTime,
+			currentTime,
 			50,
 			[]core.QuorumID{0, 1, 5}, // quorum 5 not permitted
 		)
@@ -47,12 +51,15 @@ func TestDebit(t *testing.T) {
 
 	t.Run("invalid dispersal time", func(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-		ledger := createTestLedger(t, 100, false, startTime)
+		currentTime := startTime
+		getNow := func() time.Time { return currentTime }
+		ledger := createTestLedger(t, getNow, 100, false)
 
 		// before reservation start
+		currentTime = startTime.Add(-time.Hour)
+
 		success, _, err := ledger.Debit(
-			startTime,
-			startTime.Add(-time.Hour),
+			currentTime,
 			50,
 			[]core.QuorumID{0},
 		)
@@ -62,9 +69,10 @@ func TestDebit(t *testing.T) {
 		require.True(t, errors.As(err, &timeOutOfRangeError))
 
 		// after reservation end
+		currentTime = startTime.Add(25 * time.Hour)
+
 		success, _, err = ledger.Debit(
-			startTime,
-			startTime.Add(25*time.Hour),
+			currentTime,
 			50,
 			[]core.QuorumID{0},
 		)
@@ -75,13 +83,15 @@ func TestDebit(t *testing.T) {
 
 	t.Run("minimum symbols applied", func(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-		ledger := createTestLedger(t, 100, false, startTime)
-		dispersalTime := startTime.Add(time.Hour)
+		currentTime := startTime
+		getNow := func() time.Time { return currentTime }
+		ledger := createTestLedger(t, getNow, 100, false)
+
+		currentTime = currentTime.Add(time.Hour)
 
 		// debit 5 symbols, but minNumSymbols is 10
 		success, remainingCapacity, err := ledger.Debit(
-			startTime,
-			dispersalTime,
+			currentTime,
 			5,
 			[]core.QuorumID{0},
 		)
@@ -94,13 +104,15 @@ func TestDebit(t *testing.T) {
 func TestRevertDebit(t *testing.T) {
 	t.Run("successful revert", func(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-		ledger := createTestLedger(t, 100, false, startTime)
-		dispersalTime := startTime.Add(time.Hour)
+		currentTime := startTime
+		getNow := func() time.Time { return currentTime }
+		ledger := createTestLedger(t, getNow, 100, false)
+
+		currentTime = currentTime.Add(time.Hour)
 
 		// debit first
 		success, _, err := ledger.Debit(
-			startTime,
-			dispersalTime,
+			currentTime,
 			100,
 			[]core.QuorumID{0},
 		)
@@ -108,20 +120,22 @@ func TestRevertDebit(t *testing.T) {
 		require.True(t, success)
 
 		// revert the debit
-		remainingCapacity, err := ledger.RevertDebit(startTime, 50)
+		remainingCapacity, err := ledger.RevertDebit(50)
 		require.NoError(t, err)
 		require.Equal(t, float64(950), remainingCapacity)
 	})
 
 	t.Run("minimum symbols applied", func(t *testing.T) {
 		startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-		ledger := createTestLedger(t, 100, false, startTime)
-		dispersalTime := startTime.Add(time.Hour)
+		currentTime := startTime
+		getNow := func() time.Time { return currentTime }
+		ledger := createTestLedger(t, getNow, 100, false)
+
+		currentTime = currentTime.Add(time.Hour)
 
 		// debit 5 (charged 10 due to minimum)
 		success, _, err := ledger.Debit(
-			startTime,
-			dispersalTime,
+			currentTime,
 			5,
 			[]core.QuorumID{0},
 		)
@@ -129,7 +143,7 @@ func TestRevertDebit(t *testing.T) {
 		require.True(t, success)
 
 		// revert 5 (should revert 10 due to minimum)
-		remainingCapacity, err := ledger.RevertDebit(startTime, 5)
+		remainingCapacity, err := ledger.RevertDebit(5)
 		require.NoError(t, err)
 		require.Equal(t, float64(1000), remainingCapacity)
 	})
@@ -137,13 +151,15 @@ func TestRevertDebit(t *testing.T) {
 
 func TestUpdateReservation(t *testing.T) {
 	startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-	ledger := createTestLedger(t, 100, false, startTime)
-	dispersalTime := startTime.Add(time.Hour)
+	currentTime := startTime
+	getNow := func() time.Time { return currentTime }
+	ledger := createTestLedger(t, getNow, 100, false)
+
+	currentTime = currentTime.Add(time.Hour)
 
 	// debit 500 symbols to establish a fill level
 	success, remainingCapacity, err := ledger.Debit(
-		startTime,
-		dispersalTime,
+		currentTime,
 		500,
 		[]core.QuorumID{0, 1},
 	)
@@ -156,7 +172,7 @@ func TestUpdateReservation(t *testing.T) {
 	endTime := startTime.Add(24 * time.Hour)
 	identicalReservation, err := NewReservation(100, startTime, endTime, []core.QuorumID{0, 1})
 	require.NoError(t, err)
-	err = ledger.UpdateReservation(identicalReservation, startTime)
+	err = ledger.UpdateReservation(identicalReservation)
 	require.NoError(t, err)
 
 	// totalCapacity should remain the same
@@ -164,8 +180,7 @@ func TestUpdateReservation(t *testing.T) {
 	require.Equal(t, float64(1000), totalCapacity)
 	// verify fill level was preserved by doing another debit (100 symbols)
 	success, remainingCapacity, err = ledger.Debit(
-		startTime,
-		dispersalTime,
+		currentTime,
 		100,
 		[]core.QuorumID{0},
 	)
@@ -179,7 +194,7 @@ func TestUpdateReservation(t *testing.T) {
 	newEndTime := startTime.Add(48 * time.Hour)
 	newReservation, err := NewReservation(200, newStartTime, newEndTime, []core.QuorumID{0}) // only quorum 0 now
 	require.NoError(t, err)
-	err = ledger.UpdateReservation(newReservation, startTime)
+	err = ledger.UpdateReservation(newReservation)
 	require.NoError(t, err)
 
 	// verify new total capacity (200 * 10 = 2000)
@@ -187,8 +202,7 @@ func TestUpdateReservation(t *testing.T) {
 	require.Equal(t, float64(2000), totalCapacity)
 	// verify fill level was preserved by doing another debit (100 symbols)
 	success, remainingCapacity, err = ledger.Debit(
-		startTime,
-		dispersalTime,
+		currentTime,
 		100,
 		[]core.QuorumID{0},
 	)
@@ -199,8 +213,7 @@ func TestUpdateReservation(t *testing.T) {
 
 	// verify new quorum restrictions are enforced
 	success, _, err = ledger.Debit(
-		startTime,
-		dispersalTime,
+		currentTime,
 		50,
 		[]core.QuorumID{1}, // quorum 1 no longer permitted
 	)
@@ -210,10 +223,9 @@ func TestUpdateReservation(t *testing.T) {
 	require.True(t, errors.As(err, &quorumNotPermittedError))
 
 	// verify new time window is enforced
-	lateDispersalTime := startTime.Add(30 * time.Hour)
+	currentTime = startTime.Add(30 * time.Hour)
 	success, _, err = ledger.Debit(
-		startTime,
-		lateDispersalTime, // within new 48 hour window
+		currentTime, // within new 48 hour window
 		50,
 		[]core.QuorumID{0},
 	)
@@ -221,17 +233,22 @@ func TestUpdateReservation(t *testing.T) {
 	require.True(t, success)
 
 	// update with nil reservation
-	err = ledger.UpdateReservation(nil, startTime)
+	err = ledger.UpdateReservation(nil)
 	require.Error(t, err)
 }
 
-func createTestLedger(t *testing.T, symbolsPerSecond uint64, startFull bool, startTime time.Time) *ReservationLedger {
+func createTestLedger(
+	t *testing.T,
+	getNow func() time.Time,
+	symbolsPerSecond uint64,
+	startFull bool,
+) *ReservationLedger {
 	t.Helper()
 
-	endTime := startTime.Add(24 * time.Hour)
+	endTime := getNow().Add(24 * time.Hour)
 	permittedQuorums := []core.QuorumID{0, 1}
 
-	reservation, err := NewReservation(symbolsPerSecond, startTime, endTime, permittedQuorums)
+	reservation, err := NewReservation(symbolsPerSecond, getNow(), endTime, permittedQuorums)
 	require.NoError(t, err)
 
 	config, err := NewReservationLedgerConfig(
@@ -243,7 +260,7 @@ func createTestLedger(t *testing.T, symbolsPerSecond uint64, startFull bool, sta
 	)
 	require.NoError(t, err)
 
-	ledger, err := NewReservationLedger(*config, startTime)
+	ledger, err := NewReservationLedger(*config, getNow)
 	require.NoError(t, err)
 	require.NotNil(t, ledger)
 

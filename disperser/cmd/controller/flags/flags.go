@@ -244,15 +244,15 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_FRACTION"),
 		Value:    0.55,
 	}
-	GrpcServerEnableFlag = cli.BoolFlag{
+	GrpcServerEnableFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-server-enable"),
-		Usage:    "enable the controller gRPC server. default: false",
+		Usage:    "enable the controller gRPC server. default: true",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_SERVER_ENABLE"),
 	}
-	GrpcPaymentAuthenticationFlag = cli.BoolFlag{
+	GrpcPaymentAuthenticationFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-payment-authentication"),
-		Usage:    "If true, use the new payment authentication system running on the controller; if false, payment authentication is disabled and request validation will always fail. Defaults to disabled.",
+		Usage:    "If true, use the new payment authentication system running on the controller; if false, payment authentication is disabled and request validation will always fail. default: true.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PAYMENT_AUTHENTICATION"),
 	}

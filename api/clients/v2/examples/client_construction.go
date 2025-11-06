@@ -424,9 +424,7 @@ func createClientLedger(
 	var reservationLedger *reservation.ReservationLedger
 	var onDemandLedger *ondemand.OnDemandLedger
 
-	now := time.Now()
-
-	reservationLedger, err = createReservationLedger(ctx, paymentVault, accountID, now, minNumSymbols)
+	reservationLedger, err = createReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
 	if err != nil {
 		return nil, fmt.Errorf("create reservation ledger: %w", err)
 	}
@@ -455,7 +453,6 @@ func createReservationLedger(
 	ctx context.Context,
 	paymentVault payments.PaymentVault,
 	accountID gethcommon.Address,
-	now time.Time,
 	minNumSymbols uint32,
 ) (*reservation.ReservationLedger, error) {
 	reservationData, err := paymentVault.GetReservation(ctx, accountID)
@@ -487,7 +484,7 @@ func createReservationLedger(
 		return nil, fmt.Errorf("new reservation ledger config: %w", err)
 	}
 
-	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, now)
+	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, time.Now)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger: %w", err)
 	}
