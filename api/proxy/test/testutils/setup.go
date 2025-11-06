@@ -49,6 +49,16 @@ const (
 	sepoliaEigenDADirectory    = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 	sepoliaCertVerifierAddress = "0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429"
 	sepoliaSvcManagerAddress   = "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764"
+
+	disperserHoodiTestnetHostname   = "disperser-hoodi.eigenda.xyz"
+	hoodiTestnetEigenDADirectory    = "0x5a44e56e88abcf610c68340c6814ae7f5c4369fd"
+	hoodiTestnetCertVerifierAddress = "0xD82d14F1c6d1403E95Cd9EC40CBb6463E27C1c5F"
+	hoodiTestnetSvcManagerAddress   = "0x3FF2204A567C15dC3731140B95362ABb4b17d8ED"
+
+	disperserHoodiPreprodHostname   = "disperser-v2-preprod-hoodi.eigenda.xyz"
+	hoodiPreprodEigenDADirectory    = "0xbFa1b820bb302925a3eb98C8836a95361FB75b87"
+	hoodiPreprodCertVerifierAddress = "0xb64101890d15499790d665f9863ede1278ce553d"
+	hoodiPreprodSvcManagerAddress   = "0x9F3A67f1b56d0B21115A54356c02B2d77f39EA8a"
 )
 
 var (
@@ -97,7 +107,23 @@ type Backend int
 const (
 	SepoliaBackend Backend = iota + 1
 	MemstoreBackend
+	HoodiTestnetBackend
+	HoodiPreprodBackend
 )
+
+func (b Backend) SupportsEigenDAV1() bool {
+	switch b {
+	// technically HoodiTestnet supports V1 but there's 0 rollup usage
+	case HoodiTestnetBackend, HoodiPreprodBackend:
+		return false
+
+	case SepoliaBackend, MemstoreBackend:
+		return true
+
+	default:
+		panic("unknown backend type can't be inferred")
+	}
+}
 
 // ParseBackend converts a string to a Backend enum (case insensitive)
 func ParseBackend(inputString string) (Backend, error) {
@@ -106,6 +132,11 @@ func ParseBackend(inputString string) (Backend, error) {
 		return SepoliaBackend, nil
 	case "memstore":
 		return MemstoreBackend, nil
+	case "hoodi-testnet":
+		return HoodiTestnetBackend, nil
+	case "hoodi-preprod":
+		return HoodiPreprodBackend, nil
+
 	default:
 		return 0, fmt.Errorf("invalid backend: %s", inputString)
 	}
@@ -114,7 +145,7 @@ func ParseBackend(inputString string) (Backend, error) {
 func GetBackend() Backend {
 	backend, err := ParseBackend(os.Getenv(backendEnvVar))
 	if err != nil {
-		panic(fmt.Sprintf("BACKEND must be = memstore|testnet|sepolia|preprod. parse backend error: %v", err))
+		panic(fmt.Sprintf("BACKEND must be = memstore|hoodi-testnet|hoodi-preprod|sepolia. parse backend error: %v", err))
 	}
 	return backend
 }
@@ -231,6 +262,19 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		certVerifierAddress = sepoliaCertVerifierAddress
 		svcManagerAddress = sepoliaSvcManagerAddress
 		eigenDADirectory = sepoliaEigenDADirectory
+
+	case HoodiTestnetBackend:
+		disperserHostname = disperserHoodiTestnetHostname
+		certVerifierAddress = hoodiTestnetCertVerifierAddress
+		svcManagerAddress = hoodiTestnetSvcManagerAddress
+		eigenDADirectory = hoodiTestnetEigenDADirectory
+
+	case HoodiPreprodBackend:
+		disperserHostname = disperserHoodiPreprodHostname
+		certVerifierAddress = hoodiPreprodCertVerifierAddress
+		svcManagerAddress = hoodiPreprodSvcManagerAddress
+		eigenDADirectory = hoodiPreprodEigenDADirectory
+
 	default:
 		panic("Unsupported backend")
 	}
