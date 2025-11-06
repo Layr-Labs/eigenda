@@ -61,10 +61,10 @@ This algorithm guarantees that validators participating in both quorums store on
 2. Generate assignments for all other quorums using `AddAssignmentsForQuorum` with quorum 0 as the baseline
 3. Merge all per-quorum assignments using `MergeAssignmentsAndCap` to produce the final assignment for each validator
 
-**Note on Optimality:** The algorithm produces optimal storage assignments for two quorums. For three or more quorums, the assignment is not guaranteed to be globally optimal. Since quorums 0 and 1 are typically the largest (containing most validators), and other quorums are smaller custom quorums, the algorithm achieves near-optimal storage reduction for the majority of validators.
+**Note on Optimality:** The algorithm produces optimal storage assignments for two quorums. For three or more quorums, the assignment is not guaranteed to be globally optimal. Since quorums 0 and 1 are the "default" quorums and are expected to be the larger than custom quorums (i.e. containing the most validators), the algorithm achieves near-optimal storage reduction for the majority of validators.
 
 ### Code Walkthrough
-Notation note: In the code, we use `operator` to refer to `validator`.
+Notation note: In the code, we sometimes use the term `operator` to refer to a `validator`, although `validator` is now the preferred term.
 
 **Location:** `core/v2/assignment.go`
 
