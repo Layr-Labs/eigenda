@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/s3"
+	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -42,7 +42,7 @@ var errProcessingToDispersing = errors.New("blob transit to dispersing from non 
 // See blob_metadata_store.go for more details on BlobMetadataStore.
 type SharedBlobStore struct {
 	bucketName        string
-	s3Client          s3.S3Client
+	s3Client          s3.Client
 	blobMetadataStore *BlobMetadataStore
 	logger            logging.Logger
 }
@@ -77,12 +77,7 @@ type blobResultOrError struct {
 
 var _ disperser.BlobStore = (*SharedBlobStore)(nil)
 
-func NewSharedStorage(
-	bucketName string,
-	s3Client s3.S3Client,
-	blobMetadataStore *BlobMetadataStore,
-	logger logging.Logger,
-) *SharedBlobStore {
+func NewSharedStorage(bucketName string, s3Client s3.Client, blobMetadataStore *BlobMetadataStore, logger logging.Logger) *SharedBlobStore {
 	return &SharedBlobStore{
 		bucketName:        bucketName,
 		s3Client:          s3Client,

@@ -1,17 +1,9 @@
 package s3
 
-import (
-	"context"
-	"errors"
-)
+import "context"
 
-var (
-	// ErrObjectNotFound is returned when an object is not found in the storage backend
-	ErrObjectNotFound = errors.New("object not found")
-)
-
-// S3Client encapsulates the functionality of talking to AWS S3 (or an S3 mimic service).
-type S3Client interface {
+// Client encapsulates the functionality of an S3 client.
+type Client interface {
 
 	// DownloadObject downloads an object from S3.
 	DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error)
@@ -27,7 +19,7 @@ type S3Client interface {
 
 	// ListObjects lists all objects in a bucket with the given prefix. Note that this method may return
 	// file fragments if the bucket contains files uploaded via FragmentedUploadObject.
-	ListObjects(ctx context.Context, bucket string, prefix string) ([]ListedObject, error)
+	ListObjects(ctx context.Context, bucket string, prefix string) ([]Object, error)
 
 	// CreateBucket creates a bucket in S3.
 	CreateBucket(ctx context.Context, bucket string) error
@@ -60,9 +52,4 @@ type S3Client interface {
 		key string,
 		fileSize int,
 		fragmentSize int) ([]byte, error)
-}
-
-type ListedObject struct {
-	Key  string
-	Size int64
 }

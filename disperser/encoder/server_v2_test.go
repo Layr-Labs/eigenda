@@ -11,7 +11,6 @@ import (
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
-	s3common "github.com/Layr-Labs/eigenda/common/s3"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -39,7 +38,7 @@ type testComponents struct {
 	blobStore        *blobstore.BlobStore
 	chunkStoreWriter chunkstore.ChunkWriter
 	chunkStoreReader chunkstore.ChunkReader
-	s3Client         *s3common.MockS3Client
+	s3Client         *mock.S3Client
 	dynamoDBClient   *mock.MockDynamoDBClient
 }
 
@@ -220,7 +219,7 @@ func createTestComponents(t *testing.T) *testComponents {
 	grpcMetrics := grpcprom.NewServerMetrics()
 	registry.MustRegister(grpcMetrics)
 
-	s3Client := s3common.NewMockS3Client()
+	s3Client := mock.NewS3Client()
 	dynamoDBClient := &mock.MockDynamoDBClient{}
 	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)
 	chunkStoreWriter := chunkstore.NewChunkWriter(logger, s3Client, s3BucketName, 512*1024)
