@@ -251,6 +251,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_LOG_FORMAT:                    "text",
 		BATCHER_S3_BUCKET_NAME:                "test-eigenda-blobstore",
 		BATCHER_DYNAMODB_TABLE_NAME:           "test-BlobMetadata",
+		BATCHER_OBJECT_STORAGE_BACKEND:        "s3",
 		BATCHER_ENABLE_METRICS:                "true",
 		BATCHER_METRICS_HTTP_PORT:             "9094",
 		BATCHER_PULL_INTERVAL:                 "5s",

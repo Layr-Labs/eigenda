@@ -241,9 +241,9 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_ADDRESS"),
 	}
-	UseControllerMediatedPayments = cli.BoolFlag{
+	UseControllerMediatedPayments = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-controller-mediated-payments"),
-		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using legacy system.",
+		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using new controller-mediated system.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_CONTROLLER_MEDIATED_PAYMENTS"),
 	}

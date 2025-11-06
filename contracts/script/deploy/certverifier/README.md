@@ -15,7 +15,8 @@ To set up the deployment, a config json should be placed in the `config/` folder
         "1_adversaryThreshold": 33
     },
 
-    "quorumNumbersRequired": "0x0001"
+    "quorumNumbersRequired": "0x0001",
+    "recencyWindow": 0
 }
 ```
 
