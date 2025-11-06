@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstore "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"google.golang.org/grpc/codes"
@@ -67,7 +66,7 @@ func (s *DispersalServerV2) getBlobStatus(
 
 	cert, _, err := s.blobMetadataStore.GetBlobCertificate(ctx, blobKey)
 	if err != nil {
-		if errors.Is(err, dispcommon.ErrMetadataNotFound) {
+		if errors.Is(err, blobstore.ErrMetadataNotFound) {
 			return nil, status.New(codes.NotFound, "no such blob certificate found")
 		}
 		return nil, status.Newf(codes.Internal, "failed to get blob certificate: %v", err)
