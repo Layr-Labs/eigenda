@@ -72,5 +72,4 @@ See the integration [contracts](../integration/spec/4-contracts.md) section for 
 
 ## Network Layer
 
-This section is under construction. 
-
+The network layer is described in the [Write and Read Workflow](./architecture/write-and-read-workflow.md), which explains how each component interacts when writing to and reading from EigenDA.
