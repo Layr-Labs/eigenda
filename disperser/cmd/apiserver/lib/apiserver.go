@@ -178,6 +178,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
+			time.Now,
 			blobStore,
 			blobMetadataStore,
 			transactor,
@@ -186,6 +187,14 @@ func RunDisperserServer(ctx *cli.Context) error {
 			committer,
 			config.MaxNumSymbolsPerBlob,
 			config.OnchainStateRefreshInterval,
+			// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+			// instead of hardcoding. At that point, this field should be removed from here
+			// entirely, and the value will be fetched dynamically at runtime.
+			45*time.Second, // MaxDispersalAge
+			// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+			// instead of hardcoding. At that point, this field should be removed from here
+			// entirely, and the value will be fetched dynamically at runtime.
+			45*time.Second, // MaxFutureDispersalTime
 			logger,
 			reg,
 			config.MetricsConfig,
