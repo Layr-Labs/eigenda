@@ -35,6 +35,8 @@ type CertVerifier struct {
 	confirmationThresholds sync.Map
 	// maps contract address to the cert version specified in the contract at that address
 	versions sync.Map
+	// maps contract address to the recency window specified in the contract at that address
+	recencyWindow sync.Map
 }
 
 // NewCertVerifier constructs a new CertVerifier instance
@@ -340,4 +342,52 @@ func NormalizeCertV3(cert coretypes.EigenDACert) *coretypes.EigenDACertV3 {
 	}
 
 	return certV3
+}
+
+func (cv *CertVerifier) GetRecencyWindow(ctx context.Context) (uint32, error) {
+	blockNum, err := cv.ethClient.BlockByNumber(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("get latest block number: %w", err)
+	}
+
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, blockNum.NumberU64())
+	if err != nil {
+		return 0, fmt.Errorf("get cert verifier address: %w", err)
+	}
+
+	// if the recency window for the active cert verifier address has already been cached, return it immediately
+	cachedRecencyWindow, ok := cv.recencyWindow.Load(certVerifierAddress)
+	if ok {
+		castRecencyWindow, ok := cachedRecencyWindow.(uint32)
+		if !ok {
+			return 0, fmt.Errorf("expected recency window to be uint32")
+		}
+		return castRecencyWindow, nil
+	}
+
+	// recency window not cached, so proceed to fetch it
+	certVerifierCaller, err := cv.getVerifierCallerFromAddress(certVerifierAddress)
+	if err != nil {
+		return 0, fmt.Errorf("get verifier caller from address: %w", err)
+	}
+
+	// check contract semver for recency window support
+	// recency window was added in version 3.2.0
+	semver, err := certVerifierCaller.Semver(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return 0, fmt.Errorf("get semver: %w", err)
+	}
+
+	if (semver.Major == 3 && semver.Minor >= 2) || semver.Major > 3 {
+		recencyWindow, err := certVerifierCaller.RecencyWindow(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return 0, fmt.Errorf("get recency window: %w", err)
+		}
+
+		cv.recencyWindow.Store(certVerifierAddress, recencyWindow)
+		return recencyWindow, nil
+	}
+
+	cv.recencyWindow.Store(certVerifierAddress, 0)
+	return 0, fmt.Errorf("onchain recency window not supported: semver < 3.2.0")
 }
