@@ -27,10 +27,10 @@ type metricsV2 struct {
 	disperseBlobLatency             *prometheus.SummaryVec
 	disperseBlobSize                *prometheus.CounterVec
 	disperseBlobMeteredBytes        *prometheus.CounterVec
-	validateDispersalRequestLatency    *prometheus.SummaryVec
-	storeBlobLatency                   *prometheus.SummaryVec
-	getBlobStatusLatency               *prometheus.SummaryVec
-	dispersalTimestampRejected         prometheus.Counter
+	validateDispersalRequestLatency *prometheus.SummaryVec
+	storeBlobLatency                *prometheus.SummaryVec
+	getBlobStatusLatency            *prometheus.SummaryVec
+	dispersalTimestampRejected      prometheus.Counter
 
 	registry *prometheus.Registry
 	httpPort string
