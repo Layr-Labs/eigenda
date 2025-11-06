@@ -17,7 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	awss3 "github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core"
@@ -746,7 +746,16 @@ func newTestServer(ctx context.Context, transactor core.Writer, testName string)
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
-	s3Client, err := s3.NewClient(ctx, awsConfig, logger)
+	s3Client, err := awss3.NewAwsS3Client(
+		ctx,
+		logger,
+		awsConfig.EndpointURL,
+		awsConfig.Region,
+		awsConfig.FragmentParallelismFactor,
+		awsConfig.FragmentParallelismConstant,
+		awsConfig.AccessKey,
+		awsConfig.SecretAccessKey,
+	)
 	if err != nil {
 		logger.Fatal("Failed to create s3 client:", err)
 	}

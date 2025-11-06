@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
-	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -321,7 +320,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
 				err = e.blobMetadataStore.PutBlobCertificate(storeCtx, cert, fragmentInfo)
 				cancel()
-				if err != nil && !errors.Is(err, dispcommon.ErrAlreadyExists) {
+				if err != nil && !errors.Is(err, blobstore.ErrAlreadyExists) {
 					e.logger.Error("failed to put blob certificate", "err", err)
 					continue
 				}
@@ -332,7 +331,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				err = e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Encoded)
 				finishedUpdateBlobStatusTime = time.Now()
 				cancel()
-				if err == nil || errors.Is(err, dispcommon.ErrAlreadyExists) {
+				if err == nil || errors.Is(err, blobstore.ErrAlreadyExists) {
 					// Successfully updated the status to Encoded
 					success = true
 					break

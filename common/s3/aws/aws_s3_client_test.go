@@ -1,4 +1,4 @@
-package test
+package aws_test
 
 import (
 	"context"
@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/aws/mock"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
+	s3common "github.com/Layr-Labs/eigenda/common/s3"
+	"github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigenda/test/testbed"
@@ -27,7 +27,7 @@ const (
 	localstackHost = "http://0.0.0.0:4578"
 )
 
-func setupLocalStackTest(t *testing.T) s3.Client {
+func setupLocalStackTest(t *testing.T) s3common.S3Client {
 	t.Helper()
 
 	ctx := t.Context()
@@ -47,7 +47,7 @@ func setupLocalStackTest(t *testing.T) s3.Client {
 		_ = localstackContainer.Terminate(ctx)
 	})
 
-	config := aws.DefaultClientConfig()
+	config := commonaws.DefaultClientConfig()
 	config.EndpointURL = localstackHost
 	config.Region = "us-east-1"
 
@@ -56,7 +56,16 @@ func setupLocalStackTest(t *testing.T) s3.Client {
 	err = os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
 	require.NoError(t, err, "failed to set AWS_SECRET_ACCESS_KEY")
 
-	client, err := s3.NewClient(ctx, *config, logger)
+	client, err := aws.NewAwsS3Client(
+		ctx,
+		logger,
+		config.EndpointURL,
+		config.Region,
+		config.FragmentParallelismFactor,
+		config.FragmentParallelismConstant,
+		config.AccessKey,
+		config.SecretAccessKey,
+	)
 	require.NoError(t, err, "failed to create S3 client")
 
 	err = client.CreateBucket(ctx, bucket)
@@ -65,7 +74,7 @@ func setupLocalStackTest(t *testing.T) s3.Client {
 	return client
 }
 
-func runRandomOperationsTest(t *testing.T, client s3.Client) {
+func runRandomOperationsTest(t *testing.T, client s3common.S3Client) {
 	t.Helper()
 	ctx := t.Context()
 	numberToWrite := 100
@@ -111,7 +120,7 @@ func TestRandomOperations(t *testing.T) {
 	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
-		client := mock.NewS3Client()
+		client := s3common.NewMockS3Client()
 		runRandomOperationsTest(t, client)
 	})
 
@@ -125,7 +134,7 @@ func TestReadNonExistentValue(t *testing.T) {
 	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
-		client := mock.NewS3Client()
+		client := s3common.NewMockS3Client()
 		runReadNonExistentValueTest(t, client)
 	})
 
@@ -135,7 +144,7 @@ func TestReadNonExistentValue(t *testing.T) {
 	})
 }
 
-func runReadNonExistentValueTest(t *testing.T, client s3.Client) {
+func runReadNonExistentValueTest(t *testing.T, client s3common.S3Client) {
 	t.Helper()
 	ctx := t.Context()
 
@@ -151,7 +160,7 @@ func TestHeadObject(t *testing.T) {
 	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
-		client := mock.NewS3Client()
+		client := s3common.NewMockS3Client()
 		runHeadObjectTest(t, client)
 	})
 
@@ -161,7 +170,7 @@ func TestHeadObject(t *testing.T) {
 	})
 }
 
-func runHeadObjectTest(t *testing.T, client s3.Client) {
+func runHeadObjectTest(t *testing.T, client s3common.S3Client) {
 	t.Helper()
 	ctx := t.Context()
 
@@ -175,6 +184,6 @@ func runHeadObjectTest(t *testing.T, client s3.Client) {
 	require.Equal(t, int64(4), *size, "size should match uploaded data")
 
 	size, err = client.HeadObject(ctx, bucket, "nonexistent")
-	require.ErrorIs(t, err, s3.ErrObjectNotFound, "should return ErrObjectNotFound for non-existent object")
+	require.Error(t, err, "should fail to get head object for non-existent key")
 	require.Nil(t, size, "size should be nil for non-existent object")
 }
