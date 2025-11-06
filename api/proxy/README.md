@@ -52,6 +52,7 @@ Features:
     - [Ethereum Node](#ethereum-node)
     - [SRS Points](#srs-points)
     - [Hardware Recommendation](#hardware-recommendation)
+    - [System Clock Synchronization](#system-clock-synchronization)
   - [Monitoring / Observability](#monitoring--observability)
 - [Contributor Guide](#contributor-guide)
   - [Testing](#testing)
@@ -396,6 +397,11 @@ The following specs are recommended for running on a single production server:
 
 * 1-2 cores CPU
 * 4 GB RAM
+
+#### System Clock Synchronization
+
+The host system running the proxy must maintain accurate clock synchronization via NTP or equivalent. The disperser
+validates timestamps included in dispersal requests, and may reject requests with excessive clock drift.
 
 ### Monitoring / Observability
 

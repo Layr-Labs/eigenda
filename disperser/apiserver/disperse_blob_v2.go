@@ -316,7 +316,7 @@ func (s *DispersalServerV2) validateDispersalTimestamp(blobHeader *corev2.BlobHe
 	dispersalAge := s.getNow().Sub(dispersalTime)
 
 	if dispersalAge > s.MaxDispersalAge {
-		s.metrics.reportDispersalTimestampRejected()
+		s.metrics.reportDispersalTimestampRejected("stale")
 		return fmt.Errorf("potential clock drift detected: dispersal timestamp is too old. "+
 			"age=%v, max_age=%v, timestamp_unix_nanos=%d, timestamp_utc=%s",
 			dispersalAge,
@@ -328,7 +328,7 @@ func (s *DispersalServerV2) validateDispersalTimestamp(blobHeader *corev2.BlobHe
 
 	// If dispersalAge is negative, the timestamp is in the future
 	if dispersalAge < -s.MaxFutureDispersalTime {
-		s.metrics.reportDispersalTimestampRejected()
+		s.metrics.reportDispersalTimestampRejected("future")
 		return fmt.Errorf("potential clock drift detected: dispersal timestamp is too far in the future. "+
 			"future_offset=%v, max_future_offset=%v, timestamp_unix_nanos=%d, timestamp_utc=%s",
 			-dispersalAge,

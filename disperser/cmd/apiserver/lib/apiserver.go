@@ -187,11 +187,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			committer,
 			config.MaxNumSymbolsPerBlob,
 			config.OnchainStateRefreshInterval,
-			// TODO(litt3): once the checkpointed onchain config registry is ready, this should be
-			// removed from the config struct and fetched dynamically from the onchain registry at runtime.
 			config.MaxDispersalAge,
-			// TODO(litt3): once the checkpointed onchain config registry is ready, this should be
-			// removed from the config struct and fetched dynamically from the onchain registry at runtime.
 			config.MaxFutureDispersalTime,
 			logger,
 			reg,

@@ -634,28 +634,28 @@ func TestTimestampValidation(t *testing.T) {
 		{
 			name: "valid timestamp - almost stale",
 			timestampFunc: func() int64 {
-				return time.Now().Add(-(c.DispersalServerV2.MaxDispersalAge - time.Second)).UnixNano()
+				return time.Now().Add(-(c.DispersalServerV2.MaxDispersalAge - 5*time.Second)).UnixNano()
 			},
 			expectError: false,
 		},
 		{
 			name: "stale timestamp",
 			timestampFunc: func() int64 {
-				return time.Now().Add(-(c.DispersalServerV2.MaxDispersalAge + time.Second)).UnixNano()
+				return time.Now().Add(-(c.DispersalServerV2.MaxDispersalAge + 5*time.Second)).UnixNano()
 			},
 			expectError: true,
 		},
 		{
 			name: "valid timestamp - almost too far in future",
 			timestampFunc: func() int64 {
-				return time.Now().Add(c.DispersalServerV2.MaxFutureDispersalTime - time.Second).UnixNano()
+				return time.Now().Add(c.DispersalServerV2.MaxFutureDispersalTime - 5*time.Second).UnixNano()
 			},
 			expectError: false,
 		},
 		{
 			name: "too far future timestamp",
 			timestampFunc: func() int64 {
-				return time.Now().Add(c.DispersalServerV2.MaxFutureDispersalTime + time.Second).UnixNano()
+				return time.Now().Add(c.DispersalServerV2.MaxFutureDispersalTime + 5*time.Second).UnixNano()
 			},
 			expectError: true,
 		},

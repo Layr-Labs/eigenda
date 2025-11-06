@@ -62,26 +62,15 @@ type DispersalServerV2 struct {
 	onchainStateRefreshInterval time.Duration
 
 	// MaxDispersalAge is the maximum age a dispersal request can be before it is rejected.
-	// Dispersals older than this duration are rejected at the API server.
+	// Dispersals older than this duration are rejected by the API server at ingest.
 	//
 	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
 	// client at dispersal request creation time (in nanoseconds since Unix epoch).
-	//
-	// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used instead of including
-	// in this config + hardcoding. At that point, this field will be removed from the config struct entirely, and the
-	// value will be fetched dynamically at runtime.
 	MaxDispersalAge time.Duration
 
 	// MaxFutureDispersalTime is the maximum amount of time into the future a dispersal request can be
 	// before it is rejected. Dispersals with timestamps more than this duration in the future are rejected
-	// at the API server.
-	//
-	// Future timestamp checking prevents clients from setting timestamps far in the future, which could
-	// potentially be used to bypass time-based controls or cause other issues.
-	//
-	// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used instead of including
-	// in this config + hardcoding. At that point, this field will be removed from the config struct entirely, and the
-	// value will be fetched dynamically at runtime.
+	// by the API server at ingest.
 	MaxFutureDispersalTime time.Duration
 
 	// getNow returns the current time
@@ -164,6 +153,12 @@ func NewDispersalServerV2(
 	}
 	if getNow == nil {
 		return nil, errors.New("getNow is required")
+	}
+	if maxDispersalAge <= 0 {
+		return nil, fmt.Errorf("maxDispersalAge must be positive (got: %v)", maxDispersalAge)
+	}
+	if maxFutureDispersalTime <= 0 {
+		return nil, fmt.Errorf("maxFutureDispersalTime must be positive (got: %v)", maxFutureDispersalTime)
 	}
 
 	logger := _logger.With("component", "DispersalServerV2")
