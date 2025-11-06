@@ -1,14 +1,13 @@
-package aws
+package s3
 
 import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"runtime"
 	"sync"
 
-	s3common "github.com/Layr-Labs/eigenda/common/s3"
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -24,44 +23,38 @@ const (
 )
 
 var (
-	once sync.Once
-	ref  *awsS3Client
+	once              sync.Once
+	ref               *client
+	ErrObjectNotFound = errors.New("object not found")
 )
 
-// An implementation of s3common.S3Client using AWS S3.
-type awsS3Client struct {
-	logger logging.Logger
+type Object struct {
+	Key  string
+	Size int64
+}
 
-	// Amazon's S3 client implementation.
+type client struct {
+	cfg      *commonaws.ClientConfig
 	s3Client *s3.Client
 
 	// concurrencyLimiter is a channel that limits the number of concurrent operations.
 	concurrencyLimiter chan struct{}
+
+	logger logging.Logger
 }
 
-var _ s3common.S3Client = (*awsS3Client)(nil)
+var _ Client = (*client)(nil)
 
-// NewAwsS3Client creates a new S3Client that talks to AWS S3.
-func NewAwsS3Client(
-	ctx context.Context,
-	logger logging.Logger,
-	endpointUrl string,
-	region string,
-	fragmentParallelismFactor int,
-	fragmentParallelismConstant int,
-	accessKey string,
-	secretAccessKey string,
-) (s3common.S3Client, error) {
-
+func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.Logger) (Client, error) {
 	var err error
 	once.Do(func() {
 		customResolver := aws.EndpointResolverWithOptionsFunc(
 			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-				if endpointUrl != "" {
+				if cfg.EndpointURL != "" {
 					return aws.Endpoint{
 						PartitionID:   "aws",
-						URL:           endpointUrl,
-						SigningRegion: region,
+						URL:           cfg.EndpointURL,
+						SigningRegion: cfg.Region,
 					}, nil
 				}
 
@@ -70,15 +63,15 @@ func NewAwsS3Client(
 			})
 
 		options := [](func(*config.LoadOptions) error){
-			config.WithRegion(region),
+			config.WithRegion(cfg.Region),
 			config.WithEndpointResolverWithOptions(customResolver),
 			config.WithRetryMode(aws.RetryModeStandard),
 		}
 		// If access key and secret access key are not provided, use the default credential provider
-		if len(accessKey) > 0 && len(secretAccessKey) > 0 {
+		if len(cfg.AccessKey) > 0 && len(cfg.SecretAccessKey) > 0 {
 			options = append(options,
 				config.WithCredentialsProvider(
-					credentials.NewStaticCredentialsProvider(accessKey, secretAccessKey, "")))
+					credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretAccessKey, "")))
 		}
 		awsConfig, errCfg := config.LoadDefaultConfig(context.Background(), options...)
 
@@ -92,11 +85,11 @@ func NewAwsS3Client(
 		})
 
 		workers := 0
-		if fragmentParallelismConstant > 0 {
-			workers = fragmentParallelismConstant
+		if cfg.FragmentParallelismConstant > 0 {
+			workers = cfg.FragmentParallelismConstant
 		}
-		if fragmentParallelismFactor > 0 {
-			workers = fragmentParallelismFactor * runtime.NumCPU()
+		if cfg.FragmentParallelismFactor > 0 {
+			workers = cfg.FragmentParallelismFactor * runtime.NumCPU()
 		}
 
 		if workers == 0 {
@@ -106,7 +99,8 @@ func NewAwsS3Client(
 		pool := &errgroup.Group{}
 		pool.SetLimit(workers)
 
-		ref = &awsS3Client{
+		ref = &client{
+			cfg:                &cfg,
 			s3Client:           s3Client,
 			concurrencyLimiter: make(chan struct{}, workers),
 			logger:             logger.With("component", "S3Client"),
@@ -115,7 +109,7 @@ func NewAwsS3Client(
 	return ref, err
 }
 
-func (s *awsS3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
+func (s *client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
 	objectSize := defaultBlobBufferSizeByte
 	size, err := s.HeadObject(ctx, bucket, key)
 	if err == nil {
@@ -125,10 +119,8 @@ func (s *awsS3Client) DownloadObject(ctx context.Context, bucket string, key str
 
 	var partMiBs int64 = 10
 	downloader := manager.NewDownloader(s.s3Client, func(d *manager.Downloader) {
-		// 10MB per part
-		d.PartSize = partMiBs * 1024 * 1024
-		// The number of goroutines to spin up in parallel per call to Upload when sending parts
-		d.Concurrency = 3
+		d.PartSize = partMiBs * 1024 * 1024 // 10MB per part
+		d.Concurrency = 3                   //The number of goroutines to spin up in parallel per call to Upload when sending parts
 	})
 
 	_, err = downloader.Download(ctx, buffer, &s3.GetObjectInput{
@@ -140,13 +132,13 @@ func (s *awsS3Client) DownloadObject(ctx context.Context, bucket string, key str
 	}
 
 	if buffer == nil || len(buffer.Bytes()) == 0 {
-		return nil, s3common.ErrObjectNotFound
+		return nil, ErrObjectNotFound
 	}
 
 	return buffer.Bytes(), nil
 }
 
-func (s *awsS3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
+func (s *client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
 	output, err := s.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -154,7 +146,7 @@ func (s *awsS3Client) HeadObject(ctx context.Context, bucket string, key string)
 	if err != nil {
 		var notFound *types.NotFound
 		if ok := errors.As(err, &notFound); ok {
-			return nil, s3common.ErrObjectNotFound
+			return nil, ErrObjectNotFound
 		}
 		return nil, err
 	}
@@ -162,13 +154,11 @@ func (s *awsS3Client) HeadObject(ctx context.Context, bucket string, key string)
 	return output.ContentLength, nil
 }
 
-func (s *awsS3Client) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
+func (s *client) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
 	var partMiBs int64 = 10
 	uploader := manager.NewUploader(s.s3Client, func(u *manager.Uploader) {
-		// 10MiB per part
-		u.PartSize = partMiBs * 1024 * 1024
-		// The number of goroutines to spin up in parallel per call to upload when sending parts
-		u.Concurrency = 3
+		u.PartSize = partMiBs * 1024 * 1024 // 10MiB per part
+		u.Concurrency = 3                   //The number of goroutines to spin up in parallel per call to upload when sending parts
 	})
 
 	_, err := uploader.Upload(ctx, &s3.PutObjectInput{
@@ -183,7 +173,7 @@ func (s *awsS3Client) UploadObject(ctx context.Context, bucket string, key strin
 	return nil
 }
 
-func (s *awsS3Client) DeleteObject(ctx context.Context, bucket string, key string) error {
+func (s *client) DeleteObject(ctx context.Context, bucket string, key string) error {
 	_, err := s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -196,7 +186,7 @@ func (s *awsS3Client) DeleteObject(ctx context.Context, bucket string, key strin
 }
 
 // ListObjects lists all items metadata in a bucket with the given prefix up to 1000 items.
-func (s *awsS3Client) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3common.ListedObject, error) {
+func (s *client) ListObjects(ctx context.Context, bucket string, prefix string) ([]Object, error) {
 	output, err := s.s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
@@ -205,13 +195,13 @@ func (s *awsS3Client) ListObjects(ctx context.Context, bucket string, prefix str
 		return nil, err
 	}
 
-	objects := make([]s3common.ListedObject, 0, len(output.Contents))
+	objects := make([]Object, 0, len(output.Contents))
 	for _, object := range output.Contents {
 		var size int64 = 0
 		if object.Size != nil {
 			size = *object.Size
 		}
-		objects = append(objects, s3common.ListedObject{
+		objects = append(objects, Object{
 			Key:  *object.Key,
 			Size: size,
 		})
@@ -219,7 +209,7 @@ func (s *awsS3Client) ListObjects(ctx context.Context, bucket string, prefix str
 	return objects, nil
 }
 
-func (s *awsS3Client) CreateBucket(ctx context.Context, bucket string) error {
+func (s *client) CreateBucket(ctx context.Context, bucket string) error {
 	_, err := s.s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(bucket),
 	})
@@ -230,14 +220,14 @@ func (s *awsS3Client) CreateBucket(ctx context.Context, bucket string) error {
 	return nil
 }
 
-func (s *awsS3Client) FragmentedUploadObject(
+func (s *client) FragmentedUploadObject(
 	ctx context.Context,
 	bucket string,
 	key string,
 	data []byte,
 	fragmentSize int) error {
 
-	fragments, err := s3common.BreakIntoFragments(key, data, fragmentSize)
+	fragments, err := BreakIntoFragments(key, data, fragmentSize)
 	if err != nil {
 		return err
 	}
@@ -264,10 +254,10 @@ func (s *awsS3Client) FragmentedUploadObject(
 }
 
 // fragmentedWriteTask writes a single file to S3.
-func (s *awsS3Client) fragmentedWriteTask(
+func (s *client) fragmentedWriteTask(
 	ctx context.Context,
 	resultChannel chan error,
-	fragment *s3common.Fragment,
+	fragment *Fragment,
 	bucket string) {
 
 	_, err := s.s3Client.PutObject(ctx,
@@ -280,7 +270,7 @@ func (s *awsS3Client) fragmentedWriteTask(
 	resultChannel <- err
 }
 
-func (s *awsS3Client) FragmentedDownloadObject(
+func (s *client) FragmentedDownloadObject(
 	ctx context.Context,
 	bucket string,
 	key string,
@@ -294,7 +284,7 @@ func (s *awsS3Client) FragmentedDownloadObject(
 		return nil, errors.New("fragmentSize must be greater than 0")
 	}
 
-	fragmentKeys, err := s3common.GetFragmentKeys(key, s3common.GetFragmentCount(fileSize, fragmentSize))
+	fragmentKeys, err := GetFragmentKeys(key, getFragmentCount(fileSize, fragmentSize))
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +302,7 @@ func (s *awsS3Client) FragmentedDownloadObject(
 		}()
 	}
 
-	fragments := make([]*s3common.Fragment, len(fragmentKeys))
+	fragments := make([]*Fragment, len(fragmentKeys))
 	for i := 0; i < len(fragmentKeys); i++ {
 		result := <-resultChannel
 		if result.err != nil {
@@ -325,22 +315,18 @@ func (s *awsS3Client) FragmentedDownloadObject(
 		return nil, ctx.Err()
 	}
 
-	data, err := s3common.RecombineFragments(fragments)
-	if err != nil {
-		return nil, fmt.Errorf("failed to recombine fragments: %w", err)
-	}
-	return data, nil
+	return recombineFragments(fragments)
 
 }
 
 // readResult is the result of a read task.
 type readResult struct {
-	fragment *s3common.Fragment
+	fragment *Fragment
 	err      error
 }
 
 // readTask reads a single file from S3.
-func (s *awsS3Client) readTask(
+func (s *client) readTask(
 	ctx context.Context,
 	resultChannel chan *readResult,
 	bucket string,
@@ -374,7 +360,7 @@ func (s *awsS3Client) readTask(
 		bytesRead += count
 	}
 
-	result.fragment = &s3common.Fragment{
+	result.fragment = &Fragment{
 		FragmentKey: key,
 		Data:        data,
 		Index:       index,

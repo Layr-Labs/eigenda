@@ -10,11 +10,15 @@ import (
 	"sort"
 	"strings"
 
-	s3common "github.com/Layr-Labs/eigenda/common/s3"
+	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	oraclecommon "github.com/oracle/oci-go-sdk/v65/common"
 	"github.com/oracle/oci-go-sdk/v65/common/auth"
 	"github.com/oracle/oci-go-sdk/v65/objectstorage"
+)
+
+var (
+	ErrObjectNotFound = errors.New("object not found")
 )
 
 // ObjectStorageConfig holds configuration for OCI Object Storage
@@ -27,8 +31,8 @@ type ObjectStorageConfig struct {
 	FragmentParallelismFactor   int
 }
 
-// ociS3Client implements the S3 Client interface using OCI Object Storage
-type ociS3Client struct {
+// ociClient implements the S3 Client interface using OCI Object Storage
+type ociClient struct {
 	cfg                 *ObjectStorageConfig
 	objectStorageClient objectstorage.ObjectStorageClient
 
@@ -38,13 +42,13 @@ type ociS3Client struct {
 	logger logging.Logger
 }
 
-var _ s3common.S3Client = (*ociS3Client)(nil)
+var _ s3.Client = (*ociClient)(nil)
 
-// NewOciS3Client creates a new OCI Object Storage client that implements the S3 Client interface
-func NewOciS3Client(
+// NewObjectStorageClient creates a new OCI Object Storage client that implements the S3 Client interface
+func NewObjectStorageClient(
 	ctx context.Context,
 	cfg ObjectStorageConfig,
-	logger logging.Logger) (s3common.S3Client, error) {
+	logger logging.Logger) (s3.Client, error) {
 
 	// Create OCI configuration provider using workload identity
 	configProvider, err := auth.OkeWorkloadIdentityConfigurationProvider()
@@ -93,7 +97,7 @@ func NewOciS3Client(
 	for i := 0; i < workers; i++ {
 		limiter <- struct{}{}
 	}
-	return &ociS3Client{
+	return &ociClient{
 		cfg:                 &finalCfg,
 		objectStorageClient: objectStorageClient,
 		concurrencyLimiter:  limiter,
@@ -107,7 +111,7 @@ func NewOciS3Client(
 // around the OCI SDK. The utility functions (GetFragmentCount, RecombineFragments) and
 // config processing in NewObjectStorageClient have good coverage where it matters.
 
-func (c *ociS3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
+func (c *ociClient) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
 	getObjectRequest := objectstorage.GetObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -130,13 +134,13 @@ func (c *ociS3Client) DownloadObject(ctx context.Context, bucket string, key str
 	}
 
 	if len(data) == 0 {
-		return nil, s3common.ErrObjectNotFound
+		return nil, ErrObjectNotFound
 	}
 
 	return data, nil
 }
 
-func (c *ociS3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
+func (c *ociClient) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
 	headObjectRequest := objectstorage.HeadObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -147,7 +151,7 @@ func (c *ociS3Client) HeadObject(ctx context.Context, bucket string, key string)
 	if err != nil {
 		// Check if it's a 404 error
 		if response.RawResponse != nil && response.RawResponse.StatusCode == 404 {
-			return nil, s3common.ErrObjectNotFound
+			return nil, ErrObjectNotFound
 		}
 		return nil, fmt.Errorf("failed to head object: %w", err)
 	}
@@ -155,7 +159,7 @@ func (c *ociS3Client) HeadObject(ctx context.Context, bucket string, key string)
 	return response.ContentLength, nil
 }
 
-func (c *ociS3Client) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
+func (c *ociClient) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
 	putObjectRequest := objectstorage.PutObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -172,7 +176,7 @@ func (c *ociS3Client) UploadObject(ctx context.Context, bucket string, key strin
 	return nil
 }
 
-func (c *ociS3Client) DeleteObject(ctx context.Context, bucket string, key string) error {
+func (c *ociClient) DeleteObject(ctx context.Context, bucket string, key string) error {
 	deleteObjectRequest := objectstorage.DeleteObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -187,7 +191,7 @@ func (c *ociS3Client) DeleteObject(ctx context.Context, bucket string, key strin
 	return nil
 }
 
-func (c *ociS3Client) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3common.ListedObject, error) {
+func (c *ociClient) ListObjects(ctx context.Context, bucket string, prefix string) ([]s3.Object, error) {
 	listObjectsRequest := objectstorage.ListObjectsRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -200,7 +204,7 @@ func (c *ociS3Client) ListObjects(ctx context.Context, bucket string, prefix str
 		return nil, fmt.Errorf("failed to list objects from OCI: %w", err)
 	}
 
-	objects := make([]s3common.ListedObject, 0, len(response.Objects))
+	objects := make([]s3.Object, 0, len(response.Objects))
 	for _, object := range response.Objects {
 		var size int64 = 0
 		if object.Size != nil {
@@ -210,7 +214,7 @@ func (c *ociS3Client) ListObjects(ctx context.Context, bucket string, prefix str
 		if object.Name != nil {
 			key = *object.Name
 		}
-		objects = append(objects, s3common.ListedObject{
+		objects = append(objects, s3.Object{
 			Key:  key,
 			Size: size,
 		})
@@ -219,7 +223,7 @@ func (c *ociS3Client) ListObjects(ctx context.Context, bucket string, prefix str
 	return objects, nil
 }
 
-func (c *ociS3Client) CreateBucket(ctx context.Context, bucket string) error {
+func (c *ociClient) CreateBucket(ctx context.Context, bucket string) error {
 	createBucketRequest := objectstorage.CreateBucketRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		CreateBucketDetails: objectstorage.CreateBucketDetails{
@@ -237,14 +241,14 @@ func (c *ociS3Client) CreateBucket(ctx context.Context, bucket string) error {
 	return nil
 }
 
-func (c *ociS3Client) FragmentedUploadObject(
+func (c *ociClient) FragmentedUploadObject(
 	ctx context.Context,
 	bucket string,
 	key string,
 	data []byte,
 	fragmentSize int) error {
 
-	fragments, err := s3common.BreakIntoFragments(key, data, fragmentSize)
+	fragments, err := s3.BreakIntoFragments(key, data, fragmentSize)
 	if err != nil {
 		return fmt.Errorf("failed to break data into fragments: %w", err)
 	}
@@ -274,10 +278,10 @@ func (c *ociS3Client) FragmentedUploadObject(
 }
 
 // fragmentedWriteTask writes a single fragment to OCI Object Storage.
-func (c *ociS3Client) fragmentedWriteTask(
+func (c *ociClient) fragmentedWriteTask(
 	ctx context.Context,
 	resultChannel chan error,
-	fragment *s3common.Fragment,
+	fragment *s3.Fragment,
 	bucket string) {
 
 	putObjectRequest := objectstorage.PutObjectRequest{
@@ -292,7 +296,7 @@ func (c *ociS3Client) fragmentedWriteTask(
 	resultChannel <- err
 }
 
-func (c *ociS3Client) FragmentedDownloadObject(
+func (c *ociClient) FragmentedDownloadObject(
 	ctx context.Context,
 	bucket string,
 	key string,
@@ -307,7 +311,7 @@ func (c *ociS3Client) FragmentedDownloadObject(
 		return nil, errors.New("fragmentSize must be greater than 0")
 	}
 
-	fragmentKeys, err := s3common.GetFragmentKeys(key, GetFragmentCount(fileSize, fragmentSize))
+	fragmentKeys, err := s3.GetFragmentKeys(key, GetFragmentCount(fileSize, fragmentSize))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fragment keys: %w", err)
 	}
@@ -325,7 +329,7 @@ func (c *ociS3Client) FragmentedDownloadObject(
 		}()
 	}
 
-	fragments := make([]*s3common.Fragment, len(fragmentKeys))
+	fragments := make([]*s3.Fragment, len(fragmentKeys))
 	for i := 0; i < len(fragmentKeys); i++ {
 		result := <-resultChannel
 		if result.err != nil {
@@ -343,12 +347,12 @@ func (c *ociS3Client) FragmentedDownloadObject(
 
 // readResult is the result of a read task.
 type readResult struct {
-	fragment *s3common.Fragment
+	fragment *s3.Fragment
 	err      error
 }
 
 // readTask reads a single fragment from OCI Object Storage.
-func (c *ociS3Client) readTask(
+func (c *ociClient) readTask(
 	ctx context.Context,
 	resultChannel chan *readResult,
 	bucket string,
@@ -383,7 +387,7 @@ func (c *ociS3Client) readTask(
 		return
 	}
 
-	result.fragment = &s3common.Fragment{
+	result.fragment = &s3.Fragment{
 		FragmentKey: key,
 		Data:        data,
 		Index:       index,
@@ -405,7 +409,7 @@ func GetFragmentCount(fileSize int, fragmentSize int) int {
 
 // recombineFragments recombines fragments into a single file.
 // Returns an error if any fragments are missing.
-func RecombineFragments(fragments []*s3common.Fragment) ([]byte, error) {
+func RecombineFragments(fragments []*s3.Fragment) ([]byte, error) {
 	if len(fragments) == 0 {
 		return nil, fmt.Errorf("no fragments")
 	}

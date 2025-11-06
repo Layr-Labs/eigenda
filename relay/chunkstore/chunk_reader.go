@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/common/s3"
+	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
@@ -32,7 +32,7 @@ var _ ChunkReader = (*chunkReader)(nil)
 
 type chunkReader struct {
 	logger logging.Logger
-	client s3.S3Client
+	client s3.Client
 	bucket string
 }
 
@@ -42,7 +42,7 @@ type chunkReader struct {
 // If empty, it will return data for all shards. (Note: shard feature is not yet implemented.)
 func NewChunkReader(
 	logger logging.Logger,
-	s3Client s3.S3Client,
+	s3Client s3.Client,
 	bucketName string) ChunkReader {
 
 	return &chunkReader{
