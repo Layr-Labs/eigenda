@@ -16,7 +16,7 @@ When a user writes data to EigenDA (in the form of a blob), the blob is encoded 
 The write process follows the sequence below. The labels in parentheses (e.g., W1, W2) correspond to the steps shown in the diagram above.
 
 1. **Disperser Receives Blob (W1, W2, W3).**
-   The disperser receives a blob consisting of a `BlobHeader` and `BlobData`. As a precaution, the disperser can validate the `PaymentMetadata` contained in the `BlobHeader` to ensure that the blob is properly funded, and that the KZG commitments in the `BlobHeader` are correct.
+   The disperser receives a blob consisting of a `BlobHeader` and `BlobData`. As a precaution, the disperser can validate the `PaymentMetadata` contained in the `BlobHeader` to ensure that the blob is properly funded, and that the KZG commitments in the `BlobHeader` are correct. Note that validators may still reject payment data as invalid even if approved by the disperser, since the disperser lacks knowledge of global payment state (see [Payment System](../payments/payment_system.md#211-source-of-truth) for more details).
 
 2. **Disperser Encodes Blob (W6, W7).**
    The disperser references the Chunk Assignment Logic to translate the `BlobHeader` into a set of `EncodingParams`. The disperser then encodes the blob according to the [Encoding Module](./encoding.md) and the `EncodingParams` to produce a collection of encoded `Chunk`s.
@@ -54,4 +54,4 @@ To read a blob, a client follows the sequence below. The labels in parentheses (
    The client attempts to retrieve the blob from the `GetBlob` interface of the relay(s) identified in the `BlobHeader`. This is the primary and most efficient retrieval method, as the relay stores complete blobs.
 
 2. **Read from Validators (R2).**
-   If the blob is not available from the relay(s), the client falls back to retrieving individual chunks directly from the validators and reconstructing the blob. The client iterates through the `QuorumNumbers` in the `BlobHeader`. For each quorum (until successful recovery), the client requests chunks from each validator registered with that quorum, validates the integrity of the chunks, and then reconstructs the blob using the erasure coding scheme.
+   If the blob is not available from the relay(s), the client falls back to retrieving individual chunks directly from the validators and reconstructing the blob. The client reconstructs chunk assignments for all validators assigned to the blob and downloads chunks in a random order until it has collected enough unique chunks to reconstruct the blob. Each chunk is validated using the included KZG proofs before the blob is reconstructed using the erasure coding scheme. This approach distributes load evenly across validators and terminates as soon as the minimum number of unique chunks are verified.
