@@ -288,7 +288,7 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		},
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
 		EigenDADirectory:                   eigenDADirectory,
-		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
+		RBNRecencyWindowSize:               uint32(ctx.Uint64(RBNRecencyWindowSizeFlagName)),
 		EigenDANetwork:                     eigenDANetwork,
 		RelayConnectionPoolSize:            ctx.Uint(RelayConnectionPoolSizeFlagName),
 		ClientLedgerMode:                   clientledger.ParseClientLedgerMode(ctx.String(ClientLedgerModeFlagName)),

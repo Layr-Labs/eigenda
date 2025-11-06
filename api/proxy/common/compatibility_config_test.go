@@ -314,8 +314,8 @@ func TestNewCompatibilityConfigRecencyWindow(t *testing.T) {
 
 	testCases := []struct {
 		name                  string
-		recencyWindowSize     uint64
-		expectedRecencyWindow uint64
+		recencyWindowSize     uint32
+		expectedRecencyWindow uint32
 	}{
 		{
 			name:                  "standard recency window",

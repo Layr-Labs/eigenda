@@ -49,7 +49,7 @@ type ClientConfigV2 struct {
 	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation
 	//
 	// This check is optional and will be skipped when RBNRecencyWindowSize is set to 0.
-	RBNRecencyWindowSize uint64
+	RBNRecencyWindowSize uint32
 
 	// The EigenDA network that is being used.
 	// It is optional, and when set will be used for validating that the eth-rpc chain ID matches the network.

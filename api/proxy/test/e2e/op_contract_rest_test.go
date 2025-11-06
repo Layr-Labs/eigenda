@@ -27,7 +27,7 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 
 	var testTable = []struct {
 		name                 string
-		RBNRecencyWindowSize uint64
+		RBNRecencyWindowSize uint32
 		certRBN              uint32
 		certL1IBN            uint64
 		requireErrorFn       func(t *testing.T, err error)

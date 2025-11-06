@@ -394,12 +394,18 @@ func buildEigenDAV2Backend(
 		}
 	}
 
+	recencyWindow, err := certVerifier.GetRecencyWindow(ctx)
+	if err != nil {
+		// fallback to flag value
+		recencyWindow = config.ClientConfigV2.RBNRecencyWindowSize
+	}
+
 	eigenDAV2Store, err := eigenda_v2.NewStore(
 		log,
 		payloadDisperser,
 		config.ClientConfigV2.PutTries,
 		certVerifier,
-		config.ClientConfigV2.RBNRecencyWindowSize,
+		uint64(recencyWindow),
 		retrievers,
 		// PayloadDisperserCfg.ContractCallTimeout is set by the --eigenda.v2.contract-call-timeout flag, the value
 		// is not read into any other configs. For simplicity the PayloadDisperserCfg value is reused here.
