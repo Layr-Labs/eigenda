@@ -34,20 +34,12 @@ for the exact values getting set by this flag. Permitted EigenDANetwork values i
 		EnvVar:   common.PrefixEnvVar(envPrefix, "ETH_RPC_URL"),
 		Required: true,
 	}
-
-	CertVerifierAddrFlag = &cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "cert-verifier-addr"),
-		Usage:    "immutable cert verifier address",
-		EnvVar:   common.PrefixEnvVar(envPrefix, "CERT_VERIFIER_ADDR"),
-		Required: true,
-	}
 )
 
 var requiredFlags = []cli.Flag{
 	NetworkFlag,
 	EthRpcUrlFlag,
 	CertHexFlag,
-	CertVerifierAddrFlag,
 }
 
 var optionalFlags = []cli.Flag{}

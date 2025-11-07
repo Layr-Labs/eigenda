@@ -57,7 +57,6 @@ func GetAddressByName(
 func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 
 	rpcURL := ctx.String(flags.EthRpcUrlFlag.Name)
-	v3CertVerifierAddr := gethcommon.HexToAddress(ctx.String(flags.CertVerifierAddrFlag.Name))
 	ethContext := context.Background()
 	client, err := ethclient.DialContext(ethContext, rpcURL)
 	if err != nil {
@@ -84,6 +83,11 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 	}
 
 	registryCoordinatorAddr, err := GetAddressByName(ethContext, client, directoryAddress, "REGISTRY_COORDINATOR")
+	if err != nil {
+		return nil, err
+	}
+
+	v3CertVerifierAddr, err := GetAddressByName(ethContext, client, directoryAddress, "CERT_VERIFIER")
 	if err != nil {
 		return nil, err
 	}

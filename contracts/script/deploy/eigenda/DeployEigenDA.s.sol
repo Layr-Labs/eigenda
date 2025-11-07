@@ -300,7 +300,9 @@ contract DeployEigenDA is Script {
             AddressDirectoryConstants.OPERATOR_STATE_RETRIEVER_NAME, address(new OperatorStateRetriever())
         );
 
-        address certVerifier = address(
+        directory.addAddress(
+            AddressDirectoryConstants.CERT_VERIFIER_NAME,
+            address(
                 new EigenDACertVerifier(
                     IEigenDAThresholdRegistry(directory.getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME)),
                     IEigenDASignatureVerifier(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
@@ -308,12 +310,13 @@ contract DeployEigenDA is Script {
                     cfg.certVerifierQuorumNumbersRequired(),
                     cfg.certVerifierRecencyWindow()
                 )
-            );
+            )
+        );
 
         address routerImpl = address(new EigenDACertVerifierRouter());
         address[] memory certVerifiers = new address[](1);
 
-        certVerifiers[0] = certVerifier;
+        certVerifiers[0] = directory.getAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME);
 
         directory.addAddress(
             AddressDirectoryConstants.CERT_VERIFIER_ROUTER_NAME,
