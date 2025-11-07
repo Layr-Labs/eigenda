@@ -1,6 +1,7 @@
 package prover
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	gomath "math"
@@ -145,8 +146,9 @@ func NewProver(logger logging.Logger, kzgConfig *KzgConfig, encoderConfig *encod
 	return proverGroup, nil
 }
 
-func (e *Prover) GetFrames(inputFr []fr.Element, params encoding.EncodingParams) ([]*encoding.Frame, []uint32, error) {
-
+func (e *Prover) GetFrames(
+	ctx context.Context, inputFr []fr.Element, params encoding.EncodingParams,
+) ([]*encoding.Frame, []uint32, error) {
 	blobLength := uint64(math.NextPowOf2u32(uint32(len(inputFr))))
 	provingParams, err := BuildProvingParamsFromEncodingParams(params, blobLength)
 	if err != nil {
@@ -168,7 +170,7 @@ func (e *Prover) GetFrames(inputFr []fr.Element, params encoding.EncodingParams)
 	go func() {
 		defer close(encodeChan)
 		encodeStart := time.Now()
-		frames, indices, err := e.encoder.Encode(inputFr, params)
+		frames, indices, err := e.encoder.Encode(ctx, inputFr, params)
 		encodingDuration := time.Since(encodeStart)
 		encodeChan <- encodeChanResult{
 			chunks:   frames,
@@ -179,7 +181,7 @@ func (e *Prover) GetFrames(inputFr []fr.Element, params encoding.EncodingParams)
 	}()
 
 	getProofsStart := time.Now()
-	proofs, err := prover.GetProofs(inputFr)
+	proofs, err := prover.GetProofs(ctx, inputFr)
 	getProofsDuration := time.Since(getProofsStart)
 
 	// Wait for both chunks and frames to have finished generating
@@ -268,7 +270,8 @@ func (p *Prover) newProver(params encoding.EncodingParams, provingParams Proving
 	case encoding.IcicleBackend:
 		var err error
 		multiproofsBackend, err = icicle.NewMultiProofBackend(
-			p.logger, fs, fftPointsT, p.G1SRS, p.Config.GPUEnable, p.KzgConfig.NumWorker)
+			p.logger, fs, fftPointsT, p.G1SRS, p.Config.GPUEnable,
+			p.Config.NumWorker, p.Config.GPUConcurrentFrameGenerationDangerous)
 		if err != nil {
 			return nil, fmt.Errorf("create icicle backend prover: %w", err)
 		}

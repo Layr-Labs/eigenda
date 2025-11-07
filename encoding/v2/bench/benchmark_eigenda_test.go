@@ -1,6 +1,7 @@
 package bench_test
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"sync"
@@ -88,7 +89,7 @@ func BenchmarkRSBackendIcicle(b *testing.B) {
 	if !icicle.IsAvailable {
 		b.Skip("code compiled without the icicle build tag")
 	}
-	icicleBackend, err := rsicicle.BuildRSBackend(common.SilentLogger(), true)
+	icicleBackend, err := rsicicle.BuildRSBackend(common.SilentLogger(), true, 1)
 	require.NoError(b, err)
 	benchmarkRSBackend(b, icicleBackend)
 }
@@ -111,7 +112,7 @@ func benchmarkRSBackend(b *testing.B, rsBackend backend.RSEncoderBackend) {
 			// run multiple goroutines in parallel to better utilize the GPU
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
-					_, err := rsBackend.ExtendPolyEval(blobCoeffs[:numFrs])
+					_, err := rsBackend.ExtendPolyEvalV2(context.Background(), blobCoeffs[:numFrs])
 					require.NoError(b, err)
 				}
 			})
@@ -145,7 +146,7 @@ func BenchmarkBlobToChunksEncoding(b *testing.B) {
 			require.Nil(b, err)
 
 			for b.Loop() {
-				_, _, err = enc.Encode(blob, params)
+				_, _, err = enc.Encode(context.Background(), blob, params)
 				require.Nil(b, err)
 			}
 		})
@@ -221,7 +222,7 @@ func benchmarkMultiproofGeneration(b *testing.B, encodingConfig encoding.Config)
 			require.NoError(b, err)
 
 			for b.Loop() {
-				_, err = parametrizedProver.GetProofs(maxSizeBlobCoeffs[:rsExtendedBlobFrs])
+				_, err = parametrizedProver.GetProofs(context.Background(), maxSizeBlobCoeffs[:rsExtendedBlobFrs])
 				require.NoError(b, err)
 			}
 		})
@@ -268,7 +269,7 @@ func BenchmarkFrameGeneration(b *testing.B) {
 				for range 5 {
 					go func() {
 						defer wg.Done()
-						_, _, err = p.GetFrames(maxSizeBlobCoeffs[:rsExtendedBlobFrs], params)
+						_, _, err = p.GetFrames(context.Background(), maxSizeBlobCoeffs[:rsExtendedBlobFrs], params)
 						require.NoError(b, err)
 					}()
 				}

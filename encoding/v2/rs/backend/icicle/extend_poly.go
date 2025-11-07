@@ -27,7 +27,7 @@ type RSBackend struct {
 	GpuSemaphore *semaphore.Weighted
 }
 
-func BuildRSBackend(logger logging.Logger, enableGPU bool) (*RSBackend, error) {
+func BuildRSBackend(logger logging.Logger, enableGPU bool, gpuConcurrentEncodings int64) (*RSBackend, error) {
 	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
 		Logger:    logger,
 		GPUEnable: enableGPU,

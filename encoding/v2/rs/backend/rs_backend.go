@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"context"
+
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs/backend/gnark"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs/backend/icicle"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -8,7 +10,7 @@ import (
 
 // Proof device represents a device capable of computing reed-solomon operations.
 type RSEncoderBackend interface {
-	ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error)
+	ExtendPolyEvalV2(ctx context.Context, coeffs []fr.Element) ([]fr.Element, error)
 }
 
 // We implement two backends: gnark and icicle.

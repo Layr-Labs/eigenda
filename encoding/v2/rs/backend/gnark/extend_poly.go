@@ -1,6 +1,7 @@
 package gnark
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/encoding/v2/fft"
@@ -18,7 +19,7 @@ func NewRSBackend(fs *fft.FFTSettings) *RSBackend {
 }
 
 // Encoding Reed Solomon using FFT
-func (g *RSBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
+func (g *RSBackend) ExtendPolyEvalV2(ctx context.Context, coeffs []fr.Element) ([]fr.Element, error) {
 	evals, err := g.Fs.FFT(coeffs, false)
 	if err != nil {
 		return nil, fmt.Errorf("fft: %w", err)

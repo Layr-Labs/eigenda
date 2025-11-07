@@ -3,6 +3,7 @@
 package icicle
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
 	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
@@ -38,13 +40,15 @@ type KzgMultiProofBackend struct {
 	// Also need to account how much memory this would use over all parametrized provers.
 	FlatFFTPointsT []iciclebn254.Affine
 	Device         runtime.Device
-	GpuLock        sync.Mutex
 	NumWorker      uint64
+	// request-weighted semaphore.
+	// See [encoding.Config.GPUConcurrentFrameGenerationDangerous] for more details.
+	GpuSemaphore *semaphore.Weighted
 }
 
 func NewMultiProofBackend(logger logging.Logger,
 	fs *fft.FFTSettings, fftPointsT [][]bn254.G1Affine, g1SRS []bn254.G1Affine,
-	gpuEnabled bool, numWorker uint64,
+	gpuEnabled bool, numWorker uint64, gpuConcurrentProofs int64,
 ) (*KzgMultiProofBackend, error) {
 	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
 		Logger:     logger,
@@ -63,7 +67,7 @@ func NewMultiProofBackend(logger logging.Logger,
 		Fs:             fs,
 		FlatFFTPointsT: icicleDevice.FlatFFTPointsT,
 		Device:         icicleDevice.Device,
-		GpuLock:        sync.Mutex{},
+		GpuSemaphore:   semaphore.NewWeighted(gpuConcurrentProofs),
 		NumWorker:      numWorker,
 	}, nil
 }
@@ -74,7 +78,7 @@ type WorkerResult struct {
 
 // This function supports batching over multiple blobs.
 // All blobs must have same size and concatenated passed as polyFr
-func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+func (p *KzgMultiProofBackend) ComputeMultiFrameProofV2(ctx context.Context, polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 
 	toeplitzMatrixLen := uint64(len(polyFr)) / chunkLen

@@ -3,6 +3,7 @@
 package icicle
 
 import (
+	"context"
 	"errors"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -11,13 +12,13 @@ import (
 
 type RSBackend struct{}
 
-func (g *RSBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
+func (g *RSBackend) ExtendPolyEvalV2(ctx context.Context, coeffs []fr.Element) ([]fr.Element, error) {
 	// Not supported
 	return nil, errors.New("icicle backend called without icicle build tag")
 }
 
 func BuildRSBackend(
-	logger logging.Logger, enableGPU bool) (*RSBackend, error) {
+	logger logging.Logger, enableGPU bool, gpuConcurrentEncodings int64) (*RSBackend, error) {
 	// Not supported
 	return nil, errors.New("icicle backend called without icicle build tag")
 }

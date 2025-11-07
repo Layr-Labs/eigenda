@@ -182,7 +182,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKe
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert blob data to field elements: %v", err)
 	}
-	frames, _, err := s.prover.GetFrames(dataFr, encodingParams)
+	frames, _, err := s.prover.GetFrames(ctx, dataFr, encodingParams)
 	if err != nil {
 		s.logger.Error("failed to encode frames", "error", err)
 		return nil, status.Errorf(codes.Internal, "encoding failed: %v", err)
