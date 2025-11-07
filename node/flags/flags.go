@@ -589,6 +589,12 @@ var (
 		Value:    30 * time.Second,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
 	}
+	EnablePerAccountPaymentMetricsFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-payment-metrics"),
+		Usage:    "Whether to report per-account payment metrics. If false, all metrics will be aggregated under account 0x0.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PER_ACCOUNT_PAYMENT_METRICS"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -738,6 +744,7 @@ var optionalFlags = []cli.Flag{
 	EnablePaymentValidationFlag,
 	ReservationMaxLedgersFlag,
 	PaymentVaultUpdateIntervalFlag,
+	EnablePerAccountPaymentMetricsFlag,
 }
 
 func init() {

@@ -8,16 +8,19 @@ import (
 // Tracks metrics for the [OnDemandPaymentValidator]
 type OnDemandValidatorMetrics struct {
 	onDemandSymbols            prometheus.Histogram
-	onDemandSymbolsTotal       prometheus.Counter
+	onDemandSymbolsTotal       *prometheus.CounterVec
+	onDemandDispersalsTotal    *prometheus.CounterVec
 	onDemandInsufficientFunds  prometheus.Counter
 	onDemandQuorumNotSupported prometheus.Counter
 	onDemandUnexpectedErrors   prometheus.Counter
+	enablePerAccountMetrics    bool
 }
 
 func NewOnDemandValidatorMetrics(
 	registry *prometheus.Registry,
 	namespace string,
 	subsystem string,
+	enablePerAccountMetrics bool,
 ) *OnDemandValidatorMetrics {
 	if registry == nil {
 		return nil
@@ -35,7 +38,7 @@ func NewOnDemandValidatorMetrics(
 		},
 	)
 
-	symbolsTotal := promauto.With(registry).NewCounter(
+	symbolsTotal := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_symbols_total",
@@ -43,6 +46,17 @@ func NewOnDemandValidatorMetrics(
 			Help: "Total number of symbols validated for successful on-demand payments. " +
 				"Counts reflect actual dispersed symbols, not billed symbols (which may be higher due to min size).",
 		},
+		[]string{"account_id"},
+	)
+
+	dispersalsTotal := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "on_demand_dispersals_total",
+			Subsystem: subsystem,
+			Help:      "Total number of dispersals successfully paid for by on-demand.",
+		},
+		[]string{"account_id"},
 	)
 
 	insufficientFunds := promauto.With(registry).NewCounter(
@@ -75,19 +89,28 @@ func NewOnDemandValidatorMetrics(
 	return &OnDemandValidatorMetrics{
 		onDemandSymbols:            symbols,
 		onDemandSymbolsTotal:       symbolsTotal,
+		onDemandDispersalsTotal:    dispersalsTotal,
 		onDemandInsufficientFunds:  insufficientFunds,
 		onDemandQuorumNotSupported: quorumNotSupported,
 		onDemandUnexpectedErrors:   unexpectedErrors,
+		enablePerAccountMetrics:    enablePerAccountMetrics,
 	}
 }
 
 // Records a successful on-demand payment
-func (m *OnDemandValidatorMetrics) RecordSuccess(symbolCount uint32) {
+func (m *OnDemandValidatorMetrics) RecordSuccess(accountID string, symbolCount uint32) {
 	if m == nil {
 		return
 	}
 	m.onDemandSymbols.Observe(float64(symbolCount))
-	m.onDemandSymbolsTotal.Add(float64(symbolCount))
+
+	// If per-account metrics are disabled, aggregate under "0x0"
+	labelValue := accountID
+	if !m.enablePerAccountMetrics {
+		labelValue = "0x0"
+	}
+	m.onDemandSymbolsTotal.WithLabelValues(labelValue).Add(float64(symbolCount))
+	m.onDemandDispersalsTotal.WithLabelValues(labelValue).Inc()
 }
 
 // Increments the counter for insufficient funds errors

@@ -74,7 +74,7 @@ func (pv *ReservationPaymentValidator) Debit(
 
 	if err == nil {
 		if success {
-			pv.metrics.RecordSuccess(symbolCount)
+			pv.metrics.RecordSuccess(accountID.Hex(), symbolCount)
 		} else {
 			pv.metrics.IncrementInsufficientBandwidth()
 		}

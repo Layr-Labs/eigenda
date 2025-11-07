@@ -1,112 +1,207 @@
 ## Assignment Module
 
-> Warning: this page describes the assignment logic for EigenDA V1. We need to update it with Blazar assignment logic which is very different.
+The assignment module determines how encoded blob chunks are allocated to validators based on the Ethereum chain state, specifically validator stakes and quorum memberships. Given the validator state and blob parameters, it produces a deterministic mapping from validators to chunk indices. The mapping ensures that a sufficient number of signatures and honest validators implies that data is available.
 
-The assignment module is essentially a rule which takes in the Ethereum chain state and outputs an allocation of chunks to DA operators. This can be generalized to a function that outputs a set of valid allocations.
-
-A chunk assignment has the following parameters: 
-1) **Indices**: the chunk indices that will be assigned to each DA node. Some DA nodes receive more than one chunk.
-2) **ChunkLength**: the length of each chunk (measured in number of symbols, as defined by the encoding module). We currently require all chunks to be of the same length, so this parameter is a scalar. 
-
-The assignment module is implemented by the `AssignmentCoordinator` interface. 
+The assignment module is implemented in `core/v2/assignment.go`. For blobs dispersed to multiple quorums, the algorithm employs overlap optimization to minimize storage requirements while maintaining security guarantees. 
 
 ![image](../../assets/assignment-module.png)
 
+### Chunk Assignment Algorithm within One Quorum
 
-### Chunk Assignment Scheme Overview
+The chunk assignment scheme assigns encoded chunks to validators proportionally to their stake, ensuring that any coalition of validators with sufficient combined stake can reconstruct the blob.
 
-Our chunk assignment scheme (CAS) assigns encoded chunks to validators proportionally to their stake, ensuring that any coalition of validators with sufficient combined stake can reconstruct the blob. Given:
-
+Given:
 - A set of $n$ validators with stakes $\eta_1, \eta_2, \ldots, \eta_n$, where $\sum_{i=1}^n \eta_i = 1$
 - A set of $c$ chunks to be assigned to the validators
 
-The assignment algorithm `GetAssignments` works as follows:
+Within a single quorum, the number of chunks assigned to validator $i$ is:
+```math
+c_i = \lceil \eta_i(c - n) \rceil
+```
+This assignment ensures that the total number of assigned chunks is less than or equal to the total number of chunks $c$, since $\sum_{i=1}^n c_i = \sum_{i=1}^n \lceil \eta_i(c - n) \rceil \le \sum_{i=1}^n [\eta_i(c - n) + 1]  = c$. 
 
-1. **Initial allocation:** For each validator $i$, calculate the base number of chunks:  
-   $$
-   c'_i = \lceil \eta_i(c - n) \rceil
-   $$
+This guarantees that the chunks assigned to validators within a quorum are **non-overlapping**. In other words, each validator in a quorum contributes **distinct chunks** for reconstruction. The proof that any subset of validators with sufficient combined stake can reconstruct the blob is provided in [Security Parameters](./security-parameters.md).
 
-2. **Total initial assignment:** Compute  
-   $$
-   c' = \sum_{i=1}^n c'_i
-   $$
+### Chunk Assignment for Multiple Quorums
 
-3. **Sort validators:** Order validators deterministically and assign index $k_i$ to each validator $i$.
+EigenDA supports blobs dispersed to multiple quorums simultaneously. The security threshold is guaranteed to hold for each quorum independently, as shown in the previous section. The multi-quorum assignment algorithm minimizes storage requirements through overlap optimization while maintaining security guarantees.
 
-4. **Final assignment:** The number of chunks assigned to validator $i$ is:  
-   $$
-   c_i = c'_i + \mathbb{I}_{k_i \leq c - c'}
-   $$
-   where $\mathbb{I}$ is the indicator function that adds one extra chunk to the first $c - c'$ validators to ensure the total number of assigned chunks equals $c$.
+#### Storage Optimization Strategy
 
-We will prove that any subset of validators with sufficient combined stake can reconstruct the blob in [Security Parameters](./security-parameters.md).
+The assignment algorithm uses two key strategies to minimize storage:
 
-### Assignment Logic
+1. **Chunk Overlap Maximization:** When a validator participates in multiple quorums for the same blob, the algorithm reuses the same chunk indices across quorums whenever possible.
 
-The standard assignment coordinator implements a very simple logic for determining the number of chunks per node and the chunk length, which we describe here.
+2. **Reconstruction Capping:** Each validator is assigned at most the number of chunks needed to independently reconstruct the blob.
 
-**Chunk Length**
+**Example:** Consider a validator with 5% stake in quorum 0 and 15% stake in quorum 1. Without optimization, the validator might receive two non-overlapping sets of chunks (one per quorum), totaling up to 20% of all chunks. With overlap optimization, the validator stores only `max(chunks_quorum_0, chunks_quorum_1)` unique chunks, which is 15% of the total chunks. With reconstruction capping, if the [coding rate](./security-parameters.md#blob-parameters) is $\gamma = 1/8$, the validator only needs to store 1/8 of the total chunks.
 
-Chunk lengths must be sufficiently small that operators with a small proportion of stake will be able to receive a quantity of data commensurate with their stake share. For each operator $i$, let $S_i$ signify the amount of stake held by that operator. 
+#### Algorithm Components
 
-We require that the chunk size $C$ satisfy
+The multi-quorum assignment algorithm consists of four key functions:
 
-$$
-C \le \text{NextPowerOf2}\left(\frac{B}{\gamma}\max\left(\frac{\min_jS_j}{\sum_jS_j}, \frac{1}{M_\text{max}} \right) \right)
-$$
+**1. GetAssignmentsForQuorum:** Calculates assignments for a single quorum independently using the stake-proportional algorithm described above.
 
+**2. AddAssignmentsForQuorum:** Generates the assignment for a new quorum while maximizing overlap with a baseline quorum assignment through a two-phase process:
 
-where $\gamma = \beta-\alpha$, with $\alpha$ and $\beta$ the adversary and quorum thresholds as defined in the [Overview](../overview.md).
+- **Phase 1 (Overlap Maximization):** For each validator, reuse as many chunk indices as possible from the baseline quorum assignment, up to the number required for the new quorum. Mark these reused indices as "used."
 
-This means that as long as an operator has a stake share of at least $1/M_\text{max}$, then the encoded data that they will receive will be within a factor of 2 of their share of stake. Operators with less than $1/M_\text{max}$ of stake will receive no more than a $1/M_\text{max}$ of the encoded data. $M_\text{max}$ represents the maximum number of chunks that the disperser can be required to encode per blob. This limit is included because proving costs scale somewhat super-linearly with the number of chunks. 
+- **Phase 2 (Gap Filling):** Distribute the remaining unused chunk indices to validators who need additional chunks beyond what was reused from the baseline, ensuring each validator receives their stake-proportional allocation in the new quorum.
 
-In the future, additional constraints on chunk length may be added; for instance, the chunk length may be set in order to maintain a fixed number of chunks per blob across all system states. Currently, the protocol does not mandate a specific value for the chunk length, but will accept the range satisfying the above constraint. The `CalculateChunkLength` function is provided as a convenience function that can be used to find a chunk length satisfying the protocol requirements. 
+This algorithm guarantees that validators participating in both quorums store only `max(chunks_in_quorum_1, chunks_in_quorum_2)` unique chunks rather than the sum.
 
-**Index Assignment**
+**3. MergeAssignmentsAndCap:** Merges assignments across all quorums and caps the total at the reconstruction threshold:
+```math
+\text{max\_chunks} = c \cdot \gamma
+```
+ where $c$ is the total number of chunks and $\gamma$ is the [coding rate](./security-parameters.md#blob-parameters). This cap exists because once a validator has enough unique chunks to reconstruct the blob, additional chunks provide no incremental security benefit. Therefore, pruning the extra chunks improves performance and reduces storage and bandwidth requirements without affecting security.
 
-For each operator $i$, let $S_i$ signify the amount of stake held by that operator. We want for the number of chunks assigned to operator $i$ to satisfy
+**4. GetAssignmentsForBlob:** Coordinates the full multi-quorum assignment process:
+1. Generate the assignment for quorum 0 using `GetAssignmentsForQuorum`
+2. Generate assignments for all other quorums using `AddAssignmentsForQuorum` with quorum 0 as the baseline
+3. Merge all per-quorum assignments using `MergeAssignmentsAndCap` to produce the final assignment for each validator
 
-$$
-\frac{\gamma m_i C}{B} \ge \frac{S_i}{\sum_j S_j}
-$$
+**Note on Optimality:** The algorithm produces optimal storage assignments for two quorums. For three or more quorums, the assignment is not guaranteed to be globally optimal. Since quorums 0 and 1 are the "default" quorums and are expected to be the larger than custom quorums (i.e. containing the most validators), the algorithm achieves near-optimal storage reduction for the majority of validators.
 
-Let
+### Code Walkthrough
+Notation note: In the code, we sometimes use the term `operator` to refer to a `validator`, although `validator` is now the preferred term.
 
-$$
-m_i = \text{ceil}\left(\frac{B S_i}{C\gamma \sum_j S_j}\right)\tag{1}
-$$
+**Location:** `core/v2/assignment.go`
 
-**Correctness**
-Let's show that any sets $U_q$ and $U_a$ satisfying the constraints in the [Consensus Layer Overview](../overview.md#consensus-layer), the data held by the operators $U_q \setminus U_a$ will constitute an entire blob. The amount of data held by these operators is given by
+**Data Structure:**
+```go
+type Assignment struct {
+    Indices []uint32  // Explicit list of chunk indices (non-contiguous)
+}
+```
 
-$$
-\sum_{i \in U_q \setminus U_a} m_i C
-$$
+**Core Functions:**
 
-We have from (1) and from the definitions of $U_q$ and $U_a$ that
+**1. GetAssignmentsForQuorum (`core/v2/assignment.go:40-90`)**
 
-$$
-\sum_{i \in U_q \setminus U_a} m_i C \ge  =\frac{B}{\gamma}\sum_{i \in U_q \setminus U_a}\frac{S_i}{\sum_j S_j} = \frac{B}{\gamma}\frac{\sum_{i \in U_q} S_i - \sum_{i \in U_a} S_i}{\sum_jS_j} \ge B \frac{\beta-\alpha}{\gamma} = B  \tag{2}
-$$
+Assigns chunks for a single quorum with deterministic ordering:
 
-Since the unique data held by these operators exceeds the size of a blob, the encoding module ensures that the original blob can be reconstructed from this data. 
+```go
+func GetAssignmentsForQuorum(
+    state *core.OperatorState,
+    blobParams *core.BlobVersionParameters,
+    quorum core.QuorumID,
+) (map[core.OperatorID]*Assignment, []core.OperatorID, error)
+```
 
+Algorithm:
+1. Sort operators by hex ID for determinism
+2. Calculate effective chunks: `effectiveNumChunks = NumChunks - MaxNumOperators`
+3. For each operator $i$: `chunksForOperator = ceil((effectiveNumChunks × stake_i) / totalStake)`
+4. Assign contiguous indices starting from offset 0
+5. Return assignments and ordered operator list
 
-## Validation Actions
+**2. AddAssignmentsForQuorum (`core/v2/assignment.go:99-161`)**
 
-Validation with respect to assignments is performed at different layers of the protocol:
+Maximizes overlap with a baseline assignment:
 
-### DA Nodes
+```go
+func AddAssignmentsForQuorum(
+    assignments map[core.OperatorID]*Assignment,  // Baseline from first quorum
+    state *core.OperatorState,
+    blobParams *core.BlobVersionParameters,
+    quorum core.QuorumID,
+) (map[core.OperatorID]*Assignment, error)
+```
 
-When the DA node receives a `StoreChunks` request, it performs the following validation actions relative to each blob header:
-- It uses the `ValidateChunkLength` to validate that the `ChunkLength` for the blob satisfies the above constraints. 
-- It uses `GetOperatorAssignment` to calculate the chunk indices for which it is responsible, and verifies that each of the chunks that it has received lies on the polynomial at these indices (see [Encoding validation actions](./encoding.md#validation-actions))
+Two-phase algorithm:
+- **Phase 1 (Lines 115-136):** For each operator, reuse indices from baseline up to their allotted count for this quorum
+- **Phase 2 (Lines 145-158):** Distribute unused indices to operators needing more chunks
 
-This step ensures that each honest node has received the blobs for which it is accountable.
+**3. MergeAssignmentsAndCap (`core/v2/assignment.go:167-220`)**
 
-Since the DA nodes will allow a range of `ChunkLength` values, as long as they satisfy the constraints of the protocol, it is necessary for there to be consensus on the `ChunkLength` that is in use for a particular blob and quorum. For this reason, the `ChunkLength` is included in the `BlobQuorumParam` which is hashed to create the merkle root contained in the `BatchHeaderHash` signed by the DA nodes. 
+```go
+func MergeAssignmentsAndCap(
+    assignments []map[core.OperatorID]*Assignment,
+    blobParams *core.BlobVersionParameters,
+) map[core.OperatorID]Assignment
+```
 
-### Rollup Smart Contract
+Merges all quorum assignments and caps at `maxChunks = NumChunks / CodingRate`
 
-When the rollup confirms its blob against the EigenDA batch, it checks that the `ConfirmationThreshold` for the blob is greater than the `AdversaryThreshold`. This means that if the `ChunkLength` determined by the disperser is invalid, the batch cannot be confirmed as a sufficient number of nodes will not sign.
+**4. GetAssignmentsForBlob (`core/v2/assignment.go:227-266`)**
+
+Main entry point coordinating the full multi-quorum assignment:
+
+```go
+func GetAssignmentsForBlob(
+    state *core.OperatorState,
+    blobParams *core.BlobVersionParameters,
+    quorums []core.QuorumID,
+) (map[core.OperatorID]Assignment, error) {
+    // Sort quorums for determinism
+    sort.Slice(quorums, ...)
+
+    // Process first quorum
+    assignmentsList[0], _, err = GetAssignmentsForQuorum(state, blobParams, quorums[0])
+
+    // Process remaining quorums with overlap optimization
+    for i := 1; i < len(quorums); i++ {
+        assignmentsList[i], err = AddAssignmentsForQuorum(
+            assignmentsList[0], state, blobParams, quorums[i])
+    }
+
+    // Merge and cap
+    return MergeAssignmentsAndCap(assignmentsList, blobParams)
+}
+```
+
+**Usage in Node Chunk Download (`node/node_v2.go:40-105`):**
+
+```go
+func (n *Node) DetermineChunkLocations(
+    batch *corev2.Batch,
+    operatorState *core.OperatorState,
+) {
+    for _, cert := range batch.BlobCertificates {
+        // Get assignment for this operator across ALL quorums in the blob
+        assgn, err := corev2.GetAssignmentForBlob(
+            operatorState,
+            blobParams,
+            cert.BlobHeader.QuorumNumbers,  // Multiple quorums
+            n.Config.ID)
+
+        // Request specific chunk indices from relay
+        req.chunkRequests = append(req.chunkRequests, &relay.ChunkRequestByIndex{
+            BlobKey: blobKey,
+            Indices: assgn.Indices,  // Explicit indices with overlap optimization
+        })
+    }
+}
+```
+
+**Usage in Validation (`core/v2/validator.go:49-79`):**
+
+```go
+func (v *shardValidator) validateBlobParams(
+    blob *BlobShard,
+    blobParams *core.BlobVersionParameters,
+    operatorState *core.OperatorState,
+) (*Assignment, error) {
+    // Get assignment across all quorums for this blob
+    assignment, err := GetAssignmentForBlob(
+        operatorState,
+        blobParams,
+        blob.BlobHeader.QuorumNumbers,  // All quorums
+        v.operatorID)
+
+    // Validate chunk count
+    if assignment.NumChunks() != uint32(len(blob.Bundle)) {
+        return error
+    }
+
+    // Validate chunk lengths
+    for _, chunk := range blob.Bundle {
+        if chunk.Length() != expectedChunkLength {
+            return error
+        }
+    }
+
+    return &assignment, nil
+}
+```

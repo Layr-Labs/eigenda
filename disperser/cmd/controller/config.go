@@ -117,8 +117,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	paymentAuthorizationConfig := controller.PaymentAuthorizationConfig{
-		OnDemandConfig:    onDemandConfig,
-		ReservationConfig: reservationConfig,
+		OnDemandConfig:                 onDemandConfig,
+		ReservationConfig:              reservationConfig,
+		EnablePerAccountPaymentMetrics: ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
 	}
 
 	heartbeatMonitorConfig := healthcheck.HeartbeatMonitorConfig{
@@ -155,25 +156,23 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxNumBlobsPerIteration:     int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
 			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-			// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
-			// instead of hardcoding. At that point, this field should be removed from here
-			// entirely, and the value will be fetched dynamically at runtime.
-			MaxDispersalAge: 45 * time.Second,
+			MaxDispersalAge:             ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 		},
 		DispatcherConfig: controller.DispatcherConfig{
-			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
-			DisperserID:                           disperserID,
-			FinalizationBlockDelay:                ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
-			AttestationTimeout:                    ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
-			BatchMetadataUpdatePeriod:             ctx.GlobalDuration(flags.BatchMetadataUpdatePeriodFlag.Name),
-			BatchAttestationTimeout:               ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
-			SignatureTickInterval:                 ctx.GlobalDuration(flags.SignatureTickIntervalFlag.Name),
-			NumRequestRetries:                     ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
-			MaxBatchSize:                          int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
-			SignificantSigningThresholdPercentage: uint8(ctx.GlobalUint(flags.SignificantSigningThresholdPercentageFlag.Name)),
-			SignificantSigningMetricsThresholds:   ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
-			NumConcurrentRequests:                 ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
-			NodeClientCacheSize:                   ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
+			PullInterval:                           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
+			DisperserID:                            disperserID,
+			FinalizationBlockDelay:                 ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
+			AttestationTimeout:                     ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
+			BatchMetadataUpdatePeriod:              ctx.GlobalDuration(flags.BatchMetadataUpdatePeriodFlag.Name),
+			BatchAttestationTimeout:                ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
+			SignatureTickInterval:                  ctx.GlobalDuration(flags.SignatureTickIntervalFlag.Name),
+			NumRequestRetries:                      ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
+			MaxBatchSize:                           int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
+			SignificantSigningThresholdPercentage:  uint8(ctx.GlobalUint(flags.SignificantSigningThresholdPercentageFlag.Name)),
+			SignificantSigningMetricsThresholds:    ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
+			NumConcurrentRequests:                  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
+			NodeClientCacheSize:                    ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
+			CollectDetailedValidatorSigningMetrics: ctx.GlobalBool(flags.DetailedValidatorMetricsFlag.Name),
 		},
 		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),

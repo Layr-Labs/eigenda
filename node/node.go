@@ -316,7 +316,12 @@ func NewNode(
 			config.ReservationLedgerCacheConfig,
 			paymentVault,
 			time.Now,
-			reservationvalidation.NewReservationValidatorMetrics(reg, Namespace, PaymentsSubsystem),
+			reservationvalidation.NewReservationValidatorMetrics(
+				reg,
+				Namespace,
+				PaymentsSubsystem,
+				config.EnablePerAccountPaymentMetrics,
+			),
 			reservationvalidation.NewReservationCacheMetrics(reg, Namespace, PaymentsSubsystem),
 		)
 		if err != nil {
