@@ -476,7 +476,13 @@ func (c *client) writeItems(ctx context.Context, tableName string, requestItems 
 		// check for unprocessed items
 		if len(output.UnprocessedItems) > 0 {
 			for _, req := range output.UnprocessedItems[tableName] {
-				failedItems = append(failedItems, req.DeleteRequest.Key)
+				if operation == update && req.PutRequest != nil {
+					failedItems = append(failedItems, req.PutRequest.Item)
+				} else if operation == delete && req.DeleteRequest != nil {
+					failedItems = append(failedItems, req.DeleteRequest.Key)
+				} else {
+					return nil, fmt.Errorf("unexpected batch operation: %d", operation)
+				}
 			}
 		}
 

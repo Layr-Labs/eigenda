@@ -18,7 +18,6 @@ type ReservationPaymentValidator struct {
 	logger logging.Logger
 	// A cache of the ledgers being tracked
 	ledgerCache *ReservationLedgerCache
-	timeSource  func() time.Time
 	metrics     *ReservationValidatorMetrics
 }
 
@@ -49,7 +48,6 @@ func NewReservationPaymentValidator(
 	return &ReservationPaymentValidator{
 		logger:      logger,
 		ledgerCache: ledgerCache,
-		timeSource:  timeSource,
 		metrics:     validatorMetrics,
 	}, nil
 }
@@ -72,8 +70,7 @@ func (pv *ReservationPaymentValidator) Debit(
 		return false, fmt.Errorf("get or create ledger: %w", err)
 	}
 
-	now := pv.timeSource()
-	success, _, err := ledger.Debit(now, dispersalTime, symbolCount, quorumNumbers)
+	success, _, err := ledger.Debit(dispersalTime, symbolCount, quorumNumbers)
 
 	if err == nil {
 		if success {
