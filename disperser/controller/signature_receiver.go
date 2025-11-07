@@ -24,7 +24,7 @@ type signatureReceiver struct {
 	indexedOperatorState *core.IndexedOperatorState
 
 	// validSignerMap tracks which operators have already submitted valid signatures
-	validSignerMap map[core.OperatorID]bool
+	validSignerMap map[core.OperatorID]struct{}
 	// signatureMessageReceived tracks which operators have submitted signature messages, whether valid or invalid.
 	// this is tracked separately from signerMap, since signerMap only includes valid signatures
 	signatureMessageReceived map[core.OperatorID]bool
@@ -108,7 +108,7 @@ func ReceiveSignatures(
 		return nil, fmt.Errorf("get sorted quorum ids: %w", err)
 	}
 
-	validSignerMap := make(map[core.OperatorID]bool)
+	validSignerMap := make(map[core.OperatorID]struct{})
 	signatureMessageReceived := make(map[core.OperatorID]bool)
 	aggregateSignatures := make(map[core.QuorumID]*core.Signature, len(sortedQuorumIDs))
 	aggregateSignersG2PubKeys := make(map[core.QuorumID]*core.G2Point, len(sortedQuorumIDs))
@@ -243,7 +243,7 @@ func (sr *signatureReceiver) handleNextSignature(
 		return
 	}
 
-	sr.validSignerMap[signingMessage.Operator] = true
+	sr.validSignerMap[signingMessage.Operator] = struct{}{}
 	sr.newSignaturesGathered = true
 
 	if thresholdCrossed {
@@ -370,9 +370,9 @@ func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *cor
 	for quorumID, aggregateSignature := range sr.aggregateSignatures {
 		aggregateSignaturesCopy[quorumID] = &core.Signature{G1Point: aggregateSignature.Clone()}
 	}
-	validSignerMapCopy := make(map[core.OperatorID]bool, len(sr.validSignerMap))
-	for operatorID, signed := range sr.validSignerMap {
-		validSignerMapCopy[operatorID] = signed
+	validSignerMapCopy := make(map[core.OperatorID]struct{}, len(sr.validSignerMap))
+	for operatorID, _ := range sr.validSignerMap {
+		validSignerMapCopy[operatorID] = struct{}{}
 	}
 
 	attestation := &core.QuorumAttestation{
