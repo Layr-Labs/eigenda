@@ -152,10 +152,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxNumBlobsPerIteration:     int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
 			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-			// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
-			// instead of hardcoding. At that point, this field should be removed from here
-			// entirely, and the value will be fetched dynamically at runtime.
-			MaxDispersalAge: 45 * time.Second,
+			MaxDispersalAge:             ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 		},
 		DispatcherConfig: controller.DispatcherConfig{
 			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),

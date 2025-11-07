@@ -112,6 +112,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
 		Value:    1 * time.Hour,
 	}
+	MaxDispersalAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-dispersal-age"),
+		Usage:    "Maximum age a dispersal request can be before it is discarded",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_DISPERSAL_AGE"),
+		Value:    45 * time.Second,
+	}
 
 	// Dispatcher Flags
 	DispatcherPullIntervalFlag = cli.DurationFlag{
@@ -345,6 +352,7 @@ var optionalFlags = []cli.Flag{
 	NumConcurrentEncodingRequestsFlag,
 	MaxNumBlobsPerIterationFlag,
 	OnchainStateRefreshIntervalFlag,
+	MaxDispersalAgeFlag,
 	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,
 	NumRequestRetriesFlag,
