@@ -155,22 +155,17 @@ func (s *awsS3Client) DownloadPartialObject(
 
 	rangeHeader := fmt.Sprintf("bytes=%d-%d", startIndex, endIndex-1)
 
-	objectSize := defaultBlobBufferSizeByte
-	size, err := s.HeadObject(ctx, bucket, key)
-	if err == nil {
-		objectSize = int(*size)
-	}
-	buffer := manager.NewWriteAtBuffer(make([]byte, 0, objectSize))
+	buffer := manager.NewWriteAtBuffer(make([]byte, 0, endIndex-startIndex))
 
 	var partMiBs int64 = 10
 	downloader := manager.NewDownloader(s.s3Client, func(d *manager.Downloader) {
 		// 10MB per part
 		d.PartSize = partMiBs * 1024 * 1024
-		// The number of goroutines to spin up in parallel per call to Upload when sending parts
+		// The number of goroutines to spin up in parallel per call to download when sending parts
 		d.Concurrency = 3
 	})
 
-	_, err = downloader.Download(ctx, buffer, &s3.GetObjectInput{
+	_, err := downloader.Download(ctx, buffer, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 		Range:  aws.String(rangeHeader),
