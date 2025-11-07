@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"sync"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -18,9 +19,9 @@ const (
 )
 
 var (
-	logger        = GetLogger()
-	dynamoClientX *dynamodb.Client
-	lock          sync.Mutex
+	logger       = GetLogger()
+	dynamoClient *dynamodb.Client
+	lock         sync.Mutex
 )
 
 // GetOrDeployLocalstack deploys a Localstack DynamoDB instance for testing,
@@ -30,8 +31,12 @@ func GetOrDeployLocalstack() (*dynamodb.Client, func()) {
 	lock.Lock()
 	defer lock.Unlock()
 
-	if dynamoClientX != nil {
-		return dynamoClientX, func() {
+	// TODO: temporary thing to debug tests in CI
+	fmt.Printf("calling GetOrDeployLocalstack, client exists: %v\n", dynamoClient != nil)
+	debug.PrintStack()
+
+	if dynamoClient != nil {
+		return dynamoClient, func() {
 			// If already deployed somewhere else, no cleanup needed here.
 		}
 	}
@@ -86,12 +91,17 @@ func GetOrDeployLocalstack() (*dynamodb.Client, func()) {
 				return aws.Endpoint{}, &aws.EndpointNotFoundError{}
 			}),
 	}
-	dynamoClientX = dynamodb.NewFromConfig(awsConfig)
+	dynamoClient = dynamodb.NewFromConfig(awsConfig)
 
-	return dynamoClientX, func() {
+	return dynamoClient, func() {
 		lock.Lock()
 		defer lock.Unlock()
+
+		// TODO: temporary thing to debug tests in CI
+		fmt.Printf("calling cleanup function in GetOrDeployLocalstack\n")
+		debug.PrintStack()
+
 		_ = localstackContainer.Terminate(ctx)
-		dynamoClientX = nil
+		dynamoClient = nil
 	}
 }
