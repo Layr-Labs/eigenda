@@ -2,6 +2,7 @@ package validate_cert_verifier
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -94,7 +95,7 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 
 	logger.Info("Payload dispersed successfully")
 
-	// The cert has already been verified via CheckDACert inside SendPayload,
+	// The cert has already been verified via checkDACert inside SendPayload,
 	// but let's verify it again explicitly to demonstrate the verification
 	certVerifier, err := createCertVerifier(certVerifierAddr, ethClient, logger)
 	if err != nil {
@@ -112,6 +113,24 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 	}
 
 	fmt.Println("checkDACert call passed with a valid DA Cert! ✓")
+
+	v3Cert, ok := cert.(*coretypes.EigenDACertV3)
+	if !ok {
+		return fmt.Errorf("could not cast to V3 cert")
+	}
+
+	// modify the merkle root of the batch header and ensure verification fails
+	v3Cert.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
+
+	err = certVerifier.CheckDACert(verifyCtx, v3Cert)
+	var errInvalidCert *verification.CertVerifierInvalidCertError
+	if err == nil {
+		fmt.Println(fmt.Errorf("checkDACert call passed but should have failed when given invalid DA Cert"))
+	} else if !errors.As(err, &errInvalidCert) {
+		fmt.Println(fmt.Errorf("checkDACert call failed with unknown error: %w", err))
+	} else {
+		fmt.Println("checkDACert call failed with a non-revertable error as expected when given invalid DA Cert! ✓")
+	}
 
 	// Print certificate details
 	blobKey, err := cert.ComputeBlobKey()
