@@ -116,8 +116,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	paymentAuthorizationConfig := controller.PaymentAuthorizationConfig{
-		OnDemandConfig:    onDemandConfig,
-		ReservationConfig: reservationConfig,
+		OnDemandConfig:                 onDemandConfig,
+		ReservationConfig:              reservationConfig,
+		EnablePerAccountPaymentMetrics: ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
 	}
 
 	heartbeatMonitorConfig := healthcheck.HeartbeatMonitorConfig{
