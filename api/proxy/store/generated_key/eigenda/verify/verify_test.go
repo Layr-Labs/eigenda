@@ -133,7 +133,6 @@ func TestVerifySecurityParams(t *testing.T) {
 		blobHeader  BlobHeader
 		batchHeader *disperser.BatchHeader
 		setupCV     func() *CertVerifier
-		holesky     bool
 		expectError bool
 		errorMsg    string
 	}{

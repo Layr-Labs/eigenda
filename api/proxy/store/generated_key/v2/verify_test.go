@@ -18,14 +18,6 @@ func TestVerifyCertRBNRecencyCheck(t *testing.T) {
 		expectedErrorContains string
 	}{
 		{
-			name:                  "input sanization: certRBN should always be > 0",
-			certRBN:               0,
-			certL1IBN:             100,
-			rbnRecencyWindowSize:  100,
-			expectError:           true,
-			expectedErrorContains: "bug",
-		},
-		{
 			name:                 "input sanization: certL1IBN=0 should skip the test (return nil)",
 			certRBN:              100,
 			certL1IBN:            0,
@@ -38,14 +30,6 @@ func TestVerifyCertRBNRecencyCheck(t *testing.T) {
 			certL1IBN:            101,
 			rbnRecencyWindowSize: 0,
 			expectError:          false,
-		},
-		{
-			name:                  "input sanization: certL1IBN should always be > certRBN (when != 0)",
-			certRBN:               100,
-			certL1IBN:             100,
-			rbnRecencyWindowSize:  100,
-			expectError:           true,
-			expectedErrorContains: "bug",
 		},
 		{
 			name:                 "ok: certL1IBN = certRBN + rbnRecencyWindowSize",

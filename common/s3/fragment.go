@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// getFragmentCount returns the number of fragments that a file of the given size will be broken into.
-func getFragmentCount(fileSize int, fragmentSize int) int {
+// GetFragmentCount returns the number of fragments that a file of the given size will be broken into.
+func GetFragmentCount(fileSize int, fragmentSize int) int {
 	if fileSize < fragmentSize {
 		return 1
 	} else if fileSize%fragmentSize == 0 {
@@ -18,14 +18,14 @@ func getFragmentCount(fileSize int, fragmentSize int) int {
 	}
 }
 
-// getFragmentKey returns the key for the fragment at the given index.
+// GetFragmentKey returns the key for the fragment at the given index.
 //
 // Fragment keys take the form of "body-index[f]". The index is the index of the fragment. The character "f" is
 // appended to the key of the last fragment in the series.
 //
 // Example: fileKey="abc123", fragmentCount=3
 // The keys will be "abc123-0", "abc123-1", "abc123-2f"
-func getFragmentKey(fileKey string, fragmentCount int, index int) (string, error) {
+func GetFragmentKey(fileKey string, fragmentCount int, index int) (string, error) {
 
 	postfix := ""
 	if fragmentCount-1 == index {
@@ -48,7 +48,7 @@ type Fragment struct {
 
 // BreakIntoFragments breaks a file into fragments of the given size.
 func BreakIntoFragments(fileKey string, data []byte, fragmentSize int) ([]*Fragment, error) {
-	fragmentCount := getFragmentCount(len(data), fragmentSize)
+	fragmentCount := GetFragmentCount(len(data), fragmentSize)
 	fragments := make([]*Fragment, fragmentCount)
 	for i := 0; i < fragmentCount; i++ {
 		start := i * fragmentSize
@@ -57,7 +57,7 @@ func BreakIntoFragments(fileKey string, data []byte, fragmentSize int) ([]*Fragm
 			end = len(data)
 		}
 
-		fragmentKey, err := getFragmentKey(fileKey, fragmentCount, i)
+		fragmentKey, err := GetFragmentKey(fileKey, fragmentCount, i)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +74,7 @@ func BreakIntoFragments(fileKey string, data []byte, fragmentSize int) ([]*Fragm
 func GetFragmentKeys(fileKey string, fragmentCount int) ([]string, error) {
 	keys := make([]string, fragmentCount)
 	for i := 0; i < fragmentCount; i++ {
-		fragmentKey, err := getFragmentKey(fileKey, fragmentCount, i)
+		fragmentKey, err := GetFragmentKey(fileKey, fragmentCount, i)
 		if err != nil {
 			return nil, err
 		}
@@ -100,9 +100,9 @@ func SortAndCheckAllFragmentsExist(keys []string) bool {
 	return false
 }
 
-// recombineFragments recombines fragments into a single file.
+// RecombineFragments recombines fragments into a single file.
 // Returns an error if any fragments are missing.
-func recombineFragments(fragments []*Fragment) ([]byte, error) {
+func RecombineFragments(fragments []*Fragment) ([]byte, error) {
 
 	if len(fragments) == 0 {
 		return nil, fmt.Errorf("no fragments")

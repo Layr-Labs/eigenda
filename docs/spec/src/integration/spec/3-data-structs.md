@@ -18,13 +18,13 @@ An `encodedPayload` is the bn254 encoding of the `payload`, prefixed with an enc
 
 #### Encoded Payload Header
 
-The header carries metadata needed to decode back to the original payload. Because it is included in the encoded payload, it too must be representable as valid field elements. The header currently takes 32 bytes: the first byte is 0x00 (to ensure it forms a valid field element), followed by an encoding version_byte and 4 bytes representing the size of the original payload. The golang payload clients provided in the eigenda repo currently only support [encoding version 0x0](https://github.com/Layr-Labs/eigenda/blob/f591a1fe44bced0f17edef9df43aaf13929e8508/api/clients/codecs/blob_codec.go#L12). The remaining bytes can be anything, as they are not read by the integration. However, the recommended default is to zero-fill the remaining bytes, which is also the current behavior of the eigenda proxy.
+The header carries metadata needed to decode back to the original payload. Because it is included in the encoded payload, it too must be representable as valid field elements. The header currently takes 32 bytes: the first byte is 0x00 (to ensure it forms a valid field element), followed by an encoding version_byte and 4 bytes representing the size of the original payload. The golang payload clients provided in the eigenda repo currently only support [encoding version 0x0](https://github.com/Layr-Labs/eigenda/blob/f591a1fe44bced0f17edef9df43aaf13929e8508/api/clients/codecs/blob_codec.go#L12). The remaining 26 bytes must be zero.
 
 #### Encoding Payload Version 0x0
 
 Version 0x0 specifies the following transformation from the original payload to a sequence of field element:
 - For every 31 bytes of the payload, insert a zero byte to produce a 32-byte value that is a valid field element.
-- Pad the final chunk so the payload length is a multiple of 32 bytes, and ensure the encoded payload comprises a power-of-two number of 32-byte field elements (32, 64, 128, 256, …) to match EigenDA blob sizing. We recommend to use 0 for all padding for encoded payload.
+- Further pad the output above so the final length is a multiple of 32 bytes, and comprises a power-of-two number of 32-byte field elements (32, 64, 128, 256, …) to match EigenDA blob sizing. All of the padding must be 0.
 
 ```solidity
 [0x00, version_byte, big-endian uint32 len(payload), 0x00, 0x00,...] +

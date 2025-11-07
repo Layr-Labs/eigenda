@@ -14,7 +14,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/s3"
+	awss3 "github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -35,7 +36,7 @@ var (
 	localstackPort      = "4580"
 	localstackContainer *testbed.LocalStackContainer
 
-	s3Client          s3.Client
+	s3Client          s3.S3Client
 	dynamoClient      dynamodb.Client
 	blobMetadataStore *blobstore.BlobMetadataStore
 
@@ -101,7 +102,16 @@ func setup(_ *testing.M) {
 
 	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
 
-	s3Client, err = s3.NewClient(ctx, cfg, logger)
+	s3Client, err = awss3.NewAwsS3Client(
+		ctx,
+		logger,
+		cfg.EndpointURL,
+		cfg.Region,
+		cfg.FragmentParallelismFactor,
+		cfg.FragmentParallelismConstant,
+		cfg.AccessKey,
+		cfg.SecretAccessKey,
+	)
 	if err != nil {
 		teardown()
 		logger.Fatal("Failed to create s3 client:", err)
@@ -182,13 +192,20 @@ func teardown() {
 
 func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *corev2.BlobHeader) {
 	t.Helper()
+	return newBlobWithDispersalTime(t, time.Now().UnixNano(), quorumNumbers)
+}
+
+func newBlobWithDispersalTime(
+	t *testing.T,
+	dispersalTime int64,
+	quorumNumbers []core.QuorumID,
+) (corev2.BlobKey, *corev2.BlobHeader) {
+	t.Helper()
 
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
-	timestamp, err := rand.Int(rand.Reader, big.NewInt(256))
-	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
 	require.NoError(t, err)
 	sig := make([]byte, 32)
@@ -200,7 +217,7 @@ func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *core
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			Timestamp:         timestamp.Int64(),
+			Timestamp:         dispersalTime,
 			CumulativePayment: cumulativePayment,
 		},
 	}

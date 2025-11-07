@@ -42,9 +42,10 @@ contract EigenDACertVerifier is
     DATypesV1.SecurityThresholds internal _securityThresholds;
 
     bytes internal _quorumNumbersRequired;
+    uint32 internal _recencyWindow;
 
     uint8 internal constant MAJOR_VERSION = 3;
-    uint8 internal constant MINOR_VERSION = 1;
+    uint8 internal constant MINOR_VERSION = 2;
     uint8 internal constant PATCH_VERSION = 0;
 
     /// @notice Status codes for certificate verification results
@@ -68,7 +69,8 @@ contract EigenDACertVerifier is
         IEigenDAThresholdRegistry initEigenDAThresholdRegistry,
         IEigenDASignatureVerifier initEigenDASignatureVerifier,
         DATypesV1.SecurityThresholds memory initSecurityThresholds,
-        bytes memory initQuorumNumbersRequired
+        bytes memory initQuorumNumbersRequired,
+        uint32 initRecencyWindow
     ) {
         if (initSecurityThresholds.confirmationThreshold <= initSecurityThresholds.adversaryThreshold) {
             revert InvalidSecurityThresholds();
@@ -80,6 +82,7 @@ contract EigenDACertVerifier is
         _eigenDASignatureVerifier = initEigenDASignatureVerifier;
         _securityThresholds = initSecurityThresholds;
         _quorumNumbersRequired = initQuorumNumbersRequired;
+        _recencyWindow = initRecencyWindow;
     }
 
     /// @notice Decodes a certificate from bytes to an EigenDACertV3
@@ -170,6 +173,11 @@ contract EigenDACertVerifier is
     /// @inheritdoc IEigenDACertVerifier
     function quorumNumbersRequired() external view returns (bytes memory) {
         return _quorumNumbersRequired;
+    }
+
+    /// @inheritdoc IEigenDACertVerifier
+    function recencyWindow() external view returns (uint32) {
+        return _recencyWindow;
     }
 
     /// @inheritdoc IVersionedEigenDACertVerifier

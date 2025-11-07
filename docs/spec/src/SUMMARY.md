@@ -8,6 +8,7 @@
       - [Amortized Proving](./protocol/architecture/amortized-proving.md)
     - [Assignment](./protocol/architecture/assignment.md)
     - [Security Parameters](./protocol/architecture/security-parameters.md)
+    - [Write and Read Workflow](./protocol/architecture/write-and-read-workflow.md)
   - [Contracts](./protocol/contracts.md)
   - [EigenDA V1 (Deprecated)](./v1.md)
 - [Integrations](./integration.md)

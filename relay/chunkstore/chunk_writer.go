@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
@@ -31,7 +31,7 @@ var _ ChunkWriter = (*chunkWriter)(nil)
 
 type chunkWriter struct {
 	logger       logging.Logger
-	s3Client     s3.Client
+	s3Client     s3.S3Client
 	bucketName   string
 	fragmentSize int
 }
@@ -39,7 +39,7 @@ type chunkWriter struct {
 // NewChunkWriter creates a new ChunkWriter.
 func NewChunkWriter(
 	logger logging.Logger,
-	s3Client s3.Client,
+	s3Client s3.S3Client,
 	bucketName string,
 	fragmentSize int) ChunkWriter {
 
