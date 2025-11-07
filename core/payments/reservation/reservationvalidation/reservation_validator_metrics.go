@@ -9,6 +9,9 @@ import (
 
 // Tracks metrics for the [ReservationPaymentValidator]
 type ReservationValidatorMetrics struct {
+	// Although payments internally tracks things in symbols, the consumer of metrics wants to see things in bytes.
+	// For a histogram, it's actually not possible to automatically rename bucket labels in grafana, so using
+	// symbols here causes dashboards to be less intuitive.
 	reservationBytes                 prometheus.Histogram
 	reservationSymbolsTotal          prometheus.Counter
 	reservationInsufficientBandwidth prometheus.Counter
