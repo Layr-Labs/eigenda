@@ -87,9 +87,10 @@ func RunEncoderServer(ctx *cli.Context) error {
 
 	// Set the encoding config
 	encodingConfig := &encoding.Config{
-		BackendType: backendType,
-		GPUEnable:   config.ServerConfig.GPUEnable,
-		NumWorker:   config.EncoderConfig.NumWorker,
+		BackendType:                           backendType,
+		GPUEnable:                             config.ServerConfig.GPUEnable,
+		GPUConcurrentFrameGenerationDangerous: int64(config.ServerConfig.MaxConcurrentRequests),
+		NumWorker:                             config.EncoderConfig.NumWorker,
 	}
 
 	// Read the GRPC port from flags
