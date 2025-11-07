@@ -38,6 +38,9 @@ type DispatcherConfig struct {
 	// Must be positive.
 	PullInterval time.Duration
 
+	// DisperserID is the unique identifier for this disperser instance.
+	DisperserID uint32
+
 	// FinalizationBlockDelay is the number of blocks to wait before using operator state.
 	// This provides a hedge against chain reorganizations.
 	FinalizationBlockDelay uint64

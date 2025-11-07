@@ -28,6 +28,7 @@ type Config struct {
 	DispatcherConfig      controller.DispatcherConfig
 
 	DynamoDBTableName string
+	DisperserID       uint32
 
 	EthClientConfig                     geth.EthClientConfig
 	AwsClientConfig                     aws.ClientConfig
@@ -131,6 +132,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	awsClientConfig := aws.ReadClientConfig(ctx, flags.FlagPrefix)
 	config := Config{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+		DisperserID:                         uint32(ctx.GlobalUint64(flags.DisperserIDFlag.Name)),
 		EthClientConfig:                     ethClientConfig,
 		AwsClientConfig:                     aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		DisperserStoreChunksSigningDisabled: ctx.GlobalBool(flags.DisperserStoreChunksSigningDisabledFlag.Name),
@@ -159,6 +161,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		DispatcherConfig: controller.DispatcherConfig{
 			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
+			DisperserID:                           uint32(ctx.GlobalUint64(flags.DisperserIDFlag.Name)),
 			FinalizationBlockDelay:                ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
 			AttestationTimeout:                    ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
 			BatchMetadataUpdatePeriod:             ctx.GlobalDuration(flags.BatchMetadataUpdatePeriodFlag.Name),

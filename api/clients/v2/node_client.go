@@ -19,6 +19,7 @@ type NodeClientConfig struct {
 	Hostname          string
 	Port              string
 	UseSecureGrpcFlag bool
+	DisperserID       uint32
 }
 
 type NodeClient interface {
@@ -76,7 +77,7 @@ func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*cor
 			},
 			BlobCertificates: blobCerts,
 		},
-		DisperserID: api.EigenLabsDisperserID, // this will need to be updated when dispersers are decentralized
+		DisperserID: c.config.DisperserID,
 		Timestamp:   uint32(time.Now().Unix()),
 	}
 

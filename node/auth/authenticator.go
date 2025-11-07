@@ -54,8 +54,6 @@ type requestAuthenticator struct {
 	// reloaded from the chain state in case the key has been changed.
 	keyTimeoutDuration time.Duration
 
-	// disperserIDFilter is a function that returns true if the given disperser ID is valid.
-	disperserIDFilter func(uint32) bool
 
 	// Set of disperser IDs authorized to submit on-demand payments.
 	authorizedOnDemandDispersers map[uint32]struct{}
@@ -67,7 +65,6 @@ func NewRequestAuthenticator(
 	chainReader core.Reader,
 	keyCacheSize int,
 	keyTimeoutDuration time.Duration,
-	disperserIDFilter func(uint32) bool,
 	authorizedOnDemandDispersers []uint32,
 	now time.Time,
 ) (RequestAuthenticator, error) {
@@ -86,7 +83,6 @@ func NewRequestAuthenticator(
 		chainReader:                  chainReader,
 		keyCache:                     keyCache,
 		keyTimeoutDuration:           keyTimeoutDuration,
-		disperserIDFilter:            disperserIDFilter,
 		authorizedOnDemandDispersers: authorizedSet,
 	}
 
@@ -99,10 +95,26 @@ func NewRequestAuthenticator(
 }
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
-	// this will need to be updated for decentralized dispersers
-	_, err := a.getDisperserKey(ctx, now, api.EigenLabsDisperserID)
-	if err != nil {
-		return fmt.Errorf("failed to get operator key: %w", err)
+	// Preload disperser keys starting from ID 0 until we hit cache limit or resolve a default address 0x0
+	cacheCapacity := a.keyCache.Len()
+	
+	for disperserID := uint32(0); disperserID < uint32(cacheCapacity); disperserID++ {
+		address, err := a.chainReader.GetDisperserAddress(ctx, disperserID)
+		if err != nil {
+			fmt.Printf("failed to preload disperser key for ID %d: %v\n", disperserID, err)
+			continue
+		}
+		
+		// If we get a zero address (0x0), stop preloading as this indicates no more valid dispersers
+		if address == (gethcommon.Address{}) {
+			break
+		}
+		
+		// Cache the key with timeout
+		a.keyCache.Add(disperserID, &keyWithTimeout{
+			key:        address,
+			expiration: now.Add(a.keyTimeoutDuration),
+		})
 	}
 
 	return nil
@@ -148,10 +160,6 @@ func (a *requestAuthenticator) getDisperserKey(
 	ctx context.Context,
 	now time.Time,
 	disperserID uint32) (*gethcommon.Address, error) {
-
-	if !a.disperserIDFilter(disperserID) {
-		return nil, fmt.Errorf("invalid disperser ID: %d", disperserID)
-	}
 
 	key, ok := a.keyCache.Get(disperserID)
 	if ok {
