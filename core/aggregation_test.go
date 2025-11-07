@@ -276,9 +276,9 @@ func TestFilterQuorums(t *testing.T) {
 		update)
 	assert.NoError(t, err)
 	assert.Len(t, aq.SignerMap, numOpr-advCount)
-	assert.Equal(t, aq.SignerMap, map[core.OperatorID]bool{
-		mock.MakeOperatorId(0): true,
-		mock.MakeOperatorId(1): true,
+	assert.Equal(t, aq.SignerMap, map[core.OperatorID]struct{}{
+		mock.MakeOperatorId(0): struct{}{},
+		mock.MakeOperatorId(1): struct{}{},
 	})
 	assert.Contains(t, aq.AggSignature, core.QuorumID(0))
 	assert.Contains(t, aq.AggSignature, core.QuorumID(1))
