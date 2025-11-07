@@ -145,7 +145,9 @@ For the ~7-day challenge window overlaps EigenDA availability, we assume there i
 
 In the diagram, the top row shows L1 blocks every 12 s; the smaller squares are L2 blocks every 2 s. Yellow labels mark key artifacts across the batching pipeline: batches → channel → EigenDA blob. Dispersal completes between t=12 s and t=24 s. The resulting certificate has RBN equal to the L1 block at t=0 (two L1 blocks earlier). The cert is then submitted to L1 at t=24 s. Green annotations show the generalized L2→L1 submission, with batches posted to the adjacent L1 block.
 
-However, if the RecencyWindowSize is configured to be 0, the entire recency check is skipped. It is strongly not recommended to set it to 0, as it allows a malicious or misbehaving batcher to submit an AltDACommitment whose blob has been pruned by the DA network.
+#### Exception
+
+However, if the RecencyWindowSize is configured to be 0, the entire recency check is skipped. It is strongly not recommended to set it to 0, as it allows a malicious or misbehaving batcher to submit an AltDACommitment whose blob has been pruned by the DA network. An altda commitments is considered valid and can be processed by the next stage of the eigenda blob derivation.
 
 ### 2. Cert Validation
 

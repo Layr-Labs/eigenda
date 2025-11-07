@@ -1,13 +1,18 @@
 package reservationvalidation
 
 import (
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // Tracks metrics for the [ReservationPaymentValidator]
 type ReservationValidatorMetrics struct {
-	reservationSymbols               prometheus.Histogram
+	// Although payments internally tracks things in symbols, the consumer of metrics wants to see things in bytes.
+	// For a histogram, it's actually not possible to automatically rename bucket labels in grafana, so using
+	// symbols here causes dashboards to be less intuitive.
+	reservationBytes                 prometheus.Histogram
 	reservationSymbolsTotal          prometheus.Counter
 	reservationInsufficientBandwidth prometheus.Counter
 	reservationQuorumNotPermitted    prometheus.Counter
@@ -25,15 +30,15 @@ func NewReservationValidatorMetrics(
 		return nil
 	}
 
-	symbols := promauto.With(registry).NewHistogram(
+	bytes := promauto.With(registry).NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
-			Name:      "reservation_symbols",
+			Name:      "reservation_bytes",
 			Subsystem: subsystem,
-			Help: "Distribution of symbol counts for successful reservation payments. " +
-				"Counts reflect actual dispersed symbols, not billed symbols (which may be higher due to min size).",
+			Help: "Distribution of byte counts for successful reservation payments. " +
+				"Counts reflect actual dispersed bytes, not billed bytes (which may be higher due to min size).",
 			// Buckets chosen to go from min to max blob sizes (128KiB -> 16MiB)
-			Buckets: prometheus.ExponentialBuckets(4096, 2, 8),
+			Buckets: prometheus.ExponentialBuckets(128*units.KiB, 2, 8),
 		},
 	)
 
@@ -93,7 +98,7 @@ func NewReservationValidatorMetrics(
 	)
 
 	return &ReservationValidatorMetrics{
-		reservationSymbols:               symbols,
+		reservationBytes:                 bytes,
 		reservationSymbolsTotal:          symbolsTotal,
 		reservationInsufficientBandwidth: insufficientBandwidth,
 		reservationQuorumNotPermitted:    quorumNotPermitted,
@@ -108,7 +113,7 @@ func (m *ReservationValidatorMetrics) RecordSuccess(symbolCount uint32) {
 	if m == nil {
 		return
 	}
-	m.reservationSymbols.Observe(float64(symbolCount))
+	m.reservationBytes.Observe(float64(symbolCount) * encoding.BYTES_PER_SYMBOL)
 	m.reservationSymbolsTotal.Add(float64(symbolCount))
 }
 
