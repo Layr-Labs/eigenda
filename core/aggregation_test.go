@@ -285,10 +285,10 @@ func TestNilPubkeyG1Handling(t *testing.T) {
 	}()
 
 	// This should not panic even with nil PubkeyG1 in non-signers
-	// Before the fix, this would panic when trying to process non-signers with nil PubkeyG1
+	attestationCtx := ctx
 	aq, _ := agg.ReceiveSignatures(
 		ctx,
-		ctx,
+		attestationCtx,
 		state.IndexedOperatorState,
 		message,
 		update)
