@@ -388,6 +388,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             hex"0001",
             14400 // number of 12 second blocks in a 48 hour period.
         );
+        eigenDADirectory.addAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME, address(eigenDACertVerifier));
 
         eigenDACertVerifierRouterImplementation = new EigenDACertVerifierRouter();
 
