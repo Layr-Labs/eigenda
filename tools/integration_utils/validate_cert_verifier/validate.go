@@ -126,8 +126,8 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 	}
 
 	fmt.Println("========================================================")
-	fmt.Printf("Cert version: %d", version)
-	fmt.Printf("Blob key: %s", blobKey.Hex())
+	fmt.Printf("Cert version: %d\n", version)
+	fmt.Printf("Blob key: %s\n", blobKey.Hex())
 	fmt.Printf("Reference Block Number: %d\n", cert.ReferenceBlockNumber())
 	fmt.Printf("Quorum Numbers: %v\n", cert.QuorumNumbers())
 
