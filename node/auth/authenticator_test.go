@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	wmock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/test/random"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,7 +33,6 @@ func TestValidRequest(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		[]uint32{0},
 		start)
 	require.NoError(t, err)
@@ -68,7 +67,6 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		[]uint32{0},
 		start)
 	require.NoError(t, err)
@@ -103,7 +101,6 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		[]uint32{0},
 		start)
 	require.NoError(t, err)
@@ -130,7 +127,6 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	disperserAddress0, privateKey0, err := rand.EthAccount()
 	require.NoError(t, err)
 
-	// This disperser will be loaded on chain (simulated), but will fail the valid disperser ID filter.
 	disperserAddress1, privateKey1, err := rand.EthAccount()
 	require.NoError(t, err)
 
@@ -138,24 +134,18 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress0, nil)
 	chainReader.Mock.On("GetDisperserAddress", uint32(1)).Return(disperserAddress1, nil)
 	chainReader.Mock.On("GetDisperserAddress", uint32(1234)).Return(
-		nil, errors.New("disperser not found"))
-
-	filterCallCount := atomic.Uint32{}
+		gethcommon.Address{}, errors.New("disperser not found"))
 
 	authenticator, err := NewRequestAuthenticator(
 		ctx,
 		&chainReader,
 		10,
 		time.Minute,
-		func(id uint32) bool {
-			filterCallCount.Add(1)
-			return id != uint32(1)
-		},
 		[]uint32{0},
 		start)
 	require.NoError(t, err)
-	require.Equal(t, uint32(1), filterCallCount.Load())
 
+	// Test valid disperser ID 0
 	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 	signature, err := SignStoreChunksRequest(privateKey0, request)
@@ -166,21 +156,22 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	expectedHash, err := hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.Equal(t, expectedHash, hash)
-	require.Equal(t, uint32(2), filterCallCount.Load())
 
+	// Test valid disperser ID 1 (should work now that we accept all disperser IDs)
 	request.DisperserID = 1
 	signature, err = SignStoreChunksRequest(privateKey1, request)
 	require.NoError(t, err)
 	request.Signature = signature
 	_, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
-	require.Error(t, err)
+	require.NoError(t, err) // Should succeed now
 
+	// Test invalid disperser ID (not found on chain)
 	request.DisperserID = 1234
 	signature, err = SignStoreChunksRequest(privateKey1, request)
 	require.NoError(t, err)
 	request.Signature = signature
 	_, err = authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
-	require.Error(t, err)
+	require.Error(t, err) // Should still fail - disperser not found
 }
 
 func TestKeyExpiry(t *testing.T) {
@@ -200,7 +191,6 @@ func TestKeyExpiry(t *testing.T) {
 		&mockChainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		[]uint32{0},
 		start)
 	require.NoError(t, err)
@@ -265,7 +255,6 @@ func TestKeyCacheSize(t *testing.T) {
 		&mockChainReader,
 		cacheSize,
 		time.Minute,
-		func(uint32) bool { return true },
 		[]uint32{0},
 		start)
 	require.NoError(t, err)
@@ -360,7 +349,6 @@ func TestOnDemandPaymentAuthorization(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		[]uint32{0},
 		start)
 	require.NoError(t, err)
@@ -383,4 +371,62 @@ func TestOnDemandPaymentAuthorization(t *testing.T) {
 
 	require.False(t, authenticator.IsDisperserAuthorized(1, onDemandBatch))
 	require.True(t, authenticator.IsDisperserAuthorized(1, reservationBatch))
+}
+
+func TestMultipleDisperserIDs(t *testing.T) {
+	ctx := t.Context()
+	rand := random.NewTestRandom()
+
+	start := rand.Time()
+
+	// Set up multiple disperser addresses
+	disperser0Address, privateKey0, err := rand.EthAccount()
+	require.NoError(t, err)
+	disperser1Address, privateKey1, err := rand.EthAccount()
+	require.NoError(t, err)
+	disperser2Address, privateKey2, err := rand.EthAccount()
+	require.NoError(t, err)
+
+	mockChainReader := wmock.MockWriter{}
+	mockChainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperser0Address, nil)
+	mockChainReader.Mock.On("GetDisperserAddress", uint32(1)).Return(disperser1Address, nil)
+	mockChainReader.Mock.On("GetDisperserAddress", uint32(2)).Return(disperser2Address, nil)
+
+	// Create authenticator with cache size 3 to test preloading
+	authenticator, err := NewRequestAuthenticator(
+		ctx,
+		&mockChainReader,
+		3,
+		time.Minute,
+		[]uint32{0}, // Only disperser 0 authorized for on-demand
+		start)
+	require.NoError(t, err)
+
+	// Preloading should have grabbed all 3 disperser keys
+	mockChainReader.AssertNumberOfCalls(t, "GetDisperserAddress", 3)
+
+	// Test authentication with different disperser IDs
+	testCases := []struct {
+		disperserID uint32
+		privateKey  *ecdsa.PrivateKey
+	}{
+		{0, privateKey0},
+		{1, privateKey1},
+		{2, privateKey2},
+	}
+
+	for _, tc := range testCases {
+		request := RandomStoreChunksRequest(rand)
+		request.DisperserID = tc.disperserID
+		signature, err := SignStoreChunksRequest(tc.privateKey, request)
+		require.NoError(t, err)
+		request.Signature = signature
+
+		hash, err := authenticator.AuthenticateStoreChunksRequest(ctx, request, start)
+		require.NoError(t, err)
+		require.NotNil(t, hash)
+	}
+
+	// No additional chain calls should have been made since keys were cached
+	mockChainReader.AssertNumberOfCalls(t, "GetDisperserAddress", 3)
 }

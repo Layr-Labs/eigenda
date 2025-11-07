@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"

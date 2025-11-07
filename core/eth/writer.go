@@ -9,7 +9,6 @@ import (
 	"log"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/api"
 	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
