@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -71,16 +70,14 @@ type DispatcherConfig struct {
 	// Must be at least 1.
 	MaxBatchSize int32
 
-	// SignificantSigningThresholdPercentage is a configurable "important" signing threshold percentage.
+	// SignificantSigningThresholdFraction is a configurable "important" signing threshold fraction.
 	// Used to track signing metrics and understand system performance.
 	// If the value is 0, special handling for this threshold is disabled.
-	// Must be between 0 and 100.
-	SignificantSigningThresholdPercentage uint8
+	// Must be between 0.0 and 1.0.
+	SignificantSigningThresholdFraction float64
 
-	// SignificantSigningMetricsThresholds are signing thresholds for metrics reporting.
-	// Values should be decimal strings between "0.0" (0% signed) and "1.0" (100% signed).
-	// Example: []string{"0.55", "0.67"}
-	SignificantSigningMetricsThresholds []string
+	// Whether or not to collect detailed validator signing metrics.
+	CollectDetailedValidatorSigningMetrics bool
 
 	// NumConcurrentRequests is the size of the worker pool for processing dispersal requests concurrently.
 	// Must be at least 1.
@@ -119,21 +116,10 @@ func (c *DispatcherConfig) Verify() error {
 	if c.MaxBatchSize < 1 {
 		return fmt.Errorf("MaxBatchSize must be at least 1, got %d", c.MaxBatchSize)
 	}
-	if c.SignificantSigningThresholdPercentage > 100 {
+	if c.SignificantSigningThresholdFraction > 1.0 || c.SignificantSigningThresholdFraction < 0.0 {
 		return fmt.Errorf(
-			"SignificantSigningThresholdPercentage must be between 0 and 100, got %d",
-			c.SignificantSigningThresholdPercentage)
-	}
-	for _, threshold := range c.SignificantSigningMetricsThresholds {
-		val, err := strconv.ParseFloat(threshold, 64)
-		if err != nil {
-			return fmt.Errorf("SignificantSigningMetricsThresholds contains invalid float: %s", threshold)
-		}
-		if val < 0.0 || val > 1.0 {
-			return fmt.Errorf(
-				"SignificantSigningMetricsThresholds must be between 0.0 and 1.0, got %s",
-				threshold)
-		}
+			"SignificantSigningThresholdFraction must be between 0.0 and 1.0, got %f",
+			c.SignificantSigningThresholdFraction)
 	}
 	if c.NumConcurrentRequests < 1 {
 		return fmt.Errorf("NumConcurrentRequests must be at least 1, got %d", c.NumConcurrentRequests)
@@ -146,18 +132,17 @@ func (c *DispatcherConfig) Verify() error {
 
 func DefaultDispatcherConfig() *DispatcherConfig {
 	return &DispatcherConfig{
-		PullInterval:                          1 * time.Second,
-		FinalizationBlockDelay:                75,
-		AttestationTimeout:                    45 * time.Second,
-		BatchMetadataUpdatePeriod:             time.Minute,
-		BatchAttestationTimeout:               55 * time.Second,
-		SignatureTickInterval:                 50 * time.Millisecond,
-		NumRequestRetries:                     0,
-		MaxBatchSize:                          32,
-		SignificantSigningThresholdPercentage: 55,
-		SignificantSigningMetricsThresholds:   []string{"0.55", "0.67"},
-		NumConcurrentRequests:                 600,
-		NodeClientCacheSize:                   400,
+		PullInterval:                        1 * time.Second,
+		FinalizationBlockDelay:              75,
+		AttestationTimeout:                  45 * time.Second,
+		BatchMetadataUpdatePeriod:           time.Minute,
+		BatchAttestationTimeout:             55 * time.Second,
+		SignatureTickInterval:               50 * time.Millisecond,
+		NumRequestRetries:                   0,
+		MaxBatchSize:                        32,
+		SignificantSigningThresholdFraction: 0.55,
+		NumConcurrentRequests:               600,
+		NodeClientCacheSize:                 400,
 	}
 }
 
@@ -170,7 +155,7 @@ type Dispatcher struct {
 	aggregator        core.SignatureAggregator
 	nodeClientManager NodeClientManager
 	logger            logging.Logger
-	metrics           *dispatcherMetrics
+	metrics           *controllerMetrics
 
 	cursor *blobstore.StatusIndexCursor
 
@@ -194,6 +179,7 @@ type batchData struct {
 	BlobKeys        []corev2.BlobKey
 	Metadata        map[corev2.BlobKey]*v2.BlobMetadata
 	OperatorState   *core.IndexedOperatorState
+	BatchSizeBytes  uint64
 }
 
 func NewDispatcher(
@@ -218,14 +204,10 @@ func NewDispatcher(
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	// CLI library doesn't support float slices at current version, parsing must happen manually.
-	significantThresholds := make([]float64, 0, len(config.SignificantSigningMetricsThresholds))
-	for _, threshold := range config.SignificantSigningMetricsThresholds {
-		significantThreshold, _ := strconv.ParseFloat(threshold, 64)
-		significantThresholds = append(significantThresholds, significantThreshold)
-	}
-
-	metrics, err := newDispatcherMetrics(registry, significantThresholds)
+	metrics, err := newControllerMetrics(
+		registry,
+		config.SignificantSigningThresholdFraction,
+		config.CollectDetailedValidatorSigningMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
 	}
@@ -442,7 +424,6 @@ func (d *Dispatcher) HandleBatch(
 					Err:             lastErr,
 				}
 			}
-			d.metrics.reportSendChunksRetryCount(float64(i))
 		})
 	}
 
@@ -509,7 +490,8 @@ func (d *Dispatcher) HandleSignatures(
 		batchData.BatchHeaderHash,
 		sigChan,
 		d.DispatcherConfig.SignatureTickInterval,
-		d.DispatcherConfig.SignificantSigningThresholdPercentage)
+		d.DispatcherConfig.SignificantSigningThresholdFraction,
+		batchData.BatchSizeBytes)
 	if err != nil {
 		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
 
@@ -543,22 +525,6 @@ func (d *Dispatcher) HandleSignatures(
 	if err != nil {
 		return fmt.Errorf("update batch status: %w", err)
 	}
-
-	// Track attestation metrics
-	operatorCount := make(map[core.QuorumID]int)
-	signerCount := make(map[core.QuorumID]int)
-	for quorumID, opState := range batchData.OperatorState.Operators {
-		operatorCount[quorumID] = len(opState)
-		if _, ok := signerCount[quorumID]; !ok {
-			signerCount[quorumID] = 0
-		}
-		for opID := range opState {
-			if _, ok := finalAttestation.SignerMap[opID]; ok {
-				signerCount[quorumID]++
-			}
-		}
-	}
-	d.metrics.reportAttestation(operatorCount, signerCount, finalAttestation.QuorumResults)
 
 	return nil
 }
@@ -818,6 +784,18 @@ func (d *Dispatcher) NewBatch(
 		d.blobSet.AddBlob(blobKey)
 	}
 
+	batchSizeBytes := uint64(0)
+	for _, blobKey := range keys {
+		blobMetadata, ok := metadataMap[blobKey]
+		if !ok {
+			d.logger.Warn("missing blob metadata for blob key when updating signing metrics",
+				"blobKey", blobKey.Hex(),
+				"batchHeaderHash", batchHeaderHash)
+			continue
+		}
+		batchSizeBytes += blobMetadata.BlobSize
+	}
+
 	d.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))
 	return &batchData{
 		Batch:           batch,
@@ -825,6 +803,7 @@ func (d *Dispatcher) NewBatch(
 		BlobKeys:        keys,
 		Metadata:        metadataMap,
 		OperatorState:   operatorState,
+		BatchSizeBytes:  batchSizeBytes,
 	}, nil
 }
 

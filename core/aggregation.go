@@ -50,7 +50,7 @@ type QuorumAttestation struct {
 	// QuorumResults contains the quorum ID and the amount signed for each quorum
 	QuorumResults map[QuorumID]*QuorumResult
 	// SignerMap contains the operator IDs that signed the message
-	SignerMap map[OperatorID]bool
+	SignerMap map[OperatorID]struct{}
 }
 
 // SignatureAggregation contains the results of aggregating signatures from a set of operators across multiple quorums
@@ -149,7 +149,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 	}
 	aggSigs := make(map[QuorumID]*Signature, len(quorumIDs))
 	aggPubKeys := make(map[QuorumID]*G2Point, len(quorumIDs))
-	signerMap := make(map[OperatorID]bool)
+	signerMap := make(map[OperatorID]struct{})
 
 	// Aggregate Signatures
 	numOperators := len(state.IndexedOperators)
@@ -173,7 +173,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			break
 		}
 
-		if seen := signerMap[r.Operator]; seen {
+		if _, seen := signerMap[r.Operator]; seen {
 			a.Logger.Warn("duplicate signature received", "operatorID", r.Operator.Hex())
 			continue
 		}
@@ -240,7 +240,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			}
 			operatorQuorums = append(operatorQuorums, quorumID)
 
-			signerMap[r.Operator] = true
+			signerMap[r.Operator] = struct{}{}
 
 			// Add to stake signed
 			stakeSigned[quorumID].Add(stakeSigned[quorumID], opInfo.Stake)
