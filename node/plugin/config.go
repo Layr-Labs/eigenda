@@ -221,3 +221,5 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BLSSignerAPIKey:    ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
 	}, nil
 }
+
+// This is a test
