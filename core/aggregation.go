@@ -273,8 +273,11 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 	for id, op := range state.IndexedOperators {
 		_, found := signerMap[id]
 		if !found {
-			nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
-			nonSignerOperatorIds = append(nonSignerOperatorIds, id)
+			// Only add non-signers with valid G1 public keys to prevent nil pointer dereference
+			if op.PubkeyG1 != nil {
+				nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
+				nonSignerOperatorIds = append(nonSignerOperatorIds, id)
+			}
 		}
 	}
 
@@ -384,7 +387,10 @@ func (a *StdSignatureAggregator) AggregateSignatures(
 	for id, op := range indexedOperatorState.IndexedOperators {
 		_, found := quorumAttestation.SignerMap[id]
 		if !found {
-			nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
+			// Only add non-signers with valid G1 public keys to prevent nil pointer dereference
+			if op.PubkeyG1 != nil {
+				nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
+			}
 		}
 	}
 
