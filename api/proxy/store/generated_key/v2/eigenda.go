@@ -316,19 +316,6 @@ func verifyCertRBNRecencyCheck(certRBN uint64, certL1IBN uint64, rbnRecencyWindo
 	if certL1IBN == 0 || rbnRecencyWindowSize == 0 {
 		return nil
 	}
-	if certRBN == 0 {
-		return fmt.Errorf("certRBN should never be 0, this is likely a bug")
-	}
-	if certL1IBN <= certRBN {
-		return fmt.Errorf(
-			"cert's l1 inclusion block number (%d) <= cert reference block number (%d), but this is physically impossible "+
-				"since the cert has to be signed by all eigenda validators before being submitted to the batcher inbox, "+
-				"and validators will only sign a batchRoot (contained in certs) if the RBN is in the past. "+
-				"This is a serious bug, please report it",
-			certRBN,
-			certL1IBN,
-		)
-	}
 
 	// Actual Recency Check
 	if !(certL1IBN <= certRBN+rbnRecencyWindowSize) { //nolint:staticcheck // inequality is clearer as is

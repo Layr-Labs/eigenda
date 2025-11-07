@@ -13,8 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	blobstore "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -132,7 +132,7 @@ func (s *DispersalServerV2) StoreBlob(
 
 	if err := s.blobStore.StoreBlob(ctx, blobKey, data); err != nil {
 		s.logger.Warn("failed to store blob", "err", err, "blobKey", blobKey.Hex())
-		if errors.Is(err, common.ErrAlreadyExists) {
+		if errors.Is(err, blobstore.ErrAlreadyExists) {
 			return corev2.BlobKey{}, status.Newf(codes.AlreadyExists, "blob already exists: %s", blobKey.Hex())
 		}
 
@@ -153,7 +153,7 @@ func (s *DispersalServerV2) StoreBlob(
 	err = s.blobMetadataStore.PutBlobMetadata(ctx, blobMetadata)
 	if err != nil {
 		s.logger.Warn("failed to store blob metadata", "err", err, "blobKey", blobKey.Hex())
-		if errors.Is(err, common.ErrAlreadyExists) {
+		if errors.Is(err, blobstore.ErrAlreadyExists) {
 			return corev2.BlobKey{}, status.Newf(codes.AlreadyExists, "blob metadata already exists: %s", blobKey.Hex())
 		}
 
