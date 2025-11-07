@@ -300,6 +300,7 @@ func (oh *OperatorHarness) startOperator(
 		GRPCMsgSizeLimitV2:                  1024 * 1024 * 300,
 		EnablePaymentValidation:             oh.testConfig.UseNewPayments,
 		ReservationLedgerCacheConfig:        reservationLedgerCacheConfig,
+		EnablePerAccountPaymentMetrics:      false,
 	}
 
 	// Create operator logger

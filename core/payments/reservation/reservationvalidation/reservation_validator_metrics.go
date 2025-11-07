@@ -13,18 +13,21 @@ type ReservationValidatorMetrics struct {
 	// For a histogram, it's actually not possible to automatically rename bucket labels in grafana, so using
 	// symbols here causes dashboards to be less intuitive.
 	reservationBytes                 prometheus.Histogram
-	reservationSymbolsTotal          prometheus.Counter
+	reservationSymbolsTotal          *prometheus.CounterVec
+	reservationDispersalsTotal       *prometheus.CounterVec
 	reservationInsufficientBandwidth prometheus.Counter
 	reservationQuorumNotPermitted    prometheus.Counter
 	reservationTimeOutOfRange        prometheus.Counter
 	reservationTimeMovedBackward     prometheus.Counter
 	reservationUnexpectedErrors      prometheus.Counter
+	enablePerAccountMetrics          bool
 }
 
 func NewReservationValidatorMetrics(
 	registry *prometheus.Registry,
 	namespace string,
 	subsystem string,
+	enablePerAccountMetrics bool,
 ) *ReservationValidatorMetrics {
 	if registry == nil {
 		return nil
@@ -42,7 +45,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	symbolsTotal := promauto.With(registry).NewCounter(
+	symbolsTotal := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_symbols_total",
@@ -50,6 +53,17 @@ func NewReservationValidatorMetrics(
 			Help: "Total number of symbols validated for successful reservation payments. " +
 				"Counts reflect actual dispersed symbols, not billed symbols (which may be higher due to min size).",
 		},
+		[]string{"account_id"},
+	)
+
+	dispersalsTotal := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "reservation_dispersals_total",
+			Subsystem: subsystem,
+			Help:      "Total number of dispersals successfully paid for by reservation.",
+		},
+		[]string{"account_id"},
 	)
 
 	insufficientBandwidth := promauto.With(registry).NewCounter(
@@ -100,21 +114,30 @@ func NewReservationValidatorMetrics(
 	return &ReservationValidatorMetrics{
 		reservationBytes:                 bytes,
 		reservationSymbolsTotal:          symbolsTotal,
+		reservationDispersalsTotal:       dispersalsTotal,
 		reservationInsufficientBandwidth: insufficientBandwidth,
 		reservationQuorumNotPermitted:    quorumNotPermitted,
 		reservationTimeOutOfRange:        timeOutOfRange,
 		reservationTimeMovedBackward:     timeMovedBackward,
 		reservationUnexpectedErrors:      unexpectedErrors,
+		enablePerAccountMetrics:          enablePerAccountMetrics,
 	}
 }
 
 // Records a successful reservation payment
-func (m *ReservationValidatorMetrics) RecordSuccess(symbolCount uint32) {
+func (m *ReservationValidatorMetrics) RecordSuccess(accountID string, symbolCount uint32) {
 	if m == nil {
 		return
 	}
 	m.reservationBytes.Observe(float64(symbolCount) * encoding.BYTES_PER_SYMBOL)
-	m.reservationSymbolsTotal.Add(float64(symbolCount))
+
+	// If per-account metrics are disabled, aggregate under "0x0"
+	labelValue := accountID
+	if !m.enablePerAccountMetrics {
+		labelValue = "0x0"
+	}
+	m.reservationSymbolsTotal.WithLabelValues(labelValue).Add(float64(symbolCount))
+	m.reservationDispersalsTotal.WithLabelValues(labelValue).Inc()
 }
 
 // Increments the counter for when the holder of a reservation lacks bandwidth to perform the dispersal

@@ -211,8 +211,9 @@ type Config struct {
 	// TODO(litt3): This is a temporary field, which will be removed once the new payments system is fully in place.
 	// Payment validation is currently optional to make implementation and testing possible before actually shipping
 	// the new payments system.
-	EnablePaymentValidation      bool
-	ReservationLedgerCacheConfig reservationvalidation.ReservationLedgerCacheConfig
+	EnablePaymentValidation        bool
+	ReservationLedgerCacheConfig   reservationvalidation.ReservationLedgerCacheConfig
+	EnablePerAccountPaymentMetrics bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -494,5 +495,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		IgnoreVersionForEjectionDefense: ctx.GlobalBool(flags.IgnoreVersionForEjectionDefenseFlag.Name),
 		EnablePaymentValidation:         paymentValidationEnabled,
 		ReservationLedgerCacheConfig:    reservationLedgerCacheConfig,
+		EnablePerAccountPaymentMetrics:  ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
 	}, nil
 }

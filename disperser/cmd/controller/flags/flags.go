@@ -327,6 +327,12 @@ var (
 		Value:    30 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
 	}
+	EnablePerAccountPaymentMetricsFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-payment-metrics"),
+		Usage:    "Whether to report per-account payment metrics. If false, all metrics will be aggregated under account 0x0.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PER_ACCOUNT_PAYMENT_METRICS"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -378,6 +384,7 @@ var optionalFlags = []cli.Flag{
 	OnDemandPaymentsLedgerCacheSizeFlag,
 	ReservationPaymentsLedgerCacheSizeFlag,
 	PaymentVaultUpdateIntervalFlag,
+	EnablePerAccountPaymentMetricsFlag,
 	DetailedValidatorMetricsFlag,
 }
 
