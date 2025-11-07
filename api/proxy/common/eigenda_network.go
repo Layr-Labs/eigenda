@@ -20,6 +20,7 @@ type EigenDANetwork string
 const (
 	SepoliaTestnetEigenDANetwork EigenDANetwork = "sepolia_testnet"
 	HoodiTestnetEigenDANetwork   EigenDANetwork = "hoodi_testnet"
+	HoodiPreprodEigenDANetwork   EigenDANetwork = "hoodi_preprod"
 	MainnetEigenDANetwork        EigenDANetwork = "mainnet"
 )
 
@@ -35,6 +36,8 @@ func (n EigenDANetwork) GetEigenDADirectory() string {
 		return "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 	case HoodiTestnetEigenDANetwork:
 		return "0x5a44e56e88abcf610c68340c6814ae7f5c4369fd"
+	case HoodiPreprodEigenDANetwork:
+		return "0xbFa1b820bb302925a3eb98C8836a95361FB75b87"
 	default:
 		panic(fmt.Sprintf("unknown EigenDA network: %s", n))
 	}
@@ -53,6 +56,8 @@ func (n EigenDANetwork) GetDisperserAddress() string {
 		return "disperser-testnet-sepolia.eigenda.xyz:443"
 	case HoodiTestnetEigenDANetwork:
 		return "disperser-testnet-hoodi.eigenda.xyz:443"
+	case HoodiPreprodEigenDANetwork:
+		return "disperser-v2-preprod-hoodi.eigenda.xyz:443"
 	default:
 		panic(fmt.Sprintf("unknown EigenDA network: %s", n))
 	}
@@ -66,7 +71,7 @@ func (n EigenDANetwork) String() string {
 var chainIDToNetworkMap = map[string][]EigenDANetwork{
 	"1":        {MainnetEigenDANetwork},
 	"11155111": {SepoliaTestnetEigenDANetwork},
-	"560048":   {HoodiTestnetEigenDANetwork},
+	"560048":   {HoodiTestnetEigenDANetwork, HoodiPreprodEigenDANetwork},
 }
 
 // EigenDANetworksFromChainID returns the EigenDA network(s) for a given chain ID
@@ -86,13 +91,14 @@ func EigenDANetworkFromString(inputString string) (EigenDANetwork, error) {
 	network := EigenDANetwork(inputString)
 
 	switch network {
-	case SepoliaTestnetEigenDANetwork, HoodiTestnetEigenDANetwork, MainnetEigenDANetwork:
+	case SepoliaTestnetEigenDANetwork, HoodiTestnetEigenDANetwork, HoodiPreprodEigenDANetwork, MainnetEigenDANetwork:
 		return network, nil
 	default:
 		allowedNetworks := []string{
 			MainnetEigenDANetwork.String(),
 			SepoliaTestnetEigenDANetwork.String(),
 			HoodiTestnetEigenDANetwork.String(),
+			HoodiPreprodEigenDANetwork.String(),
 		}
 		return "", fmt.Errorf("invalid network: %s. Must be one of: %s",
 			inputString, strings.Join(allowedNetworks, ", "))

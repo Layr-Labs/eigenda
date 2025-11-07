@@ -307,7 +307,8 @@ contract DeployEigenDA is Script {
                     IEigenDAThresholdRegistry(directory.getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME)),
                     IEigenDASignatureVerifier(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
                     cfg.certVerifierSecurityThresholds(),
-                    cfg.certVerifierQuorumNumbersRequired()
+                    cfg.certVerifierQuorumNumbersRequired(),
+                    cfg.certVerifierRecencyWindow()
                 )
             )
         );
