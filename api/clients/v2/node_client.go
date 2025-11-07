@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api"
 	"github.com/docker/go-units"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"

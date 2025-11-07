@@ -16,6 +16,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// setupMockChainReader sets up a mock chain reader with the given disperser addresses.
+// Any disperser ID not in the map will return zero address.
+func setupMockChainReader(dispersers map[uint32]gethcommon.Address, cacheSize int) *wmock.MockWriter {
+	chainReader := &wmock.MockWriter{}
+
+	for i := uint32(0); i < uint32(cacheSize); i++ {
+		if addr, exists := dispersers[i]; exists {
+			chainReader.Mock.On("GetDisperserAddress", i).Return(addr, nil)
+		} else {
+			chainReader.Mock.On("GetDisperserAddress", i).Return(gethcommon.Address{}, nil)
+		}
+	}
+
+	return chainReader
+}
+
 func TestValidRequest(t *testing.T) {
 	ctx := t.Context()
 	rand := random.NewTestRandom()
@@ -25,12 +41,13 @@ func TestValidRequest(t *testing.T) {
 	disperserAddress, privateKey, err := rand.EthAccount()
 	require.NoError(t, err)
 
-	chainReader := wmock.MockWriter{}
-	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
+	chainReader := setupMockChainReader(map[uint32]gethcommon.Address{
+		0: disperserAddress,
+	}, 10)
 
 	authenticator, err := NewRequestAuthenticator(
 		ctx,
-		&chainReader,
+		chainReader,
 		10,
 		time.Minute,
 		[]uint32{0},

@@ -366,6 +366,7 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "5",
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
+		CONTROLLER_DISPERSER_ID:                            "0",
 	}
 
 	if env.UseNewPayments {

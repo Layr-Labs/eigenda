@@ -49,10 +49,12 @@ type requestAuthenticator struct {
 	// the public key of the disperser and the time when the local cache of the key will expire.
 	keyCache *lru.Cache[uint32 /* disperser ID */, *keyWithTimeout]
 
+	// keyCacheCapacity is the maximum number of keys that can be cached.
+	keyCacheCapacity int
+
 	// keyTimeoutDuration is the duration for which a key is cached. After this duration, the key should be
 	// reloaded from the chain state in case the key has been changed.
 	keyTimeoutDuration time.Duration
-
 
 	// Set of disperser IDs authorized to submit on-demand payments.
 	authorizedOnDemandDispersers map[uint32]struct{}
@@ -81,6 +83,7 @@ func NewRequestAuthenticator(
 	authenticator := &requestAuthenticator{
 		chainReader:                  chainReader,
 		keyCache:                     keyCache,
+		keyCacheCapacity:             keyCacheSize,
 		keyTimeoutDuration:           keyTimeoutDuration,
 		authorizedOnDemandDispersers: authorizedSet,
 	}
@@ -95,20 +98,18 @@ func NewRequestAuthenticator(
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
 	// Preload disperser keys starting from ID 0 until we hit cache limit or resolve a default address 0x0
-	cacheCapacity := a.keyCache.Len()
-	
-	for disperserID := uint32(0); disperserID < uint32(cacheCapacity); disperserID++ {
+	for disperserID := uint32(0); disperserID < uint32(a.keyCacheCapacity); disperserID++ {
 		address, err := a.chainReader.GetDisperserAddress(ctx, disperserID)
 		if err != nil {
 			fmt.Printf("failed to preload disperser key for ID %d: %v\n", disperserID, err)
 			continue
 		}
-		
+
 		// If we get a zero address (0x0), stop preloading as this indicates no more valid dispersers
 		if address == (gethcommon.Address{}) {
 			break
 		}
-		
+
 		// Cache the key with timeout
 		a.keyCache.Add(disperserID, &keyWithTimeout{
 			key:        address,
