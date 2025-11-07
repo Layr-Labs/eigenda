@@ -843,6 +843,7 @@ func startController(
 	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		encodingManagerConfig,
+		time.Now,
 		metadataStore,
 		encodingPool,
 		encoderClient,

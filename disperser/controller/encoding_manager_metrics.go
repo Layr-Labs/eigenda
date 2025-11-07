@@ -25,6 +25,7 @@ type encodingManagerMetrics struct {
 	failedSubmissionCount   *prometheus.CounterVec
 	completedBlobs          *prometheus.CounterVec
 	blobSetSize             *prometheus.GaugeVec
+	staleDispersalCount     prometheus.Counter
 }
 
 // NewEncodingManagerMetrics sets up metrics for the encoding manager.
@@ -143,6 +144,14 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		[]string{},
 	)
 
+	staleDispersalCount := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: encodingManagerNamespace,
+			Name:      "stale_dispersal_discarded_total",
+			Help:      "The number of stale dispersals that were discarded.",
+		},
+	)
+
 	return &encodingManagerMetrics{
 		batchSubmissionLatency:  batchSubmissionLatency,
 		blobHandleLatency:       blobHandleLatency,
@@ -156,6 +165,7 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		failedSubmissionCount:   failSubmissionCount,
 		completedBlobs:          completedBlobs,
 		blobSetSize:             blobSetSize,
+		staleDispersalCount:     staleDispersalCount,
 	}
 }
 
@@ -217,4 +227,8 @@ func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.Blo
 
 func (m *encodingManagerMetrics) reportBlobSetSize(size int) {
 	m.blobSetSize.WithLabelValues().Set(float64(size))
+}
+
+func (m *encodingManagerMetrics) reportStaleDispersal() {
+	m.staleDispersalCount.Inc()
 }
