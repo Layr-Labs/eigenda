@@ -67,10 +67,6 @@ type EncodingManagerConfig struct {
 	//
 	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
 	// client at dispersal request creation time (in nanoseconds since Unix epoch).
-	//
-	// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used instead of including
-	// in this config + hardcoding. At that point, this field will be removed from the config struct entirely, and the
-	// value will be fetched dynamically at runtime.
 	MaxDispersalAge time.Duration
 }
 
