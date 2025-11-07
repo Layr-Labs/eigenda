@@ -72,6 +72,7 @@ func NewServerV2(
 		chunkAuthenticator, err = auth.NewRequestAuthenticator(
 			ctx,
 			reader,
+			logger,
 			config.DispersalAuthenticationKeyCacheSize,
 			config.DisperserKeyTimeout,
 			// TODO(litt3): once the checkpointed onchain config registry is ready, the authorized

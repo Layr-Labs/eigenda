@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
@@ -44,6 +45,9 @@ type requestAuthenticator struct {
 	// chainReader is used to read the chain state.
 	chainReader core.Reader
 
+	// logger is used for logging.
+	logger logging.Logger
+
 	// keyCache is used to cache the public keys of dispersers. The uint32 map keys are disperser IDs. Disperser
 	// IDs are serial numbers, with the original EigenDA disperser assigned ID 0. The map values contain
 	// the public key of the disperser and the time when the local cache of the key will expire.
@@ -64,6 +68,7 @@ type requestAuthenticator struct {
 func NewRequestAuthenticator(
 	ctx context.Context,
 	chainReader core.Reader,
+	logger logging.Logger,
 	keyCacheSize int,
 	keyTimeoutDuration time.Duration,
 	authorizedOnDemandDispersers []uint32,
@@ -82,6 +87,7 @@ func NewRequestAuthenticator(
 
 	authenticator := &requestAuthenticator{
 		chainReader:                  chainReader,
+		logger:                       logger,
 		keyCache:                     keyCache,
 		keyCacheCapacity:             keyCacheSize,
 		keyTimeoutDuration:           keyTimeoutDuration,
@@ -96,25 +102,31 @@ func NewRequestAuthenticator(
 	return authenticator, nil
 }
 
+// Preload disperser keys starting from ID 0 until we hit cache limit or resolve a default address 0x0
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
-	// Preload disperser keys starting from ID 0 until we hit cache limit or resolve a default address 0x0
 	for disperserID := uint32(0); disperserID < uint32(a.keyCacheCapacity); disperserID++ {
 		address, err := a.chainReader.GetDisperserAddress(ctx, disperserID)
 		if err != nil {
-			fmt.Printf("failed to preload disperser key for ID %d: %v\n", disperserID, err)
+			a.logger.Error("failed to preload disperser key", "disperserID", disperserID, "error", err)
 			continue
 		}
 
-		// If we get a zero address (0x0), stop preloading as this indicates no more valid dispersers
 		if address == (gethcommon.Address{}) {
+			if disperserID == 0 {
+				return fmt.Errorf("disperser registry is not initialized")
+			}
 			break
 		}
 
-		// Cache the key with timeout
 		a.keyCache.Add(disperserID, &keyWithTimeout{
 			key:        address,
 			expiration: now.Add(a.keyTimeoutDuration),
 		})
+		a.logger.Info("cached disperser key", "disperserID", disperserID, "address", address.Hex())
+	}
+
+	if a.keyCache.Len() == 0 {
+		return fmt.Errorf("disperser key cache is empty")
 	}
 
 	return nil
