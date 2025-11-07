@@ -142,7 +142,7 @@ func assertAttestationCorrectness(
 				expectedQuorumPubkeyAggregate.Add(operatorKeys[operatorID].GetPubKeyG1())
 			}
 
-			if !attestationToVerify.SignerMap[operatorID] {
+			if _, exists := attestationToVerify.SignerMap[operatorID]; !exists {
 				// the rest of the aggregates are only for signers
 				continue
 			}
