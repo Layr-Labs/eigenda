@@ -14,9 +14,6 @@ import (
 )
 
 // RequestAuthenticator authenticates requests to the DA node. This object is thread safe.
-//
-// This class has largely been future-proofed for decentralized dispersers, with the exception of the
-// preloadCache method, which will need to be updated to handle decentralized dispersers.
 type RequestAuthenticator interface {
 	// AuthenticateStoreChunksRequest authenticates a StoreChunksRequest, returning an error if the request is invalid.
 	// Returns the hash of the request and an error if the request is invalid.
@@ -53,9 +50,6 @@ type requestAuthenticator struct {
 	// the public key of the disperser and the time when the local cache of the key will expire.
 	keyCache *lru.Cache[uint32 /* disperser ID */, *keyWithTimeout]
 
-	// keyCacheCapacity is the maximum number of keys that can be cached.
-	keyCacheCapacity int
-
 	// keyTimeoutDuration is the duration for which a key is cached. After this duration, the key should be
 	// reloaded from the chain state in case the key has been changed.
 	keyTimeoutDuration time.Duration
@@ -89,48 +83,13 @@ func NewRequestAuthenticator(
 		chainReader:                  chainReader,
 		logger:                       logger,
 		keyCache:                     keyCache,
-		keyCacheCapacity:             keyCacheSize,
 		keyTimeoutDuration:           keyTimeoutDuration,
 		authorizedOnDemandDispersers: authorizedSet,
-	}
-
-	err = authenticator.preloadCache(ctx, now)
-	if err != nil {
-		return nil, fmt.Errorf("failed to preload cache: %w", err)
 	}
 
 	return authenticator, nil
 }
 
-// Preload disperser keys starting from ID 0 until we hit cache limit or resolve a default address 0x0
-func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
-	for disperserID := uint32(0); disperserID < uint32(a.keyCacheCapacity); disperserID++ {
-		address, err := a.chainReader.GetDisperserAddress(ctx, disperserID)
-		if err != nil {
-			a.logger.Error("failed to preload disperser key", "disperserID", disperserID, "error", err)
-			continue
-		}
-
-		if address == (gethcommon.Address{}) {
-			if disperserID == 0 {
-				return fmt.Errorf("disperser registry is not initialized")
-			}
-			break
-		}
-
-		a.keyCache.Add(disperserID, &keyWithTimeout{
-			key:        address,
-			expiration: now.Add(a.keyTimeoutDuration),
-		})
-		a.logger.Info("cached disperser key", "disperserID", disperserID, "address", address.Hex())
-	}
-
-	if a.keyCache.Len() == 0 {
-		return fmt.Errorf("disperser key cache is empty")
-	}
-
-	return nil
-}
 
 func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	ctx context.Context,
