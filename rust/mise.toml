@@ -1,0 +1,3 @@
+[tools]
+"cargo:cargo-deny" = { version = "latest", default-features = false }
+"cargo:cargo-machete" = { version = "latest", default-features = false }

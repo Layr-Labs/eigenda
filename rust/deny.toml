@@ -14,6 +14,10 @@ allow = [
   "Zlib",
   "BSD-3-Clause",
   "CC0-1.0",
+  "ISC",
+  "Unlicense",
+  "OpenSSL",
+  "CDLA-Permissive-2.0",
 ]
 
 [licenses.private]
