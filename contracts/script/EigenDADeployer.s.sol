@@ -21,6 +21,7 @@ import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {EigenDACertVerifierV2} from "src/integrations/cert/legacy/v2/EigenDACertVerifierV2.sol";
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
+import {EigenDAProofValidator} from "src/integrations/cert/arbitrum_customda/EigenDAProofValidator.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
@@ -65,6 +66,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     EigenDACertVerifierV2 public legacyEigenDACertVerifier;
     EigenDACertVerifier public eigenDACertVerifier;
     EigenDACertVerifierRouter public eigenDACertVerifierRouter;
+    EigenDAProofValidator public eigenDAProofValidator;
     EigenDARegistryCoordinator public registryCoordinator;
     IIndexRegistry public indexRegistry;
     IStakeRegistry public stakeRegistry;
@@ -405,6 +407,10 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 (addressConfig.eigenDACommunityMultisig, initABNs, initCertVerifiers)
             )
         );
+
+        eigenDAProofValidator = new EigenDAProofValidator(address(eigenDACertVerifierRouter));
+        eigenDADirectory.addAddress(AddressDirectoryConstants.ARB_PROOF_VALIDATOR_NAME, address(eigenDAProofValidator));
+
         eigenDARelayRegistryImplementation = new EigenDARelayRegistry();
 
         eigenDAProxyAdmin.upgradeAndCall(
