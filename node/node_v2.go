@@ -52,6 +52,8 @@ func (n *Node) DetermineChunkLocations(
 
 	relayRequests = make(map[corev2.RelayKey]*relayRequest)
 
+	totalAssignedChunks := uint32(0)
+
 	for i, cert := range batch.BlobCertificates {
 		blobKey, err := cert.BlobHeader.BlobKey()
 		if err != nil {
@@ -74,6 +76,7 @@ func (n *Node) DetermineChunkLocations(
 			n.Logger.Errorf("failed to get assignment: %v", err)
 			continue
 		}
+		totalAssignedChunks += assgn.NumChunks()
 
 		chunkLength, err := blobParams.GetChunkLength(uint32(cert.BlobHeader.BlobCommitments.Length))
 		if err != nil {
@@ -100,6 +103,18 @@ func (n *Node) DetermineChunkLocations(
 				assignment:     assgn,
 			})
 		}
+	}
+
+	// Sanity check: the download requests should request the proper number of chunks
+	totalRequestedChunks := uint32(0)
+	for _, req := range relayRequests {
+		for _, r := range req.chunkRequests {
+			totalRequestedChunks += r.End - r.Start
+		}
+	}
+	if totalRequestedChunks != totalAssignedChunks {
+		return 0, nil, fmt.Errorf("total requested chunks (%d) does not match total assigned chunks (%d)",
+			totalRequestedChunks, totalAssignedChunks)
 	}
 
 	return downloadSizeInBytes, relayRequests, nil
@@ -205,6 +220,7 @@ func (n *Node) DownloadChunksFromRelays(
 
 	probe.SetStage("deserialize")
 
+	deserializedChunkCount := 0
 	for i := 0; i < len(relayRequests); i++ {
 		resp := responses[i]
 		if resp.err != nil {
@@ -226,8 +242,21 @@ func (n *Node) DownloadChunksFromRelays(
 				return nil, nil, fmt.Errorf("failed to deserialize bundle: %v", err)
 			}
 			rawBundles[metadata.blobShardIndex].Bundle = bundle
-
+			deserializedChunkCount += len(bundle)
 		}
+	}
+
+	// Sanity check: ensure we deserialized the expected number of chunks
+	expectedChunkCount := 0
+	for _, req := range relayRequests {
+		for _, r := range req.chunkRequests {
+			expectedChunkCount += int(r.End - r.Start)
+		}
+	}
+	if deserializedChunkCount != expectedChunkCount {
+		return nil, nil,
+			fmt.Errorf("number of deserialized chunks (%d) does not match expected (%d)",
+				deserializedChunkCount, expectedChunkCount)
 	}
 
 	return blobShards, rawBundles, nil
@@ -247,5 +276,10 @@ func (n *Node) ValidateBatchV2(
 		return fmt.Errorf("failed to validate batch header: %v", err)
 	}
 	blobVersionParams := n.BlobVersionParams.Load()
-	return n.ValidatorV2.ValidateBlobs(ctx, blobShards, blobVersionParams, n.ValidationPool, operatorState)
+	err := n.ValidatorV2.ValidateBlobs(ctx, blobShards, blobVersionParams, n.ValidationPool, operatorState)
+	if err != nil {
+		return fmt.Errorf("failed to validate blobs for batch: %w", err)
+	}
+
+	return nil
 }
