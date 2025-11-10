@@ -636,6 +636,13 @@ var (
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_STORE_DURATION_BLOCKS"),
 	}
+	OverrideV2TtlFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "override-v2-ttl"),
+		Usage:    "Override the TTL for v2 chunks. 0 means no override.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_V2_TTL"),
+	}
 	// DO NOT set plain private key in flag in production.
 	// When test mode is enabled, the DA Node will take private BLS key from this flag.
 	TestPrivateBlsFlag = cli.StringFlag{
@@ -745,6 +752,7 @@ var optionalFlags = []cli.Flag{
 	ReservationMaxLedgersFlag,
 	PaymentVaultUpdateIntervalFlag,
 	EnablePerAccountPaymentMetricsFlag,
+	OverrideV2TtlFlag,
 }
 
 func init() {
