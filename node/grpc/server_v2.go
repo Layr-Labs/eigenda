@@ -72,15 +72,12 @@ func NewServerV2(
 		chunkAuthenticator, err = auth.NewRequestAuthenticator(
 			ctx,
 			reader,
+			logger,
 			config.DispersalAuthenticationKeyCacheSize,
 			config.DisperserKeyTimeout,
-			// TODO(litt3): this must be made configurable before additional dispersers can be added
-			func(id uint32) bool {
-				return id == api.EigenLabsDisperserID
-			},
 			// TODO(litt3): once the checkpointed onchain config registry is ready, the authorized
 			// on-demand dispersers should be read from there instead of being hardcoded.
-			[]uint32{api.EigenLabsDisperserID},
+			[]uint32{0}, // Default to disperser ID 0 for on-demand payments
 			time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create authenticator: %w", err)

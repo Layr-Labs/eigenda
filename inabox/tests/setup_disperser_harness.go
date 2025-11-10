@@ -874,6 +874,7 @@ func startController(
 	nodeClientManager, err := controller.NewNodeClientManager(
 		dispatcherConfig.NodeClientCacheSize,
 		requestSigner,
+		dispatcherConfig.DisperserID,
 		controllerLogger,
 	)
 	if err != nil {

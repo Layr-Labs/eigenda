@@ -28,6 +28,7 @@ type Config struct {
 	DispatcherConfig      controller.DispatcherConfig
 
 	DynamoDBTableName string
+	DisperserID       uint32
 
 	EthClientConfig                     geth.EthClientConfig
 	AwsClientConfig                     aws.ClientConfig
@@ -130,8 +131,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	awsClientConfig := aws.ReadClientConfig(ctx, flags.FlagPrefix)
+	disperserID := uint32(ctx.GlobalUint64(flags.DisperserIDFlag.Name))
 	config := Config{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+		DisperserID:                         disperserID,
 		EthClientConfig:                     ethClientConfig,
 		AwsClientConfig:                     aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		DisperserStoreChunksSigningDisabled: ctx.GlobalBool(flags.DisperserStoreChunksSigningDisabledFlag.Name),
@@ -156,16 +159,16 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxDispersalAge:             ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 		},
 		DispatcherConfig: controller.DispatcherConfig{
-			PullInterval:              ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
-			FinalizationBlockDelay:    ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
-			AttestationTimeout:        ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
-			BatchMetadataUpdatePeriod: ctx.GlobalDuration(flags.BatchMetadataUpdatePeriodFlag.Name),
-			BatchAttestationTimeout:   ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
-			SignatureTickInterval:     ctx.GlobalDuration(flags.SignatureTickIntervalFlag.Name),
-			NumRequestRetries:         ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
-			MaxBatchSize:              int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
-			SignificantSigningThresholdFraction: ctx.GlobalFloat64(
-				flags.SignificantSigningThresholdFractionFlag.Name),
+			PullInterval:                           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
+			DisperserID:                            disperserID,
+			FinalizationBlockDelay:                 ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
+			AttestationTimeout:                     ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
+			BatchMetadataUpdatePeriod:              ctx.GlobalDuration(flags.BatchMetadataUpdatePeriodFlag.Name),
+			BatchAttestationTimeout:                ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
+			SignatureTickInterval:                  ctx.GlobalDuration(flags.SignatureTickIntervalFlag.Name),
+			NumRequestRetries:                      ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
+			MaxBatchSize:                           int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
+			SignificantSigningThresholdFraction:    ctx.GlobalFloat64(flags.SignificantSigningThresholdFractionFlag.Name),
 			NumConcurrentRequests:                  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
 			NodeClientCacheSize:                    ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 			CollectDetailedValidatorSigningMetrics: ctx.GlobalBool(flags.DetailedValidatorMetricsFlag.Name),

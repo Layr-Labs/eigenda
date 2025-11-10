@@ -333,6 +333,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PER_ACCOUNT_PAYMENT_METRICS"),
 	}
+	DisperserIDFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-id"),
+		Usage:    "Unique identifier for this disperser instance. The value specified must match the index of the associated pubkey in the disperser registry",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_ID"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -345,6 +351,7 @@ var requiredFlags = []cli.Flag{
 	DispatcherPullIntervalFlag,
 	AttestationTimeoutFlag,
 	BatchAttestationTimeoutFlag,
+	DisperserIDFlag,
 }
 
 var optionalFlags = []cli.Flag{
