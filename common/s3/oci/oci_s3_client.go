@@ -144,6 +144,10 @@ func (c *ociS3Client) DownloadPartialObject(
 	endIndex int64,
 ) ([]byte, error) {
 
+	if startIndex < 0 || endIndex <= startIndex {
+		return nil, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", startIndex, endIndex)
+	}
+
 	rangeString := fmt.Sprintf("bytes=%d-%d", startIndex, endIndex-1)
 
 	getObjectRequest := objectstorage.GetObjectRequest{

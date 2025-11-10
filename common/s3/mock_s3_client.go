@@ -25,6 +25,7 @@ func NewMockS3Client() *MockS3Client {
 			"CreateBucket":             0,
 			"FragmentedUploadObject":   0,
 			"FragmentedDownloadObject": 0,
+			"DownloadPartialObject":    0,
 		},
 	}
 }
