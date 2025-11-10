@@ -868,6 +868,14 @@ func (d *Dispatcher) checkAndHandleStaleBlob(
 	if err != nil {
 		d.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
 	} else {
+		// Call beforeDispatch to clean up the blob from upstream encodingManager blobSet.
+		// Since the stale check occurs before beforeDispatch would normally be called,
+		// we must invoke it here to prevent orphaning the blob in the encoding manager's tracking.
+		if d.beforeDispatch != nil {
+			if err := d.beforeDispatch(blobKey); err != nil {
+				d.logger.Error("beforeDispatch cleanup failed for stale blob", "blobKey", blobKey.Hex(), "err", err)
+			}
+		}
 		d.blobSet.RemoveBlob(blobKey)
 	}
 
