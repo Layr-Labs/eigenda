@@ -42,7 +42,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
-	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
@@ -51,7 +50,6 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	geth_common "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -577,9 +575,9 @@ func buildPayloadDisperser(
 	registryCoordinatorAddr geth_common.Address,
 	registry *prometheus.Registry,
 ) (*payloaddispersal.PayloadDisperser, error) {
-	signer, err := buildLocalSigner(ctx, log, secrets, ethClient)
+	signer, err := auth.NewLocalBlobRequestSigner(secrets.SignerPaymentKey)
 	if err != nil {
-		return nil, fmt.Errorf("build local signer: %w", err)
+		return nil, fmt.Errorf("new local blob request signer: %w", err)
 	}
 
 	accountId, err := signer.GetAccountID()
@@ -660,42 +658,6 @@ func buildPayloadDisperser(
 	}
 
 	return payloadDisperser, nil
-}
-
-// buildLocalSigner attempts to check the pending balance of the created signer account. If the check fails, or if the
-// balance is determined to be 0, the user is warned with a log. This method doesn't return an error based on this
-// check:
-// it's possible that a user could want to set up a signer before it's actually ready to be used
-//
-// TODO: the checks performed in this method could be improved in the future, e.g. by checking payment vault state,
-// or by accessing the disperser accountant
-func buildLocalSigner(
-	ctx context.Context,
-	log logging.Logger,
-	secrets common.SecretConfigV2,
-	ethClient common_eigenda.EthClient,
-) (core_v2.BlobRequestSigner, error) {
-	signer, err := auth.NewLocalBlobRequestSigner(secrets.SignerPaymentKey)
-	if err != nil {
-		return nil, fmt.Errorf("new local blob request signer: %w", err)
-	}
-
-	accountID := crypto.PubkeyToAddress(signer.PrivateKey.PublicKey)
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	pendingBalance, err := ethClient.PendingBalanceAt(ctxWithTimeout, accountID)
-
-	switch {
-	case err != nil:
-		log.Errorf("get pending balance for accountID %v: %v", accountID, err)
-	case pendingBalance == nil:
-		log.Errorf(
-			"get pending balance for accountID %v didn't return an error, but pending balance is nil", accountID)
-	case pendingBalance.Sign() <= 0:
-		log.Warnf("pending balance for accountID %v is zero", accountID)
-	}
-
-	return signer, nil
 }
 
 // buildReservationLedger creates a reservation ledger for a given account
