@@ -220,7 +220,6 @@ func (n *Node) DownloadChunksFromRelays(
 
 	probe.SetStage("deserialize")
 
-	deserializedChunkCount := 0
 	for i := 0; i < len(relayRequests); i++ {
 		resp := responses[i]
 		if resp.err != nil {
@@ -242,21 +241,7 @@ func (n *Node) DownloadChunksFromRelays(
 				return nil, nil, fmt.Errorf("failed to deserialize bundle: %v", err)
 			}
 			rawBundles[metadata.blobShardIndex].Bundle = bundle
-			deserializedChunkCount++
 		}
-	}
-
-	// Sanity check: ensure we deserialized the expected number of chunks
-	expectedChunkCount := 0
-	for _, req := range relayRequests {
-		for _, r := range req.chunkRequests {
-			expectedChunkCount += int(r.End - r.Start)
-		}
-	}
-	if deserializedChunkCount != expectedChunkCount {
-		return nil, nil,
-			fmt.Errorf("number of deserialized chunks (%d) does not match expected (%d)",
-				deserializedChunkCount, expectedChunkCount)
 	}
 
 	return blobShards, rawBundles, nil
@@ -267,7 +252,7 @@ func (n *Node) ValidateBatchV2(
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
 	operatorState *core.OperatorState,
-) error {
+) error { 
 	if n.ValidatorV2 == nil {
 		return fmt.Errorf("store v2 is not set")
 	}
