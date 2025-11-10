@@ -733,7 +733,7 @@ func buildReservationLedger(
 		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
 		// instead of hardcoding. At that point, this field will be removed from the config struct
 		// entirely, and the value will be fetched dynamically at runtime.
-		30*time.Second,
+		60*time.Second,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger config: %w", err)

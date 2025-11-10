@@ -46,7 +46,7 @@ func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
 
 	reservationConfig := reservationvalidation.ReservationLedgerCacheConfig{
 		MaxLedgers:           1024,
-		BucketCapacityPeriod: 75 * time.Second,
+		BucketCapacityPeriod: 90 * time.Second,
 		OverfillBehavior:     ratelimit.OverfillOncePermitted,
 		UpdateInterval:       30 * time.Second,
 	}
