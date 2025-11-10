@@ -296,6 +296,8 @@ func (e *EncodingManager) checkAndHandleStaleBlob(
 	cancel()
 	if err != nil {
 		e.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
+	} else {
+		e.blobSet.RemoveBlob(blobKey)
 	}
 
 	return true
@@ -430,6 +432,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
 					return
 				}
+				e.blobSet.RemoveBlob(blobKey)
 				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed)
 			}
 		})
