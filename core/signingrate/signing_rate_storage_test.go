@@ -92,8 +92,12 @@ func TestSigningRateStorage(t *testing.T) {
 
 	rand := random.NewTestRandom()
 
-	dynamoClient, cleanup := test.GetOrDeployLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack()
+	require.NoError(t, err)
 	defer cleanup()
+
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err)
 
 	tableName := "TestSigningRateStorage"
 	storage, err := NewDynamoSigningRateStorage(t.Context(), dynamoClient, tableName)

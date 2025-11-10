@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"sync"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -15,33 +16,29 @@ import (
 
 const (
 	// used if DEPLOY_LOCALSTACK != "false"
-	DefaultLocalstackPort = "4573"
+	DefaultLocalstackPort = uint16(4573)
 )
 
 var (
-	logger       = GetLogger()
-	dynamoClient *dynamodb.Client
-	lock         sync.Mutex
+	logger         = GetLogger()
+	lock           sync.Mutex
+	localstackPort uint16
+	deployed       bool
 )
 
-// GetOrDeployLocalstack deploys a Localstack DynamoDB instance for testing,
-// returning existing client if already deployed. Returns a function that should be
-// called to clean up resources after tests complete.
-func GetOrDeployLocalstack() (*dynamodb.Client, func()) {
+// DeployDynamoLocalstack deploys a Localstack DynamoDB instance for testing.
+func DeployDynamoLocalstack() (func(), error) {
 	lock.Lock()
 	defer lock.Unlock()
 
-	// TODO: temporary thing to debug tests in CI
-	fmt.Printf("calling GetOrDeployLocalstack, client exists: %v\n", dynamoClient != nil)
-	debug.PrintStack()
+	if deployed {
+		// Already deployed somewhere else
+		return func() {
 
-	if dynamoClient != nil {
-		return dynamoClient, func() {
-			// If already deployed somewhere else, no cleanup needed here.
-		}
+		}, nil
 	}
 
-	localstackPort := DefaultLocalstackPort
+	localstackPort = DefaultLocalstackPort
 
 	var localstackContainer *testbed.LocalStackContainer
 
@@ -51,7 +48,7 @@ func GetOrDeployLocalstack() (*dynamodb.Client, func()) {
 		var err error
 		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 			ExposeHostPort: true,
-			HostPort:       localstackPort,
+			HostPort:       fmt.Sprintf("%d", localstackPort),
 			Services:       []string{"dynamodb"},
 			Logger:         logger,
 		})
@@ -60,15 +57,43 @@ func GetOrDeployLocalstack() (*dynamodb.Client, func()) {
 			logger.Fatal("Failed to start localstack container:", err)
 		}
 	} else {
-		// localstack is already deployed
-		localstackPort = os.Getenv("LOCALSTACK_PORT")
+		// assume localstack is already deployed
+		port, err := strconv.ParseUint(os.Getenv("LOCALSTACK_PORT"), 10, 16)
+		if err != nil {
+			logger.Fatal("Failed to parse LOCALSTACK_PORT:", err)
+		}
+		localstackPort = uint16(port)
+	}
+
+	deployed = true
+
+	return func() {
+		lock.Lock()
+		defer lock.Unlock()
+
+		// TODO: temporary thing to debug tests in CI
+		fmt.Printf("calling cleanup function in GetOrDeployLocalstack\n")
+		debug.PrintStack()
+
+		_ = localstackContainer.Terminate(ctx)
+		deployed = false
+	}, nil
+}
+
+// GetDynamoClient returns a DynamoDB client connected to Localstack for testing.
+func GetDynamoClient() (*dynamodb.Client, error) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	if !deployed {
+		return nil, fmt.Errorf("localstack not deployed; call DeployDynamoLocalstack first")
 	}
 
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%d", localstackPort),
 	}
 
 	awsConfig := aws.Config{
@@ -91,17 +116,12 @@ func GetOrDeployLocalstack() (*dynamodb.Client, func()) {
 				return aws.Endpoint{}, &aws.EndpointNotFoundError{}
 			}),
 	}
-	dynamoClient = dynamodb.NewFromConfig(awsConfig)
+	return dynamodb.NewFromConfig(awsConfig), nil
+}
 
-	return dynamoClient, func() {
-		lock.Lock()
-		defer lock.Unlock()
-
-		// TODO: temporary thing to debug tests in CI
-		fmt.Printf("calling cleanup function in GetOrDeployLocalstack\n")
-		debug.PrintStack()
-
-		_ = localstackContainer.Terminate(ctx)
-		dynamoClient = nil
-	}
+// GetLocalstackPort returns the port number where Localstack is running.
+func GetLocalstackPort() uint16 {
+	lock.Lock()
+	defer lock.Unlock()
+	return localstackPort
 }

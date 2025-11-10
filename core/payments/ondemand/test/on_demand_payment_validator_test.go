@@ -34,8 +34,12 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	dynamoClient, cleanup := test.GetOrDeployLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack()
+	require.NoError(t, err)
 	defer cleanup()
+
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err)
 
 	paymentValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
 		ctx,
@@ -81,8 +85,12 @@ func TestDebitInsufficientFunds(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	dynamoClient, cleanup := test.GetOrDeployLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack()
+	require.NoError(t, err)
 	defer cleanup()
+
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err)
 
 	paymentValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
 		ctx,

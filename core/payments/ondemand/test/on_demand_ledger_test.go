@@ -232,8 +232,12 @@ func TestOnDemandLedgerFromStore(t *testing.T) {
 // Creates a payment table and store for testing, returning the store and a cleanup function
 func createTestStore(t *testing.T, tableNameSuffix string) (*ondemand.CumulativePaymentStore, func()) {
 
-	dynamoClient, cleanupLocalstack := test.GetOrDeployLocalstack()
-	defer cleanupLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack()
+	require.NoError(t, err)
+	defer cleanup()
+
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err)
 
 	tableName := createPaymentTable(t, tableNameSuffix)
 	testAccountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -241,9 +245,9 @@ func createTestStore(t *testing.T, tableNameSuffix string) (*ondemand.Cumulative
 	require.NoError(t, err)
 	require.NotNil(t, store)
 
-	cleanup := func() {
+	cleanupFunc := func() {
 		deleteTable(t, tableName)
 	}
 
-	return store, cleanup
+	return store, cleanupFunc
 }

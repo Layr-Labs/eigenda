@@ -25,8 +25,12 @@ func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		dynamoClient, cleanup := test.GetOrDeployLocalstack()
+		cleanup, err := test.DeployDynamoLocalstack()
+		require.NoError(t, err)
 		defer cleanup()
+
+		dynamoClient, err := test.GetDynamoClient()
+		require.NoError(t, err)
 
 		cache, err := ondemandvalidation.NewOnDemandLedgerCache(
 			ctx,
@@ -85,8 +89,12 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	dynamoClient, cleanup := test.GetOrDeployLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack()
+	require.NoError(t, err)
 	defer cleanup()
+
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err)
 
 	ledgerCache, err := ondemandvalidation.NewOnDemandLedgerCache(
 		ctx,

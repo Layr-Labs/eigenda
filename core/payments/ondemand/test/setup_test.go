@@ -16,7 +16,11 @@ import (
 
 // TestMain sets up Localstack/Dynamo for all tests in the ondemand package and tears down after.
 func TestMain(m *testing.M) {
-	_, cleanup := test.GetOrDeployLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack()
+	if err != nil {
+		fmt.Println("Failed to deploy Localstack:", err)
+		os.Exit(1)
+	}
 	defer cleanup()
 
 	code := m.Run()
@@ -36,14 +40,14 @@ func createPaymentTable(t *testing.T, tableName string) string {
 	// Create local client config for table creation
 	localstackPort := test.DefaultLocalstackPort
 	if os.Getenv("DEPLOY_LOCALSTACK") == "false" {
-		localstackPort = os.Getenv("LOCALSTACK_PORT")
+		localstackPort = test.GetLocalstackPort()
 	}
 
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%d", localstackPort),
 	}
 
 	err := meterer.CreateOnDemandTable(clientConfig, fullTableName)
@@ -57,10 +61,10 @@ func deleteTable(t *testing.T, tableName string) {
 	t.Helper()
 	ctx := t.Context()
 
-	dynamoClient, cleanup := test.GetOrDeployLocalstack()
-	defer cleanup()
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err, "failed to get dynamo client")
 
-	_, err := dynamoClient.DeleteTable(ctx, &dynamodb.DeleteTableInput{
+	_, err = dynamoClient.DeleteTable(ctx, &dynamodb.DeleteTableInput{
 		TableName: aws.String(tableName),
 	})
 	require.NoError(t, err, "failed to delete table")
