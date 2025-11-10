@@ -628,7 +628,7 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 }
 
 func TestDispatcherFilterStaleBlobs(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now()
 
 	components := newDispatcherComponents(t)
@@ -672,6 +672,7 @@ func TestDispatcherFilterStaleBlobs(t *testing.T) {
 
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
+	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 
 	batchData, err := components.Dispatcher.NewBatch(ctx, nil)
