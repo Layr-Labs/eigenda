@@ -89,7 +89,6 @@ batchConfirmers = []
 confirmationThreshold = 55
 adversaryThreshold = 33
 quorumNumbersRequired = [0, 1]
-recencyWindow = 14400
 
 [initParams.eigenDA.disperser]
 dispersers = []

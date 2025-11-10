@@ -49,7 +49,6 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     bytes quorumConfirmationThresholdPercentages = hex"373737";
     bytes quorumNumbersRequired = hex"0001";
     DATypesV1.SecurityThresholds defaultSecurityThresholds = DATypesV1.SecurityThresholds(55, 33);
-    uint32 recencyWindow = 0;
 
     uint32 defaultReferenceBlockNumber = 100;
     uint32 defaultConfirmationBlockNumber = 1000;
@@ -179,8 +178,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             defaultSecurityThresholds,
-            quorumNumbersRequired,
-            recencyWindow
+            quorumNumbersRequired
         );
     }
 
