@@ -90,7 +90,6 @@ func NewRequestAuthenticator(
 	return authenticator, nil
 }
 
-
 func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	ctx context.Context,
 	request *grpc.StoreChunksRequest,
@@ -98,7 +97,7 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 
 	key, err := a.getDisperserKey(ctx, now, request.GetDisperserID())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get operator key: %w", err)
+		return nil, fmt.Errorf("failed to get disperser key: %w", err)
 	}
 
 	hash, err := VerifyStoreChunksRequest(*key, request)
