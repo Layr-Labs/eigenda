@@ -86,6 +86,13 @@ type DispatcherConfig struct {
 	// NodeClientCacheSize is the maximum number of node clients to cache for reuse.
 	// Must be at least 1.
 	NodeClientCacheSize int
+
+	// MaxDispersalAge is the maximum age a dispersal request can be before it is discarded.
+	// Dispersals older than this duration are marked as Failed and not processed.
+	//
+	// Age is determined by the BlobMetadata.RequestedAt field, which is set when the
+	// dispersal request is created (in nanoseconds since Unix epoch).
+	MaxDispersalAge time.Duration
 }
 
 var _ config.VerifiableConfig = &DispatcherConfig{}
@@ -127,6 +134,9 @@ func (c *DispatcherConfig) Verify() error {
 	if c.NodeClientCacheSize < 1 {
 		return fmt.Errorf("NodeClientCacheSize must be at least 1, got %d", c.NodeClientCacheSize)
 	}
+	if c.MaxDispersalAge <= 0 {
+		return fmt.Errorf("MaxDispersalAge must be positive, got %v", c.MaxDispersalAge)
+	}
 	return nil
 }
 
@@ -143,6 +153,7 @@ func DefaultDispatcherConfig() *DispatcherConfig {
 		SignificantSigningThresholdFraction: 0.55,
 		NumConcurrentRequests:               600,
 		NodeClientCacheSize:                 400,
+		MaxDispersalAge:                     45 * time.Second,
 	}
 }
 
@@ -156,6 +167,7 @@ type Dispatcher struct {
 	nodeClientManager NodeClientManager
 	logger            logging.Logger
 	metrics           *controllerMetrics
+	getNow            func() time.Time
 
 	cursor *blobstore.StatusIndexCursor
 
@@ -184,6 +196,7 @@ type batchData struct {
 
 func NewDispatcher(
 	config *DispatcherConfig,
+	getNow func() time.Time,
 	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	chainState core.IndexedChainState,
@@ -222,6 +235,7 @@ func NewDispatcher(
 		nodeClientManager: nodeClientManager,
 		logger:            logger.With("component", "Dispatcher"),
 		metrics:           metrics,
+		getNow:            getNow,
 
 		cursor:                 nil,
 		beforeDispatch:         beforeDispatch,
@@ -609,19 +623,36 @@ func (d *Dispatcher) logAttestationUpdate(batchHeaderHash string, quorumResults 
 		"quorumPercentages", quorumPercentagesBuilder.String())
 }
 
-func (d *Dispatcher) dedupBlobs(blobs []*v2.BlobMetadata) []*v2.BlobMetadata {
-	dedupedBlobs := make([]*v2.BlobMetadata, 0)
-	for _, blob := range blobs {
-		key, err := blob.BlobHeader.BlobKey()
+// Iterates over the input metadata slice, and returns a new slice with stale and duplicate metadatas filtered out
+func (d *Dispatcher) filterStaleAndDedupBlobs(
+	ctx context.Context,
+	inputMetadatas []*v2.BlobMetadata,
+) []*v2.BlobMetadata {
+	outputMetadatas := make([]*v2.BlobMetadata, 0, len(inputMetadatas))
+	now := d.getNow()
+
+	for _, metadata := range inputMetadatas {
+		blobKey, err := metadata.BlobHeader.BlobKey()
 		if err != nil {
-			d.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt)
+			d.logger.Errorf("compute blob key: %w", err)
+			// we must discard if we cannot compute key, since it's used for deduplication
 			continue
 		}
-		if !d.blobSet.Contains(key) {
-			dedupedBlobs = append(dedupedBlobs, blob)
+
+		if d.checkAndHandleStaleBlob(ctx, blobKey, now, time.Unix(0, int64(metadata.RequestedAt))) {
+			// discard stale blob
+			continue
 		}
+
+		if d.blobSet.Contains(blobKey) {
+			// discard duplicate blob
+			continue
+		}
+
+		outputMetadatas = append(outputMetadatas, metadata)
 	}
-	return dedupedBlobs
+
+	return outputMetadatas
 }
 
 // NewBatch creates a batch of blobs to dispatch
@@ -646,7 +677,7 @@ func (d *Dispatcher) NewBatch(
 		return nil, fmt.Errorf("failed to get blob metadata by status: %w", err)
 	}
 
-	blobMetadatas = d.dedupBlobs(blobMetadatas)
+	blobMetadatas = d.filterStaleAndDedupBlobs(ctx, blobMetadatas)
 	d.metrics.reportBlobSetSize(d.blobSet.Size())
 	if len(blobMetadatas) == 0 {
 		return nil, errNoBlobsToDispatch
@@ -805,6 +836,39 @@ func (d *Dispatcher) NewBatch(
 		OperatorState:   operatorState,
 		BatchSizeBytes:  batchSizeBytes,
 	}, nil
+}
+
+// Checks if a blob is older than MaxDispersalAge and handles it accordingly.
+// If the blob is stale, it increments metrics, logs a warning, and updates the database status to Failed.
+// Returns true if the blob is stale, otherwise false.
+func (d *Dispatcher) checkAndHandleStaleBlob(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	now time.Time,
+	dispersalTime time.Time,
+) bool {
+	dispersalAge := now.Sub(dispersalTime)
+
+	if dispersalAge <= d.MaxDispersalAge {
+		return false
+	}
+
+	d.metrics.reportStaleDispersal()
+
+	d.logger.Warnf(
+		"discarding stale dispersal: blobKey=%s dispersalAge=%s maxAge=%s dispersalTime=%s",
+		blobKey.Hex(),
+		dispersalAge.String(),
+		d.MaxDispersalAge.String(),
+		dispersalTime.Format(time.RFC3339),
+	)
+
+	err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
+	if err != nil {
+		d.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
+	}
+
+	return true
 }
 
 // GetOperatorState returns the operator state for the given quorums at the given block number

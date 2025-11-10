@@ -30,6 +30,7 @@ type controllerMetrics struct {
 	completedBlobs               *prometheus.CounterVec
 	attestation                  *prometheus.GaugeVec
 	blobSetSize                  *prometheus.GaugeVec
+	staleDispersalCount          prometheus.Counter
 	batchStageTimer              *common.StageTimer
 	sendToValidatorStageTimer    *common.StageTimer
 
@@ -204,6 +205,14 @@ func newControllerMetrics(
 		[]string{},
 	)
 
+	staleDispersalCount := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: controllerNamespace,
+			Name:      "stale_dispersal_count",
+			Help:      "Total number of dispersals discarded due to being stale.",
+		},
+	)
+
 	batchStageTimer := common.NewStageTimer(registry, controllerNamespace, "batch", false)
 	sendToValidatorStageTimer := common.NewStageTimer(
 		registry,
@@ -311,6 +320,7 @@ func newControllerMetrics(
 		completedBlobs:                  completedBlobs,
 		attestation:                     attestation,
 		blobSetSize:                     blobSetSize,
+		staleDispersalCount:             staleDispersalCount,
 		batchStageTimer:                 batchStageTimer,
 		sendToValidatorStageTimer:       sendToValidatorStageTimer,
 		minimumSigningThreshold:         minimumSigningThreshold,
@@ -422,6 +432,13 @@ func (m *controllerMetrics) reportBlobSetSize(size int) {
 		return
 	}
 	m.blobSetSize.WithLabelValues().Set(float64(size))
+}
+
+func (m *controllerMetrics) reportStaleDispersal() {
+	if m == nil {
+		return
+	}
+	m.staleDispersalCount.Inc()
 }
 
 func (m *controllerMetrics) reportLegacyAttestation(
