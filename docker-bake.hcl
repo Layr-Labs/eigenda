@@ -53,6 +53,7 @@ group "all" {
     "traffic-generator",
     "traffic-generator-v2",
     "controller",
+    "ejector",
     "relay",
     "blobapi",
     "proxy",
@@ -79,6 +80,7 @@ group "internal-release" {
     "traffic-generator-internal",
     "traffic-generator-v2-internal",
     "controller-internal",
+    "ejector-internal",
     "relay-internal",
     "blobapi-internal",
     "proxy-internal",
@@ -261,6 +263,22 @@ target "controller-internal" {
     "${REGISTRY}/eigenda-controller:${BUILD_TAG}",
     "${REGISTRY}/eigenda-controller:${GIT_SHA}",
     "${REGISTRY}/eigenda-controller:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
+target "ejector" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  target     = "ejector"
+  tags       = ["${REGISTRY}/${REPO}/ejector:${BUILD_TAG}"]
+}
+
+target "ejector-internal" {
+  inherits = ["ejector"]
+  tags     = [
+    "${REGISTRY}/eigenda-ejector:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-ejector:${GIT_SHA}",
+    "${REGISTRY}/eigenda-ejector:sha-${GIT_SHORT_SHA}"
   ]
 }
 
