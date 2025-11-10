@@ -514,10 +514,10 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// create stale blob
-	staleKey, staleHeader := newBlob(t, []core.QuorumID{0, 1})
+	// create blob with old UpdatedAt timestamp (will appear earlier in query results due to sorting)
+	oldTimestampKey, oldTimestampHeader := newBlob(t, []core.QuorumID{0, 1})
 	meta := &commonv2.BlobMetadata{
-		BlobHeader: staleHeader,
+		BlobHeader: oldTimestampHeader,
 		BlobStatus: commonv2.Encoded,
 		Expiry:     objs.blobMetadatas[0].Expiry,
 		NumRetries: 0,
@@ -525,14 +525,14 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	}
 	err = blobMetadataStore.PutBlobMetadata(ctx, meta)
 	require.NoError(t, err)
-	staleCert := &corev2.BlobCertificate{
-		BlobHeader: staleHeader,
+	oldTimestampCert := &corev2.BlobCertificate{
+		BlobHeader: oldTimestampHeader,
 		RelayKeys:  []corev2.RelayKey{0, 1, 2},
 	}
-	err = blobMetadataStore.PutBlobCertificate(ctx, staleCert, &encoding.FragmentInfo{})
+	err = blobMetadataStore.PutBlobCertificate(ctx, oldTimestampCert, &encoding.FragmentInfo{})
 	require.NoError(t, err)
 
-	// process another batch (excludes stale blob)
+	// process another batch (skips blob with old UpdatedAt due to cursor position)
 	batchData, err := components.Dispatcher.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	require.Len(t, batchData.Batch.BlobCertificates, 1)
@@ -540,14 +540,14 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[maxBatchSize], commonv2.GatheringSignatures)
 	require.NoError(t, err)
 
-	// cursor should be reset and pick up stale blob
+	// cursor resets to beginning and picks up blob with old UpdatedAt
 	newBatchData, err := components.Dispatcher.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	require.Len(t, batchData.Batch.BlobCertificates, 1)
-	require.Equal(t, staleKey, newBatchData.BlobKeys[0])
+	require.Equal(t, oldTimestampKey, newBatchData.BlobKeys[0])
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{batchData.BatchHeaderHash, batchData.BatchHeaderHash})
-	deleteBlobs(t, components.BlobMetadataStore, []corev2.BlobKey{staleKey}, [][32]byte{newBatchData.BatchHeaderHash})
+	deleteBlobs(t, components.BlobMetadataStore, []corev2.BlobKey{oldTimestampKey}, [][32]byte{newBatchData.BatchHeaderHash})
 }
 
 func TestDispatcherDedupBlobs(t *testing.T) {
@@ -622,6 +622,73 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 	verified, err = merkletree.VerifyProofUsing(hash[:], false, proof, [][]byte{merkleTree.Root()}, keccak256.New())
 	require.NoError(t, err)
 	require.True(t, verified)
+}
+
+func TestDispatcherFilterStaleBlobs(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+
+	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
+	staleBlobKey, staleBlobHeader := newBlobWithDispersalTime(t, now.Add(-time.Minute).UnixNano(), []core.QuorumID{0, 1})
+	freshBlobKey, freshBlobHeader := newBlobWithDispersalTime(t, now.UnixNano(), []core.QuorumID{0, 1})
+
+	staleMetadata := &commonv2.BlobMetadata{
+		BlobHeader: staleBlobHeader,
+		BlobStatus: commonv2.Encoded,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+	freshMetadata := &commonv2.BlobMetadata{
+		BlobHeader: freshBlobHeader,
+		BlobStatus: commonv2.Encoded,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+
+	err := blobMetadataStore.PutBlobMetadata(ctx, staleMetadata)
+	require.NoError(t, err)
+	err = blobMetadataStore.PutBlobMetadata(ctx, freshMetadata)
+	require.NoError(t, err)
+
+	staleCert := &corev2.BlobCertificate{
+		BlobHeader: staleBlobHeader,
+		RelayKeys:  []corev2.RelayKey{0, 1, 2},
+	}
+	freshCert := &corev2.BlobCertificate{
+		BlobHeader: freshBlobHeader,
+		RelayKeys:  []corev2.RelayKey{0, 1, 2},
+	}
+	err = blobMetadataStore.PutBlobCertificate(ctx, staleCert, &encoding.FragmentInfo{})
+	require.NoError(t, err)
+	err = blobMetadataStore.PutBlobCertificate(ctx, freshCert, &encoding.FragmentInfo{})
+	require.NoError(t, err)
+
+	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("Contains", mock.Anything).Return(false)
+	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+
+	batchData, err := components.Dispatcher.NewBatch(ctx, nil)
+	require.NoError(t, err)
+	require.NotNil(t, batchData)
+	require.Len(t, batchData.Batch.BlobCertificates, 1)
+	require.Equal(t, freshBlobKey, batchData.BlobKeys[0])
+
+	fetchedStaleMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, staleBlobKey)
+	require.NoError(t, err)
+	require.Equal(t, commonv2.Failed, fetchedStaleMetadata.BlobStatus)
+
+	fetchedFreshMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, freshBlobKey)
+	require.NoError(t, err)
+	require.Equal(t, commonv2.Encoded, fetchedFreshMetadata.BlobStatus)
+
+	components.BlobSet.AssertCalled(t, "AddBlob", freshBlobKey)
+	components.BlobSet.AssertNotCalled(t, "AddBlob", staleBlobKey)
+
+	deleteBlobs(t, components.BlobMetadataStore, []corev2.BlobKey{staleBlobKey, freshBlobKey}, [][32]byte{batchData.BatchHeaderHash})
 }
 
 type testObjects struct {

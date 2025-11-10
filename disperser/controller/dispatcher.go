@@ -90,8 +90,8 @@ type DispatcherConfig struct {
 	// MaxDispersalAge is the maximum age a dispersal request can be before it is discarded.
 	// Dispersals older than this duration are marked as Failed and not processed.
 	//
-	// Age is determined by the BlobMetadata.RequestedAt field, which is set when the
-	// dispersal request is created (in nanoseconds since Unix epoch).
+	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
+	// client at dispersal request creation time (in nanoseconds since Unix epoch).
 	MaxDispersalAge time.Duration
 }
 
@@ -639,7 +639,7 @@ func (d *Dispatcher) filterStaleAndDedupBlobs(
 			continue
 		}
 
-		if d.checkAndHandleStaleBlob(ctx, blobKey, now, time.Unix(0, int64(metadata.RequestedAt))) {
+		if d.checkAndHandleStaleBlob(ctx, blobKey, now, metadata.BlobHeader.PaymentMetadata.Timestamp) {
 			// discard stale blob
 			continue
 		}
@@ -845,8 +845,9 @@ func (d *Dispatcher) checkAndHandleStaleBlob(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	now time.Time,
-	dispersalTime time.Time,
+	dispersalTimestamp int64,
 ) bool {
+	dispersalTime := time.Unix(0, dispersalTimestamp)
 	dispersalAge := now.Sub(dispersalTime)
 
 	if dispersalAge <= d.MaxDispersalAge {
