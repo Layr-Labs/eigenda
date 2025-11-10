@@ -873,7 +873,7 @@ func (d *Dispatcher) checkAndHandleStaleBlob(
 		// we must invoke it here to prevent orphaning the blob in the encoding manager's tracking.
 		if d.beforeDispatch != nil {
 			if err := d.beforeDispatch(blobKey); err != nil {
-				d.logger.Error("beforeDispatch cleanup failed for stale blob", "blobKey", blobKey.Hex(), "err", err)
+				d.logger.Errorf("beforeDispatch cleanup failed for stale blob: blobKey=%s err=%w", blobKey.Hex(), err)
 			}
 		}
 		d.blobSet.RemoveBlob(blobKey)
