@@ -242,7 +242,7 @@ func (n *Node) DownloadChunksFromRelays(
 				return nil, nil, fmt.Errorf("failed to deserialize bundle: %v", err)
 			}
 			rawBundles[metadata.blobShardIndex].Bundle = bundle
-			deserializedChunkCount += len(bundle)
+			deserializedChunkCount++
 		}
 	}
 
