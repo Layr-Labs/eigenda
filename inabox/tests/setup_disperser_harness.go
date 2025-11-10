@@ -1265,6 +1265,7 @@ func startAPIServer(
 	// Note: meterer is nil when using controller-mediated payments, otherwise it's the legacy meterer
 	apiServer, err := apiserver.NewDispersalServerV2(
 		serverConfig,
+		time.Now,
 		blobStore,
 		metadataStore,
 		chainReader,
@@ -1273,6 +1274,8 @@ func startAPIServer(
 		kzgCommitter,
 		maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval,
+		45*time.Second, // maxDispersalAge
+		45*time.Second, // maxFutureDispersalTime
 		apiServerLogger,
 		metricsRegistry,
 		metricsConfig,
