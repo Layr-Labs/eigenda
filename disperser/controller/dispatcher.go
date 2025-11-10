@@ -867,6 +867,8 @@ func (d *Dispatcher) checkAndHandleStaleBlob(
 	err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
 	if err != nil {
 		d.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
+	} else {
+		d.blobSet.RemoveBlob(blobKey)
 	}
 
 	return true
