@@ -1,13 +1,18 @@
 package ondemandvalidation
 
 import (
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // Tracks metrics for the [OnDemandPaymentValidator]
 type OnDemandValidatorMetrics struct {
-	onDemandSymbols            prometheus.Histogram
+	// Although payments internally tracks things in symbols, the consumer of metrics wants to see things in bytes.
+	// For a histogram, it's actually not possible to automatically rename bucket labels in grafana, so using
+	// symbols here causes dashboards to be less intuitive.
+	onDemandBytes              prometheus.Histogram
 	onDemandSymbolsTotal       *prometheus.CounterVec
 	onDemandDispersalsTotal    *prometheus.CounterVec
 	onDemandInsufficientFunds  prometheus.Counter
@@ -26,15 +31,15 @@ func NewOnDemandValidatorMetrics(
 		return nil
 	}
 
-	symbols := promauto.With(registry).NewHistogram(
+	bytes := promauto.With(registry).NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
-			Name:      "on_demand_symbols",
+			Name:      "on_demand_bytes",
 			Subsystem: subsystem,
-			Help: "Distribution of symbol counts for successful on-demand payments. " +
-				"Counts reflect actual dispersed symbols, not billed symbols (which may be higher due to min size).",
+			Help: "Distribution of byte counts for successful on-demand payments. " +
+				"Counts reflect actual dispersed bytes, not billed bytes (which may be higher due to min size).",
 			// Buckets chosen to go from min to max blob sizes (128KiB -> 16MiB)
-			Buckets: prometheus.ExponentialBuckets(4096, 2, 8),
+			Buckets: prometheus.ExponentialBuckets(128*units.KiB, 2, 8),
 		},
 	)
 
@@ -87,7 +92,7 @@ func NewOnDemandValidatorMetrics(
 	)
 
 	return &OnDemandValidatorMetrics{
-		onDemandSymbols:            symbols,
+		onDemandBytes:              bytes,
 		onDemandSymbolsTotal:       symbolsTotal,
 		onDemandDispersalsTotal:    dispersalsTotal,
 		onDemandInsufficientFunds:  insufficientFunds,
@@ -102,7 +107,7 @@ func (m *OnDemandValidatorMetrics) RecordSuccess(accountID string, symbolCount u
 	if m == nil {
 		return
 	}
-	m.onDemandSymbols.Observe(float64(symbolCount))
+	m.onDemandBytes.Observe(float64(symbolCount) * encoding.BYTES_PER_SYMBOL)
 
 	// If per-account metrics are disabled, aggregate under "0x0"
 	labelValue := accountID
