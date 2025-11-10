@@ -547,7 +547,10 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	require.Equal(t, oldTimestampKey, newBatchData.BlobKeys[0])
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{batchData.BatchHeaderHash, batchData.BatchHeaderHash})
-	deleteBlobs(t, components.BlobMetadataStore, []corev2.BlobKey{oldTimestampKey}, [][32]byte{newBatchData.BatchHeaderHash})
+	deleteBlobs(t,
+		components.BlobMetadataStore,
+		[]corev2.BlobKey{oldTimestampKey},
+		[][32]byte{newBatchData.BatchHeaderHash})
 }
 
 func TestDispatcherDedupBlobs(t *testing.T) {
@@ -688,7 +691,10 @@ func TestDispatcherFilterStaleBlobs(t *testing.T) {
 	components.BlobSet.AssertCalled(t, "AddBlob", freshBlobKey)
 	components.BlobSet.AssertNotCalled(t, "AddBlob", staleBlobKey)
 
-	deleteBlobs(t, components.BlobMetadataStore, []corev2.BlobKey{staleBlobKey, freshBlobKey}, [][32]byte{batchData.BatchHeaderHash})
+	deleteBlobs(t,
+		components.BlobMetadataStore,
+		[]corev2.BlobKey{staleBlobKey, freshBlobKey},
+		[][32]byte{batchData.BatchHeaderHash})
 }
 
 type testObjects struct {
