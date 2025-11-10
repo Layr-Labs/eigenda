@@ -44,6 +44,8 @@ func DeployDynamoLocalstack() (func(), error) {
 
 	ctx := context.Background()
 
+	shouldTearDown := true
+
 	if os.Getenv("DEPLOY_LOCALSTACK") != "false" {
 		var err error
 		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
@@ -58,6 +60,7 @@ func DeployDynamoLocalstack() (func(), error) {
 		}
 	} else {
 		// assume localstack is already deployed
+		shouldTearDown = false
 		port, err := strconv.ParseUint(os.Getenv("LOCALSTACK_PORT"), 10, 16)
 		if err != nil {
 			logger.Fatal("Failed to parse LOCALSTACK_PORT:", err)
@@ -68,6 +71,11 @@ func DeployDynamoLocalstack() (func(), error) {
 	deployed = true
 
 	return func() {
+		if !shouldTearDown {
+			// If localstack was not deployed here, do not tear down here either.
+			return
+		}
+
 		lock.Lock()
 		defer lock.Unlock()
 

@@ -38,16 +38,11 @@ func createPaymentTable(t *testing.T, tableName string) string {
 	fullTableName := fmt.Sprintf("%s_%d", tableName, randomSuffix)
 
 	// Create local client config for table creation
-	localstackPort := test.DefaultLocalstackPort
-	if os.Getenv("DEPLOY_LOCALSTACK") == "false" {
-		localstackPort = test.GetLocalstackPort()
-	}
-
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%d", localstackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%d", test.GetLocalstackPort()),
 	}
 
 	err := meterer.CreateOnDemandTable(clientConfig, fullTableName)
