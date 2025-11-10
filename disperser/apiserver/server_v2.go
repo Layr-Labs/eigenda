@@ -61,6 +61,21 @@ type DispersalServerV2 struct {
 	maxNumSymbolsPerBlob        uint32
 	onchainStateRefreshInterval time.Duration
 
+	// MaxDispersalAge is the maximum age a dispersal request can be before it is rejected.
+	// Dispersals older than this duration are rejected by the API server at ingest.
+	//
+	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
+	// client at dispersal request creation time (in nanoseconds since Unix epoch).
+	MaxDispersalAge time.Duration
+
+	// MaxFutureDispersalTime is the maximum amount of time into the future a dispersal request can be
+	// before it is rejected. Dispersals with timestamps more than this duration in the future are rejected
+	// by the API server at ingest.
+	MaxFutureDispersalTime time.Duration
+
+	// getNow returns the current time
+	getNow func() time.Time
+
 	metricsConfig disperser.MetricsConfig
 	metrics       *metricsV2
 
@@ -89,6 +104,7 @@ type DispersalServerV2 struct {
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
+	getNow func() time.Time,
 	blobStore *blobstore.BlobStore,
 	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
@@ -97,6 +113,8 @@ func NewDispersalServerV2(
 	committer *committer.Committer,
 	maxNumSymbolsPerBlob uint32,
 	onchainStateRefreshInterval time.Duration,
+	maxDispersalAge time.Duration,
+	maxFutureDispersalTime time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
@@ -133,6 +151,15 @@ func NewDispersalServerV2(
 	if _logger == nil {
 		return nil, errors.New("logger is required")
 	}
+	if getNow == nil {
+		return nil, errors.New("getNow is required")
+	}
+	if maxDispersalAge <= 0 {
+		return nil, fmt.Errorf("maxDispersalAge must be positive (got: %v)", maxDispersalAge)
+	}
+	if maxFutureDispersalTime <= 0 {
+		return nil, fmt.Errorf("maxFutureDispersalTime must be positive (got: %v)", maxFutureDispersalTime)
+	}
 
 	logger := _logger.With("component", "DispersalServerV2")
 
@@ -158,6 +185,9 @@ func NewDispersalServerV2(
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
+		MaxDispersalAge:             maxDispersalAge,
+		MaxFutureDispersalTime:      maxFutureDispersalTime,
+		getNow:                      getNow,
 
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
