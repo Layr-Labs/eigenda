@@ -92,7 +92,7 @@ func TestSigningRateStorage(t *testing.T) {
 
 	rand := random.NewTestRandom()
 
-	cleanup, err := test.DeployDynamoLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
 	require.NoError(t, err)
 	defer cleanup()
 

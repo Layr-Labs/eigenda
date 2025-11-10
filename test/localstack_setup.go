@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
-	"strconv"
 	"sync"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -15,42 +14,31 @@ import (
 )
 
 const (
-	// used if DEPLOY_LOCALSTACK != "false"
-	DefaultLocalstackPort = uint16(4573)
+	LocalstackPort = uint16(4573)
 )
 
 var (
-	logger         = GetLogger()
-	lock           sync.Mutex
-	localstackPort uint16
-	deployed       bool
+	logger = GetLogger()
+	lock   sync.Mutex
 )
 
 // DeployDynamoLocalstack deploys a Localstack DynamoDB instance for testing.
-func DeployDynamoLocalstack() (func(), error) {
+func DeployDynamoLocalstack(ctx context.Context) (func(), error) {
 	lock.Lock()
 	defer lock.Unlock()
 
-	if deployed {
-		// Already deployed somewhere else
-		return func() {
-
-		}, nil
-	}
-
-	localstackPort = DefaultLocalstackPort
-
 	var localstackContainer *testbed.LocalStackContainer
-
-	ctx := context.Background()
-
 	shouldTearDown := true
+
+	// Unfortunately, we have to use environment variables to control this, because
+	// tests across different packages do not share state. This may cause race conditions,
+	// but that can't be helped with the current state of the testing framework.
 
 	if os.Getenv("DEPLOY_LOCALSTACK") != "false" {
 		var err error
 		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 			ExposeHostPort: true,
-			HostPort:       fmt.Sprintf("%d", localstackPort),
+			HostPort:       fmt.Sprintf("%d", LocalstackPort),
 			Services:       []string{"dynamodb"},
 			Logger:         logger,
 		})
@@ -61,18 +49,17 @@ func DeployDynamoLocalstack() (func(), error) {
 	} else {
 		// assume localstack is already deployed
 		shouldTearDown = false
-		port, err := strconv.ParseUint(os.Getenv("LOCALSTACK_PORT"), 10, 16)
-		if err != nil {
-			logger.Fatal("Failed to parse LOCALSTACK_PORT:", err)
-		}
-		localstackPort = uint16(port)
 	}
 
-	deployed = true
+	if os.Getenv("CI") != "false" {
+		// Special case: in CI environments, never tear down localstack.
+		shouldTearDown = false
+		_ = os.Setenv("DEPLOY_LOCALSTACK", "false")
+	}
 
 	return func() {
 		if !shouldTearDown {
-			// If localstack was not deployed here, do not tear down here either.
+			// If localstack was not deployed here, do not tear down here either
 			return
 		}
 
@@ -84,7 +71,6 @@ func DeployDynamoLocalstack() (func(), error) {
 		debug.PrintStack()
 
 		_ = localstackContainer.Terminate(ctx)
-		deployed = false
 	}, nil
 }
 
@@ -93,15 +79,11 @@ func GetDynamoClient() (*dynamodb.Client, error) {
 	lock.Lock()
 	defer lock.Unlock()
 
-	if !deployed {
-		return nil, fmt.Errorf("localstack not deployed; call DeployDynamoLocalstack first")
-	}
-
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%d", localstackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%d", LocalstackPort),
 	}
 
 	awsConfig := aws.Config{
@@ -125,11 +107,4 @@ func GetDynamoClient() (*dynamodb.Client, error) {
 			}),
 	}
 	return dynamodb.NewFromConfig(awsConfig), nil
-}
-
-// GetLocalstackPort returns the port number where Localstack is running.
-func GetLocalstackPort() uint16 {
-	lock.Lock()
-	defer lock.Unlock()
-	return localstackPort
 }

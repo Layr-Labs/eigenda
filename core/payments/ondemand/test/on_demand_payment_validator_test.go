@@ -34,7 +34,7 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	cleanup, err := test.DeployDynamoLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -85,7 +85,7 @@ func TestDebitInsufficientFunds(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	cleanup, err := test.DeployDynamoLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
 	require.NoError(t, err)
 	defer cleanup()
 

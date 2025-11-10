@@ -1,6 +1,7 @@
 package ondemand_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -16,7 +17,7 @@ import (
 
 // TestMain sets up Localstack/Dynamo for all tests in the ondemand package and tears down after.
 func TestMain(m *testing.M) {
-	cleanup, err := test.DeployDynamoLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack(context.Background())
 	if err != nil {
 		fmt.Println("Failed to deploy Localstack:", err)
 		os.Exit(1)
@@ -42,7 +43,7 @@ func createPaymentTable(t *testing.T, tableName string) string {
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%d", test.GetLocalstackPort()),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%d", test.LocalstackPort),
 	}
 
 	err := meterer.CreateOnDemandTable(clientConfig, fullTableName)

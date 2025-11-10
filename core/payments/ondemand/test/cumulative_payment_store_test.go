@@ -19,7 +19,7 @@ func TestConstructor(t *testing.T) {
 	require.Error(t, err, "nil client should error")
 	require.Nil(t, store)
 
-	cleanup, err := test.DeployDynamoLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -39,7 +39,7 @@ func TestStoreCumulativePaymentInputValidation(t *testing.T) {
 	tableName := createPaymentTable(t, "StoreInputValidation")
 	defer deleteTable(t, tableName)
 
-	cleanup, err := test.DeployDynamoLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -63,7 +63,7 @@ func TestStoreThenGet(t *testing.T) {
 	tableName := createPaymentTable(t, "StoreThenGet")
 	defer deleteTable(t, tableName)
 
-	cleanup, err := test.DeployDynamoLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -99,7 +99,7 @@ func TestStoreThenGet(t *testing.T) {
 func TestDifferentAddresses(t *testing.T) {
 	tableName := createPaymentTable(t, "DifferentAddresses")
 	defer deleteTable(t, tableName)
-	cleanup, err := test.DeployDynamoLocalstack()
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
 	require.NoError(t, err)
 	defer cleanup()
 
