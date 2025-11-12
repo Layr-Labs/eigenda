@@ -56,22 +56,24 @@ type Config struct {
 	EnableTestMode                  bool
 	OverrideBlockStaleMeasure       uint64
 	OverrideStoreDurationBlocks     uint64
-	QuorumIDList                    []core.QuorumID
-	DbPath                          string
-	LogPath                         string
-	ID                              core.OperatorID
-	EigenDADirectory                string
-	PubIPProviders                  []string
-	PubIPCheckInterval              time.Duration
-	ChurnerUrl                      string
-	DataApiUrl                      string
-	NumBatchValidators              int
-	NumBatchDeserializationWorkers  int
-	EnableGnarkBundleEncoding       bool
-	ClientIPHeader                  string
-	ChurnerUseSecureGrpc            bool
-	RelayUseSecureGrpc              bool
-	RelayMaxMessageSize             uint
+	// If set, overrides the default TTL for v2 chunks
+	OverrideV2Ttl                  time.Duration
+	QuorumIDList                   []core.QuorumID
+	DbPath                         string
+	LogPath                        string
+	ID                             core.OperatorID
+	EigenDADirectory               string
+	PubIPProviders                 []string
+	PubIPCheckInterval             time.Duration
+	ChurnerUrl                     string
+	DataApiUrl                     string
+	NumBatchValidators             int
+	NumBatchDeserializationWorkers int
+	EnableGnarkBundleEncoding      bool
+	ClientIPHeader                 string
+	ChurnerUseSecureGrpc           bool
+	RelayUseSecureGrpc             bool
+	RelayMaxMessageSize            uint
 	// The number of connections to establish with each relay node.
 	RelayConnectionPoolSize        uint
 	ReachabilityPollIntervalSec    uint64
@@ -438,6 +440,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LevelDBDisableSeeksCompactionV1:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV1Flag.Name),
 		LevelDBSyncWritesV1:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV1Flag.Name),
 		OverrideStoreDurationBlocks:         ctx.GlobalUint64(flags.OverrideStoreDurationBlocksFlag.Name),
+		OverrideV2Ttl:                       ctx.GlobalDuration(flags.OverrideV2TtlFlag.Name),
 		QuorumIDList:                        ids,
 		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),
 		EthClientConfig:                     ethClientConfig,
