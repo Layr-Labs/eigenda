@@ -42,6 +42,7 @@ build: protoc contract-bindings
 	$(MAKE) -C relay build
 	$(MAKE) -C litt build
 	$(MAKE) -C api/proxy build
+	$(MAKE) -C ejector build
 
 clean:
 	$(MAKE) -C api clean
@@ -54,6 +55,7 @@ clean:
 	$(MAKE) -C relay clean
 	$(MAKE) -C litt clean
 	$(MAKE) -C api/proxy clean
+	$(MAKE) -C ejector clean
 	$(MAKE) -C contracts clean
 
 # Compiles the contracts and builds the golang bindings.

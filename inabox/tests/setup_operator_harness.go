@@ -222,7 +222,7 @@ func (oh *OperatorHarness) startOperator(
 		var err error
 		reservationLedgerCacheConfig, err = reservationvalidation.NewReservationLedgerCacheConfig(
 			1024,
-			90*time.Second,
+			120*time.Second,
 			ratelimit.OverfillOncePermitted,
 			1*time.Second, // Matches controller and API server update interval
 		)
@@ -300,6 +300,7 @@ func (oh *OperatorHarness) startOperator(
 		GRPCMsgSizeLimitV2:                  1024 * 1024 * 300,
 		EnablePaymentValidation:             oh.testConfig.UseNewPayments,
 		ReservationLedgerCacheConfig:        reservationLedgerCacheConfig,
+		EnablePerAccountPaymentMetrics:      false,
 	}
 
 	// Create operator logger

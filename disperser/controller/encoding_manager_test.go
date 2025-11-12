@@ -467,6 +467,7 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	c := newTestComponents(t, false)
 	c.BlobSet.On("Contains", mock.Anything).Return(false)
 	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+	c.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Twice()
 
 	// start a goroutine to collect heartbeats
@@ -545,6 +546,7 @@ func TestEncodingManagerFilterStaleBlobs(t *testing.T) {
 	c := newTestComponents(t, false)
 	c.BlobSet.On("Contains", mock.Anything).Return(false)
 	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+	c.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
 		FragmentSizeBytes:   1024 * 1024 * 4,
@@ -565,6 +567,7 @@ func TestEncodingManagerFilterStaleBlobs(t *testing.T) {
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 1)
 	c.BlobSet.AssertCalled(t, "AddBlob", freshBlobKey)
 	c.BlobSet.AssertNotCalled(t, "AddBlob", staleBlobKey)
+	c.BlobSet.AssertCalled(t, "RemoveBlob", staleBlobKey)
 
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{staleBlobKey, freshBlobKey}, nil)
 }

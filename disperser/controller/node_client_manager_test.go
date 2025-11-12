@@ -16,7 +16,7 @@ func TestNodeClientManager(t *testing.T) {
 	require.NoError(t, err)
 	requestSigner := mock.NewStaticRequestSigner(private)
 
-	m, err := controller.NewNodeClientManager(2, requestSigner, nil)
+	m, err := controller.NewNodeClientManager(2, requestSigner, 0, nil)
 	require.NoError(t, err)
 
 	client0, err := m.GetClient("localhost", "0000")

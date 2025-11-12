@@ -416,7 +416,7 @@ func TestNewLocalDispersalRequestSignerErrors(t *testing.T) {
 
 func TestDefaultDispersalRequestSignerConfig(t *testing.T) {
 	config := DefaultDispersalRequestSignerConfig()
-	
+
 	require.Equal(t, "us-east-1", config.Region, "default region should be us-east-1")
 	require.Equal(t, "", config.Endpoint, "default endpoint should be empty")
 	require.Equal(t, "", config.KeyID, "default KeyID should be empty")
@@ -640,7 +640,7 @@ func TestKMSSignerEdgeCases(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to create KMS signer")
 
-	// Note: nil request test omitted as it would cause panic in hashing function, 
+	// Note: nil request test omitted as it would cause panic in hashing function,
 	// which is expected behavior (caller should not pass nil)
 
 	// Test with cancelled context
@@ -659,7 +659,7 @@ func TestKMSSignerEdgeCases(t *testing.T) {
 
 func TestLocalSignerEdgeCases(t *testing.T) {
 	ctx := t.Context()
-	
+
 	// Generate a private key for testing
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err, "failed to generate test private key")
@@ -670,7 +670,7 @@ func TestLocalSignerEdgeCases(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to create local signer")
 
-	// Note: nil request test omitted as it would cause panic in hashing function, 
+	// Note: nil request test omitted as it would cause panic in hashing function,
 	// which is expected behavior (caller should not pass nil)
 
 	// Test with cancelled context (should still work for local signing)

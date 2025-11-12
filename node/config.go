@@ -211,8 +211,9 @@ type Config struct {
 	// TODO(litt3): This is a temporary field, which will be removed once the new payments system is fully in place.
 	// Payment validation is currently optional to make implementation and testing possible before actually shipping
 	// the new payments system.
-	EnablePaymentValidation      bool
-	ReservationLedgerCacheConfig reservationvalidation.ReservationLedgerCacheConfig
+	EnablePaymentValidation        bool
+	ReservationLedgerCacheConfig   reservationvalidation.ReservationLedgerCacheConfig
+	EnablePerAccountPaymentMetrics bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -403,7 +404,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
 			// instead of hardcoding. At that point, this field will be removed from the config struct
 			// entirely, and the value will be fetched dynamically at runtime.
-			90*time.Second,
+			120*time.Second,
 			// this is hardcoded: it's a parameter just in case, but it's never expected to change
 			ratelimit.OverfillOncePermitted,
 			ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),
@@ -494,5 +495,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		IgnoreVersionForEjectionDefense: ctx.GlobalBool(flags.IgnoreVersionForEjectionDefenseFlag.Name),
 		EnablePaymentValidation:         paymentValidationEnabled,
 		ReservationLedgerCacheConfig:    reservationLedgerCacheConfig,
+		EnablePerAccountPaymentMetrics:  ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
 	}, nil
 }

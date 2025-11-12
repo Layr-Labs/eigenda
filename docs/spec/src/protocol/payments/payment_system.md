@@ -67,13 +67,10 @@ dispersals from the dishonest client to the rate of the reservation, and no addi
 expected latency of the system. Specifically:
 `validatorBucketCapacity - clientBucketCapacity = reservationRate * maxSystemLatency`
 - This ensures that honest clients operating at full capacity won't be rejected due to timing discrepancies.
-- Proposed bucket sizing (actual configuration may vary): Client buckets will use 1 minute duration while validator
-buckets use 6 minutes, accommodating up to 5 minutes of system latency.
-- Validators may potentially be configured to leak buckets slightly faster (e.g., 1% faster) than the actual reservation
-rate. This causes validator bucket states to converge toward empty for honest clients operating within their reservation
-limits, as the faster leak rate ensures buckets tracked by the validators drain over time.
-   - The trade-off is that dishonest clients could potentially disperse up to 1% more data than their allotted
-   reservation.
+- Current bucket size configuration: 
+   - Client buckets use a duration of 1 minute.
+   - Disperser buckets use a duration of 1.5 minutes.
+   - Validator buckets use a duration of 2 minutes, accommodating up to 1 minute of system latency.
 
 #### 2.1.3 Leaky Bucket Overfill
 

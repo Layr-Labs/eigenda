@@ -57,7 +57,7 @@ func (pv *OnDemandPaymentValidator) Debit(
 
 	_, err = ledger.Debit(ctx, symbolCount, quorumNumbers)
 	if err == nil {
-		pv.metrics.RecordSuccess(symbolCount)
+		pv.metrics.RecordSuccess(accountID.Hex(), symbolCount)
 		return nil
 	}
 

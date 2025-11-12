@@ -178,6 +178,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
+			time.Now,
 			blobStore,
 			blobMetadataStore,
 			transactor,
@@ -186,6 +187,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 			committer,
 			config.MaxNumSymbolsPerBlob,
 			config.OnchainStateRefreshInterval,
+			config.MaxDispersalAge,
+			config.MaxFutureDispersalTime,
 			logger,
 			reg,
 			config.MetricsConfig,

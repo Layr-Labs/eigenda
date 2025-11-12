@@ -20,8 +20,9 @@ import (
 
 // PaymentAuthorizationConfig contains configuration for building a payment authorization handler
 type PaymentAuthorizationConfig struct {
-	OnDemandConfig    ondemandvalidation.OnDemandLedgerCacheConfig
-	ReservationConfig reservationvalidation.ReservationLedgerCacheConfig
+	OnDemandConfig                 ondemandvalidation.OnDemandLedgerCacheConfig
+	ReservationConfig              reservationvalidation.ReservationLedgerCacheConfig
+	EnablePerAccountPaymentMetrics bool
 }
 
 // Verify validates the PaymentAuthorizationConfig
@@ -45,14 +46,15 @@ func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
 
 	reservationConfig := reservationvalidation.ReservationLedgerCacheConfig{
 		MaxLedgers:           1024,
-		BucketCapacityPeriod: 75 * time.Second,
+		BucketCapacityPeriod: 90 * time.Second,
 		OverfillBehavior:     ratelimit.OverfillOncePermitted,
 		UpdateInterval:       30 * time.Second,
 	}
 
 	return &PaymentAuthorizationConfig{
-		OnDemandConfig:    onDemandConfig,
-		ReservationConfig: reservationConfig,
+		OnDemandConfig:                 onDemandConfig,
+		ReservationConfig:              reservationConfig,
+		EnablePerAccountPaymentMetrics: true,
 	}
 }
 
@@ -112,6 +114,7 @@ func BuildPaymentAuthorizationHandler(
 			metricsRegistry,
 			"eigenda_controller",
 			"authorize_payments",
+			config.EnablePerAccountPaymentMetrics,
 		)
 		onDemandCacheMetrics = ondemandvalidation.NewOnDemandCacheMetrics(
 			metricsRegistry,
@@ -141,6 +144,7 @@ func BuildPaymentAuthorizationHandler(
 			metricsRegistry,
 			"eigenda_controller",
 			"authorize_payments",
+			config.EnablePerAccountPaymentMetrics,
 		)
 		reservationCacheMetrics = reservationvalidation.NewReservationCacheMetrics(
 			metricsRegistry,
