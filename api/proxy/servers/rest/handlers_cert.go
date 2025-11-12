@@ -205,7 +205,7 @@ func (svr *Server) handlePostShared(
 		return fmt.Errorf("post request failed: %w", err)
 	}
 
-	responseCommit, err := commitments.EncodeCommitment(*versionedCert, mode)
+	responseCommit, err := commitments.EncodeCommitment(versionedCert, mode)
 	if err != nil {
 		// This error is only possible if we have a bug in the code.
 		return fmt.Errorf("failed to encode DA Commitment %v: %w", versionedCert.SerializedCert, err)
