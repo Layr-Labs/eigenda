@@ -223,7 +223,7 @@ func (n *Node) DownloadChunksFromRelays(
 
 	probe.SetStage("deserialize")
 
-	for i := 0; i < len(relayRequests); i++ {
+	for i := 0; i < len(responses); i++ {
 		resp := responses[i]
 		if resp.err != nil {
 			// TODO (cody-littley) this is flaky, and will fail if any relay fails. We should retry failures

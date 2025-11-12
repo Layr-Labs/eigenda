@@ -428,7 +428,7 @@ func gatherChunkDataToSend(
 			// This is easy to do with an index request, since an index request allows non-contiguous chunks
 			// to be requested. But range queries require contiguous chunks, so we may receive multiple range requests
 			// for the same blob. In order to avoid breaking tricky validation logic, it is simpler to just group
-			// all range requests for the same blob together here.
+			// all range requests for the same blob together into a single "bundle" (aka a binary object with chunks).
 
 			rangeRequests := make([]*pb.ChunkRequestByRange, 0)
 			rangeRequests = append(rangeRequests, nextRequest.GetByRange())
