@@ -229,6 +229,7 @@ func RunController(cliCtx *cli.Context) error {
 
 	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,
+		time.Now,
 		blobMetadataStore,
 		dispatcherPool,
 		ics,
