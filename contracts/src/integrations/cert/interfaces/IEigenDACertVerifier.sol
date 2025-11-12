@@ -24,8 +24,4 @@ interface IEigenDACertVerifier {
 
     /// @notice Returns the quorum numbers required in bytes format for certificate verification.
     function quorumNumbersRequired() external view returns (bytes memory);
-
-    /// @notice Returns the recency window for certificate verification.
-    ///         This is only present in CertVerifier with semver >= 3.2.0.
-    function recencyWindow() external view returns (uint32);
 }
