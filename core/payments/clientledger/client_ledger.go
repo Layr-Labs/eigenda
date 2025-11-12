@@ -106,6 +106,12 @@ func NewClientLedger(
 			clientLedger.GetAccountsToUpdate,
 			clientLedger.UpdateReservation)
 		enforce.NilError(err, "new reservation vault monitor")
+
+		// record initial values, so that metrics start out accurate
+		clientLedger.accountantMetricer.RecordReservationBucketCapacity(
+			clientLedger.reservationLedger.GetBucketCapacity())
+		clientLedger.accountantMetricer.RecordReservationPayment(
+			clientLedger.reservationLedger.GetRemainingCapacity())
 	}
 
 	if clientLedger.onDemandLedger != nil {
@@ -118,6 +124,12 @@ func NewClientLedger(
 			clientLedger.GetAccountsToUpdate,
 			clientLedger.UpdateTotalDeposit)
 		enforce.NilError(err, "new on demand vault monitor")
+
+		// record initial values, so that metrics start out accurate
+		clientLedger.accountantMetricer.RecordOnDemandTotalDeposits(
+			clientLedger.onDemandLedger.GetTotalDeposits())
+		clientLedger.accountantMetricer.RecordCumulativePayment(
+			clientLedger.onDemandLedger.GetCumulativePayment())
 	}
 
 	return clientLedger
