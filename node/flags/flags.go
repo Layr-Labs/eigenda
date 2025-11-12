@@ -636,7 +636,7 @@ var (
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_STORE_DURATION_BLOCKS"),
 	}
-	OverrideV2TtlFlag = cli.Uint64Flag{
+	OverrideV2TtlFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "override-v2-ttl"),
 		Usage:    "Override the TTL for v2 chunks. 0 means no override.",
 		Required: false,
