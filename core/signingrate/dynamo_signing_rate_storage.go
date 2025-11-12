@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -109,20 +110,20 @@ import (
 const (
 	// DynamoDB attribute names - these define the column names in our table
 	attrStartTimestamp = "StartTimestamp" // Primary key: when the bucket started (unique identifier)
-	attrPayloadType    = "PayloadType"    // Artificial partition key for Global Secondary Index queries (always "Payload")
+	attrPartitionKey   = "PartitionKey"   // Artificial partition key for Global Secondary Index queries
 	attrEndTimestamp   = "EndTimestamp"   // When the bucket ended (used for range queries)
 	attrPayload        = "Payload"        // The serialized protobuf data
 
 	// Global Secondary Index name - allows us to query by EndTimestamp ranges
-	// DynamoDB requires a partition key for all queries, so we use PayloadType as a dummy partition
+	// DynamoDB requires a partition key for all queries, so we use PartitionKey as a dummy partition
 	endTimestampIndex = "EndTimestampIndex"
-	payloadTypeValue  = "Payload" // Constant value for the dummy partition key
+	partitionKeyValue = "X`" // Constant value for the dummy partition key
 
-	// DynamoDB expression placeholders - these are security tokens that prevent injection attacks
+	// DynamoDB expression placeholders - these are security tokens that prevent injection attacks.
 	// DynamoDB requires all values in expressions to be parameterized using these placeholders
 	placeholderPayload      = ":payload"
 	placeholderEndTimestamp = ":endTimestamp"
-	placeholderPayloadType  = ":payloadType"
+	placeholderPartitionKey = ":partitionKey"
 	placeholderStart        = ":start"
 )
 
@@ -130,6 +131,7 @@ var _ SigningRateStorage = (*dynamoSigningRateStorage)(nil)
 
 // A DynamoDB implementation of the SigningRateStorage interface.
 type dynamoSigningRateStorage struct {
+	logger       logging.Logger
 	dynamoClient *dynamodb.Client
 	tableName    *string
 }
@@ -137,6 +139,7 @@ type dynamoSigningRateStorage struct {
 // Create a new DynamoDB-backed SigningRateStorage.
 func NewDynamoSigningRateStorage(
 	ctx context.Context,
+	logger logging.Logger,
 	dynamoClient *dynamodb.Client,
 	tableName string,
 ) (SigningRateStorage, error) {
@@ -149,6 +152,7 @@ func NewDynamoSigningRateStorage(
 	}
 
 	s := &dynamoSigningRateStorage{
+		logger:       logger,
 		dynamoClient: dynamoClient,
 		tableName:    aws.String(tableName),
 	}
@@ -172,7 +176,6 @@ func (d *dynamoSigningRateStorage) StoreBuckets(ctx context.Context, buckets []*
 
 func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *validator.SigningRateBucket) error {
 
-	// Create the primary key for this bucket (StartTimestamp)
 	key := getDynamoBucketKey(bucket)
 
 	// Serialize the bucket data as protobuf bytes for storage
@@ -181,32 +184,23 @@ func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *vali
 		return fmt.Errorf("proto marshal failed: %w", err)
 	}
 
-	// Note: PayloadType is a dummy partition key required for Global Secondary Index queries.
-	// DynamoDB requires all queries to specify a partition key, but we want to query by EndTimestamp ranges.
-	// So we create an artificial partition key that's always the same value ("Payload").
-
 	// Use UpdateItem instead of PutItem because it creates the item if it doesn't exist,
-	// or updates it if it does exist (upsert behavior).
+	// or updates it if it does exist.
 	_, err = d.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: d.tableName,
 		Key:       key, // Primary key: {StartTimestamp: "00000001234567890"}
 
 		// SET expression updates/creates the specified attributes
-		// This is DynamoDB's expression language for atomic updates
 		UpdateExpression: aws.String(fmt.Sprintf("SET %s = %s, %s = %s, %s = %s",
-			attrPayload, placeholderPayload, // Store serialized bucket data
-			attrEndTimestamp, placeholderEndTimestamp, // Store end timestamp for range queries
-			attrPayloadType, placeholderPayloadType)), // Store dummy partition key for Global Secondary Index
+			attrPayload, placeholderPayload,
+			attrEndTimestamp, placeholderEndTimestamp,
+			attrPartitionKey, placeholderPartitionKey)),
 
-		// Map placeholder tokens to actual values - this prevents injection attacks
-		// and allows DynamoDB to optimize the query
+		// Map placeholder tokens to actual values.
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			// Binary data type for protobuf bytes
-			placeholderPayload: &types.AttributeValueMemberB{Value: value},
-			// String data type for timestamp (zero-padded for lexicographical sorting)
+			placeholderPayload:      &types.AttributeValueMemberB{Value: value},
 			placeholderEndTimestamp: &types.AttributeValueMemberS{Value: timestampToString(bucket.GetEndTimestamp())},
-			// String data type for dummy partition key
-			placeholderPayloadType: &types.AttributeValueMemberS{Value: payloadTypeValue},
+			placeholderPartitionKey: &types.AttributeValueMemberS{Value: partitionKeyValue},
 		},
 	})
 
@@ -217,14 +211,10 @@ func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *vali
 }
 
 // Get the DynamoDB key for a given bucket. The primary key for a bucket is its starting timestamp.
-// getDynamoBucketKey creates the primary key for a bucket in DynamoDB.
-// DynamoDB keys must be a map of attribute names to AttributeValue objects.
 // We use StartTimestamp as the primary key because it's unique for each bucket.
 func getDynamoBucketKey(bucket *validator.SigningRateBucket) map[string]types.AttributeValue {
 	timestamp := bucket.GetStartTimestamp()
 
-	// Return a composite key map - in this case just the primary key
-	// AttributeValueMemberS indicates this is a String type in DynamoDB
 	return map[string]types.AttributeValue{
 		attrStartTimestamp: &types.AttributeValueMemberS{Value: timestampToString(timestamp)},
 	}
@@ -244,7 +234,6 @@ func timestampToString(unixTime uint64) string {
 }
 
 // LoadBuckets retrieves all signing rate buckets that ended after the given start time.
-// This method demonstrates DynamoDB's pagination and Global Secondary Index usage.
 func (d *dynamoSigningRateStorage) LoadBuckets(
 	ctx context.Context,
 	startTimestamp time.Time,
@@ -255,27 +244,17 @@ func (d *dynamoSigningRateStorage) LoadBuckets(
 	// that only has StartTimestamp as the key
 	input := &dynamodb.QueryInput{
 		TableName: d.tableName,
-		// Use the Global Secondary Index that has PayloadType as partition key and EndTimestamp as sort key
 		IndexName: aws.String(endTimestampIndex),
-
-		// KeyConditionExpression defines the query conditions
-		// Format: "partition_key = value AND sort_key > value"
-		// We must specify the partition key (PayloadType) and can add range conditions on sort key (EndTimestamp)
 		KeyConditionExpression: aws.String(fmt.Sprintf("%s = %s AND %s > %s",
-			attrPayloadType, placeholderPayloadType, // PayloadType = "Payload" (dummy partition)
-			attrEndTimestamp, placeholderStart)), // EndTimestamp > startTimestamp
+			attrPartitionKey, placeholderPartitionKey,
+			attrEndTimestamp, placeholderStart)),
 
-		// Parameterized values for the query conditions (prevents injection attacks)
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			// All items have this same dummy partition key value
-			placeholderPayloadType: &types.AttributeValueMemberS{Value: payloadTypeValue},
-			// Convert the start time to our zero-padded string format for comparison
+			placeholderPartitionKey: &types.AttributeValueMemberS{Value: partitionKeyValue},
 			placeholderStart: &types.AttributeValueMemberS{
 				Value: timestampToString(uint64(startTimestamp.Unix())),
 			},
 		},
-		// ProjectionExpression limits which attributes are returned (saves bandwidth/cost)
-		// We only need the Payload attribute since that contains the full serialized bucket
 		ProjectionExpression: aws.String(attrPayload),
 	}
 
@@ -291,11 +270,10 @@ func (d *dynamoSigningRateStorage) LoadBuckets(
 
 		// Process each item in this page of results
 		for _, item := range resp.Items {
-			// Extract the binary payload attribute and verify it's the right type
-			// DynamoDB returns a generic AttributeValue interface, we need to cast to the specific type
 			bin, ok := item[attrPayload].(*types.AttributeValueMemberB)
 			if !ok {
 				// This shouldn't happen unless the data is corrupted, but skip gracefully
+				d.logger.Warnf("unexpected attribute type for payload, skipping item")
 				continue
 			}
 
@@ -351,15 +329,11 @@ func (d *dynamoSigningRateStorage) ensureTableExists(ctx context.Context) error 
 	// Table doesn't exist, so create it
 	_, err = d.dynamoClient.CreateTable(ctx, &dynamodb.CreateTableInput{
 		TableName: d.tableName,
-
-		// AttributeDefinitions specify the data types for attributes used in keys
-		// You only need to define attributes that are used in primary keys or index keys
-		// Other attributes are schemaless and don't need to be defined here
 		AttributeDefinitions: []types.AttributeDefinition{
 			// Primary key attribute for the main table
 			{AttributeName: aws.String(attrStartTimestamp), AttributeType: types.ScalarAttributeTypeS},
 			// Global Secondary Index partition key (dummy key that's always the same value)
-			{AttributeName: aws.String(attrPayloadType), AttributeType: types.ScalarAttributeTypeS},
+			{AttributeName: aws.String(attrPartitionKey), AttributeType: types.ScalarAttributeTypeS},
 			// Global Secondary Index sort key (allows range queries on EndTimestamp)
 			{AttributeName: aws.String(attrEndTimestamp), AttributeType: types.ScalarAttributeTypeS},
 		},
@@ -369,7 +343,6 @@ func (d *dynamoSigningRateStorage) ensureTableExists(ctx context.Context) error 
 			// HASH key is the partition key - determines which physical partition stores the item
 			// We use StartTimestamp as our primary key since each bucket has a unique start time
 			{AttributeName: aws.String(attrStartTimestamp), KeyType: types.KeyTypeHash},
-			// No RANGE key needed for the main table since StartTimestamp alone is unique
 		},
 
 		// Use pay-per-request billing instead of provisioned capacity
@@ -387,18 +360,11 @@ func (d *dynamoSigningRateStorage) ensureTableExists(ctx context.Context) error 
 				KeySchema: []types.KeySchemaElement{
 					// Partition key for the Global Secondary Index - we use a dummy constant value
 					// This puts all items in the same partition, which is fine for our use case
-					{AttributeName: aws.String(attrPayloadType), KeyType: types.KeyTypeHash},
+					{AttributeName: aws.String(attrPartitionKey), KeyType: types.KeyTypeHash},
 					// Sort key for the Global Secondary Index - allows range queries on EndTimestamp
 					{AttributeName: aws.String(attrEndTimestamp), KeyType: types.KeyTypeRange},
 				},
-
-				// ProjectionType determines what attributes are copied to the Global Secondary Index
-				// ALL means all attributes are available, so we can query the Global Secondary Index without
-				// needing to look up the main table (avoids additional read costs)
 				Projection: &types.Projection{ProjectionType: types.ProjectionTypeAll},
-
-				// No ProvisionedThroughput specified because we're using PAY_PER_REQUEST billing
-				// The Global Secondary Index inherits the billing mode from the main table
 			},
 		},
 	})

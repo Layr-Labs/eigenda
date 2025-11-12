@@ -231,11 +231,6 @@ func TestOnDemandLedgerFromStore(t *testing.T) {
 
 // Creates a payment table and store for testing, returning the store and a cleanup function
 func createTestStore(t *testing.T, tableNameSuffix string) (*ondemand.CumulativePaymentStore, func()) {
-
-	cleanup, err := test.DeployDynamoLocalstack(t.Context())
-	require.NoError(t, err)
-	defer cleanup()
-
 	dynamoClient, err := test.GetDynamoClient()
 	require.NoError(t, err)
 

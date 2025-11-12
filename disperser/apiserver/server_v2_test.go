@@ -608,7 +608,7 @@ func TestInvalidLength(t *testing.T) {
 	commitments, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 
-	// Length we are commiting to should be a power of 2.
+	// Length we are committing to should be a power of 2.
 	require.Equal(t, uint64(commitments.Length), math.NextPowOf2u64(uint64(commitments.Length)))
 
 	// Changing the number of commitments should cause an error before a validity check of the commitments

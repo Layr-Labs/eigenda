@@ -12,6 +12,7 @@ type SigningRateStorage interface {
 	// Store one or more buckets. If a bucket with the same start time already exists, it will be overwritten.
 	StoreBuckets(ctx context.Context, buckets []*validator.SigningRateBucket) error
 
-	// Load all buckets with data starting at or after startTimestamp.
+	// Load all buckets that contain any data from after the provided startTimestamp. A bucket is returned
+	// even if it also has some data that is before the startTimestamp, so long as it also contains data after it.
 	LoadBuckets(ctx context.Context, startTimestamp time.Time) ([]*validator.SigningRateBucket, error)
 }

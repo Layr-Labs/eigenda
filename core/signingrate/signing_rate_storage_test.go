@@ -99,8 +99,11 @@ func TestSigningRateStorage(t *testing.T) {
 	dynamoClient, err := test.GetDynamoClient()
 	require.NoError(t, err)
 
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
 	tableName := "TestSigningRateStorage"
-	storage, err := NewDynamoSigningRateStorage(t.Context(), dynamoClient, tableName)
+	storage, err := NewDynamoSigningRateStorage(t.Context(), logger, dynamoClient, tableName)
 	require.NoError(t, err)
 
 	validatorCount := rand.Intn(10) + 5
@@ -110,9 +113,6 @@ func TestSigningRateStorage(t *testing.T) {
 	}
 
 	quorumCount := core.QuorumID(rand.Intn(5) + 3)
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
 
 	now := rand.Time()
 	timePointer := atomic.Pointer[time.Time]{}
