@@ -13,7 +13,7 @@
     - [Configuration Options](#configuration-options)
     - [CLI](#littdb-cli)
 - [Definitions](#definitions)
-- [Architecture](docsrchitecture.md)
+- [Architecture](#architecture)
 - [Filesystem Layout](docsilesystem_layout.md)
 
 # What is LittDB?
