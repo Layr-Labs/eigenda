@@ -124,7 +124,9 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 	h.logMethodCall(MethodGetSupportedHeaderBytes)
 
 	return &SupportedHeaderBytesResult{
-		HeaderBytes: []byte{commitments.ArbCustomDAHeaderByte},
+		HeaderBytes: []hexutil.Bytes{
+			{commitments.ArbCustomDAHeaderByte, commitments.EigenDALayerByte},
+		},
 	}, nil
 }
 
@@ -160,11 +162,13 @@ func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (
 
 // logMethodCall logs the method call with timing information and allows caller to pass in
 // method specific log context
-func (h *Handlers) logMethodCall(method string, logValue ...string) func() {
+func (h *Handlers) logMethodCall(method string, logValue ...any) func() {
 	start := time.Now()
 
 	return func() {
-		h.log.Info(method, "ns", time.Since(start).Nanoseconds(), logValue)
+		tags := []any{"ns", time.Since(start).Nanoseconds()}
+		tags = append(tags, logValue...)
+		h.log.Info(method, tags...)
 	}
 }
 
