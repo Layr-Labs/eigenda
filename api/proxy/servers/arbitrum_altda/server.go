@@ -15,18 +15,12 @@ import (
 // determine which upstream example DA Server config fields are absolutely necessary.
 // the example DA Provider server provided by OCL uses:
 //   - String JWT auth
-//   - Write toggling
-//   - Server request body limits
 //
 // JWT authorization is supported by the AnyTrust and example Custom DA servers
 // and toggled in core nitro as a client config field
 // TODO: Add support for JWT authentication
 //
-// Write toggling allows a user to use the ALT DA server in "read only" mode
-// which is typical behavior for all rollup operator nodes outside of the batch poster
-// TODO: Add support for "read only" mode
-//
-// The ALT DA server implementation should be a thin wrapper over the existing
+// The Custom DA server implementation is a thin wrapper over the existing proxy
 // storage abstractions with lightweight translation from the existing critical
 // REST status code signals (i.e, "drop cert", "failover") into arbitrum specific
 // errors

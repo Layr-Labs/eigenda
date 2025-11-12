@@ -246,7 +246,7 @@ func (h *Handlers) Store(
 		// translate a "failover" error into the FallbackRequested type error
 		// that arbitrum nitro understands to be the same
 		if errors.Is(err, &api.ErrorFailover{}) {
-			return nil, ErrFallbackRequested
+			return nil, errors.Join(err, ErrFallbackRequested)
 		}
 
 		return nil, fmt.Errorf("put rollup payload: %w", err)
