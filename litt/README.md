@@ -14,7 +14,7 @@
     - [CLI](#littdb-cli)
 - [Definitions](#definitions)
 - [Architecture](#architecture)
-- [Filesystem Layout](docsilesystem_layout.md)
+- [Filesystem Layout](#filesystem-layout)
 
 # What is LittDB?
 
