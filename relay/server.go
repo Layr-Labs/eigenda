@@ -438,20 +438,20 @@ func gatherChunkDataToSend(
 
 			// If there are multiple range requests for the same blob, combine them.
 			for i := requestIndex + 1; i < len(request.GetChunkRequests()); i++ {
-				nextRequest := request.GetChunkRequests()[i]
-				nextRangeRequest := nextRequest.GetByRange()
-				if nextRangeRequest == nil {
-					// Next request is not by range, don't combine
+				followingRequest := request.GetChunkRequests()[i]
+				followingRangeRequest := followingRequest.GetByRange()
+				if followingRangeRequest == nil {
+					// Following request is not by range, don't combine.
 					break
 				}
 
-				nextKey := nextRangeRequest.GetBlobKey()
+				nextKey := followingRangeRequest.GetBlobKey()
 				if bytes.Equal(targetKey, nextKey) == false {
-					// Next request is for a different blob, don't combine
+					// Next request is for a different blob, don't combine.
 					break
 				}
 
-				rangeRequests = append(rangeRequests, nextRangeRequest)
+				rangeRequests = append(rangeRequests, followingRangeRequest)
 				// Bump the counter for the outer loop since this iteration will handle it
 				requestIndex++
 			}
@@ -476,7 +476,7 @@ func gatherChunkDataToSend(
 
 // selectFrameSubsetByRange selects a subset of frames from a BinaryFrames object based on a range
 func selectFrameSubsetByRange(
-	// One ore more requests for chunks from the same blob
+	// One or more requests for chunks from the same blob
 	requests []*pb.ChunkRequestByRange,
 	allFrames map[v2.BlobKey]*core.ChunksData,
 ) (*core.ChunksData, error) {
@@ -488,8 +488,8 @@ func selectFrameSubsetByRange(
 	}
 
 	chunkCount := 0
-	for i := 0; i < len(requests); i++ {
-		chunkCount += int(requests[i].GetEndIndex() - requests[i].GetStartIndex())
+	for _, request := range requests {
+		chunkCount += int(request.GetEndIndex() - request.GetStartIndex())
 	}
 	chunks := make([][]byte, 0, chunkCount)
 
@@ -504,7 +504,7 @@ func selectFrameSubsetByRange(
 		}
 		if endIndex > uint32(len(frames.Chunks)) {
 			return nil, fmt.Errorf(
-				"chunk range %d-%d is invald for key %s, chunk count %d",
+				"chunk range %d-%d is invalid for key %s, chunk count %d",
 				startIndex, endIndex, key, len(frames.Chunks))
 		}
 

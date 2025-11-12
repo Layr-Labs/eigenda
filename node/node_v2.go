@@ -53,8 +53,6 @@ func (n *Node) DetermineChunkLocations(
 
 	relayRequests = make(map[corev2.RelayKey]*RelayRequest)
 
-	totalAssignedChunks := uint32(0)
-
 	for i, cert := range batch.BlobCertificates {
 		blobKey, err := cert.BlobHeader.BlobKey()
 		if err != nil {
@@ -77,7 +75,6 @@ func (n *Node) DetermineChunkLocations(
 			n.Logger.Errorf("failed to get assignment: %v", err)
 			continue
 		}
-		totalAssignedChunks += assgn.NumChunks()
 
 		chunkLength, err := blobParams.GetChunkLength(uint32(cert.BlobHeader.BlobCommitments.Length))
 		if err != nil {
@@ -101,7 +98,8 @@ func (n *Node) DetermineChunkLocations(
 		for _, request := range rangeRequests {
 			if bytes.Equal(previouslyRequestedKey[:], request.BlobKey[:]) {
 				// Code expects one metadata entry per unique blob requested (relay merges requests for the same blob),
-				// so skip adding another metadata entry if we see a repeated blob key.
+				// so skip adding another metadata entry if we see a repeated blob key. Requests for the same blob
+				// always appear sequentially, so this is safe.
 				continue
 			}
 
