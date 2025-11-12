@@ -1,9 +1,26 @@
 package arbitrum_altda
 
 import (
+	"errors"
+
 	proxy_common "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+)
+
+var (
+	// Vendored from:
+	// https://github.com/OffchainLabs/nitro/blob/d298d2b62e033e3195f33740c55e5396ff76a478/daprovider/writer.go
+	//
+	// ErrFallbackRequested is returned by a DA provider to explicitly signal that
+	// the batch poster should fall back to the next available DA writer.
+	// Without this explicit signal, any error will cause batch posting to fail
+	// rather than automatically falling back, preventing expensive surprise costs
+	// from fixable infrastructure issues. Although the rpcclient will retry a certain
+	// number of times on transient errors, there could be other issues like
+	// misconfigurations or temporary outages that are better fixed by operator
+	// intervention than automatically falling back.
+	ErrFallbackRequested = errors.New("DA provider requests fallback to next writer")
 )
 
 const (
