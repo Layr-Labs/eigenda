@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/lotusdblabs/lotusdb/logger"
 )
 
 type requestMetadata struct {
@@ -77,6 +78,9 @@ func (n *Node) DetermineChunkLocations(
 			continue
 		}
 		totalAssignedChunks += assgn.NumChunks()
+
+		logger.Infof("Blob %s: assigned %d chunks from relay %d: %v",
+			blobKey.Hex(), assgn.NumChunks(), relayKey, assgn.Indices)
 
 		chunkLength, err := blobParams.GetChunkLength(uint32(cert.BlobHeader.BlobCommitments.Length))
 		if err != nil {
@@ -252,7 +256,7 @@ func (n *Node) ValidateBatchV2(
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
 	operatorState *core.OperatorState,
-) error { 
+) error {
 	if n.ValidatorV2 == nil {
 		return fmt.Errorf("store v2 is not set")
 	}

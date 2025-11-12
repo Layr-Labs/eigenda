@@ -304,7 +304,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			requestStringBuilder.WriteString(fmt.Sprintf("request %d: ", i))
 			for _, chunkRequest := range relayRequest.ChunkRequests {
 				requestStringBuilder.WriteString(
-					fmt.Sprintf("[start: %d, end: %d] ", chunkRequest.Start, chunkRequest.End))
+					fmt.Sprintf("[start: %d, end: %d, blob hash: %s] ",
+						chunkRequest.Start, chunkRequest.End, chunkRequest.BlobKey.Hex()))
 			}
 		}
 
