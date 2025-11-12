@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -414,14 +415,47 @@ func gatherChunkDataToSend(
 
 	bytesToSend := make([][]byte, 0, len(request.GetChunkRequests()))
 
-	for _, chunkRequest := range request.GetChunkRequests() {
+	for requestIndex := 0; requestIndex < len(request.GetChunkRequests()); requestIndex++ {
+		nextRequest := request.GetChunkRequests()[requestIndex]
+
 		var framesSubset *core.ChunksData
 		var err error
 
-		if chunkRequest.GetByIndex() != nil {
-			framesSubset, err = selectFrameSubsetByIndex(chunkRequest.GetByIndex(), frames)
+		if nextRequest.GetByIndex() != nil {
+			framesSubset, err = selectFrameSubsetByIndex(nextRequest.GetByIndex(), frames)
 		} else {
-			framesSubset, err = selectFrameSubsetByRange(chunkRequest.GetByRange(), frames)
+			// Validator verification logic expects all chunks for the same blob to be grouped together.
+			// This is easy to do with an index request, since an index request allows non-contiguous chunks
+			// to be requested. But range queries require contiguous chunks, so we may receive multiple range requests
+			// for the same blob. In order to avoid breaking tricky validation logic, it is simpler to just group
+			// all range requests for the same blob together here.
+
+			rangeRequests := make([]*pb.ChunkRequestByRange, 0)
+			rangeRequests = append(rangeRequests, nextRequest.GetByRange())
+
+			targetKey := nextRequest.GetByRange().GetBlobKey()
+
+			// If there are multiple range requests for the same blob, combine them.
+			for i := requestIndex + 1; i < len(request.GetChunkRequests()); i++ {
+				nextRequest := request.GetChunkRequests()[i]
+				nextRangeRequest := nextRequest.GetByRange()
+				if nextRangeRequest == nil {
+					// Next request is not by range, don't combine
+					break
+				}
+
+				nextKey := nextRangeRequest.GetBlobKey()
+				if bytes.Equal(targetKey, nextKey) == false {
+					// Next request is for a different blob, don't combine
+					break
+				}
+
+				rangeRequests = append(rangeRequests, nextRangeRequest)
+				// Bump the counter for the outer loop since this iteration will handle it
+				requestIndex++
+			}
+
+			framesSubset, err = selectFrameSubsetByRange(rangeRequests, frames)
 		}
 
 		if err != nil {
@@ -441,31 +475,43 @@ func gatherChunkDataToSend(
 
 // selectFrameSubsetByRange selects a subset of frames from a BinaryFrames object based on a range
 func selectFrameSubsetByRange(
-	request *pb.ChunkRequestByRange,
-	allFrames map[v2.BlobKey]*core.ChunksData) (*core.ChunksData, error) {
+	// One ore more requests for chunks from the same blob
+	requests []*pb.ChunkRequestByRange,
+	allFrames map[v2.BlobKey]*core.ChunksData,
+) (*core.ChunksData, error) {
 
-	key := v2.BlobKey(request.GetBlobKey())
-	startIndex := request.GetStartIndex()
-	endIndex := request.GetEndIndex()
-
+	key := v2.BlobKey(requests[0].GetBlobKey())
 	frames, ok := allFrames[key]
 	if !ok {
 		return nil, fmt.Errorf("frames not found for key %s", key.Hex())
 	}
 
-	if startIndex > endIndex {
-		return nil, fmt.Errorf(
-			"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
-			startIndex, endIndex, key.Hex())
+	chunkCount := 0
+	for i := 0; i < len(requests); i++ {
+		chunkCount += int(requests[i].GetEndIndex() - requests[i].GetStartIndex())
 	}
-	if endIndex > uint32(len(frames.Chunks)) {
-		return nil, fmt.Errorf(
-			"chunk range %d-%d is invald for key %s, chunk count %d",
-			startIndex, endIndex, key, len(frames.Chunks))
+	chunks := make([][]byte, 0, chunkCount)
+
+	for _, request := range requests {
+		startIndex := request.GetStartIndex()
+		endIndex := request.GetEndIndex()
+
+		if startIndex > endIndex {
+			return nil, fmt.Errorf(
+				"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
+				startIndex, endIndex, key.Hex())
+		}
+		if endIndex > uint32(len(frames.Chunks)) {
+			return nil, fmt.Errorf(
+				"chunk range %d-%d is invald for key %s, chunk count %d",
+				startIndex, endIndex, key, len(frames.Chunks))
+		}
+
+		chunks = append(chunks, frames.Chunks[startIndex:endIndex]...)
 	}
 
 	framesSubset := &core.ChunksData{
-		Chunks:   frames.Chunks[startIndex:endIndex],
+		Chunks:   chunks,
 		Format:   frames.Format,
 		ChunkLen: frames.ChunkLen,
 	}
