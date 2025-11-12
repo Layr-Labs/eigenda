@@ -9,10 +9,10 @@ const (
 // ArbitrumCommitment is the default commitment used by arbitrum nitro stack
 // for EigenDA V2
 type ArbitrumCommitment struct {
-	versionedCert *certs.VersionedCert
+	versionedCert certs.VersionedCert
 }
 
-func NewArbCommitment(versionedCert *certs.VersionedCert) ArbitrumCommitment {
+func NewArbCommitment(versionedCert certs.VersionedCert) ArbitrumCommitment {
 	return ArbitrumCommitment{versionedCert}
 }
 func (c ArbitrumCommitment) Encode() []byte {

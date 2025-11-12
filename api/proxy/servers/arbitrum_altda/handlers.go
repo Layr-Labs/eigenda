@@ -246,7 +246,7 @@ func (h *Handlers) Store(
 	if err != nil {
 		return nil, fmt.Errorf("put rollup payload: %w", err)
 	}
-	daCommitment := commitments.NewArbCommitment(versionedCert)
+	daCommitment := commitments.NewArbCommitment(*versionedCert)
 
 	result := &StoreResult{
 		SerializedDACert: daCommitment.Encode(),
