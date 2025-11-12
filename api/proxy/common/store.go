@@ -112,12 +112,12 @@ type EigenDAV2Store interface {
 	// Get retrieves the given key if it's present in the key-value (serializedCert-payload) data store.
 	// If returnEncodedPayload is true, the payload is returned without decoding.
 	Get(ctx context.Context,
-		versionedCert certs.VersionedCert,
+		versionedCert *certs.VersionedCert,
 		serializationType coretypes.CertSerializationType,
 		returnEncodedPayload bool,
 	) (payloadOrEncodedPayload []byte, err error)
 	// VerifyCert verifies the cert validity and rbn recency.
-	VerifyCert(ctx context.Context, versionedCert certs.VersionedCert,
+	VerifyCert(ctx context.Context, versionedCert *certs.VersionedCert,
 		serializationType coretypes.CertSerializationType, l1InclusionBlockNum uint64) error
 }
 

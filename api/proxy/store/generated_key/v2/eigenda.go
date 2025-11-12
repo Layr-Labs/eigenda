@@ -84,7 +84,7 @@ func NewStore(
 // TODO: Refactor to use [coretypes.EncodedPayload] and [coretypes.Payload] instead of []byte.
 func (e Store) Get(
 	ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 	serializationType coretypes.CertSerializationType,
 	returnEncodedPayload bool,
 ) ([]byte, error) {
@@ -222,7 +222,7 @@ func (e Store) BackendType() common.BackendType {
 // TODO: this whole function should be upstreamed to a new eigenda VerifyingPayloadRetrieval client
 // that would verify certs, and then retrieve the payloads (from relay with fallback to eigenda validators if needed).
 // Then proxy could remain a very thin server wrapper around eigenda clients.
-func (e Store) VerifyCert(ctx context.Context, versionedCert certs.VersionedCert,
+func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCert,
 	serializationType coretypes.CertSerializationType, l1InclusionBlockNum uint64) error {
 	var sumDACert coretypes.EigenDACert
 

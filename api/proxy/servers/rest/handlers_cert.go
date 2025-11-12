@@ -107,7 +107,7 @@ func (svr *Server) handleGetShared(
 
 	payloadOrEncodedPayload, err := svr.certMgr.Get(
 		r.Context(),
-		*versionedCert,
+		versionedCert,
 		coretypes.CertSerializationRLP,
 		common.GETOpts{
 			L1InclusionBlockNum:  l1InclusionBlockNum,

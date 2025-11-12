@@ -44,7 +44,7 @@ func (m *MockIEigenDAManager) EXPECT() *MockIEigenDAManagerMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockIEigenDAManager) Get(ctx context.Context, versionedCert certs.VersionedCert, serializationType coretypes.CertSerializationType, opts common.GETOpts) ([]byte, error) {
+func (m *MockIEigenDAManager) Get(ctx context.Context, versionedCert *certs.VersionedCert, serializationType coretypes.CertSerializationType, opts common.GETOpts) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", ctx, versionedCert, serializationType, opts)
 	ret0, _ := ret[0].([]byte)

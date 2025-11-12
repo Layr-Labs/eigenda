@@ -33,7 +33,7 @@ type IEigenDAManager interface {
 	// See [EigenDAManager.Get]
 	Get(
 		ctx context.Context,
-		versionedCert certs.VersionedCert,
+		versionedCert *certs.VersionedCert,
 		serializationType coretypes.CertSerializationType,
 		opts common.GETOpts,
 	) ([]byte, error)
@@ -104,7 +104,7 @@ func (m *EigenDAManager) SetDispersalBackend(backend common.EigenDABackend) {
 // It also validates the value retrieved and returns an error if the value is invalid.
 // If opts.ReturnEncodedPayload is true, it will return the encoded payload without decoding it.
 func (m *EigenDAManager) Get(ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 	serializationType coretypes.CertSerializationType,
 	opts common.GETOpts,
 ) ([]byte, error) {
@@ -130,7 +130,7 @@ func (m *EigenDAManager) Get(ctx context.Context,
 // in case the v1 disperser is down, the same way we do for v2.
 func (m *EigenDAManager) getEigenDAV1(
 	ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 ) ([]byte, error) {
 	verifyFnForSecondary := func(ctx context.Context, cert []byte, payload []byte) error {
 		// We don't add the cert version because EigenDA V1 only supports [certs.V0VersionByte] Certs.
@@ -192,7 +192,7 @@ func (m *EigenDAManager) getEigenDAV1(
 // from cache, EigenDA V2 relays, EigenDA V2 validators, and fallback storage.
 func (m *EigenDAManager) getEigenDAV2(
 	ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 	serializationType coretypes.CertSerializationType,
 	opts common.GETOpts,
 ) ([]byte, error) {
