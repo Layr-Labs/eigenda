@@ -223,7 +223,7 @@ func (e *MemStore) Get(
 // the same certificate used in dispersal for retrieval
 func (e *MemStore) Put(
 	_ context.Context, value []byte, serializationType coretypes.CertSerializationType,
-) ([]byte, error) {
+) (*certs.VersionedCert, error) {
 	payload := coretypes.Payload(value)
 
 	blob, err := payload.ToBlob(e.polyForm)
@@ -249,7 +249,7 @@ func (e *MemStore) Put(
 		return nil, err
 	}
 
-	return certBytes, nil
+	return certs.NewVersionedCert(certBytes, certs.V2VersionByte), nil
 }
 
 func (e *MemStore) VerifyCert(

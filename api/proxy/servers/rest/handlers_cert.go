@@ -107,7 +107,7 @@ func (svr *Server) handleGetShared(
 
 	payloadOrEncodedPayload, err := svr.certMgr.Get(
 		r.Context(),
-		versionedCert,
+		*versionedCert,
 		coretypes.CertSerializationRLP,
 		common.GETOpts{
 			L1InclusionBlockNum:  l1InclusionBlockNum,
@@ -200,30 +200,19 @@ func (svr *Server) handlePostShared(
 		return proxyerrors.NewReadRequestBodyError(err, common.MaxServerPOSTRequestBodySize)
 	}
 
-	serializedCert, err := svr.certMgr.Put(r.Context(), payload, coretypes.CertSerializationRLP)
+	versionedCert, err := svr.certMgr.Put(r.Context(), payload, coretypes.CertSerializationRLP)
 	if err != nil {
 		return fmt.Errorf("post request failed: %w", err)
 	}
 
-	var certVersion certs.VersionByte
-	switch svr.certMgr.GetDispersalBackend() {
-	case common.V1EigenDABackend:
-		certVersion = certs.V0VersionByte
-	case common.V2EigenDABackend:
-		certVersion = certs.V2VersionByte
-	default:
-		return fmt.Errorf("unknown dispersal backend: %v", svr.certMgr.GetDispersalBackend())
-	}
-	versionedCert := certs.NewVersionedCert(serializedCert, certVersion)
-
-	responseCommit, err := commitments.EncodeCommitment(versionedCert, mode)
+	responseCommit, err := commitments.EncodeCommitment(*versionedCert, mode)
 	if err != nil {
 		// This error is only possible if we have a bug in the code.
-		return fmt.Errorf("failed to encode serializedCert %v: %w", serializedCert, err)
+		return fmt.Errorf("failed to encode DA Commitment %v: %w", versionedCert.SerializedCert, err)
 	}
 
 	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path, "commitmentMode", mode,
-		"certVersion", versionedCert.Version, "cert", hex.EncodeToString(serializedCert))
+		"certVersion", versionedCert.Version, "cert", hex.EncodeToString(versionedCert.SerializedCert))
 
 	// We write the commitment as bytes directly instead of hex encoded.
 	// The spec https://specs.optimism.io/experimental/alt-da.html#da-server says it should be hex-encoded,
@@ -235,7 +224,7 @@ func (svr *Server) handlePostShared(
 		// If the write fails, we will already have sent a 200 header. But we still return an error
 		// here so that the logging middleware can log it.
 		return fmt.Errorf("failed to write response for POST serializedCert (version %v) %x: %w",
-			versionedCert.Version, serializedCert, err)
+			versionedCert.Version, versionedCert.SerializedCert, err)
 	}
 	return nil
 }

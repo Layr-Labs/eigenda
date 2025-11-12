@@ -154,7 +154,7 @@ func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (
 
 	certVersionByte := daCommit[2]
 	versionedCert := certs.NewVersionedCert([]byte(daCommit[DACommitPrefixBytes+1:]), certs.VersionByte(certVersionByte))
-	return versionedCert, nil
+	return *versionedCert, nil
 }
 
 // logMethodCall logs the method call with timing information and allows caller to pass in
@@ -242,14 +242,10 @@ func (h *Handlers) Store(
 		return nil, fmt.Errorf("received empty rollup payload")
 	}
 
-	certBytes, err := h.eigenDAManager.Put(ctx, message, coretypes.CertSerializationABI)
+	versionedCert, err := h.eigenDAManager.Put(ctx, message, coretypes.CertSerializationABI)
 	if err != nil {
 		return nil, fmt.Errorf("put rollup payload: %w", err)
 	}
-
-	// TODO: This should eventually be propagated by the Put method given the actual
-	//       version byte assumed is dictated by the EigenDACertVerifier used
-	versionedCert := certs.NewVersionedCert(certBytes, certs.V2VersionByte)
 	daCommitment := commitments.NewArbCommitment(versionedCert)
 
 	result := &StoreResult{

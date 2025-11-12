@@ -108,7 +108,7 @@ type EigenDAV2Store interface {
 		ctx context.Context,
 		payload []byte,
 		serializationType coretypes.CertSerializationType,
-	) (serializedCert []byte, err error)
+	) (vc *certs.VersionedCert, err error)
 	// Get retrieves the given key if it's present in the key-value (serializedCert-payload) data store.
 	// If returnEncodedPayload is true, the payload is returned without decoding.
 	Get(ctx context.Context,

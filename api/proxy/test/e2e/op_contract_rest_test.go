@@ -116,7 +116,7 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 			require.NoError(t, err)
 			// altdaCommitment is what is returned by the proxy
 			altdaCommitment, err := commitments.EncodeCommitment(
-				certs.NewVersionedCert(serializedCertV3, certs.V2VersionByte),
+				*certs.NewVersionedCert(serializedCertV3, certs.V2VersionByte),
 				commitments.OptimismGenericCommitmentMode)
 			require.NoError(t, err)
 			// the op client expects a typed commitment, so we have to decode the altdaCommitment
@@ -204,7 +204,7 @@ func TestOPContractTestValidAndInvalidCertErrors(t *testing.T) {
 			require.NoError(t, err)
 
 			altdaCommitment, err := commitments.EncodeCommitment(
-				certs.NewVersionedCert(serializedCert, certs.V2VersionByte),
+				*certs.NewVersionedCert(serializedCert, certs.V2VersionByte),
 				commitments.OptimismGenericCommitmentMode)
 			require.NoError(t, err)
 			// the op client expects a typed commitment, so we have to decode the altdaCommitment

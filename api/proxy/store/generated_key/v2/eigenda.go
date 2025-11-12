@@ -130,7 +130,7 @@ func (e Store) Get(
 // Put disperses a blob for some pre-image and returns the associated certificate commit.
 func (e Store) Put(
 	ctx context.Context, value []byte, serializationType coretypes.CertSerializationType,
-) ([]byte, error) {
+) (*certs.VersionedCert, error) {
 	if e.disperser == nil {
 		return nil, fmt.Errorf("PUT routes are disabled, did you provide a signer private key?")
 	}
@@ -199,11 +199,11 @@ func (e Store) Put(
 	case *coretypes.EigenDACertV2:
 		return nil, fmt.Errorf("EigenDA V2 certs are not supported anymore, use V3 instead")
 	case *coretypes.EigenDACertV3:
-		serialized, err := cert.Serialize(serializationType)
+		serializedCert, err := cert.Serialize(serializationType)
 		if err != nil {
 			return nil, fmt.Errorf("serialize cert: %w", err)
 		}
-		return serialized, nil
+		return certs.NewVersionedCert(serializedCert, certs.V2VersionByte), nil
 	default:
 		return nil, fmt.Errorf("unsupported cert version: %T", cert)
 	}

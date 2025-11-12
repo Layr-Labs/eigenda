@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -43,17 +42,15 @@ func TestGetSet(t *testing.T) {
 	)
 
 	expected := []byte(testPreimage)
-	key, err := msV2.Put(t.Context(), expected, coretypes.CertSerializationRLP)
+	versionedCert, err := msV2.Put(t.Context(), expected, coretypes.CertSerializationRLP)
 	require.NoError(t, err)
 
-	cert := certs.NewVersionedCert(key, coretypes.VersionThreeCert)
-
-	actual, err := msV2.Get(t.Context(), cert, coretypes.CertSerializationRLP, false)
+	actual, err := msV2.Get(t.Context(), *versionedCert, coretypes.CertSerializationRLP, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
 
 	// Test getting the encoded payload
-	encodedPayload, err := msV2.Get(t.Context(), cert, coretypes.CertSerializationRLP, true)
+	encodedPayload, err := msV2.Get(t.Context(), *versionedCert, coretypes.CertSerializationRLP, true)
 	require.NoError(t, err)
 	require.NotEqual(t, expected, encodedPayload)
 }
