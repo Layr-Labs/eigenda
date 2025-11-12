@@ -79,9 +79,6 @@ func (n *Node) DetermineChunkLocations(
 		}
 		totalAssignedChunks += assgn.NumChunks()
 
-		n.Logger.Infof("Blob %s: assigned %d chunks from relay %d: %v",
-			blobKey.Hex(), assgn.NumChunks(), relayKey, assgn.Indices)
-
 		chunkLength, err := blobParams.GetChunkLength(uint32(cert.BlobHeader.BlobCommitments.Length))
 		if err != nil {
 			return 0, nil, fmt.Errorf("failed to get chunk length: %w", err)
@@ -115,18 +112,6 @@ func (n *Node) DetermineChunkLocations(
 				assignment:     assgn,
 			})
 		}
-	}
-
-	// Sanity check: the download requests should request the proper number of chunks
-	totalRequestedChunks := uint32(0)
-	for _, req := range relayRequests {
-		for _, r := range req.ChunkRequests {
-			totalRequestedChunks += r.End - r.Start
-		}
-	}
-	if totalRequestedChunks != totalAssignedChunks {
-		return 0, nil, fmt.Errorf("total requested chunks (%d) does not match total assigned chunks (%d)",
-			totalRequestedChunks, totalAssignedChunks)
 	}
 
 	return downloadSizeInBytes, relayRequests, nil

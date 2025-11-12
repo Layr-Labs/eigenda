@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"net"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -284,33 +283,6 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	if err != nil {
 		//nolint:wrapcheck
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to download chunks: %v", err))
-	}
-
-	chunkCount := 0
-	for _, shard := range blobShards {
-		chunkCount += len(shard.Bundle)
-	}
-
-	expectedChunkCount := uint32(0)
-	for _, relayRequest := range relayRequests {
-		for _, chunkRequest := range relayRequest.ChunkRequests {
-			expectedChunkCount += chunkRequest.End - chunkRequest.Start
-		}
-	}
-
-	if uint32(chunkCount) != expectedChunkCount {
-		requestStringBuilder := strings.Builder{}
-		for i, relayRequest := range relayRequests {
-			requestStringBuilder.WriteString(fmt.Sprintf("request %d: ", i))
-			for _, chunkRequest := range relayRequest.ChunkRequests {
-				requestStringBuilder.WriteString(
-					fmt.Sprintf("[start: %d, end: %d, blob hash: %s] ",
-						chunkRequest.Start, chunkRequest.End, chunkRequest.BlobKey.Hex()))
-			}
-		}
-
-		s.logger.Errorf("downloaded chunk count (%d) does not match expected chunk count (%d) for batch %s; %s",
-			chunkCount, expectedChunkCount, hex.EncodeToString(batchHeaderHash[:]), requestStringBuilder.String())
 	}
 
 	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)

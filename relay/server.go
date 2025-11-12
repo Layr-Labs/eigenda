@@ -426,9 +426,10 @@ func gatherChunkDataToSend(
 		} else {
 			// Validator verification logic expects all chunks for the same blob to be grouped together.
 			// This is easy to do with an index request, since an index request allows non-contiguous chunks
-			// to be requested. But range queries require contiguous chunks, so we may receive multiple range requests
-			// for the same blob. In order to avoid breaking tricky validation logic, it is simpler to just group
-			// all range requests for the same blob together into a single "bundle" (aka a binary object with chunks).
+			// to be fetched via a single request. But range queries require contiguous chunks, so we may receive
+			// multiple range requests for the same blob. In order to avoid breaking tricky validation logic,
+			// it is simpler to just group all range requests for the same blob together into a single "bundle"
+			// (aka a binary object that encodes a list of chunks).
 
 			rangeRequests := make([]*pb.ChunkRequestByRange, 0)
 			rangeRequests = append(rangeRequests, nextRequest.GetByRange())
