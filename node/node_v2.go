@@ -4,6 +4,7 @@
 package node
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -99,8 +100,16 @@ func (n *Node) DetermineChunkLocations(
 		rangeRequests := convertIndicesToRangeRequests(blobKey, assgn.Indices)
 		req.ChunkRequests = append(req.ChunkRequests, rangeRequests...)
 
-		// Code expects one metadata entry per range request
-		for range rangeRequests {
+		previouslyRequestedKey := corev2.BlobKey(make([]byte, 32))
+		for _, request := range rangeRequests {
+			if bytes.Equal(previouslyRequestedKey[:], request.BlobKey[:]) {
+				// Code expects one metadata entry per unique blob requested (relay merges requests for the same blob),
+				// so skip adding another metadata entry if we see a repeated blob key.
+				continue
+			}
+
+			previouslyRequestedKey = request.BlobKey
+
 			req.Metadata = append(req.Metadata, &requestMetadata{
 				blobShardIndex: i,
 				assignment:     assgn,
@@ -193,7 +202,6 @@ func (n *Node) DownloadChunksFromRelays(
 
 	bundleChan := make(chan response, len(relayRequests))
 	for relayKey := range relayRequests {
-		relayKey := relayKey
 		req := relayRequests[relayKey]
 		n.DownloadPool.Submit(func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
