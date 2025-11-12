@@ -90,7 +90,10 @@ func (e Store) Get(
 ) ([]byte, error) {
 	certTypeVersion, err := versionedCert.Version.IntoCertVersion()
 	if err != nil {
-		return nil, fmt.Errorf("casting into cert version: %w", err)
+		return nil, coretypes.NewCertParsingFailedError(
+			hex.EncodeToString(versionedCert.SerializedCert),
+			fmt.Sprintf("casting into cert version: %v", err),
+		)
 	}
 
 	cert, err := coretypes.DeserializeEigenDACert(
@@ -99,7 +102,10 @@ func (e Store) Get(
 		serializationType,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("deserialize cert: %w", err)
+		return nil, coretypes.NewCertParsingFailedError(
+			hex.EncodeToString(versionedCert.SerializedCert),
+			fmt.Sprintf("deserialize cert: %v", err),
+		)
 	}
 
 	// Try each retriever in sequence until one succeeds
