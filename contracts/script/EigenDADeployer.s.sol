@@ -385,8 +385,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             defaultSecurityThresholds,
-            hex"0001",
-            14400 // number of 12 second blocks in a 48 hour period.
+            hex"0001"
         );
         eigenDADirectory.addAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME, address(eigenDACertVerifier));
 
