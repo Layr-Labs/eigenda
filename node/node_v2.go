@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/lotusdblabs/lotusdb/logger"
 )
 
 type requestMetadata struct {
@@ -79,7 +78,7 @@ func (n *Node) DetermineChunkLocations(
 		}
 		totalAssignedChunks += assgn.NumChunks()
 
-		logger.Infof("Blob %s: assigned %d chunks from relay %d: %v",
+		n.Logger.Infof("Blob %s: assigned %d chunks from relay %d: %v",
 			blobKey.Hex(), assgn.NumChunks(), relayKey, assgn.Indices)
 
 		chunkLength, err := blobParams.GetChunkLength(uint32(cert.BlobHeader.BlobCommitments.Length))
