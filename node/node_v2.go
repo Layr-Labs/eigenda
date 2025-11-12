@@ -18,9 +18,9 @@ type requestMetadata struct {
 	blobShardIndex int
 	assignment     corev2.Assignment
 }
-type relayRequest struct {
-	chunkRequests []*relay.ChunkRequestByRange
-	metadata      []*requestMetadata
+type RelayRequest struct {
+	ChunkRequests []*relay.ChunkRequestByRange
+	Metadata      []*requestMetadata
 }
 type response struct {
 	metadata []*requestMetadata
@@ -41,7 +41,7 @@ func (n *Node) DetermineChunkLocations(
 	batch *corev2.Batch,
 	operatorState *core.OperatorState,
 	probe *common.SequenceProbe,
-) (downloadSizeInBytes uint64, relayRequests map[corev2.RelayKey]*relayRequest, err error) {
+) (downloadSizeInBytes uint64, relayRequests map[corev2.RelayKey]*RelayRequest, err error) {
 
 	probe.SetStage("determine_chunk_locations")
 
@@ -50,7 +50,7 @@ func (n *Node) DetermineChunkLocations(
 		return 0, nil, fmt.Errorf("blob version params is nil")
 	}
 
-	relayRequests = make(map[corev2.RelayKey]*relayRequest)
+	relayRequests = make(map[corev2.RelayKey]*RelayRequest)
 
 	totalAssignedChunks := uint32(0)
 
@@ -86,19 +86,19 @@ func (n *Node) DetermineChunkLocations(
 
 		req, ok := relayRequests[relayKey]
 		if !ok {
-			req = &relayRequest{
-				chunkRequests: make([]*relay.ChunkRequestByRange, 0),
-				metadata:      make([]*requestMetadata, 0),
+			req = &RelayRequest{
+				ChunkRequests: make([]*relay.ChunkRequestByRange, 0),
+				Metadata:      make([]*requestMetadata, 0),
 			}
 			relayRequests[relayKey] = req
 		}
 		// Chunks from one blob are requested to the same relay
 		rangeRequests := convertIndicesToRangeRequests(blobKey, assgn.Indices)
-		req.chunkRequests = append(req.chunkRequests, rangeRequests...)
+		req.ChunkRequests = append(req.ChunkRequests, rangeRequests...)
 
 		// Code expects one metadata entry per range request
 		for range rangeRequests {
-			req.metadata = append(req.metadata, &requestMetadata{
+			req.Metadata = append(req.Metadata, &requestMetadata{
 				blobShardIndex: i,
 				assignment:     assgn,
 			})
@@ -108,7 +108,7 @@ func (n *Node) DetermineChunkLocations(
 	// Sanity check: the download requests should request the proper number of chunks
 	totalRequestedChunks := uint32(0)
 	for _, req := range relayRequests {
-		for _, r := range req.chunkRequests {
+		for _, r := range req.ChunkRequests {
 			totalRequestedChunks += r.End - r.Start
 		}
 	}
@@ -166,7 +166,7 @@ func convertIndicesToRangeRequests(blobKey corev2.BlobKey, indices []uint32) []*
 func (n *Node) DownloadChunksFromRelays(
 	ctx context.Context,
 	batch *corev2.Batch,
-	relayRequests map[corev2.RelayKey]*relayRequest,
+	relayRequests map[corev2.RelayKey]*RelayRequest,
 	probe *common.SequenceProbe,
 ) (blobShards []*corev2.BlobShard, rawBundles []*RawBundle, err error) {
 
@@ -195,7 +195,7 @@ func (n *Node) DownloadChunksFromRelays(
 		n.DownloadPool.Submit(func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
-			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
+			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.ChunkRequests)
 			if err != nil {
 				n.Logger.Errorf("failed to get chunks from relays: %v", err)
 				bundleChan <- response{
@@ -206,7 +206,7 @@ func (n *Node) DownloadChunksFromRelays(
 				return
 			}
 			bundleChan <- response{
-				metadata: req.metadata,
+				metadata: req.Metadata,
 				bundles:  bundles,
 				err:      nil,
 			}

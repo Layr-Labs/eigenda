@@ -285,6 +285,23 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to download chunks: %v", err))
 	}
 
+	chunkCount := 0
+	for _, shard := range blobShards {
+		chunkCount += len(shard.Bundle)
+	}
+
+	expectedChunkCount := uint32(0)
+	for _, relayRequest := range relayRequests {
+		for _, chunkRequest := range relayRequest.ChunkRequests {
+			expectedChunkCount += chunkRequest.End - chunkRequest.Start
+		}
+	}
+
+	if uint32(chunkCount) != expectedChunkCount {
+		s.logger.Errorf("downloaded chunk count (%d) does not match expected chunk count (%d) for batch %s",
+			chunkCount, expectedChunkCount, hex.EncodeToString(batchHeaderHash[:]))
+	}
+
 	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
 	if err != nil {
 		return nil, err
