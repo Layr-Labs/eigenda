@@ -72,7 +72,7 @@ func ByteToVersion(b byte) (VersionByte, error) {
 // VersionedCert is a structured type that holds the DA Commitment version
 // and the raw serialized DA Cert bytes
 //
-// TODO: for future extensible - does it make sense to pass the SerializationType
+// TODO: for future extensibility - does it make sense to pass the SerializationType
 // into this structure?
 type VersionedCert struct {
 	Version        VersionByte
