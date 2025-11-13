@@ -72,7 +72,7 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 	// Read it back.
 	for key, frames := range expectedFrames {
 
-		mMap := make(metadataMap)
+		mMap := make(map[v2.BlobKey]*blobMetadata)
 
 		fMap, err := server.GetFrames(ctx, mMap)
 		require.NoError(t, err)
@@ -89,7 +89,7 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 
 	// Read it back again to test caching.
 	for key, frames := range expectedFrames {
-		mMap := make(metadataMap)
+		mMap := make(map[v2.BlobKey]*blobMetadata)
 
 		fMap, err := server.GetFrames(ctx, mMap)
 		require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 	batchSize := 3
 	for i := 0; i < 10; i++ {
 
-		mMap := make(metadataMap)
+		mMap := make(map[v2.BlobKey]*blobMetadata)
 		for range expectedFrames {
 			if len(mMap) == batchSize {
 				break

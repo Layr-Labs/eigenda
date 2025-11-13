@@ -89,14 +89,14 @@ func newMetadataProvider(
 	return server, nil
 }
 
-// metadataMap is a map of blob keys to metadata.
-type metadataMap map[v2.BlobKey]*blobMetadata
-
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
 // If any of the blobs do not exist, an error is returned.
 // Note that resulting metadata map may not have the same length as the input
 // keys slice if the input keys slice has duplicate items.
-func (m *metadataProvider) GetMetadataForBlobs(ctx context.Context, keys []v2.BlobKey) (metadataMap, error) {
+func (m *metadataProvider) GetMetadataForBlobs(
+	ctx context.Context,
+	keys []v2.BlobKey,
+) (map[v2.BlobKey]*blobMetadata, error) {
 
 	// blobMetadataResult is the result of a metadata fetch operation.
 	type blobMetadataResult struct {
@@ -111,7 +111,7 @@ func (m *metadataProvider) GetMetadataForBlobs(ctx context.Context, keys []v2.Bl
 	// Set when the first error is encountered. Useful for preventing new operations from starting.
 	hadError := atomic.Bool{}
 
-	mMap := make(metadataMap)
+	mMap := make(map[v2.BlobKey]*blobMetadata)
 	for _, key := range keys {
 		mMap[key] = nil
 	}

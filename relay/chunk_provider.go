@@ -88,7 +88,7 @@ func (s *chunkProvider) computeFramesCacheWeight(_ blobKeyWithMetadata, frames *
 }
 
 // GetFrames retrieves the frames for a blob.
-func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameMap, error) {
+func (s *chunkProvider) GetFrames(ctx context.Context, mMap map[v2.BlobKey]*blobMetadata) (frameMap, error) {
 
 	if len(mMap) == 0 {
 		return nil, fmt.Errorf("no metadata provided")
