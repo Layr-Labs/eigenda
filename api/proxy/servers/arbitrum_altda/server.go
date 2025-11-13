@@ -48,7 +48,7 @@ func NewServer(ctx context.Context, cfg *Config, h IHandlers) (*Server, error) {
 
 	var handler http.Handler
 	// go-ethereum puts specific constraints on JWT usage; ie:
-	//     - HS256 is only supported key asymetric key schema
+	//     - HS256 is the only supported symmetric key schema
 	//     - only signed claim for token payload is the IAT (issued at timestamp)
 	//
 	// see https://github.com/ethereum/go-ethereum/blob/v1.16.7/node/jwt_auth.go#L28-L45
