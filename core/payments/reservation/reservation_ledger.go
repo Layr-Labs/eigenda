@@ -202,3 +202,11 @@ func (rl *ReservationLedger) GetBucketCapacity() float64 {
 
 	return rl.leakyBucket.GetCapacity()
 }
+
+// Returns the remaining capacity in the bucket in symbols
+func (rl *ReservationLedger) GetRemainingCapacity() float64 {
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
+
+	return rl.leakyBucket.GetRemainingCapacity()
+}
