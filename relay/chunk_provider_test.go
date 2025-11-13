@@ -73,11 +73,6 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 	for key, frames := range expectedFrames {
 
 		mMap := make(metadataMap)
-		fragmentInfo := fragmentInfoMap[key]
-		mMap[key] = &blobMetadata{
-			totalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-			fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
-		}
 
 		fMap, err := server.GetFrames(ctx, mMap)
 		require.NoError(t, err)
@@ -95,11 +90,6 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 	// Read it back again to test caching.
 	for key, frames := range expectedFrames {
 		mMap := make(metadataMap)
-		fragmentInfo := fragmentInfoMap[key]
-		mMap[key] = &blobMetadata{
-			totalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-			fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
-		}
 
 		fMap, err := server.GetFrames(ctx, mMap)
 		require.NoError(t, err)
@@ -161,11 +151,7 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 	for i := 0; i < 10; i++ {
 
 		mMap := make(metadataMap)
-		for key := range expectedFrames {
-			mMap[key] = &blobMetadata{
-				totalChunkSizeBytes: fragmentInfoMap[key].TotalChunkSizeBytes,
-				fragmentSizeBytes:   fragmentInfoMap[key].FragmentSizeBytes,
-			}
+		for range expectedFrames {
 			if len(mMap) == batchSize {
 				break
 			}

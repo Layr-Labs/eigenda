@@ -504,8 +504,7 @@ func TestReadWriteChunks(t *testing.T) {
 				BlobHeader: header,
 			},
 			&encoding.FragmentInfo{
-				TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-				FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+				SymbolsPerFrame: fragmentInfo.SymbolsPerFrame,
 			})
 		require.NoError(t, err)
 	}
@@ -735,8 +734,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 				BlobHeader: header,
 			},
 			&encoding.FragmentInfo{
-				TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-				FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+				SymbolsPerFrame: fragmentInfo.SymbolsPerFrame,
 			})
 		require.NoError(t, err)
 	}
@@ -901,8 +899,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 				RelayKeys:  shards,
 			},
 			&encoding.FragmentInfo{
-				TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-				FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+				SymbolsPerFrame: fragmentInfo.SymbolsPerFrame,
 			})
 		require.NoError(t, err)
 	}
@@ -1212,8 +1209,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 				RelayKeys:  shards,
 			},
 			&encoding.FragmentInfo{
-				TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-				FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+				SymbolsPerFrame: fragmentInfo.SymbolsPerFrame,
 			})
 		require.NoError(t, err)
 	}
