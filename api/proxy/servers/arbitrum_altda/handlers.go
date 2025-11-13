@@ -27,7 +27,7 @@ import (
 
 	TODO: Method implementations:
 		[X] GetSupportedHeaderBytes // trusted integration
-		[-] Store // trusted integration
+		[X] Store // trusted integration
 		[X] RecoveryPayload // trusted integration
 		[-] CollectPreimages // trusted integration
 		[ ] GenerateProof // trustless AND secure integration
@@ -224,9 +224,6 @@ func (h *Handlers) RecoverPayload(
 //
 //	@return bytes: Arbitrum Custom DA commitment bytes
 //	@return error: a structured error message (if applicable)
-//
-// TODO: Determine the encoding standard to use for the returned DA Commitment. It's assumed that an EigenDAV2 message
-// header byte will be prefixed. We can likely reuse the Standard Commitment mode but will require some analysis.
 //
 // TODO: Add processing for client provided timeout value
 func (h *Handlers) Store(
