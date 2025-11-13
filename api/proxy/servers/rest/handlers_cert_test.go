@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
@@ -171,7 +172,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 				mockEigenDAManager.EXPECT().Put(
 					gomock.Any(),
 					gomock.Any(),
-					gomock.Any()).Return([]byte(testCommitStr), nil)
+					gomock.Any()).Return(certs.NewVersionedCert([]byte(testCommitStr), certs.V0VersionByte), nil)
 			},
 			expectedCode: http.StatusOK,
 			expectedBody: opGenericPrefixStr + testCommitStr,
@@ -196,7 +197,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 				mockEigenDAManager.EXPECT().Put(
 					gomock.Any(),
 					gomock.Any(),
-					gomock.Any()).Return([]byte(testCommitStr), nil)
+					gomock.Any()).Return(certs.NewVersionedCert([]byte(testCommitStr), certs.V0VersionByte), nil)
 			},
 			expectedCode: http.StatusOK,
 			expectedBody: stdCommitmentPrefix + testCommitStr,
@@ -293,7 +294,7 @@ func TestHandlerPutErrors(t *testing.T) {
 				t.Log(tt.name + " / " + mode.name)
 				mockEigenDAManager.EXPECT().
 					Put(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil, tt.mockEigenDAManagerPutReturnedErr)
+					Return(certs.NewVersionedCert([]byte{0x0}, certs.V0VersionByte), tt.mockEigenDAManagerPutReturnedErr)
 
 				req := httptest.NewRequest(
 					http.MethodPost,

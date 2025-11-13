@@ -67,10 +67,6 @@ type EncodingManagerConfig struct {
 	//
 	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
 	// client at dispersal request creation time (in nanoseconds since Unix epoch).
-	//
-	// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used instead of including
-	// in this config + hardcoding. At that point, this field will be removed from the config struct entirely, and the
-	// value will be fetched dynamically at runtime.
 	MaxDispersalAge time.Duration
 }
 
@@ -300,6 +296,11 @@ func (e *EncodingManager) checkAndHandleStaleBlob(
 	cancel()
 	if err != nil {
 		e.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
+	} else {
+		// we need to remove the blobKey from the blobSet once the BlobStatus is set to FAILED
+		// the Dispatcher removes the blobKey from the blobSet when batching, but blobs that are set to FAILED
+		// never are batched, and therefore must be removed manually
+		e.blobSet.RemoveBlob(blobKey)
 	}
 
 	return true
@@ -434,6 +435,10 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
 					return
 				}
+				// we need to remove the blobKey from the blobSet once the BlobStatus is set to FAILED
+				// the Dispatcher removes the blobKey from the blobSet when batching, but blobs that are set to FAILED
+				// never are batched, and therefore must be removed manually
+				e.blobSet.RemoveBlob(blobKey)
 				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed)
 			}
 		})

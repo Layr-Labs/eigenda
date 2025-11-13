@@ -30,6 +30,7 @@ type metricsV2 struct {
 	validateDispersalRequestLatency *prometheus.SummaryVec
 	storeBlobLatency                *prometheus.SummaryVec
 	getBlobStatusLatency            *prometheus.SummaryVec
+	dispersalTimestampRejected      *prometheus.CounterVec
 
 	registry *prometheus.Registry
 	httpPort string
@@ -123,6 +124,15 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 		[]string{},
 	)
 
+	dispersalTimestampRejected := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "dispersal_timestamp_rejections_total",
+			Help:      "Total number of dispersal requests rejected due to invalid timestamps (too old or too far in the future).",
+		},
+		[]string{"reason"},
+	)
+
 	return &metricsV2{
 		grpcMetrics:                     grpcMetrics,
 		getBlobCommitmentLatency:        getBlobCommitmentLatency,
@@ -133,6 +143,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 		validateDispersalRequestLatency: validateDispersalRequestLatency,
 		storeBlobLatency:                storeBlobLatency,
 		getBlobStatusLatency:            getBlobStatusLatency,
+		dispersalTimestampRejected:      dispersalTimestampRejected,
 		registry:                        registry,
 		httpPort:                        metricsConfig.HTTPPort,
 		logger:                          logger.With("component", "DisperserV2Metrics"),
@@ -186,4 +197,8 @@ func (m *metricsV2) reportStoreBlobLatency(duration time.Duration) {
 
 func (m *metricsV2) reportGetBlobStatusLatency(duration time.Duration) {
 	m.getBlobStatusLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *metricsV2) reportDispersalTimestampRejected(reason string) {
+	m.dispersalTimestampRejected.WithLabelValues(reason).Inc()
 }

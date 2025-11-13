@@ -316,7 +316,12 @@ func NewNode(
 			config.ReservationLedgerCacheConfig,
 			paymentVault,
 			time.Now,
-			reservationvalidation.NewReservationValidatorMetrics(reg, Namespace, PaymentsSubsystem),
+			reservationvalidation.NewReservationValidatorMetrics(
+				reg,
+				Namespace,
+				PaymentsSubsystem,
+				config.EnablePerAccountPaymentMetrics,
+			),
 			reservationvalidation.NewReservationCacheMetrics(reg, Namespace, PaymentsSubsystem),
 		)
 		if err != nil {
@@ -355,8 +360,15 @@ func NewNode(
 
 	if config.EnableV2 {
 		var blobVersionParams *corev2.BlobVersionParameterMap
-		// 12s per block
-		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
+
+		var ttl time.Duration
+		if config.OverrideV2Ttl == 0 {
+			// 12s per block
+			ttl = time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
+		} else {
+			ttl = config.OverrideV2Ttl
+		}
+
 		n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new store v2: %w", err)

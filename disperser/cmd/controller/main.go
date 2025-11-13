@@ -203,6 +203,7 @@ func RunController(cliCtx *cli.Context) error {
 	nodeClientManager, err := controller.NewNodeClientManager(
 		config.DispatcherConfig.NodeClientCacheSize,
 		requestSigner,
+		config.DispatcherConfig.DisperserID,
 		logger)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
@@ -228,6 +229,7 @@ func RunController(cliCtx *cli.Context) error {
 
 	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,
+		time.Now,
 		blobMetadataStore,
 		dispatcherPool,
 		ics,

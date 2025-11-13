@@ -29,11 +29,11 @@ import (
 // IEigenDAManager handles EigenDA certificate operations
 type IEigenDAManager interface {
 	// See [EigenDAManager.Put]
-	Put(ctx context.Context, value []byte, serializationType coretypes.CertSerializationType) ([]byte, error)
+	Put(ctx context.Context, value []byte, serializationType coretypes.CertSerializationType) (*certs.VersionedCert, error)
 	// See [EigenDAManager.Get]
 	Get(
 		ctx context.Context,
-		versionedCert certs.VersionedCert,
+		versionedCert *certs.VersionedCert,
 		serializationType coretypes.CertSerializationType,
 		opts common.GETOpts,
 	) ([]byte, error)
@@ -104,7 +104,7 @@ func (m *EigenDAManager) SetDispersalBackend(backend common.EigenDABackend) {
 // It also validates the value retrieved and returns an error if the value is invalid.
 // If opts.ReturnEncodedPayload is true, it will return the encoded payload without decoding it.
 func (m *EigenDAManager) Get(ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 	serializationType coretypes.CertSerializationType,
 	opts common.GETOpts,
 ) ([]byte, error) {
@@ -130,7 +130,7 @@ func (m *EigenDAManager) Get(ctx context.Context,
 // in case the v1 disperser is down, the same way we do for v2.
 func (m *EigenDAManager) getEigenDAV1(
 	ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 ) ([]byte, error) {
 	verifyFnForSecondary := func(ctx context.Context, cert []byte, payload []byte) error {
 		// We don't add the cert version because EigenDA V1 only supports [certs.V0VersionByte] Certs.
@@ -192,7 +192,7 @@ func (m *EigenDAManager) getEigenDAV1(
 // from cache, EigenDA V2 relays, EigenDA V2 validators, and fallback storage.
 func (m *EigenDAManager) getEigenDAV2(
 	ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 	serializationType coretypes.CertSerializationType,
 	opts common.GETOpts,
 ) ([]byte, error) {
@@ -265,31 +265,29 @@ func (m *EigenDAManager) getEigenDAV2(
 // Put ... inserts a value into a storage backend based on the commitment mode
 func (m *EigenDAManager) Put(
 	ctx context.Context, value []byte, serializationType coretypes.CertSerializationType,
-) ([]byte, error) {
-	var commit []byte
-	var err error
+) (*certs.VersionedCert, error) {
 
-	// 1 - Put blob into primary storage backend
-	commit, err = m.putToCorrectEigenDABackend(ctx, value, serializationType)
+	// 1 - Put blob into primary storage backend and obtain serialized DA Cert
+	versionedCert, err := m.putToCorrectEigenDABackend(ctx, value, serializationType)
 	if err != nil {
 		return nil, err
 	}
 
 	// 2 - Put blob into secondary storage backends
 	if m.secondary.Enabled() {
-		err = m.backupToSecondary(ctx, commit, value)
+		err = m.backupToSecondary(ctx, versionedCert.SerializedCert, value)
 		if err != nil {
 			return nil, fmt.Errorf("backup to secondary storage: %w", err)
 		}
 	}
 
-	return commit, nil
+	return versionedCert, nil
 }
 
 // putToCorrectEigenDABackend ... disperses blob to EigenDA backend
 func (m *EigenDAManager) putToCorrectEigenDABackend(
 	ctx context.Context, value []byte, serializationType coretypes.CertSerializationType,
-) ([]byte, error) {
+) (*certs.VersionedCert, error) {
 	val := m.dispersalBackend.Load()
 	backend, ok := val.(common.EigenDABackend)
 	if !ok {
@@ -300,14 +298,24 @@ func (m *EigenDAManager) putToCorrectEigenDABackend(
 		if m.eigenda == nil {
 			return nil, errors.New("EigenDA V1 dispersal requested but not configured")
 		}
-		return m.eigenda.Put(ctx, value) //nolint: wrapcheck
+		serializedCert, err := m.eigenda.Put(ctx, value)
+		if err != nil {
+			return nil, fmt.Errorf("could not disperse payload to v1 backend: %w", err)
+		}
+
+		return certs.NewVersionedCert(serializedCert, certs.V0VersionByte), nil
 	}
 
 	if backend == common.V2EigenDABackend {
 		if m.eigendaV2 == nil {
 			return nil, errors.New("EigenDA V2 dispersal requested but not configured")
 		}
-		return m.eigendaV2.Put(ctx, value, serializationType) //nolint: wrapcheck
+		versionedCert, err := m.eigendaV2.Put(ctx, value, serializationType)
+		if err != nil {
+			return nil, fmt.Errorf("could not disperse payload to v2 backend: %w", err)
+		}
+
+		return versionedCert, nil
 	}
 
 	return nil, fmt.Errorf("unsupported dispersal backend: %v", backend)

@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/tools/integration_utils/calldata_gas_estimator"
 	"github.com/Layr-Labs/eigenda/tools/integration_utils/flags"
 	"github.com/Layr-Labs/eigenda/tools/integration_utils/gas_exhaustion_cert_meter"
+	"github.com/Layr-Labs/eigenda/tools/integration_utils/validate_cert_verifier"
 
 	"github.com/urfave/cli"
 )
@@ -57,6 +58,13 @@ func main() {
 			Description: "Gas estimation tool for EigenDA certificate verification in worst-case scenarios",
 			Flags:       flags.GasExhaustionCertMeterFlags,
 			Action:      gas_exhaustion_cert_meter.RunMeterer,
+		},
+		{
+			Name:        "validate-cert-verifier",
+			Usage:       "Validate the CertVerifier contract by dispersing a blob and verifying the certificate",
+			Description: "Disperses a test blob to EigenDA and validates that the CertVerifier contract correctly verifies the returned certificate using checkDACert",
+			Flags:       flags.ValidateCertVerifierFlags,
+			Action:      validate_cert_verifier.RunCreateAndValidateCertValidation,
 		},
 	}
 

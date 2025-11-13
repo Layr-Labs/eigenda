@@ -25,6 +25,7 @@ func NewMockS3Client() *MockS3Client {
 			"CreateBucket":             0,
 			"FragmentedUploadObject":   0,
 			"FragmentedDownloadObject": 0,
+			"DownloadPartialObject":    0,
 		},
 	}
 }
@@ -134,4 +135,22 @@ func (s *MockS3Client) FragmentedDownloadObject(
 		data = append(data, fragmentData...)
 	}
 	return data, nil
+}
+
+func (s *MockS3Client) DownloadPartialObject(
+	ctx context.Context,
+	bucket string,
+	key string,
+	startIndex int64,
+	endIndex int64,
+) ([]byte, error) {
+	s.Called["DownloadPartialObject"]++
+	data, ok := s.bucket[key]
+	if !ok {
+		return []byte{}, ErrObjectNotFound
+	}
+	if startIndex < 0 || endIndex > int64(len(data)) || startIndex >= endIndex {
+		return []byte{}, errors.New("invalid startIndex or endIndex")
+	}
+	return data[startIndex:endIndex], nil
 }

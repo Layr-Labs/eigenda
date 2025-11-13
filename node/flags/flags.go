@@ -589,6 +589,12 @@ var (
 		Value:    30 * time.Second,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
 	}
+	EnablePerAccountPaymentMetricsFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-payment-metrics"),
+		Usage:    "Whether to report per-account payment metrics. If false, all metrics will be aggregated under account 0x0.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PER_ACCOUNT_PAYMENT_METRICS"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -629,6 +635,13 @@ var (
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_STORE_DURATION_BLOCKS"),
+	}
+	OverrideV2TtlFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "override-v2-ttl"),
+		Usage:    "Override the TTL for v2 chunks. 0 means no override.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_V2_TTL"),
 	}
 	// DO NOT set plain private key in flag in production.
 	// When test mode is enabled, the DA Node will take private BLS key from this flag.
@@ -738,6 +751,8 @@ var optionalFlags = []cli.Flag{
 	EnablePaymentValidationFlag,
 	ReservationMaxLedgersFlag,
 	PaymentVaultUpdateIntervalFlag,
+	EnablePerAccountPaymentMetricsFlag,
+	OverrideV2TtlFlag,
 }
 
 func init() {
