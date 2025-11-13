@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	proxy_common "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
@@ -225,7 +226,8 @@ func (h *Handlers) RecoverPayload(
 //	@return bytes: Arbitrum Custom DA commitment bytes
 //	@return error: a structured error message (if applicable)
 //
-// TODO: Add processing for client provided timeout value
+// TODO: Add processing for client provided timeout value.
+// do we actually need this?
 func (h *Handlers) Store(
 	ctx context.Context,
 	message hexutil.Bytes,
@@ -245,6 +247,12 @@ func (h *Handlers) Store(
 
 	certBytes, err := h.eigenDAManager.Put(ctx, message, coretypes.CertSerializationABI)
 	if err != nil {
+		// translate a "failover" error into the FallbackRequested type error
+		// that arbitrum nitro understands to be the same
+		if errors.Is(err, &api.ErrorFailover{}) {
+			return nil, errors.Join(err, ErrFallbackRequested)
+		}
+
 		return nil, fmt.Errorf("put rollup payload: %w", err)
 	}
 
