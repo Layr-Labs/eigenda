@@ -235,6 +235,14 @@ func checkForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
 	return nil
 }
 
+// Returns the cumulative payment for this ledger
+func (odl *OnDemandLedger) GetCumulativePayment() *big.Int {
+	odl.lock.Lock()
+	defer odl.lock.Unlock()
+
+	return new(big.Int).Set(odl.cumulativePayment)
+}
+
 // Returns the total deposits for this ledger
 func (odl *OnDemandLedger) GetTotalDeposits() *big.Int {
 	odl.lock.Lock()
