@@ -132,9 +132,9 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 
 // deserializeCertFromSequencerMsg reads the VersionedCert from the raw sequencer message provided
 // by the DA Client
-func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (certs.VersionedCert, error) {
+func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (*certs.VersionedCert, error) {
 	if len(sequencerMsg) <= DACertOffset {
-		return certs.VersionedCert{},
+		return nil,
 			fmt.Errorf("sequencer message expected to be >%d bytes, got: %d",
 				DACertOffset, len(sequencerMsg))
 	}
@@ -143,14 +143,14 @@ func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (
 
 	daHeaderByte := daCommit[0]
 	if daHeaderByte != commitments.ArbCustomDAHeaderByte {
-		return certs.VersionedCert{},
+		return nil,
 			fmt.Errorf("expected CustomDAHeader byte (%x) for 0th index byte of message, instead got: %x ",
 				commitments.ArbCustomDAHeaderByte, daHeaderByte)
 	}
 
 	daLayerByte := daCommit[1]
 	if daLayerByte != commitments.EigenDALayerByte {
-		return certs.VersionedCert{},
+		return nil,
 			fmt.Errorf("expected EigenDALayer byte (%x) for 1st index byte of message, instead got: %x ",
 				commitments.EigenDALayerByte, daLayerByte)
 	}
@@ -245,7 +245,7 @@ func (h *Handlers) Store(
 		return nil, fmt.Errorf("received empty rollup payload")
 	}
 
-	certBytes, err := h.eigenDAManager.Put(ctx, message, coretypes.CertSerializationABI)
+	versionedCert, err := h.eigenDAManager.Put(ctx, message, coretypes.CertSerializationABI)
 	if err != nil {
 		// translate a "failover" error into the FallbackRequested type error
 		// that arbitrum nitro understands to be the same
@@ -255,11 +255,7 @@ func (h *Handlers) Store(
 
 		return nil, fmt.Errorf("put rollup payload: %w", err)
 	}
-
-	// TODO: This should eventually be propagated by the Put method given the actual
-	//       version byte assumed is dictated by the EigenDACertVerifier used
-	versionedCert := certs.NewVersionedCert(certBytes, certs.V2VersionByte)
-	daCommitment := commitments.NewArbCommitment(versionedCert)
+	daCommitment := commitments.NewArbCommitment(*versionedCert)
 
 	result := &StoreResult{
 		SerializedDACert: daCommitment.Encode(),

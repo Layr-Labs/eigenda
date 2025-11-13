@@ -84,7 +84,7 @@ func NewStore(
 // TODO: Refactor to use [coretypes.EncodedPayload] and [coretypes.Payload] instead of []byte.
 func (e Store) Get(
 	ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 	serializationType coretypes.CertSerializationType,
 	returnEncodedPayload bool,
 ) ([]byte, error) {
@@ -130,7 +130,7 @@ func (e Store) Get(
 // Put disperses a blob for some pre-image and returns the associated certificate commit.
 func (e Store) Put(
 	ctx context.Context, value []byte, serializationType coretypes.CertSerializationType,
-) ([]byte, error) {
+) (*certs.VersionedCert, error) {
 	if e.disperser == nil {
 		return nil, fmt.Errorf("PUT routes are disabled, did you provide a signer private key?")
 	}
@@ -199,11 +199,11 @@ func (e Store) Put(
 	case *coretypes.EigenDACertV2:
 		return nil, fmt.Errorf("EigenDA V2 certs are not supported anymore, use V3 instead")
 	case *coretypes.EigenDACertV3:
-		serialized, err := cert.Serialize(serializationType)
+		serializedCert, err := cert.Serialize(serializationType)
 		if err != nil {
 			return nil, fmt.Errorf("serialize cert: %w", err)
 		}
-		return serialized, nil
+		return certs.NewVersionedCert(serializedCert, certs.V2VersionByte), nil
 	default:
 		return nil, fmt.Errorf("unsupported cert version: %T", cert)
 	}
@@ -222,7 +222,7 @@ func (e Store) BackendType() common.BackendType {
 // TODO: this whole function should be upstreamed to a new eigenda VerifyingPayloadRetrieval client
 // that would verify certs, and then retrieve the payloads (from relay with fallback to eigenda validators if needed).
 // Then proxy could remain a very thin server wrapper around eigenda clients.
-func (e Store) VerifyCert(ctx context.Context, versionedCert certs.VersionedCert,
+func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCert,
 	serializationType coretypes.CertSerializationType, l1InclusionBlockNum uint64) error {
 	var sumDACert coretypes.EigenDACert
 

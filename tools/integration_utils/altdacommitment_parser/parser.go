@@ -64,7 +64,7 @@ func ParseAltDACommitmentFromHex(hexString string) (*PrefixMetadata, *certs.Vers
 	}
 
 	// parse cert
-	var versionedCert certs.VersionedCert
+	var versionedCert *certs.VersionedCert
 	var prefix PrefixMetadata
 	prefix.Mode = mode
 	// length of binary data on L1
@@ -97,7 +97,7 @@ func ParseAltDACommitmentFromHex(hexString string) (*PrefixMetadata, *certs.Vers
 		return nil, nil, fmt.Errorf("unsupported commitment mode: %v", mode)
 	}
 
-	return &prefix, &versionedCert, nil
+	return &prefix, versionedCert, nil
 }
 
 // ProcessHexString processes a hex-encoded string and returns binary data for RLP decoding

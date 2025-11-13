@@ -44,7 +44,7 @@ func (m *MockIEigenDAManager) EXPECT() *MockIEigenDAManagerMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockIEigenDAManager) Get(ctx context.Context, versionedCert certs.VersionedCert, serializationType coretypes.CertSerializationType, opts common.GETOpts) ([]byte, error) {
+func (m *MockIEigenDAManager) Get(ctx context.Context, versionedCert *certs.VersionedCert, serializationType coretypes.CertSerializationType, opts common.GETOpts) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", ctx, versionedCert, serializationType, opts)
 	ret0, _ := ret[0].([]byte)
@@ -73,10 +73,10 @@ func (mr *MockIEigenDAManagerMockRecorder) GetDispersalBackend() *gomock.Call {
 }
 
 // Put mocks base method.
-func (m *MockIEigenDAManager) Put(ctx context.Context, value []byte, serializationType coretypes.CertSerializationType) ([]byte, error) {
+func (m *MockIEigenDAManager) Put(ctx context.Context, value []byte, serializationType coretypes.CertSerializationType) (*certs.VersionedCert, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Put", ctx, value, serializationType)
-	ret0, _ := ret[0].([]byte)
+	ret0, _ := ret[0].(*certs.VersionedCert)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
