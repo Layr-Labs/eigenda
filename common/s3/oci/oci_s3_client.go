@@ -3,12 +3,9 @@ package oci
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"runtime"
-	"sort"
-	"strings"
 
 	s3common "github.com/Layr-Labs/eigenda/common/s3"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -107,7 +104,7 @@ func NewOciS3Client(
 // around the OCI SDK. The utility functions (GetFragmentCount, RecombineFragments) and
 // config processing in NewObjectStorageClient have good coverage where it matters.
 
-func (c *ociS3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
+func (c *ociS3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, bool, error) {
 	getObjectRequest := objectstorage.GetObjectRequest{
 		NamespaceName: oraclecommon.String(c.cfg.Namespace),
 		BucketName:    oraclecommon.String(bucket),
@@ -116,7 +113,10 @@ func (c *ociS3Client) DownloadObject(ctx context.Context, bucket string, key str
 
 	response, err := c.objectStorageClient.GetObject(ctx, getObjectRequest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get object from OCI: %w", err)
+		if response.RawResponse != nil && response.RawResponse.StatusCode == 404 {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("failed to get object from OCI: %w", err)
 	}
 	defer func() {
 		if closeErr := response.Content.Close(); closeErr != nil {
@@ -126,14 +126,14 @@ func (c *ociS3Client) DownloadObject(ctx context.Context, bucket string, key str
 
 	data, err := io.ReadAll(response.Content)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read object content: %w", err)
+		return nil, false, fmt.Errorf("failed to read object content: %w", err)
 	}
 
 	if len(data) == 0 {
-		return nil, s3common.ErrObjectNotFound
+		return nil, false, nil
 	}
 
-	return data, nil
+	return data, true, nil
 }
 
 func (c *ociS3Client) DownloadPartialObject(
@@ -142,10 +142,10 @@ func (c *ociS3Client) DownloadPartialObject(
 	key string,
 	startIndex int64,
 	endIndex int64,
-) ([]byte, error) {
+) ([]byte, bool, error) {
 
 	if startIndex < 0 || endIndex <= startIndex {
-		return nil, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", startIndex, endIndex)
+		return nil, false, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", startIndex, endIndex)
 	}
 
 	rangeString := fmt.Sprintf("bytes=%d-%d", startIndex, endIndex-1)
@@ -159,7 +159,10 @@ func (c *ociS3Client) DownloadPartialObject(
 
 	response, err := c.objectStorageClient.GetObject(ctx, getObjectRequest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get object from OCI: %w", err)
+		if response.RawResponse != nil && response.RawResponse.StatusCode == 404 {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("failed to get object from OCI: %w", err)
 	}
 	defer func() {
 		if closeErr := response.Content.Close(); closeErr != nil {
@@ -169,14 +172,14 @@ func (c *ociS3Client) DownloadPartialObject(
 
 	data, err := io.ReadAll(response.Content)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read object content: %w", err)
+		return nil, false, fmt.Errorf("failed to read object content: %w", err)
 	}
 
 	if len(data) == 0 {
-		return nil, s3common.ErrObjectNotFound
+		return nil, false, nil
 	}
 
-	return data, nil
+	return data, true, nil
 }
 
 func (c *ociS3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
@@ -278,207 +281,4 @@ func (c *ociS3Client) CreateBucket(ctx context.Context, bucket string) error {
 	}
 
 	return nil
-}
-
-func (c *ociS3Client) FragmentedUploadObject(
-	ctx context.Context,
-	bucket string,
-	key string,
-	data []byte,
-	fragmentSize int) error {
-
-	fragments, err := s3common.BreakIntoFragments(key, data, fragmentSize)
-	if err != nil {
-		return fmt.Errorf("failed to break data into fragments: %w", err)
-	}
-	resultChannel := make(chan error, len(fragments))
-
-	for _, fragment := range fragments {
-		fragmentCapture := fragment
-		<-c.concurrencyLimiter
-		go func() {
-			defer func() {
-				c.concurrencyLimiter <- struct{}{}
-			}()
-			c.fragmentedWriteTask(ctx, resultChannel, fragmentCapture, bucket)
-		}()
-	}
-
-	for range fragments {
-		err = <-resultChannel
-		if err != nil {
-			return err
-		}
-	}
-	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("context error during fragmented upload: %w", err)
-	}
-	return nil
-}
-
-// fragmentedWriteTask writes a single fragment to OCI Object Storage.
-func (c *ociS3Client) fragmentedWriteTask(
-	ctx context.Context,
-	resultChannel chan error,
-	fragment *s3common.Fragment,
-	bucket string) {
-
-	putObjectRequest := objectstorage.PutObjectRequest{
-		NamespaceName: oraclecommon.String(c.cfg.Namespace),
-		BucketName:    oraclecommon.String(bucket),
-		ObjectName:    oraclecommon.String(fragment.FragmentKey),
-		PutObjectBody: io.NopCloser(bytes.NewReader(fragment.Data)),
-		ContentLength: oraclecommon.Int64(int64(len(fragment.Data))),
-	}
-
-	_, err := c.objectStorageClient.PutObject(ctx, putObjectRequest)
-	resultChannel <- err
-}
-
-func (c *ociS3Client) FragmentedDownloadObject(
-	ctx context.Context,
-	bucket string,
-	key string,
-	fileSize int,
-	fragmentSize int) ([]byte, error) {
-
-	if fileSize <= 0 {
-		return nil, errors.New("fileSize must be greater than 0")
-	}
-
-	if fragmentSize <= 0 {
-		return nil, errors.New("fragmentSize must be greater than 0")
-	}
-
-	fragmentKeys, err := s3common.GetFragmentKeys(key, GetFragmentCount(fileSize, fragmentSize))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get fragment keys: %w", err)
-	}
-	resultChannel := make(chan *readResult, len(fragmentKeys))
-
-	for i, fragmentKey := range fragmentKeys {
-		boundFragmentKey := fragmentKey
-		boundI := i
-		<-c.concurrencyLimiter
-		go func() {
-			defer func() {
-				c.concurrencyLimiter <- struct{}{}
-			}()
-			c.readTask(ctx, resultChannel, bucket, boundFragmentKey, boundI)
-		}()
-	}
-
-	fragments := make([]*s3common.Fragment, len(fragmentKeys))
-	for i := 0; i < len(fragmentKeys); i++ {
-		result := <-resultChannel
-		if result.err != nil {
-			return nil, result.err
-		}
-		fragments[result.fragment.Index] = result.fragment
-	}
-
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("context error during fragmented download: %w", err)
-	}
-
-	return RecombineFragments(fragments)
-}
-
-// readResult is the result of a read task.
-type readResult struct {
-	fragment *s3common.Fragment
-	err      error
-}
-
-// readTask reads a single fragment from OCI Object Storage.
-func (c *ociS3Client) readTask(
-	ctx context.Context,
-	resultChannel chan *readResult,
-	bucket string,
-	key string,
-	index int) {
-
-	result := &readResult{}
-	defer func() {
-		resultChannel <- result
-	}()
-
-	getObjectRequest := objectstorage.GetObjectRequest{
-		NamespaceName: oraclecommon.String(c.cfg.Namespace),
-		BucketName:    oraclecommon.String(bucket),
-		ObjectName:    oraclecommon.String(key),
-	}
-
-	response, err := c.objectStorageClient.GetObject(ctx, getObjectRequest)
-	if err != nil {
-		result.err = err
-		return
-	}
-	defer func() {
-		if closeErr := response.Content.Close(); closeErr != nil {
-			c.logger.Warn("Failed to close response body", "error", closeErr)
-		}
-	}()
-
-	data, err := io.ReadAll(response.Content)
-	if err != nil {
-		result.err = err
-		return
-	}
-
-	result.fragment = &s3common.Fragment{
-		FragmentKey: key,
-		Data:        data,
-		Index:       index,
-	}
-}
-
-// Helper functions copied from s3 package (unexported)
-
-// GetFragmentCount returns the number of fragments that a file of the given size will be broken into.
-func GetFragmentCount(fileSize int, fragmentSize int) int {
-	if fileSize < fragmentSize {
-		return 1
-	} else if fileSize%fragmentSize == 0 {
-		return fileSize / fragmentSize
-	} else {
-		return fileSize/fragmentSize + 1
-	}
-}
-
-// recombineFragments recombines fragments into a single file.
-// Returns an error if any fragments are missing.
-func RecombineFragments(fragments []*s3common.Fragment) ([]byte, error) {
-	if len(fragments) == 0 {
-		return nil, fmt.Errorf("no fragments")
-	}
-
-	// Sort the fragments by index
-	sort.Slice(fragments, func(i, j int) bool {
-		return fragments[i].Index < fragments[j].Index
-	})
-
-	// Make sure there aren't any gaps in the fragment indices
-	dataSize := 0
-	for i, fragment := range fragments {
-		if fragment.Index != i {
-			return nil, fmt.Errorf("missing fragment with index %d", i)
-		}
-		dataSize += len(fragment.Data)
-	}
-
-	// Make sure we have the last fragment
-	if !strings.HasSuffix(fragments[len(fragments)-1].FragmentKey, "f") {
-		return nil, fmt.Errorf("missing final fragment")
-	}
-
-	fragmentSize := len(fragments[0].Data)
-
-	// Concatenate the data
-	result := make([]byte, dataSize)
-	for _, fragment := range fragments {
-		copy(result[fragment.Index*fragmentSize:], fragment.Data)
-	}
-
-	return result, nil
 }

@@ -47,8 +47,8 @@ type Server struct {
 	// blobProvider encapsulates logic for fetching blobs.
 	blobProvider *blobProvider
 
-	// chunkProvider encapsulates logic for fetching chunks.
-	chunkProvider *chunkProvider
+	// legacyChunkProvider encapsulates logic for fetching chunks using the legacy getByIndex query.
+	legacyChunkProvider *chunkProvider
 
 	// blobRateLimiter enforces rate limits on GetBlob and operations.
 	blobRateLimiter *limiter.BlobRateLimiter
@@ -160,7 +160,7 @@ func NewServer(
 		logger:           logger.With("component", "RelayServer"),
 		metadataProvider: mp,
 		blobProvider:     bp,
-		chunkProvider:    cp,
+		legacyChunkProvider:    cp,
 		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits, relayMetrics),
 		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits, relayMetrics),
 		authenticator:    authenticator,
@@ -365,7 +365,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 	s.metrics.ReportGetChunksBandwidthUsage(requiredBandwidth)
 
-	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
+	frames, err := s.legacyChunkProvider.GetFrames(ctx, mMap)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching frames: %v", err))
 	}
