@@ -6,10 +6,8 @@ import {EigenDARelayRegistryStorage} from "./EigenDARelayRegistryStorage.sol";
 import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
-/**
- * @title Registry for EigenDA relay keys
- * @author Layr Labs, Inc.
- */
+/// @title Registry for EigenDA relay keys
+/// @author Layr Labs, Inc.
 contract EigenDARelayRegistry is OwnableUpgradeable, EigenDARelayRegistryStorage, IEigenDARelayRegistry {
     constructor() {
         _disableInitializers();

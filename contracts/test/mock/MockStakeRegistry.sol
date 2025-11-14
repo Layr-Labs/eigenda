@@ -4,7 +4,7 @@ import {
     IDelegationManager
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 // This mock is needed by the service manager contract's constructor
 contract MockStakeRegistry {

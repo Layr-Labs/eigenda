@@ -5,11 +5,9 @@ import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contrac
 import {PaymentVaultStorage} from "./PaymentVaultStorage.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-/**
- * @title Entrypoint for making reservations and on demand payments for EigenDA.
- * @author Layr Labs, Inc.
- *
- */
+/// @title Entrypoint for making reservations and on demand payments for EigenDA.
+/// @author Layr Labs, Inc.
+///
 contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
     constructor() {
         _disableInitializers();
@@ -44,11 +42,9 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         globalRatePeriodInterval = _globalRatePeriodInterval;
     }
 
-    /**
-     * @notice This function is called by EigenDA governance to store reservations
-     * @param _account is the address to submit the reservation for
-     * @param _reservation is the Reservation struct containing details of the reservation
-     */
+    /// @notice This function is called by EigenDA governance to store reservations
+    /// @param _account is the address to submit the reservation for
+    /// @param _reservation is the Reservation struct containing details of the reservation
     function setReservation(address _account, Reservation memory _reservation) external onlyOwner {
         _checkQuorumSplit(_reservation.quorumNumbers, _reservation.quorumSplits);
         require(
@@ -59,10 +55,8 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         emit ReservationUpdated(_account, _reservation);
     }
 
-    /**
-     * @notice This function is called to deposit funds for on demand payment
-     * @param _account is the address to deposit the funds for
-     */
+    /// @notice This function is called to deposit funds for on demand payment
+    /// @param _account is the address to deposit the funds for
     function depositOnDemand(address _account) external payable {
         _deposit(_account, msg.value);
     }

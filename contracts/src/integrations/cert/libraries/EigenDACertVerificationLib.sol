@@ -3,14 +3,11 @@ pragma solidity ^0.8.9;
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
-import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {Merkle} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
-import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
@@ -84,17 +81,15 @@ library EigenDACertVerificationLib {
         );
     }
 
-    /**
-     * @notice Checks a complete blob certificate for V2 in a single call
-     * @param eigenDAThresholdRegistry The threshold registry contract
-     * @param signatureVerifier The signature verifier contract
-     * @param batchHeader The batch header
-     * @param blobInclusionInfo The blob inclusion info
-     * @param nonSignerStakesAndSignature The non-signer stakes and signature
-     * @param securityThresholds The security thresholds to verify against
-     * @param requiredQuorumNumbers The required quorum numbers
-     * @param signedQuorumNumbers The signed quorum numbers
-     */
+    /// @notice Checks a complete blob certificate for V2 in a single call
+    /// @param eigenDAThresholdRegistry The threshold registry contract
+    /// @param signatureVerifier The signature verifier contract
+    /// @param batchHeader The batch header
+    /// @param blobInclusionInfo The blob inclusion info
+    /// @param nonSignerStakesAndSignature The non-signer stakes and signature
+    /// @param securityThresholds The security thresholds to verify against
+    /// @param requiredQuorumNumbers The required quorum numbers
+    /// @param signedQuorumNumbers The signed quorum numbers
     function checkDACertV2(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
@@ -128,11 +123,9 @@ library EigenDACertVerificationLib {
         );
     }
 
-    /**
-     * @notice Checks blob inclusion in the batch using Merkle proof
-     * @param batchHeader The batch header
-     * @param blobInclusionInfo The blob inclusion info
-     */
+    /// @notice Checks blob inclusion in the batch using Merkle proof
+    /// @param batchHeader The batch header
+    /// @param blobInclusionInfo The blob inclusion info
     function checkBlobInclusion(
         DATypesV2.BatchHeaderV2 memory batchHeader,
         DATypesV2.BlobInclusionInfo memory blobInclusionInfo
@@ -150,16 +143,14 @@ library EigenDACertVerificationLib {
         }
     }
 
-    /**
-     * @notice Checks the security parameters for a blob cert
-     * @dev Verifies that the security condition
-     *      (confirmationThreshold - adversaryThreshold > reconstructionThreshold)
-     *      holds, by checking an invariant.
-     *      If the inequality fails, the blob is considered insecure.
-     * @param eigenDAThresholdRegistry The threshold registry contract
-     * @param blobVersion The blob version to verify
-     * @param securityThresholds The security thresholds to verify against
-     */
+    /// @notice Checks the security parameters for a blob cert
+    /// @dev Verifies that the security condition
+    ///      (confirmationThreshold - adversaryThreshold > reconstructionThreshold)
+    ///      holds, by checking an invariant.
+    ///      If the inequality fails, the blob is considered insecure.
+    /// @param eigenDAThresholdRegistry The threshold registry contract
+    /// @param blobVersion The blob version to verify
+    /// @param securityThresholds The security thresholds to verify against
     function checkSecurityParams(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         uint16 blobVersion,
@@ -204,16 +195,14 @@ library EigenDACertVerificationLib {
         }
     }
 
-    /**
-     * @notice Checks quorum signatures and builds a bitmap of confirmed quorums
-     * @param signatureVerifier The signature verifier contract
-     * @param batchHashRoot The hash of the batch header
-     * @param signedQuorumNumbers The signed quorum numbers
-     * @param referenceBlockNumber The reference block number
-     * @param nonSignerStakesAndSignature The non-signer stakes and signature
-     * @param securityThresholds The security thresholds to verify against
-     * @return confirmedQuorumsBitmap The bitmap of confirmed quorums
-     */
+    /// @notice Checks quorum signatures and builds a bitmap of confirmed quorums
+    /// @param signatureVerifier The signature verifier contract
+    /// @param batchHashRoot The hash of the batch header
+    /// @param signedQuorumNumbers The signed quorum numbers
+    /// @param referenceBlockNumber The reference block number
+    /// @param nonSignerStakesAndSignature The non-signer stakes and signature
+    /// @param securityThresholds The security thresholds to verify against
+    /// @return confirmedQuorumsBitmap The bitmap of confirmed quorums
     function checkSignaturesAndBuildConfirmedQuorums(
         IEigenDASignatureVerifier signatureVerifier,
         bytes32 batchHashRoot,
@@ -241,12 +230,10 @@ library EigenDACertVerificationLib {
         return confirmedQuorumsBitmap;
     }
 
-    /**
-     * @notice Checks that requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums
-     * @param requiredQuorumNumbers The required quorum numbers
-     * @param blobQuorumNumbers The blob quorum numbers, which are the quorums requested in the blobHeader part of the dispersal
-     * @param confirmedQuorumsBitmap The bitmap of confirmed quorums, which are signed quorums that meet the confirmationThreshold
-     */
+    /// @notice Checks that requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums
+    /// @param requiredQuorumNumbers The required quorum numbers
+    /// @param blobQuorumNumbers The blob quorum numbers, which are the quorums requested in the blobHeader part of the dispersal
+    /// @param confirmedQuorumsBitmap The bitmap of confirmed quorums, which are signed quorums that meet the confirmationThreshold
     function checkQuorumSubsets(
         bytes memory requiredQuorumNumbers,
         bytes memory blobQuorumNumbers,
@@ -263,14 +250,12 @@ library EigenDACertVerificationLib {
         }
     }
 
-    /**
-     * @notice Gets nonSignerStakesAndSignature for a given signed batch
-     * @param operatorStateRetriever The operator state retriever contract
-     * @param registryCoordinator The registry coordinator contract
-     * @param signedBatch The signed batch
-     * @return nonSignerStakesAndSignature The non-signer stakes and signature
-     * @return signedQuorumNumbers The signed quorum numbers
-     */
+    /// @notice Gets nonSignerStakesAndSignature for a given signed batch
+    /// @param operatorStateRetriever The operator state retriever contract
+    /// @param registryCoordinator The registry coordinator contract
+    /// @param signedBatch The signed batch
+    /// @return nonSignerStakesAndSignature The non-signer stakes and signature
+    /// @return signedQuorumNumbers The signed quorum numbers
     function getNonSignerStakesAndSignature(
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
@@ -312,18 +297,14 @@ library EigenDACertVerificationLib {
         return (nonSignerStakesAndSignature, signedQuorumNumbers);
     }
 
-    /**
-     * @notice hashes the given V2 batch header
-     * @param batchHeader the V2 batch header to hash
-     */
+    /// @notice hashes the given V2 batch header
+    /// @param batchHeader the V2 batch header to hash
     function hashBatchHeaderV2(DATypesV2.BatchHeaderV2 memory batchHeader) internal pure returns (bytes32) {
         return keccak256(abi.encode(batchHeader));
     }
 
-    /**
-     * @notice hashes the given V2 blob header
-     * @param blobHeader the V2 blob header to hash
-     */
+    /// @notice hashes the given V2 blob header
+    /// @param blobHeader the V2 blob header to hash
     function hashBlobHeaderV2(DATypesV2.BlobHeaderV2 memory blobHeader) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
@@ -333,10 +314,8 @@ library EigenDACertVerificationLib {
         );
     }
 
-    /**
-     * @notice hashes the given V2 blob certificate
-     * @param blobCertificate the V2 blob certificate to hash
-     */
+    /// @notice hashes the given V2 blob certificate
+    /// @param blobCertificate the V2 blob certificate to hash
     function hashBlobCertificate(DATypesV2.BlobCertificate memory blobCertificate) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
