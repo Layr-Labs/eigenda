@@ -134,7 +134,6 @@ func (c *DisperserClient) DisperseBlob(
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
 	probe *common.SequenceProbe,
-	// if this is nil, that indicates we will use the legacy payment system to create the paymentMetadata
 	paymentMetadata *core.PaymentMetadata,
 ) (*corev2.BlobHeader, *disperser_rpc.DisperseBlobReply, error) {
 	if len(quorums) == 0 {
@@ -150,6 +149,10 @@ func (c *DisperserClient) DisperseBlob(
 			//nolint:wrapcheck
 			return nil, nil, api.NewErrorInvalidArg(fmt.Sprintf("quorum number %d must be <= %d", q, corev2.MaxQuorumID))
 		}
+	}
+
+	if paymentMetadata == nil {
+		return nil, nil, api.NewErrorInvalidArg("payment metadata must be provided")
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint32(len(data)))
