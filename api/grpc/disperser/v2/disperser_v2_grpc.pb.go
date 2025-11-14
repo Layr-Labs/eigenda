@@ -40,8 +40,7 @@ type DisperserClient interface {
 	// It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
 	// and don't have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
 	//
-	// For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
-	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
+	// DEPRECATED: This method is deprecated and will be removed in a future release.
 	GetBlobCommitment(ctx context.Context, in *BlobCommitmentRequest, opts ...grpc.CallOption) (*BlobCommitmentReply, error)
 	// GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
 	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
@@ -113,8 +112,7 @@ type DisperserServer interface {
 	// It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
 	// and don't have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
 	//
-	// For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
-	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
+	// DEPRECATED: This method is deprecated and will be removed in a future release.
 	GetBlobCommitment(context.Context, *BlobCommitmentRequest) (*BlobCommitmentReply, error)
 	// GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
 	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
