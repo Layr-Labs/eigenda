@@ -590,24 +590,11 @@ func buildPayloadDisperser(
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
-	var accountant *clients_v2.Accountant
-	// The legacy `Accountant` is only initialized if using legacy payments.
-	//
-	// There isn't an `else` statement here, because `ClientLedger` (responsible for the new payment system)
-	// construction is handled below by the `buildClientLedger` helper function. The `ClientLedger` cannot be built
-	// here in the same place as the `Accountant` because it requires the `disperserClient` be already built, and the
-	// `Accountant`, if being used, is a part of the `disperserClient`
-	if clientConfigV2.ClientLedgerMode == clientledger.ClientLedgerModeLegacy {
-		// The accountant is populated lazily by disperserClient.PopulateAccountant
-		accountant = clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
-	}
-
 	disperserClient, err := clients_v2.NewDisperserClient(
 		log,
 		&clientConfigV2.DisperserClientCfg,
 		signer,
 		kzgCommitter,
-		accountant,
 		dispersalMetrics,
 	)
 	if err != nil {
@@ -764,9 +751,6 @@ func buildClientLedger(
 	accountantMetrics metrics_v2.AccountantMetricer,
 	disperserClient *clients_v2.DisperserClient,
 ) (*clientledger.ClientLedger, error) {
-	if config.ClientLedgerMode == clientledger.ClientLedgerModeLegacy {
-		return nil, nil
-	}
 	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
 		return nil, fmt.Errorf("get PaymentVault address: %w", err)
@@ -785,8 +769,6 @@ func buildClientLedger(
 	var reservationLedger *reservation.ReservationLedger
 	var onDemandLedger *ondemand.OnDemandLedger
 	switch config.ClientLedgerMode {
-	case clientledger.ClientLedgerModeLegacy:
-		panic("impossible case- this is checked at the start of the method")
 	case clientledger.ClientLedgerModeReservationOnly:
 		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
 		if err != nil {

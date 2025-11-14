@@ -285,7 +285,6 @@ func createDisperserClient(
 		disperserClientConfig,
 		signer,
 		kzgCommitter,
-		nil,
 		metrics.NoopDispersalMetrics)
 }
 

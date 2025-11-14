@@ -153,21 +153,15 @@ func NewTestClient(
 	}
 
 	accountantMetrics := metricsv2.NewAccountantMetrics(registry)
-	accountant := clientsv2.NewUnpopulatedAccountant(accountId, accountantMetrics)
 	disperserClient, err := clientsv2.NewDisperserClient(
 		logger,
 		disperserConfig,
 		signer,
 		kzgCommitter,
-		accountant,
 		metricsv2.NoopDispersalMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
-	}
-	err = disperserClient.PopulateAccountant(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to populate accountant: %w", err)
 	}
 
 	ethClientConfig := geth.EthClientConfig{
@@ -958,10 +952,6 @@ func buildClientLedger(
 	disperserClient *clientsv2.DisperserClient,
 	accountantMetrics metricsv2.AccountantMetricer,
 ) (*clientledger.ClientLedger, error) {
-	if mode == clientledger.ClientLedgerModeLegacy {
-		return nil, nil
-	}
-
 	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddr)
 	if err != nil {
 		return nil, fmt.Errorf("new payment vault: %w", err)
@@ -975,8 +965,6 @@ func buildClientLedger(
 	var reservationLedger *reservation.ReservationLedger
 	var onDemandLedger *ondemand.OnDemandLedger
 	switch mode {
-	case clientledger.ClientLedgerModeLegacy:
-		panic("impossible case- this is checked at the start of the method")
 	case clientledger.ClientLedgerModeReservationOnly:
 		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
 		if err != nil {
