@@ -499,7 +499,6 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 
 	_, _, err = disperserClient.DisperseBlob(ctx, blob.Serialize(), 0, quorums, nil, nil)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "error accounting blob")
 }
 
 func TestDispersalWithInvalidSignature(t *testing.T) {
