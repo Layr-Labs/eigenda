@@ -230,9 +230,9 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		// so it calls the grpc GetBlobCommitment to generate commitments.
 		// DisperserV2 uses the V2 prover which always uses SRSOrder=2^28.
 		// So it needs the trailing g2 points to generate correct length commitments.
-		DISPERSER_SERVER_G2_TRAILING_PATH:               "../resources/srs/g2.trailing.point",
-		DISPERSER_SERVER_ONCHAIN_STATE_REFRESH_INTERVAL: "1s",
-		DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS:  "true",
+		DISPERSER_SERVER_G2_TRAILING_PATH:                 "../resources/srs/g2.trailing.point",
+		DISPERSER_SERVER_ONCHAIN_STATE_REFRESH_INTERVAL:   "1s",
+		DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS: "true",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
