@@ -217,14 +217,18 @@ func (oh *OperatorHarness) startOperator(
 	// TODO(dmanc): In addition to loggers, we should have a centralized place for creating
 	// configuration and injecting it into the harness config.
 
-	reservationLedgerCacheConfig, err := reservationvalidation.NewReservationLedgerCacheConfig(
-		1024,
-		120*time.Second,
-		ratelimit.OverfillOncePermitted,
-		1*time.Second, // Matches controller and API server update interval
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create reservation ledger cache config: %w", err)
+	var reservationLedgerCacheConfig reservationvalidation.ReservationLedgerCacheConfig
+	if oh.testConfig.UseNewPayments {
+		var err error
+		reservationLedgerCacheConfig, err = reservationvalidation.NewReservationLedgerCacheConfig(
+			1024,
+			120*time.Second,
+			ratelimit.OverfillOncePermitted,
+			1*time.Second, // Matches controller and API server update interval
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create reservation ledger cache config: %w", err)
+		}
 	}
 
 	nodeConfig := &node.Config{
@@ -294,7 +298,7 @@ func (oh *OperatorHarness) startOperator(
 		GetChunksColdCacheReadLimitMB:       1 * units.GiB / units.MiB,
 		GetChunksColdBurstLimitMB:           1 * units.GiB / units.MiB,
 		GRPCMsgSizeLimitV2:                  1024 * 1024 * 300,
-		EnablePaymentValidation:             true,
+		EnablePaymentValidation:             oh.testConfig.UseNewPayments,
 		ReservationLedgerCacheConfig:        reservationLedgerCacheConfig,
 		EnablePerAccountPaymentMetrics:      false,
 	}

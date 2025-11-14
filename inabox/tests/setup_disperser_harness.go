@@ -937,13 +937,15 @@ func startController(
 		return nil, fmt.Errorf("failed to start dispatcher: %w", err)
 	}
 
-	// Build and start gRPC server
+	// Build and start gRPC server if payments are enabled
 	var controllerServer *server.Server
 	var controllerAddress string
-	controllerLogger.Info("Starting gRPC server")
+	//nolint:nestif // Complex nested block is temporary until old payment system is removed
+	if config.TestConfig.UseNewPayments {
+		controllerLogger.Info("UseNewPayments enabled - starting gRPC server")
 
-	// Create contract directory
-	contractDirectory, err := directory.NewContractDirectory(
+		// Create contract directory
+		contractDirectory, err := directory.NewContractDirectory(
 		ctx,
 		controllerLogger,
 		ethClient,
@@ -1028,9 +1030,14 @@ func startController(
 		}
 	}()
 
-	controllerServer = grpcServer
-	controllerAddress = fmt.Sprintf("localhost:%d", assignedPort)
-	controllerLogger.Info("Controller gRPC server started successfully", "address", controllerAddress)
+		controllerServer = grpcServer
+		controllerAddress = fmt.Sprintf("localhost:%d", assignedPort)
+		controllerLogger.Info("Controller gRPC server started successfully", "address", controllerAddress)
+	} else {
+		// When server is disabled, use empty address
+		controllerAddress = ""
+		controllerLogger.Info("UseNewPayments disabled - controller will not have server")
+	}
 
 	controllerLogger.Info("Controller components started successfully",
 		"address", controllerAddress, "logFile", logFilePath)
@@ -1163,7 +1170,9 @@ func startAPIServer(
 
 	// Create meterer
 	// Note: The meterer is always created to serve GetPaymentState calls, even when using
-	// controller-mediated payments.
+	// controller-mediated payments. The UseNewPayments flag controls which
+	// payment system is used for authorization during dispersals, but doesn't affect
+	// whether the meterer is available for querying payment state.
 	apiServerLogger.Info("Creating meterer")
 
 	mtConfig := meterer.Config{
@@ -1235,21 +1244,23 @@ func startAPIServer(
 	// Onchain state refresh interval
 	onchainStateRefreshInterval := 1 * time.Second
 
-	// Create controller client
+	// Create controller client if using new payments
 	var controllerConnection *grpc.ClientConn
 	var controllerClient grpccontroller.ControllerServiceClient
-	if controllerAddress == "" {
-		return nil, fmt.Errorf("controller address is empty")
+	if config.TestConfig.UseNewPayments {
+		if controllerAddress == "" {
+			return nil, fmt.Errorf("controller address is empty but UseNewPayments is true")
+		}
+		connection, err := grpc.NewClient(
+			controllerAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("create controller connection: %w", err)
+		}
+		controllerConnection = connection
+		controllerClient = grpccontroller.NewControllerServiceClient(connection)
 	}
-	connection, err := grpc.NewClient(
-		controllerAddress,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create controller connection: %w", err)
-	}
-	controllerConnection = connection
-	controllerClient = grpccontroller.NewControllerServiceClient(connection)
 
 	// Create API server
 	// Note: meterer is nil when using controller-mediated payments, otherwise it's the legacy meterer
@@ -1269,8 +1280,8 @@ func startAPIServer(
 		apiServerLogger,
 		metricsRegistry,
 		metricsConfig,
-		false, // ReservedOnly
-		true,  // useControllerMediatedPayments
+		false,                            // ReservedOnly
+		config.TestConfig.UseNewPayments, // useControllerMediatedPayments
 		controllerConnection,
 		controllerClient,
 		listener,
