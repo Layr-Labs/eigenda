@@ -160,7 +160,7 @@ library EigenDACertVerificationV1Lib {
         }
     }
 
-    /// @notice hashes the given metdata into the commitment that will be stored in the contract
+    /// @notice hashes the given metadata into the commitment that will be stored in the contract
     /// @param batchHeaderHash the hash of the batchHeader
     /// @param signatoryRecordHash the hash of the signatory record
     /// @param blockNumber the block number at which the batch was confirmed
@@ -172,7 +172,7 @@ library EigenDACertVerificationV1Lib {
         return keccak256(abi.encodePacked(batchHeaderHash, signatoryRecordHash, blockNumber));
     }
 
-    /// @notice hashes the given metdata into the commitment that will be stored in the contract
+    /// @notice hashes the given metadata into the commitment that will be stored in the contract
     /// @param batchHeaderHash the hash of the batchHeader
     /// @param confirmationData the confirmation data of the batch
     /// @param blockNumber the block number at which the batch was confirmed
@@ -184,7 +184,7 @@ library EigenDACertVerificationV1Lib {
         return keccak256(abi.encodePacked(batchHeaderHash, confirmationData, blockNumber));
     }
 
-    /// @notice given the batchHeader in the provided metdata, calculates the hash of the batchMetadata
+    /// @notice given the batchHeader in the provided metadata, calculates the hash of the batchMetadata
     /// @param batchMetadata the metadata of the batch
     function hashBatchMetadata(DATypesV1.BatchMetadata memory batchMetadata) internal pure returns (bytes32) {
         return hashBatchHashedMetadata(

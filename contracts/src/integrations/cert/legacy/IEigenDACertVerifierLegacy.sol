@@ -42,7 +42,7 @@ interface IEigenDACertVerifierLegacy is IEigenDAThresholdRegistry {
         DATypesV2.BlobInclusionInfo calldata blobInclusionInfo
     ) external view;
 
-    /// @notice Thin try/catch wrapper around verifyDACertV2 that returns false instead of panicing
+    /// @notice Thin try/catch wrapper around verifyDACertV2 that returns false instead of panicking
     /// @dev The Steel library (https://github.com/risc0/risc0-ethereum/tree/main/crates/steel)
     ///      currently has a limitation that it can only create zk proofs for functions that return a value
     /// @param batchHeader The batch header of the blob

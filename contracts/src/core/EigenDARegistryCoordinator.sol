@@ -347,7 +347,7 @@ contract EigenDARegistryCoordinator is
     }
 
     /// @notice Sets the ejection cooldown, which is the time an operator must wait in
-    /// seconds afer ejection before registering for any quorum
+    /// seconds after ejection before registering for any quorum
     /// @param _ejectionCooldown the new ejection cooldown in seconds
     /// @dev only callable by the owner
     function setEjectionCooldown(uint256 _ejectionCooldown) external onlyOwner {
