@@ -92,7 +92,7 @@ func (e Store) Get(
 	if err != nil {
 		return nil, coretypes.NewCertParsingFailedError(
 			hex.EncodeToString(versionedCert.SerializedCert),
-			fmt.Sprintf("casting into cert version: %v", err),
+			fmt.Sprintf("casting to cert type version: %v", err),
 		)
 	}
 
