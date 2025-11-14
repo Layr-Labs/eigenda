@@ -23,7 +23,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPayments(t *testing.T) {
+// NOTE: Currently, it doesn't work to run these tests in sequence. Each test must be run as a separate command.
+// The problem is that the cleanup logic sometimes randomly fails to free docker ports, so subsequent setups fail.
+// Once we figure out why resources aren't being freed, then these tests will be runnable the "normal" way.
+
+func TestLegacyPayments(t *testing.T) {
+	// manual test for now
+	test.SkipInCI(t)
+	testWithPaymentMode(t, false)
+}
+
+func TestNewPayments(t *testing.T) {
+	// manual test for now
+	test.SkipInCI(t)
+	testWithPaymentMode(t, true)
+}
+
+func testWithPaymentMode(t *testing.T, useNewPayments bool) {
 	// Save current working directory. The setup process in its current form changes working directory, which causes
 	// subsequent executions to fail, since the process relies on relative paths. This is a workaround for now: we just
 	// capture the original working directory, and switch back to it as a cleanup step.
@@ -41,7 +57,7 @@ func TestPayments(t *testing.T) {
 		Logger:         test.GetLogger(),
 		RootPath:       "../../../",
 		RelayCount:     4,
-		UseNewPayments: true,
+		UseNewPayments: useNewPayments,
 	}
 
 	infra, err := integration.SetupInfrastructure(t.Context(), infraConfig)
@@ -281,8 +297,6 @@ func testReservationExpiration(
 		require.Panics(t, func() {
 			_, _ = payloadDisperser.SendPayload(t.Context(), payload)
 		}, "dispersal should panic with expired reservation in ReservationAndOnDemand mode")
-	case clientledger.ClientLedgerModeOnDemandOnly:
-		panic("testReservationExpiration should not be called with OnDemandOnly")
 	default:
 		panic("testReservationExpiration called with unexpected client ledger mode")
 	}

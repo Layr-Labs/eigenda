@@ -152,6 +152,7 @@ func (c *DisperserClient) DisperseBlob(
 	}
 
 	if paymentMetadata == nil {
+		//nolint:wrapcheck
 		return nil, nil, api.NewErrorInvalidArg("payment metadata must be provided")
 	}
 
