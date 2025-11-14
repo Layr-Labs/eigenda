@@ -2,11 +2,7 @@
 pragma solidity ^0.8.9;
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
-import {
-    EigenDACertVerificationV1Lib as CertV1Lib
-} from "src/integrations/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
 import {
     EigenDACertVerificationV2Lib as CertV2Lib
 } from "src/integrations/cert/legacy/v2/EigenDACertVerificationV2Lib.sol";

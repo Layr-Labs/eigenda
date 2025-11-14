@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
 import {EigenDAEjectionLib} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
-import {EigenDAEjectionTypes} from "src/periphery/ejection/libraries/EigenDAEjectionTypes.sol";
 
 import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
 import {EigenDADirectory} from "src/core/EigenDADirectory.sol";

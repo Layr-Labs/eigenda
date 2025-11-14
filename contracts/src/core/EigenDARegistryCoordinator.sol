@@ -10,7 +10,6 @@ import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IService
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {ISocketRegistry} from "lib/eigenlayer-middleware/src/interfaces/ISocketRegistry.sol";
 
-import {EIP1271SignatureUtils} from "eigenlayer-contracts/src/contracts/libraries/EIP1271SignatureUtils.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 
@@ -23,7 +22,6 @@ import {EigenDARegistryCoordinatorStorage} from "src/core/EigenDARegistryCoordin
 
 import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
 import {AddressDirectoryLib} from "src/core/libraries/v3/address-directory/AddressDirectoryLib.sol";
-import {IEigenDAAddressDirectory} from "src/core/interfaces/IEigenDADirectory.sol";
 
 /// @title A `RegistryCoordinator` that has three registries:
 ///      1) a `StakeRegistry` that keeps track of operators' stakes

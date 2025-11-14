@@ -15,12 +15,14 @@ import {IStakeRegistry, StakeRegistry} from "lib/eigenlayer-middleware/src/Stake
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {BLSApkRegistry} from "lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
 import {EigenDARegistryCoordinator, IRegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
-import {IEigenDAThresholdRegistry, EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
+import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry, EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {IEigenDADisperserRegistry, EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
-import {EigenDAServiceManager, IServiceManager} from "src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
+import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
 import {
     IAVSDirectory
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";

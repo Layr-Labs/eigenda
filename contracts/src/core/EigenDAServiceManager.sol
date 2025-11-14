@@ -5,12 +5,9 @@ import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/c
 import {
     IPauserRegistry
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
-import {
-    ServiceManagerBase,
-    IAVSDirectory,
-    IRewardsCoordinator,
-    IServiceManager
-} from "lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
+import {ServiceManagerBase, IAVSDirectory, IRewardsCoordinator} from 
+
+"lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
 import {BLSSignatureChecker} from "lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
@@ -19,7 +16,6 @@ import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.s
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 
 /// @title Primary entrypoint for procuring services from EigenDA.
