@@ -7,7 +7,6 @@ import (
 	s3common "github.com/Layr-Labs/eigenda/common/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/pkg/errors"
 )
 
 type BlobStore struct {
@@ -42,14 +41,12 @@ func (b *BlobStore) StoreBlob(ctx context.Context, key corev2.BlobKey, data []by
 
 // GetBlob retrieves a blob from the blob store
 func (b *BlobStore) GetBlob(ctx context.Context, key corev2.BlobKey) ([]byte, error) {
-	data, err := b.s3Client.DownloadObject(ctx, b.bucketName, s3common.ScopedBlobKey(key))
-	if errors.Is(err, s3common.ErrObjectNotFound) {
-		b.logger.Warnf("blob not found in bucket %s: %s", b.bucketName, key)
-		return nil, ErrBlobNotFound
-	}
-
+	data, found, err := b.s3Client.DownloadObject(ctx, b.bucketName, s3common.ScopedBlobKey(key))
 	if err != nil {
 		return nil, fmt.Errorf("%s, bucket: %s,: %w", ErrBlobNotFound.Error(), b.bucketName, err)
+	}
+	if !found {
+		return nil, ErrBlobNotFound
 	}
 	return data, nil
 }

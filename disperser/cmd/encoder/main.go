@@ -22,11 +22,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-const (
-	// DefaultFragmentSizeBytes represents the size of each fragment in bytes (4MB)
-	DefaultFragmentSizeBytes = 4 * 1024 * 1024
-)
-
 var (
 	// Version is the version of the binary.
 	Version   string
@@ -133,7 +128,9 @@ func RunEncoderServer(ctx *cli.Context) error {
 		logger.Info("Blob store", "bucket", blobStoreBucketName, "backend", config.BlobStoreConfig.Backend)
 
 		chunkStoreBucketName := config.ChunkStoreConfig.BucketName
-		chunkWriter := chunkstore.NewChunkWriter(logger, objectStorageClient, chunkStoreBucketName, DefaultFragmentSizeBytes)
+		chunkWriter := chunkstore.NewChunkWriter(
+			objectStorageClient,
+			chunkStoreBucketName)
 		logger.Info("Chunk store writer", "bucket", chunkStoreBucketName, "backend", config.ChunkStoreConfig.Backend)
 
 		server := encoder.NewEncoderServerV2(

@@ -60,7 +60,6 @@ func (c *clientV2) EncodeBlob(
 
 	// Extract and return fragment info
 	return &encoding.FragmentInfo{
-		TotalChunkSizeBytes: reply.GetFragmentInfo().GetTotalChunkSizeBytes(),
-		FragmentSizeBytes:   reply.GetFragmentInfo().GetFragmentSizeBytes(),
+		SymbolsPerFrame: reply.GetFragmentInfo().GetSymbolsPerFrame(),
 	}, nil
 }

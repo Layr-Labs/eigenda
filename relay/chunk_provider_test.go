@@ -72,11 +72,9 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 	// Read it back.
 	for key, frames := range expectedFrames {
 
-		mMap := make(metadataMap)
-		fragmentInfo := fragmentInfoMap[key]
+		mMap := make(map[v2.BlobKey]*blobMetadata)
 		mMap[key] = &blobMetadata{
-			totalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-			fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+			symbolsPerFrame: uint32(len(frames[0].Coeffs)),
 		}
 
 		fMap, err := server.GetFrames(ctx, mMap)
@@ -94,11 +92,9 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 
 	// Read it back again to test caching.
 	for key, frames := range expectedFrames {
-		mMap := make(metadataMap)
-		fragmentInfo := fragmentInfoMap[key]
+		mMap := make(map[v2.BlobKey]*blobMetadata)
 		mMap[key] = &blobMetadata{
-			totalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-			fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+			symbolsPerFrame: uint32(len(frames[0].Coeffs)),
 		}
 
 		fMap, err := server.GetFrames(ctx, mMap)
@@ -156,26 +152,30 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 		nil)
 	require.NoError(t, err)
 
+	mMap := make(map[v2.BlobKey]*blobMetadata)
+	for key := range expectedFrames {
+		mMap[key] = &blobMetadata{
+			symbolsPerFrame: uint32(len(expectedFrames[key][0].Coeffs)),
+		}
+	}
+
 	// Read it back.
 	batchSize := 3
 	for i := 0; i < 10; i++ {
 
-		mMap := make(metadataMap)
-		for key := range expectedFrames {
-			mMap[key] = &blobMetadata{
-				totalChunkSizeBytes: fragmentInfoMap[key].TotalChunkSizeBytes,
-				fragmentSizeBytes:   fragmentInfoMap[key].FragmentSizeBytes,
-			}
-			if len(mMap) == batchSize {
+		partialMetadata := make(map[v2.BlobKey]*blobMetadata)
+		for key, metadata := range mMap {
+			if len(partialMetadata) >= batchSize {
 				break
 			}
+			partialMetadata[key] = metadata
 		}
 
-		fMap, err := server.GetFrames(ctx, mMap)
+		fMap, err := server.GetFrames(ctx, partialMetadata)
 		require.NoError(t, err)
 
 		require.Equal(t, batchSize, len(fMap))
-		for key := range mMap {
+		for key := range partialMetadata {
 
 			readFrames := (fMap)[key]
 			require.NotNil(t, readFrames)

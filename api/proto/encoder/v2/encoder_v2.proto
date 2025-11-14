@@ -27,10 +27,11 @@ message EncodingParams {
   uint64 num_chunks = 2;
 }
 
-// FragmentInfo contains metadata about the encoded fragments
+// FragmentInfo contains metadata about the encoded chunks. This name is misleading, but since it shows up in many
+// places, it is best not to attempt to rename it for now.
 message FragmentInfo {
-  uint32 total_chunk_size_bytes = 1;
-  uint32 fragment_size_bytes = 2;
+  // The number of symbols in each frame.
+  uint32 symbols_per_frame = 1;
 }
 
 // EncodeBlobReply contains metadata about the encoded chunks

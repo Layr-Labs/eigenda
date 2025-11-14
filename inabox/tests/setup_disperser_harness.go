@@ -496,7 +496,7 @@ func startRelayWithListener(
 
 	// Create blob store and chunk reader
 	blobStore := blobstore.NewBlobStore(config.S3BucketName, s3Client, logger)
-	chunkReader := chunkstore.NewChunkReader(logger, s3Client, config.S3BucketName)
+	chunkReader := chunkstore.NewChunkReader(s3Client, config.S3BucketName)
 
 	// Create eth writer
 	tx, err := eth.NewWriter(
@@ -665,8 +665,7 @@ func startEncoder(
 	blobStore := blobstore.NewBlobStore(config.S3BucketName, s3Client, encoderLogger)
 
 	// Create chunk writer
-	const DefaultFragmentSizeBytes = 4 * 1024 * 1024
-	chunkWriter := chunkstore.NewChunkWriter(encoderLogger, s3Client, config.S3BucketName, DefaultFragmentSizeBytes)
+	chunkWriter := chunkstore.NewChunkWriter(s3Client, config.S3BucketName)
 
 	// Create encoder server config
 	serverConfig := encoder.ServerConfig{

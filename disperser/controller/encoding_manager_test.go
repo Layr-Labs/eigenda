@@ -127,8 +127,7 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 	c.BlobSet.On("Contains", mock.Anything).Return(false)
 	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
-		TotalChunkSizeBytes: 100,
-		FragmentSizeBytes:   1024 * 1024 * 4,
+		SymbolsPerFrame: 8,
 	}, nil)
 
 	// start a goroutine to collect heartbeats
@@ -175,8 +174,7 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 	for _, relayKey := range fetchedCert.RelayKeys {
 		require.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
-	require.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
-	require.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
+	require.Equal(t, fetchedFragmentInfo.SymbolsPerFrame, uint32(8))
 
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
@@ -198,8 +196,7 @@ func TestEncodingManagerHandleBatchDedup(t *testing.T) {
 	c := newTestComponents(t, false)
 	c.BlobSet.On("Contains", blobKey1).Return(true).Once()
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
-		TotalChunkSizeBytes: 100,
-		FragmentSizeBytes:   1024 * 1024 * 4,
+		SymbolsPerFrame: 8,
 	}, nil)
 
 	// start a goroutine to collect heartbeats
@@ -397,8 +394,7 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Once()
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
-		TotalChunkSizeBytes: 100,
-		FragmentSizeBytes:   1024 * 1024 * 4,
+		SymbolsPerFrame: 8,
 	}, nil)
 
 	// start a goroutine to collect heartbeats
@@ -426,8 +422,7 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	for _, relayKey := range fetchedCert.RelayKeys {
 		require.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
-	require.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
-	require.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
+	require.Equal(t, fetchedFragmentInfo.SymbolsPerFrame, uint32(8))
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
 
 	// give the signals a moment to be sent
@@ -548,8 +543,7 @@ func TestEncodingManagerFilterStaleBlobs(t *testing.T) {
 	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
-		TotalChunkSizeBytes: 100,
-		FragmentSizeBytes:   1024 * 1024 * 4,
+		SymbolsPerFrame: 8,
 	}, nil)
 
 	err = c.EncodingManager.HandleBatch(ctx)

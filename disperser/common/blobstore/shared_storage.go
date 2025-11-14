@@ -146,11 +146,15 @@ func (s *SharedBlobStore) StoreBlob(ctx context.Context, blob *core.Blob, reques
 
 // GetBlobContent retrieves blob content by the blob key.
 func (s *SharedBlobStore) GetBlobContent(ctx context.Context, blobHash disperser.BlobHash) ([]byte, error) {
-	return s.s3Client.DownloadObject(ctx, s.bucketName, blobObjectKey(blobHash))
+	data, _, err := s.s3Client.DownloadObject(ctx, s.bucketName, blobObjectKey(blobHash))
+	if err != nil {
+		return nil, fmt.Errorf("error downloading blob content: %w", err)
+	}
+	return data, nil
 }
 
 func (s *SharedBlobStore) getBlobContentParallel(ctx context.Context, blobKey disperser.BlobKey, blobRequestHeader core.BlobRequestHeader, resultChan chan<- blobResultOrError) {
-	blob, err := s.s3Client.DownloadObject(ctx, s.bucketName, blobObjectKey(blobKey.BlobHash))
+	blob, _, err := s.s3Client.DownloadObject(ctx, s.bucketName, blobObjectKey(blobKey.BlobHash))
 	if err != nil {
 		resultChan <- blobResultOrError{err: err}
 		return

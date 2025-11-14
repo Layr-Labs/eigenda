@@ -201,8 +201,8 @@ func buildChunkStore(t *testing.T, logger logging.Logger) (chunkstore.ChunkReade
 	require.NoError(t, err)
 
 	// intentionally use very small fragment size
-	chunkWriter := chunkstore.NewChunkWriter(logger, client, bucketName, 32)
-	chunkReader := chunkstore.NewChunkReader(logger, client, bucketName)
+	chunkWriter := chunkstore.NewChunkWriter(client, bucketName)
+	chunkReader := chunkstore.NewChunkReader(client, bucketName)
 
 	return chunkReader, chunkWriter
 }

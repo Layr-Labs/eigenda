@@ -115,7 +115,7 @@ func NewAwsS3Client(
 	return ref, err
 }
 
-func (s *awsS3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
+func (s *awsS3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, bool, error) {
 	objectSize := defaultBlobBufferSizeByte
 	size, err := s.HeadObject(ctx, bucket, key)
 	if err == nil {
@@ -136,19 +136,22 @@ func (s *awsS3Client) DownloadObject(ctx context.Context, bucket string, key str
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return nil, err
+		if errors.Is(err, &types.NoSuchKey{}) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("failed to download object: %w", err)
 	}
 
 	if buffer == nil || len(buffer.Bytes()) == 0 {
-		return nil, s3common.ErrObjectNotFound
+		return nil, false, nil
 	}
 
 	if len(buffer.Bytes()) != objectSize {
-		return nil, fmt.Errorf("downloaded object size (%d) does not match expected size (%d)",
+		return nil, false, fmt.Errorf("downloaded object size (%d) does not match expected size (%d)",
 			len(buffer.Bytes()), objectSize)
 	}
 
-	return buffer.Bytes(), nil
+	return buffer.Bytes(), true, nil
 }
 
 func (s *awsS3Client) DownloadPartialObject(
@@ -156,10 +159,10 @@ func (s *awsS3Client) DownloadPartialObject(
 	bucket string,
 	key string,
 	startIndex int64,
-	endIndex int64) ([]byte, error) {
+	endIndex int64) ([]byte, bool, error) {
 
 	if startIndex < 0 || endIndex <= startIndex {
-		return nil, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", startIndex, endIndex)
+		return nil, false, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", startIndex, endIndex)
 	}
 
 	rangeHeader := fmt.Sprintf("bytes=%d-%d", startIndex, endIndex-1)
@@ -180,14 +183,17 @@ func (s *awsS3Client) DownloadPartialObject(
 		Range:  aws.String(rangeHeader),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to download partial object: %w", err)
+		if errors.Is(err, &types.NoSuchKey{}) {
+			return nil, false, s3common.ErrObjectNotFound
+		}
+		return nil, false, fmt.Errorf("failed to download partial object: %w", err)
 	}
 
 	if buffer == nil || len(buffer.Bytes()) == 0 {
-		return nil, s3common.ErrObjectNotFound
+		return nil, false, nil
 	}
 
-	return buffer.Bytes(), nil
+	return buffer.Bytes(), true, nil
 }
 
 func (s *awsS3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
@@ -272,160 +278,4 @@ func (s *awsS3Client) CreateBucket(ctx context.Context, bucket string) error {
 	}
 
 	return nil
-}
-
-func (s *awsS3Client) FragmentedUploadObject(
-	ctx context.Context,
-	bucket string,
-	key string,
-	data []byte,
-	fragmentSize int) error {
-
-	fragments, err := s3common.BreakIntoFragments(key, data, fragmentSize)
-	if err != nil {
-		return err
-	}
-	resultChannel := make(chan error, len(fragments))
-
-	for _, fragment := range fragments {
-		fragmentCapture := fragment
-		s.concurrencyLimiter <- struct{}{}
-		go func() {
-			defer func() {
-				<-s.concurrencyLimiter
-			}()
-			s.fragmentedWriteTask(ctx, resultChannel, fragmentCapture, bucket)
-		}()
-	}
-
-	for range fragments {
-		err = <-resultChannel
-		if err != nil {
-			return err
-		}
-	}
-	return ctx.Err()
-}
-
-// fragmentedWriteTask writes a single file to S3.
-func (s *awsS3Client) fragmentedWriteTask(
-	ctx context.Context,
-	resultChannel chan error,
-	fragment *s3common.Fragment,
-	bucket string) {
-
-	_, err := s.s3Client.PutObject(ctx,
-		&s3.PutObjectInput{
-			Bucket: aws.String(bucket),
-			Key:    aws.String(fragment.FragmentKey),
-			Body:   bytes.NewReader(fragment.Data),
-		})
-
-	resultChannel <- err
-}
-
-func (s *awsS3Client) FragmentedDownloadObject(
-	ctx context.Context,
-	bucket string,
-	key string,
-	fileSize int,
-	fragmentSize int) ([]byte, error) {
-	if fileSize <= 0 {
-		return nil, errors.New("fileSize must be greater than 0")
-	}
-
-	if fragmentSize <= 0 {
-		return nil, errors.New("fragmentSize must be greater than 0")
-	}
-
-	fragmentKeys, err := s3common.GetFragmentKeys(key, s3common.GetFragmentCount(fileSize, fragmentSize))
-	if err != nil {
-		return nil, err
-	}
-	resultChannel := make(chan *readResult, len(fragmentKeys))
-
-	for i, fragmentKey := range fragmentKeys {
-		boundFragmentKey := fragmentKey
-		boundI := i
-		s.concurrencyLimiter <- struct{}{}
-		go func() {
-			defer func() {
-				<-s.concurrencyLimiter
-			}()
-			s.readTask(ctx, resultChannel, bucket, boundFragmentKey, boundI)
-		}()
-	}
-
-	fragments := make([]*s3common.Fragment, len(fragmentKeys))
-	for i := 0; i < len(fragmentKeys); i++ {
-		result := <-resultChannel
-		if result.err != nil {
-			return nil, result.err
-		}
-		fragments[result.fragment.Index] = result.fragment
-	}
-
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-
-	data, err := s3common.RecombineFragments(fragments)
-	if err != nil {
-		return nil, fmt.Errorf("failed to recombine fragments: %w", err)
-	}
-	return data, nil
-
-}
-
-// readResult is the result of a read task.
-type readResult struct {
-	fragment *s3common.Fragment
-	err      error
-}
-
-// readTask reads a single file from S3.
-func (s *awsS3Client) readTask(
-	ctx context.Context,
-	resultChannel chan *readResult,
-	bucket string,
-	key string,
-	index int) {
-
-	result := &readResult{}
-	defer func() {
-		resultChannel <- result
-	}()
-
-	ret, err := s.s3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
-
-	if err != nil {
-		result.err = err
-		return
-	}
-
-	data := make([]byte, *ret.ContentLength)
-	bytesRead := 0
-
-	for bytesRead < len(data) && ctx.Err() == nil {
-		count, err := ret.Body.Read(data[bytesRead:])
-		if err != nil && err.Error() != "EOF" {
-			result.err = err
-			return
-		}
-		bytesRead += count
-	}
-
-	result.fragment = &s3common.Fragment{
-		FragmentKey: key,
-		Data:        data,
-		Index:       index,
-	}
-
-	err = ret.Body.Close()
-	if err != nil {
-		result.err = err
-	}
 }

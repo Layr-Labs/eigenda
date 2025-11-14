@@ -645,8 +645,7 @@ func TestFetchBlobCertificate(t *testing.T) {
 		RelayKeys:  []corev2.RelayKey{0, 2, 4},
 	}
 	fragmentInfo := &encoding.FragmentInfo{
-		TotalChunkSizeBytes: 100,
-		FragmentSizeBytes:   1024 * 1024 * 4,
+		SymbolsPerFrame: 8,
 	}
 	err = blobMetadataStore.PutBlobCertificate(t.Context(), blobCert, fragmentInfo)
 	require.NoError(t, err)

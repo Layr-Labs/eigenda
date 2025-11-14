@@ -17,15 +17,13 @@ import (
 
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.
 // This struct adds caching and threading on top of blobstore.BlobMetadataStore.
-type blobMetadata struct {
+type blobMetadata struct { // TODO what is actually needed here?
 	// the size of the blob in bytes
 	blobSizeBytes uint32
 	// the size of each encoded chunk
 	chunkSizeBytes uint32
-	// the size of the file containing the encoded chunks
-	totalChunkSizeBytes uint32
-	// the fragment size used for uploading the encoded chunks
-	fragmentSizeBytes uint32
+	// number of symbols per frame
+	symbolsPerFrame uint32
 }
 
 // metadataProvider encapsulates logic for fetching metadata for blobs. Utilized by the relay Server.
@@ -91,14 +89,14 @@ func newMetadataProvider(
 	return server, nil
 }
 
-// metadataMap is a map of blob keys to metadata.
-type metadataMap map[v2.BlobKey]*blobMetadata
-
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
 // If any of the blobs do not exist, an error is returned.
 // Note that resulting metadata map may not have the same length as the input
 // keys slice if the input keys slice has duplicate items.
-func (m *metadataProvider) GetMetadataForBlobs(ctx context.Context, keys []v2.BlobKey) (metadataMap, error) {
+func (m *metadataProvider) GetMetadataForBlobs(
+	ctx context.Context,
+	keys []v2.BlobKey,
+) (map[v2.BlobKey]*blobMetadata, error) {
 
 	// blobMetadataResult is the result of a metadata fetch operation.
 	type blobMetadataResult struct {
@@ -113,7 +111,7 @@ func (m *metadataProvider) GetMetadataForBlobs(ctx context.Context, keys []v2.Bl
 	// Set when the first error is encountered. Useful for preventing new operations from starting.
 	hadError := atomic.Bool{}
 
-	mMap := make(metadataMap)
+	mMap := make(map[v2.BlobKey]*blobMetadata)
 	for _, key := range keys {
 		mMap[key] = nil
 	}
@@ -212,16 +210,12 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 	// TODO(cody-littley): blob size is not correct https://github.com/Layr-Labs/eigenda/pull/906#discussion_r1847396530
 	blobSize := uint32(cert.BlobHeader.BlobCommitments.Length) * encoding.BYTES_PER_SYMBOL
 
-	chunkSize, err := m.computeChunkSize(cert.BlobHeader, fragmentInfo.TotalChunkSizeBytes)
-	if err != nil {
-		return nil, fmt.Errorf("error getting chunk length: %w", err)
-	}
+	chunkSize := fragmentInfo.SymbolsPerFrame * encoding.BYTES_PER_SYMBOL
 
 	metadata := &blobMetadata{
-		blobSizeBytes:       blobSize,
-		chunkSizeBytes:      chunkSize,
-		totalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-		fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+		blobSizeBytes:   blobSize,
+		chunkSizeBytes:  chunkSize,
+		symbolsPerFrame: fragmentInfo.SymbolsPerFrame,
 	}
 
 	return metadata, nil
