@@ -144,7 +144,8 @@ func (x *EncodingParams) GetNumChunks() uint64 {
 	return 0
 }
 
-// FragmentInfo contains metadata about the encoded chunks.
+// FragmentInfo contains metadata about the encoded chunks. This name is misleading, but since it shows up in many
+// places, it is best not to attempt to rename it for now.
 type FragmentInfo struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
