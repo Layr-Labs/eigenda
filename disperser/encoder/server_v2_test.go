@@ -129,17 +129,13 @@ func TestEncodeBlob(t *testing.T) {
 	}
 
 	expectedUploadCalls := 1
-	expectedFragmentedUploadObjectCalls := 0
 	assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
-	assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 	resp, err := server.EncodeBlob(ctx, req)
 	if !assert.NoError(t, err, "EncodeBlob failed") {
 		t.FailNow()
 	}
-	expectedUploadCalls++
-	expectedFragmentedUploadObjectCalls++
+	expectedUploadCalls += 2
 	assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
-	assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 
 	// Verify encoding results
 	t.Run("Verify Encoding Results", func(t *testing.T) {
@@ -169,18 +165,9 @@ func TestEncodeBlob(t *testing.T) {
 
 	t.Run("Verify Re-encoding is prevented", func(t *testing.T) {
 		assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
-		assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 		// Create and execute encoding request again
-		resp, err := server.EncodeBlob(ctx, req)
-		assert.NoError(t, err)
-
-		if !assert.NotNil(t, resp, "Response should not be nil") {
-			t.FailNow() // Stop the test here to prevent nil pointer panic
-			return
-		}
-
-		assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
-		assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
+		_, err := server.EncodeBlob(ctx, req)
+		require.Error(t, err)
 	})
 }
 
