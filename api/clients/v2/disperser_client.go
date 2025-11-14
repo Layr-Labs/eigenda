@@ -84,6 +84,9 @@ func NewDisperserClient(
 	if signer == nil {
 		return nil, fmt.Errorf("signer must be provided")
 	}
+	if committer == nil {
+		return nil, fmt.Errorf("committer must be provided")
+	}
 	if metrics == nil {
 		return nil, fmt.Errorf("metrics must be provided")
 	}
