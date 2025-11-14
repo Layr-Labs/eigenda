@@ -2,7 +2,9 @@ package live
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +19,7 @@ import (
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
@@ -446,6 +449,25 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	require.NoError(t, err)
 	logger.Infof("Account ID: %s", accountId.Hex())
 
+	config := c.GetConfig()
+	g1Path, err := config.ResolveSRSPath(client.SRSPathG1)
+	require.NoError(t, err, "resolve G1 SRS path")
+	g2Path, err := config.ResolveSRSPath(client.SRSPathG2)
+	require.NoError(t, err, "resolve G2 SRS path")
+	g2TrailingPath, err := config.ResolveSRSPath(client.SRSPathG2Trailing)
+	require.NoError(t, err, "resolve trailing G2 SRS path")
+	if _, err := os.Stat(g2TrailingPath); errors.Is(err, os.ErrNotExist) {
+		g2TrailingPath = ""
+	}
+
+	kzgCommitter, err := committer.NewFromConfig(committer.Config{
+		G1SRSPath:         g1Path,
+		G2SRSPath:         g2Path,
+		G2TrailingSRSPath: g2TrailingPath,
+		SRSNumberToLoad:   config.SRSNumberToLoad,
+	})
+	require.NoError(t, err, "new committer")
+
 	disperserConfig := &clients.DisperserClientConfig{
 		Hostname:          c.GetConfig().DisperserHostname,
 		Port:              fmt.Sprintf("%d", c.GetConfig().DisperserPort),
@@ -457,7 +479,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 		logger,
 		disperserConfig,
 		signer,
-		nil,
+		kzgCommitter,
 		accountant,
 		metrics.NoopDispersalMetrics,
 	)
