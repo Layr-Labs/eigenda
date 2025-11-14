@@ -119,6 +119,10 @@ func (r *chunkReader) GetBinaryChunkProofsRange(
 	endIndex uint32,
 ) ([][]byte, bool, error) {
 
+	if startIndex >= endIndex {
+		return nil, false, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", startIndex, endIndex)
+	}
+
 	firstByteIndex := startIndex * encoding.SerializedProofLength
 	count := endIndex - startIndex
 	size := count * encoding.SerializedProofLength
@@ -154,6 +158,14 @@ func (r *chunkReader) GetBinaryChunkCoefficientRange(
 	endIndex uint32,
 	symbolsPerFrame uint32,
 ) ([][]byte, bool, error) {
+
+	if startIndex >= endIndex {
+		return nil, false, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", startIndex, endIndex)
+	}
+
+	if symbolsPerFrame == 0 {
+		return nil, false, fmt.Errorf("symbolsPerFrame must be greater than 0")
+	}
 
 	bytesPerFrame := encoding.BYTES_PER_SYMBOL * symbolsPerFrame
 	firstByteIndex := 4 + startIndex*bytesPerFrame

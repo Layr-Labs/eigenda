@@ -213,8 +213,9 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 	chunkSize := fragmentInfo.SymbolsPerFrame * encoding.BYTES_PER_SYMBOL
 
 	metadata := &blobMetadata{
-		blobSizeBytes:  blobSize,
-		chunkSizeBytes: chunkSize,
+		blobSizeBytes:   blobSize,
+		chunkSizeBytes:  chunkSize,
+		symbolsPerFrame: fragmentInfo.SymbolsPerFrame,
 	}
 
 	return metadata, nil

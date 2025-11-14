@@ -129,7 +129,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 
 		chunkStoreBucketName := config.ChunkStoreConfig.BucketName
 		chunkWriter := chunkstore.NewChunkWriter(
-			objectStorageClient, 
+			objectStorageClient,
 			chunkStoreBucketName)
 		logger.Info("Chunk store writer", "bucket", chunkStoreBucketName, "backend", config.ChunkStoreConfig.Backend)
 

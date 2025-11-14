@@ -479,7 +479,7 @@ func (s *Server) gatherChunkDataToSend(
 
 			proofs[i] = data
 			if err != nil {
-				err = fmt.Errorf("failed to download proofs for %s: %w", blobKey.Hex(), err)
+				err = fmt.Errorf("failed to download proofs: %w", err)
 			}
 			results <- downloadResult{key: blobKey, found: found, err: err}
 		}()
@@ -495,7 +495,7 @@ func (s *Server) gatherChunkDataToSend(
 
 			coefficients[i] = data
 			if err != nil {
-				err = fmt.Errorf("failed to download coefficients for %s: %w", blobKey.Hex(), err)
+				err = fmt.Errorf("failed to download coefficients: %w", err)
 			}
 			results <- downloadResult{key: blobKey, found: found, err: err}
 		}()
