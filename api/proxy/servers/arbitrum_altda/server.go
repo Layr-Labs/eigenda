@@ -6,27 +6,25 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/node"
+
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-// determine which upstream example DA Server config fields are absolutely necessary.
-// the example DA Provider server provided by OCL uses:
-//   - String JWT auth
-//
-// JWT authorization is supported by the AnyTrust and example Custom DA servers
-// and toggled in core nitro as a client config field
-// TODO: Add support for JWT authentication
-//
-// The Custom DA server implementation is a thin wrapper over the existing proxy
+// The ALT DA server implementation is a thin wrapper over the existing
 // storage abstractions with lightweight translation from the existing critical
 // REST status code signals (i.e, "drop cert", "failover") into arbitrum specific
 // errors
 type Config struct {
-	Host string
-	Port int
+	Host      string
+	Port      int
+	JWTSecret string
 }
 
 type Server struct {
@@ -46,8 +44,30 @@ func NewServer(ctx context.Context, cfg *Config, h IHandlers) (*Server, error) {
 	if err := rpcServer.RegisterName("daprovider", h); err != nil {
 		return nil, fmt.Errorf("failed to register daprovider: %w", err)
 	}
-
 	rpcServer.SetHTTPBodyLimit(int(common.MaxServerPOSTRequestBodySize))
+
+	var handler http.Handler
+	// go-ethereum puts specific constraints on JWT usage; ie:
+	//     - HS256 is the only supported symmetric key schema
+	//     - only signed claim for token payload is the IAT (issued at timestamp)
+	//
+	// see https://github.com/ethereum/go-ethereum/blob/v1.16.7/node/jwt_auth.go#L28-L45
+	//
+	// go-ethereum uses JWT for authenticated communication with consensus client where
+	// the HS256 symmetric private key is copied between server domains. it's assumed
+	// this is only used for local or enclosed service environments that aren't shared with open internet.
+	//
+	// for arbitrum, this is used for secure communication between rollup nodes and the
+	// CustomDA server.
+	if cfg.JWTSecret != "" {
+		jwt, err := fetchJWTSecret(cfg.JWTSecret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch JWT secret: %w", err)
+		}
+		handler = node.NewHTTPHandlerStack(rpcServer, nil, nil, jwt)
+	} else {
+		handler = rpcServer
+	}
 
 	addr, ok := listener.Addr().(*net.TCPAddr)
 	if !ok {
@@ -56,7 +76,7 @@ func NewServer(ctx context.Context, cfg *Config, h IHandlers) (*Server, error) {
 
 	svr := &http.Server{
 		Addr:    "http://" + addr.String(),
-		Handler: rpcServer,
+		Handler: handler,
 	}
 
 	return &Server{
@@ -98,4 +118,22 @@ func (s *Server) Stop() error {
 		return fmt.Errorf("failed to shutdown server: %w", err)
 	}
 	return nil
+}
+
+// fetchJWTSecret processes a HS256 private key from a user provided text file
+//
+// this is a refactor of:
+// https://github.com/OffchainLabs/nitro/blob/9eda1777a836c13916caac493ee1e2796c536afc/daprovider/server/provider_server.go#L76-L88
+func fetchJWTSecret(fileName string) ([]byte, error) {
+	data, err := os.ReadFile(fileName)
+	if err != nil {
+		return nil, fmt.Errorf("could not read JWT Secret at file %s : %w", fileName, err)
+	}
+
+	jwtSecret := gethcommon.FromHex(strings.TrimSpace(string(data)))
+	if length := len(jwtSecret); length != 32 {
+		return nil, fmt.Errorf("invalid length detected for JWT token, expected 32 bytes but got %d", length)
+	}
+
+	return jwtSecret, nil
 }
