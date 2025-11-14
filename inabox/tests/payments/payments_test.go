@@ -23,23 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// NOTE: Currently, it doesn't work to run these tests in sequence. Each test must be run as a separate command.
-// The problem is that the cleanup logic sometimes randomly fails to free docker ports, so subsequent setups fail.
-// Once we figure out why resources aren't being freed, then these tests will be runnable the "normal" way.
-
-func TestLegacyPayments(t *testing.T) {
-	// manual test for now
-	test.SkipInCI(t)
-	testWithPaymentMode(t, false)
-}
-
-func TestNewPayments(t *testing.T) {
-	// manual test for now
-	test.SkipInCI(t)
-	testWithPaymentMode(t, true)
-}
-
-func testWithPaymentMode(t *testing.T, useNewPayments bool) {
+func TestPayments(t *testing.T) {
 	// Save current working directory. The setup process in its current form changes working directory, which causes
 	// subsequent executions to fail, since the process relies on relative paths. This is a workaround for now: we just
 	// capture the original working directory, and switch back to it as a cleanup step.
@@ -52,12 +36,11 @@ func testWithPaymentMode(t *testing.T, useNewPayments bool) {
 	})
 
 	infraConfig := &integration.InfrastructureConfig{
-		TemplateName:   "testconfig-anvil.yaml",
-		TestName:       "",
-		Logger:         test.GetLogger(),
-		RootPath:       "../../../",
-		RelayCount:     4,
-		UseNewPayments: useNewPayments,
+		TemplateName: "testconfig-anvil.yaml",
+		TestName:     "",
+		Logger:       test.GetLogger(),
+		RootPath:     "../../../",
+		RelayCount:   4,
 	}
 
 	infra, err := integration.SetupInfrastructure(t.Context(), infraConfig)
@@ -78,55 +61,32 @@ func testWithPaymentMode(t *testing.T, useNewPayments bool) {
 
 	// Subtests all use unique accountIDs, so they can run in parallel
 
-	t.Run("Reservation only: Legacy client payments with reservation reduction", func(t *testing.T) {
-		t.Parallel()
-		testReservationReduction(t, infra.Logger, testHarness, clientledger.ClientLedgerModeLegacy)
-	})
-
-	t.Run("Reservation only: New client payments with reservation reduction", func(t *testing.T) {
+	t.Run("Reservation only with reservation reduction", func(t *testing.T) {
 		t.Parallel()
 		testReservationReduction(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationOnly)
 	})
 
-	t.Run("Reservation only: Legacy client payments with reservation increase", func(t *testing.T) {
-		t.Parallel()
-		testReservationIncrease(t, infra.Logger, testHarness, clientledger.ClientLedgerModeLegacy)
-	})
-
-	t.Run("Reservation only: New client payments with reservation increase", func(t *testing.T) {
+	t.Run("Reservation only with reservation increase", func(t *testing.T) {
 		t.Parallel()
 		testReservationIncrease(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationOnly)
 	})
 
-	t.Run("On-demand only: Legacy client payments", func(t *testing.T) {
-		t.Parallel()
-		testOnDemandOnly(t, infra.Logger, testHarness, clientledger.ClientLedgerModeLegacy)
-	})
-
-	t.Run("On-demand only: New client payments", func(t *testing.T) {
+	t.Run("On-demand only", func(t *testing.T) {
 		t.Parallel()
 		testOnDemandOnly(t, infra.Logger, testHarness, clientledger.ClientLedgerModeOnDemandOnly)
 	})
 
-	t.Run("Reservation and on-demand: Old client payments", func(t *testing.T) {
-		t.Parallel()
-		testReservationAndOnDemand(t, infra.Logger, testHarness, clientledger.ClientLedgerModeLegacy)
-	})
-
-	t.Run("Reservation and on-demand: New client payments", func(t *testing.T) {
+	t.Run("Reservation and on-demand", func(t *testing.T) {
 		t.Parallel()
 		testReservationAndOnDemand(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationAndOnDemand)
 	})
 
-	// We don't run this test with old client payments, since they don't exhibit the panicky behavior being asserted
-	t.Run("Reservation only: New client payments with reservation expiration", func(t *testing.T) {
+	t.Run("Reservation only with reservation expiration", func(t *testing.T) {
 		t.Parallel()
 		testReservationExpiration(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationOnly)
 	})
 
-	// We *do* test with ClientLedgerModeReservationAndOnDemand, since even clients that have on-demand payments
-	// configured should exhibit the same panicky behavior when a reservation expires
-	t.Run("Reservation and on-demand: New client payments with reservation expiration", func(t *testing.T) {
+	t.Run("Reservation and on-demand with reservation expiration", func(t *testing.T) {
 		t.Parallel()
 		testReservationExpiration(t, infra.Logger, testHarness, clientledger.ClientLedgerModeReservationAndOnDemand)
 	})
@@ -189,14 +149,6 @@ func testReservationReduction(
 	require.NoError(t, err)
 	registerReservation(t, testHarness, clientReservation, accountID)
 
-	// The next part of the test asserts the same dispersal conditions now yield errors, considering the decreased
-	// reservation. The legacy client ledger mode doesn't observe payment vault updates, so we need to build
-	// a new payload disperser to pick up the change
-	if clientLedgerMode == clientledger.ClientLedgerModeLegacy {
-		payloadDisperser, err = testHarness.CreatePayloadDisperser(t.Context(), logger, payloadDisperserConfig)
-		require.NoError(t, err)
-	}
-
 	// Since we're dispersing at double the supported rate, assert ~50% success rate
 	mustSubmitPayloads(t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 0.5, 0.25)
 }
@@ -257,14 +209,6 @@ func testReservationIncrease(
 	)
 	require.NoError(t, err)
 	registerReservation(t, testHarness, clientReservation, accountID)
-
-	// The next part of the test asserts the same dispersal conditions no longer yield errors, considering the increased
-	// reservation. The legacy client ledger mode doesn't observe payment vault updates, so we need to build
-	// a new payload disperser to pick up the change
-	if clientLedgerMode == clientledger.ClientLedgerModeLegacy {
-		payloadDisperser, err = testHarness.CreatePayloadDisperser(t.Context(), logger, payloadDisperserConfig)
-		require.NoError(t, err)
-	}
 
 	// Since we're dispersing at half the supported rate, assert no failures
 	mustSubmitPayloads(t, testRandom, payloadDisperser, blobsPerSecond, payloadBytes, submissionDuration, 1.0, 0)
@@ -336,8 +280,8 @@ func testReservationExpiration(
 		require.Panics(t, func() {
 			_, _ = payloadDisperser.SendPayload(t.Context(), payload)
 		}, "dispersal should panic with expired reservation in ReservationAndOnDemand mode")
-	case clientledger.ClientLedgerModeOnDemandOnly, clientledger.ClientLedgerModeLegacy:
-		panic("testReservationExpiration should not be called with OnDemandOnly or Legacy")
+	case clientledger.ClientLedgerModeOnDemandOnly:
+		panic("testReservationExpiration should not be called with OnDemandOnly")
 	default:
 		panic("testReservationExpiration called with unexpected client ledger mode")
 	}
@@ -407,13 +351,6 @@ func testOnDemandOnly(
 	require.Error(t, err)
 
 	depositOnDemand(t, testHarness, big.NewInt(int64(deposit)), accountID)
-
-	// The next part of the test makes additional dispersals, considering the new deposit.
-	// The legacy client ledger mode doesn't observe payment vault updates, so we need to rebuild it
-	if clientLedgerMode == clientledger.ClientLedgerModeLegacy {
-		payloadDisperser, err = testHarness.CreatePayloadDisperser(t.Context(), logger, payloadDisperserConfig)
-		require.NoError(t, err)
-	}
 
 	// disperse the number of blobs that we expect to succeed
 	for i := 0; i < blobsToDisperse; i++ {

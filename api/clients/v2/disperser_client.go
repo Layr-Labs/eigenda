@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -32,16 +31,12 @@ type DisperserClientConfig struct {
 
 // DisperserClient manages communication with the disperser server.
 type DisperserClient struct {
-	logger                  logging.Logger
-	config                  *DisperserClientConfig
-	signer                  corev2.BlobRequestSigner
-	clientPool              *common.GRPCClientPool[disperser_rpc.DisperserClient]
-	committer               *committer.Committer
-	accountant              *Accountant
-	accountantLock          sync.Mutex
-	initOnceAccountant      sync.Once
-	initOnceAccountantError error
-	metrics                 metrics.DispersalMetricer
+	logger     logging.Logger
+	config     *DisperserClientConfig
+	signer     corev2.BlobRequestSigner
+	clientPool *common.GRPCClientPool[disperser_rpc.DisperserClient]
+	committer  *committer.Committer
+	metrics    metrics.DispersalMetricer
 }
 
 // DisperserClient maintains a single underlying grpc connection to the disperser server,
@@ -69,7 +64,6 @@ func NewDisperserClient(
 	config *DisperserClientConfig,
 	signer corev2.BlobRequestSigner,
 	committer *committer.Committer,
-	accountant *Accountant,
 	metrics metrics.DispersalMetricer,
 ) (*DisperserClient, error) {
 	if config == nil {
@@ -114,28 +108,8 @@ func NewDisperserClient(
 		signer:     signer,
 		clientPool: clientPool,
 		committer:  committer,
-		accountant: accountant,
 		metrics:    metrics,
 	}, nil
-}
-
-// PopulateAccountant populates the accountant with the payment state from the disperser.
-func (c *DisperserClient) PopulateAccountant(ctx context.Context) error {
-	if c.accountant == nil {
-		return fmt.Errorf("accountant is nil")
-	}
-
-	paymentState, err := c.GetPaymentState(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
-	}
-
-	err = c.accountant.SetPaymentState(paymentState)
-	if err != nil {
-		return fmt.Errorf("error setting payment state for accountant: %w", err)
-	}
-
-	return nil
 }
 
 // Close closes the grpc connection to the disperser server.
@@ -179,34 +153,6 @@ func (c *DisperserClient) DisperseBlob(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint32(len(data)))
-
-	if paymentMetadata == nil {
-		// we are using the legacy payment system
-		probe.SetStage("acquire_accountant_lock")
-		c.accountantLock.Lock()
-
-		probe.SetStage("accountant")
-
-		err := c.initOncePopulateAccountant(ctx)
-		if err != nil {
-			c.accountantLock.Unlock()
-			return nil, nil, fmt.Errorf("error initializing accountant: %w", err)
-		}
-
-		paymentMetadata, err = c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
-		if err != nil {
-			c.accountantLock.Unlock()
-			return nil, nil, fmt.Errorf("error accounting blob: %w", err)
-		}
-
-		if paymentMetadata.CumulativePayment == nil || paymentMetadata.CumulativePayment.Sign() == 0 {
-			// This request is using reserved bandwidth, no need to prevent parallel dispersal.
-			c.accountantLock.Unlock()
-		} else {
-			// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
-			defer c.accountantLock.Unlock()
-		}
-	}
 
 	probe.SetStage("verify_field_element")
 
@@ -346,20 +292,4 @@ func (c *DisperserClient) GetBlobCommitment(
 		return nil, fmt.Errorf("error while calling GetBlobCommitment: %w", err)
 	}
 	return reply, nil
-}
-
-// initOncePopulateAccountant initializes the accountant if it is not already initialized.
-// If initialization fails, it caches the error and will return it on every subsequent call.
-func (c *DisperserClient) initOncePopulateAccountant(ctx context.Context) error {
-	c.initOnceAccountant.Do(func() {
-		err := c.PopulateAccountant(ctx)
-		if err != nil {
-			c.initOnceAccountantError = err
-			return
-		}
-	})
-	if c.initOnceAccountantError != nil {
-		return fmt.Errorf("populating accountant: %w", c.initOnceAccountantError)
-	}
-	return nil
 }

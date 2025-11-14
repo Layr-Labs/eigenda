@@ -282,15 +282,6 @@ func createDisperserClient(
 		return nil, fmt.Errorf("create blob request signer: %w", err)
 	}
 
-	// Get account ID from the signer's public key
-	accountID, err := signer.GetAccountID()
-	if err != nil {
-		return nil, fmt.Errorf("get account ID: %w", err)
-	}
-
-	// Create an unpopulated accountant for legacy payment mode
-	accountant := clients.NewUnpopulatedAccountant(accountID, metrics.NoopAccountantMetrics)
-
 	hostname, port, err := net.SplitHostPort(disperserHostName)
 	if err != nil {
 		return nil, fmt.Errorf("parse EigenDA RPC: %w", err)
@@ -307,7 +298,6 @@ func createDisperserClient(
 		disperserClientConfig,
 		signer,
 		kzgCommitter,
-		accountant,
 		metrics.NoopDispersalMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)

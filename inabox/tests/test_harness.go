@@ -272,23 +272,11 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("error getting account ID: %w", err)
 	}
 
-	accountant := clientsv2.NewAccountant(
-		accountId,
-		nil,
-		nil,
-		0,
-		0,
-		0,
-		0,
-		metrics.NoopAccountantMetrics,
-	)
-
 	disperserClient, err := clientsv2.NewDisperserClient(
 		logger,
 		disperserClientConfig,
 		signer,
 		nil, // no prover so will query disperser for generating commitments
-		accountant,
 		metrics.NoopDispersalMetrics,
 	)
 	if err != nil {
@@ -303,26 +291,22 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		ContractCallTimeout:    5 * time.Second,
 	}
 
-	// Create ClientLedger based on configured mode
-	var clientLedger *clientledger.ClientLedger
-	if config.ClientLedgerMode != clientledger.ClientLedgerModeLegacy {
-		paymentVaultAddr, err := tc.ContractDirectory.GetContractAddress(ctx, directory.PaymentVault)
-		if err != nil {
-			return nil, fmt.Errorf("get PaymentVault address: %w", err)
-		}
+	paymentVaultAddr, err := tc.ContractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
 
-		clientLedger, err = buildClientLedger(
-			ctx,
-			logger,
-			tc.EthClient,
-			paymentVaultAddr,
-			accountId,
-			config.ClientLedgerMode,
-			disperserClient,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("build client ledger: %w", err)
-		}
+	clientLedger, err := buildClientLedger(
+		ctx,
+		logger,
+		tc.EthClient,
+		paymentVaultAddr,
+		accountId,
+		config.ClientLedgerMode,
+		disperserClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build client ledger: %w", err)
 	}
 
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(

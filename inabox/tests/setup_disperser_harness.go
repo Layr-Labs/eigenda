@@ -937,107 +937,100 @@ func startController(
 		return nil, fmt.Errorf("failed to start dispatcher: %w", err)
 	}
 
-	// Build and start gRPC server if payments are enabled
+	// Build and start gRPC server
 	var controllerServer *server.Server
 	var controllerAddress string
-	//nolint:nestif // Complex nested block is temporary until old payment system is removed
-	if config.TestConfig.UseNewPayments {
-		controllerLogger.Info("UseNewPayments enabled - starting gRPC server")
+	controllerLogger.Info("Starting gRPC server")
 
-		// Create contract directory
-		contractDirectory, err := directory.NewContractDirectory(
-			ctx,
-			controllerLogger,
-			ethClient,
-			gethcommon.HexToAddress(config.TestConfig.EigenDA.EigenDADirectory),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create contract directory: %w", err)
-		}
-
-		// Build payment authorization handler
-		paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
-		paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
-		paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
-		paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
-
-		paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
-			ctx,
-			controllerLogger,
-			*paymentAuthConfig,
-			contractDirectory,
-			ethClient,
-			dynamoClient.GetAwsClient(),
-			metricsRegistry,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)
-		}
-
-		// Pre-create listener with port 0 (OS assigns random port)
-		listener, err := net.Listen("tcp", "0.0.0.0:0")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create listener for controller: %w", err)
-		}
-		defer func() {
-			if err != nil {
-				_ = listener.Close()
-			}
-		}()
-
-		// Extract the port assigned by the OS
-		assignedPort := listener.Addr().(*net.TCPAddr).Port
-		controllerLogger.Info("Created listener for controller", "assigned_port", assignedPort)
-
-		// Create server config
-		grpcServerConfig, err := common.NewGRPCServerConfig(
-			true,
-			uint16(assignedPort),
-			1024*1024,
-			5*time.Minute,
-			5*time.Minute,
-			3*time.Minute,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gRPC server config: %w", err)
-		}
-
-		serverConfig, err := server.NewConfig(
-			grpcServerConfig,
-			true, // EnablePaymentAuthentication
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create server config: %w", err)
-		}
-
-		// Create and start gRPC server
-		grpcServer, err := server.NewServer(
-			ctx,
-			serverConfig,
-			controllerLogger,
-			metricsRegistry,
-			paymentAuthorizationHandler,
-			listener,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gRPC server: %w", err)
-		}
-
-		go func() {
-			controllerLogger.Info("Starting controller gRPC server", "address", listener.Addr().String())
-			if err := grpcServer.Start(); err != nil {
-				controllerLogger.Error("gRPC server failed", "error", err)
-			}
-		}()
-
-		controllerServer = grpcServer
-		controllerAddress = fmt.Sprintf("localhost:%d", assignedPort)
-		controllerLogger.Info("Controller gRPC server started successfully", "address", controllerAddress)
-	} else {
-		// When server is disabled, use empty address
-		controllerAddress = ""
-		controllerLogger.Info("UseNewPayments disabled - controller will not have server")
+	// Create contract directory
+	contractDirectory, err := directory.NewContractDirectory(
+		ctx,
+		controllerLogger,
+		ethClient,
+		gethcommon.HexToAddress(config.TestConfig.EigenDA.EigenDADirectory),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create contract directory: %w", err)
 	}
+
+	// Build payment authorization handler
+	paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
+	paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
+	paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
+	paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
+
+	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
+		ctx,
+		controllerLogger,
+		*paymentAuthConfig,
+		contractDirectory,
+		ethClient,
+		dynamoClient.GetAwsClient(),
+		metricsRegistry,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)
+	}
+
+	// Pre-create listener with port 0 (OS assigns random port)
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create listener for controller: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = listener.Close()
+		}
+	}()
+
+	// Extract the port assigned by the OS
+	assignedPort := listener.Addr().(*net.TCPAddr).Port
+	controllerLogger.Info("Created listener for controller", "assigned_port", assignedPort)
+
+	// Create server config
+	grpcServerConfig, err := common.NewGRPCServerConfig(
+		true,
+		uint16(assignedPort),
+		1024*1024,
+		5*time.Minute,
+		5*time.Minute,
+		3*time.Minute,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gRPC server config: %w", err)
+	}
+
+	serverConfig, err := server.NewConfig(
+		grpcServerConfig,
+		true, // EnablePaymentAuthentication
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create server config: %w", err)
+	}
+
+	// Create and start gRPC server
+	grpcServer, err := server.NewServer(
+		ctx,
+		serverConfig,
+		controllerLogger,
+		metricsRegistry,
+		paymentAuthorizationHandler,
+		listener,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gRPC server: %w", err)
+	}
+
+	go func() {
+		controllerLogger.Info("Starting controller gRPC server", "address", listener.Addr().String())
+		if err := grpcServer.Start(); err != nil {
+			controllerLogger.Error("gRPC server failed", "error", err)
+		}
+	}()
+
+	controllerServer = grpcServer
+	controllerAddress = fmt.Sprintf("localhost:%d", assignedPort)
+	controllerLogger.Info("Controller gRPC server started successfully", "address", controllerAddress)
 
 	controllerLogger.Info("Controller components started successfully",
 		"address", controllerAddress, "logFile", logFilePath)
@@ -1170,9 +1163,7 @@ func startAPIServer(
 
 	// Create meterer
 	// Note: The meterer is always created to serve GetPaymentState calls, even when using
-	// controller-mediated payments. The UseNewPayments flag controls which
-	// payment system is used for authorization during dispersals, but doesn't affect
-	// whether the meterer is available for querying payment state.
+	// controller-mediated payments.
 	apiServerLogger.Info("Creating meterer")
 
 	mtConfig := meterer.Config{
@@ -1244,23 +1235,21 @@ func startAPIServer(
 	// Onchain state refresh interval
 	onchainStateRefreshInterval := 1 * time.Second
 
-	// Create controller client if using new payments
+	// Create controller client
 	var controllerConnection *grpc.ClientConn
 	var controllerClient grpccontroller.ControllerServiceClient
-	if config.TestConfig.UseNewPayments {
-		if controllerAddress == "" {
-			return nil, fmt.Errorf("controller address is empty but UseNewPayments is true")
-		}
-		connection, err := grpc.NewClient(
-			controllerAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("create controller connection: %w", err)
-		}
-		controllerConnection = connection
-		controllerClient = grpccontroller.NewControllerServiceClient(connection)
+	if controllerAddress == "" {
+		return nil, fmt.Errorf("controller address is empty")
 	}
+	connection, err := grpc.NewClient(
+		controllerAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create controller connection: %w", err)
+	}
+	controllerConnection = connection
+	controllerClient = grpccontroller.NewControllerServiceClient(connection)
 
 	// Create API server
 	// Note: meterer is nil when using controller-mediated payments, otherwise it's the legacy meterer
@@ -1280,8 +1269,8 @@ func startAPIServer(
 		apiServerLogger,
 		metricsRegistry,
 		metricsConfig,
-		false,                            // ReservedOnly
-		config.TestConfig.UseNewPayments, // useControllerMediatedPayments
+		false, // ReservedOnly
+		true,  // useControllerMediatedPayments
 		controllerConnection,
 		controllerClient,
 		listener,
