@@ -22,14 +22,12 @@ import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 
-/**
- * @title Primary entrypoint for procuring services from EigenDA.
- * @author Layr Labs, Inc.
- * @notice This contract is used for:
- * - initializing the data store by the disperser
- * - confirming the data store by the disperser with inferred aggregated signatures of the quorum
- * - freezing operators as the result of various "challenges"
- */
+/// @title Primary entrypoint for procuring services from EigenDA.
+/// @author Layr Labs, Inc.
+/// @notice This contract is used for:
+/// - initializing the data store by the disperser
+/// - confirming the data store by the disperser with inferred aggregated signatures of the quorum
+/// - freezing operators as the result of various "challenges"
 contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBase, BLSSignatureChecker, Pausable {
     uint8 internal constant PAUSED_CONFIRM_BATCH = 0;
 
@@ -73,12 +71,10 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         }
     }
 
-    /**
-     * @notice This function is used for
-     * - submitting data availabilty certificates for EigenDA V1,
-     * - check that the aggregate signature is valid,
-     * - and check whether quorum has been achieved or not.
-     */
+    /// @notice This function is used for
+    /// - submitting data availabilty certificates for EigenDA V1,
+    /// - check that the aggregate signature is valid,
+    /// - and check whether quorum has been achieved or not.
     function confirmBatch(
         DATypesV1.BatchHeader calldata batchHeader,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature

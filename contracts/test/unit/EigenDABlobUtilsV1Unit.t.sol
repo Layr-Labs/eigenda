@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import "../MockEigenDADeployer.sol";
 import {EigenDACertVerifierV1} from "src/integrations/cert/legacy/v1/EigenDACertVerifierV1.sol";

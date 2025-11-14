@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
@@ -250,16 +250,13 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             if (i < 2) {
                 blobHeader.quorumBlobParams[i].quorumNumber = uint8(i); // Typecast is checked above.
             } else {
-                blobHeader.quorumBlobParams[i].quorumNumber =
-                    uint8( // Typecast is checked above.
-                            uint256(
-                                keccak256(
-                                    abi.encodePacked(
-                                        pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i
-                                    )
-                                )
-                            )
-                        ) % 192;
+                blobHeader.quorumBlobParams[i].quorumNumber = uint8( // Typecast is checked above.
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i)
+                        )
+                    )
+                ) % 192;
 
                 // make sure it isn't already used
                 while (quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber]) {

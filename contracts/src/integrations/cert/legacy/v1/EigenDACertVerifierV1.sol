@@ -13,20 +13,16 @@ import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStat
 import {IRegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 
-/**
- * @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
- *         to change these values or verification behavior a new CertVerifier must be deployed
- */
+/// @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
+///         to change these values or verification behavior a new CertVerifier must be deployed
 contract EigenDACertVerifierV1 {
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistryV1;
 
     IEigenDABatchMetadataStorage public immutable eigenDABatchMetadataStorageV1;
 
-    /**
-     * @notice Constructor for the EigenDA V1 certificate verifier
-     * @param _eigenDAThresholdRegistryV1 The address of the EigenDAThresholdRegistry contract
-     * @param _eigenDABatchMetadataStorageV1 The address of the EigenDABatchMetadataStorage contract
-     */
+    /// @notice Constructor for the EigenDA V1 certificate verifier
+    /// @param _eigenDAThresholdRegistryV1 The address of the EigenDAThresholdRegistry contract
+    /// @param _eigenDABatchMetadataStorageV1 The address of the EigenDABatchMetadataStorage contract
     constructor(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistryV1,
         IEigenDABatchMetadataStorage _eigenDABatchMetadataStorageV1
@@ -35,11 +31,9 @@ contract EigenDACertVerifierV1 {
         eigenDABatchMetadataStorageV1 = _eigenDABatchMetadataStorageV1;
     }
 
-    /**
-     * @notice Verifies that the blob cert is valid for the required quorums
-     * @param blobHeader The blob header to verify
-     * @param blobVerificationProof The blob cert verification proof to verify
-     */
+    /// @notice Verifies that the blob cert is valid for the required quorums
+    /// @param blobHeader The blob header to verify
+    /// @param blobVerificationProof The blob cert verification proof to verify
     function verifyDACertV1(
         DATypesV1.BlobHeader calldata blobHeader,
         DATypesV1.BlobVerificationProof calldata blobVerificationProof
@@ -49,11 +43,9 @@ contract EigenDACertVerifierV1 {
         );
     }
 
-    /**
-     * @notice Verifies a batch of blob certs for the required quorums
-     * @param blobHeaders The blob headers to verify
-     * @param blobVerificationProofs The blob cert verification proofs to verify against
-     */
+    /// @notice Verifies a batch of blob certs for the required quorums
+    /// @param blobHeaders The blob headers to verify
+    /// @param blobVerificationProofs The blob cert verification proofs to verify against
     function verifyDACertsV1(
         DATypesV1.BlobHeader[] calldata blobHeaders,
         DATypesV1.BlobVerificationProof[] calldata blobVerificationProofs
@@ -97,20 +89,16 @@ contract EigenDACertVerifierV1 {
         return _thresholdRegistry().getBlobParams(version);
     }
 
-    /**
-     * @notice Returns the threshold registry contract
-     * @return The IEigenDAThresholdRegistry contract
-     * @dev Can be overridden by derived contracts
-     */
+    /// @notice Returns the threshold registry contract
+    /// @return The IEigenDAThresholdRegistry contract
+    /// @dev Can be overridden by derived contracts
     function _thresholdRegistry() internal view virtual returns (IEigenDAThresholdRegistry) {
         return eigenDAThresholdRegistryV1;
     }
 
-    /**
-     * @notice Returns the batch metadata storage contract
-     * @return The IEigenDABatchMetadataStorage contract
-     * @dev Can be overridden by derived contracts
-     */
+    /// @notice Returns the batch metadata storage contract
+    /// @return The IEigenDABatchMetadataStorage contract
+    /// @dev Can be overridden by derived contracts
     function _batchMetadataStorage() internal view virtual returns (IEigenDABatchMetadataStorage) {
         return eigenDABatchMetadataStorageV1;
     }

@@ -10,26 +10,20 @@ import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.
 interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
     // EVENTS
 
-    /**
-     * @notice Emitted when a Batch is confirmed.
-     * @param batchHeaderHash The hash of the batch header
-     * @param batchId The ID for the Batch inside of the specified duration (i.e. *not* the globalBatchId)
-     */
+    /// @notice Emitted when a Batch is confirmed.
+    /// @param batchHeaderHash The hash of the batch header
+    /// @param batchId The ID for the Batch inside of the specified duration (i.e. *not* the globalBatchId)
     event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId);
 
-    /**
-     * @notice Emitted when a batch confirmer status is updated.
-     * @param batchConfirmer The address of the batch confirmer
-     * @param status The new status of the batch confirmer
-     */
+    /// @notice Emitted when a batch confirmer status is updated.
+    /// @param batchConfirmer The address of the batch confirmer
+    /// @param status The new status of the batch confirmer
     event BatchConfirmerStatusChanged(address batchConfirmer, bool status);
 
-    /**
-     * @notice This function is used for
-     * - submitting data availabilty certificates,
-     * - check that the aggregate signature is valid,
-     * - and check whether quorum has been achieved or not.
-     */
+    /// @notice This function is used for
+    /// - submitting data availabilty certificates,
+    /// - check that the aggregate signature is valid,
+    /// - and check whether quorum has been achieved or not.
     function confirmBatch(
         DATypesV1.BatchHeader calldata batchHeader,
         BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature

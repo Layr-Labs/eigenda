@@ -7,10 +7,8 @@ import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contrac
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-/**
- * @title The `EigenDAThresholdRegistry` contract.
- * @author Layr Labs, Inc.
- */
+/// @title The `EigenDAThresholdRegistry` contract.
+/// @author Layr Labs, Inc.
 contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpgradeable {
     constructor() {
         _disableInitializers();
