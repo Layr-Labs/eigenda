@@ -946,89 +946,89 @@ func startController(
 
 		// Create contract directory
 		contractDirectory, err := directory.NewContractDirectory(
-		ctx,
-		controllerLogger,
-		ethClient,
-		gethcommon.HexToAddress(config.TestConfig.EigenDA.EigenDADirectory),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create contract directory: %w", err)
-	}
-
-	// Build payment authorization handler
-	paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
-	paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
-	paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
-	paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
-
-	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
-		ctx,
-		controllerLogger,
-		*paymentAuthConfig,
-		contractDirectory,
-		ethClient,
-		dynamoClient.GetAwsClient(),
-		metricsRegistry,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)
-	}
-
-	// Pre-create listener with port 0 (OS assigns random port)
-	listener, err := net.Listen("tcp", "0.0.0.0:0")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create listener for controller: %w", err)
-	}
-	defer func() {
+			ctx,
+			controllerLogger,
+			ethClient,
+			gethcommon.HexToAddress(config.TestConfig.EigenDA.EigenDADirectory),
+		)
 		if err != nil {
-			_ = listener.Close()
+			return nil, fmt.Errorf("failed to create contract directory: %w", err)
 		}
-	}()
 
-	// Extract the port assigned by the OS
-	assignedPort := listener.Addr().(*net.TCPAddr).Port
-	controllerLogger.Info("Created listener for controller", "assigned_port", assignedPort)
+		// Build payment authorization handler
+		paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
+		paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
+		paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
+		paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
 
-	// Create server config
-	grpcServerConfig, err := common.NewGRPCServerConfig(
-		true,
-		uint16(assignedPort),
-		1024*1024,
-		5*time.Minute,
-		5*time.Minute,
-		3*time.Minute,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gRPC server config: %w", err)
-	}
-
-	serverConfig, err := server.NewConfig(
-		grpcServerConfig,
-		true, // EnablePaymentAuthentication
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create server config: %w", err)
-	}
-
-	// Create and start gRPC server
-	grpcServer, err := server.NewServer(
-		ctx,
-		serverConfig,
-		controllerLogger,
-		metricsRegistry,
-		paymentAuthorizationHandler,
-		listener,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gRPC server: %w", err)
-	}
-
-	go func() {
-		controllerLogger.Info("Starting controller gRPC server", "address", listener.Addr().String())
-		if err := grpcServer.Start(); err != nil {
-			controllerLogger.Error("gRPC server failed", "error", err)
+		paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
+			ctx,
+			controllerLogger,
+			*paymentAuthConfig,
+			contractDirectory,
+			ethClient,
+			dynamoClient.GetAwsClient(),
+			metricsRegistry,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)
 		}
-	}()
+
+		// Pre-create listener with port 0 (OS assigns random port)
+		listener, err := net.Listen("tcp", "0.0.0.0:0")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create listener for controller: %w", err)
+		}
+		defer func() {
+			if err != nil {
+				_ = listener.Close()
+			}
+		}()
+
+		// Extract the port assigned by the OS
+		assignedPort := listener.Addr().(*net.TCPAddr).Port
+		controllerLogger.Info("Created listener for controller", "assigned_port", assignedPort)
+
+		// Create server config
+		grpcServerConfig, err := common.NewGRPCServerConfig(
+			true,
+			uint16(assignedPort),
+			1024*1024,
+			5*time.Minute,
+			5*time.Minute,
+			3*time.Minute,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gRPC server config: %w", err)
+		}
+
+		serverConfig, err := server.NewConfig(
+			grpcServerConfig,
+			true, // EnablePaymentAuthentication
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create server config: %w", err)
+		}
+
+		// Create and start gRPC server
+		grpcServer, err := server.NewServer(
+			ctx,
+			serverConfig,
+			controllerLogger,
+			metricsRegistry,
+			paymentAuthorizationHandler,
+			listener,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gRPC server: %w", err)
+		}
+
+		go func() {
+			controllerLogger.Info("Starting controller gRPC server", "address", listener.Addr().String())
+			if err := grpcServer.Start(); err != nil {
+				controllerLogger.Error("gRPC server failed", "error", err)
+			}
+		}()
 
 		controllerServer = grpcServer
 		controllerAddress = fmt.Sprintf("localhost:%d", assignedPort)

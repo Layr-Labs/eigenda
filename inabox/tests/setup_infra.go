@@ -29,6 +29,11 @@ type InfrastructureConfig struct {
 	// tests that do not require the disperser infrastructure to be deployed (e.g. testing graph
 	// node with operator registration)
 	DisableDisperser bool
+
+	// The following field is temporary, to be able to test different payments configurations. It will be removed
+	// once legacy payments are removed. When true, the controller, API server, and validator nodes will all
+	// use the new payment system.
+	UseNewPayments bool
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
@@ -61,6 +66,7 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 
 	testConfig := deploy.ReadTestConfig(testName, config.RootPath)
+	testConfig.UseNewPayments = config.UseNewPayments
 
 	// Create a long-lived context for the infrastructure lifecycle
 	infraCtx, infraCancel := context.WithCancel(ctx)
