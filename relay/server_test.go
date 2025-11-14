@@ -50,11 +50,11 @@ func defaultConfig() *Config {
 			MaxGetChunkBytesPerSecond:       20 * 1024 * 1024,
 			GetChunkBytesBurstiness:         20 * 1024 * 1024,
 			MaxConcurrentGetChunkOps:        1024,
-			MaxGetChunkOpsPerSecondClient:   8,
-			GetChunkOpsBurstinessClient:     8,
+			MaxGetChunkOpsPerSecondClient:   1024,
+			GetChunkOpsBurstinessClient:     1024,
 			MaxGetChunkBytesPerSecondClient: 2 * 1024 * 1024,
 			GetChunkBytesBurstinessClient:   2 * 1024 * 1024,
-			MaxConcurrentGetChunkOpsClient:  1,
+			MaxConcurrentGetChunkOpsClient:  1024,
 		},
 		Timeouts: TimeoutConfig{
 			GetBlobTimeout:                 10 * time.Second,
@@ -539,7 +539,6 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
-	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
 
 	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
