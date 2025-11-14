@@ -36,11 +36,12 @@ func TestPayments(t *testing.T) {
 	})
 
 	infraConfig := &integration.InfrastructureConfig{
-		TemplateName: "testconfig-anvil.yaml",
-		TestName:     "",
-		Logger:       test.GetLogger(),
-		RootPath:     "../../../",
-		RelayCount:   4,
+		TemplateName:   "testconfig-anvil.yaml",
+		TestName:       "",
+		Logger:         test.GetLogger(),
+		RootPath:       "../../../",
+		RelayCount:     4,
+		UseNewPayments: true,
 	}
 
 	infra, err := integration.SetupInfrastructure(t.Context(), infraConfig)
