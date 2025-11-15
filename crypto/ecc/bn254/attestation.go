@@ -46,11 +46,15 @@ func (p *G1Point) VerifyEquivalence(p2 *G2Point) (bool, error) {
 	return CheckG1AndG2DiscreteLogEquality(p.G1Affine, p2.G2Affine)
 }
 
+// Serialize returns the uncompressed binary representation of the G1 point.
+// The format matches the gnark-crypto RawBytes format (uncompressed affine coordinates).
 func (p *G1Point) Serialize() []byte {
 	res := p.RawBytes()
 	return res[:]
 }
 
+// Deserialize creates a new G1Point from its binary representation.
+// Returns an error if the input data is invalid or cannot be parsed as a valid G1 point.
 func (p *G1Point) Deserialize(data []byte) (*G1Point, error) {
 	var point bn254.G1Affine
 	_, err := point.SetBytes(data)
@@ -60,6 +64,8 @@ func (p *G1Point) Deserialize(data []byte) (*G1Point, error) {
 	return &G1Point{&point}, nil
 }
 
+// Clone creates an independent copy of the G1Point.
+// Modifications to the returned point will not affect the original.
 func (p *G1Point) Clone() *G1Point {
 	return &G1Point{&bn254.G1Affine{
 		X: newFpElement(p.X.BigInt(new(big.Int))),
@@ -67,6 +73,8 @@ func (p *G1Point) Clone() *G1Point {
 	}}
 }
 
+// Hash computes the Keccak256 hash of the serialized G1 point.
+// Returns a 32-byte hash value.
 func (p *G1Point) Hash() [32]byte {
 	return crypto.Keccak256Hash(p.Serialize())
 }
@@ -85,11 +93,15 @@ func (p *G2Point) Sub(p2 *G2Point) {
 	p.G2Affine.Sub(p.G2Affine, p2.G2Affine)
 }
 
+// Serialize returns the uncompressed binary representation of the G2 point.
+// The format matches the gnark-crypto RawBytes format (uncompressed affine coordinates).
 func (p *G2Point) Serialize() []byte {
 	res := p.RawBytes()
 	return res[:]
 }
 
+// Deserialize creates a new G2Point from its binary representation.
+// Returns an error if the input data is invalid or cannot be parsed as a valid G2 point.
 func (p *G2Point) Deserialize(data []byte) (*G2Point, error) {
 	var point bn254.G2Affine
 	_, err := point.SetBytes(data)
@@ -99,6 +111,8 @@ func (p *G2Point) Deserialize(data []byte) (*G2Point, error) {
 	return &G2Point{&point}, nil
 }
 
+// Clone creates an independent copy of the G2Point.
+// Modifications to the returned point will not affect the original.
 func (p *G2Point) Clone() *G2Point {
 	return &G2Point{&bn254.G2Affine{
 		X: struct {
