@@ -357,7 +357,7 @@ An optional `--eigenda.confirmation-depth` flag can be provided to specify a num
 `0`: Verify the cert immediately upon blob confirmation and return the cert
 `N where 0<N<64`: Wait `N` blocks before returning the cert to the batcher
 
-The default value is 8. Using 0 is dangerous: see [troubleshooting the batch-hash-mismatch error](./docs/troubleshooting_v1.md#batch-hash-mismatch-error).
+The default value is 8. Using 0 is dangerous: see [troubleshooting the batch-hash-mismatch error](https://github.com/Layr-Labs/eigenda/blob/749b333052738210107432f28a6b539daabc2f98/api/proxy/docs/troubleshooting_v1.md).
 
 #### In-Memory Backend <!-- omit from toc -->
 
