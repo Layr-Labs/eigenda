@@ -35,6 +35,7 @@ jobs:
 
       - name: Validate branch is master or another release branch
         run: |
+          branch="${{ github.ref_name }}"
           if [[ "$branch" != "master" && "$branch" != release/* ]]; then
             echo "Error: This workflow can only be run from either master or another release branch"
             exit 1
