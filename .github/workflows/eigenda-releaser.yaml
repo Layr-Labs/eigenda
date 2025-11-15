@@ -33,19 +33,21 @@ jobs:
         with:
           token: ${{ steps.generate_token.outputs.token }}
 
-      - name: Validate branch is master
+      - name: Validate branch is master or another release branch
         run: |
-          if [[ "${{ github.ref_name }}" != "master" ]]; then
-            echo "Error: This workflow can only be run from the master branch"
+          branch="${{ github.ref_name }}"
+          if [[ "$branch" != "master" && "$branch" != release/* ]]; then
+            echo "Error: This workflow can only be run from either master or another release branch"
             exit 1
           fi
-          echo "Branch validation passed: running on master"
+          echo "Branch validation passed"
 
       - name: Validate version format
         run: |
           version="${{ github.event.inputs.version }}"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: Version must be in format x.y.z (e.g., 1.2.3)"
+          # Accept X.Y or X.Y.Z (where X,Y,Z are integers)
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Error: Version must be in format x.y or x.y.z (e.g., 2.5, 1.2.3)"
             exit 1
           fi
           echo "Version format is valid: $version"
