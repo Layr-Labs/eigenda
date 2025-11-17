@@ -42,7 +42,7 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 			Name: ProcessInvalidCertFlagName,
 			Usage: "Whether or not the CustomDA server should return a `CertificateValidationError` to the arbitrum nitro derivation pipeline which \"drops\" the DA " +
 				"Cert by treating it as an empty batch. When disabled or set to false, an invalid DA Cert would cause the derivation pipeline to halt where the nitro software " +
-				"would death loop on calls to daprovider_RecoverPayload",
+				"would enter an infinite loop on calls to daprovider_RecoverPayload",
 			Value:    false,
 			EnvVars:  withEnvPrefix(envPrefix, "PROCESS_INVALID_CERT"),
 			Category: category,
