@@ -102,17 +102,21 @@ type Handlers struct {
 	//       We should dig into this underlying logging and see if there's a way to intuitively override, disable,
 	//       or enforce consistency between log outputs.
 
-	log              logging.Logger
-	eigenDAManager   *store.EigenDAManager
-	compatibilityCfg proxy_common.CompatibilityConfig
+	processInvalidCert bool
+	log                logging.Logger
+	eigenDAManager     store.IEigenDAManager
+	compatibilityCfg   proxy_common.CompatibilityConfig
 }
 
 // NewHandlers is a constructor
-func NewHandlers(m *store.EigenDAManager, l logging.Logger, compatCfg proxy_common.CompatibilityConfig) IHandlers {
+func NewHandlers(
+	m store.IEigenDAManager, l logging.Logger, pic bool, compatCfg proxy_common.CompatibilityConfig,
+) IHandlers {
 	return &Handlers{
-		log:              l,
-		eigenDAManager:   m,
-		compatibilityCfg: compatCfg,
+		log:                l,
+		processInvalidCert: pic,
+		eigenDAManager:     m,
+		compatibilityCfg:   compatCfg,
 	}
 }
 
@@ -194,17 +198,17 @@ func (h *Handlers) RecoverPayload(
 	// then it is treated as a DerivationError
 	daCert, err := h.deserializeCertFromSequencerMsg(sequencerMsg)
 	if err != nil {
-		return nil, nil
+		if h.processInvalidCert {
+			err = errors.Join(err, CertificateValidationError)
+		}
+		return nil, fmt.Errorf("deserialize DA Cert from message: %w", err)
 	}
 
 	payload, err := h.eigenDAManager.Get(ctx, daCert, coretypes.CertSerializationABI, proxy_common.GETOpts{})
 	if err != nil {
 		var dpError *coretypes.DerivationError
-		if errors.As(err, &dpError) {
-			// returning nil for the batch payload indicates to the
-			// nitro derivation pipeline to "discard" this batch and move
-			// onto the next DA Cert in the Sequencer Inbox
-			return nil, nil
+		if errors.As(err, &dpError) && h.processInvalidCert {
+			err = errors.Join(err, CertificateValidationError)
 		}
 
 		return nil, fmt.Errorf("get rollup payload from DA Cert: %w", err)

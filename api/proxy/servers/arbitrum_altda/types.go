@@ -15,6 +15,10 @@ var (
 	// ErrFallbackRequested is returned by a CustomDA provider to explicitly signal that
 	// the batch poster should fall back to the next available DA writer (e.g, AnyTrust).
 	ErrFallbackRequested = errors.New("DA provider requests fallback to next writer")
+
+	// CertificateValidationError is returned by a CustomDA provider to signal an "invalid DA Cert"
+	// condition.
+	CertificateValidationError = errors.New("certificate validation failed")
 )
 
 const (
