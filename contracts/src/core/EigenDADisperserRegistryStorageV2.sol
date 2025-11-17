@@ -6,15 +6,14 @@ import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/
 
 abstract contract EigenDADisperserRegistryStorageV2 {
     using EnumerableSet for EnumerableSet.UintSet;
- 
+
     /// -----------------------------------------------------------------------
     /// Constants
     /// -----------------------------------------------------------------------
 
     /// @notice The EIP-712 typehash signed by a disperser that signals intent to deregister.
     /// @dev Owner has the ability to censor deregistrations by not processing the signature.
-    bytes32 public constant DEREGISTRATION_TYPEHASH = 
-        keccak256("Deregister(uint32 disperserId)");
+    bytes32 public constant DEREGISTRATION_TYPEHASH = keccak256("Deregister(uint32 disperserId)");
 
     /// @notice The EIP-712 typehash signed by a disperser that signals intent to update their relay URL.
     /// @dev Owner has the ability to censor relay URL updates by not processing the signature.

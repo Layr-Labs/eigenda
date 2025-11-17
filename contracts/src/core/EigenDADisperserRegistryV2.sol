@@ -2,17 +2,17 @@
 pragma solidity ^0.8.9;
 
 import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
-import {EIP712Upgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/draft-EIP712Upgradeable.sol";
+import {
+    EIP712Upgradeable
+} from "lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/draft-EIP712Upgradeable.sol";
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {EigenDADisperserRegistryStorageV2} from "./EigenDADisperserRegistryStorageV2.sol";
 import {IEigenDADisperserRegistryV2} from "src/core/interfaces/IEigenDADisperserRegistryV2.sol";
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
- 
-/**
- * @title Registry for EigenDA disperser info V2
- * @author Layr Labs, Inc.
- */
+
+/// @title Registry for EigenDA disperser info V2
+/// @author Layr Labs, Inc.
 contract EigenDADisperserRegistryV2 is
     OwnableUpgradeable,
     EIP712Upgradeable,
@@ -44,9 +44,9 @@ contract EigenDADisperserRegistryV2 is
         if (disperserAddress == address(0)) revert InputAddressZero();
 
         if (bytes(relayURL).length == 0) revert InvalidRelayURL();
-        
+
         if (pubKey.length == 0) revert InvalidPublicKey();
-        
+
         if (disperserAddressToId[disperserAddress] != 0) revert DisperserAlreadyRegistered();
 
         uint32 disperserId = nextDisperserId;
@@ -90,8 +90,7 @@ contract EigenDADisperserRegistryV2 is
         if (bytes(newRelayURL).length == 0) revert InvalidRelayURL();
 
         // Verify EIP712 signature
-        bytes32 structHash =
-            keccak256(abi.encode(UPDATERELAYURLTYPEHASH, disperserId, keccak256(bytes(newRelayURL))));
+        bytes32 structHash = keccak256(abi.encode(UPDATERELAYURLTYPEHASH, disperserId, keccak256(bytes(newRelayURL))));
         bytes32 digest = hashTypedDataV4(structHash);
         address signer = ECDSA.recover(digest, signature);
 
