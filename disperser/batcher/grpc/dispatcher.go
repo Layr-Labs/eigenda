@@ -74,7 +74,7 @@ func (c *dispatcher) sendAllChunks(
 				update <- core.SigningMessage{
 					Err:                  fmt.Errorf("failed to get batch header hash: %w", err),
 					Signature:            nil,
-					Operator:             id,
+					ValidatorId:          id,
 					BatchHeaderHash:      [32]byte{},
 					AttestationLatencyMs: -1,
 				}
@@ -95,7 +95,7 @@ func (c *dispatcher) sendAllChunks(
 				update <- core.SigningMessage{
 					Err:                  errors.New("operator is not part of any quorum"),
 					Signature:            nil,
-					Operator:             id,
+					ValidatorId:          id,
 					BatchHeaderHash:      batchHeaderHash,
 					AttestationLatencyMs: -1,
 				}
@@ -109,7 +109,7 @@ func (c *dispatcher) sendAllChunks(
 				update <- core.SigningMessage{
 					Err:                  err,
 					Signature:            nil,
-					Operator:             id,
+					ValidatorId:          id,
 					BatchHeaderHash:      batchHeaderHash,
 					AttestationLatencyMs: latencyMs,
 				}
@@ -117,7 +117,7 @@ func (c *dispatcher) sendAllChunks(
 			} else {
 				update <- core.SigningMessage{
 					Signature:            sig,
-					Operator:             id,
+					ValidatorId:          id,
 					BatchHeaderHash:      batchHeaderHash,
 					AttestationLatencyMs: latencyMs,
 					Err:                  nil,

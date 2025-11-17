@@ -40,7 +40,7 @@ func createSigningMessage(
 
 	return core.SigningMessage{
 		Signature:            keypair.SignMessage(headerHash),
-		Operator:             operatorID,
+		ValidatorId:          operatorID,
 		BatchHeaderHash:      headerHash,
 		AttestationLatencyMs: 10.0,
 		TimeReceived:         time.Now(),

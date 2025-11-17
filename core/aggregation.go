@@ -26,12 +26,12 @@ var (
 	ErrAggSigNotValid      = errors.New("aggregated signature is not valid")
 )
 
-type SigningMessage struct {
+type SigningMessage struct { // TODO roll this back, create new V2 only version
 	Signature       *Signature
-	Operator        OperatorID
-	BatchHeaderHash [32]byte
+	ValidatorId     OperatorID
+	BatchHeaderHash [32]byte // TODO why is this needed?
 	// Undefined if this value <= 0.
-	AttestationLatencyMs float64
+	AttestationLatencyMs float64 // TODO where is this used?
 	TimeReceived         time.Time
 	Err                  error
 }
@@ -173,27 +173,27 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			break
 		}
 
-		if _, seen := signerMap[r.Operator]; seen {
-			a.Logger.Warn("duplicate signature received", "operatorID", r.Operator.Hex())
+		if _, seen := signerMap[r.ValidatorId]; seen {
+			a.Logger.Warn("duplicate signature received", "operatorID", r.ValidatorId.Hex())
 			continue
 		}
 
-		operatorIDHex := r.Operator.Hex()
-		operatorAddr, ok := a.OperatorAddresses.Get(r.Operator)
+		operatorIDHex := r.ValidatorId.Hex()
+		operatorAddr, ok := a.OperatorAddresses.Get(r.ValidatorId)
 		if !ok && a.Transactor != nil {
-			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.Operator)
+			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.ValidatorId)
 			if err != nil {
 				a.Logger.Warn("failed to get operator address from registry", "operatorID", operatorIDHex)
 				operatorAddr = gethcommon.Address{}
 			} else {
-				a.OperatorAddresses.Add(r.Operator, operatorAddr)
+				a.OperatorAddresses.Add(r.ValidatorId, operatorAddr)
 			}
 		} else if !ok {
 			operatorAddr = gethcommon.Address{}
 		}
 
 		socket := ""
-		if op, ok := state.IndexedOperators[r.Operator]; ok {
+		if op, ok := state.IndexedOperators[r.ValidatorId]; ok {
 			socket = op.Socket
 		}
 		batchHeaderHashHex := hex.EncodeToString(r.BatchHeaderHash[:])
@@ -208,7 +208,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			continue
 		}
 
-		op, found := state.IndexedOperators[r.Operator]
+		op, found := state.IndexedOperators[r.ValidatorId]
 		if !found {
 			a.Logger.Error("Operator not found in state",
 				"operatorID", operatorIDHex,
@@ -233,14 +233,14 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 		for _, quorumID := range quorumIDs {
 			// Get stake amounts for operator
 			ops := state.Operators[quorumID]
-			opInfo, ok := ops[r.Operator]
+			opInfo, ok := ops[r.ValidatorId]
 			// If operator is not in quorum, skip
 			if !ok {
 				continue
 			}
 			operatorQuorums = append(operatorQuorums, quorumID)
 
-			signerMap[r.Operator] = struct{}{}
+			signerMap[r.ValidatorId] = struct{}{}
 
 			// Add to stake signed
 			stakeSigned[quorumID].Add(stakeSigned[quorumID], opInfo.Stake)

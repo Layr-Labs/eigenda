@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"slices"
 	"strings"
 	"time"
@@ -64,11 +63,6 @@ type DispatcherConfig struct {
 	// Must be positive.
 	SignatureTickInterval time.Duration
 
-	// NumRequestRetries is the number of times to retry dispersing to a node after the initial attempt fails.
-	// The current implementation has performance issues, so this should typically be 0 (no retries).
-	// Must be non-negative.
-	NumRequestRetries int
-
 	// MaxBatchSize is the maximum number of blobs to include in a single batch for dispersal.
 	// Must be at least 1.
 	MaxBatchSize int32
@@ -120,9 +114,6 @@ func (c *DispatcherConfig) Verify() error {
 	if c.SignatureTickInterval <= 0 {
 		return fmt.Errorf("SignatureTickInterval must be positive, got %v", c.SignatureTickInterval)
 	}
-	if c.NumRequestRetries < 0 {
-		return fmt.Errorf("NumRequestRetries must be non-negative, got %d", c.NumRequestRetries)
-	}
 	if c.MaxBatchSize < 1 {
 		return fmt.Errorf("MaxBatchSize must be at least 1, got %d", c.MaxBatchSize)
 	}
@@ -151,7 +142,6 @@ func DefaultDispatcherConfig() *DispatcherConfig {
 		BatchMetadataUpdatePeriod:           time.Minute,
 		BatchAttestationTimeout:             55 * time.Second,
 		SignatureTickInterval:               50 * time.Millisecond,
-		NumRequestRetries:                   0,
 		MaxBatchSize:                        32,
 		SignificantSigningThresholdFraction: 0.55,
 		NumConcurrentRequests:               600,
@@ -318,13 +308,27 @@ func (d *Dispatcher) HandleBatch(
 		validatorProbe.SetStage("pool_submission")
 
 		d.pool.Submit(func() {
-			d.sendChunksToValidator(
+			signature, timeReceived, err := d.sendChunksToValidator(
 				ctx,
 				batchData,
 				validatorId,
 				validatorInfo,
-				validatorProbe,
-				signingResponseChan)
+				validatorProbe)
+
+			if err != nil {
+				d.logger.Warn("error sending chunks to validator",
+					"validator", validatorId.Hex(),
+					"batchHeaderHash", hex.EncodeToString(batchData.BatchHeaderHash[:]),
+					"err", err)
+			}
+
+			signingResponseChan <- core.SigningMessage{
+				ValidatorId:     validatorId,
+				Signature:       signature,
+				BatchHeaderHash: batchData.BatchHeaderHash,
+				TimeReceived:    timeReceived,
+				Err:             err,
+			}
 		})
 	}
 
@@ -333,16 +337,14 @@ func (d *Dispatcher) HandleBatch(
 	return signingResponseChan, batchData, nil
 }
 
-// Send a StoreChunks request for a batch to a specific validator, and send the response to the signingResponseChan
-// when it is received (or an error occurs).
+// Send a StoreChunks request for a batch to a specific validator, returning the result.
 func (d *Dispatcher) sendChunksToValidator(
 	ctx context.Context,
 	batchData *batchData,
 	validatorId core.OperatorID,
 	validatorInfo *core.IndexedOperatorInfo,
 	validatorProbe *common.SequenceProbe,
-	signingResponseChan chan core.SigningMessage,
-) {
+) (Signature *core.Signature, TimeReceived time.Time, Err error) {
 
 	defer validatorProbe.End()
 
@@ -350,35 +352,13 @@ func (d *Dispatcher) sendChunksToValidator(
 
 	host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(validatorInfo.Socket)
 	if err != nil {
-		d.logger.Warn("failed to parse operator socket, check if the socket format is correct",
-			"operator", validatorId.Hex(),
-			"socket", validatorInfo.Socket,
-			"err", err)
-		signingResponseChan <- core.SigningMessage{
-			Signature:       nil,
-			Operator:        validatorId,
-			BatchHeaderHash: batchData.BatchHeaderHash,
-			TimeReceived:    time.Now(),
-			Err:             fmt.Errorf("failed to parse operator socket (%s): %w", validatorInfo.Socket, err),
-		}
-		return
+		return nil, time.Now(), fmt.Errorf("failed to parse operator socket %s: %w", validatorInfo.Socket, err)
 	}
 
 	client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
 	if err != nil {
-		d.logger.Warn("failed to get node client; node may not be reachable",
-			"operator", validatorId.Hex(),
-			"host", host,
-			"v2DispersalPort", v2DispersalPort,
-			"err", err)
-		signingResponseChan <- core.SigningMessage{
-			Signature:       nil,
-			Operator:        validatorId,
-			BatchHeaderHash: batchData.BatchHeaderHash,
-			TimeReceived:    time.Now(),
-			Err:             err,
-		}
-		return
+		return nil, time.Now(),
+			fmt.Errorf("failed to get node client for validator at port %s: %w", v2DispersalPort, err)
 	}
 
 	validatorProbe.SetStage("put_dispersal_request")
@@ -394,77 +374,38 @@ func (d *Dispatcher) sendChunksToValidator(
 	err = d.blobMetadataStore.PutDispersalRequest(ctx, req)
 	if err != nil {
 		d.logger.Error("failed to put dispersal request", "err", err)
-		signingResponseChan <- core.SigningMessage{
-			Signature:       nil,
-			Operator:        validatorId,
-			BatchHeaderHash: batchData.BatchHeaderHash,
-			TimeReceived:    time.Now(),
-			Err:             err,
-		}
-		return
+
+		return nil, time.Now(),
+			fmt.Errorf("failed to put dispersal request for validator: %w", err)
 	}
 
-	var i int
-	var lastErr error
-	for i = 0; i < d.NumRequestRetries+1; i++ {
-		validatorProbe.SetStage("send_chunks")
+	validatorProbe.SetStage("send_chunks")
 
-		sig, err := d.sendChunks(ctx, client, batchData.Batch)
-		lastErr = err
-		if err == nil {
-			validatorProbe.SetStage("put_dispersal_response")
-			storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
-				DispersalRequest: req,
-				RespondedAt:      uint64(time.Now().UnixNano()),
-				Signature:        sig.Bytes(),
-				Error:            "",
-			})
-			if storeErr != nil {
-				d.logger.Error("failed to store a succeeded dispersal response", "err", storeErr)
-			}
-
-			signingResponseChan <- core.SigningMessage{
-				Signature:       sig,
-				Operator:        validatorId,
-				BatchHeaderHash: batchData.BatchHeaderHash,
-				TimeReceived:    time.Now(),
-				Err:             nil,
-			}
-			break
-		}
-
-		d.logger.Warn("failed to send chunks",
-			"operator", validatorId.Hex(),
-			"NumAttempts", i,
-			"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
-			"err", err)
-		time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Second) // Wait before retrying
-	}
-
-	if lastErr != nil {
-		d.logger.Warn("failed to send chunks",
-			"operator", validatorId.Hex(),
-			"NumAttempts", i,
-			"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
-			"err", lastErr)
+	sig, err := d.sendChunks(ctx, client, batchData.Batch)
+	if err != nil {
 		storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
 			DispersalRequest: req,
 			RespondedAt:      uint64(time.Now().UnixNano()),
 			Signature:        [32]byte{}, // all zero sig for failed dispersal
-			Error:            lastErr.Error(),
+			Error:            err.Error(),
 		})
 		if storeErr != nil {
 			d.logger.Error("failed to store a failed dispersal response", "err", storeErr)
 		}
-
-		signingResponseChan <- core.SigningMessage{
-			Signature:       nil,
-			Operator:        validatorId,
-			BatchHeaderHash: batchData.BatchHeaderHash,
-			TimeReceived:    time.Now(),
-			Err:             lastErr,
-		}
+		return nil, time.Now(), fmt.Errorf("failed to send chunks to validator: %w", err)
 	}
+
+	validatorProbe.SetStage("put_dispersal_response")
+	storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
+		DispersalRequest: req,
+		RespondedAt:      uint64(time.Now().UnixNano()),
+		Signature:        sig.Bytes(),
+	})
+	if storeErr != nil {
+		d.logger.Error("failed to store a succeeded dispersal response", "err", storeErr)
+	}
+
+	return sig, time.Now(), nil
 }
 
 // HandleSignatures receives SigningMessages from operators for a given batch through the input sigChan. The signatures
