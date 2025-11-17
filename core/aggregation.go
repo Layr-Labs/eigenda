@@ -26,14 +26,18 @@ var (
 	ErrAggSigNotValid      = errors.New("aggregated signature is not valid")
 )
 
+// The result of asking for a validator to sign for the custody of chunks in a batch.
 type SigningMessage struct { // TODO roll this back, create new V2 only version
-	Signature       *Signature
-	ValidatorId     OperatorID
+	// The signature returned by the validator.
+	Signature *Signature
+	// The ID of the signing validator.
+	ValidatorId OperatorID
+	// The hash of the batch header that was signed.
 	BatchHeaderHash [32]byte // TODO why is this needed?
-	// Undefined if this value <= 0.
-	AttestationLatencyMs float64 // TODO where is this used?
-	TimeReceived         time.Time
-	Err                  error
+	// The time taken for the validator to return a signature.
+	Latency time.Duration
+	// Nil if no error occurred during signing, otherwise contains the error.
+	Err error
 }
 
 // QuorumAttestation contains the results of aggregating signatures from a set of operators by quorums
@@ -203,7 +207,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 				"operatorAddress", operatorAddr,
 				"socket", socket,
 				"batchHeaderHash", batchHeaderHashHex,
-				"attestationLatencyMs", r.AttestationLatencyMs,
+				"attestationLatencyMs", r.Latency.Milliseconds(),
 				"err", r.Err)
 			continue
 		}
@@ -260,7 +264,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			"socket", socket,
 			"quorumIDs", fmt.Sprint(operatorQuorums), //nolint:staticcheck // printing byte slices is fine here
 			"batchHeaderHash", batchHeaderHashHex,
-			"attestationLatencyMs", r.AttestationLatencyMs)
+			"attestationLatencyMs", r.Latency.Milliseconds())
 	}
 
 	// Aggregate Non signer Pubkey Id

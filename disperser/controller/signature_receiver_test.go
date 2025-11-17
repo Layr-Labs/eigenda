@@ -42,8 +42,6 @@ func createSigningMessage(
 		Signature:            keypair.SignMessage(headerHash),
 		ValidatorId:          operatorID,
 		BatchHeaderHash:      headerHash,
-		AttestationLatencyMs: 10.0,
-		TimeReceived:         time.Now(),
 		Err:                  err,
 	}
 }

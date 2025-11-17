@@ -72,11 +72,11 @@ func (c *dispatcher) sendAllChunks(
 			batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 			if err != nil {
 				update <- core.SigningMessage{
-					Err:                  fmt.Errorf("failed to get batch header hash: %w", err),
-					Signature:            nil,
-					ValidatorId:          id,
-					BatchHeaderHash:      [32]byte{},
-					AttestationLatencyMs: -1,
+					Err:             fmt.Errorf("failed to get batch header hash: %w", err),
+					Signature:       nil,
+					ValidatorId:     id,
+					BatchHeaderHash: [32]byte{},
+					Latency:         -1,
 				}
 				return
 			}
@@ -93,36 +93,36 @@ func (c *dispatcher) sendAllChunks(
 			if !hasAnyBundles {
 				// Operator is not part of any quorum, no need to send chunks
 				update <- core.SigningMessage{
-					Err:                  errors.New("operator is not part of any quorum"),
-					Signature:            nil,
-					ValidatorId:          id,
-					BatchHeaderHash:      batchHeaderHash,
-					AttestationLatencyMs: -1,
+					Err:             errors.New("operator is not part of any quorum"),
+					Signature:       nil,
+					ValidatorId:     id,
+					BatchHeaderHash: batchHeaderHash,
+					Latency:         -1,
 				}
 				return
 			}
 
 			requestedAt := time.Now()
 			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
-			latencyMs := float64(time.Since(requestedAt).Milliseconds())
+			latency := time.Since(requestedAt)
 			if err != nil {
 				update <- core.SigningMessage{
-					Err:                  err,
-					Signature:            nil,
-					ValidatorId:          id,
-					BatchHeaderHash:      batchHeaderHash,
-					AttestationLatencyMs: latencyMs,
+					Err:             err,
+					Signature:       nil,
+					ValidatorId:     id,
+					BatchHeaderHash: batchHeaderHash,
+					Latency:         latency,
 				}
-				c.metrics.ObserveLatency(id.Hex(), false, latencyMs)
+				c.metrics.ObserveLatency(id.Hex(), false, float64(latency.Milliseconds()))
 			} else {
 				update <- core.SigningMessage{
-					Signature:            sig,
-					ValidatorId:          id,
-					BatchHeaderHash:      batchHeaderHash,
-					AttestationLatencyMs: latencyMs,
-					Err:                  nil,
+					Signature:       sig,
+					ValidatorId:     id,
+					BatchHeaderHash: batchHeaderHash,
+					Latency:         latency,
+					Err:             nil,
 				}
-				c.metrics.ObserveLatency(id.Hex(), true, latencyMs)
+				c.metrics.ObserveLatency(id.Hex(), true, float64(latency.Milliseconds()))
 			}
 
 		}(core.IndexedOperatorInfo{

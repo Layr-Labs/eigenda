@@ -18,7 +18,6 @@ const controllerNamespace = "eigenda_dispatcher"
 // controllerMetrics is a struct that holds the metrics for the controller.
 type controllerMetrics struct {
 	processSigningMessageLatency *prometheus.SummaryVec
-	signingMessageChannelLatency *prometheus.SummaryVec
 	attestationUpdateLatency     *prometheus.SummaryVec
 	attestationBuildingLatency   *prometheus.SummaryVec
 	thresholdSignedToDoneLatency *prometheus.SummaryVec
@@ -88,17 +87,6 @@ func newControllerMetrics(
 			Namespace:  controllerNamespace,
 			Name:       "process_signing_message_latency_ms",
 			Help:       "The time required to process a single signing message (part of HandleSignatures()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	signingMessageChannelLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace: controllerNamespace,
-			Name:      "signing_message_channel_latency_ms",
-			Help: "The time a signing message sits in the channel " +
-				"waiting to be processed (part of HandleSignatures()).",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -308,7 +296,6 @@ func newControllerMetrics(
 
 	return &controllerMetrics{
 		processSigningMessageLatency:    processSigningMessageLatency,
-		signingMessageChannelLatency:    signingMessageChannelLatency,
 		attestationUpdateLatency:        attestationUpdateLatency,
 		attestationBuildingLatency:      attestationBuildingLatency,
 		thresholdSignedToDoneLatency:    thresholdSignedToDoneLatency,
@@ -342,13 +329,6 @@ func (m *controllerMetrics) reportProcessSigningMessageLatency(duration time.Dur
 		return
 	}
 	m.processSigningMessageLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *controllerMetrics) reportSigningMessageChannelLatency(duration time.Duration) {
-	if m == nil {
-		return
-	}
-	m.signingMessageChannelLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *controllerMetrics) reportAttestationUpdateLatency(duration time.Duration) {

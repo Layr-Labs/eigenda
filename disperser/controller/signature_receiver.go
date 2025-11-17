@@ -203,29 +203,18 @@ func (sr *signatureReceiver) handleNextSignature(
 	attestationChan chan *core.QuorumAttestation,
 ) {
 
-	if signingMessage.TimeReceived.IsZero() {
-		sr.logger.Errorf("signing message from %s time received is zero in batch %s. "+
-			"This shouldn't be possible.",
-			signingMessage.ValidatorId.Hex(),
-			hex.EncodeToString(sr.batchHeaderHash[:]))
-	} else if sr.metrics != nil {
-		sr.metrics.reportSigningMessageChannelLatency(time.Since(signingMessage.TimeReceived))
-	}
-
 	indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.ValidatorId]
 	if !found {
 		sr.logger.Error("operator not found in state",
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-			"operatorID", signingMessage.ValidatorId.Hex(),
-			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
+			"validatorID", signingMessage.ValidatorId.Hex())
 		return
 	}
 
 	if seen := sr.signatureMessageReceived[signingMessage.ValidatorId]; seen {
 		sr.logger.Error("duplicate message from operator",
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-			"operatorID", signingMessage.ValidatorId.Hex(),
-			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
+			"validatorID", signingMessage.ValidatorId.Hex())
 		return
 	}
 
@@ -237,8 +226,7 @@ func (sr *signatureReceiver) handleNextSignature(
 		sr.errorCount++
 		sr.logger.Warn("error processing signing message",
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-			"operatorID", signingMessage.ValidatorId.Hex(),
-			"attestationLatencyMs", signingMessage.AttestationLatencyMs,
+			"validatorID", signingMessage.ValidatorId.Hex(),
 			"error", err)
 		return
 	}
