@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,7 +30,7 @@ func TestAnvilEnableIntervalMining(t *testing.T) {
 	require.NoError(t, err)
 
 	// Connect to Anvil RPC
-	client, err := ethclient.Dial(anvil.RpcURL())
+	client, err := geth.SafeDial(ctx, anvil.RpcURL())
 	require.NoError(t, err)
 	defer client.Close()
 
@@ -64,7 +64,7 @@ func TestAnvilWithBlockTime(t *testing.T) {
 	}()
 
 	// Connect to Anvil RPC
-	client, err := ethclient.Dial(anvil.RpcURL())
+	client, err := geth.SafeDial(ctx, anvil.RpcURL())
 	require.NoError(t, err)
 	defer client.Close()
 

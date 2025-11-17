@@ -26,7 +26,6 @@ import (
 	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -115,8 +114,9 @@ func mustMakeTestClients(
 	client, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
 	require.NoError(t, err, "failed to create geth client")
 
-	rpcClient, err := rpc.Dial(deployer.RPC)
+	ethClient, err := geth.SafeDial(t.Context(), deployer.RPC)
 	require.NoError(t, err, "failed to create RPC client")
+	rpcClient := ethClient.Client()
 
 	return client, rpcClient
 }
