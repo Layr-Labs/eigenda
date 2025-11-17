@@ -19,7 +19,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -363,12 +362,10 @@ func (d *Dispatcher) sendChunksToValidator(
 	validatorProbe.SetStage("put_dispersal_request")
 
 	req := &corev2.DispersalRequest{
-		OperatorID: validatorId,
-		// TODO: get OperatorAddress
-		OperatorAddress: gethcommon.Address{},
-		Socket:          validatorInfo.Socket,
-		DispersedAt:     uint64(time.Now().UnixNano()),
-		BatchHeader:     *batchData.Batch.BatchHeader,
+		OperatorID:  validatorId,
+		Socket:      validatorInfo.Socket,
+		DispersedAt: uint64(time.Now().UnixNano()),
+		BatchHeader: *batchData.Batch.BatchHeader,
 	}
 	err = d.blobMetadataStore.PutDispersalRequest(ctx, req)
 	if err != nil {
