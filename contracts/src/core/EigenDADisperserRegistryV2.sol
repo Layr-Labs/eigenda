@@ -3,13 +3,19 @@ pragma solidity ^0.8.9;
 
 import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 import {
+    EnumerableMapUpgradeable,
+    EnumerableSetUpgradeable
+} from "lib/openzeppelin-contracts-upgradeable/contracts/utils/structs/EnumerableMapUpgradeable.sol";
+import {
     EIP712Upgradeable
 } from "lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/draft-EIP712Upgradeable.sol";
-import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import {EigenDADisperserRegistryStorageV2} from "./EigenDADisperserRegistryStorageV2.sol";
-import {IEigenDADisperserRegistryV2} from "src/core/interfaces/IEigenDADisperserRegistryV2.sol";
+import {
+    SignatureCheckerUpgradeable
+} from "lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/SignatureCheckerUpgradeable.sol";
+
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
-import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
+import {IEigenDADisperserRegistryV2} from "src/core/interfaces/IEigenDADisperserRegistryV2.sol";
+import {EigenDADisperserRegistryStorageV2} from "src/core/EigenDADisperserRegistryStorageV2.sol";
 
 /// @title Registry for EigenDA disperser info V2
 /// @author Layr Labs, Inc.
@@ -19,7 +25,13 @@ contract EigenDADisperserRegistryV2 is
     EigenDADisperserRegistryStorageV2,
     IEigenDADisperserRegistryV2
 {
-    using EnumerableSet for EnumerableSet.UintSet;
+    using SignatureCheckerUpgradeable for address;
+    using EnumerableMapUpgradeable for *;
+    using EnumerableSetUpgradeable for *;
+
+    /// -----------------------------------------------------------------------
+    /// Initialization
+    /// -----------------------------------------------------------------------
 
     constructor() {
         _disableInitializers();
@@ -29,7 +41,6 @@ contract EigenDADisperserRegistryV2 is
         __Ownable_init();
         __EIP712_init("EigenDADisperserRegistry", "2");
         _transferOwnership(_initialOwner);
-        nextDisperserId = 1; // Start IDs from 1, 0 is reserved for "not found"
     }
 
     /// -----------------------------------------------------------------------
@@ -37,106 +48,97 @@ contract EigenDADisperserRegistryV2 is
     /// -----------------------------------------------------------------------
 
     /// @inheritdoc IEigenDADisperserRegistryV2
-    function registerDisperser(address disperserAddress, string memory relayURL, bytes memory pubKey)
+    function registerDisperser(address disperser, string memory relayURL)
         external
-        returns (uint32)
+        virtual
+        returns (uint32 disperserId)
     {
-        if (disperserAddress == address(0)) revert InputAddressZero();
+        // Increment and assign the next available disperserId, starting at 1 (not 0).
+        disperserId = ++totalDispersers;
 
-        if (bytes(relayURL).length == 0) revert InvalidRelayURL();
+        EigenDATypesV2.DisperserInfoV2 storage disperserInfo = _disperserInfo[disperserId];
 
-        if (pubKey.length == 0) revert InvalidPublicKey();
+        // Assert that the disperser address is non-zero.
+        if (disperser == address(0)) revert InputAddressZero();
+        // Assert that the disperser is not already registered.
+        if (disperserInfo.disperser != address(0)) revert AlreadyRegistered();
 
-        if (disperserAddressToId[disperserAddress] != 0) revert DisperserAlreadyRegistered();
+        // Set the disperser info.
+        disperserInfo.disperser = disperser;
+        disperserInfo.relayURL = relayURL;
 
-        uint32 disperserId = nextDisperserId;
-        nextDisperserId++;
-
-        disperserKeyToInfo[disperserId] =
-            EigenDATypesV2.DisperserInfoV2({disperserAddress: disperserAddress, relayURL: relayURL, pubKey: pubKey});
-
-        disperserAddressToId[disperserAddress] = disperserId;
-
-        emit DisperserRegistered(disperserId, disperserAddress, relayURL);
-        return disperserId;
+        emit DisperserRegistered(disperserId, disperser);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
-    function deregisterDisperser(uint32 disperserId, bytes memory signature) external {
-        if (disperserKeyToInfo[disperserId].disperserAddress == address(0)) revert DisperserNotFound();
+    function deregisterDisperser(uint32 disperserId, bytes memory signature) external virtual {
+        EigenDATypesV2.DisperserInfoV2 storage disperserInfo = _disperserInfo[disperserId];
 
-        // Verify EIP712 signature
-        bytes32 structHash = keccak256(abi.encode(DEREGISTRATIONTYPEHASH, disperserId));
-        bytes32 digest = hashTypedDataV4(structHash);
-        address signer = ECDSA.recover(digest, signature);
+        bytes32 digest = keccak256(abi.encode(DEREGISTRATION_TYPEHASH, disperserId));
 
-        if (signer != disperserKeyToInfo[disperserId].disperserAddress) revert InvalidSignature();
+        // Assert that the disperser is not in the default or on-demand dispersers sets.
+        // This means owner can only deregister dispersers after revoking their default or on-demand status.
+        if (_defaultDispersers.contains(disperserId) || _onDemandDispersers.contains(disperserId)) {
+            revert DisperserInSet();
+        }
+        // Assert that the signature is valid (supports EIP-1271).
+        if (!disperserInfo.disperser.isValidSignatureNow(digest, signature)) revert InvalidSignature();
+        // Assert that the disperser is registered.
+        if (disperserInfo.disperser == address(0)) revert NotRegistered();
 
-        // Remove from sets if present
-        defaultDispersersSet.remove(disperserId);
-        onDemandDispersersSet.remove(disperserId);
-
-        // Clear mappings
-        address disperserAddr = disperserKeyToInfo[disperserId].disperserAddress;
-        delete disperserAddressToId[disperserAddr];
-        delete disperserKeyToInfo[disperserId];
+        // Delete the disperser info.
+        delete disperserInfo.disperser;
+        delete disperserInfo.relayURL;
 
         emit DisperserDeregistered(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
-    function updateRelayURL(uint32 disperserId, string memory newRelayURL, bytes memory signature) external {
-        if (disperserKeyToInfo[disperserId].disperserAddress == address(0)) revert DisperserNotFound();
-        if (bytes(newRelayURL).length == 0) revert InvalidRelayURL();
+    function updateRelayURL(uint32 disperserId, string memory relayURL, bytes memory signature) external {
+        EigenDATypesV2.DisperserInfoV2 storage disperserInfo = _disperserInfo[disperserId];
 
-        // Verify EIP712 signature
-        bytes32 structHash = keccak256(abi.encode(UPDATERELAYURLTYPEHASH, disperserId, keccak256(bytes(newRelayURL))));
-        bytes32 digest = hashTypedDataV4(structHash);
-        address signer = ECDSA.recover(digest, signature);
+        // TODO: Skip verification if the disperser is msg.sender.
 
-        if (signer != disperserKeyToInfo[disperserId].disperserAddress) revert InvalidSignature();
+        bytes32 digest = keccak256(abi.encode(UPDATE_RELAY_URL_TYPEHASH, disperserId, relayURL));
 
-        disperserKeyToInfo[disperserId].relayURL = newRelayURL;
+        // Assert that the signature is valid (supports EIP-1271).
+        if (!disperserInfo.disperser.isValidSignatureNow(digest, signature)) revert InvalidSignature();
+        // Assert that the disperser is registered.
+        if (disperserInfo.disperser == address(0)) revert NotRegistered();
 
-        emit RelayURLUpdated(disperserId, newRelayURL);
-    }
+        // Set the relay URL.
+        disperserInfo.relayURL = relayURL;
 
-    /// @inheritdoc IEigenDADisperserRegistryV2
-    function getDisperserInfo(uint32[] memory ids) external view returns (EigenDATypesV2.DisperserInfoV2[] memory) {
-        EigenDATypesV2.DisperserInfoV2[] memory infos = new EigenDATypesV2.DisperserInfoV2[](ids.length);
-        for (uint256 i = 0; i < ids.length; i++) {
-            infos[i] = disperserKeyToInfo[ids[i]];
-        }
-        return infos;
+        emit RelayURLUpdated(disperserId, relayURL);
     }
 
     /// -----------------------------------------------------------------------
     /// Owner-only Logic
     /// -----------------------------------------------------------------------
 
+    // TODO: Extra checks
+
     /// @inheritdoc IEigenDADisperserRegistryV2
-    function addDefaultDisperser(uint32 disperserId) external onlyOwner {
-        if (disperserKeyToInfo[disperserId].disperserAddress == address(0)) revert DisperserNotFound();
-        if (!defaultDispersersSet.add(disperserId)) revert AlreadyInDefaultSet();
+    function addDefaultDisperser(address disperser, uint32 disperserId) external onlyOwner {
+        if (!_defaultDispersers.set(disperserId, disperser)) revert DisperserAlreadyExists();
         emit DefaultDisperserAdded(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
-    function addOnDemandDisperser(uint32 disperserId) external onlyOwner {
-        if (disperserKeyToInfo[disperserId].disperserAddress == address(0)) revert DisperserNotFound();
-        if (!onDemandDispersersSet.add(disperserId)) revert AlreadyInOnDemandSet();
+    function addOnDemandDisperser(address disperser, uint32 disperserId) external onlyOwner {
+        if (!_onDemandDispersers.set(disperserId, disperser)) revert DisperserAlreadyExists();
         emit OnDemandDisperserAdded(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function removeDefaultDisperser(uint32 disperserId) external onlyOwner {
-        if (!defaultDispersersSet.remove(disperserId)) revert NotInDefaultSet();
+        if (!_defaultDispersers.remove(disperserId)) revert DisperserNotFound();
         emit DefaultDisperserRemoved(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function removeOnDemandDisperser(uint32 disperserId) external onlyOwner {
-        if (!onDemandDispersersSet.remove(disperserId)) revert NotInOnDemandSet();
+        if (!_onDemandDispersers.remove(disperserId)) revert DisperserNotFound();
         emit OnDemandDisperserRemoved(disperserId);
     }
 
@@ -145,46 +147,43 @@ contract EigenDADisperserRegistryV2 is
     /// -----------------------------------------------------------------------
 
     /// @inheritdoc IEigenDADisperserRegistryV2
-    /// TODO:
-    function getAllDisperserIds() external view returns (uint32[] memory) {}
+    function getDisperserInfo(uint32[] memory ids) external view returns (EigenDATypesV2.DisperserInfoV2[] memory) {}
+
+    // /// @inheritdoc IEigenDADisperserRegistryV2
+    // function disperserKeyToAddress(uint32 key) external view returns (address) {}
+
+    // /// @inheritdoc IEigenDADisperserRegistryV2
+    // function getDisperserIdByAddress(address disperser) external view returns (uint32) {
+    //     return _disperserInfo[disperser].disperserId;
+    // }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
-    function disperserKeyToAddress(uint32 key) external view returns (address) {
-        return disperserKeyToInfo[key].disperserAddress;
-    }
-
-    /// @inheritdoc IEigenDADisperserRegistryV2
-    function getDisperserIdByAddress(address disperserAddress) external view returns (uint32) {
-        return disperserAddressToId[disperserAddress];
-    }
-
-    /// @inheritdoc IEigenDADisperserRegistryV2
-    function getDefaultDispersers() external view returns (uint32[] memory) {
-        uint256 length = defaultDispersersSet.length();
-        uint32[] memory dispersers = new uint32[](length);
-        for (uint256 i = 0; i < length; i++) {
-            dispersers[i] = uint32(defaultDispersersSet.at(i));
+    function getDefaultDisperserIds() external view returns (uint32[] memory ids) {
+        bytes32[] memory keys = _defaultDispersers._inner._keys.values();
+        /// @solidity memory-safe-assembly
+        assembly {
+            ids := keys
         }
-        return dispersers;
+        return ids;
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
-    function getOnDemandDispersers() external view returns (uint32[] memory) {
-        uint256 length = onDemandDispersersSet.length();
-        uint32[] memory dispersers = new uint32[](length);
-        for (uint256 i = 0; i < length; i++) {
-            dispersers[i] = uint32(onDemandDispersersSet.at(i));
+    function getOnDemandDisperserIds() external view returns (uint32[] memory ids) {
+        bytes32[] memory keys = _onDemandDispersers._inner._keys.values();
+        /// @solidity memory-safe-assembly
+        assembly {
+            ids := keys
         }
-        return dispersers;
+        return ids;
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
-    function isDefaultDisperser(uint32 disperserId) external view returns (bool) {
-        return defaultDispersersSet.contains(disperserId);
+    function isDefaultDisperserId(uint32 disperserId) external view returns (bool) {
+        return _defaultDispersers.contains(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
-    function isOnDemandDisperser(uint32 disperserId) external view returns (bool) {
-        return onDemandDispersersSet.contains(disperserId);
+    function isOnDemandDisperserId(uint32 disperserId) external view returns (bool) {
+        return _onDemandDispersers.contains(disperserId);
     }
 }

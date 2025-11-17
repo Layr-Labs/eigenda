@@ -2,10 +2,12 @@
 pragma solidity ^0.8.9;
 
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
-import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
+import {
+    EnumerableMapUpgradeable
+} from "lib/openzeppelin-contracts-upgradeable/contracts/utils/structs/EnumerableMapUpgradeable.sol";
 
 abstract contract EigenDADisperserRegistryStorageV2 {
-    using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableMapUpgradeable for EnumerableMapUpgradeable.UintToAddressMap;
 
     /// -----------------------------------------------------------------------
     /// Constants
@@ -24,26 +26,19 @@ abstract contract EigenDADisperserRegistryStorageV2 {
     /// Mutable Storage
     /// -----------------------------------------------------------------------
 
-    /// @notice Given `disperserId`, returns the disperser's info.
-    /// @dev Returns an empty struct for non-existent disperser IDs.
-    mapping(uint32 disperserId => EigenDATypesV2.DisperserInfoV2 disperserInfo) public disperserIdToInfo;
-
-    /// @notice Mapping from disperser address to disperser ID
-    mapping(address => uint32) public disperserAddressToId;
-
-    /// @notice Counter for the next disperser ID
-    uint32 public nextDisperserId;
-
-    /// @notice Set of default disperser IDs
-    EnumerableSet.UintSet internal defaultDispersersSet;
-
-    /// @notice Set of on-demand disperser IDs
-    EnumerableSet.UintSet internal onDemandDispersersSet;
+    /// @notice Returns the total number of registered dispersers.
+    uint32 public totalDispersers;
+    /// @dev Mapping from disperser ID to disperser address for default dispersers.
+    EnumerableMapUpgradeable.UintToAddressMap internal _defaultDispersers;
+    /// @dev Mapping from disperser ID to disperser address for on-demand dispersers.
+    EnumerableMapUpgradeable.UintToAddressMap internal _onDemandDispersers;
+    /// @dev Mapping from disperser ID to disperser info.
+    mapping(uint32 disperserId => EigenDATypesV2.DisperserInfoV2 disperserInfo) public _disperserInfo;
 
     /// -----------------------------------------------------------------------
     /// Storage Gap
     /// -----------------------------------------------------------------------
 
     // slither-disable-next-line shadowing-state
-    uint256[44] private __GAP;
+    uint256[44] private __GAP; // TODO: Update gap to accounts for enumerable maps.
 }

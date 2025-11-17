@@ -14,9 +14,8 @@ library EigenDATypesV2 {
     }
 
     struct DisperserInfoV2 {
-        address disperserAddress;
+        address disperser;
         string relayURL;
-        bytes pubKey; // For signature-based deregistration
     }
 
     struct BlobInclusionInfo {
