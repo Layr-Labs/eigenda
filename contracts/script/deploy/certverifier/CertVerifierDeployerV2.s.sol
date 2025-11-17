@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";

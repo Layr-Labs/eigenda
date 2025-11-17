@@ -25,7 +25,6 @@ The disperser presents a [grpc v2 service](https://github.com/Layr-Labs/eigenda/
 $ EIGENDA_DISPERSER_PREPROD=disperser-preprod-holesky.eigenda.xyz:443
 $ grpcurl $EIGENDA_DISPERSER_PREPROD list disperser.v2.Disperser
 disperser.v2.Disperser.DisperseBlob
-disperser.v2.Disperser.GetBlobCommitment
 disperser.v2.Disperser.GetBlobStatus
 disperser.v2.Disperser.GetPaymentState
 ```
