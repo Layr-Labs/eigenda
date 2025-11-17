@@ -61,7 +61,9 @@ impl EigenDaProxy {
                 cmd_args.push(
                     "--eigenda.v2.cert-verifier-router-or-immutable-verifier-addr".to_string(),
                 );
-                cmd_args.push("0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429".to_string());
+                // Latest CertVerifier on the Router: https://sepolia.etherscan.io/address/0x17ec4112c4BbD540E2c1fE0A49D264a280176F0D#readProxyContract
+                // TODO(samlaf): make this lib support router
+                cmd_args.push("0x19a469Ddb7199c7EB9E40455978b39894BB90974".to_string());
                 cmd_args.push("--eigenda.v2.eth-rpc".to_string());
                 cmd_args.push("wss://ethereum-sepolia-rpc.publicnode.com".to_string());
             }
