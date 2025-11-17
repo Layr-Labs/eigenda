@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 
 	s3common "github.com/Layr-Labs/eigenda/common/s3"
@@ -136,7 +137,8 @@ func (s *awsS3Client) DownloadObject(ctx context.Context, bucket string, key str
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		if errors.Is(err, &types.NoSuchKey{}) {
+		errString := err.Error()
+		if strings.Contains(errString, "StatusCode: 404") {
 			return nil, false, nil
 		}
 		return nil, false, fmt.Errorf("failed to download object: %w", err)
