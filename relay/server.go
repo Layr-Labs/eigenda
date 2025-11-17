@@ -453,10 +453,41 @@ func (s *Server) gatherChunkDataToSend(
 	request *pb.GetChunksRequest,
 ) ([][]byte, bool, error) {
 
+	coefficients, proofs, found, err := s.downloadDataFromRelays(ctx, metadataMap, request)
+	if err != nil {
+		return nil, false, fmt.Errorf("error downloading chunk data from relays: %w", err)
+	}
+	if !found {
+		return nil, false, nil
+	}
+
+	chunkDataObjects, err := combineProofsAndCoefficients(
+		proofs,
+		coefficients,
+		request,
+		metadataMap)
+	if err != nil {
+		return nil, false, fmt.Errorf("error building chunk data: %w", err)
+	}
+
+	bytesToSend, err := buildBinaryChunkData(chunkDataObjects, request)
+	if err != nil {
+		return nil, false, fmt.Errorf("error building binary chunk data: %w", err)
+	}
+
+	return bytesToSend, true, nil
+}
+
+// Download all data from relays needed to fulfill a GetChunks request.
+func (s *Server) downloadDataFromRelays(
+	ctx context.Context,
+	metadataMap map[v2.BlobKey]*blobMetadata,
+	request *pb.GetChunksRequest,
+) (coefficients [][][]byte, proofs [][][]byte, allDataFound bool, err error) {
 	requestCount := len(request.GetChunkRequests())
 
-	coefficients := make([][][]byte, requestCount)
-	proofs := make([][][]byte, requestCount)
+	coefficients = make([][][]byte, requestCount)
+	proofs = make([][][]byte, requestCount)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -506,33 +537,49 @@ func (s *Server) gatherChunkDataToSend(
 		result := <-results
 		if result.err != nil {
 			cancel()
-			return nil, false, fmt.Errorf("error downloading chunk data %s: %w", result.key.Hex(), result.err)
+			return nil, nil, false, fmt.Errorf("error downloading chunk data %s: %w", result.key.Hex(), result.err)
 		}
 		if !result.found {
 			cancel()
-			return nil, false, nil
+			return nil, nil, false, nil
 		}
 	}
 
-	// If we reach this point, then all downloads were successful, and coefficients/proofs arrays will be populated.
+	return coefficients, proofs, true, nil
+}
 
-	// Convert the disparate proofs and coefficients into unified "ChunkData" objects
-	// (or "chunks" or "frames" or other names, depending on what part of the code you are looking at)
+// Convert the disparate proofs and coefficients into unified "ChunkData" objects
+// (or "chunks" or "frames" or other names, depending on what part of the code you are looking at)
+func combineProofsAndCoefficients(
+	proofs [][][]byte,
+	coefficients [][][]byte,
+	request *pb.GetChunksRequest,
+	metadataMap map[v2.BlobKey]*blobMetadata,
+) ([]*core.ChunksData, error) {
+
+	requestCount := len(request.GetChunkRequests())
+
 	chunkDataObjects := make([]*core.ChunksData, requestCount)
 	for i := 0; i < requestCount; i++ {
 		blobKey := v2.BlobKey(request.GetChunkRequests()[i].GetByRange().GetBlobKey())
 		metadata := metadataMap[blobKey]
 		chunkData, err := buildChunksData(proofs[i], int(metadata.symbolsPerFrame), coefficients[i])
 		if err != nil {
-			return nil, false, fmt.Errorf("error building frame data: %w", err)
+			return nil, fmt.Errorf("error building frame data: %w", err)
 		}
 		chunkDataObjects[i] = chunkData
 	}
 
-	// Now, take this data and collate it into the final byte arrays to send back to the client.
+	return chunkDataObjects, nil
+}
+
+// Take the chunk data objects and build the final byte arrays to send back to the client.
+func buildBinaryChunkData(
+	chunkDataObjects []*core.ChunksData,
+	request *pb.GetChunksRequest,
+) ([][]byte, error) {
 
 	bytesToSend := make([][]byte, 0, len(request.GetChunkRequests()))
-
 	for requestIndex := 0; requestIndex < len(request.GetChunkRequests()); requestIndex++ {
 		nextRequest := request.GetChunkRequests()[requestIndex]
 		targetKey := nextRequest.GetByRange().GetBlobKey()
@@ -565,13 +612,13 @@ func (s *Server) gatherChunkDataToSend(
 
 		bundleBytes, err := chunkDataToSend.FlattenToBundle()
 		if err != nil {
-			return nil, false, fmt.Errorf("error serializing frame subset: %w", err)
+			return nil, fmt.Errorf("error serializing frame subset: %w", err)
 		}
 
 		bytesToSend = append(bytesToSend, bundleBytes)
 	}
 
-	return bytesToSend, true, nil
+	return bytesToSend, nil
 }
 
 // gatherChunkDataToSendLegacy takes the chunk data and narrows it down to the data requested in the GetChunks request.
