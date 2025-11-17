@@ -151,7 +151,7 @@ func TestSSHSession_FindFiles(t *testing.T) {
 
 func TestSSHSession_Rsync(t *testing.T) {
 	t.Skip() // Docker build is flaky, need to fix prior to re-enabling
-	
+
 	t.Parallel()
 
 	// Create a temporary data directory for testing
