@@ -372,8 +372,6 @@ func (d *Dispatcher) sendChunksToValidator(
 	}
 	err = d.blobMetadataStore.PutDispersalRequest(ctx, req)
 	if err != nil {
-		d.logger.Error("failed to put dispersal request", "err", err)
-
 		return nil, 0, fmt.Errorf("failed to put dispersal request for validator: %w", err)
 	}
 

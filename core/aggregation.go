@@ -27,13 +27,13 @@ var (
 )
 
 // The result of asking for a validator to sign for the custody of chunks in a batch.
-type SigningMessage struct { // TODO roll this back, create new V2 only version
+type SigningMessage struct {
 	// The signature returned by the validator.
 	Signature *Signature
 	// The ID of the signing validator.
 	ValidatorId OperatorID
 	// The hash of the batch header that was signed.
-	BatchHeaderHash [32]byte // TODO why is this needed?
+	BatchHeaderHash [32]byte
 	// The time taken for the validator to return a signature.
 	Latency time.Duration
 	// Nil if no error occurred during signing, otherwise contains the error.
