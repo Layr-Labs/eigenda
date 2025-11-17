@@ -2,6 +2,7 @@ syntax = "proto3";
 package controller;
 
 import "common/v2/common_v2.proto";
+import "validator/signing_rate.proto";
 
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/controller";
 
@@ -24,6 +25,12 @@ service ControllerService {
   // able to waste user funds. They would only be able to attack the liveness of the Controller through high submission
   // volume, which would be a vulnerability regardless of whether we had auth between the API server and the Controller.
   rpc AuthorizePayment(AuthorizePaymentRequest) returns (AuthorizePaymentResponse) {}
+
+  // GetValidatorSigningRate returns the signing rate of a validator during a time range.
+  rpc GetValidatorSigningRate(GetValidatorSigningRateRequest) returns (GetValidatorSigningRateReply) {}
+
+    // Request a dump of signing rate data for all validators after a specified start time.
+  rpc GetValidatorSigningRateDump(GetValidatorSigningRateDumpRequest) returns (GetValidatorSigningRateDumpReply) {}
 }
 
 // Contains all information necessary for the controller to evaluate the validity of a dispersal payment
@@ -50,3 +57,40 @@ message AuthorizePaymentRequest {
 // - PermissionDenied: Client signature is valid, but payment is insufficient or account has exceeded reservation limits
 // - ResourceExhausted: Metering check failed - total network on-demand throughput is exhausted
 message AuthorizePaymentResponse {}
+
+// A request to get the signing rate of a validator during a time range. The time range of the returned data may not
+// exactly match the requested time range, as the data is aggregated into fixed size buckets.
+message GetValidatorSigningRateRequest {
+  // The unique identifier of the validator (i.e. the operator ID).
+  bytes validator_id = 1;
+  // The time range to query the signing rate for, in seconds since Unix epoch.
+  uint64 start_timestamp = 2;
+  // The end time of the range, in seconds since Unix epoch, exclusive.
+  uint64 end_timestamp = 3;
+}
+
+// A reply containing the signing rate of a validator during a time range.
+message GetValidatorSigningRateReply {
+  // The start time of the range, in seconds since Unix epoch, inclusive. May be different from the requested start time
+  // (in order to align with bucket boundaries).
+  uint64 start_timestamp = 1;
+  // The end time of the range, in seconds since Unix epoch, exclusive. May be different from the requested end time
+  // (in order to align with bucket boundaries).
+  uint64 end_timestamp = 2;
+  // The signing rate of the validator during the time range.
+  validator.ValidatorSigningRate validator_signing_rate = 3;
+}
+
+// A request to get a dump of signing rate data for all validators after a specified start time.
+message GetValidatorSigningRateDumpRequest {
+  // Request all signing rate data starting from this time, in seconds since Unix epoch.
+  uint64 start_timestamp = 1;
+}
+
+// A reply containing the signing rate data for all validators after a specified start time.
+message GetValidatorSigningRateDumpReply {
+  // The signing rate data for all validators after the specified start time. If a too much data is requested
+  // in a single request, the server may only send a partial dump. To get a full dump, call this RPC
+  // multiple times, using the end_timestamp of the last bucket received as the start_timestamp of the next request.
+  repeated validator.SigningRateBucket signing_rate_buckets = 1;
+}
