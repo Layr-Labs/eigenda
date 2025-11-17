@@ -146,9 +146,12 @@ func (s *SharedBlobStore) StoreBlob(ctx context.Context, blob *core.Blob, reques
 
 // GetBlobContent retrieves blob content by the blob key.
 func (s *SharedBlobStore) GetBlobContent(ctx context.Context, blobHash disperser.BlobHash) ([]byte, error) {
-	data, _, err := s.s3Client.DownloadObject(ctx, s.bucketName, blobObjectKey(blobHash))
+	data, found, err := s.s3Client.DownloadObject(ctx, s.bucketName, blobObjectKey(blobHash))
 	if err != nil {
 		return nil, fmt.Errorf("error downloading blob content: %w", err)
+	}
+	if !found {
+		return nil, fmt.Errorf("blob not found for blob hash: %s", blobHash)
 	}
 	return data, nil
 }
@@ -163,7 +166,7 @@ func (s *SharedBlobStore) getBlobContentParallel(ctx context.Context, blobKey di
 }
 
 func (s *SharedBlobStore) MarkBlobConfirmed(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationInfo *disperser.ConfirmationInfo) (*disperser.BlobMetadata, error) {
-	// TODO (ian-shim): remove this check once we are sure that the metadata is never overwritten
+	// frame (ian-shim): remove this check once we are sure that the metadata is never overwritten
 	refreshedMetadata, err := s.GetBlobMetadata(ctx, existingMetadata.GetBlobKey())
 	if err != nil {
 		s.logger.Error("error getting blob metadata", "err", err)

@@ -111,13 +111,14 @@ func DeserializeSplitFrameCoeffs(elementCount uint32, binaryFrameCoeffs [][]byte
 // each containing the serialized data for a single FrameCoeffs object.
 func SplitSerializedFrameCoeffsWithElementCount(serializedData []byte, symbolsPerFrame uint32) ([][]byte, error) {
 	index := uint32(0)
-
+	remainingBytes := uint32(len(serializedData))
 	bytesPerFrameCoeffs := encoding.BYTES_PER_SYMBOL * symbolsPerFrame
-	remainingBytes := uint32(len(serializedData[index:]))
+
 	if remainingBytes%bytesPerFrameCoeffs != 0 {
 		return nil, fmt.Errorf("invalid data size: %d", len(serializedData))
 	}
-	frameCoeffCount := uint32(len(serializedData[index:])) / bytesPerFrameCoeffs
+	
+	frameCoeffCount := remainingBytes / bytesPerFrameCoeffs
 	binaryFrameCoeffs := make([][]byte, frameCoeffCount)
 
 	for i := uint32(0); i < frameCoeffCount; i++ {

@@ -17,7 +17,7 @@ import (
 
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.
 // This struct adds caching and threading on top of blobstore.BlobMetadataStore.
-type blobMetadata struct { // TODO what is actually needed here?
+type blobMetadata struct {
 	// the size of the blob in bytes
 	blobSizeBytes uint32
 	// the size of each encoded chunk
@@ -157,24 +157,6 @@ func (m *metadataProvider) GetMetadataForBlobs(
 
 func (m *metadataProvider) UpdateBlobVersionParameters(blobParamsMap *v2.BlobVersionParameterMap) {
 	m.blobParamsMap.Store(blobParamsMap)
-}
-
-func (m *metadataProvider) computeChunkSize(header *v2.BlobHeader, totalChunkSizeBytes uint32) (uint32, error) {
-	blobParamsMap := m.blobParamsMap.Load()
-	if blobParamsMap == nil {
-		return 0, fmt.Errorf("blob version parameters is nil")
-	}
-
-	blobParams, ok := blobParamsMap.Get(header.BlobVersion)
-	if !ok {
-		return 0, fmt.Errorf("blob version %d not found in blob params map", header.BlobVersion)
-	}
-
-	if blobParams.NumChunks == 0 {
-		return 0, fmt.Errorf("numChunks is 0, this should never happen")
-	}
-
-	return totalChunkSizeBytes / blobParams.NumChunks, nil
 }
 
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.

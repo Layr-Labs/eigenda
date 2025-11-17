@@ -37,8 +37,7 @@ type S3Client interface {
 	// DeleteObject deletes an object from S3.
 	DeleteObject(ctx context.Context, bucket string, key string) error
 
-	// ListObjects lists all objects in a bucket with the given prefix. Note that this method may return
-	// file fragments if the bucket contains files uploaded via FragmentedUploadObject.
+	// ListObjects lists all objects in a bucket with the given prefix.
 	ListObjects(ctx context.Context, bucket string, prefix string) ([]ListedObject, error)
 
 	// CreateBucket creates a bucket in S3.

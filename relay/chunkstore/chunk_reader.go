@@ -94,12 +94,12 @@ func (r *chunkReader) GetBinaryChunkCoefficients(
 ) (uint32, [][]byte, error) {
 
 	bytes, found, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedChunkKey(blobKey))
-	if !found {
-		return 0, nil, fmt.Errorf("coefficients not found for blob %s", blobKey.Hex())
-	}
-
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to download coefficients from S3 for blob %s: %w", blobKey.Hex(), err)
+	}
+
+	if !found {
+		return 0, nil, fmt.Errorf("coefficients not found for blob %s", blobKey.Hex())
 	}
 
 	elementCount, frames, err := rs.SplitSerializedFrameCoeffs(bytes)
@@ -109,8 +109,6 @@ func (r *chunkReader) GetBinaryChunkCoefficients(
 
 	return elementCount, frames, nil
 }
-
-// TODO handle not found error properly!!!
 
 func (r *chunkReader) GetBinaryChunkProofsRange(
 	ctx context.Context,

@@ -94,18 +94,10 @@ func (c *chunkWriter) ProofExists(ctx context.Context, blobKey corev2.BlobKey) b
 }
 
 func (c *chunkWriter) CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey) bool {
-	// TODO(ian-shim): check latency
-	objs, err := c.s3Client.ListObjects(ctx, c.bucketName, s3.ScopedChunkKey(blobKey))
-	if err != nil {
-		return false
+	size, err := c.s3Client.HeadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey))
+	if err == nil && size != nil && *size > 0 {
+		return true
 	}
 
-	keys := make([]string, len(objs))
-	totalSize := int64(0)
-	for i, obj := range objs {
-		keys[i] = obj.Key
-		totalSize += int64(obj.Size)
-	}
-
-	return true
+	return false
 }
