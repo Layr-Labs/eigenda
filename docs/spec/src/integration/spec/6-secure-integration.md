@@ -145,7 +145,9 @@ For the ~7-day challenge window overlaps EigenDA availability, we assume there i
 
 In the diagram, the top row shows L1 blocks every 12 s; the smaller squares are L2 blocks every 2 s. Yellow labels mark key artifacts across the batching pipeline: batches → channel → EigenDA blob. Dispersal completes between t=12 s and t=24 s. The resulting certificate has RBN equal to the L1 block at t=0 (two L1 blocks earlier). The cert is then submitted to L1 at t=24 s. Green annotations show the generalized L2→L1 submission, with batches posted to the adjacent L1 block.
 
-However, if the RecencyWindowSize is configured to be 0, the entire recency check is skipped. It is strongly not recommended to set it to 0, as it allows a malicious or misbehaving batcher to submit an AltDACommitment whose blob has been pruned by the DA network.
+#### Exception
+
+However, if the RecencyWindowSize is configured to be 0, the entire recency check is skipped. It is strongly not recommended to set it to 0, as it allows a malicious or misbehaving batcher to submit an AltDACommitment whose blob has been pruned by the DA network. An altda commitments is considered valid and can be processed by the next stage of the eigenda blob derivation.
 
 ### 2. Cert Validation
 
@@ -220,17 +222,6 @@ After verification, EigenDA blob derivation decodes the [encoded payload](./3-da
 Proxy behavior. The EigenDA proxy can return either the encoded payload or the decoded rollup payload based on GET parameters:
   - With `?return_encoded_payload=true` or `?return_encoded_payload=1`, it only checks the blob against the kzg commitment and returns the encoded payload, it is useful when integrating with proof systems to control the data transformation.
   - Without parameters, it decodes and returns the rollup payload; on any decoding error, it returns HTTP 418.
-
-### Notes on Dispersal
-Dispersal:
-
-1. If the `BlobCertificate` was generated using the disperser’s `GetBlobCommitment` RPC endpoint, verify its contents:
-    1. verify KZG commitment
-    2. verify that `length` matches the expected value, based on the blob that was actually sent
-    3. verify the `lengthProof` using the `length` and `lengthCommitment`
-2. After dispersal, verify that the `BlobKey` actually dispersed by the disperser matches the locally computed `BlobKey`
-
-Note: The verification steps in point 1. for dispersal are not currently implemented. This route only makes sense for clients that want to avoid having large amounts of SRS data, but KZG commitment verification via Fiat-Shamir is required to do the verification without this data. Until the alternate verification method is implemented, usage of `GetBlobCommitment` places a correctness trust assumption on the disperser generating the commitment.
 
 ## Upgradable Quorums and Thresholds for Optimistic Verification
 ![image.png](../../assets/integration/router-in-fraud-proof.png)

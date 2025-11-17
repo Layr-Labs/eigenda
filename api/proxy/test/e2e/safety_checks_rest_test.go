@@ -20,6 +20,10 @@ func isNilPtrDerefPanic(err string) bool {
 }
 
 func TestOpClientKeccak256MalformedInputsV1(t *testing.T) {
+	if !testutils.GetBackend().SupportsEigenDAV1() {
+		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
+	}
+
 	testOpClientKeccak256MalformedInputs(t, common.V1EigenDABackend)
 }
 
@@ -76,6 +80,10 @@ func testOpClientKeccak256MalformedInputs(t *testing.T, dispersalBackend common.
 }
 
 func TestProxyClientMalformedInputCasesV1(t *testing.T) {
+	if !testutils.GetBackend().SupportsEigenDAV1() {
+		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
+	}
+
 	testProxyClientMalformedInputCases(t, common.V1EigenDABackend)
 }
 
@@ -192,6 +200,10 @@ func testProxyClientMalformedInputCases(t *testing.T, dispersalBackend common.Ei
 }
 
 func TestKeccak256CommitmentRequestErrorsWhenS3NotSetV1(t *testing.T) {
+	if !testutils.GetBackend().SupportsEigenDAV1() {
+		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
+	}
+
 	testKeccak256CommitmentRequestErrorsWhenS3NotSet(t, common.V1EigenDABackend)
 }
 
@@ -223,6 +235,10 @@ func testKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T, dispersalBac
 }
 
 func TestOversizedBlobRequestErrorsV1(t *testing.T) {
+	if !testutils.GetBackend().SupportsEigenDAV1() {
+		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
+	}
+
 	testOversizedBlobRequestErrors(t, common.V1EigenDABackend)
 }
 

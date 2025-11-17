@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
@@ -156,6 +157,7 @@ func RunController(cliCtx *cli.Context) error {
 	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		&config.EncodingManagerConfig,
+		time.Now,
 		blobMetadataStore,
 		encodingPool,
 		encoderClient,
@@ -201,6 +203,7 @@ func RunController(cliCtx *cli.Context) error {
 	nodeClientManager, err := controller.NewNodeClientManager(
 		config.DispatcherConfig.NodeClientCacheSize,
 		requestSigner,
+		config.DispatcherConfig.DisperserID,
 		logger)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
@@ -226,6 +229,7 @@ func RunController(cliCtx *cli.Context) error {
 
 	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,
+		time.Now,
 		blobMetadataStore,
 		dispatcherPool,
 		ics,

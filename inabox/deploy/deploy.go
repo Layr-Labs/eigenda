@@ -236,7 +236,7 @@ func (env *Config) registerDisperserKeypair(ethClient common.EthClient) error {
 		return fmt.Errorf("could not create writer: %v", err)
 	}
 
-	err = writer.SetDisperserAddress(context.Background(), env.DisperserAddress)
+	err = writer.SetDisperserAddress(context.Background(), 0, env.DisperserAddress)
 	if err != nil {
 		return fmt.Errorf("could not set disperser address: %v", err)
 	}

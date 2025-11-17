@@ -26,7 +26,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
@@ -62,6 +61,21 @@ type DispersalServerV2 struct {
 	maxNumSymbolsPerBlob        uint32
 	onchainStateRefreshInterval time.Duration
 
+	// MaxDispersalAge is the maximum age a dispersal request can be before it is rejected.
+	// Dispersals older than this duration are rejected by the API server at ingest.
+	//
+	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
+	// client at dispersal request creation time (in nanoseconds since Unix epoch).
+	MaxDispersalAge time.Duration
+
+	// MaxFutureDispersalTime is the maximum amount of time into the future a dispersal request can be
+	// before it is rejected. Dispersals with timestamps more than this duration in the future are rejected
+	// by the API server at ingest.
+	MaxFutureDispersalTime time.Duration
+
+	// getNow returns the current time
+	getNow func() time.Time
+
 	metricsConfig disperser.MetricsConfig
 	metrics       *metricsV2
 
@@ -75,9 +89,12 @@ type DispersalServerV2 struct {
 	// TODO(litt3): this field should be removed once the migration to the new payments system is complete
 	useControllerMediatedPayments bool
 
-	// Controller gRPC client connection and service client
+	// Exists as a member variable so that the connection can be closed inside Stop().
 	controllerConnection *grpc.ClientConn
-	controllerClient     controller.ControllerServiceClient
+
+	// Client for making gRPC calls to the controller.
+	// May be nil if useControllerMediatedPayments is false
+	controllerClient controller.ControllerServiceClient
 
 	// Pre-created listener for the gRPC server
 	listener   net.Listener
@@ -87,6 +104,7 @@ type DispersalServerV2 struct {
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
+	getNow func() time.Time,
 	blobStore *blobstore.BlobStore,
 	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
@@ -95,13 +113,15 @@ func NewDispersalServerV2(
 	committer *committer.Committer,
 	maxNumSymbolsPerBlob uint32,
 	onchainStateRefreshInterval time.Duration,
+	maxDispersalAge time.Duration,
+	maxFutureDispersalTime time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
 	useControllerMediatedPayments bool,
-	// must be non-empty if useControllerMediatedPayments is true
-	controllerAddress string,
+	controllerConnection *grpc.ClientConn,
+	controllerClient controller.ControllerServiceClient,
 	listener net.Listener,
 ) (*DispersalServerV2, error) {
 	if listener == nil {
@@ -131,27 +151,23 @@ func NewDispersalServerV2(
 	if _logger == nil {
 		return nil, errors.New("logger is required")
 	}
+	if getNow == nil {
+		return nil, errors.New("getNow is required")
+	}
+	if maxDispersalAge <= 0 {
+		return nil, fmt.Errorf("maxDispersalAge must be positive (got: %v)", maxDispersalAge)
+	}
+	if maxFutureDispersalTime <= 0 {
+		return nil, fmt.Errorf("maxFutureDispersalTime must be positive (got: %v)", maxFutureDispersalTime)
+	}
 
 	logger := _logger.With("component", "DispersalServerV2")
 
-	var controllerConnection *grpc.ClientConn
-	var controllerClient controller.ControllerServiceClient
 	if useControllerMediatedPayments {
-		if controllerAddress == "" {
-			return nil, errors.New("controller address is required to use new payment system")
+		if controllerClient == nil {
+			return nil, errors.New("controller client is required when using controller-mediated payments")
 		}
-
-		connection, err := grpc.NewClient(
-			controllerAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("create controller connection: %w", err)
-		}
-		controllerConnection = connection
-		controllerClient = controller.NewControllerServiceClient(connection)
-
-		logger.Info("Using controller-based payment system", "controller", controllerAddress)
+		logger.Info("Using controller-based payment system")
 	} else {
 		logger.Info("Using legacy payment metering system")
 	}
@@ -169,6 +185,9 @@ func NewDispersalServerV2(
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
+		MaxDispersalAge:             maxDispersalAge,
+		MaxFutureDispersalTime:      maxFutureDispersalTime,
+		getNow:                      getNow,
 
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
@@ -232,7 +251,7 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", s.listener.Addr().String())
 
 	if err := s.grpcServer.Serve(s.listener); err != nil {
-		return errors.New("could not start GRPC server")
+		return fmt.Errorf("could not start GRPC server: %w", err)
 	}
 
 	return nil
@@ -272,19 +291,19 @@ func (s *DispersalServerV2) getBlobCommitment(
 	}
 	c, err := s.committer.GetCommitmentsForPaddedLength(req.GetBlob())
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to compute commitments")
+		return nil, status.Newf(codes.Internal, "failed to compute commitments: %v", err)
 	}
 	commitment, err := c.Commitment.Serialize()
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to serialize commitment")
+		return nil, status.Newf(codes.Internal, "failed to serialize commitment: %v", err)
 	}
 	lengthCommitment, err := c.LengthCommitment.Serialize()
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to serialize length commitment")
+		return nil, status.Newf(codes.Internal, "failed to serialize length commitment: %v", err)
 	}
 	lengthProof, err := c.LengthProof.Serialize()
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to serialize length proof")
+		return nil, status.Newf(codes.Internal, "failed to serialize length proof: %v", err)
 	}
 
 	return &pb.BlobCommitmentReply{

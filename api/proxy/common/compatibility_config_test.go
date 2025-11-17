@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,6 +27,7 @@ func validClientConfigV2() common.ClientConfigV2 {
 		RetrieversToEnable:                 []common.RetrieverType{common.RelayRetrieverType},
 		EigenDADirectory:                   "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
 		RBNRecencyWindowSize:               100,
+		ClientLedgerMode:                   clientledger.ClientLedgerModeReservationOnly,
 	}
 }
 

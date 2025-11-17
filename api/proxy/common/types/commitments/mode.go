@@ -26,7 +26,7 @@ const (
 // op keccak mode: 0x00 prefix byte
 // op generic mode: 0x01 + 0x00 prefix bytes
 func EncodeCommitment(
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 	commitmentMode CommitmentMode,
 ) ([]byte, error) {
 	switch commitmentMode {
@@ -37,9 +37,9 @@ func EncodeCommitment(
 		// (from https://specs.optimism.io/experimental/alt-da.html#example-commitments)
 		// This is because the version_byte is added by op-alt-da when calling TxData() right before submitting the tx:
 		// https://github.com/Layr-Labs/optimism/blob/89ac40d0fddba2e06854b253b9f0266f36350af2/op-alt-da/commitment.go#L158-L160
-		return NewOPEigenDAGenericCommitment(versionedCert).Encode(), nil
+		return NewOPEigenDAGenericCommitment(*versionedCert).Encode(), nil
 	case StandardCommitmentMode:
-		return NewStandardCommitment(versionedCert).Encode(), nil
+		return NewStandardCommitment(*versionedCert).Encode(), nil
 	}
 	return nil, fmt.Errorf("unknown commitment mode")
 }

@@ -61,7 +61,6 @@ type BlobHeader struct {
 	// Users can check their reserved quorum numbers on the IPaymentVault's reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10
 	QuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
 	// commitment is the KZG commitment to the blob.
-	// This commitment can either be constructed locally, or obtained by using the disperser's GetBlobCommitment RPC (see disperser_v2.proto).
 	Commitment *common.BlobCommitment `protobuf:"bytes,3,opt,name=commitment,proto3" json:"commitment,omitempty"`
 	// payment_header contains payment information for the blob
 	PaymentHeader *PaymentHeader `protobuf:"bytes,4,opt,name=payment_header,json=paymentHeader,proto3" json:"payment_header,omitempty"`

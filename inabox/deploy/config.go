@@ -226,8 +226,6 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
 		DISPERSER_SERVER_CONTROLLER_ADDRESS:      fmt.Sprintf("localhost:%d", controllerGrpcPort),
 
-		// V2 inabox test is setup with a client that doesn't setup a client for some reason,
-		// so it calls the grpc GetBlobCommitment to generate commitments.
 		// DisperserV2 uses the V2 prover which always uses SRSOrder=2^28.
 		// So it needs the trailing g2 points to generate correct length commitments.
 		DISPERSER_SERVER_G2_TRAILING_PATH:               "../resources/srs/g2.trailing.point",
@@ -251,6 +249,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_LOG_FORMAT:                    "text",
 		BATCHER_S3_BUCKET_NAME:                "test-eigenda-blobstore",
 		BATCHER_DYNAMODB_TABLE_NAME:           "test-BlobMetadata",
+		BATCHER_OBJECT_STORAGE_BACKEND:        "s3",
 		BATCHER_ENABLE_METRICS:                "true",
 		BATCHER_METRICS_HTTP_PORT:             "9094",
 		BATCHER_PULL_INTERVAL:                 "5s",
@@ -365,6 +364,7 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "5",
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
+		CONTROLLER_DISPERSER_ID:                            "0",
 	}
 
 	if env.UseNewPayments {

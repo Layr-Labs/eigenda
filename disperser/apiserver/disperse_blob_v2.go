@@ -13,8 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	blobstore "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -132,7 +132,7 @@ func (s *DispersalServerV2) StoreBlob(
 
 	if err := s.blobStore.StoreBlob(ctx, blobKey, data); err != nil {
 		s.logger.Warn("failed to store blob", "err", err, "blobKey", blobKey.Hex())
-		if errors.Is(err, common.ErrAlreadyExists) {
+		if errors.Is(err, blobstore.ErrAlreadyExists) {
 			return corev2.BlobKey{}, status.Newf(codes.AlreadyExists, "blob already exists: %s", blobKey.Hex())
 		}
 
@@ -153,7 +153,7 @@ func (s *DispersalServerV2) StoreBlob(
 	err = s.blobMetadataStore.PutBlobMetadata(ctx, blobMetadata)
 	if err != nil {
 		s.logger.Warn("failed to store blob metadata", "err", err, "blobKey", blobKey.Hex())
-		if errors.Is(err, common.ErrAlreadyExists) {
+		if errors.Is(err, blobstore.ErrAlreadyExists) {
 			return corev2.BlobKey{}, status.Newf(codes.AlreadyExists, "blob metadata already exists: %s", blobKey.Hex())
 		}
 
@@ -259,6 +259,10 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, errors.New("invalid payment metadata")
 	}
 
+	if err := s.validateDispersalTimestamp(blobHeader); err != nil {
+		return nil, err
+	}
+
 	if len(blobHeaderProto.GetQuorumNumbers()) == 0 {
 		return nil, errors.New("blob header must contain at least one quorum number")
 	}
@@ -304,6 +308,36 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	}
 
 	return blobHeader, nil
+}
+
+// Validates that the dispersal timestamp in the blob header is neither too old, nor too far in the future.
+func (s *DispersalServerV2) validateDispersalTimestamp(blobHeader *corev2.BlobHeader) error {
+	dispersalTime := time.Unix(0, blobHeader.PaymentMetadata.Timestamp)
+	dispersalAge := s.getNow().Sub(dispersalTime)
+
+	if dispersalAge > s.MaxDispersalAge {
+		s.metrics.reportDispersalTimestampRejected("stale")
+		return fmt.Errorf("potential clock drift detected: dispersal timestamp is too old. "+
+			"age=%v, max_age=%v, timestamp_unix_nanos=%d, timestamp_utc=%s",
+			dispersalAge,
+			s.MaxDispersalAge,
+			blobHeader.PaymentMetadata.Timestamp,
+			dispersalTime.UTC().Format(time.RFC3339),
+		)
+	}
+
+	// If dispersalAge is negative, the timestamp is in the future
+	if dispersalAge < -s.MaxFutureDispersalTime {
+		s.metrics.reportDispersalTimestampRejected("future")
+		return fmt.Errorf("potential clock drift detected: dispersal timestamp is too far in the future. "+
+			"future_offset=%v, max_future_offset=%v, timestamp_unix_nanos=%d, timestamp_utc=%s",
+			-dispersalAge,
+			s.MaxFutureDispersalTime,
+			blobHeader.PaymentMetadata.Timestamp,
+			dispersalTime.UTC().Format(time.RFC3339))
+	}
+
+	return nil
 }
 
 func (s *DispersalServerV2) checkBlobExistence(ctx context.Context, blobHeader *corev2.BlobHeader) *status.Status {

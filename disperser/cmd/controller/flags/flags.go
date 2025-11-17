@@ -112,6 +112,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
 		Value:    1 * time.Hour,
 	}
+	MaxDispersalAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-dispersal-age"),
+		Usage:    "Maximum age a dispersal request can be before it is discarded",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_DISPERSAL_AGE"),
+		Value:    45 * time.Second,
+	}
 
 	// Dispatcher Flags
 	DispatcherPullIntervalFlag = cli.DurationFlag{
@@ -177,6 +184,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NODE_CLIENT_CACHE_NUM_ENTRIES"),
 		Value:    400,
 	}
+	DetailedValidatorMetricsFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "detailed-validator-metrics"),
+		Usage:    "Whether to collect detailed validator metrics",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DETAILED_VALIDATOR_METRICS"),
+	}
 	MaxBatchSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-batch-size"),
 		Usage:    "Max number of blobs to disperse in a batch",
@@ -230,31 +243,23 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "HEARTBEAT_MAX_STALL_DURATION"),
 		Value:    4 * time.Minute,
 	}
-	SignificantSigningThresholdPercentageFlag = cli.UintFlag{
-		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-percentage"),
-		Usage: "Percentage of stake that represents a 'significant' signing threshold. Currently used to track" +
+	SignificantSigningThresholdFractionFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-fraction"),
+		Usage: "Fraction of stake that represents a 'significant' signing threshold. Currently used to track" +
 			" metrics to better understand signing behavior.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_PERCENTAGE"),
-		Value:    55,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_FRACTION"),
+		Value:    0.55,
 	}
-	defaultSigningThresholds                cli.StringSlice = []string{"0.55", "0.67"}
-	SignificantSigningMetricsThresholdsFlag                 = cli.StringSliceFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "significant-signing-thresholds"),
-		Usage:    "Significant signing thresholds for metrics, each must be between 0.0 and 1.0",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_METRICS_THRESHOLDS"),
-		Value:    &defaultSigningThresholds,
-	}
-	GrpcServerEnableFlag = cli.BoolFlag{
+	GrpcServerEnableFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-server-enable"),
-		Usage:    "enable the controller gRPC server. default: false",
+		Usage:    "enable the controller gRPC server. default: true",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_SERVER_ENABLE"),
 	}
-	GrpcPaymentAuthenticationFlag = cli.BoolFlag{
+	GrpcPaymentAuthenticationFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-payment-authentication"),
-		Usage:    "If true, use the new payment authentication system running on the controller; if false, payment authentication is disabled and request validation will always fail. Defaults to disabled.",
+		Usage:    "If true, use the new payment authentication system running on the controller; if false, payment authentication is disabled and request validation will always fail. default: true.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PAYMENT_AUTHENTICATION"),
 	}
@@ -322,6 +327,18 @@ var (
 		Value:    30 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
 	}
+	EnablePerAccountPaymentMetricsFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-payment-metrics"),
+		Usage:    "Whether to report per-account payment metrics. If false, all metrics will be aggregated under account 0x0.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PER_ACCOUNT_PAYMENT_METRICS"),
+	}
+	DisperserIDFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-id"),
+		Usage:    "Unique identifier for this disperser instance. The value specified must match the index of the associated pubkey in the disperser registry",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_ID"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -334,6 +351,7 @@ var requiredFlags = []cli.Flag{
 	DispatcherPullIntervalFlag,
 	AttestationTimeoutFlag,
 	BatchAttestationTimeoutFlag,
+	DisperserIDFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -345,6 +363,7 @@ var optionalFlags = []cli.Flag{
 	NumConcurrentEncodingRequestsFlag,
 	MaxNumBlobsPerIterationFlag,
 	OnchainStateRefreshIntervalFlag,
+	MaxDispersalAgeFlag,
 	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,
 	NumRequestRetriesFlag,
@@ -358,8 +377,7 @@ var optionalFlags = []cli.Flag{
 	ControllerReadinessProbePathFlag,
 	ControllerHealthProbePathFlag,
 	ControllerHeartbeatMaxStallDurationFlag,
-	SignificantSigningThresholdPercentageFlag,
-	SignificantSigningMetricsThresholdsFlag,
+	SignificantSigningThresholdFractionFlag,
 	EigenDAContractDirectoryAddressFlag,
 	BatchMetadataUpdatePeriodFlag,
 	GrpcServerEnableFlag,
@@ -373,6 +391,8 @@ var optionalFlags = []cli.Flag{
 	OnDemandPaymentsLedgerCacheSizeFlag,
 	ReservationPaymentsLedgerCacheSizeFlag,
 	PaymentVaultUpdateIntervalFlag,
+	EnablePerAccountPaymentMetricsFlag,
+	DetailedValidatorMetricsFlag,
 }
 
 var Flags []cli.Flag

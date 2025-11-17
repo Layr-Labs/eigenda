@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {EigenDACertVerifierV1} from "src/integrations/cert/legacy/v1/EigenDACertVerifierV1.sol";
 import {EigenDARegistryCoordinator, IRegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
@@ -86,11 +86,9 @@ contract CertVerifierDeployerV1 is Script, Test {
         vm.writeJson(finalJson, outputPath);
     }
 
-    /**
-     * @notice Helper function to convert uint8[] to bytes
-     * @param arr The uint8 array to convert
-     * @return result The bytes representation of the array
-     */
+    /// @notice Helper function to convert uint8[] to bytes
+    /// @param arr The uint8 array to convert
+    /// @return result The bytes representation of the array
     function uint8ArrayToBytes(uint8[] memory arr) internal pure returns (bytes memory) {
         bytes memory result = new bytes(arr.length);
         for (uint256 i = 0; i < arr.length; i++) {

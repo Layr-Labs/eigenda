@@ -569,9 +569,9 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "IGNORE_VERSION_FOR_EJECTION_DEFENSE"),
 	}
-	EnablePaymentValidationFlag = cli.BoolFlag{
+	EnablePaymentValidationFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-payment-validation"),
-		Usage:    "Whether the validator should perform payment validation. Temporary flag that will be removed once the new payments system is fully in place.",
+		Usage:    "Whether the validator should perform payment validation. Temporary flag that will be removed once the new payments system is fully in place. default: true.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PAYMENT_VALIDATION"),
 	}
@@ -588,6 +588,12 @@ var (
 		Required: false,
 		Value:    30 * time.Second,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
+	}
+	EnablePerAccountPaymentMetricsFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-payment-metrics"),
+		Usage:    "Whether to report per-account payment metrics. If false, all metrics will be aggregated under account 0x0.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PER_ACCOUNT_PAYMENT_METRICS"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -629,6 +635,13 @@ var (
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_STORE_DURATION_BLOCKS"),
+	}
+	OverrideV2TtlFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "override-v2-ttl"),
+		Usage:    "Override the TTL for v2 chunks. 0 means no override.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_V2_TTL"),
 	}
 	// DO NOT set plain private key in flag in production.
 	// When test mode is enabled, the DA Node will take private BLS key from this flag.
@@ -738,6 +751,8 @@ var optionalFlags = []cli.Flag{
 	EnablePaymentValidationFlag,
 	ReservationMaxLedgersFlag,
 	PaymentVaultUpdateIntervalFlag,
+	EnablePerAccountPaymentMetricsFlag,
+	OverrideV2TtlFlag,
 }
 
 func init() {

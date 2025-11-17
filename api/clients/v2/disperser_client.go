@@ -84,6 +84,9 @@ func NewDisperserClient(
 	if signer == nil {
 		return nil, fmt.Errorf("signer must be provided")
 	}
+	if committer == nil {
+		return nil, fmt.Errorf("committer must be provided")
+	}
 	if metrics == nil {
 		return nil, fmt.Errorf("metrics must be provided")
 	}
@@ -221,37 +224,9 @@ func (c *DisperserClient) DisperseBlob(
 
 	probe.SetStage("get_commitments")
 
-	var blobCommitments encoding.BlobCommitments
-	if c.committer == nil {
-		// if committer is not configured, get blob commitments from disperser
-		commitments, err := c.GetBlobCommitment(ctx, data)
-		if err != nil {
-			// Failover worthy error because it means the disperser is not responsive.
-			return nil, nil, api.NewErrorFailover(fmt.Errorf("GetBlobCommitment rpc: %w", err))
-		}
-		deserialized, err := encoding.BlobCommitmentsFromProtobuf(commitments.GetBlobCommitment())
-		if err != nil {
-			return nil, nil, fmt.Errorf("error deserializing blob commitments: %w", err)
-		}
-		blobCommitments = *deserialized
-
-		// We need to check that the disperser used the correct length. Even once checking the commitment from the
-		// disperser has been implemented, there is still an edge case where the disperser could truncate trailing 0s,
-		// yielding the wrong blob length, but not causing commitment verification to fail. It is important that the
-		// commitment doesn't report a blob length smaller than expected, since this could cause payload parsing to
-		// fail, if the length claimed in the encoded payload header is larger than the blob length in the commitment.
-		lengthFromCommitment := commitments.GetBlobCommitment().GetLength()
-		if lengthFromCommitment != uint32(symbolLength) {
-			return nil, nil, fmt.Errorf(
-				"blob commitment length (%d) from disperser doesn't match expected length (%d): %w",
-				lengthFromCommitment, symbolLength, err)
-		}
-	} else {
-		// if committer is configured, get commitments from committer
-		blobCommitments, err = c.committer.GetCommitmentsForPaddedLength(data)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error getting blob commitments: %w", err)
-		}
+	blobCommitments, err := c.committer.GetCommitmentsForPaddedLength(data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get commitments for padded length: %w", err)
 	}
 
 	blobHeader := &corev2.BlobHeader{
@@ -326,24 +301,6 @@ func (c *DisperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	reply, err := c.clientPool.GetClient().GetPaymentState(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("error while calling GetPaymentState: %w", err)
-	}
-	return reply, nil
-}
-
-// GetBlobCommitment is a utility method that calculates commitment for a blob payload.
-// While the blob commitment can be calculated by anyone, it requires SRS points to
-// be loaded. For service that does not have access to SRS points, this method can be
-// used to calculate the blob commitment in blob header, which is required for dispersal.
-func (c *DisperserClient) GetBlobCommitment(
-	ctx context.Context,
-	data []byte,
-) (*disperser_rpc.BlobCommitmentReply, error) {
-	request := &disperser_rpc.BlobCommitmentRequest{
-		Blob: data,
-	}
-	reply, err := c.clientPool.GetClient().GetBlobCommitment(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("error while calling GetBlobCommitment: %w", err)
 	}
 	return reply, nil
 }

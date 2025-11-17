@@ -56,22 +56,24 @@ type Config struct {
 	EnableTestMode                  bool
 	OverrideBlockStaleMeasure       uint64
 	OverrideStoreDurationBlocks     uint64
-	QuorumIDList                    []core.QuorumID
-	DbPath                          string
-	LogPath                         string
-	ID                              core.OperatorID
-	EigenDADirectory                string
-	PubIPProviders                  []string
-	PubIPCheckInterval              time.Duration
-	ChurnerUrl                      string
-	DataApiUrl                      string
-	NumBatchValidators              int
-	NumBatchDeserializationWorkers  int
-	EnableGnarkBundleEncoding       bool
-	ClientIPHeader                  string
-	ChurnerUseSecureGrpc            bool
-	RelayUseSecureGrpc              bool
-	RelayMaxMessageSize             uint
+	// If set, overrides the default TTL for v2 chunks
+	OverrideV2Ttl                  time.Duration
+	QuorumIDList                   []core.QuorumID
+	DbPath                         string
+	LogPath                        string
+	ID                             core.OperatorID
+	EigenDADirectory               string
+	PubIPProviders                 []string
+	PubIPCheckInterval             time.Duration
+	ChurnerUrl                     string
+	DataApiUrl                     string
+	NumBatchValidators             int
+	NumBatchDeserializationWorkers int
+	EnableGnarkBundleEncoding      bool
+	ClientIPHeader                 string
+	ChurnerUseSecureGrpc           bool
+	RelayUseSecureGrpc             bool
+	RelayMaxMessageSize            uint
 	// The number of connections to establish with each relay node.
 	RelayConnectionPoolSize        uint
 	ReachabilityPollIntervalSec    uint64
@@ -211,8 +213,9 @@ type Config struct {
 	// TODO(litt3): This is a temporary field, which will be removed once the new payments system is fully in place.
 	// Payment validation is currently optional to make implementation and testing possible before actually shipping
 	// the new payments system.
-	EnablePaymentValidation      bool
-	ReservationLedgerCacheConfig reservationvalidation.ReservationLedgerCacheConfig
+	EnablePaymentValidation        bool
+	ReservationLedgerCacheConfig   reservationvalidation.ReservationLedgerCacheConfig
+	EnablePerAccountPaymentMetrics bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -403,7 +406,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
 			// instead of hardcoding. At that point, this field will be removed from the config struct
 			// entirely, and the value will be fetched dynamically at runtime.
-			90*time.Second,
+			120*time.Second,
 			// this is hardcoded: it's a parameter just in case, but it's never expected to change
 			ratelimit.OverfillOncePermitted,
 			ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),
@@ -437,6 +440,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LevelDBDisableSeeksCompactionV1:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV1Flag.Name),
 		LevelDBSyncWritesV1:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV1Flag.Name),
 		OverrideStoreDurationBlocks:         ctx.GlobalUint64(flags.OverrideStoreDurationBlocksFlag.Name),
+		OverrideV2Ttl:                       ctx.GlobalDuration(flags.OverrideV2TtlFlag.Name),
 		QuorumIDList:                        ids,
 		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),
 		EthClientConfig:                     ethClientConfig,
@@ -494,5 +498,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		IgnoreVersionForEjectionDefense: ctx.GlobalBool(flags.IgnoreVersionForEjectionDefenseFlag.Name),
 		EnablePaymentValidation:         paymentValidationEnabled,
 		ReservationLedgerCacheConfig:    reservationLedgerCacheConfig,
+		EnablePerAccountPaymentMetrics:  ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
 	}, nil
 }

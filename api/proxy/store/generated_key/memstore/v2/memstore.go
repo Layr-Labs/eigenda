@@ -179,7 +179,7 @@ func (e *MemStore) generateRandomV3Cert(blobContents []byte) (*coretypes.EigenDA
 // If returnEncodedPayload is true, it returns the encoded blob without decoding.
 func (e *MemStore) Get(
 	_ context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 	serializationType coretypes.CertSerializationType,
 	returnEncodedPayload bool,
 ) ([]byte, error) {
@@ -223,7 +223,7 @@ func (e *MemStore) Get(
 // the same certificate used in dispersal for retrieval
 func (e *MemStore) Put(
 	_ context.Context, value []byte, serializationType coretypes.CertSerializationType,
-) ([]byte, error) {
+) (*certs.VersionedCert, error) {
 	payload := coretypes.Payload(value)
 
 	blob, err := payload.ToBlob(e.polyForm)
@@ -249,11 +249,11 @@ func (e *MemStore) Put(
 		return nil, err
 	}
 
-	return certBytes, nil
+	return certs.NewVersionedCert(certBytes, certs.V2VersionByte), nil
 }
 
 func (e *MemStore) VerifyCert(
-	_ context.Context, _ certs.VersionedCert, _ coretypes.CertSerializationType, _ uint64,
+	_ context.Context, _ *certs.VersionedCert, _ coretypes.CertSerializationType, _ uint64,
 ) error {
 	return nil
 }

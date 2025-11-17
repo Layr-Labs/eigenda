@@ -228,6 +228,20 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTH_PMT_REQUEST_MAX_FUTURE_AGE"),
 	}
+	MaxDispersalAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-dispersal-age"),
+		Usage:    "Maximum age of a dispersal request timestamp. Requests older than this will be rejected at ingest",
+		Required: false,
+		Value:    45 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_DISPERSAL_AGE"),
+	}
+	MaxFutureDispersalTimeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-future-dispersal-time"),
+		Usage:    "Maximum time into the future a dispersal request timestamp can be. Requests with timestamps further in the future will be rejected at ingest",
+		Required: false,
+		Value:    45 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_FUTURE_DISPERSAL_TIME"),
+	}
 	ReservedOnly = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "reserved-only"),
 		Usage:    "if true, only reserved dispersal requests are served; on-demand requests are rejected (default: true)",
@@ -241,9 +255,9 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_ADDRESS"),
 	}
-	UseControllerMediatedPayments = cli.BoolFlag{
+	UseControllerMediatedPayments = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-controller-mediated-payments"),
-		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using legacy system.",
+		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using new controller-mediated system.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_CONTROLLER_MEDIATED_PAYMENTS"),
 	}
@@ -310,6 +324,8 @@ var optionalFlags = []cli.Flag{
 	EnablePprof,
 	AuthPmtStateRequestMaxPastAge,
 	AuthPmtStateRequestMaxFutureAge,
+	MaxDispersalAgeFlag,
+	MaxFutureDispersalTimeFlag,
 	ReservedOnly,
 	ControllerAddressFlag,
 	UseControllerMediatedPayments,

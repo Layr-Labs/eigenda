@@ -56,6 +56,8 @@ type Config struct {
 	EigenDAServiceManagerAddr       string
 	AuthPmtStateRequestMaxPastAge   time.Duration
 	AuthPmtStateRequestMaxFutureAge time.Duration
+	MaxDispersalAge                 time.Duration
+	MaxFutureDispersalTime          time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -135,6 +137,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:       ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		AuthPmtStateRequestMaxPastAge:   ctx.GlobalDuration(flags.AuthPmtStateRequestMaxPastAge.Name),
 		AuthPmtStateRequestMaxFutureAge: ctx.GlobalDuration(flags.AuthPmtStateRequestMaxFutureAge.Name),
+		MaxDispersalAge:                 ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
+		MaxFutureDispersalTime:          ctx.GlobalDuration(flags.MaxFutureDispersalTimeFlag.Name),
 	}
 	return config, nil
 }

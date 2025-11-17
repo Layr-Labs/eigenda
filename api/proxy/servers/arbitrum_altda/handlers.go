@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	proxy_common "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
@@ -27,7 +28,7 @@ import (
 
 	TODO: Method implementations:
 		[X] GetSupportedHeaderBytes // trusted integration
-		[-] Store // trusted integration
+		[X] Store // trusted integration
 		[X] RecoveryPayload // trusted integration
 		[-] CollectPreimages // trusted integration
 		[ ] GenerateProof // trustless AND secure integration
@@ -123,15 +124,17 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 	h.logMethodCall(MethodGetSupportedHeaderBytes)
 
 	return &SupportedHeaderBytesResult{
-		HeaderBytes: []byte{commitments.ArbCustomDAHeaderByte},
+		HeaderBytes: []hexutil.Bytes{
+			{commitments.ArbCustomDAHeaderByte, commitments.EigenDALayerByte},
+		},
 	}, nil
 }
 
 // deserializeCertFromSequencerMsg reads the VersionedCert from the raw sequencer message provided
 // by the DA Client
-func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (certs.VersionedCert, error) {
+func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (*certs.VersionedCert, error) {
 	if len(sequencerMsg) <= DACertOffset {
-		return certs.VersionedCert{},
+		return nil,
 			fmt.Errorf("sequencer message expected to be >%d bytes, got: %d",
 				DACertOffset, len(sequencerMsg))
 	}
@@ -140,14 +143,14 @@ func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (
 
 	daHeaderByte := daCommit[0]
 	if daHeaderByte != commitments.ArbCustomDAHeaderByte {
-		return certs.VersionedCert{},
+		return nil,
 			fmt.Errorf("expected CustomDAHeader byte (%x) for 0th index byte of message, instead got: %x ",
 				commitments.ArbCustomDAHeaderByte, daHeaderByte)
 	}
 
 	daLayerByte := daCommit[1]
 	if daLayerByte != commitments.EigenDALayerByte {
-		return certs.VersionedCert{},
+		return nil,
 			fmt.Errorf("expected EigenDALayer byte (%x) for 1st index byte of message, instead got: %x ",
 				commitments.EigenDALayerByte, daLayerByte)
 	}
@@ -159,11 +162,13 @@ func (h *Handlers) deserializeCertFromSequencerMsg(sequencerMsg hexutil.Bytes) (
 
 // logMethodCall logs the method call with timing information and allows caller to pass in
 // method specific log context
-func (h *Handlers) logMethodCall(method string, logValue ...string) func() {
+func (h *Handlers) logMethodCall(method string, logValue ...any) func() {
 	start := time.Now()
 
 	return func() {
-		h.log.Info(method, "ns", time.Since(start).Nanoseconds(), logValue)
+		tags := []any{"ns", time.Since(start).Nanoseconds()}
+		tags = append(tags, logValue...)
+		h.log.Info(method, tags...)
 	}
 }
 
@@ -221,10 +226,8 @@ func (h *Handlers) RecoverPayload(
 //	@return bytes: Arbitrum Custom DA commitment bytes
 //	@return error: a structured error message (if applicable)
 //
-// TODO: Determine the encoding standard to use for the returned DA Commitment. It's assumed that an EigenDAV2 message
-// header byte will be prefixed. We can likely reuse the Standard Commitment mode but will require some analysis.
-//
-// TODO: Add processing for client provided timeout value
+// TODO: Add processing for client provided timeout value.
+// do we actually need this?
 func (h *Handlers) Store(
 	ctx context.Context,
 	message hexutil.Bytes,
@@ -242,15 +245,17 @@ func (h *Handlers) Store(
 		return nil, fmt.Errorf("received empty rollup payload")
 	}
 
-	certBytes, err := h.eigenDAManager.Put(ctx, message, coretypes.CertSerializationABI)
+	versionedCert, err := h.eigenDAManager.Put(ctx, message, coretypes.CertSerializationABI)
 	if err != nil {
+		// translate a "failover" error into the FallbackRequested type error
+		// that arbitrum nitro understands to be the same
+		if errors.Is(err, &api.ErrorFailover{}) {
+			return nil, errors.Join(err, ErrFallbackRequested)
+		}
+
 		return nil, fmt.Errorf("put rollup payload: %w", err)
 	}
-
-	// TODO: This should eventually be propagated by the Put method given the actual
-	//       version byte assumed is dictated by the EigenDACertVerifier used
-	versionedCert := certs.NewVersionedCert(certBytes, certs.V2VersionByte)
-	daCommitment := commitments.NewArbCommitment(versionedCert)
+	daCommitment := commitments.NewArbCommitment(*versionedCert)
 
 	result := &StoreResult{
 		SerializedDACert: daCommitment.Encode(),

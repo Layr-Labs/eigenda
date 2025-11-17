@@ -29,14 +29,6 @@ type ClientLedger struct {
 	accountantMetricer metrics.AccountantMetricer
 	accountID          gethcommon.Address
 
-	// Though it would theoretically be possible to infer mode of operation based on on-chain state, it's important
-	// that this be directly configurable by the user, to ensure that reality matches intention.
-	//
-	// Consider, for example, if a user intends to operate with a reservation covering the majority of dispersals,
-	// with an on-demand balance as a backup. If there is a configuration issue which prevents the reservation from
-	// being used, the client could mistakenly burn through all backup funds before becoming aware of the
-	// misconfiguration. In such cases, it's better to fail early, to bring the misconfiguration to the attention of the
-	// user as soon as possible.
 	clientLedgerMode ClientLedgerMode
 
 	reservationLedger *reservation.ReservationLedger
@@ -114,6 +106,12 @@ func NewClientLedger(
 			clientLedger.GetAccountsToUpdate,
 			clientLedger.UpdateReservation)
 		enforce.NilError(err, "new reservation vault monitor")
+
+		// record initial values, so that metrics start out accurate
+		clientLedger.accountantMetricer.RecordReservationBucketCapacity(
+			clientLedger.reservationLedger.GetBucketCapacity())
+		clientLedger.accountantMetricer.RecordReservationPayment(
+			clientLedger.reservationLedger.GetRemainingCapacity())
 	}
 
 	if clientLedger.onDemandLedger != nil {
@@ -126,6 +124,12 @@ func NewClientLedger(
 			clientLedger.GetAccountsToUpdate,
 			clientLedger.UpdateTotalDeposit)
 		enforce.NilError(err, "new on demand vault monitor")
+
+		// record initial values, so that metrics start out accurate
+		clientLedger.accountantMetricer.RecordOnDemandTotalDeposits(
+			clientLedger.onDemandLedger.GetTotalDeposits())
+		clientLedger.accountantMetricer.RecordCumulativePayment(
+			clientLedger.onDemandLedger.GetCumulativePayment())
 	}
 
 	return clientLedger
