@@ -51,7 +51,7 @@ type InfrastructureHarness struct {
 	DisperserHarness DisperserHarness
 
 	// Proxy
-	// TODO: Add harness when we need it
+	ProxyHarness ProxyHarness
 
 	// Legacy deployment configuration
 	TestConfig     *deploy.Config
@@ -111,6 +111,10 @@ type TestHarness struct {
 
 	// API Server address for the disperser
 	APIServerAddress string
+
+	// Proxy server addresses
+	ProxyRESTAddress string
+	ProxyArbAddress  string
 }
 
 // Cleanup releases resources held by the TestHarness

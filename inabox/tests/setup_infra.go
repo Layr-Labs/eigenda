@@ -34,6 +34,10 @@ type InfrastructureConfig struct {
 	// once legacy payments are removed. When true, the controller, API server, and validator nodes will all
 	// use the new payment system.
 	UseNewPayments bool
+
+	// DisableProxy disables the proxy deployment when set to true. This is useful for
+	// tests that do not require the proxy infrastructure to be deployed.
+	DisableProxy bool
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
@@ -153,6 +157,35 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 	infra.OperatorHarness = *operatorHarness
 
+	// Setup Proxy Harness fourth (requires chain and disperser to be ready)
+	if !config.DisableProxy && !config.DisableDisperser {
+		// Get contract addresses from test config
+		proxyHarnessConfig := ProxyHarnessConfig{
+			DisperserHostname:     "localhost",
+			DisperserPort:         "32005", // V2 API server port from testconfig
+			EthRPCURL:             "http://localhost:8545",
+			S3BucketName:          "test-eigenda-blobstore", // Same bucket used by disperser
+			LocalStackPort:        infra.LocalStackPort,
+			EigenDADirectory:      testConfig.EigenDA.EigenDADirectory,
+			CertVerifierAddress:   testConfig.EigenDA.CertVerifierRouter,
+			ServiceManagerAddress: testConfig.EigenDA.ServiceManager,
+			MaxBlobSizeBytes:      1 * 1024 * 1024, // 1 MiB
+			EnableArbCustomDA:     true,
+		}
+
+		proxyHarness, err := SetupProxyHarness(infraCtx, logger, proxyHarnessConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup proxy harness: %w", err)
+		}
+		infra.ProxyHarness = *proxyHarness
+	} else {
+		if config.DisableProxy {
+			logger.Info("Proxy deployment disabled, skipping proxy harness setup")
+		} else if config.DisableDisperser {
+			logger.Info("Disperser deployment disabled, skipping proxy harness setup (proxy requires disperser)")
+		}
+	}
+
 	return infra, nil
 }
 
@@ -176,6 +209,9 @@ func TeardownInfrastructure(infra *InfrastructureHarness) {
 	// Stop test binaries
 	infra.Logger.Info("Stopping binaries")
 	infra.TestConfig.StopBinaries()
+
+	// Clean up proxy harness
+	infra.ProxyHarness.Cleanup(cleanupCtx, infra.Logger)
 
 	// Clean up disperser harness
 	infra.DisperserHarness.Cleanup(cleanupCtx, infra.Logger)

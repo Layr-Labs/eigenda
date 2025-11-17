@@ -36,6 +36,16 @@ services:
     operators: 4
     maxOperatorCount: 3
     relays: 4
+  proxy:
+    enabled: true
+    rest_port: 3100
+    arb_port: 3101
+    max_blob_size: "1mib"
+    enabled_apis:
+      standard_commitment: true
+      op_generic_commitment: true
+      op_keccak_commitment: true
+    enable_arb_custom_da: true
   stakes:
     - total: 100e18
       distribution: [1, 4, 6, 10]

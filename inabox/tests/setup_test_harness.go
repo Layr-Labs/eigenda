@@ -130,6 +130,10 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 
 	testCtx.APIServerAddress = infra.DisperserHarness.APIServerAddress
 
+	// Set proxy addresses if proxy is enabled
+	testCtx.ProxyRESTAddress = infra.ProxyHarness.RestAddress
+	testCtx.ProxyArbAddress = infra.ProxyHarness.ArbAddress
+
 	if err := setupDefaultPayloadDisperser(ctx, testCtx, infra); err != nil {
 		return nil, fmt.Errorf("setup default payload disperser: %w", err)
 	}
