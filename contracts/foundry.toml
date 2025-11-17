@@ -1,24 +1,170 @@
 [profile.default]
-src = 'src'
-out = 'out'
-libs = ['lib']
-fs_permissions = [{ access = "read-write", path = "./" }]
+    # Project Configuration
 
-# We force all warnings to be fixed
-deny_warnings = true
-# We error warnings from libraries. This should be fixed upstream but I'm lazy.
-# See https://github.com/ethereum/solidity/issues/2675 for an interesting discussion.
-ignored_warnings_from = [
-    "lib/eigenlayer-middleware/src/RegistryCoordinator.sol",
-]
+    # Path to contract sources relative to the root of the project.
+    src = "src"
+    # Path to the test contract sources relative to the root of the project.
+    test = "test"
+    # Path to the script contract sources relative to the root of the project.
+    script = "script"
+    # Path to store contract artifacts relative to the root of the project.
+    out = "out"
+    # Array of paths that contain libraries, relative to the root of the project.
+    libs = ["lib"]
 
-gas_reports = ["*"]
+    # Solidity Compiler Configuration
 
-# Enables or disables the optimizer
-optimizer = true
-# The number of optimizer runs
-optimizer_runs = 200
-# Whether or not to use the Yul intermediate representation compilation pipeline
-via_ir = false
-# Override the Solidity version (this overrides `auto_detect_solc`)
-solc_version = '0.8.12'
+    # Defines paths for Solidity imports.
+    remappings = [
+        "@openzeppelin/=node_modules/@openzeppelin/"
+    ]
+    # Specifies the exact version of Solidity to use, overriding auto-detection.
+    solc_version = '0.8.29'
+    # If enabled, treats Solidity compiler warnings as errors, preventing artifact generation if warnings are present.
+    deny_warnings = true 
+    # If set to true, changes compilation pipeline to go through the new IR optimizer.
+    via_ir = false
+    # Whether or not to enable the Solidity optimizer.
+    optimizer = true
+    # The number of runs specifies roughly how often each opcode of the deployed code will be executed 
+    # across the life-time of the contract. This means it is a trade-off parameter between code size (deploy cost) 
+    # and code execution cost (cost after deployment).
+    optimizer_runs = 200
+    # An array of Solidity compiler error codes to ignore during build, such as warnings.
+    ignored_error_codes = [
+        # 1878, # license
+        5574, # code-size
+        # 2018, # func-mutability
+        # 2072, # unused-var
+        # 5667, # unused-param
+        # 9302, # unused-return
+        # 5815, # virtual-interfaces
+        # 3628, # missing-receive-ether
+        # 2519, # shadowing
+        # 8760, # same-varname
+        # 6321, # unnamed-return
+        # 5740, # unreachable
+        # 3420, # pragma-solidity
+        # 2462, # constructor-visibility
+        3860, # init-code-size
+        # 2394, # transient-storage
+        4591  # too-many-warnings
+    ]
+
+    # We error warnings from libraries. This should be fixed upstream but I'm lazy.
+    # See https://github.com/ethereum/solidity/issues/2675 for an interesting discussion.
+    # An array of file paths from which warnings should be ignored during compilation.
+    ignored_warnings_from = [
+        "lib/eigenlayer-middleware/src/RegistryCoordinator.sol",
+    ]
+
+    # Test Configuration
+
+    # Verbosity level during test execution. Higher levels provide more detailed information:
+    # - 2 (-vv): Logs emitted during tests are displayed.
+    # - 3 (-vvv): Stack traces for failing tests are displayed.
+    # - 4 (-vvvv): Stack traces for all tests and setup traces for failing tests are displayed.
+    # - 5 (-vvvvv): Stack and setup traces are always displayed.
+    verbosity = 0
+    # Enables the Foreign Function Interface (FFI) cheatcode. 
+    # WARNING: This allows arbitrary programs to run on your computer, which poses security risks.
+    ffi = false
+    # Contracts to include in gas reports. By default, all contracts are included.
+    gas_reports = ["*"]
+    # Show test execution progress if set to true.
+    show_progress = true
+    # Sparse mode only compiles files that match certain criteria.
+    sparse_mode = true
+    
+    no_match_test = "queueUpgrade"
+    no_match_path = "script/**/*.sol"
+    fs_permissions = [{ access = "read-write", path = "./" }]
+
+[profile.default.fmt]
+    # Single-line vs multi-line statement blocks
+    single_line_statement_blocks = "preserve"  # Options: "single", "multi", "preserve"
+    # Formatting style for long function headers
+    multiline_func_header = "attributes_first"  # Options: "attributes_first", "params_first", "all"
+    # Sort import statements alphabetically
+    sort_imports = false  
+    # Maximum line length where formatter will wrap the line
+    line_length = 120  # Default: 120
+    # Number of spaces per indentation level
+    tab_width = 4  # Default: 4
+    # Whether to print spaces between brackets
+    bracket_spacing = false  
+    # Style of uint/int256 types
+    int_types = "long"  # Options: "long", "short", "preserve"
+    # Quotation mark style
+    quote_style = "double"  # Options: "double", "single", "preserve"
+    # Style of underscores in number literals
+    number_underscore = "thousands"  # Options: "preserve", "thousands", "remove"
+    # Whether or not to wrap comments at line_length
+    wrap_comments = false  
+    # Enforces the style of doc (natspec) comments.
+    docs_style = "line" # Options: "line", "block", "preserve"
+    # List of files to ignore during formatting (can use glob patterns)
+    ignore = [
+        # "./test/**/*"
+    ]
+
+[profile.default.lint]
+    # Whether to run the linter when building.
+    lint_on_build = false
+    # Specifies which lints to run based on severity.
+    severity = [
+        "high", 
+        "med", 
+        "low", 
+        "info", 
+        "gas"
+    ]
+    # List of lints to exclude from linting.
+    exclude_lints = [
+        # High
+        # "incorrect-shift",
+        # "unchecked-call",
+        # "erc20-unchecked-transfer",
+
+        # Medium
+        # "divide-before-multiply",
+
+        # Info
+        # "unused-import",
+        # "unaliased-plain-import",
+        # "mixed-case-function",
+        # "mixed-case-variable",
+        # "pascal-case-struct",
+        # "screaming-snake-case-const",
+        # "screaming-snake-case-immutable",
+
+        # Gas
+        # "asm-keccak256",
+        # "unwrapped-modifier-logic"
+    ]
+    # List of files or patterns to ignore when running the linter (can use glob patterns)
+    ignore = [
+        "src/test/**/*",
+        "script/**/*"
+    ]
+
+[profile.forktest.fuzz]    
+    optimizer = false
+    runs = 16
+
+[profile.coverage.fuzz]
+    optimizer = false
+    runs = 1
+    gas_limit = "18446744073709551615" # u64::MAX
+
+[profile.medium.fuzz]
+    optimizer = false
+    runs = 256
+
+[profile.intense.fuzz]
+    optimizer = false
+    runs = 5000
+
+[rpc_endpoints]
+    mainnet = "${RPC_MAINNET}"
+    holesky = "${RPC_HOLESKY}"
