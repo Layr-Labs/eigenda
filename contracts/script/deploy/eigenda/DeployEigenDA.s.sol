@@ -5,8 +5,9 @@ pragma solidity ^0.8.12;
 import {EmptyContract} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 import {ProxyAdmin, TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-import {IDelegationManager} from
-    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {
+    IDelegationManager
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ISocketRegistry, SocketRegistry} from "lib/eigenlayer-middleware/src/SocketRegistry.sol";
 import {IIndexRegistry} from "lib/eigenlayer-middleware/src/interfaces/IIndexRegistry.sol";
 import {IndexRegistry} from "lib/eigenlayer-middleware/src/IndexRegistry.sol";
@@ -22,10 +23,12 @@ import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {IEigenDADisperserRegistry, EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
-import {IAVSDirectory} from
-    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
-import {IRewardsCoordinator} from
-    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+import {
+    IAVSDirectory
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
+import {
+    IRewardsCoordinator
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 import {
     IPauserRegistry,
     PauserRegistry
@@ -341,9 +344,8 @@ contract DeployEigenDA is Script {
         }
 
         for (uint256 i; i < cfg.relayInfos().length; i++) {
-            IEigenDARelayRegistry(directory.getAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME)).addRelayInfo(
-                cfg.relayInfos()[i]
-            );
+            IEigenDARelayRegistry(directory.getAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME))
+                .addRelayInfo(cfg.relayInfos()[i]);
         }
 
         if (msg.sender != cfg.initialOwner()) {
@@ -353,9 +355,8 @@ contract DeployEigenDA is Script {
             accessControl.revokeRole(accessControl.DEFAULT_ADMIN_ROLE(), msg.sender);
             EigenDADisperserRegistry(directory.getAddress(AddressDirectoryConstants.DISPERSER_REGISTRY_NAME))
                 .transferOwnership(cfg.initialOwner());
-            EigenDARelayRegistry(directory.getAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME)).transferOwnership(
-                cfg.initialOwner()
-            );
+            EigenDARelayRegistry(directory.getAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME))
+                .transferOwnership(cfg.initialOwner());
         }
 
         vm.stopBroadcast();
