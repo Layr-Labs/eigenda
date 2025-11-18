@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
@@ -49,8 +49,12 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
-			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
-			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			BucketName:       ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			TableName:        ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			Backend:          blobstore.ObjectStorageBackend(ctx.GlobalString(flags.ObjectStorageBackendFlag.Name)),
+			OCIRegion:        ctx.GlobalString(flags.OCIRegionFlag.Name),
+			OCICompartmentID: ctx.GlobalString(flags.OCICompartmentIDFlag.Name),
+			OCINamespace:     ctx.GlobalString(flags.OCINamespaceFlag.Name),
 		},
 		EthClientConfig: ethClientConfig,
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
@@ -66,7 +70,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			BatchSizeMBLimit:         ctx.GlobalUint(flags.BatchSizeLimitFlag.Name),
 			SRSOrder:                 ctx.GlobalInt(flags.SRSOrderFlag.Name),
 			MaxNumRetriesPerBlob:     ctx.GlobalUint(flags.MaxNumRetriesPerBlobFlag.Name),
-			TargetNumChunks:          ctx.GlobalUint(flags.TargetNumChunksFlag.Name),
+			TargetNumChunks:          ctx.GlobalUint64(flags.TargetNumChunksFlag.Name),
 			MaxBlobsToFetchFromStore: ctx.GlobalInt(flags.MaxBlobsToFetchFromStoreFlag.Name),
 			FinalizationBlockDelay:   ctx.GlobalUint(flags.FinalizationBlockDelayFlag.Name),
 		},

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import "../MockEigenDADeployer.sol";
 
@@ -18,8 +18,7 @@ contract EigenDARelayRegistryUnit is MockEigenDADeployer {
 
     function test_addRelayInfo() public {
         DATypesV2.RelayInfo memory relayInfo = DATypesV2.RelayInfo({
-            relayAddress: address(uint160(uint256(keccak256(abi.encodePacked("relay"))))),
-            relayURL: "https://relay.com"
+            relayAddress: address(uint160(uint256(keccak256(abi.encodePacked("relay"))))), relayURL: "https://relay.com"
         });
 
         vm.expectEmit(address(eigenDARelayRegistry));
@@ -35,8 +34,7 @@ contract EigenDARelayRegistryUnit is MockEigenDADeployer {
 
     function test_addRelayInfo_revert_notOwner() public {
         DATypesV2.RelayInfo memory relayInfo = DATypesV2.RelayInfo({
-            relayAddress: address(uint160(uint256(keccak256(abi.encodePacked("relay"))))),
-            relayURL: "https://relay.com"
+            relayAddress: address(uint160(uint256(keccak256(abi.encodePacked("relay"))))), relayURL: "https://relay.com"
         });
 
         vm.expectRevert("Ownable: caller is not the owner");

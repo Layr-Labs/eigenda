@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	coretypes "github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	common "github.com/Layr-Labs/eigenda/api/proxy/common"
 	certs "github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	gomock "go.uber.org/mock/gomock"
@@ -43,18 +44,18 @@ func (m *MockIEigenDAManager) EXPECT() *MockIEigenDAManagerMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockIEigenDAManager) Get(ctx context.Context, versionedCert certs.VersionedCert, opts common.GETOpts) ([]byte, error) {
+func (m *MockIEigenDAManager) Get(ctx context.Context, versionedCert *certs.VersionedCert, serializationType coretypes.CertSerializationType, opts common.GETOpts) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", ctx, versionedCert, opts)
+	ret := m.ctrl.Call(m, "Get", ctx, versionedCert, serializationType, opts)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockIEigenDAManagerMockRecorder) Get(ctx, versionedCert, opts any) *gomock.Call {
+func (mr *MockIEigenDAManagerMockRecorder) Get(ctx, versionedCert, serializationType, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockIEigenDAManager)(nil).Get), ctx, versionedCert, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockIEigenDAManager)(nil).Get), ctx, versionedCert, serializationType, opts)
 }
 
 // GetDispersalBackend mocks base method.
@@ -72,18 +73,18 @@ func (mr *MockIEigenDAManagerMockRecorder) GetDispersalBackend() *gomock.Call {
 }
 
 // Put mocks base method.
-func (m *MockIEigenDAManager) Put(ctx context.Context, value []byte) ([]byte, error) {
+func (m *MockIEigenDAManager) Put(ctx context.Context, value []byte, serializationType coretypes.CertSerializationType) (*certs.VersionedCert, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Put", ctx, value)
-	ret0, _ := ret[0].([]byte)
+	ret := m.ctrl.Call(m, "Put", ctx, value, serializationType)
+	ret0, _ := ret[0].(*certs.VersionedCert)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Put indicates an expected call of Put.
-func (mr *MockIEigenDAManagerMockRecorder) Put(ctx, value any) *gomock.Call {
+func (mr *MockIEigenDAManagerMockRecorder) Put(ctx, value, serializationType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockIEigenDAManager)(nil).Put), ctx, value)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockIEigenDAManager)(nil).Put), ctx, value, serializationType)
 }
 
 // SetDispersalBackend mocks base method.

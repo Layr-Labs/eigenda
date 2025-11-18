@@ -3,12 +3,14 @@ package lib
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -18,12 +20,13 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func RunDisperserServer(ctx *cli.Context) error {
@@ -57,7 +60,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
 
-	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
+	objectStorageClient, err := blobstore.CreateObjectStorageClient(
+		context.Background(), config.BlobstoreConfig, config.AwsClientConfig, logger)
 	if err != nil {
 		return err
 	}
@@ -129,17 +133,16 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("configured max blob size is invalid %v", config.MaxBlobSize)
 	}
 
-	if !encoding.IsPowerOfTwo(uint64(config.MaxBlobSize)) {
+	if !math.IsPowerOfTwo(uint64(config.MaxBlobSize)) {
 		return fmt.Errorf("configured max blob size must be power of 2 %v", config.MaxBlobSize)
 	}
 
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
 	if config.DisperserVersion == V2 {
-		config.EncodingConfig.LoadG2Points = true
-		prover, err := prover.NewProver(&config.EncodingConfig, nil)
+		committer, err := committer.NewFromConfig(config.KzgCommitterConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create encoder: %w", err)
+			return fmt.Errorf("new committer: %w", err)
 		}
 		baseBlobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
 		blobMetadataStore := blobstorev2.NewInstrumentedMetadataStore(baseBlobMetadataStore, blobstorev2.InstrumentedMetadataStoreConfig{
@@ -147,24 +150,53 @@ func RunDisperserServer(ctx *cli.Context) error {
 			Registry:    reg,
 			Backend:     blobstorev2.BackendDynamoDB,
 		})
-		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
+		blobStore := blobstorev2.NewBlobStore(bucketName, objectStorageClient, logger)
+
+		var controllerConnection *grpc.ClientConn
+		var controllerClient controller.ControllerServiceClient
+		if config.UseControllerMediatedPayments {
+			if config.ControllerAddress == "" {
+				return fmt.Errorf("controller address is required when using controller-mediated payments")
+			}
+			connection, err := grpc.NewClient(
+				config.ControllerAddress,
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+			)
+			if err != nil {
+				return fmt.Errorf("create controller connection: %w", err)
+			}
+			controllerConnection = connection
+			controllerClient = controller.NewControllerServiceClient(connection)
+		}
+
+		// Create listener for the gRPC server
+		addr := fmt.Sprintf("%s:%s", "0.0.0.0", config.ServerConfig.GrpcPort)
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("failed to create listener: %w", err)
+		}
 
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
+			time.Now,
 			blobStore,
 			blobMetadataStore,
 			transactor,
 			meterer,
 			authv2.NewPaymentStateAuthenticator(config.AuthPmtStateRequestMaxPastAge, config.AuthPmtStateRequestMaxFutureAge),
-			prover,
-			uint64(config.MaxNumSymbolsPerBlob),
+			committer,
+			config.MaxNumSymbolsPerBlob,
 			config.OnchainStateRefreshInterval,
+			config.MaxDispersalAge,
+			config.MaxFutureDispersalTime,
 			logger,
 			reg,
 			config.MetricsConfig,
 			config.ReservedOnly,
 			config.UseControllerMediatedPayments,
-			config.ControllerAddress,
+			controllerConnection,
+			controllerClient,
+			listener,
 		)
 		if err != nil {
 			return err
@@ -173,7 +205,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 	}
 
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
-	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+	blobStore := blobstore.NewSharedStorage(bucketName, objectStorageClient, blobMetadataStore, logger)
 
 	grpcMetrics := grpcprom.NewServerMetrics()
 	metrics := disperser.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)

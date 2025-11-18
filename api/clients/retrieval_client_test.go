@@ -11,10 +11,10 @@ import (
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -107,10 +107,10 @@ func setup(t *testing.T) {
 		t.Fatalf("failed to get operator state: %s", err)
 	}
 
-	blobSize := uint(len(blob.Data))
-	blobLength := encoding.GetBlobLength(uint(blobSize))
+	blobSize := uint32(len(blob.Data))
+	blobLength := encoding.GetBlobLength(blobSize)
 
-	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
+	chunkLength, err := coordinator.CalculateChunkLength(operatorState, uint(blobLength), 0, securityParams[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,12 +124,12 @@ func setup(t *testing.T) {
 		ChunkLength: chunkLength,
 	}
 
-	assignments, info, err := coordinator.GetAssignments(operatorState, blobLength, quorumHeader)
+	assignments, info, err := coordinator.GetAssignments(operatorState, uint(blobLength), quorumHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+	params := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
 
 	commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
 	if err != nil {

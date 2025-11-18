@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -32,7 +32,7 @@ var _ ChunkReader = (*chunkReader)(nil)
 
 type chunkReader struct {
 	logger logging.Logger
-	client s3.Client
+	client s3.S3Client
 	bucket string
 }
 
@@ -42,7 +42,7 @@ type chunkReader struct {
 // If empty, it will return data for all shards. (Note: shard feature is not yet implemented.)
 func NewChunkReader(
 	logger logging.Logger,
-	s3Client s3.Client,
+	s3Client s3.S3Client,
 	bucketName string) ChunkReader {
 
 	return &chunkReader{
@@ -59,7 +59,7 @@ func (r *chunkReader) GetBinaryChunkProofs(ctx context.Context, blobKey corev2.B
 		return nil, fmt.Errorf("failed to download proofs from S3 for blob %s: %w", blobKey.Hex(), err)
 	}
 
-	proofs, err := rs.SplitSerializedFrameProofs(bytes)
+	proofs, err := encoding.SplitSerializedFrameProofs(bytes)
 	if err != nil {
 		r.logger.Error("failed to split proofs", "blob", blobKey.Hex(), "error", err)
 		return nil, fmt.Errorf("failed to split proofs for blob %s: %w", blobKey.Hex(), err)

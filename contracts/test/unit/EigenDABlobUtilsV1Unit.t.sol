@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import "../MockEigenDADeployer.sol";
 import {EigenDACertVerifierV1} from "src/integrations/cert/legacy/v1/EigenDACertVerifierV1.sol";
-import {EigenDACertVerificationV1Lib as CertV1Lib} from
-    "src/integrations/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
+import {
+    EigenDACertVerificationV1Lib as CertV1Lib
+} from "src/integrations/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
 
@@ -49,9 +50,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
-        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
-            defaultBatchId
-        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
+        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)")
+            .with_key(defaultBatchId).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
         DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -59,6 +59,9 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
         blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+
+        if (batchHeader.quorumNumbers.length > type(uint8).max) revert(); // Sanity check.
+        // forge-lint: disable-next-item(unsafe-typecast)
         for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
@@ -93,9 +96,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
-        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
-            defaultBatchId
-        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
+        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)")
+            .with_key(defaultBatchId).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
         DATypesV1.BlobVerificationProof[] memory blobVerificationProofs = new DATypesV1.BlobVerificationProof[](2);
         blobVerificationProofs[0].batchId = defaultBatchId;
         blobVerificationProofs[1].batchId = defaultBatchId;
@@ -107,6 +109,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProofs[1].blobIndex = 1;
         blobVerificationProofs[0].quorumIndices = new bytes(batchHeader.quorumNumbers.length);
         blobVerificationProofs[1].quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+        if (batchHeader.quorumNumbers.length > type(uint8).max) revert(); // Sanity check.
+        // forge-lint: disable-next-item(unsafe-typecast)
         for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
             blobVerificationProofs[0].quorumIndices[i] = bytes1(uint8(i));
             blobVerificationProofs[1].quorumIndices[i] = bytes1(uint8(i));
@@ -143,9 +147,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         // add dummy batch metadata
         DATypesV1.BatchMetadata memory batchMetadata;
 
-        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
-            defaultBatchId
-        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
+        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)")
+            .with_key(defaultBatchId).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
         DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -183,9 +186,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
-        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
-            defaultBatchId
-        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
+        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)")
+            .with_key(defaultBatchId).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
         DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -193,8 +195,10 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
         blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+        if (batchHeader.quorumNumbers.length > type(uint8).max) revert(); // Sanity check.
+        // forge-lint: disable-next-item(unsafe-typecast)
         for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
-            blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
+            blobVerificationProof.quorumIndices[i] = bytes1(uint8(i)); // Typecast is checked above.
         }
 
         cheats.expectRevert(
@@ -229,9 +233,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
-        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
-            defaultBatchId
-        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
+        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)")
+            .with_key(defaultBatchId).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
         DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -239,9 +242,11 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
         blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+        if (batchHeader.quorumNumbers.length > type(uint8).max) revert(); // Sanity check.
+        // forge-lint: disable-next-item(unsafe-typecast)
         for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
             // implant the incorrect quorumNumbers here
-            blobVerificationProof.quorumIndices[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i));
+            blobVerificationProof.quorumIndices[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i)); // Typecast is checked above.
         }
 
         cheats.expectRevert("EigenDACertVerificationV1Lib._verifyDACertForQuorums: quorumNumber does not match");
@@ -275,9 +280,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
-        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
-            defaultBatchId
-        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
+        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)")
+            .with_key(defaultBatchId).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
         DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -285,6 +289,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
         blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+        if (batchHeader.quorumNumbers.length > type(uint8).max) revert(); // Sanity check.
+        // forge-lint: disable-next-item(unsafe-typecast)
         for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
             // implant the incorrect quorumNumbers here
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));

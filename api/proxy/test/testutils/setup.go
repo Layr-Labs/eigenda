@@ -15,9 +15,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	enablement "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
@@ -25,7 +25,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -37,27 +38,27 @@ const (
 	minioAdmin       = "minioadmin"
 	backendEnvVar    = "BACKEND"
 	privateKeyEnvVar = "SIGNER_PRIVATE_KEY"
-	ethRPCEnvVar     = "ETHEREUM_RPC"
+	EthRPCEnvVar     = "ETHEREUM_RPC"
 	transport        = "http"
 	host             = "127.0.0.1"
 	disperserPort    = "443"
 
 	// CertVerifier and SvcManager addresses are still specified by hand for V1.
 	// Probably not worth the effort to force use of EigenDADirectory for V1.
-	disperserPreprodHostname   = "disperser-preprod-holesky.eigenda.xyz"
-	preprodEigenDADirectory    = "0xfB676e909f376efFDbDee7F17342aCF55f6Ec502"
-	preprodCertVerifierAddress = "0xCCFE3d87fB7D369f1eeE65221a29A83f1323043C"
-	preprodSvcManagerAddress   = "0x54A03db2784E3D0aCC08344D05385d0b62d4F432"
-
-	disperserTestnetHostname   = "disperser-testnet-holesky.eigenda.xyz"
-	testnetEigenDADirectory    = "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE"
-	testnetCertVerifierAddress = "0xd305aeBcdEc21D00fDF8796CE37d0e74836a6B6e"
-	testnetSvcManagerAddress   = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
-
 	disperserSepoliaHostname   = "disperser-testnet-sepolia.eigenda.xyz"
 	sepoliaEigenDADirectory    = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 	sepoliaCertVerifierAddress = "0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429"
 	sepoliaSvcManagerAddress   = "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764"
+
+	disperserHoodiTestnetHostname   = "disperser-hoodi.eigenda.xyz"
+	hoodiTestnetEigenDADirectory    = "0x5a44e56e88abcf610c68340c6814ae7f5c4369fd"
+	hoodiTestnetCertVerifierAddress = "0xD82d14F1c6d1403E95Cd9EC40CBb6463E27C1c5F"
+	hoodiTestnetSvcManagerAddress   = "0x3FF2204A567C15dC3731140B95362ABb4b17d8ED"
+
+	disperserHoodiPreprodHostname   = "disperser-v2-preprod-hoodi.eigenda.xyz"
+	hoodiPreprodEigenDADirectory    = "0xbFa1b820bb302925a3eb98C8836a95361FB75b87"
+	hoodiPreprodCertVerifierAddress = "0xb64101890d15499790d665f9863ede1278ce553d"
+	hoodiPreprodSvcManagerAddress   = "0x9F3A67f1b56d0B21115A54356c02B2d77f39EA8a"
 )
 
 var (
@@ -104,23 +105,38 @@ func startMinIOContainer() error {
 type Backend int
 
 const (
-	TestnetBackend Backend = iota + 1
-	PreprodBackend
-	SepoliaBackend
+	SepoliaBackend Backend = iota + 1
 	MemstoreBackend
+	HoodiTestnetBackend
+	HoodiPreprodBackend
 )
+
+func (b Backend) SupportsEigenDAV1() bool {
+	switch b {
+	// technically HoodiTestnet supports V1 but there's 0 rollup usage
+	case HoodiTestnetBackend, HoodiPreprodBackend:
+		return false
+
+	case SepoliaBackend, MemstoreBackend:
+		return true
+
+	default:
+		panic("unknown backend type can't be inferred")
+	}
+}
 
 // ParseBackend converts a string to a Backend enum (case insensitive)
 func ParseBackend(inputString string) (Backend, error) {
 	switch strings.ToLower(inputString) {
-	case "testnet":
-		return TestnetBackend, nil
-	case "preprod":
-		return PreprodBackend, nil
 	case "sepolia":
 		return SepoliaBackend, nil
 	case "memstore":
 		return MemstoreBackend, nil
+	case "hoodi-testnet":
+		return HoodiTestnetBackend, nil
+	case "hoodi-preprod":
+		return HoodiPreprodBackend, nil
+
 	default:
 		return 0, fmt.Errorf("invalid backend: %s", inputString)
 	}
@@ -129,7 +145,7 @@ func ParseBackend(inputString string) (Backend, error) {
 func GetBackend() Backend {
 	backend, err := ParseBackend(os.Getenv(backendEnvVar))
 	if err != nil {
-		panic(fmt.Sprintf("BACKEND must be = memstore|testnet|sepolia|preprod. parse backend error: %v", err))
+		panic(fmt.Sprintf("BACKEND must be = memstore|hoodi-testnet|hoodi-preprod|sepolia. parse backend error: %v", err))
 	}
 	return backend
 }
@@ -145,9 +161,13 @@ type TestConfig struct {
 	WriteThreadCount int
 	WriteOnCacheMiss bool
 	// at most one of the below options should be true
-	UseKeccak256ModeS3 bool
-	UseS3Caching       bool
-	UseS3Fallback      bool
+	UseKeccak256ModeS3            bool
+	UseS3Caching                  bool
+	UseS3Fallback                 bool
+	ErrorOnSecondaryInsertFailure bool
+
+	ClientLedgerMode     clientledger.ClientLedgerMode
+	VaultMonitorInterval time.Duration
 }
 
 // NewTestConfig returns a new TestConfig
@@ -172,16 +192,19 @@ func NewTestConfig(
 			OpKeccakCommitment:  true,
 			StandardCommitment:  true,
 		},
-		BackendsToEnable:   backendsToEnable,
-		DispersalBackend:   dispersalBackend,
-		Backend:            backend,
-		Retrievers:         []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
-		Expiration:         14 * 24 * time.Hour,
-		UseKeccak256ModeS3: false,
-		UseS3Caching:       false,
-		UseS3Fallback:      false,
-		WriteThreadCount:   0,
-		WriteOnCacheMiss:   false,
+		BackendsToEnable:              backendsToEnable,
+		DispersalBackend:              dispersalBackend,
+		Backend:                       backend,
+		Retrievers:                    []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
+		Expiration:                    14 * 24 * time.Hour,
+		UseKeccak256ModeS3:            false,
+		UseS3Caching:                  false,
+		UseS3Fallback:                 false,
+		WriteThreadCount:              0,
+		WriteOnCacheMiss:              false,
+		ErrorOnSecondaryInsertFailure: false,
+		ClientLedgerMode:              clientledger.ClientLedgerModeReservationOnly,
+		VaultMonitorInterval:          30 * time.Second,
 	}
 }
 
@@ -205,11 +228,8 @@ func createS3Config() s3.Config {
 func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	useMemory := testCfg.Backend == MemstoreBackend
 	pk := os.Getenv(privateKeyEnvVar)
-	if pk == "" && !useMemory {
-		panic("SIGNER_PRIVATE_KEY environment variable not set")
-	}
 
-	ethRPC := os.Getenv(ethRPCEnvVar)
+	ethRPC := os.Getenv(EthRPCEnvVar)
 	if ethRPC == "" && !useMemory {
 		panic("ETHEREUM_RPC environment variable is not set")
 	}
@@ -237,21 +257,24 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	switch testCfg.Backend {
 	case MemstoreBackend:
 		break // no need to set these fields for local tests
-	case PreprodBackend:
-		disperserHostname = disperserPreprodHostname
-		certVerifierAddress = preprodCertVerifierAddress
-		svcManagerAddress = preprodSvcManagerAddress
-		eigenDADirectory = preprodEigenDADirectory
-	case TestnetBackend:
-		disperserHostname = disperserTestnetHostname
-		certVerifierAddress = testnetCertVerifierAddress
-		svcManagerAddress = testnetSvcManagerAddress
-		eigenDADirectory = testnetEigenDADirectory
 	case SepoliaBackend:
 		disperserHostname = disperserSepoliaHostname
 		certVerifierAddress = sepoliaCertVerifierAddress
 		svcManagerAddress = sepoliaSvcManagerAddress
 		eigenDADirectory = sepoliaEigenDADirectory
+
+	case HoodiTestnetBackend:
+		disperserHostname = disperserHoodiTestnetHostname
+		certVerifierAddress = hoodiTestnetCertVerifierAddress
+		svcManagerAddress = hoodiTestnetSvcManagerAddress
+		eigenDADirectory = hoodiTestnetEigenDADirectory
+
+	case HoodiPreprodBackend:
+		disperserHostname = disperserHoodiPreprodHostname
+		certVerifierAddress = hoodiPreprodCertVerifierAddress
+		svcManagerAddress = hoodiPreprodSvcManagerAddress
+		eigenDADirectory = hoodiPreprodEigenDADirectory
+
 	default:
 		panic("Unsupported backend")
 	}
@@ -261,10 +284,11 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	}
 	builderConfig := builder.Config{
 		StoreConfig: store.Config{
-			AsyncPutWorkers:  testCfg.WriteThreadCount,
-			BackendsToEnable: testCfg.BackendsToEnable,
-			DispersalBackend: testCfg.DispersalBackend,
-			WriteOnCacheMiss: testCfg.WriteOnCacheMiss,
+			AsyncPutWorkers:               testCfg.WriteThreadCount,
+			BackendsToEnable:              testCfg.BackendsToEnable,
+			DispersalBackend:              testCfg.DispersalBackend,
+			WriteOnCacheMiss:              testCfg.WriteOnCacheMiss,
+			ErrorOnSecondaryInsertFailure: testCfg.ErrorOnSecondaryInsertFailure,
 		},
 		ClientConfigV1: common.ClientConfigV1{
 			EdaClientCfg: clients.EigenDAClientConfig{
@@ -292,7 +316,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			G2Path:          "../../resources/g2.point",
 			G2TrailingPath:  "../../resources/g2.trailing.point",
 			CacheDir:        "../../resources/SRSTables",
-			SRSOrder:        eigendaflags.SrsOrder,
+			SRSOrder:        encoding.SRSOrder,
 			SRSNumberToLoad: maxBlobLengthBytes / 32,
 			NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 			LoadG2Points:    true,
@@ -325,7 +349,8 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			EigenDACertVerifierOrRouterAddress: certVerifierAddress,
 			EigenDADirectory:                   eigenDADirectory,
 			RetrieversToEnable:                 testCfg.Retrievers,
-			ClientLedgerMode:                   clientledger.ClientLedgerModeLegacy,
+			ClientLedgerMode:                   testCfg.ClientLedgerMode,
+			VaultMonitorInterval:               testCfg.VaultMonitorInterval,
 		},
 	}
 	if useMemory {
@@ -364,6 +389,10 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			Host:        host,
 			Port:        0,
 			APIsEnabled: testCfg.EnabledRestAPIs,
+		},
+		ArbCustomDASvrCfg: arbitrum_altda.Config{
+			Host: host,
+			Port: 0,
 		},
 	}
 }

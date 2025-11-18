@@ -245,7 +245,7 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.NotNil(t, encodedResult.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.LengthProof)
-	assert.Greater(t, encodedResult.Commitment.Length, uint(0))
+	assert.Greater(t, encodedResult.Commitment.Length, uint32(0))
 	assert.Len(t, encodedResult.Assignments, numOperators)
 	assert.Len(t, encodedResult.ChunksData.Chunks, 32)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
@@ -452,7 +452,7 @@ func TestPartialBlob(t *testing.T) {
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint32(48)) //nolint: staticcheck
 	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{
@@ -693,7 +693,7 @@ func TestGetBatch(t *testing.T) {
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint32(48)) //nolint: staticcheck
 	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 2)
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{
 		{
@@ -726,7 +726,7 @@ func TestGetBatch(t *testing.T) {
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint32(48)) //nolint: staticcheck
 	assert.Len(t, encodedBlob2.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob2.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{

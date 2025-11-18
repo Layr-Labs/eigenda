@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/aws/mock"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	s3common "github.com/Layr-Labs/eigenda/common/s3"
+	s3aws "github.com/Layr-Labs/eigenda/common/s3/aws"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigenda/test/testbed"
@@ -31,7 +31,7 @@ const (
 	bucket         = "eigen-test"
 )
 
-func setupLocalStackTest(t *testing.T) s3.Client {
+func setupLocalStackTest(t *testing.T) s3common.S3Client {
 	t.Helper()
 
 	ctx := t.Context()
@@ -60,7 +60,16 @@ func setupLocalStackTest(t *testing.T) s3.Client {
 	err = os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
 	require.NoError(t, err, "failed to set AWS_SECRET_ACCESS_KEY")
 
-	client, err := s3.NewClient(ctx, *config, logger)
+	client, err := s3aws.NewAwsS3Client(
+		ctx,
+		logger,
+		config.EndpointURL,
+		config.Region,
+		config.FragmentParallelismFactor,
+		config.FragmentParallelismConstant,
+		"localstack",
+		"localstack",
+	)
 	require.NoError(t, err, "failed to create S3 client")
 
 	err = client.CreateBucket(ctx, bucket)
@@ -94,7 +103,7 @@ func getProofs(t *testing.T, count int) []*encoding.Proof {
 	return proofs
 }
 
-func runRandomProofsTest(t *testing.T, client s3.Client) {
+func runRandomProofsTest(t *testing.T, client s3common.S3Client) {
 	t.Helper()
 	ctx := t.Context()
 
@@ -120,7 +129,7 @@ func runRandomProofsTest(t *testing.T, client s3.Client) {
 	for key, expectedProofs := range expectedValues {
 		binaryProofs, err := reader.GetBinaryChunkProofs(ctx, key)
 		require.NoError(t, err, "failed to get binary chunk proofs for blob key %x", key)
-		proofs := rs.DeserializeSplitFrameProofs(binaryProofs)
+		proofs := encoding.DeserializeSplitFrameProofs(binaryProofs)
 		require.Equal(t, expectedProofs, proofs, "proof mismatch for blob key %x", key)
 	}
 }
@@ -129,7 +138,7 @@ func TestRandomProofs(t *testing.T) {
 	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
-		client := mock.NewS3Client()
+		client := s3common.NewMockS3Client()
 		runRandomProofsTest(t, client)
 	})
 
@@ -145,12 +154,12 @@ func generateRandomFrameCoeffs(
 	size int,
 	params encoding.EncodingParams) []rs.FrameCoeffs {
 
-	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(random.RandomBytes(size)), params)
+	frames, _, err := encoder.EncodeBytes(t.Context(), codec.ConvertByPaddingEmptyByte(random.RandomBytes(size)), params)
 	require.NoError(t, err, "failed to encode bytes into frame coefficients")
 	return frames
 }
 
-func runRandomCoefficientsTest(t *testing.T, client s3.Client) {
+func runRandomCoefficientsTest(t *testing.T, client s3common.S3Client) {
 	t.Helper()
 	ctx := t.Context()
 
@@ -158,9 +167,8 @@ func runRandomCoefficientsTest(t *testing.T, client s3.Client) {
 	fragmentSize := int(chunkSize / 2)
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
-	encoder, err := rs.NewEncoder(cfg)
-	require.NoError(t, err, "failed to create encoder")
-	require.NotNil(t, encoder, "encoder should not be nil")
+	encoder, err := rs.NewEncoder(logger, cfg)
+	require.NoError(t, err)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, client, bucket)
@@ -199,7 +207,7 @@ func TestRandomCoefficients(t *testing.T) {
 	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
-		client := mock.NewS3Client()
+		client := s3common.NewMockS3Client()
 		runRandomCoefficientsTest(t, client)
 	})
 
@@ -211,16 +219,15 @@ func TestRandomCoefficients(t *testing.T) {
 
 func TestCheckProofCoefficientsExist(t *testing.T) {
 	random.InitializeRandom()
-	client := mock.NewS3Client()
+	client := s3common.NewMockS3Client()
 
 	chunkSize := uint64(rand.Intn(1024) + 100)
 	fragmentSize := int(chunkSize / 2)
 
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
-	encoder, err := rs.NewEncoder(cfg)
-	require.NoError(t, err, "failed to create encoder")
-	require.NotNil(t, encoder, "encoder should not be nil")
+	encoder, err := rs.NewEncoder(logger, cfg)
+	require.NoError(t, err)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	ctx := t.Context()

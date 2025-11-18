@@ -13,10 +13,12 @@ golangci-lint = "2.1.6"
 # and is enabled via --v2 flag feature flag to abigen command. 
 "go:github.com/ethereum/go-ethereum/cmd/abigen" = "v1.16.2"
 # Believe yarn is needed for contract npm deps (see contracts/package.json) and subgraph stuff.
-# TODO: document exactly why these are needed.
 node = "20.18.1"
 yarn = "1.22.22"
+# Used by inabox
 "npm:@graphprotocol/graph-cli" = "0.97.1"
+jq = "latest"
+grpcurl = "latest"
 
 # Used by the subgraph ABI update script
 yq = "latest"
@@ -36,9 +38,9 @@ protoc-gen-go-grpc = "v1.3.0"
 "go:github.com/segmentio/golines" = "0.12.0"
 
 # Forge Dependencies
-forge = "v1.0.0"
-cast = "v1.0.0"
-anvil = "v1.0.0"
+forge = "v1.4.4"
+cast = "v1.4.4"
+anvil = "v1.4.4"
 
 [alias]
 forge = "ubi:foundry-rs/foundry[exe=forge]"
@@ -47,3 +49,7 @@ anvil = "ubi:foundry-rs/foundry[exe=anvil]"
 yarn = "https://github.com/mise-plugins/mise-yarn"
 protoc-gen-go = "go:google.golang.org/protobuf/cmd/protoc-gen-go"
 protoc-gen-go-grpc = "go:google.golang.org/grpc/cmd/protoc-gen-go-grpc"
+
+[tasks.install-hooks]
+description = "Install git pre-commit hooks"
+run = "./scripts/install-hooks.sh"

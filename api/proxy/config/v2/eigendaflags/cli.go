@@ -68,8 +68,10 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 		},
 		&cli.StringFlag{
-			Name:     SignerPaymentKeyHexFlagName,
-			Usage:    "Hex-encoded signer private key. Used for authorizing payments with EigenDA disperser. Should not be associated with an Ethereum address holding any funds.",
+			Name: SignerPaymentKeyHexFlagName,
+			Usage: "Optional hex-encoded signer private key. Used for authorizing payments with EigenDA disperser in PUT routes. " +
+				"If not provided, proxy will be started in read-only mode, and will not be able to submit blobs to EigenDA. " +
+				"Should not be associated with an Ethereum address holding any funds.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "SIGNER_PRIVATE_KEY_HEX")},
 			Category: category,
 		},
@@ -186,10 +188,9 @@ See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/common/eigenda_ne
 for the exact values getting set by this flag. All of those values can also be manually
 set via their respective flags, and take precedence over the default values set by the network flag.
 If all of those other flags are manually configured, the network flag may be omitted. 
-Permitted EigenDANetwork values include %s, %s, %s, & %s.`,
+Permitted EigenDANetwork values include %s, %s, & %s.`,
 				common.MainnetEigenDANetwork,
-				common.HoleskyTestnetEigenDANetwork,
-				common.HoleskyPreprodEigenDANetwork,
+				common.HoodiTestnetEigenDANetwork,
 				common.SepoliaTestnetEigenDANetwork,
 			),
 			EnvVars:  []string{withEnvPrefix(envPrefix, "NETWORK")},
@@ -216,11 +217,9 @@ This check is optional and will be skipped when set to 0.`,
 		},
 		&cli.StringFlag{
 			Name: ClientLedgerModeFlagName,
-			Usage: "Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', " +
-				"'reservation-and-on-demand'. The current default is 'legacy', which means that payments will be tracked " +
-				"via the bin-based model, which is in the process of being deprecated. Eventually, the 'legacy' option " +
-				"will be removed, once the migration to the new leaky bucket payment model is complete.",
-			Value:    "legacy",
+			Usage: "Payment mode for the client. Options: 'legacy' (old bin-based payment logic, slated for " +
+				"deprecation), 'reservation-only', 'on-demand-only', 'reservation-and-on-demand'.",
+			Value:    "reservation-only",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CLIENT_LEDGER_MODE")},
 			Category: category,
 			Required: false,

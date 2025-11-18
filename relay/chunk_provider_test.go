@@ -11,8 +11,8 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/test/random"
 )
 
@@ -197,11 +197,11 @@ func TestParsingBundle(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(paddedPayload)))
 	cfg := encoding.DefaultConfig()
-	enc, err := rs.NewEncoder(cfg)
-	require.Nil(t, err)
+	enc, err := rs.NewEncoder(logger, cfg)
+	require.NoError(t, err)
 
 	// Build some random coefficients
-	coeffs, _, err := enc.EncodeBytes(paddedPayload, params)
+	coeffs, _, err := enc.EncodeBytes(t.Context(), paddedPayload, params)
 	require.Nil(t, err)
 	require.NotNil(t, coeffs, err)
 	serializedCoeffs, err := rs.SerializeFrameCoeffsSlice(coeffs)
@@ -219,9 +219,9 @@ func TestParsingBundle(t *testing.T) {
 		proof := g1.G1Affine
 		proofs[i] = proof
 	}
-	serializedProofs, err := rs.SerializeFrameProofs(proofs)
+	serializedProofs, err := encoding.SerializeFrameProofs(proofs)
 	require.NoError(t, err)
-	splitProofs, err := rs.SplitSerializedFrameProofs(serializedProofs)
+	splitProofs, err := encoding.SplitSerializedFrameProofs(serializedProofs)
 	require.NoError(t, err)
 	require.Equal(t, len(proofs), len(splitProofs))
 

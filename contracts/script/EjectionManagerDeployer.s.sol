@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 import {EjectionManager} from "../lib/eigenlayer-middleware/src/EjectionManager.sol";
@@ -62,10 +62,13 @@ contract Deployer_EjectionManager is Script, Test {
         address[] memory ejectors = new address[](1);
         ejectors[0] = ejector;
 
-        TransparentUpgradeableProxy(payable(address(ejectionManager))).upgradeToAndCall(
-            address(ejectionManagerImplementation),
-            abi.encodeWithSelector(EjectionManager.initialize.selector, ejectorOwner, ejectors, quorumEjectionParams)
-        );
+        TransparentUpgradeableProxy(payable(address(ejectionManager)))
+            .upgradeToAndCall(
+                address(ejectionManagerImplementation),
+                abi.encodeWithSelector(
+                    EjectionManager.initialize.selector, ejectorOwner, ejectors, quorumEjectionParams
+                )
+            );
 
         TransparentUpgradeableProxy(payable(address(ejectionManager))).changeAdmin(address(eigenDAProxyAdmin));
 

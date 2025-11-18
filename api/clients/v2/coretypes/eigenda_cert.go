@@ -1,6 +1,7 @@
 package coretypes
 
 import (
+	"encoding/json"
 	"fmt"
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -71,6 +72,19 @@ type EigenDACert interface {
 	// For the theoretical reasoning behind this choice, see
 	// https://www.tedinski.com/2018/02/27/the-expression-problem.html
 	isEigenDACert()
+}
+
+// DeserializeEigenDACert deserializes raw bytes into an EigenDACert
+// based on the provided version and serialization type
+func DeserializeEigenDACert(data []byte, version CertificateVersion, ct CertSerializationType) (EigenDACert, error) {
+	switch version {
+	case VersionTwoCert:
+		return DeserializeEigenDACertV2(data, ct)
+	case VersionThreeCert:
+		return DeserializeEigenDACertV3(data, ct)
+	default:
+		return nil, fmt.Errorf("unsupported certificate version: %d", version)
+	}
 }
 
 var _ EigenDACert = &EigenDACertV2{}
@@ -185,6 +199,63 @@ func (c *EigenDACertV3) Serialize(ct CertSerializationType) ([]byte, error) {
 
 }
 
+// DeserializeEigenDACertV2 deserializes raw bytes into an EigenDACertV2
+func DeserializeEigenDACertV2(data []byte, ct CertSerializationType) (*EigenDACertV3, error) {
+	switch ct {
+	case CertSerializationRLP:
+		var cert EigenDACertV2
+		if err := rlp.DecodeBytes(data, &cert); err != nil {
+			return nil, fmt.Errorf("rlp decode v2 cert: %w", err)
+		}
+
+		return cert.ToV3(), nil
+
+	case CertSerializationABI:
+		return nil, fmt.Errorf("abi encoding is not supported for legacy v2 cert")
+
+	default:
+		return nil, fmt.Errorf("unknown serialization type: %d", ct)
+	}
+}
+
+// DeserializeEigenDACertV3 deserializes raw bytes into an EigenDACertV3 provided the serialization
+// standard being used
+func DeserializeEigenDACertV3(data []byte, ct CertSerializationType) (*EigenDACertV3, error) {
+	switch ct {
+	case CertSerializationRLP:
+		var cert EigenDACertV3
+		if err := rlp.DecodeBytes(data, &cert); err != nil {
+			return nil, fmt.Errorf("rlp decode v3 cert: %w", err)
+		}
+		return &cert, nil
+
+	case CertSerializationABI:
+		abiMap := make(map[string]interface{})
+		err := v3CertTypeEncodeArgs.UnpackIntoMap(abiMap, data)
+		if err != nil {
+			return nil, fmt.Errorf("unpacking from encoding ABI: %w", err)
+		}
+
+		// use json as intermediary to cast abstract type to bytes to
+		// then deserialize into structured certificate type
+		bytes, err := json.Marshal(abiMap["cert"])
+		if err != nil {
+			return nil, fmt.Errorf("marshalling ABI arg into bytes: %w", err)
+		}
+
+		var cert *EigenDACertV3
+		err = json.Unmarshal(bytes, &cert)
+		if err != nil {
+			return nil, fmt.Errorf("json unmarshal v3 cert: %w", err)
+		}
+
+		return cert, nil
+
+	default:
+		return nil, fmt.Errorf("unknown serialization type: %d", ct)
+	}
+}
+
 // Commitments returns the blob's cryptographic kzg commitments
 func (c *EigenDACertV3) Commitments() (*encoding.BlobCommitments, error) {
 	// TODO: figure out how to remove this casting entirely
@@ -217,8 +288,7 @@ func (c *EigenDACertV3) isEigenDACert() {}
 
 // This struct represents the composition of an EigenDA V2 certificate
 // NOTE: This type is hardforked from the V3 type and will no longer
-//
-//	be supported for dispersals after the CertV3 hardfork
+// be supported for dispersals after the CertV3 hardfork
 type EigenDACertV2 struct {
 	BlobInclusionInfo           contractEigenDACertVerifierV2.EigenDATypesV2BlobInclusionInfo
 	BatchHeader                 contractEigenDACertVerifierV2.EigenDATypesV2BatchHeaderV2

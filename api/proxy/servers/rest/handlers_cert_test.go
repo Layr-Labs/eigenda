@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
@@ -89,7 +90,7 @@ func TestHandlerGet(t *testing.T) {
 			url:  fmt.Sprintf("/get/0x010000%s", testCommitStr),
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().
-					Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, fmt.Errorf("internal error"))
 			},
 			expectedCode: http.StatusInternalServerError,
@@ -100,7 +101,7 @@ func TestHandlerGet(t *testing.T) {
 			url:  fmt.Sprintf("/get/0x010000%s", testCommitStr),
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().
-					Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return([]byte(testCommitStr), nil)
 			},
 			expectedCode: http.StatusOK,
@@ -113,7 +114,7 @@ func TestHandlerGet(t *testing.T) {
 			url:  fmt.Sprintf("/get/0x010000%s?l1_inclusion_block_number=100", testCommitStr),
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().
-					Get(gomock.Any(), gomock.Any(), gomock.Eq(common.GETOpts{L1InclusionBlockNum: 100})).
+					Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(common.GETOpts{L1InclusionBlockNum: 100})).
 					Return([]byte(testCommitStr), nil)
 			},
 			expectedCode: http.StatusOK,
@@ -170,7 +171,8 @@ func TestHandlerPutSuccess(t *testing.T) {
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().Put(
 					gomock.Any(),
-					gomock.Any()).Return([]byte(testCommitStr), nil)
+					gomock.Any(),
+					gomock.Any()).Return(certs.NewVersionedCert([]byte(testCommitStr), certs.V0VersionByte), nil)
 			},
 			expectedCode: http.StatusOK,
 			expectedBody: opGenericPrefixStr + testCommitStr,
@@ -194,7 +196,8 @@ func TestHandlerPutSuccess(t *testing.T) {
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().Put(
 					gomock.Any(),
-					gomock.Any()).Return([]byte(testCommitStr), nil)
+					gomock.Any(),
+					gomock.Any()).Return(certs.NewVersionedCert([]byte(testCommitStr), certs.V0VersionByte), nil)
 			},
 			expectedCode: http.StatusOK,
 			expectedBody: stdCommitmentPrefix + testCommitStr,
@@ -290,8 +293,8 @@ func TestHandlerPutErrors(t *testing.T) {
 			t.Run(tt.name+" / "+mode.name, func(t *testing.T) {
 				t.Log(tt.name + " / " + mode.name)
 				mockEigenDAManager.EXPECT().
-					Put(gomock.Any(), gomock.Any()).
-					Return(nil, tt.mockEigenDAManagerPutReturnedErr)
+					Put(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(certs.NewVersionedCert([]byte{0x0}, certs.V0VersionByte), tt.mockEigenDAManagerPutReturnedErr)
 
 				req := httptest.NewRequest(
 					http.MethodPost,

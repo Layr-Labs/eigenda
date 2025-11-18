@@ -36,6 +36,11 @@ group "default" {
   targets = ["all"]
 }
 
+# NOTE: encoder-icicle is intentionally excluded from the "all" group and built in a separate
+# workflow (.github/workflows/docker-publish-encoder-icicle.yaml) because:
+# 1. It uses a different Dockerfile (icicle.Dockerfile) with GPU-specific dependencies
+# 2. It's restricted to linux/amd64 platform only (ICICLE requires NVIDIA GPUs)
+# 3. We've seen OOM on action workflow when ran together with other builds
 group "all" {
   targets = [
     "node-group",
@@ -48,6 +53,7 @@ group "all" {
     "traffic-generator",
     "traffic-generator-v2",
     "controller",
+    "ejector",
     "relay",
     "blobapi",
     "proxy",
@@ -67,12 +73,14 @@ group "internal-release" {
     "batcher-internal",
     "disperser-internal",
     "encoder-internal",
+    "encoder-icicle-internal",
     "retriever-internal",
     "churner-internal",
     "dataapi-internal",
     "traffic-generator-internal",
     "traffic-generator-v2-internal",
     "controller-internal",
+    "ejector-internal",
     "relay-internal",
     "blobapi-internal",
     "proxy-internal",
@@ -122,6 +130,9 @@ target "encoder" {
 target "encoder-icicle" {
   context    = "."
   dockerfile = "./disperser/cmd/encoder/icicle.Dockerfile"
+  // Currently needed because Dockerfile has amd64 hardcoded in a few places.
+  // TODO: make Dockerfile also work for arm.
+  platforms  = ["linux/amd64"]
   tags       = ["${REGISTRY}/${REPO}/encoder-icicle:${BUILD_TAG}"]
 }
 
@@ -255,10 +266,31 @@ target "controller-internal" {
   ]
 }
 
+target "ejector" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  target     = "ejector"
+  tags       = ["${REGISTRY}/${REPO}/ejector:${BUILD_TAG}"]
+}
+
+target "ejector-internal" {
+  inherits = ["ejector"]
+  tags     = [
+    "${REGISTRY}/eigenda-ejector:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-ejector:${GIT_SHA}",
+    "${REGISTRY}/eigenda-ejector:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
 target "blobapi" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "blobapi"
+  args       = {
+    SEMVER    = "${SEMVER}"
+    GITCOMMIT = "${GIT_SHORT_SHA}"
+    GITDATE   = "${GITDATE}"
+  }
   tags       = ["${REGISTRY}/${REPO}/blobapi:${BUILD_TAG}"]
 }
 
@@ -275,6 +307,11 @@ target "proxy" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "proxy"
+  args       = {
+    SEMVER    = "${SEMVER}"
+    GITCOMMIT = "${GIT_SHORT_SHA}"
+    GITDATE   = "${GITDATE}"
+  }
   # We push to layr-labs/ directly instead of layr-labs/eigenda/ for historical reasons,
   # since proxy was previously in its own repo: https://github.com/Layr-Labs/eigenda-proxy
   tags       = ["${REGISTRY}/layr-labs/eigenda-proxy:${BUILD_TAG}"]

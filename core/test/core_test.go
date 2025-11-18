@@ -12,10 +12,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
@@ -129,10 +129,10 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 				t.Fatal(err)
 			}
 
-			blobSize := uint(len(blob.Data))
+			blobSize := uint32(len(blob.Data))
 			blobLength := encoding.GetBlobLength(blobSize)
 
-			chunkLength, err := asn.CalculateChunkLength(state, blobLength, 0, securityParam)
+			chunkLength, err := asn.CalculateChunkLength(state, uint(blobLength), 0, securityParam)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -146,12 +146,12 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 				ChunkLength: chunkLength,
 			}
 
-			assignments, info, err := asn.GetAssignments(state, blobLength, quorumHeader)
+			assignments, info, err := asn.GetAssignments(state, uint(blobLength), quorumHeader)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+			params := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
 
 			commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
 			if err != nil {
@@ -159,7 +159,7 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 			}
 			bytes := make([][]byte, 0, len(chunks))
 			for _, c := range chunks {
-				serialized, err := c.Serialize()
+				serialized, err := c.SerializeGob()
 				if err != nil {
 					t.Fatal(err)
 				}

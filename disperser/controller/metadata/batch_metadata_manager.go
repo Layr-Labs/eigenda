@@ -44,7 +44,7 @@ type batchMetadataManager struct {
 	quorumScanner eth.QuorumScanner
 
 	// Used to look up the reference block number (RBN) to use for batch creation.
-	referenceBlockProvider ReferenceBlockProvider
+	referenceBlockProvider eth.ReferenceBlockProvider
 
 	// The time between updates to the metadata.
 	updatePeriod time.Duration
@@ -71,7 +71,7 @@ func NewBatchMetadataManager(
 	referenceBlockOffset uint64,
 ) (BatchMetadataManager, error) {
 
-	rbnProvider := NewReferenceBlockProvider(logger, contractBackend, referenceBlockOffset)
+	rbnProvider := eth.NewReferenceBlockProvider(logger, contractBackend, referenceBlockOffset)
 
 	quorumScanner, err := eth.NewQuorumScanner(contractBackend, registryCoordinatorAddress)
 	if err != nil {

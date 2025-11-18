@@ -7,18 +7,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
+	s3common "github.com/Layr-Labs/eigenda/common/s3"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -39,22 +39,19 @@ type testComponents struct {
 	blobStore        *blobstore.BlobStore
 	chunkStoreWriter chunkstore.ChunkWriter
 	chunkStoreReader chunkstore.ChunkReader
-	s3Client         *mock.S3Client
+	s3Client         *s3common.MockS3Client
 	dynamoDBClient   *mock.MockDynamoDBClient
 }
 
 func makeTestProver(numPoint uint64) (*prover.Prover, error) {
 	// We need the larger SRS for testing the encoder with 8192 chunks
-	kzgConfig := &kzg.KzgConfig{
+	kzgConfig := &prover.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        300000,
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    false,
 	}
-	p, err := prover.NewProver(kzgConfig, nil)
+	p, err := prover.NewProver(logger, kzgConfig, nil)
 
 	return p, err
 }
@@ -90,7 +87,7 @@ func TestEncodeBlob(t *testing.T) {
 
 	// Setup test data
 	data := createTestData(t, testDataSize)
-	blobSize := uint(len(data))
+	blobSize := uint32(len(data))
 	blobLength := encoding.GetBlobLength(blobSize)
 
 	// Get chunk length for blob version 0
@@ -162,7 +159,7 @@ func TestEncodeBlob(t *testing.T) {
 		assert.True(t, c.chunkStoreWriter.ProofExists(ctx, blobKey))
 		binaryProofs, err := c.chunkStoreReader.GetBinaryChunkProofs(ctx, blobKey)
 		require.NoError(t, err, "Failed to get chunk proofs")
-		proofs := rs.DeserializeSplitFrameProofs(binaryProofs)
+		proofs := encoding.DeserializeSplitFrameProofs(binaryProofs)
 		assert.NoError(t, err, "Failed to get chunk proofs")
 		assert.Len(t, proofs, int(numChunks), "Unexpected number of proofs")
 
@@ -223,16 +220,15 @@ func createTestComponents(t *testing.T) *testComponents {
 	grpcMetrics := grpcprom.NewServerMetrics()
 	registry.MustRegister(grpcMetrics)
 
-	s3Client := mock.NewS3Client()
+	s3Client := s3common.NewMockS3Client()
 	dynamoDBClient := &mock.MockDynamoDBClient{}
 	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)
 	chunkStoreWriter := chunkstore.NewChunkWriter(logger, s3Client, s3BucketName, 512*1024)
 	chunkStoreReader := chunkstore.NewChunkReader(logger, s3Client, s3BucketName)
 	encoderServer := encoder.NewEncoderServerV2(encoder.ServerConfig{
-		GrpcPort:              "8080",
-		MaxConcurrentRequests: 10,
-		RequestQueueSize:      5,
-		PreventReencoding:     true,
+		MaxConcurrentRequestsDangerous: 10,
+		RequestQueueSize:               5,
+		PreventReencoding:              true,
 	}, blobStore, chunkStoreWriter, logger, prover, metrics, grpcMetrics)
 
 	return &testComponents{

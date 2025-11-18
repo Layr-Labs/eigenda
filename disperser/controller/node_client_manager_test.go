@@ -12,11 +12,11 @@ import (
 func TestNodeClientManager(t *testing.T) {
 	rand := random.NewTestRandom()
 
-	_, private, err := rand.ECDSA()
+	_, private, err := rand.EthAccount()
 	require.NoError(t, err)
 	requestSigner := mock.NewStaticRequestSigner(private)
 
-	m, err := controller.NewNodeClientManager(2, requestSigner, nil)
+	m, err := controller.NewNodeClientManager(2, requestSigner, 0, nil)
 	require.NoError(t, err)
 
 	client0, err := m.GetClient("localhost", "0000")

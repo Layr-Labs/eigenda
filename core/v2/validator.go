@@ -9,7 +9,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -45,7 +46,11 @@ func NewShardValidator(v *verifier.Verifier, operatorID core.OperatorID, logger 
 	}
 }
 
-func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.BlobVersionParameters, operatorState *core.OperatorState) (*Assignment, error) {
+func (v *shardValidator) validateBlobParams(
+	blob *BlobShard,
+	blobParams *core.BlobVersionParameters,
+	operatorState *core.OperatorState,
+) (*Assignment, error) {
 
 	// Get the assignments for the quorum
 
@@ -59,7 +64,8 @@ func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.Bl
 		return nil, fmt.Errorf("operator %s has no chunks assigned", v.operatorID.Hex())
 	}
 	if assignment.NumChunks() != uint32(len(blob.Bundle)) {
-		return nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d)", len(blob.Bundle), assignment.NumChunks())
+		return nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d)",
+			len(blob.Bundle), assignment.NumChunks())
 	}
 
 	// Get the chunk length
@@ -98,7 +104,14 @@ func (v *shardValidator) ValidateBatchHeader(ctx context.Context, header *BatchH
 	return nil
 }
 
-func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, blobVersionParams *BlobVersionParameterMap, pool common.WorkerPool, state *core.OperatorState) error {
+func (v *shardValidator) ValidateBlobs(
+	ctx context.Context,
+	blobs []*BlobShard,
+	blobVersionParams *BlobVersionParameterMap,
+	pool common.WorkerPool,
+	state *core.OperatorState,
+) error {
+
 	if len(blobs) == 0 {
 		return fmt.Errorf("no blobs")
 	}
@@ -122,12 +135,12 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 		}
 		assignment, err := v.validateBlobParams(blob, blobParams, state)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to validate blob params: %w", err)
 		}
 
 		params, err := GetEncodingParams(blob.BlobHeader.BlobCommitments.Length, blobParams)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get encoding params: %w", err)
 		}
 
 		// Check the received chunks against the commitment
@@ -144,7 +157,7 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 			samples[ind] = encoding.Sample{
 				Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
 				Chunk:           chunks[ind],
-				AssignmentIndex: uint(indices[ind]),
+				AssignmentIndex: uint64(indices[ind]),
 				BlobIndex:       blobIndex,
 			}
 		}
@@ -168,8 +181,6 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 
 	// parallelize subBatch verification
 	for params, subBatch := range subBatchMap {
-		params := params
-		subBatch := subBatch
 		pool.Submit(func() {
 			v.universalVerifyWorker(params, subBatch, out)
 		})
@@ -177,13 +188,12 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 
 	// parallelize length proof verification
 	for _, blobCommitments := range blobCommitmentList {
-		blobCommitments := blobCommitments
 		pool.Submit(func() {
 			v.verifyBlobLengthWorker(blobCommitments, out)
 		})
 	}
 	// check if commitments are equivalent
-	err = v.verifier.VerifyCommitEquivalenceBatch(blobCommitmentList)
+	err = committer.VerifyCommitEquivalenceBatch(blobCommitmentList)
 	if err != nil {
 		return err
 	}
@@ -210,7 +220,7 @@ func (v *shardValidator) universalVerifyWorker(params encoding.EncodingParams, s
 }
 
 func (v *shardValidator) verifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
-	err := v.verifier.VerifyBlobLength(blobCommitments)
+	err := committer.VerifyLengthProof(blobCommitments)
 	if err != nil {
 		out <- err
 		return

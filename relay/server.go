@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -55,6 +56,9 @@ type Server struct {
 	// chunkRateLimiter enforces rate limits on GetChunk operations.
 	chunkRateLimiter *limiter.ChunkRateLimiter
 
+	// listener is the network listener for the gRPC server.
+	listener net.Listener
+
 	// grpcServer is the gRPC server.
 	grpcServer *grpc.Server
 
@@ -82,8 +86,11 @@ func NewServer(
 	chunkReader chunkstore.ChunkReader,
 	chainReader core.Reader,
 	ics core.IndexedChainState,
+	listener net.Listener,
 ) (*Server, error) {
-
+	if listener == nil {
+		return nil, errors.New("listener is required")
+	}
 	if chainReader == nil {
 		return nil, errors.New("chainReader is required")
 	}
@@ -148,7 +155,7 @@ func NewServer(
 		config.GetChunksRequestMaxPastAge,
 		config.GetChunksRequestMaxPastAge)
 
-	return &Server{
+	server := &Server{
 		config:           config,
 		logger:           logger.With("component", "RelayServer"),
 		metadataProvider: mp,
@@ -159,7 +166,27 @@ func NewServer(
 		authenticator:    authenticator,
 		replayGuardian:   replayGuardian,
 		metrics:          relayMetrics,
-	}, nil
+		chainReader:      chainReader,
+		listener:         listener,
+	}
+
+	// Setup gRPC server
+	opt := grpc.MaxRecvMsgSize(config.MaxGRPCMessageSize)
+	keepAliveConfig := grpc.KeepaliveParams(keepalive.ServerParameters{
+		MaxConnectionIdle:     config.MaxIdleConnectionAge,
+		MaxConnectionAge:      config.MaxConnectionAge,
+		MaxConnectionAgeGrace: config.MaxConnectionAgeGrace,
+	})
+
+	server.grpcServer = grpc.NewServer(opt, relayMetrics.GetGRPCServerOption(), keepAliveConfig)
+	reflection.Register(server.grpcServer)
+	pb.RegisterRelayServer(server.grpcServer, server)
+
+	// Register Server for Health Checks
+	name := pb.Relay_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, server.grpcServer)
+
+	return server, nil
 }
 
 // GetBlob retrieves a blob stored by the relay.
@@ -388,14 +415,48 @@ func gatherChunkDataToSend(
 
 	bytesToSend := make([][]byte, 0, len(request.GetChunkRequests()))
 
-	for _, chunkRequest := range request.GetChunkRequests() {
+	for requestIndex := 0; requestIndex < len(request.GetChunkRequests()); requestIndex++ {
+		nextRequest := request.GetChunkRequests()[requestIndex]
+
 		var framesSubset *core.ChunksData
 		var err error
 
-		if chunkRequest.GetByIndex() != nil {
-			framesSubset, err = selectFrameSubsetByIndex(chunkRequest.GetByIndex(), frames)
+		if nextRequest.GetByIndex() != nil {
+			framesSubset, err = selectFrameSubsetByIndex(nextRequest.GetByIndex(), frames)
 		} else {
-			framesSubset, err = selectFrameSubsetByRange(chunkRequest.GetByRange(), frames)
+			// Validator verification logic expects all chunks for the same blob to be grouped together.
+			// This is easy to do with an index request, since an index request allows non-contiguous chunks
+			// to be fetched via a single request. But range queries require contiguous chunks, so we may receive
+			// multiple range requests for the same blob. In order to avoid breaking tricky validation logic,
+			// it is simpler to just group all range requests for the same blob together into a single "bundle"
+			// (aka a binary object that encodes a list of chunks).
+
+			rangeRequests := make([]*pb.ChunkRequestByRange, 0)
+			rangeRequests = append(rangeRequests, nextRequest.GetByRange())
+
+			targetKey := nextRequest.GetByRange().GetBlobKey()
+
+			// If there are multiple range requests for the same blob, combine them.
+			for i := requestIndex + 1; i < len(request.GetChunkRequests()); i++ {
+				followingRequest := request.GetChunkRequests()[i]
+				followingRangeRequest := followingRequest.GetByRange()
+				if followingRangeRequest == nil {
+					// Following request is not by range, don't combine.
+					break
+				}
+
+				nextKey := followingRangeRequest.GetBlobKey()
+				if bytes.Equal(targetKey, nextKey) == false {
+					// Next request is for a different blob, don't combine.
+					break
+				}
+
+				rangeRequests = append(rangeRequests, followingRangeRequest)
+				// Bump the counter for the outer loop since this iteration will handle it
+				requestIndex++
+			}
+
+			framesSubset, err = selectFrameSubsetByRange(rangeRequests, frames)
 		}
 
 		if err != nil {
@@ -415,31 +476,43 @@ func gatherChunkDataToSend(
 
 // selectFrameSubsetByRange selects a subset of frames from a BinaryFrames object based on a range
 func selectFrameSubsetByRange(
-	request *pb.ChunkRequestByRange,
-	allFrames map[v2.BlobKey]*core.ChunksData) (*core.ChunksData, error) {
+	// One or more requests for chunks from the same blob
+	requests []*pb.ChunkRequestByRange,
+	allFrames map[v2.BlobKey]*core.ChunksData,
+) (*core.ChunksData, error) {
 
-	key := v2.BlobKey(request.GetBlobKey())
-	startIndex := request.GetStartIndex()
-	endIndex := request.GetEndIndex()
-
+	key := v2.BlobKey(requests[0].GetBlobKey())
 	frames, ok := allFrames[key]
 	if !ok {
 		return nil, fmt.Errorf("frames not found for key %s", key.Hex())
 	}
 
-	if startIndex > endIndex {
-		return nil, fmt.Errorf(
-			"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
-			startIndex, endIndex, key.Hex())
+	chunkCount := 0
+	for _, request := range requests {
+		chunkCount += int(request.GetEndIndex() - request.GetStartIndex())
 	}
-	if endIndex > uint32(len(frames.Chunks)) {
-		return nil, fmt.Errorf(
-			"chunk range %d-%d is invald for key %s, chunk count %d",
-			startIndex, endIndex, key, len(frames.Chunks))
+	chunks := make([][]byte, 0, chunkCount)
+
+	for _, request := range requests {
+		startIndex := request.GetStartIndex()
+		endIndex := request.GetEndIndex()
+
+		if startIndex > endIndex {
+			return nil, fmt.Errorf(
+				"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
+				startIndex, endIndex, key.Hex())
+		}
+		if endIndex > uint32(len(frames.Chunks)) {
+			return nil, fmt.Errorf(
+				"chunk range %d-%d is invalid for key %s, chunk count %d",
+				startIndex, endIndex, key, len(frames.Chunks))
+		}
+
+		chunks = append(chunks, frames.Chunks[startIndex:endIndex]...)
 	}
 
 	framesSubset := &core.ChunksData{
-		Chunks:   frames.Chunks[startIndex:endIndex],
+		Chunks:   chunks,
 		Format:   frames.Format,
 		ChunkLen: frames.ChunkLen,
 	}
@@ -539,7 +612,8 @@ func buildInsufficientGetChunksBandwidthError(
 		blobCount, chunkCount, requiredBandwidth, originalError))
 }
 
-// Start starts the server listening for requests. This method will block until the server is stopped.
+// Start starts the server using the listener provided in the constructor.
+// This method will block until the server is stopped.
 func (s *Server) Start(ctx context.Context) error {
 	// Start metrics server if enabled
 	if s.config.EnableMetrics {
@@ -561,31 +635,9 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Serve grpc requests
-	addr := fmt.Sprintf("0.0.0.0:%d", s.config.GRPCPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("could not start tcp listener on %s: %w", addr, err)
-	}
-
-	opt := grpc.MaxRecvMsgSize(s.config.MaxGRPCMessageSize)
-
-	keepAliveConfig := grpc.KeepaliveParams(keepalive.ServerParameters{
-		MaxConnectionIdle:     s.config.MaxIdleConnectionAge,
-		MaxConnectionAge:      s.config.MaxConnectionAge,
-		MaxConnectionAgeGrace: s.config.MaxConnectionAgeGrace,
-	})
-
-	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption(), keepAliveConfig)
-	reflection.Register(s.grpcServer)
-	pb.RegisterRelayServer(s.grpcServer, s)
-
-	// Register Server for Health Checks
-	name := pb.Relay_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, s.grpcServer)
-
-	s.logger.Info("GRPC Listening", "port", s.config.GRPCPort, "address", listener.Addr().String())
-	if err = s.grpcServer.Serve(listener); err != nil {
-		return errors.New("could not start GRPC server")
+	s.logger.Info("GRPC Listening", "address", s.listener.Addr().String())
+	if err := s.grpcServer.Serve(s.listener); err != nil {
+		return fmt.Errorf("could not start GRPC server: %w", err)
 	}
 
 	return nil

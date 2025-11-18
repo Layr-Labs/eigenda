@@ -18,50 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDownloadBundles(t *testing.T) {
-	c := newComponents(t, op0)
-	c.node.RelayClient.Store(c.relayClient)
-	ctx := context.Background()
-	blobKeys, batch, bundles := nodemock.MockBatch(t)
-	blobCerts := batch.BlobCertificates
-
-	bundles00Bytes, err := bundles[0][0].Serialize()
-	require.NoError(t, err)
-	bundles10Bytes, err := bundles[1][0].Serialize()
-	require.NoError(t, err)
-	bundles20Bytes, err := bundles[2][0].Serialize()
-	require.NoError(t, err)
-
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
-		require.Len(t, requests, 2)
-		require.Equal(t, blobKeys[0], requests[0].BlobKey)
-		require.Equal(t, blobKeys[2], requests[1].BlobKey)
-	})
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
-		require.Len(t, requests, 1)
-		require.Equal(t, blobKeys[1], requests[0].BlobKey)
-	})
-	state, err := c.node.ChainState.GetOperatorStateByOperator(ctx, uint(10), op0)
-	require.NoError(t, err)
-
-	_, relayRequests, err := c.node.DetermineChunkLocations(batch, state, nil)
-	require.NoError(t, err)
-
-	blobShards, rawBundles, err := c.node.DownloadChunksFromRelays(ctx, batch, relayRequests, nil)
-	require.NoError(t, err)
-	require.Len(t, blobShards, 3)
-	require.Equal(t, blobCerts[0], blobShards[0].BlobCertificate)
-	require.Equal(t, blobCerts[1], blobShards[1].BlobCertificate)
-	require.Equal(t, blobCerts[2], blobShards[2].BlobCertificate)
-
-	require.Len(t, rawBundles, 3)
-	require.Equal(t, blobCerts[0], rawBundles[0].BlobCertificate)
-	require.Equal(t, blobCerts[1], rawBundles[1].BlobCertificate)
-	require.Equal(t, blobCerts[2], rawBundles[2].BlobCertificate)
-}
-
 func TestDownloadBundlesFail(t *testing.T) {
 	c := newComponents(t, op0)
 	c.node.RelayClient.Store(c.relayClient)
@@ -72,15 +28,25 @@ func TestDownloadBundlesFail(t *testing.T) {
 	require.NoError(t, err)
 	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
-		require.Len(t, requests, 2)
+	c.relayClient.On(
+		"GetChunksByRange",
+		mock.Anything,
+		v2.RelayKey(0),
+		mock.Anything,
+	).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
+		require.Len(t, requests, 3)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
 	relayServerError := fmt.Errorf("relay server error")
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return(nil, relayServerError).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+	c.relayClient.On(
+		"GetChunksByRange",
+		mock.Anything,
+		v2.RelayKey(1),
+		mock.Anything,
+	).Return(nil, relayServerError).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
@@ -111,14 +77,24 @@ func TestDownloadBundlesOnlyParticipatingQuorums(t *testing.T) {
 	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
 	// there shouldn't be a request to quorum 2 for blobKeys[2]
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+	c.relayClient.On(
+		"GetChunksByRange",
+		mock.Anything,
+		v2.RelayKey(0),
+		mock.Anything,
+	).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
-	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+	c.relayClient.On(
+		"GetChunksByRange",
+		mock.Anything,
+		v2.RelayKey(1),
+		mock.Anything,
+	).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})

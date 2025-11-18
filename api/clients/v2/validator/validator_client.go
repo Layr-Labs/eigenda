@@ -7,8 +7,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 )
@@ -33,6 +33,7 @@ type validatorClient struct {
 	logger           logging.Logger
 	blobParamsReader BlobParamsReader
 	chainState       core.ChainState
+	encoder          *rs.Encoder
 	verifier         *verifier.Verifier
 	config           *ValidatorClientConfig
 	connectionPool   *workerpool.WorkerPool
@@ -47,6 +48,7 @@ func NewValidatorClient(
 	logger logging.Logger,
 	blobParamsReader BlobParamsReader,
 	chainState core.ChainState,
+	encoder *rs.Encoder,
 	verifier *verifier.Verifier,
 	config *ValidatorClientConfig,
 	metrics *ValidatorClientMetrics,
@@ -82,6 +84,7 @@ func NewValidatorClient(
 		logger:           logger.With("component", "ValidatorClient"),
 		blobParamsReader: blobParamsReader,
 		chainState:       chainState,
+		encoder:          encoder,
 		verifier:         verifier,
 		config:           config,
 		connectionPool:   workerpool.New(config.ConnectionPoolSize),
@@ -98,13 +101,6 @@ func (c *validatorClient) GetBlob(
 
 	probe := c.metrics.newGetBlobProbe()
 	defer probe.End()
-
-	probe.SetStage("verify_commitment")
-	commitmentBatch := []encoding.BlobCommitments{blobHeader.BlobCommitments}
-	err := c.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
-	if err != nil {
-		return nil, err
-	}
 
 	probe.SetStage("get_operator_state")
 	operatorState, err := c.chainState.GetOperatorStateWithSocket(
@@ -155,7 +151,7 @@ func (c *validatorClient) GetBlob(
 		c.computePool,
 		c.config.UnsafeValidatorGRPCManagerFactory(c.logger, sockets),
 		c.config.UnsafeChunkDeserializerFactory(assignments, c.verifier),
-		c.config.UnsafeBlobDecoderFactory(c.verifier),
+		c.config.UnsafeBlobDecoderFactory(c.encoder),
 		assignments,
 		minimumChunkCount,
 		&encodingParams,
@@ -173,9 +169,10 @@ func (c *validatorClient) GetBlob(
 	return data, nil
 }
 
-// getFlattenedOperatorSockets merges the operator sockets contained in a nested mapping (QuorumID => OperatorID => OperatorInfo) to a flattened mapping
-// (OperatorID) => OperatorSocket). If an operator is encountered multiple times, it uses the socket corresponding to the first occurence.
-// As operators can only register a single socket across quorums, this is acceptable.
+// getFlattenedOperatorSockets merges the operator sockets contained in a nested mapping
+// (QuorumID => OperatorID => OperatorInfo) to a flattened mapping (OperatorID) => OperatorSocket).
+// If an operator is encountered multiple times, it uses the socket corresponding to
+// the first occurrence. As operators can only register a single socket across quorums, this is acceptable.
 func getFlattenedOperatorSockets(operatorsMap map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo) map[core.OperatorID]core.OperatorSocket {
 
 	operatorSockets := make(map[core.OperatorID]core.OperatorSocket)

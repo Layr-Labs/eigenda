@@ -50,7 +50,7 @@ type QuorumAttestation struct {
 	// QuorumResults contains the quorum ID and the amount signed for each quorum
 	QuorumResults map[QuorumID]*QuorumResult
 	// SignerMap contains the operator IDs that signed the message
-	SignerMap map[OperatorID]bool
+	SignerMap map[OperatorID]struct{}
 }
 
 // SignatureAggregation contains the results of aggregating signatures from a set of operators across multiple quorums
@@ -90,9 +90,7 @@ type SignatureAggregator interface {
 	// AggregateSignatures takes attestation result by quorum and aggregates the signatures across them.
 	// If the aggregated signature is invalid, an error is returned.
 	AggregateSignatures(
-		ctx context.Context,
-		ics IndexedChainState,
-		referenceBlockNumber uint,
+		indexedOperatorState *IndexedOperatorState,
 		quorumAttestation *QuorumAttestation,
 		quorumIDs []QuorumID,
 	) (*SignatureAggregation, error)
@@ -112,8 +110,7 @@ func NewStdSignatureAggregator(logger logging.Logger, transactor Reader) (*StdSi
 	}
 
 	return &StdSignatureAggregator{
-		Logger: logger.With(
-			"component", "SignatureAggregator"),
+		Logger:            logger.With("component", "SignatureAggregator"),
 		Transactor:        transactor,
 		OperatorAddresses: operatorAddrs,
 	}, nil
@@ -152,7 +149,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 	}
 	aggSigs := make(map[QuorumID]*Signature, len(quorumIDs))
 	aggPubKeys := make(map[QuorumID]*G2Point, len(quorumIDs))
-	signerMap := make(map[OperatorID]bool)
+	signerMap := make(map[OperatorID]struct{})
 
 	// Aggregate Signatures
 	numOperators := len(state.IndexedOperators)
@@ -176,7 +173,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			break
 		}
 
-		if seen := signerMap[r.Operator]; seen {
+		if _, seen := signerMap[r.Operator]; seen {
 			a.Logger.Warn("duplicate signature received", "operatorID", r.Operator.Hex())
 			continue
 		}
@@ -243,7 +240,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			}
 			operatorQuorums = append(operatorQuorums, quorumID)
 
-			signerMap[r.Operator] = true
+			signerMap[r.Operator] = struct{}{}
 
 			// Add to stake signed
 			stakeSigned[quorumID].Add(stakeSigned[quorumID], opInfo.Stake)
@@ -273,8 +270,11 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 	for id, op := range state.IndexedOperators {
 		_, found := signerMap[id]
 		if !found {
-			nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
-			nonSignerOperatorIds = append(nonSignerOperatorIds, id)
+			// Only add non-signers with valid G1 public keys to prevent nil pointer dereference
+			if op.PubkeyG1 != nil {
+				nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
+				nonSignerOperatorIds = append(nonSignerOperatorIds, id)
+			}
 		}
 	}
 
@@ -338,9 +338,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 }
 
 func (a *StdSignatureAggregator) AggregateSignatures(
-	ctx context.Context,
-	ics IndexedChainState,
-	referenceBlockNumber uint,
+	indexedOperatorState *IndexedOperatorState,
 	quorumAttestation *QuorumAttestation,
 	quorumIDs []QuorumID,
 ) (*SignatureAggregation, error) {
@@ -377,14 +375,13 @@ func (a *StdSignatureAggregator) AggregateSignatures(
 	}
 
 	nonSignerKeys := make([]*G1Point, 0)
-	indexedOperatorState, err := ics.GetIndexedOperatorState(ctx, referenceBlockNumber, quorumIDs)
-	if err != nil {
-		return nil, err
-	}
 	for id, op := range indexedOperatorState.IndexedOperators {
 		_, found := quorumAttestation.SignerMap[id]
 		if !found {
-			nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
+			// Only add non-signers with valid G1 public keys to prevent nil pointer dereference
+			if op.PubkeyG1 != nil {
+				nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
+			}
 		}
 	}
 

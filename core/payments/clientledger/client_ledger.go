@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/common/enforce"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
@@ -28,14 +29,6 @@ type ClientLedger struct {
 	accountantMetricer metrics.AccountantMetricer
 	accountID          gethcommon.Address
 
-	// Though it would theoretically be possible to infer mode of operation based on on-chain state, it's important
-	// that this be directly configurable by the user, to ensure that reality matches intention.
-	//
-	// Consider, for example, if a user intends to operate with a reservation covering the majority of dispersals,
-	// with an on-demand balance as a backup. If there is a configuration issue which prevents the reservation from
-	// being used, the client could mistakenly burn through all backup funds before becoming aware of the
-	// misconfiguration. In such cases, it's better to fail early, to bring the misconfiguration to the attention of the
-	// user as soon as possible.
 	clientLedgerMode ClientLedgerMode
 
 	reservationLedger *reservation.ReservationLedger
@@ -58,8 +51,6 @@ func NewClientLedger(
 	reservationLedger *reservation.ReservationLedger,
 	// may be nil if clientLedgerMode is configured to not use on-demand payments
 	onDemandLedger *ondemand.OnDemandLedger,
-	// Should be a timesource which includes monotonic timestamps, for best results. Otherwise, reservation payments
-	// may occasionally fail due to NTP adjustments
 	getNow func() time.Time,
 	// provides access to payment vault contract
 	paymentVault payments.PaymentVault,
@@ -115,6 +106,12 @@ func NewClientLedger(
 			clientLedger.GetAccountsToUpdate,
 			clientLedger.UpdateReservation)
 		enforce.NilError(err, "new reservation vault monitor")
+
+		// record initial values, so that metrics start out accurate
+		clientLedger.accountantMetricer.RecordReservationBucketCapacity(
+			clientLedger.reservationLedger.GetBucketCapacity())
+		clientLedger.accountantMetricer.RecordReservationPayment(
+			clientLedger.reservationLedger.GetRemainingCapacity())
 	}
 
 	if clientLedger.onDemandLedger != nil {
@@ -127,6 +124,12 @@ func NewClientLedger(
 			clientLedger.GetAccountsToUpdate,
 			clientLedger.UpdateTotalDeposit)
 		enforce.NilError(err, "new on demand vault monitor")
+
+		// record initial values, so that metrics start out accurate
+		clientLedger.accountantMetricer.RecordOnDemandTotalDeposits(
+			clientLedger.onDemandLedger.GetTotalDeposits())
+		clientLedger.accountantMetricer.RecordCumulativePayment(
+			clientLedger.onDemandLedger.GetCumulativePayment())
 	}
 
 	return clientLedger
@@ -164,17 +167,24 @@ func (cl *ClientLedger) Debit(
 
 // Used by ClientLedger instances where only reservation payments are configured.
 func (cl *ClientLedger) debitReservationOnly(
-	now time.Time,
+	dispersalTime time.Time,
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
-	// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
-	// dispersal time when constructing the payment header, and it does so with its conception of "now"
-	success, remainingCapacity, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
+	success, remainingCapacity, err := cl.reservationLedger.Debit(dispersalTime, blobLengthSymbols, quorums)
 	if err != nil {
-		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
+		var timeMovedBackwardErr *ratelimit.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
 			// this is the only class of error that can be returned from Debit where trying again might help
+			return nil, fmt.Errorf("debit reservation: %w", err)
+		}
+
+		var reservationOutOfRange *reservation.TimeOutOfRangeError
+		if errors.As(err, &reservationOutOfRange) {
+			// Don't panic if in ReservationOnly mode. This error causes a panic in ReservationAndOnDemand mode, to
+			// avoid inadvertently depleting on-demand funds when a reservation expires. But in the case where only
+			// reservation payments are being used, the ClientLedger may recover if the user acquires a new
+			// reservation.
 			return nil, fmt.Errorf("debit reservation: %w", err)
 		}
 
@@ -191,7 +201,7 @@ func (cl *ClientLedger) debitReservationOnly(
 			blobLengthSymbols, blobLengthSymbols*encoding.BYTES_PER_SYMBOL)
 	}
 
-	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
+	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, dispersalTime, nil)
 	enforce.NilError(err, "new payment metadata")
 	return paymentMetadata, nil
 }
@@ -204,8 +214,24 @@ func (cl *ClientLedger) debitOnDemandOnly(
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
 	cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
-	enforce.NilError(err, "on-demand debit failed. reservations aren't configured, and the ledger won't become "+
-		"aware of new on-chain deposits without a restart")
+	if err != nil {
+		var insufficientFundsErr *ondemand.InsufficientFundsError
+		if errors.As(err, &insufficientFundsErr) {
+			// Don't panic if insufficient funds occurs: new deposits will be observed by the client ledger, so it's
+			// possible to recover from this.
+			// nolint:wrapcheck // the returned error message is informative
+			return nil, err
+		}
+
+		var quorumNotSupportedErr *ondemand.QuorumNotSupportedError
+		if errors.As(err, &quorumNotSupportedErr) {
+			// This error is included here explicitly, for the sake of completeness (even though the behavior is the
+			// same as for a generic error)
+			panic(err.Error())
+		}
+
+		panic(err.Error())
+	}
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
 	enforce.NilError(err, "new payment metadata")
@@ -221,18 +247,25 @@ func (cl *ClientLedger) debitOnDemandOnly(
 // lacks capacity.
 func (cl *ClientLedger) debitReservationOrOnDemand(
 	ctx context.Context,
-	now time.Time,
+	dispersalTime time.Time,
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
-	// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
-	// dispersal time when constructing the payment header, and it does so with its conception of "now"
-	success, remainingCapacity, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
+	success, remainingCapacity, err := cl.reservationLedger.Debit(dispersalTime, blobLengthSymbols, quorums)
 	if err != nil {
-		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
+		var timeMovedBackwardErr *ratelimit.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
 			// this is the only class of error that can be returned from Debit where trying again might help
 			return nil, fmt.Errorf("debit reservation: %w", err)
+		}
+
+		var reservationOutOfRange *reservation.TimeOutOfRangeError
+		if errors.As(err, &reservationOutOfRange) {
+			panic(fmt.Sprintf(
+				"%v: panicking to avoid inadvertently depleting on-demand funds due to expired reservation. "+
+					"Acquire a new reservation, or switch mode of ClientLedger operation to `on-demand-only` if you "+
+					"wish to continue operating without an active reservation.",
+				reservationOutOfRange))
 		}
 
 		// all other modes of failure are fatal
@@ -242,7 +275,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	cl.accountantMetricer.RecordReservationPayment(remainingCapacity)
 
 	if success {
-		paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
+		paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, dispersalTime, nil)
 		enforce.NilError(err, "new payment metadata")
 		return paymentMetadata, nil
 	}
@@ -262,7 +295,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 		panic(fmt.Sprintf("on-demand debit failed: %v", err))
 	}
 
-	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
+	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, dispersalTime, cumulativePayment)
 	enforce.NilError(err, "new payment metadata")
 
 	cl.accountantMetricer.RecordCumulativePayment(cumulativePayment)
@@ -292,7 +325,7 @@ func (cl *ClientLedger) RevertDebit(
 		enforce.NotNil(cl.reservationLedger,
 			"payment metadata is for a reservation payment, but ReservationLedger is nil")
 
-		remainingCapacity, err := cl.reservationLedger.RevertDebit(cl.getNow(), blobSymbolCount)
+		remainingCapacity, err := cl.reservationLedger.RevertDebit(blobSymbolCount)
 		if err != nil {
 			return fmt.Errorf("revert reservation debit: %w", err)
 		}
@@ -312,7 +345,7 @@ func (cl *ClientLedger) GetAccountsToUpdate() []gethcommon.Address {
 func (cl *ClientLedger) UpdateReservation(accountID gethcommon.Address, newReservation *reservation.Reservation) error {
 	enforce.Equals(cl.accountID, accountID, "attempted to update reservation for the wrong account")
 
-	err := cl.reservationLedger.UpdateReservation(newReservation, cl.getNow())
+	err := cl.reservationLedger.UpdateReservation(newReservation)
 	if err != nil {
 		return fmt.Errorf("update reservation: %w", err)
 	}

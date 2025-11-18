@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -25,7 +26,6 @@ import (
 )
 
 var (
-	logger     = test.GetLogger()
 	blobParams = &core.BlobVersionParameters{
 		NumChunks:       8192,
 		CodingRate:      8,
@@ -196,7 +196,7 @@ func TestBasicWorkflow(t *testing.T) {
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
-		indices []uint,
+		indices []encoding.ChunkNumber,
 		encodingParams *encoding.EncodingParams,
 		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
@@ -229,6 +229,7 @@ func TestBasicWorkflow(t *testing.T) {
 		PaymentMetadataHash: [32]byte{},
 	}
 
+	logger := common.TestLogger(t)
 	worker, err := newRetrievalWorker(
 		ctx,
 		logger,
@@ -414,7 +415,7 @@ func TestDownloadTimeout(t *testing.T) {
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
-		indices []uint,
+		indices []encoding.ChunkNumber,
 		encodingParams *encoding.EncodingParams,
 		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
@@ -447,6 +448,7 @@ func TestDownloadTimeout(t *testing.T) {
 		PaymentMetadataHash: [32]byte{},
 	}
 
+	logger := common.TestLogger(t)
 	worker, err := newRetrievalWorker(
 		ctx,
 		logger,
@@ -673,7 +675,7 @@ func TestFailedVerification(t *testing.T) {
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
-		indices []uint,
+		indices []encoding.ChunkNumber,
 		encodingParams *encoding.EncodingParams,
 		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
@@ -706,6 +708,7 @@ func TestFailedVerification(t *testing.T) {
 		PaymentMetadataHash: [32]byte{},
 	}
 
+	logger := common.TestLogger(t)
 	worker, err := newRetrievalWorker(
 		ctx,
 		logger,
@@ -773,4 +776,213 @@ func MockCommitment(t *testing.T) encoding.BlobCommitments {
 		LengthProof:      (*encoding.G2Commitment)(&lengthProof),
 		Length:           10,
 	}
+}
+
+func TestForDoubleCountingBug(t *testing.T) {
+	ctx := t.Context()
+	rand := testrandom.NewTestRandom()
+	start := rand.Time()
+
+	fakeClock := atomic.Pointer[time.Time]{}
+	fakeClock.Store(&start)
+
+	config := DefaultClientConfig()
+	config.ControlLoopPeriod = 50 * time.Microsecond
+	config.TimeSource = func() time.Time {
+		return *fakeClock.Load()
+	}
+	// For the sake of this test, force all chunks to begin the process of being downloaded.
+	config.DownloadPessimism = 8.0
+	// For the sake of this test, force all chunks to begin the process of being verified.
+	config.VerificationPessimism = 8.0
+	connectionPool := workerpool.New(8)
+	computePool := workerpool.New(8)
+
+	blobKey := (v2.BlobKey)(rand.Bytes(32))
+
+	validatorCount := rand.Int32Range(50, 100)
+	quorumID := (core.QuorumID)(rand.Uint32Range(0, 10))
+
+	// Simulated chunks for each operator
+	operatorChunks := make(map[core.OperatorID][][]byte, validatorCount)
+
+	// The number of chunks needed to reconstruct the blob
+	minimumChunkCount := blobParams.NumChunks / blobParams.CodingRate
+
+	// The assignments for this test are intentionally crafted to trigger a bug that used to exist.
+	//
+	// Each validator is given the following:
+	// - at least 1 chunk that is unique to them
+	// - a bunch of chunks that overlap with every other validator
+	//
+	// The sum of all unique chunks should be just enough to reconstruct the blob. But if the client
+	// double counts overlapping chunks, it's highly likely they will stop downloading before they
+	// get enough unique chunks.
+
+	assignments := make(map[core.OperatorID]v2.Assignment, validatorCount)
+	uniqueChunks := make(map[uint32]struct{})
+	overlappingChunkCount := minimumChunkCount - uint32(validatorCount)
+
+	for i := uint32(0); i < uint32(validatorCount); i++ {
+		validatorID := (core.OperatorID)(rand.PrintableBytes(32))
+
+		indices := make([]uint32, 0, overlappingChunkCount+1)
+
+		// assign one unique chunk
+		indices = append(indices, i)
+		uniqueChunks[i] = struct{}{}
+
+		// assign overlapping chunks
+		for j := uint32(validatorCount); j < uint32(validatorCount)+overlappingChunkCount; j++ {
+			indices = append(indices, j)
+			uniqueChunks[j] = struct{}{}
+		}
+
+		operatorChunks[validatorID] = make([][]byte, len(indices))
+		for j := 0; j < len(indices); j++ {
+			operatorChunks[validatorID][j] = rand.PrintableBytes(8)
+		}
+
+		assignments[validatorID] = v2.Assignment{
+			Indices: indices,
+		}
+	}
+
+	// a set of operators that have provided chunks
+	downloadSet := sync.Map{}
+	mockGRPCManager := &mock.MockValidatorGRPCManager{}
+	mockGRPCManager.DownloadChunksFunction = func(
+		ctx context.Context,
+		key v2.BlobKey,
+		operatorID core.OperatorID,
+	) (*grpcnode.GetChunksReply, error) {
+
+		// verify we have the expected blob key
+		require.Equal(t, blobKey, key)
+
+		// make sure this is for a valid operator ID
+		chunks, ok := operatorChunks[operatorID]
+		require.True(t, ok)
+
+		// only permit downloads to happen once per operator
+		_, ok = downloadSet.Load(operatorID)
+		require.False(t, ok)
+
+		downloadSet.Store(operatorID, struct{}{})
+
+		return &grpcnode.GetChunksReply{
+			Chunks: chunks,
+		}, nil
+	}
+
+	// the set of operators we have verified the chunks of
+	verificationSet := sync.Map{}
+	mockDeserializer := &mock.MockChunkDeserializer{}
+	outerKey := blobKey
+	mockDeserializer.DeserializeAndVerifyFunction = func(
+		blobKey v2.BlobKey,
+		operatorID core.OperatorID,
+		getChunksReply *grpcnode.GetChunksReply,
+		blobCommitments *encoding.BlobCommitments,
+		encodingParams *encoding.EncodingParams,
+	) ([]*encoding.Frame, error) {
+
+		// verify we have the expected blob key
+		require.Equal(t, outerKey, blobKey)
+
+		// make sure this is for a valid operator ID
+		chunks, ok := operatorChunks[operatorID]
+		require.True(t, ok)
+
+		// make sure we previously downloaded from this operator
+		_, ok = downloadSet.Load(operatorID)
+		require.True(t, ok)
+
+		// make sure we have not previously verified data from this operator
+		_, ok = verificationSet.Load(operatorID)
+		require.False(t, ok)
+		verificationSet.Store(operatorID, struct{}{})
+
+		// make sure the chunks are the ones we expect for this operator
+		require.Equal(t, len(chunks), len(getChunksReply.GetChunks()))
+		for i, chunk := range getChunksReply.GetChunks() {
+			require.Equal(t, chunks[i], chunk)
+		}
+
+		frames := make([]*encoding.Frame, len(chunks))
+		for i := range chunks {
+			// Unfortunately, it's complicated to generate random frame data.
+			// So just use placeholders.
+			frames[i] = &encoding.Frame{}
+		}
+
+		return frames, nil
+	}
+
+	decodeCalled := atomic.Bool{}
+	decodedBytes := rand.PrintableBytes(32)
+	framesSentToDecoding := sync.Map{}
+	framesSentToDecodingCount := atomic.Uint32{}
+
+	mockDecoder := &mock.MockBlobDecoder{}
+	mockDecoder.DecodeBlobFunction = func(
+		key v2.BlobKey,
+		chunks []*encoding.Frame,
+		indices []encoding.ChunkNumber,
+		encodingParams *encoding.EncodingParams,
+		blobCommitments *encoding.BlobCommitments,
+	) ([]byte, error) {
+
+		// verify we have the expected blob key
+		require.Equal(t, blobKey, key)
+
+		// we shouldn't have called decode before
+		require.False(t, decodeCalled.Load())
+		decodeCalled.Store(true)
+
+		// De-duplicate frames when counting
+		frameCount := uint32(0)
+		for _, i := range indices {
+			_, ok := framesSentToDecoding.Load(i)
+			if !ok {
+				framesSentToDecoding.Store(i, struct{}{})
+				frameCount++
+			}
+		}
+		framesSentToDecodingCount.Add(frameCount)
+
+		return decodedBytes, nil
+	}
+
+	blobHeader := &v2.BlobHeaderWithHashedPayment{
+		BlobVersion:         0,
+		QuorumNumbers:       []core.QuorumID{quorumID},
+		BlobCommitments:     MockCommitment(t),
+		PaymentMetadataHash: [32]byte{},
+	}
+
+	logger := common.TestLogger(t)
+	worker, err := newRetrievalWorker(
+		ctx,
+		logger,
+		config,
+		connectionPool,
+		computePool,
+		mockGRPCManager,
+		mockDeserializer,
+		mockDecoder,
+		assignments,
+		minimumChunkCount,
+		nil,
+		blobHeader,
+		blobKey,
+		nil)
+	require.NoError(t, err)
+
+	blob, err := worker.retrieveBlobFromValidators()
+	require.NoError(t, err)
+	require.Equal(t, decodedBytes, blob)
+
+	// We should have been asked to verify at least the minimum chunk count.
+	require.GreaterOrEqual(t, framesSentToDecodingCount.Load(), minimumChunkCount)
 }

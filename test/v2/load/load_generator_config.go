@@ -1,11 +1,37 @@
 package load
 
+import (
+	"github.com/Layr-Labs/eigenda/common/config"
+	"github.com/Layr-Labs/eigenda/test/v2/client"
+)
+
+var _ config.DocumentedConfig = (*TrafficGeneratorConfig)(nil)
+
+// Configuration for the traffic generator.
+//
+// TODO(cody.littley): This parent struct is not currently used for deploying a traffic generator,
+// but that will soon change. When the change is made, I will also do some renaming to make things cleaner.
+type TrafficGeneratorConfig struct {
+	// Configures the environment towards which the traffic generator will run.
+	Environment client.TestClientConfig
+	// Configures the load the traffic generator will produce.
+	Load LoadGeneratorConfig
+}
+
+// DefaultTrafficGeneratorConfig returns a default configuration for the traffic generator.
+func DefaultTrafficGeneratorConfig() *TrafficGeneratorConfig {
+	return &TrafficGeneratorConfig{
+		Environment: *client.DefaultTestClientConfig(),
+		Load:        *DefaultLoadGeneratorConfig(),
+	}
+}
+
 // LoadGeneratorConfig is the configuration for the load generator.
 type LoadGeneratorConfig struct {
 	// The desired number of megabytes bytes per second to write.
-	MBPerSecond float64
+	MbPerSecond float64
 	// The size of the blobs to write, in megabytes.
-	BlobSizeMB float64
+	BlobSizeMb float64
 	// By default, this utility reads each blob back from each relay once. The number of
 	// reads per relay is multiplied by this factor. For example, If this is set to 3,
 	// then each blob is read back from each relay 3 times. If less than 1, then this value
@@ -54,8 +80,8 @@ type LoadGeneratorConfig struct {
 // DefaultLoadGeneratorConfig returns a default configuration for the load generator.
 func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 	return &LoadGeneratorConfig{
-		MBPerSecond:                   0.5,
-		BlobSizeMB:                    2.0,
+		MbPerSecond:                   0.5,
+		BlobSizeMb:                    2.0,
 		RelayReadAmplification:        1.0,
 		ValidatorReadAmplification:    1.0,
 		ValidatorVerificationFraction: 0.01,
@@ -72,4 +98,24 @@ func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 		FrequencyAcceleration:         0.0025,
 		UseProxy:                      false,
 	}
+}
+
+func (c *TrafficGeneratorConfig) GetEnvVarPrefix() string {
+	return "TRAFFIC_GENERATOR"
+}
+
+func (c *TrafficGeneratorConfig) GetName() string {
+	return "TrafficGenerator"
+}
+
+func (c *TrafficGeneratorConfig) GetPackagePaths() []string {
+	return []string{
+		"github.com/Layr-Labs/eigenda/test/v2/client",
+		"github.com/Layr-Labs/eigenda/test/v2/load",
+	}
+}
+
+func (c *TrafficGeneratorConfig) Verify() error {
+	// TODO(cody.littley): This is a place holder. Implement this when integrating new config with traffic generator.
+	return nil
 }

@@ -19,7 +19,7 @@ To set up the deployment, a config json should be placed in the `config/` folder
 }
 ```
 
-One sample config is provided in the `config/v2` folder for Sepolia testnet environment.
+Some configurations are provided in the `config/v2` folder for various environments.
 
 ### Deployment
 

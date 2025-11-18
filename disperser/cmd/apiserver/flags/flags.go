@@ -1,7 +1,6 @@
 package flags
 
 import (
-	"runtime"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -10,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgflags"
 	"github.com/urfave/cli"
 )
 
@@ -26,6 +25,31 @@ var (
 		Usage:    "Name of the bucket to store blobs",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "S3_BUCKET_NAME"),
+	}
+	ObjectStorageBackendFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "object-storage-backend"),
+		Usage:    "Object storage backend to use (s3 or oci)",
+		Required: false,
+		Value:    "s3",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OBJECT_STORAGE_BACKEND"),
+	}
+	OCIRegionFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-region"),
+		Usage:    "OCI region (only used when object-storage-backend is oci)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_REGION"),
+	}
+	OCICompartmentIDFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-compartment-id"),
+		Usage:    "OCI compartment ID (only used when object-storage-backend is oci)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_COMPARTMENT_ID"),
+	}
+	OCINamespaceFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "oci-namespace"),
+		Usage:    "OCI namespace (only used when object-storage-backend is oci). If not provided, will be retrieved dynamically",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OCI_NAMESPACE"),
 	}
 	DynamoDBTableNameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "dynamodb-table-name"),
@@ -204,6 +228,20 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTH_PMT_REQUEST_MAX_FUTURE_AGE"),
 	}
+	MaxDispersalAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-dispersal-age"),
+		Usage:    "Maximum age of a dispersal request timestamp. Requests older than this will be rejected at ingest",
+		Required: false,
+		Value:    45 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_DISPERSAL_AGE"),
+	}
+	MaxFutureDispersalTimeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-future-dispersal-time"),
+		Usage:    "Maximum time into the future a dispersal request timestamp can be. Requests with timestamps further in the future will be rejected at ingest",
+		Required: false,
+		Value:    45 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_FUTURE_DISPERSAL_TIME"),
+	}
 	ReservedOnly = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "reserved-only"),
 		Usage:    "if true, only reserved dispersal requests are served; on-demand requests are rejected (default: true)",
@@ -217,79 +255,40 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_ADDRESS"),
 	}
-	UseControllerMediatedPayments = cli.BoolFlag{
+	UseControllerMediatedPayments = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-controller-mediated-payments"),
-		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using legacy system.",
+		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using new controller-mediated system.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_CONTROLLER_MEDIATED_PAYMENTS"),
 	}
 )
 
-var kzgFlags = []cli.Flag{
-	// KZG flags for encoding
-	// These are copied from encoding/kzg/cli.go as optional flags for compatibility between v1 and v2 dispersers
-	// These flags are only used in v2 disperser
+// Flags needed for computing kzg commitments.
+// These flags are only used in V2 disperser.
+var kzgCommitterFlags = []cli.Flag{
 	cli.StringFlag{
-		Name:     kzg.G1PathFlagName,
+		Name:     kzgflags.G1PathFlagName,
 		Usage:    "Path to G1 SRS",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G1_PATH"),
 	},
 	cli.StringFlag{
-		Name:     kzg.G2PathFlagName,
+		Name:     kzgflags.G2PathFlagName,
 		Usage:    "Path to G2 SRS. Either this flag or G2_POWER_OF_2_PATH needs to be specified. For operator node, if both are specified, the node uses G2_POWER_OF_2_PATH first, if failed then tries to G2_PATH",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G2_PATH"),
 	},
 	cli.StringFlag{
-		Name:     kzg.CachePathFlagName,
-		Usage:    "Path to SRS Table directory",
+		Name:     kzgflags.G2TrailingPathFlagName,
+		Usage:    "Path to trailing G2 SRS file. Its intended purpose is to allow local generation the blob length proof. If you already downloaded the entire G2 SRS file which contains 268435456 G2 points with total size 16GiB, this flag is not needed. With this G2TrailingPathFlag, user can use a smaller file that contains only the trailing end of the whole G2 SRS file. Ignoring this flag, the program assumes the entire G2 SRS file is provided. With this flag, the size of the provided file must be at least SRSLoadingNumberFlagName * 64 Bytes.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CACHE_PATH"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G2_TRAILING_PATH"),
 	},
 	cli.Uint64Flag{
-		Name:     kzg.SRSOrderFlagName,
-		Usage:    "Order of the SRS",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SRS_ORDER"),
-	},
-	cli.Uint64Flag{
-		Name:     kzg.SRSLoadingNumberFlagName,
+		Name:     kzgflags.SRSLoadingNumberFlagName,
 		Usage:    "Number of SRS points to load into memory",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SRS_LOAD"),
-	},
-	cli.Uint64Flag{
-		Name:     kzg.NumWorkerFlagName,
-		Usage:    "Number of workers for multithreading",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NUM_WORKERS"),
-		Value:    uint64(runtime.GOMAXPROCS(0)),
-	},
-	cli.BoolFlag{
-		Name:     kzg.VerboseFlagName,
-		Usage:    "Enable to see verbose output for encoding/decoding",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "VERBOSE"),
-	},
-	cli.BoolFlag{
-		Name:     kzg.CacheEncodedBlobsFlagName,
-		Usage:    "Enable to cache encoded results",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CACHE_ENCODED_BLOBS"),
-	},
-	cli.BoolFlag{
-		Name:     kzg.PreloadEncoderFlagName,
-		Usage:    "Set to enable Encoder PreLoading",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PRELOAD_ENCODER"),
-	},
-	cli.StringFlag{
-		Name:     kzg.DeprecatedG2PowerOf2PathFlagName,
-		Usage:    "Path to G2 SRS points that are on power of 2. Either this flag or G2_PATH needs to be specified. For operator node, if both are specified, the node uses G2_POWER_OF_2_PATH first, if failed then tries to G2_PATH",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G2_POWER_OF_2_PATH"),
-		Hidden:   true, // deprecated so we hide it from help output
 	},
 }
 
@@ -301,6 +300,10 @@ var requiredFlags = []cli.Flag{
 }
 
 var optionalFlags = []cli.Flag{
+	ObjectStorageBackendFlag,
+	OCIRegionFlag,
+	OCICompartmentIDFlag,
+	OCINamespaceFlag,
 	DisperserVersionFlag,
 	MetricsHTTPPort,
 	EnableMetrics,
@@ -321,6 +324,8 @@ var optionalFlags = []cli.Flag{
 	EnablePprof,
 	AuthPmtStateRequestMaxPastAge,
 	AuthPmtStateRequestMaxFutureAge,
+	MaxDispersalAgeFlag,
+	MaxFutureDispersalTimeFlag,
 	ReservedOnly,
 	ControllerAddressFlag,
 	UseControllerMediatedPayments,
@@ -339,5 +344,5 @@ func init() {
 	Flags = append(Flags, ratelimit.RatelimiterCLIFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, apiserver.CLIFlags(envVarPrefix)...)
-	Flags = append(Flags, kzgFlags...)
+	Flags = append(Flags, kzgCommitterFlags...)
 }

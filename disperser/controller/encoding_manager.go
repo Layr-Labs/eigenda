@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
-	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -25,23 +25,107 @@ import (
 
 var errNoBlobsToEncode = errors.New("no blobs to encode")
 
+// EncodingManagerConfig contains configuration parameters for the EncodingManager.
+// The EncodingManager is responsible for pulling queued blobs from the blob metadata store,
+// sending them to the encoder service for encoding, and creating blob certificates.
 type EncodingManagerConfig struct {
+	// PullInterval is how frequently the EncodingManager polls for new blobs to encode.
+	// Must be positive.
 	PullInterval time.Duration
 
+	// EncodingRequestTimeout is the maximum time to wait for a single encoding request to complete.
+	// Must be positive.
 	EncodingRequestTimeout time.Duration
-	StoreTimeout           time.Duration
-	// NumEncodingRetries defines how many times the encoding will be retried
+	// StoreTimeout is the maximum time to wait for blob metadata store operations.
+	// Must be positive.
+	StoreTimeout time.Duration
+	// NumEncodingRetries is the number of times to retry encoding a blob after the initial attempt fails.
+	// A value of 0 means no retries (only the initial attempt).
+	// Must be non-negative.
 	NumEncodingRetries int
-	// NumRelayAssignment defines how many relays will be assigned to a blob
+	// NumRelayAssignment is the number of relays to assign to each blob.
+	// Must be at least 1 and cannot exceed the length of AvailableRelays.
 	NumRelayAssignment uint16
-	// AvailableRelays is a list of available relays
+	// AvailableRelays is the list of relay keys that can be assigned to blobs.
+	// Must not be empty.
 	AvailableRelays []corev2.RelayKey
-	// EncoderAddress is the address of the encoder
+	// EncoderAddress is the network address of the encoder service (e.g., "localhost:50051").
+	// Must not be empty.
 	EncoderAddress string
-	// MaxNumBlobsPerIteration is the maximum number of blobs to encode per iteration
+	// MaxNumBlobsPerIteration is the maximum number of blobs to pull and encode in each iteration.
+	// Must be at least 1.
 	MaxNumBlobsPerIteration int32
-	// OnchainStateRefreshInterval is the interval at which the onchain state is refreshed
+	// OnchainStateRefreshInterval is how frequently the manager refreshes blob version parameters from the chain.
+	// Must be positive.
 	OnchainStateRefreshInterval time.Duration
+	// NumConcurrentRequests is the size of the worker pool for processing encoding requests concurrently.
+	// Must be at least 1.
+	NumConcurrentRequests int
+
+	// MaxDispersalAge is the maximum age a dispersal request can be before it is discarded.
+	// Dispersals older than this duration are marked as Failed and not processed.
+	//
+	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
+	// client at dispersal request creation time (in nanoseconds since Unix epoch).
+	MaxDispersalAge time.Duration
+}
+
+var _ config.VerifiableConfig = &EncodingManagerConfig{}
+
+func DefaultEncodingManagerConfig() *EncodingManagerConfig {
+	return &EncodingManagerConfig{
+		PullInterval:                2 * time.Second,
+		EncodingRequestTimeout:      5 * time.Minute,
+		StoreTimeout:                15 * time.Second,
+		NumEncodingRetries:          3,
+		MaxNumBlobsPerIteration:     128,
+		OnchainStateRefreshInterval: 1 * time.Hour,
+		NumConcurrentRequests:       250,
+		NumRelayAssignment:          1,
+		MaxDispersalAge:             45 * time.Second,
+	}
+}
+
+func (c *EncodingManagerConfig) Verify() error {
+	if c.PullInterval <= 0 {
+		return fmt.Errorf("PullInterval must be positive, got %v", c.PullInterval)
+	}
+	if c.EncodingRequestTimeout <= 0 {
+		return fmt.Errorf("EncodingRequestTimeout must be positive, got %v", c.EncodingRequestTimeout)
+	}
+	if c.StoreTimeout <= 0 {
+		return fmt.Errorf("StoreTimeout must be positive, got %v", c.StoreTimeout)
+	}
+	if c.NumEncodingRetries < 0 {
+		return fmt.Errorf("NumEncodingRetries must be non-negative, got %d", c.NumEncodingRetries)
+	}
+	if c.NumRelayAssignment < 1 {
+		return fmt.Errorf("NumRelayAssignment must be at least 1, got %d", c.NumRelayAssignment)
+	}
+	if len(c.AvailableRelays) == 0 {
+		return fmt.Errorf("AvailableRelays cannot be empty")
+	}
+	if int(c.NumRelayAssignment) > len(c.AvailableRelays) {
+		return fmt.Errorf(
+			"NumRelayAssignment (%d) cannot be greater than the number of available relays (%d)",
+			c.NumRelayAssignment, len(c.AvailableRelays))
+	}
+	if c.MaxNumBlobsPerIteration < 1 {
+		return fmt.Errorf("MaxNumBlobsPerIteration must be at least 1, got %d", c.MaxNumBlobsPerIteration)
+	}
+	if c.OnchainStateRefreshInterval <= 0 {
+		return fmt.Errorf("OnchainStateRefreshInterval must be positive, got %v", c.OnchainStateRefreshInterval)
+	}
+	if c.NumConcurrentRequests < 1 {
+		return fmt.Errorf("NumConcurrentRequests must be at least 1, got %d", c.NumConcurrentRequests)
+	}
+	if c.EncoderAddress == "" {
+		return fmt.Errorf("EncoderAddress cannot be empty")
+	}
+	if c.MaxDispersalAge <= 0 {
+		return fmt.Errorf("MaxDispersalAge must be positive, got %v", c.MaxDispersalAge)
+	}
+	return nil
 }
 
 // EncodingManager is responsible for pulling queued blobs from the blob
@@ -56,6 +140,7 @@ type EncodingManager struct {
 	encodingClient    disperser.EncoderClientV2
 	chainReader       core.Reader
 	logger            logging.Logger
+	getNow            func() time.Time
 
 	// state
 	cursor                *blobstore.StatusIndexCursor
@@ -71,6 +156,7 @@ type EncodingManager struct {
 
 func NewEncodingManager(
 	config *EncodingManagerConfig,
+	getNow func() time.Time,
 	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	encodingClient disperser.EncoderClientV2,
@@ -80,16 +166,13 @@ func NewEncodingManager(
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 ) (*EncodingManager, error) {
-	if config.NumRelayAssignment < 1 ||
-		len(config.AvailableRelays) == 0 ||
-		config.MaxNumBlobsPerIteration < 1 {
-		return nil, fmt.Errorf("invalid encoding manager config")
+	if err := config.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	if int(config.NumRelayAssignment) > len(config.AvailableRelays) {
-		return nil, fmt.Errorf("NumRelayAssignment (%d) cannot be greater than NumRelays (%d)", config.NumRelayAssignment, len(config.AvailableRelays))
-	}
+
 	return &EncodingManager{
 		EncodingManagerConfig:  config,
+		getNow:                 getNow,
 		blobMetadataStore:      blobMetadataStore,
 		pool:                   pool,
 		encodingClient:         encodingClient,
@@ -150,19 +233,77 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 	return nil
 }
 
-func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.BlobMetadata {
-	dedupedBlobs := make([]*v2.BlobMetadata, 0)
-	for _, blob := range blobMetadatas {
-		key, err := blob.BlobHeader.BlobKey()
+// Iterates over the input metadata slice, and returns a new slice with stale and duplicate metadatas filtered out
+func (e *EncodingManager) filterStaleAndDedupBlobs(
+	ctx context.Context,
+	inputMetadatas []*v2.BlobMetadata,
+) []*v2.BlobMetadata {
+	outputMetadatas := make([]*v2.BlobMetadata, 0, len(inputMetadatas))
+	now := e.getNow()
+
+	for _, metadata := range inputMetadatas {
+		blobKey, err := metadata.BlobHeader.BlobKey()
 		if err != nil {
-			e.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt)
+			e.logger.Errorf("compute blob key: %w", err)
+			// we must discard if we cannot compute key, since it's used for deduplication
 			continue
 		}
-		if !e.blobSet.Contains(key) {
-			dedupedBlobs = append(dedupedBlobs, blob)
+
+		if e.checkAndHandleStaleBlob(ctx, blobKey, now, metadata.BlobHeader.PaymentMetadata.Timestamp) {
+			// discard stale blob
+			continue
 		}
+
+		if e.blobSet.Contains(blobKey) {
+			// discard duplicate blob
+			continue
+		}
+
+		outputMetadatas = append(outputMetadatas, metadata)
 	}
-	return dedupedBlobs
+
+	return outputMetadatas
+}
+
+// Checks if a blob is older than MaxDispersalAge and handles it accordingly.
+// If the blob is stale, it increments metrics, logs a warning, and updates the database status to Failed.
+// Returns true if the blob is stale, otherwise false.
+func (e *EncodingManager) checkAndHandleStaleBlob(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	now time.Time,
+	dispersalTimestamp int64,
+) bool {
+	dispersalTime := time.Unix(0, dispersalTimestamp)
+	dispersalAge := now.Sub(dispersalTime)
+
+	if dispersalAge <= e.MaxDispersalAge {
+		return false
+	}
+
+	e.metrics.reportStaleDispersal()
+
+	e.logger.Warnf(
+		"discarding stale dispersal: blobKey=%s dispersalAge=%s maxAge=%s dispersalTime=%s",
+		blobKey.Hex(),
+		dispersalAge.String(),
+		e.MaxDispersalAge.String(),
+		dispersalTime.Format(time.RFC3339),
+	)
+
+	storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
+	err := e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Failed)
+	cancel()
+	if err != nil {
+		e.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
+	} else {
+		// we need to remove the blobKey from the blobSet once the BlobStatus is set to FAILED
+		// the Dispatcher removes the blobKey from the blobSet when batching, but blobs that are set to FAILED
+		// never are batched, and therefore must be removed manually
+		e.blobSet.RemoveBlob(blobKey)
+	}
+
+	return true
 }
 
 // HandleBatch handles a batch of blobs to encode
@@ -172,7 +313,7 @@ func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.Blo
 // WARNING: This method is not thread-safe. It should only be called from a single goroutine.
 func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	// Signal Liveness to indicate no stall
-	healthcheck.SignalHeartbeat("encodingManager", e.controllerLivenessChan, e.logger)
+	healthcheck.SignalHeartbeat(e.logger, "encodingManager", e.controllerLivenessChan)
 
 	// Get a batch of blobs to encode
 	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
@@ -180,7 +321,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		return err
 	}
 
-	blobMetadatas = e.dedupBlobs(blobMetadatas)
+	blobMetadatas = e.filterStaleAndDedupBlobs(ctx, blobMetadatas)
 	e.metrics.reportBlobSetSize(e.blobSet.Size())
 	if len(blobMetadatas) == 0 {
 		return errNoBlobsToEncode
@@ -251,7 +392,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
 				err = e.blobMetadataStore.PutBlobCertificate(storeCtx, cert, fragmentInfo)
 				cancel()
-				if err != nil && !errors.Is(err, dispcommon.ErrAlreadyExists) {
+				if err != nil && !errors.Is(err, blobstore.ErrAlreadyExists) {
 					e.logger.Error("failed to put blob certificate", "err", err)
 					continue
 				}
@@ -262,7 +403,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				err = e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Encoded)
 				finishedUpdateBlobStatusTime = time.Now()
 				cancel()
-				if err == nil || errors.Is(err, dispcommon.ErrAlreadyExists) {
+				if err == nil || errors.Is(err, blobstore.ErrAlreadyExists) {
 					// Successfully updated the status to Encoded
 					success = true
 					break
@@ -294,6 +435,10 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
 					return
 				}
+				// we need to remove the blobKey from the blobSet once the BlobStatus is set to FAILED
+				// the Dispatcher removes the blobKey from the blobSet when batching, but blobs that are set to FAILED
+				// never are batched, and therefore must be removed manually
+				e.blobSet.RemoveBlob(blobKey)
 				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed)
 			}
 		})

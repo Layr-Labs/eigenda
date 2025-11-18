@@ -82,6 +82,13 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go build -o ./bin/controller ./cmd/controller
 
+# Ejector build stage
+FROM common-builder AS ejector-builder
+WORKDIR /app/ejector
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -o ./bin/ejector ./main
+
 # Relay build stage
 FROM common-builder AS relay-builder
 WORKDIR /app/relay
@@ -105,22 +112,28 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # BlobAPI (Combined API Server and Relay) build stage
 FROM common-builder AS blobapi-builder
+ARG SEMVER
+ARG GITCOMMIT
+ARG GITDATE
 WORKDIR /app/disperser
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go build -ldflags="-X main.version=${SEMVER} \
-                       -X main.gitCommit=${GITCOMMIT} \
-                       -X main.gitDate=${GITDATE}" \
+    go build -ldflags="-X 'main.version=${SEMVER}' \
+                       -X 'main.gitCommit=${GITCOMMIT}' \
+                       -X 'main.gitDate=${GITDATE}'" \
         -o ./bin/blobapi ./cmd/blobapi
 
 # Proxy build stage
 FROM common-builder AS proxy-builder
+ARG SEMVER
+ARG GITCOMMIT
+ARG GITDATE
 WORKDIR /app/api/proxy
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-        go build -ldflags="-X main.version=${SEMVER} \
-                       -X main.gitCommit=${GITCOMMIT} \
-                       -X main.gitDate=${GITDATE}" \
+        go build -ldflags="-X 'main.Version=${SEMVER}' \
+                       -X 'main.Commit=${GITCOMMIT}' \
+                       -X 'main.Date=${GITDATE}'" \
         -o ./bin/eigenda-proxy ./cmd/server
 
 # Final stages for each component
@@ -160,6 +173,10 @@ FROM alpine:3.22 AS controller
 COPY --from=controller-builder /app/disperser/bin/controller /usr/local/bin
 ENTRYPOINT ["controller"]
 
+FROM alpine:3.22 AS ejector
+COPY --from=ejector-builder /app/ejector/bin/ejector /usr/local/bin
+ENTRYPOINT ["ejector"]
+
 FROM alpine:3.22 AS relay
 COPY --from=relay-builder /app/relay/bin/relay /usr/local/bin
 ENTRYPOINT ["relay"]
@@ -170,7 +187,7 @@ ENTRYPOINT ["generator"]
 
 FROM alpine:3.22 AS generator2
 COPY --from=generator2-builder /app/test/v2/bin/load /usr/local/bin
-ENTRYPOINT ["load", "-", "-"]
+ENTRYPOINT ["load"]
 
 FROM alpine:3.22 AS blobapi
 COPY --from=blobapi-builder /app/disperser/bin/blobapi /usr/local/bin

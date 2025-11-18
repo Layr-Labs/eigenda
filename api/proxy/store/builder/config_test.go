@@ -11,7 +11,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/stretchr/testify/require"
 )
 
@@ -72,7 +73,8 @@ func validCfg() Config {
 				common.RelayRetrieverType,
 				common.ValidatorRetrieverType,
 			},
-			PutTries: 3,
+			PutTries:         3,
+			ClientLedgerMode: clientledger.ClientLedgerModeReservationOnly,
 		},
 		S3Config: s3.Config{
 			Bucket:          "test-bucket",

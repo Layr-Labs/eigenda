@@ -20,13 +20,12 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
@@ -54,13 +53,28 @@ type DispersalServerV2 struct {
 
 	chainReader              core.Reader
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator
-	prover                   *prover.Prover
+	committer                *committer.Committer
 	logger                   logging.Logger
 
 	// state
 	onchainState                atomic.Pointer[OnchainState]
-	maxNumSymbolsPerBlob        uint64
+	maxNumSymbolsPerBlob        uint32
 	onchainStateRefreshInterval time.Duration
+
+	// MaxDispersalAge is the maximum age a dispersal request can be before it is rejected.
+	// Dispersals older than this duration are rejected by the API server at ingest.
+	//
+	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
+	// client at dispersal request creation time (in nanoseconds since Unix epoch).
+	MaxDispersalAge time.Duration
+
+	// MaxFutureDispersalTime is the maximum amount of time into the future a dispersal request can be
+	// before it is rejected. Dispersals with timestamps more than this duration in the future are rejected
+	// by the API server at ingest.
+	MaxFutureDispersalTime time.Duration
+
+	// getNow returns the current time
+	getNow func() time.Time
 
 	metricsConfig disperser.MetricsConfig
 	metrics       *metricsV2
@@ -75,30 +89,44 @@ type DispersalServerV2 struct {
 	// TODO(litt3): this field should be removed once the migration to the new payments system is complete
 	useControllerMediatedPayments bool
 
-	// Controller gRPC client connection and service client
+	// Exists as a member variable so that the connection can be closed inside Stop().
 	controllerConnection *grpc.ClientConn
-	controllerClient     controller.ControllerServiceClient
+
+	// Client for making gRPC calls to the controller.
+	// May be nil if useControllerMediatedPayments is false
+	controllerClient controller.ControllerServiceClient
+
+	// Pre-created listener for the gRPC server
+	listener   net.Listener
+	grpcServer *grpc.Server
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
+	getNow func() time.Time,
 	blobStore *blobstore.BlobStore,
 	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
-	prover *prover.Prover,
-	maxNumSymbolsPerBlob uint64,
+	committer *committer.Committer,
+	maxNumSymbolsPerBlob uint32,
 	onchainStateRefreshInterval time.Duration,
+	maxDispersalAge time.Duration,
+	maxFutureDispersalTime time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
 	useControllerMediatedPayments bool,
-	// must be non-empty if useControllerMediatedPayments is true
-	controllerAddress string,
+	controllerConnection *grpc.ClientConn,
+	controllerClient controller.ControllerServiceClient,
+	listener net.Listener,
 ) (*DispersalServerV2, error) {
+	if listener == nil {
+		return nil, errors.New("listener is required")
+	}
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
 	}
@@ -114,8 +142,8 @@ func NewDispersalServerV2(
 	if blobRequestAuthenticator == nil {
 		return nil, errors.New("blobRequestAuthenticator is required")
 	}
-	if prover == nil {
-		return nil, errors.New("prover is required")
+	if committer == nil {
+		return nil, errors.New("committer is required")
 	}
 	if maxNumSymbolsPerBlob == 0 {
 		return nil, errors.New("maxNumSymbolsPerBlob is required")
@@ -123,26 +151,22 @@ func NewDispersalServerV2(
 	if _logger == nil {
 		return nil, errors.New("logger is required")
 	}
+	if getNow == nil {
+		return nil, errors.New("getNow is required")
+	}
+	if maxDispersalAge <= 0 {
+		return nil, fmt.Errorf("maxDispersalAge must be positive (got: %v)", maxDispersalAge)
+	}
+	if maxFutureDispersalTime <= 0 {
+		return nil, fmt.Errorf("maxFutureDispersalTime must be positive (got: %v)", maxFutureDispersalTime)
+	}
 
 	logger := _logger.With("component", "DispersalServerV2")
 
-	var controllerConnection *grpc.ClientConn
-	var controllerClient controller.ControllerServiceClient
 	if useControllerMediatedPayments {
-		if controllerAddress == "" {
-			return nil, errors.New("controller address is required to use new payment system")
+		if controllerClient == nil {
+			return nil, errors.New("controller client is required when using controller-mediated payments")
 		}
-
-		connection, err := grpc.NewClient(
-			controllerAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("create controller connection: %w", err)
-		}
-		controllerConnection = connection
-		controllerClient = controller.NewControllerServiceClient(connection)
-
 		logger.Info("Using controller-based payment system")
 	} else {
 		logger.Info("Using legacy payment metering system")
@@ -156,11 +180,14 @@ func NewDispersalServerV2(
 		chainReader:              chainReader,
 		blobRequestAuthenticator: blobRequestAuthenticator,
 		meterer:                  meterer,
-		prover:                   prover,
+		committer:                committer,
 		logger:                   logger,
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
+		MaxDispersalAge:             maxDispersalAge,
+		MaxFutureDispersalTime:      maxFutureDispersalTime,
+		getNow:                      getNow,
 
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
@@ -169,6 +196,7 @@ func NewDispersalServerV2(
 		useControllerMediatedPayments: useControllerMediatedPayments,
 		controllerConnection:          controllerConnection,
 		controllerClient:              controllerClient,
+		listener:                      listener,
 	}, nil
 }
 
@@ -185,26 +213,20 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		MaxConnectionAgeGrace: s.serverConfig.MaxConnectionAgeGrace,
 	})
 
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return errors.New("could not start tcp listener")
-	}
-
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(
+	s.grpcServer = grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			s.metrics.grpcMetrics.UnaryServerInterceptor(),
 		), opt, keepAliveConfig)
-	reflection.Register(gs)
-	pb.RegisterDisperserServer(gs, s)
+	reflection.Register(s.grpcServer)
+	pb.RegisterDisperserServer(s.grpcServer, s)
 
 	// Unimplemented v1 server for grpcurl/reflection support
-	pbv1.RegisterDisperserServer(gs, &DispersalServerV1{})
+	pbv1.RegisterDisperserServer(s.grpcServer, &DispersalServerV1{})
 
 	// Register Server for Health Checks
 	name := pb.Disperser_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, gs)
+	healthcheck.RegisterHealthServer(name, s.grpcServer)
 
 	if err := s.RefreshOnchainState(ctx); err != nil {
 		return fmt.Errorf("failed to refresh onchain quorum state: %w", err)
@@ -226,10 +248,10 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", listener.Addr().String())
+	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", s.listener.Addr().String())
 
-	if err := gs.Serve(listener); err != nil {
-		return errors.New("could not start GRPC server")
+	if err := s.grpcServer.Serve(s.listener); err != nil {
+		return fmt.Errorf("could not start GRPC server: %w", err)
 	}
 
 	return nil
@@ -256,32 +278,32 @@ func (s *DispersalServerV2) getBlobCommitment(
 		s.metrics.reportGetBlobCommitmentLatency(time.Since(start))
 	}()
 
-	if s.prover == nil {
-		return nil, status.New(codes.Internal, "prover is not configured")
+	if s.committer == nil {
+		return nil, status.New(codes.Internal, "committer is not configured")
 	}
-	blobSize := uint(len(req.GetBlob()))
+	blobSize := uint32(len(req.GetBlob()))
 	if blobSize == 0 {
 		return nil, status.New(codes.InvalidArgument, "blob cannot be empty")
 	}
-	if uint64(encoding.GetBlobLengthPowerOf2(blobSize)) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
+	if encoding.GetBlobLengthPowerOf2(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
 		return nil, status.Newf(codes.InvalidArgument, "blob size cannot exceed %v bytes",
 			s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL)
 	}
-	c, err := s.prover.GetCommitmentsForPaddedLength(req.GetBlob())
+	c, err := s.committer.GetCommitmentsForPaddedLength(req.GetBlob())
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to compute commitments")
+		return nil, status.Newf(codes.Internal, "failed to compute commitments: %v", err)
 	}
 	commitment, err := c.Commitment.Serialize()
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to serialize commitment")
+		return nil, status.Newf(codes.Internal, "failed to serialize commitment: %v", err)
 	}
 	lengthCommitment, err := c.LengthCommitment.Serialize()
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to serialize length commitment")
+		return nil, status.Newf(codes.Internal, "failed to serialize length commitment: %v", err)
 	}
 	lengthProof, err := c.LengthProof.Serialize()
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to serialize length proof")
+		return nil, status.Newf(codes.Internal, "failed to serialize length proof: %v", err)
 	}
 
 	return &pb.BlobCommitmentReply{
@@ -446,9 +468,14 @@ func (s *DispersalServerV2) getPaymentState(
 
 // Gracefully shuts down the server and closes any open connections
 func (s *DispersalServerV2) Stop() error {
+	if s.grpcServer != nil {
+		// GracefulStop will close the listener that was passed to Serve()
+		s.grpcServer.GracefulStop()
+	}
+
 	if s.controllerConnection != nil {
 		if err := s.controllerConnection.Close(); err != nil {
-			s.logger.Error("failed to close controller connection", "error", err)
+			return fmt.Errorf("failed to close controller connection: %w", err)
 		}
 	}
 	return nil

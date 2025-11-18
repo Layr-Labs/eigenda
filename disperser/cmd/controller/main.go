@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -11,10 +12,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
-	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
-	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
@@ -34,8 +31,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
-	"github.com/Layr-Labs/eigensdk-go/logging"
-	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gammazero/workerpool"
 	"github.com/urfave/cli"
@@ -45,8 +40,6 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
-
-	controllerMaxStallDuration = 240 * time.Second
 )
 
 func main() {
@@ -65,8 +58,8 @@ func main() {
 	select {}
 }
 
-func RunController(ctx *cli.Context) error {
-	config, err := NewConfig(ctx)
+func RunController(cliCtx *cli.Context) error {
+	config, err := NewConfig(cliCtx)
 	if err != nil {
 		return err
 	}
@@ -91,8 +84,10 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create geth client: %w", err)
 	}
 
+	ctx := context.Background()
+
 	contractDirectory, err := directory.NewContractDirectory(
-		context.Background(),
+		ctx,
 		logger,
 		gethClient,
 		gethcommon.HexToAddress(config.EigenDAContractDirectoryAddress))
@@ -101,17 +96,17 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	operatorStateRetrieverAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.OperatorStateRetriever)
+		contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
 	if err != nil {
 		return fmt.Errorf("failed to get OperatorStateRetriever address: %w", err)
 	}
 	serviceManagerAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
+		contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
 	if err != nil {
 		return fmt.Errorf("failed to get ServiceManager address: %w", err)
 	}
 	registryCoordinatorAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.RegistryCoordinator)
+		contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
 	if err != nil {
 		return fmt.Errorf("failed to get registry coordinator address: %w", err)
 	}
@@ -158,10 +153,11 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
-	encodingPool := workerpool.New(config.NumConcurrentEncodingRequests)
+	encodingPool := workerpool.New(config.EncodingManagerConfig.NumConcurrentRequests)
 	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		&config.EncodingManagerConfig,
+		time.Now,
 		blobMetadataStore,
 		encodingPool,
 		encoderClient,
@@ -179,7 +175,7 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create signature aggregator: %v", err)
 	}
-	dispatcherPool := workerpool.New(config.NumConcurrentDispersalRequests)
+	dispatcherPool := workerpool.New(config.DispatcherConfig.NumConcurrentRequests)
 	chainState := eth.NewChainState(chainReader, gethClient)
 	var ics core.IndexedChainState
 	if config.UseGraph {
@@ -196,16 +192,19 @@ func RunController(ctx *cli.Context) error {
 		logger.Warn("StoreChunks() signing is disabled")
 	} else {
 		requestSigner, err = clients.NewDispersalRequestSigner(
-			context.Background(),
-			config.AwsClientConfig.Region,
-			config.AwsClientConfig.EndpointURL,
-			config.DisperserKMSKeyID)
+			ctx,
+			config.DispersalRequestSignerConfig,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create request signer: %v", err)
 		}
 	}
 
-	nodeClientManager, err := controller.NewNodeClientManager(config.NodeClientCacheSize, requestSigner, logger)
+	nodeClientManager, err := controller.NewNodeClientManager(
+		config.DispatcherConfig.NodeClientCacheSize,
+		requestSigner,
+		config.DispatcherConfig.DisperserID,
+		logger)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
@@ -216,7 +215,7 @@ func RunController(ctx *cli.Context) error {
 	dispatcherBlobSet := controller.NewBlobSet()
 
 	batchMetadataManager, err := metadata.NewBatchMetadataManager(
-		context.Background(),
+		ctx,
 		logger,
 		gethClient,
 		ics,
@@ -230,6 +229,7 @@ func RunController(ctx *cli.Context) error {
 
 	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,
+		time.Now,
 		blobMetadataStore,
 		dispatcherPool,
 		ics,
@@ -246,52 +246,62 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
 	}
 
-	c := context.Background()
-
-	err = controller.RecoverState(c, blobMetadataStore, logger)
+	err = controller.RecoverState(ctx, blobMetadataStore, logger)
 	if err != nil {
 		return fmt.Errorf("failed to recover state: %v", err)
 	}
 
-	err = encodingManager.Start(c)
+	err = encodingManager.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start encoding manager: %v", err)
 	}
 
-	err = dispatcher.Start(c)
+	err = dispatcher.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
 
 	if config.ServerConfig.EnableServer {
+		logger.Info("Controller gRPC server ENABLED", "port", config.ServerConfig.GrpcPort)
 		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
 		if config.ServerConfig.EnablePaymentAuthentication {
-			paymentAuthorizationHandler, err = buildPaymentAuthorizationHandler(
-				c,
+			logger.Info("Payment authentication ENABLED - building payment authorization handler")
+			paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
+				ctx,
 				logger,
-				config.OnDemandConfig,
-				config.ReservationConfig,
+				config.PaymentAuthorizationConfig,
 				contractDirectory,
 				gethClient,
 				dynamoClient.GetAwsClient(),
+				metricsRegistry,
 			)
 			if err != nil {
 				return fmt.Errorf("build payment authorization handler: %w", err)
 			}
+		} else {
+			logger.Warn("Payment authentication DISABLED - payment requests will fail")
+		}
+
+		// Create listener for the gRPC server
+		addr := fmt.Sprintf("0.0.0.0:%d", config.ServerConfig.GrpcPort)
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("failed to create listener: %w", err)
 		}
 
 		grpcServer, err := server.NewServer(
-			c,
+			ctx,
 			config.ServerConfig,
 			logger,
 			metricsRegistry,
-			paymentAuthorizationHandler)
+			paymentAuthorizationHandler,
+			listener)
 		if err != nil {
 			return fmt.Errorf("create gRPC server: %w", err)
 		}
 
 		go func() {
-			logger.Info("Starting controller gRPC server", "port", config.ServerConfig.GrpcPort)
+			logger.Info("Starting controller gRPC server", "address", listener.Addr().String())
 			if err := grpcServer.Start(); err != nil {
 				panic(fmt.Sprintf("gRPC server failed: %v", err))
 			}
@@ -312,86 +322,17 @@ func RunController(ctx *cli.Context) error {
 		logger.Warn("Failed to create readiness file", "error", err, "path", config.ControllerReadinessProbePath)
 	}
 
-	if _, err := os.Create(config.ControllerHealthProbePath); err != nil {
-		logger.Warn("Failed to create healthProbe file: %v", err)
-	}
-
 	// Start heartbeat monitor
 	go func() {
-		err := healthcheck.HeartbeatMonitor(
-			config.ControllerHealthProbePath,
-			controllerMaxStallDuration,
-			controllerLivenessChan,
+		err := healthcheck.NewHeartbeatMonitor(
 			logger,
+			controllerLivenessChan,
+			config.HeartbeatMonitorConfig,
 		)
 		if err != nil {
-			logger.Warn("Heartbeat monitor exited with error", "err", err)
+			logger.Warn("Heartbeat monitor failed", "err", err)
 		}
 	}()
 
 	return nil
-}
-
-func buildPaymentAuthorizationHandler(
-	ctx context.Context,
-	logger logging.Logger,
-	onDemandConfig ondemand.OnDemandLedgerCacheConfig,
-	reservationConfig reservation.ReservationLedgerCacheConfig,
-	contractDirectory *directory.ContractDirectory,
-	ethClient common.EthClient,
-	awsDynamoClient *awsdynamodb.Client,
-) (*controllerpayments.PaymentAuthorizationHandler, error) {
-	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
-	if err != nil {
-		return nil, fmt.Errorf("get PaymentVault address: %w", err)
-	}
-
-	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddress)
-	if err != nil {
-		return nil, fmt.Errorf("create payment vault: %w", err)
-	}
-
-	globalSymbolsPerSecond, err := paymentVault.GetGlobalSymbolsPerSecond(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get global symbols per second: %w", err)
-	}
-
-	globalRatePeriodInterval, err := paymentVault.GetGlobalRatePeriodInterval(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get global rate period interval: %w", err)
-	}
-
-	onDemandMeterer := meterer.NewOnDemandMeterer(
-		globalSymbolsPerSecond,
-		globalRatePeriodInterval,
-		time.Now,
-	)
-
-	onDemandValidator, err := ondemand.NewOnDemandPaymentValidator(
-		ctx,
-		logger,
-		onDemandConfig,
-		paymentVault,
-		awsDynamoClient,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create on-demand payment validator: %w", err)
-	}
-
-	reservationValidator, err := reservation.NewReservationPaymentValidator(
-		ctx,
-		logger,
-		reservationConfig,
-		paymentVault,
-		time.Now,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create reservation payment validator: %w", err)
-	}
-
-	return controllerpayments.NewPaymentAuthorizationHandler(
-		onDemandMeterer,
-		onDemandValidator,
-		reservationValidator,
-	), nil
 }

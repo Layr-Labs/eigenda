@@ -16,9 +16,9 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	encmock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -43,9 +43,8 @@ func makeTestProverV1(numPoint uint64) (*prover.Prover, encoder.ServerConfig) {
 
 	p, _ := prover.NewProver(kzgConfig, nil)
 	encoderServerConfig := encoder.ServerConfig{
-		GrpcPort:              "3000",
-		MaxConcurrentRequests: 16,
-		RequestPoolSize:       32,
+		MaxConcurrentRequestsDangerous: 16,
+		RequestPoolSize:                32,
 	}
 
 	return p, encoderServerConfig
@@ -86,10 +85,10 @@ func getTestData(t *testing.T) (core.Blob, encoding.EncodingParams) {
 	}
 	coordinator := &core.StdAssignmentCoordinator{}
 
-	blobSize := uint(len(testBlob.Data))
-	blobLength := encoding.GetBlobLength(uint(blobSize))
+	blobSize := uint32(len(testBlob.Data))
+	blobLength := encoding.GetBlobLength(blobSize)
 
-	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
+	chunkLength, err := coordinator.CalculateChunkLength(operatorState, uint(blobLength), 0, securityParams[0])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -99,12 +98,12 @@ func getTestData(t *testing.T) (core.Blob, encoding.EncodingParams) {
 		ChunkLength:   chunkLength,
 	}
 
-	_, info, err := coordinator.GetAssignments(operatorState, blobLength, blobQuorumInfo)
+	_, info, err := coordinator.GetAssignments(operatorState, uint(blobLength), blobQuorumInfo)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	testEncodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+	testEncodingParams := encoding.ParamsFromMins(uint64(chunkLength), info.TotalChunks)
 
 	return testBlob, testEncodingParams
 }
@@ -136,7 +135,7 @@ func TestEncodeBlobV1(t *testing.T) {
 	var chunksData []*encoding.Frame
 
 	for i := range reply.GetChunks() {
-		chunkSerialized, _ := new(encoding.Frame).Deserialize(reply.GetChunks()[i])
+		chunkSerialized, _ := new(encoding.Frame).DeserializeGob(reply.GetChunks()[i])
 		// perform an operation
 		chunksData = append(chunksData, chunkSerialized)
 	}
@@ -201,9 +200,8 @@ func TestThrottling(t *testing.T) {
 
 	mockEncoder.On("EncodeAndProve", mock.Anything, mock.Anything).Return(blobCommitment, []*encoding.Frame{}, nil)
 	encoderServerConfig := encoder.ServerConfig{
-		GrpcPort:              "3000",
-		MaxConcurrentRequests: concurrentRequests,
-		RequestPoolSize:       requestPoolSize,
+		MaxConcurrentRequestsDangerous: concurrentRequests,
+		RequestPoolSize:                requestPoolSize,
 	}
 	s := encoder.NewEncoderServer(encoderServerConfig, logger, mockEncoder, metrics, nil)
 	testBlobData, testEncodingParams := getTestData(t)
@@ -281,7 +279,7 @@ func TestEncoderPointsLoading(t *testing.T) {
 	var chunksData []*encoding.Frame
 
 	for i := range reply1.GetChunks() {
-		chunkSerialized, _ := new(encoding.Frame).Deserialize(reply1.GetChunks()[i])
+		chunkSerialized, _ := new(encoding.Frame).DeserializeGob(reply1.GetChunks()[i])
 		// perform an operation
 		chunksData = append(chunksData, chunkSerialized)
 	}
@@ -310,7 +308,7 @@ func TestEncoderPointsLoading(t *testing.T) {
 	assert.NotNil(t, reply2.GetChunks())
 
 	for i := range reply2.GetChunks() {
-		chunkSerialized, _ := new(encoding.Frame).Deserialize(reply2.GetChunks()[i])
+		chunkSerialized, _ := new(encoding.Frame).DeserializeGob(reply2.GetChunks()[i])
 		// perform an operation
 		assert.Equal(t, len(chunkSerialized.Coeffs), len(chunksData[i].Coeffs))
 		assert.Equal(t, chunkSerialized.Coeffs, chunksData[i].Coeffs)

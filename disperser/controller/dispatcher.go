@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -29,42 +29,135 @@ var errNoBlobsToDispatch = errors.New("no blobs to dispatch")
 
 type BlobCallback func(blobKey corev2.BlobKey) error
 
+// DispatcherConfig contains configuration parameters for the Dispatcher.
+// The Dispatcher is responsible for batching encoded blobs, dispersing them to DA nodes,
+// collecting signatures, and creating attestations.
 type DispatcherConfig struct {
+	// PullInterval is how frequently the Dispatcher polls for new encoded blobs to batch and dispatch.
+	// Must be positive.
 	PullInterval time.Duration
 
-	// The number of blocks to wait before using operator state. A hedge against forking.
+	// DisperserID is the unique identifier for this disperser instance.
+	DisperserID uint32
+
+	// FinalizationBlockDelay is the number of blocks to wait before using operator state.
+	// This provides a hedge against chain reorganizations.
 	FinalizationBlockDelay uint64
 
-	// The time in between attempts to update the batch metadata (i.e. the reference block number and operator state).
-	// Since this can change at most once per eth block, it's pointless to make this period shorter than 10 seconds.
-	// In practice, it is completely ok to only check for new batch metadata every several minutes.
+	// BatchMetadataUpdatePeriod is the interval between attempts to refresh batch metadata
+	// (reference block number and operator state).
+	// Since this changes at most once per eth block, values shorter than 10 seconds are not useful.
+	// In practice, checking every several minutes is sufficient.
+	// Must be positive.
 	BatchMetadataUpdatePeriod time.Duration
 
-	// The maximum time permitted to wait for a node to provide a signature for a batch.
+	// AttestationTimeout is the maximum time to wait for a single node to provide a signature.
+	// Must be positive.
 	AttestationTimeout time.Duration
 
-	// The maximum time permitted to wait for all nodes to provide signatures for a batch.
+	// BatchAttestationTimeout is the maximum time to wait for all nodes to provide signatures for a batch.
+	// Must be positive and must be longer or equal to the AttestationTimeout.
 	BatchAttestationTimeout time.Duration
 
-	// SignatureTickInterval is the interval at which Attestations will be updated in the blobMetadataStore,
+	// SignatureTickInterval is how frequently attestations are updated in the blob metadata store
 	// as signature gathering progresses.
+	// Must be positive.
 	SignatureTickInterval time.Duration
 
-	// The number of times to retry a batch. The current implementation has major performance issues, so for the
-	// time being we should not attempt to retry batches.
+	// NumRequestRetries is the number of times to retry dispersing to a node after the initial attempt fails.
+	// The current implementation has performance issues, so this should typically be 0 (no retries).
+	// Must be non-negative.
 	NumRequestRetries int
 
-	// MaxBatchSize is the maximum number of blobs to dispatch in a batch
+	// MaxBatchSize is the maximum number of blobs to include in a single batch for dispersal.
+	// Must be at least 1.
 	MaxBatchSize int32
 
-	// SignificantSigningThresholdPercentage is a configurable "important" signing threshold. Right now, it's being
-	// used to track signing metrics, to understand system performance. If the value is 0, then special handling for
-	// the threshold is disabled.
-	SignificantSigningThresholdPercentage uint8
+	// SignificantSigningThresholdFraction is a configurable "important" signing threshold fraction.
+	// Used to track signing metrics and understand system performance.
+	// If the value is 0, special handling for this threshold is disabled.
+	// Must be between 0.0 and 1.0.
+	SignificantSigningThresholdFraction float64
 
-	// Important signing thresholds for metrics reporting.
-	// Values should be between 0.0 (0% signed) and 1.0 (100% signed).
-	SignificantSigningMetricsThresholds []string
+	// Whether or not to collect detailed validator signing metrics.
+	CollectDetailedValidatorSigningMetrics bool
+
+	// NumConcurrentRequests is the size of the worker pool for processing dispersal requests concurrently.
+	// Must be at least 1.
+	NumConcurrentRequests int
+
+	// NodeClientCacheSize is the maximum number of node clients to cache for reuse.
+	// Must be at least 1.
+	NodeClientCacheSize int
+
+	// MaxDispersalAge is the maximum age a dispersal request can be before it is discarded.
+	// Dispersals older than this duration are marked as Failed and not processed.
+	//
+	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
+	// client at dispersal request creation time (in nanoseconds since Unix epoch).
+	MaxDispersalAge time.Duration
+}
+
+var _ config.VerifiableConfig = &DispatcherConfig{}
+
+func (c *DispatcherConfig) Verify() error {
+	if c.PullInterval <= 0 {
+		return fmt.Errorf("PullInterval must be positive, got %v", c.PullInterval)
+	}
+	if c.BatchMetadataUpdatePeriod <= 0 {
+		return fmt.Errorf("BatchMetadataUpdatePeriod must be positive, got %v", c.BatchMetadataUpdatePeriod)
+	}
+	if c.AttestationTimeout <= 0 {
+		return fmt.Errorf("AttestationTimeout must be positive, got %v", c.AttestationTimeout)
+	}
+	if c.BatchAttestationTimeout <= 0 {
+		return fmt.Errorf("BatchAttestationTimeout must be positive, got %v", c.BatchAttestationTimeout)
+	}
+	if c.BatchAttestationTimeout < c.AttestationTimeout {
+		return fmt.Errorf("BatchAttestationTimeout must be longer than AttestationTimeout, got %v < %v",
+			c.BatchAttestationTimeout, c.AttestationTimeout)
+	}
+	if c.SignatureTickInterval <= 0 {
+		return fmt.Errorf("SignatureTickInterval must be positive, got %v", c.SignatureTickInterval)
+	}
+	if c.NumRequestRetries < 0 {
+		return fmt.Errorf("NumRequestRetries must be non-negative, got %d", c.NumRequestRetries)
+	}
+	if c.MaxBatchSize < 1 {
+		return fmt.Errorf("MaxBatchSize must be at least 1, got %d", c.MaxBatchSize)
+	}
+	if c.SignificantSigningThresholdFraction > 1.0 || c.SignificantSigningThresholdFraction < 0.0 {
+		return fmt.Errorf(
+			"SignificantSigningThresholdFraction must be between 0.0 and 1.0, got %f",
+			c.SignificantSigningThresholdFraction)
+	}
+	if c.NumConcurrentRequests < 1 {
+		return fmt.Errorf("NumConcurrentRequests must be at least 1, got %d", c.NumConcurrentRequests)
+	}
+	if c.NodeClientCacheSize < 1 {
+		return fmt.Errorf("NodeClientCacheSize must be at least 1, got %d", c.NodeClientCacheSize)
+	}
+	if c.MaxDispersalAge <= 0 {
+		return fmt.Errorf("MaxDispersalAge must be positive, got %v", c.MaxDispersalAge)
+	}
+	return nil
+}
+
+func DefaultDispatcherConfig() *DispatcherConfig {
+	return &DispatcherConfig{
+		PullInterval:                        1 * time.Second,
+		FinalizationBlockDelay:              75,
+		AttestationTimeout:                  45 * time.Second,
+		BatchMetadataUpdatePeriod:           time.Minute,
+		BatchAttestationTimeout:             55 * time.Second,
+		SignatureTickInterval:               50 * time.Millisecond,
+		NumRequestRetries:                   0,
+		MaxBatchSize:                        32,
+		SignificantSigningThresholdFraction: 0.55,
+		NumConcurrentRequests:               600,
+		NodeClientCacheSize:                 400,
+		MaxDispersalAge:                     45 * time.Second,
+	}
 }
 
 type Dispatcher struct {
@@ -76,7 +169,8 @@ type Dispatcher struct {
 	aggregator        core.SignatureAggregator
 	nodeClientManager NodeClientManager
 	logger            logging.Logger
-	metrics           *dispatcherMetrics
+	metrics           *controllerMetrics
+	getNow            func() time.Time
 
 	cursor *blobstore.StatusIndexCursor
 
@@ -100,10 +194,12 @@ type batchData struct {
 	BlobKeys        []corev2.BlobKey
 	Metadata        map[corev2.BlobKey]*v2.BlobMetadata
 	OperatorState   *core.IndexedOperatorState
+	BatchSizeBytes  uint64
 }
 
 func NewDispatcher(
 	config *DispatcherConfig,
+	getNow func() time.Time,
 	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	chainState core.IndexedChainState,
@@ -119,25 +215,15 @@ func NewDispatcher(
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
-	if config.PullInterval == 0 ||
-		config.AttestationTimeout == 0 ||
-		config.BatchAttestationTimeout == 0 ||
-		config.SignatureTickInterval == 0 ||
-		config.MaxBatchSize == 0 {
-		return nil, errors.New("invalid config")
+
+	if err := config.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	// CLI library doesn't support float slices at current version, parsing must happen manually
-	significantThresholds := make([]float64, 0, len(config.SignificantSigningMetricsThresholds))
-	for _, threshold := range config.SignificantSigningMetricsThresholds {
-		significantThreshold, err := strconv.ParseFloat(threshold, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse significant threshold %s: %v", threshold, err)
-		}
-		significantThresholds = append(significantThresholds, significantThreshold)
-	}
-
-	metrics, err := newDispatcherMetrics(registry, significantThresholds)
+	metrics, err := newControllerMetrics(
+		registry,
+		config.SignificantSigningThresholdFraction,
+		config.CollectDetailedValidatorSigningMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
 	}
@@ -152,6 +238,7 @@ func NewDispatcher(
 		nodeClientManager: nodeClientManager,
 		logger:            logger.With("component", "Dispatcher"),
 		metrics:           metrics,
+		getNow:            getNow,
 
 		cursor:                 nil,
 		beforeDispatch:         beforeDispatch,
@@ -211,7 +298,7 @@ func (d *Dispatcher) HandleBatch(
 	batchProbe *common.SequenceProbe,
 ) (chan core.SigningMessage, *batchData, error) {
 	// Signal Liveness to indicate no stall
-	healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
+	healthcheck.SignalHeartbeat(d.logger, "dispatcher", d.controllerLivenessChan)
 
 	// Get a batch of blobs to dispatch
 	// This also writes a batch header and blob inclusion info for each blob in metadata store
@@ -354,7 +441,6 @@ func (d *Dispatcher) HandleBatch(
 					Err:             lastErr,
 				}
 			}
-			d.metrics.reportSendChunksRetryCount(float64(i))
 		})
 	}
 
@@ -421,7 +507,8 @@ func (d *Dispatcher) HandleSignatures(
 		batchData.BatchHeaderHash,
 		sigChan,
 		d.DispatcherConfig.SignatureTickInterval,
-		d.DispatcherConfig.SignificantSigningThresholdPercentage)
+		d.DispatcherConfig.SignificantSigningThresholdFraction,
+		batchData.BatchSizeBytes)
 	if err != nil {
 		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
 
@@ -456,22 +543,6 @@ func (d *Dispatcher) HandleSignatures(
 		return fmt.Errorf("update batch status: %w", err)
 	}
 
-	// Track attestation metrics
-	operatorCount := make(map[core.QuorumID]int)
-	signerCount := make(map[core.QuorumID]int)
-	for quorumID, opState := range batchData.OperatorState.Operators {
-		operatorCount[quorumID] = len(opState)
-		if _, ok := signerCount[quorumID]; !ok {
-			signerCount[quorumID] = 0
-		}
-		for opID := range opState {
-			if _, ok := finalAttestation.SignerMap[opID]; ok {
-				signerCount[quorumID]++
-			}
-		}
-	}
-	d.metrics.reportAttestation(operatorCount, signerCount, finalAttestation.QuorumResults)
-
 	return nil
 }
 
@@ -488,9 +559,7 @@ func (d *Dispatcher) updateAttestation(
 
 	aggregationStartTime := time.Now()
 	signatureAggregation, err := d.aggregator.AggregateSignatures(
-		ctx,
-		d.chainState,
-		uint(batchData.Batch.BatchHeader.ReferenceBlockNumber),
+		batchData.OperatorState,
 		quorumAttestation,
 		sortedNonZeroQuorums)
 	d.metrics.reportAggregateSignaturesLatency(time.Since(aggregationStartTime))
@@ -557,19 +626,36 @@ func (d *Dispatcher) logAttestationUpdate(batchHeaderHash string, quorumResults 
 		"quorumPercentages", quorumPercentagesBuilder.String())
 }
 
-func (d *Dispatcher) dedupBlobs(blobs []*v2.BlobMetadata) []*v2.BlobMetadata {
-	dedupedBlobs := make([]*v2.BlobMetadata, 0)
-	for _, blob := range blobs {
-		key, err := blob.BlobHeader.BlobKey()
+// Iterates over the input metadata slice, and returns a new slice with stale and duplicate metadatas filtered out
+func (d *Dispatcher) filterStaleAndDedupBlobs(
+	ctx context.Context,
+	inputMetadatas []*v2.BlobMetadata,
+) []*v2.BlobMetadata {
+	outputMetadatas := make([]*v2.BlobMetadata, 0, len(inputMetadatas))
+	now := d.getNow()
+
+	for _, metadata := range inputMetadatas {
+		blobKey, err := metadata.BlobHeader.BlobKey()
 		if err != nil {
-			d.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt)
+			d.logger.Errorf("compute blob key: %w", err)
+			// we must discard if we cannot compute key, since it's used for deduplication
 			continue
 		}
-		if !d.blobSet.Contains(key) {
-			dedupedBlobs = append(dedupedBlobs, blob)
+
+		if d.checkAndHandleStaleBlob(ctx, blobKey, now, metadata.BlobHeader.PaymentMetadata.Timestamp) {
+			// discard stale blob
+			continue
 		}
+
+		if d.blobSet.Contains(blobKey) {
+			// discard duplicate blob
+			continue
+		}
+
+		outputMetadatas = append(outputMetadatas, metadata)
 	}
-	return dedupedBlobs
+
+	return outputMetadatas
 }
 
 // NewBatch creates a batch of blobs to dispatch
@@ -594,7 +680,7 @@ func (d *Dispatcher) NewBatch(
 		return nil, fmt.Errorf("failed to get blob metadata by status: %w", err)
 	}
 
-	blobMetadatas = d.dedupBlobs(blobMetadatas)
+	blobMetadatas = d.filterStaleAndDedupBlobs(ctx, blobMetadatas)
 	d.metrics.reportBlobSetSize(d.blobSet.Size())
 	if len(blobMetadatas) == 0 {
 		return nil, errNoBlobsToDispatch
@@ -732,6 +818,18 @@ func (d *Dispatcher) NewBatch(
 		d.blobSet.AddBlob(blobKey)
 	}
 
+	batchSizeBytes := uint64(0)
+	for _, blobKey := range keys {
+		blobMetadata, ok := metadataMap[blobKey]
+		if !ok {
+			d.logger.Warn("missing blob metadata for blob key when updating signing metrics",
+				"blobKey", blobKey.Hex(),
+				"batchHeaderHash", batchHeaderHash)
+			continue
+		}
+		batchSizeBytes += blobMetadata.BlobSize
+	}
+
 	d.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))
 	return &batchData{
 		Batch:           batch,
@@ -739,7 +837,52 @@ func (d *Dispatcher) NewBatch(
 		BlobKeys:        keys,
 		Metadata:        metadataMap,
 		OperatorState:   operatorState,
+		BatchSizeBytes:  batchSizeBytes,
 	}, nil
+}
+
+// Checks if a blob is older than MaxDispersalAge and handles it accordingly.
+// If the blob is stale, it increments metrics, logs a warning, and updates the database status to Failed.
+// Returns true if the blob is stale, otherwise false.
+func (d *Dispatcher) checkAndHandleStaleBlob(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	now time.Time,
+	dispersalTimestamp int64,
+) bool {
+	dispersalTime := time.Unix(0, dispersalTimestamp)
+	dispersalAge := now.Sub(dispersalTime)
+
+	if dispersalAge <= d.MaxDispersalAge {
+		return false
+	}
+
+	d.metrics.reportStaleDispersal()
+
+	d.logger.Warnf(
+		"discarding stale dispersal: blobKey=%s dispersalAge=%s maxAge=%s dispersalTime=%s",
+		blobKey.Hex(),
+		dispersalAge.String(),
+		d.MaxDispersalAge.String(),
+		dispersalTime.Format(time.RFC3339),
+	)
+
+	err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
+	if err != nil {
+		d.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
+	} else {
+		// Call beforeDispatch to clean up the blob from upstream encodingManager blobSet.
+		// Since the stale check occurs before beforeDispatch would normally be called,
+		// we must invoke it here to prevent orphaning the blob in the encoding manager's tracking.
+		if d.beforeDispatch != nil {
+			if err := d.beforeDispatch(blobKey); err != nil {
+				d.logger.Errorf("beforeDispatch cleanup failed for stale blob: blobKey=%s err=%w", blobKey.Hex(), err)
+			}
+		}
+		d.blobSet.RemoveBlob(blobKey)
+	}
+
+	return true
 }
 
 // GetOperatorState returns the operator state for the given quorums at the given block number

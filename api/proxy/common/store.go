@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 )
 
@@ -103,15 +104,21 @@ type EigenDAV1Store interface {
 type EigenDAV2Store interface {
 	Store
 	// Put inserts the given value into the key-value (serializedCert-payload) data store.
-	Put(ctx context.Context, payload []byte) (serializedCert []byte, err error)
+	Put(
+		ctx context.Context,
+		payload []byte,
+		serializationType coretypes.CertSerializationType,
+	) (vc *certs.VersionedCert, err error)
 	// Get retrieves the given key if it's present in the key-value (serializedCert-payload) data store.
 	// If returnEncodedPayload is true, the payload is returned without decoding.
 	Get(ctx context.Context,
-		versionedCert certs.VersionedCert,
+		versionedCert *certs.VersionedCert,
+		serializationType coretypes.CertSerializationType,
 		returnEncodedPayload bool,
 	) (payloadOrEncodedPayload []byte, err error)
 	// VerifyCert verifies the cert validity and rbn recency.
-	VerifyCert(ctx context.Context, versionedCert certs.VersionedCert, l1InclusionBlockNum uint64) error
+	VerifyCert(ctx context.Context, versionedCert *certs.VersionedCert,
+		serializationType coretypes.CertSerializationType, l1InclusionBlockNum uint64) error
 }
 
 // SecondaryStore is the interface for a key-value data store that uses keccak(value) as the key.

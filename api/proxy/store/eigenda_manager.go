@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	_ "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	_ "github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
@@ -14,14 +15,28 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
+/*
+	TODO: right now, the serialization type is passed through the application call chain from
+	handlers -> eigenda_manager -> underlying clients where a DA Cert is either serialized/deserialized.
+
+	This incurs the additive cost of an additional param being passed through. The intersection of
+	V1 x V2 within this construction makes it challenging to modularize. Once V1 code paths are nuked, the
+	serialization call chain should be reworked to support a smaller overhead implementation.
+*/
+
 //go:generate mockgen -package mocks --destination ../test/mocks/eigen_da_manager.go . IEigenDAManager
 
 // IEigenDAManager handles EigenDA certificate operations
 type IEigenDAManager interface {
 	// See [EigenDAManager.Put]
-	Put(ctx context.Context, value []byte) ([]byte, error)
+	Put(ctx context.Context, value []byte, serializationType coretypes.CertSerializationType) (*certs.VersionedCert, error)
 	// See [EigenDAManager.Get]
-	Get(ctx context.Context, versionedCert certs.VersionedCert, opts common.GETOpts) ([]byte, error)
+	Get(
+		ctx context.Context,
+		versionedCert *certs.VersionedCert,
+		serializationType coretypes.CertSerializationType,
+		opts common.GETOpts,
+	) ([]byte, error)
 	// See [EigenDAManager.SetDispersalBackend]
 	SetDispersalBackend(backend common.EigenDABackend)
 	// See [EigenDAManager.GetDispersalBackend]
@@ -89,7 +104,8 @@ func (m *EigenDAManager) SetDispersalBackend(backend common.EigenDABackend) {
 // It also validates the value retrieved and returns an error if the value is invalid.
 // If opts.ReturnEncodedPayload is true, it will return the encoded payload without decoding it.
 func (m *EigenDAManager) Get(ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
+	serializationType coretypes.CertSerializationType,
 	opts common.GETOpts,
 ) ([]byte, error) {
 	switch versionedCert.Version {
@@ -102,7 +118,7 @@ func (m *EigenDAManager) Get(ctx context.Context,
 		if m.eigendaV2 == nil {
 			return nil, errors.New("received EigenDAV2 cert but EigenDA V2 client is not initialized")
 		}
-		return m.getEigenDAV2(ctx, versionedCert, opts)
+		return m.getEigenDAV2(ctx, versionedCert, serializationType, opts)
 	default:
 		return nil, fmt.Errorf("cert version unknown: %b", versionedCert.Version)
 	}
@@ -114,7 +130,7 @@ func (m *EigenDAManager) Get(ctx context.Context,
 // in case the v1 disperser is down, the same way we do for v2.
 func (m *EigenDAManager) getEigenDAV1(
 	ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
 ) ([]byte, error) {
 	verifyFnForSecondary := func(ctx context.Context, cert []byte, payload []byte) error {
 		// We don't add the cert version because EigenDA V1 only supports [certs.V0VersionByte] Certs.
@@ -150,7 +166,10 @@ func (m *EigenDAManager) getEigenDAV1(
 			return nil, fmt.Errorf("verify EigenDA V1 cert: %w", err)
 		}
 		if m.secondary.WriteOnCacheMissEnabled() {
-			m.backupToSecondary(ctx, versionedCert.SerializedCert, payload)
+			err = m.backupToSecondary(ctx, versionedCert.SerializedCert, payload)
+			if err != nil {
+				return nil, fmt.Errorf("backup to secondary on cache miss: %w", err)
+			}
 		}
 		return payload, nil
 	}
@@ -173,14 +192,15 @@ func (m *EigenDAManager) getEigenDAV1(
 // from cache, EigenDA V2 relays, EigenDA V2 validators, and fallback storage.
 func (m *EigenDAManager) getEigenDAV2(
 	ctx context.Context,
-	versionedCert certs.VersionedCert,
+	versionedCert *certs.VersionedCert,
+	serializationType coretypes.CertSerializationType,
 	opts common.GETOpts,
 ) ([]byte, error) {
 
 	// The cert must be verified before attempting to get the data, since the GET logic
 	// assumes the cert is valid. Verify v2 doesn't require a payload
 	// because the payload is checked inside the Get function below.
-	err := m.eigendaV2.VerifyCert(ctx, versionedCert, opts.L1InclusionBlockNum)
+	err := m.eigendaV2.VerifyCert(ctx, versionedCert, serializationType, opts.L1InclusionBlockNum)
 	if err != nil {
 		return nil, fmt.Errorf("verify EigenDACert: %w", err)
 	}
@@ -213,13 +233,16 @@ func (m *EigenDAManager) getEigenDAV2(
 
 	// 2 - read payloadOrEncodedPayload from EigenDA
 	m.log.Debug("Reading blob from EigenDAV2 backend", "returnEncodedPayload", opts.ReturnEncodedPayload)
-	payloadOrEncodedPayload, err := m.eigendaV2.Get(ctx, versionedCert, opts.ReturnEncodedPayload)
+	payloadOrEncodedPayload, err := m.eigendaV2.Get(ctx, versionedCert, serializationType, opts.ReturnEncodedPayload)
 	if err == nil {
 		// Only backup to secondary storage if we're returning the decoded payload
 		// since the secondary stores are currently hardcoded to store payloads only.
 		// TODO: we could consider also storing encoded payloads under separate keys?
 		if m.secondary.WriteOnCacheMissEnabled() && !opts.ReturnEncodedPayload {
-			m.backupToSecondary(ctx, versionedCert.SerializedCert, payloadOrEncodedPayload)
+			err = m.backupToSecondary(ctx, versionedCert.SerializedCert, payloadOrEncodedPayload)
+			if err != nil {
+				return nil, fmt.Errorf("backup to secondary on cache miss: %w", err)
+			}
 		}
 		return payloadOrEncodedPayload, nil
 	}
@@ -240,26 +263,31 @@ func (m *EigenDAManager) getEigenDAV2(
 }
 
 // Put ... inserts a value into a storage backend based on the commitment mode
-func (m *EigenDAManager) Put(ctx context.Context, value []byte) ([]byte, error) {
-	var commit []byte
-	var err error
+func (m *EigenDAManager) Put(
+	ctx context.Context, value []byte, serializationType coretypes.CertSerializationType,
+) (*certs.VersionedCert, error) {
 
-	// 1 - Put blob into primary storage backend
-	commit, err = m.putToCorrectEigenDABackend(ctx, value)
+	// 1 - Put blob into primary storage backend and obtain serialized DA Cert
+	versionedCert, err := m.putToCorrectEigenDABackend(ctx, value, serializationType)
 	if err != nil {
 		return nil, err
 	}
 
 	// 2 - Put blob into secondary storage backends
 	if m.secondary.Enabled() {
-		m.backupToSecondary(ctx, commit, value)
+		err = m.backupToSecondary(ctx, versionedCert.SerializedCert, value)
+		if err != nil {
+			return nil, fmt.Errorf("backup to secondary storage: %w", err)
+		}
 	}
 
-	return commit, nil
+	return versionedCert, nil
 }
 
 // putToCorrectEigenDABackend ... disperses blob to EigenDA backend
-func (m *EigenDAManager) putToCorrectEigenDABackend(ctx context.Context, value []byte) ([]byte, error) {
+func (m *EigenDAManager) putToCorrectEigenDABackend(
+	ctx context.Context, value []byte, serializationType coretypes.CertSerializationType,
+) (*certs.VersionedCert, error) {
 	val := m.dispersalBackend.Load()
 	backend, ok := val.(common.EigenDABackend)
 	if !ok {
@@ -270,31 +298,55 @@ func (m *EigenDAManager) putToCorrectEigenDABackend(ctx context.Context, value [
 		if m.eigenda == nil {
 			return nil, errors.New("EigenDA V1 dispersal requested but not configured")
 		}
-		return m.eigenda.Put(ctx, value) //nolint: wrapcheck
+		serializedCert, err := m.eigenda.Put(ctx, value)
+		if err != nil {
+			return nil, fmt.Errorf("could not disperse payload to v1 backend: %w", err)
+		}
+
+		return certs.NewVersionedCert(serializedCert, certs.V0VersionByte), nil
 	}
 
 	if backend == common.V2EigenDABackend {
 		if m.eigendaV2 == nil {
 			return nil, errors.New("EigenDA V2 dispersal requested but not configured")
 		}
-		return m.eigendaV2.Put(ctx, value) //nolint: wrapcheck
+		versionedCert, err := m.eigendaV2.Put(ctx, value, serializationType)
+		if err != nil {
+			return nil, fmt.Errorf("could not disperse payload to v2 backend: %w", err)
+		}
+
+		return versionedCert, nil
 	}
 
 	return nil, fmt.Errorf("unsupported dispersal backend: %v", backend)
 }
 
-func (m *EigenDAManager) backupToSecondary(ctx context.Context, commitment []byte, value []byte) {
+// backupToSecondary writes data to secondary storage backends (caches and fallbacks).
+// When errorOnInsertFailure is enabled and writes are synchronous, errors are returned
+// to the caller to propagate as HTTP 500 responses. For async writes, errors are only logged.
+func (m *EigenDAManager) backupToSecondary(ctx context.Context, commitment []byte, value []byte) error {
 	if m.secondary.AsyncWriteEntry() { // publish put notification to secondary's subscription on PutNotify topic
 		m.log.Debug("Publishing data to async secondary stores", "commitment", commitment)
 		m.secondary.Topic() <- secondary.PutNotify{
 			Commitment: commitment,
 			Value:      value,
 		}
-	} else { // secondary is available only for synchronous writes
-		m.log.Debug("Publishing data to single threaded secondary stores")
-		err := m.secondary.HandleRedundantWrites(ctx, commitment, value)
-		if err != nil {
-			m.log.Error("Secondary insertions failed", "error", err.Error())
+		// Async writes cannot return errors to the client since they happen in background goroutines.
+		// The configuration validation ensures errorOnInsertFailure is disabled when async mode is enabled.
+		return nil
+	}
+
+	// Synchronous writes
+	m.log.Debug("Publishing data to single threaded secondary stores")
+	err := m.secondary.HandleRedundantWrites(ctx, commitment, value)
+	if err != nil {
+		m.log.Error("Secondary insertions failed", "error", err.Error())
+		// Only propagate the error if errorOnInsertFailure is enabled.
+		// This allows the caller to return HTTP 500 to the client.
+		if m.secondary.ErrorOnInsertFailure() {
+			return fmt.Errorf("a secondary storage write failed and error-on-secondary-insert-failure is enabled: %w", err)
 		}
 	}
+
+	return nil
 }

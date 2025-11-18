@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {PauserRegistry} from
-    "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
+import {
+    PauserRegistry
+} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {EigenDARegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
@@ -158,17 +159,15 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         // Register Reservations for client as the eigenDACommunityMultisig
         IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 452198,
+            symbolsPerSecond: uint64(vm.envOr("USER_RESERVATION_SYMBOLS_PER_SECOND", uint256(452_198))),
             startTimestamp: uint64(block.timestamp),
-            endTimestamp: uint64(block.timestamp + 1000000000),
+            endTimestamp: uint64(block.timestamp + 1_000_000_000),
             quorumNumbers: hex"0001",
             quorumSplits: hex"3232"
         });
         address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
         vm.startBroadcast(msg.sender);
         paymentVault.setReservation(clientAddress, reservation);
-        // Deposit OnDemand
-        paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
         vm.stopBroadcast();
 
         // Deposit stakers into EigenLayer and delegate to operators
@@ -176,9 +175,8 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             vm.startBroadcast(stakerPrivateKeys[i]);
             for (uint256 j = 0; j < numStrategies; j++) {
                 if (stakerTokenAmounts[j][i] > 0) {
-                    deployedStrategyArray[j].underlyingToken().approve(
-                        address(strategyManager), stakerTokenAmounts[j][i]
-                    );
+                    deployedStrategyArray[j].underlyingToken()
+                        .approve(address(strategyManager), stakerTokenAmounts[j][i]);
                     strategyManager.depositIntoStrategy(
                         deployedStrategyArray[j], deployedStrategyArray[j].underlyingToken(), stakerTokenAmounts[j][i]
                     );

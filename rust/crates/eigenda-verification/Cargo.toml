@@ -1,0 +1,58 @@
+[package]
+edition = "2024"
+name = "eigenda-verification"
+version = "0.1.0"
+
+[dependencies]
+alloy-consensus = { workspace = true, features = [
+  "serde",
+  "serde-bincode-compat",
+  "k256",
+] }
+alloy-primitives = { workspace = true, features = ["serde"] }
+alloy-rlp = { workspace = true, features = ["derive"] }
+alloy-sol-types = { workspace = true }
+ark-bn254 = { workspace = true, features = ["curve"] }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+bitvec = { version = "1.0.1", default-features = false }
+bytes = { workspace = true }
+derive_more = { workspace = true }
+eigenda-srs-data = { path = "../eigenda-srs-data" }
+hashbrown = { workspace = true, features = ["default-hasher"] }
+hex = { workspace = true }
+proptest = { workspace = true, features = ["alloc", "std"], optional = true }
+reth-trie-common = { workspace = true, features = ["serde", "std"] }
+rust-kzg-bn254-primitives = { git = "https://github.com/Layr-Labs/rust-kzg-bn254.git", rev = "60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6", default-features = false }
+rust-kzg-bn254-prover = { workspace = true }
+serde = { workspace = true, features = ["alloc", "derive"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+arbitrary = { workspace = true }
+bincode = { workspace = true, features = ["derive", "serde", "std"] }
+criterion = { workspace = true, features = ["html_reports"] }
+hex = { workspace = true }
+jsonschema = { workspace = true }
+rand = { workspace = true }
+reltester = { workspace = true }
+risc0-zkvm = { workspace = true, features = ["std"] }
+test-strategy = { workspace = true }
+testcontainers = { workspace = true }
+wiremock = { workspace = true }
+
+[features]
+arbitrary = ["dep:proptest"]
+default = []
+test-utils = []
+
+[[bench]]
+harness = false
+name = "cert_verification"
+required-features = ["test-utils"]
+
+[[bench]]
+harness = false
+name = "blob_verification"
+required-features = ["test-utils"]

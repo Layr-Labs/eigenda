@@ -7,7 +7,7 @@ import (
 const (
 	ListenAddrFlagName = "arbitrum-da.addr"
 	PortFlagName       = "arbitrum-da.port"
-	Enabled            = "arbitrum-da.enabled"
+	JwtSecretFlagName  = "arbitrum-da.jwtsecret"
 )
 
 func withEnvPrefix(prefix, s string) []string {
@@ -30,6 +30,13 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "PORT"),
 			Category: category,
 		},
+		&cli.StringFlag{
+			Name:     JwtSecretFlagName,
+			Usage:    "Path to shared JWT token (i.e, HS256 private key) used for secure communication with arbitrum nitro",
+			Value:    "",
+			EnvVars:  withEnvPrefix(envPrefix, "JWT_SECRET"),
+			Category: category,
+		},
 	}
 
 	return flags
@@ -37,8 +44,8 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 
 func ReadConfig(ctx *cli.Context) Config {
 	return Config{
-		Host:   ctx.String(ListenAddrFlagName),
-		Port:   ctx.Int(PortFlagName),
-		Enable: ctx.Bool(Enabled),
+		Host:      ctx.String(ListenAddrFlagName),
+		Port:      ctx.Int(PortFlagName),
+		JWTSecret: ctx.String(JwtSecretFlagName),
 	}
 }

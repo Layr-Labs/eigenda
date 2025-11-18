@@ -34,17 +34,13 @@ interface IPaymentVault {
         uint64 newPriceUpdateCooldown
     );
 
-    /**
-     * @notice This function is called by EigenDA governance to store reservations
-     * @param _account is the address to submit the reservation for
-     * @param _reservation is the Reservation struct containing details of the reservation
-     */
+    /// @notice This function is called by EigenDA governance to store reservations
+    /// @param _account is the address to submit the reservation for
+    /// @param _reservation is the Reservation struct containing details of the reservation
     function setReservation(address _account, Reservation memory _reservation) external;
 
-    /**
-     * @notice This function is called to deposit funds for on demand payment
-     * @param _account is the address to deposit the funds for
-     */
+    /// @notice This function is called to deposit funds for on demand payment
+    /// @param _account is the address to deposit the funds for
     function depositOnDemand(address _account) external payable;
 
     /// @notice Fetches the current reservation for an account

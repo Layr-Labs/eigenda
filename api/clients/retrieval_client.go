@@ -7,7 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/wealdtech/go-merkletree/v2"
 
@@ -174,7 +174,7 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 		return nil, err
 	}
 
-	assignments, info, err := r.assignmentCoordinator.GetAssignments(operatorState, blobHeader.Length, quorumHeader)
+	assignments, info, err := r.assignmentCoordinator.GetAssignments(operatorState, uint(blobHeader.Length), quorumHeader)
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
@@ -189,39 +189,46 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 		})
 	}
 
-	encodingParams := encoding.ParamsFromMins(quorumHeader.ChunkLength, info.TotalChunks)
+	encodingParams := encoding.ParamsFromMins(uint64(quorumHeader.ChunkLength), info.TotalChunks)
 
 	var chunks []*encoding.Frame
 	var indices []encoding.ChunkNumber
 	// TODO(ian-shim): if we gathered enough chunks, cancel remaining RPC calls
 	for i := 0; i < len(operators); i++ {
-		reply := <-chunksChan
-		if reply.Err != nil {
-			r.logger.Warn("failed to get chunks from operator", "operator", reply.OperatorID.Hex(), "err", reply.Err)
-			continue
-		}
-		assignment, ok := assignments[reply.OperatorID]
-		if !ok {
-			return nil, fmt.Errorf("no assignment to operator %s", reply.OperatorID.Hex())
-		}
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context done: %w", ctx.Err())
+		case reply := <-chunksChan:
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("context done: %w", ctx.Err())
+			}
+			if reply.Err != nil {
+				r.logger.Warn("failed to get chunks from operator", "operator", reply.OperatorID.Hex(), "err", reply.Err)
+				continue
+			}
+			assignment, ok := assignments[reply.OperatorID]
+			if !ok {
+				return nil, fmt.Errorf("no assignment to operator %s", reply.OperatorID.Hex())
+			}
 
-		err = r.verifier.VerifyFrames(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
-		if err != nil {
-			r.logger.Warn("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
-			continue
-		} else {
-			r.logger.Info("verified chunks from operator", "operator", reply.OperatorID.Hex())
-		}
+			err = r.verifier.VerifyFrames(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
+			if err != nil {
+				r.logger.Warn("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
+				continue
+			} else {
+				r.logger.Info("verified chunks from operator", "operator", reply.OperatorID.Hex())
+			}
 
-		chunks = append(chunks, reply.Chunks...)
-		indices = append(indices, assignment.GetIndices()...)
+			chunks = append(chunks, reply.Chunks...)
+			indices = append(indices, assignment.GetIndices()...)
+		}
 	}
 
 	return &BlobChunks{
 		Chunks:           chunks,
 		Indices:          indices,
 		EncodingParams:   encodingParams,
-		BlobHeaderLength: blobHeader.Length,
+		BlobHeaderLength: uint(blobHeader.Length),
 		Assignments:      assignments,
 		AssignmentInfo:   info,
 	}, nil

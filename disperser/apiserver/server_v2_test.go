@@ -10,10 +10,13 @@ import (
 	"time"
 
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
+	controllermocks "github.com/Layr-Labs/eigenda/api/grpc/controller/mocks"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/math"
+	awss3 "github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -24,7 +27,7 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -32,6 +35,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	tmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/peer"
 )
 
@@ -53,7 +57,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	commitments, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	require.NoError(t, err)
@@ -65,7 +69,7 @@ func TestV2DisperseBlob(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID.Hex(),
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -120,56 +124,10 @@ func TestV2DisperseBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	data2 = codec.ConvertByPaddingEmptyByte(data2)
-	commitments, err = prover.GetCommitmentsForPaddedLength(data2)
+	commitments, err = committer.GetCommitmentsForPaddedLength(data2)
 	require.NoError(t, err)
 	commitmentProto, err = commitments.ToProtobuf()
 	require.NoError(t, err)
-	blobHeaderProto2 := &pbcommonv2.BlobHeader{
-		Version:       0,
-		QuorumNumbers: []uint32{0, 1},
-		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID.Hex(),
-			Timestamp:         5,
-			CumulativePayment: big.NewInt(100).Bytes(),
-		},
-	}
-	blobHeader2, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto2)
-	require.NoError(t, err)
-	sig2, err := signer.SignBlobRequest(blobHeader2)
-	require.NoError(t, err)
-
-	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data2,
-		Signature:  sig2,
-		BlobHeader: blobHeaderProto2,
-	})
-	require.Nil(t, reply)
-	require.ErrorContains(t, err, "failed to update cumulative payment: insufficient cumulative payment increment")
-
-	// request with on-demand payments in reserved only mode
-	c.DispersalServerV2.ReservedOnly = true
-	ondemandReqProto := &pbcommonv2.BlobHeader{
-		Version:       0,
-		QuorumNumbers: []uint32{0, 1},
-		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID.Hex(),
-			Timestamp:         0,
-			CumulativePayment: big.NewInt(500).Bytes(),
-		},
-	}
-	blobHeader, err = corev2.BlobHeaderFromProtobuf(ondemandReqProto)
-	require.NoError(t, err)
-	sig, err = signer.SignBlobRequest(blobHeader)
-	require.NoError(t, err)
-
-	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  sig,
-		BlobHeader: ondemandReqProto,
-	})
-	require.ErrorContains(t, err, "on-demand payments are not supported by reserved-only mode disperser")
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
@@ -181,7 +139,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	require.NoError(t, err)
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	commitments, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	require.NoError(t, err)
@@ -191,7 +149,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID.Hex(),
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -211,7 +169,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID.Hex(),
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -229,7 +187,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID.Hex(),
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -247,7 +205,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID.Hex(),
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -264,7 +222,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID.Hex(),
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -307,7 +265,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    invalidCommitment,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID.Hex(),
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -327,7 +285,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	_, err = rand.Read(data)
 	require.NoError(t, err)
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err = prover.GetCommitmentsForPaddedLength(data)
+	commitments, err = committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	commitmentProto, err = commitments.ToProtobuf()
 	require.NoError(t, err)
@@ -337,7 +295,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID.Hex(),
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -471,7 +429,7 @@ func TestV2GetBlobCommitment(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commit, err := prover.GetCommitmentsForPaddedLength(data)
+	commit, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	reply, err := c.DispersalServerV2.GetBlobCommitment(ctx, &pbv2.BlobCommitmentRequest{
 		Blob: data,
@@ -500,7 +458,16 @@ func newTestServerV2(t *testing.T) *testComponents {
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
-	s3Client, err := s3.NewClient(ctx, awsConfig, logger)
+	s3Client, err := awss3.NewAwsS3Client(
+		ctx,
+		logger,
+		awsConfig.EndpointURL,
+		awsConfig.Region,
+		awsConfig.FragmentParallelismFactor,
+		awsConfig.FragmentParallelismConstant,
+		awsConfig.AccessKey,
+		awsConfig.SecretAccessKey,
+	)
 	require.NoError(t, err)
 	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
 	require.NoError(t, err)
@@ -568,19 +535,35 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 	}, nil)
 
+	// Create listener for test server
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+
+	// Create mock controller client that always authorizes payments
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockControllerClient := controllermocks.NewMockControllerServiceClient(mockCtrl)
+	mockControllerClient.EXPECT().
+		AuthorizePayment(gomock.Any(), gomock.Any()).
+		Return(&controller.AuthorizePaymentResponse{}, nil).
+		AnyTimes()
+
 	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
 			GrpcPort:    "51002",
 			GrpcTimeout: 1 * time.Second,
 		},
+		time.Now,
 		blobStore,
 		blobMetadataStore,
 		chainReader,
 		meterer,
 		auth.NewBlobRequestAuthenticator(),
-		prover,
+		committer,
 		10,
 		time.Hour,
+		45*time.Second, // maxDispersalAge
+		45*time.Second, // maxFutureDispersalTime
 		logger,
 		prometheus.NewRegistry(),
 		disperser.MetricsConfig{
@@ -588,8 +571,10 @@ func newTestServerV2(t *testing.T) *testComponents {
 			EnableMetrics: false,
 		},
 		false, // enable both reservation and on-demand
-		false, // use old style payments
-		"",    // No controller client in tests
+		true,  // use new payment system
+		nil,   // controllerConnection - not needed for unit tests
+		mockControllerClient,
+		listener,
 	)
 	require.NoError(t, err)
 
@@ -614,6 +599,104 @@ func newTestServerV2(t *testing.T) *testComponents {
 	}
 }
 
+func TestTimestampValidation(t *testing.T) {
+	ctx := t.Context()
+	c := newTestServerV2(t)
+	ctx = peer.NewContext(ctx, c.Peer)
+
+	data := make([]byte, 50)
+	_, err := rand.Read(data)
+	require.NoError(t, err)
+	data = codec.ConvertByPaddingEmptyByte(data)
+
+	commitments, err := committer.GetCommitmentsForPaddedLength(data)
+	require.NoError(t, err)
+	accountID, err := c.Signer.GetAccountID()
+	require.NoError(t, err)
+	commitmentProto, err := commitments.ToProtobuf()
+	require.NoError(t, err)
+
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		timestampFunc func() int64
+		expectError   bool
+	}{
+		{
+			name: "valid timestamp - current time",
+			timestampFunc: func() int64 {
+				return time.Now().UnixNano()
+			},
+			expectError: false,
+		},
+		{
+			name: "valid timestamp - almost stale",
+			timestampFunc: func() int64 {
+				return time.Now().Add(-(c.DispersalServerV2.MaxDispersalAge - 5*time.Second)).UnixNano()
+			},
+			expectError: false,
+		},
+		{
+			name: "stale timestamp",
+			timestampFunc: func() int64 {
+				return time.Now().Add(-(c.DispersalServerV2.MaxDispersalAge + 5*time.Second)).UnixNano()
+			},
+			expectError: true,
+		},
+		{
+			name: "valid timestamp - almost too far in future",
+			timestampFunc: func() int64 {
+				return time.Now().Add(c.DispersalServerV2.MaxFutureDispersalTime - 5*time.Second).UnixNano()
+			},
+			expectError: false,
+		},
+		{
+			name: "too far future timestamp",
+			timestampFunc: func() int64 {
+				return time.Now().Add(c.DispersalServerV2.MaxFutureDispersalTime + 5*time.Second).UnixNano()
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			timestamp := tt.timestampFunc()
+
+			blobHeaderProto := &pbcommonv2.BlobHeader{
+				Version:       0,
+				QuorumNumbers: []uint32{0, 1},
+				Commitment:    commitmentProto,
+				PaymentHeader: &pbcommonv2.PaymentHeader{
+					AccountId:         accountID.Hex(),
+					Timestamp:         timestamp,
+					CumulativePayment: big.NewInt(100).Bytes(),
+				},
+			}
+
+			blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
+			require.NoError(t, err)
+
+			sig, err := signer.SignBlobRequest(blobHeader)
+			require.NoError(t, err)
+
+			_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
+				Blob:       data,
+				Signature:  sig,
+				BlobHeader: blobHeaderProto,
+			})
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestInvalidLength(t *testing.T) {
 	ctx := t.Context()
 	c := newTestServerV2(t)
@@ -623,11 +706,11 @@ func TestInvalidLength(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	commitments, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 
-	// Length we are commiting to should be a power of 2.
-	require.Equal(t, commitments.Length, encoding.NextPowerOf2(commitments.Length))
+	// Length we are committing to should be a power of 2.
+	require.Equal(t, uint64(commitments.Length), math.NextPowOf2u64(uint64(commitments.Length)))
 
 	// Changing the number of commitments should cause an error before a validity check of the commitments
 	commitments.Length += 1
@@ -642,7 +725,7 @@ func TestInvalidLength(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID.Hex(),
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -674,11 +757,11 @@ func TestTooShortCommitment(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	commitments, err := committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 
 	// Length we are commiting to should be a power of 2.
-	require.Equal(t, commitments.Length, encoding.NextPowerOf2(commitments.Length))
+	require.Equal(t, uint64(commitments.Length), math.NextPowOf2u64(uint64(commitments.Length)))
 
 	// Choose a smaller commitment length than is legal. Make sure it's a power of 2 so that it doesn't
 	// fail prior to the commitment length check.
@@ -694,7 +777,7 @@ func TestTooShortCommitment(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID.Hex(),
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}

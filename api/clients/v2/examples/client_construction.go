@@ -1,8 +1,10 @@
 package examples
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"math/big"
 	"math/rand"
 	"path/filepath"
 	"time"
@@ -16,58 +18,115 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// These constants are specific to the EigenDA holesky testnet. To execute the provided examples on a different
+// These constants are specific to the EigenDA Sepolia testnet. To execute the provided examples on a different
 // network, you will need to set these constants to the correct values, based on the chosen network.
 const (
-	ethRPCURL                  = "https://ethereum-holesky-rpc.publicnode.com"
-	disperserHostname          = "disperser-testnet-holesky.eigenda.xyz"
-	certVerifierRouterAddress  = "0x7F40A8e1B62aa1c8Afed23f6E8bAe0D340A4BC4e"
-	registryCoordinatorAddress = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
-	// These two addresses are no longer required for the Eth Client, but parameter is still being taken until we deprecate the flags
-	eigenDAServiceManagerAddress = ""
-	// operatorStateRetrieverAddress is still used for CertBuilder
-	operatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
+	ethRPCURL         = "https://ethereum-sepolia-rpc.publicnode.com"
+	disperserHostname = "disperser-testnet-sepolia.eigenda.xyz"
+	// EigenDA Directory Address for Sepolia - this allows fetching all other contract addresses
+	eigenDADirectoryAddress = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 )
 
-func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDisperser, error) {
+func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisperser, error) {
 	logger, err := createLogger()
 	if err != nil {
 		panic(fmt.Sprintf("create logger: %v", err))
 	}
 
-	kzgProver, err := createKzgProver()
+	kzgCommitter, err := createKzgCommitter()
 	if err != nil {
-		return nil, fmt.Errorf("create kzg prover: %v", err)
+		return nil, fmt.Errorf("create kzg committer: %w", err)
 	}
 
-	disperserClient, err := createDisperserClient(logger, privateKey, kzgProver)
+	disperserClient, err := createDisperserClient(logger, privateKeyHex, kzgCommitter)
 	if err != nil {
 		return nil, fmt.Errorf("create disperser client: %w", err)
 	}
 
-	certVerifier, err := createCertVerifier()
+	ethClient, err := createEthClient(logger)
+	if err != nil {
+		return nil, fmt.Errorf("create eth client: %w", err)
+	}
+
+	contractDirectory, err := createEigenDADirectory(context.Background(), logger, ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("create contract directory: %w", err)
+	}
+
+	certVerifierRouterAddress, err := contractDirectory.GetContractAddress(
+		context.Background(), directory.CertVerifierRouter)
+	if err != nil {
+		return nil, fmt.Errorf("get cert verifier router address: %w", err)
+	}
+
+	certVerifier, err := createCertVerifier(certVerifierRouterAddress, ethClient, logger)
 	if err != nil {
 		return nil, fmt.Errorf("create cert verifier: %w", err)
 	}
 
-	certBuilder, err := createCertBuilder()
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(
+		context.Background(), directory.OperatorStateRetriever)
 	if err != nil {
-		return nil, fmt.Errorf("create cert builder: %w", err)
+		return nil, fmt.Errorf("get OperatorStateRetriever address: %w", err)
+	}
+
+	registryCoordinatorAddr, err := contractDirectory.GetContractAddress(
+		context.Background(), directory.RegistryCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("get RegistryCoordinator address: %w", err)
+	}
+
+	certBuilder, err := clients.NewCertBuilder(
+		logger,
+		operatorStateRetrieverAddr,
+		registryCoordinatorAddr,
+		ethClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new cert builder: %w", err)
 	}
 
 	blockNumMonitor, err := createBlockNumberMonitor()
 	if err != nil {
 		return nil, fmt.Errorf("create block number monitor: %w", err)
+	}
+
+	privateKeyBytes := gethcommon.FromHex(privateKeyHex)
+	privateKey, err := crypto.ToECDSA(privateKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("to ecdsa: %w", err)
+	}
+	accountID := crypto.PubkeyToAddress(privateKey.PublicKey)
+
+	clientLedger, err := createClientLedger(
+		context.Background(),
+		logger,
+		clientledger.ClientLedgerModeReservationAndOnDemand,
+		ethClient,
+		accountID,
+		contractDirectory,
+		disperserClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create client ledger: %w", err)
 	}
 
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
@@ -85,25 +144,26 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		blockNumMonitor,
 		certBuilder,
 		certVerifier,
-		nil,
+		clientLedger,
 		nil,
 	)
 }
 
-func createRelayPayloadRetriever() (*payloadretrieval.RelayPayloadRetriever, error) {
-	logger, err := createLogger()
-	if err != nil {
-		return nil, fmt.Errorf("create logger: %w", err)
-	}
+func createRelayPayloadRetriever(
+	logger logging.Logger,
+	ethClient *geth.EthClient,
+	operatorStateRetrieverAddr gethcommon.Address,
+	serviceManagerAddr gethcommon.Address,
+) (*payloadretrieval.RelayPayloadRetriever, error) {
 
-	ethClient, err := createEthClient(logger)
+	reader, err := eth.NewReader(
+		logger,
+		ethClient,
+		operatorStateRetrieverAddr.Hex(),
+		serviceManagerAddr.Hex(),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("create eth client: %w", err)
-	}
-
-	reader, err := createEthReader(logger, ethClient)
-	if err != nil {
-		return nil, fmt.Errorf("create eth reader: %w", err)
+		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
 	relayClient, err := createRelayClient(logger, ethClient, reader.GetRelayRegistryAddress())
@@ -130,22 +190,20 @@ func createRelayPayloadRetriever() (*payloadretrieval.RelayPayloadRetriever, err
 		metrics.NoopRetrievalMetrics)
 }
 
-func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetriever, error) {
-	logger, err := createLogger()
+func createValidatorPayloadRetriever(
+	logger logging.Logger,
+	ethClient *geth.EthClient,
+	operatorStateRetrieverAddr gethcommon.Address,
+	serviceManagerAddr gethcommon.Address,
+) (*payloadretrieval.ValidatorPayloadRetriever, error) {
+	ethReader, err := eth.NewReader(
+		logger,
+		ethClient,
+		operatorStateRetrieverAddr.Hex(),
+		serviceManagerAddr.Hex(),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("create logger: %w", err)
-	}
-
-	// Create an EthClient for blockchain interaction
-	ethClient, err := createEthClient(logger)
-	if err != nil {
-		return nil, fmt.Errorf("create eth client: %w", err)
-	}
-
-	// Create the eth reader
-	ethReader, err := createEthReader(logger, ethClient)
-	if err != nil {
-		return nil, fmt.Errorf("create eth reader: %w", err)
+		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
 	chainState := eth.NewChainState(ethReader, ethClient)
@@ -155,12 +213,17 @@ func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetrie
 	}
 
 	clientConfig := validator.DefaultClientConfig()
+	encoder, err := rs.NewEncoder(logger, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create rs encoder: %w", err)
+	}
 
 	// Create the retrieval client for fetching blobs from DA nodes
 	retrievalClient := validator.NewValidatorClient(
 		logger,
 		ethReader,
 		chainState,
+		encoder,
 		kzgVerifier,
 		clientConfig,
 		nil,
@@ -204,7 +267,7 @@ func createRelayClient(
 func createDisperserClient(
 	logger logging.Logger,
 	privateKey string,
-	kzgProver *prover.Prover,
+	kzgCommitter *committer.Committer,
 ) (*clients.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
@@ -221,15 +284,14 @@ func createDisperserClient(
 		logger,
 		disperserClientConfig,
 		signer,
-		kzgProver,
+		kzgCommitter,
 		nil,
 		metrics.NoopDispersalMetrics)
 }
 
 func createKzgVerifier() (*verifier.Verifier, error) {
-	kzgConfig := createKzgConfig()
-	kzgConfig.LoadG2Points = false
-	blobVerifier, err := verifier.NewVerifier(&kzgConfig, nil)
+	verifierConfig := createVerifierConfig()
+	blobVerifier, err := verifier.NewVerifier(&verifierConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create blob verifier: %w", err)
 	}
@@ -237,60 +299,27 @@ func createKzgVerifier() (*verifier.Verifier, error) {
 	return blobVerifier, nil
 }
 
-func createKzgProver() (*prover.Prover, error) {
-	kzgConfig := createKzgConfig()
-	kzgProver, err := prover.NewProver(&kzgConfig, nil)
+func createKzgCommitter() (*committer.Committer, error) {
+	committer, err := committer.NewFromConfig(createCommitterConfig())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create committer from config: %w", err)
 	}
 
-	return kzgProver, nil
+	return committer, nil
 }
 
-func createCertVerifier() (*verification.CertVerifier, error) {
-	logger, err := createLogger()
-	if err != nil {
-		return nil, fmt.Errorf("create logger: %v", err)
-	}
-
-	ethClient, err := createEthClient(logger)
-	if err != nil {
-		return nil, fmt.Errorf("create eth client: %w", err)
-	}
-
-	routerAddressProvider, err := verification.BuildRouterAddressProvider(
-		gethcommon.HexToAddress(certVerifierRouterAddress),
-		ethClient,
-		logger,
-	)
+func createCertVerifier(
+	certVerifierRouterAddress gethcommon.Address,
+	ethClient common.EthClient,
+	logger logging.Logger,
+) (*verification.CertVerifier, error) {
+	routerAddressProvider, err := verification.BuildRouterAddressProvider(certVerifierRouterAddress, ethClient, logger)
 	if err != nil {
 		return nil, fmt.Errorf("create router address provider: %w", err)
 	}
 
-	return verification.NewCertVerifier(
-		logger,
-		ethClient,
-		routerAddressProvider,
-	)
-}
-
-func createCertBuilder() (*clients.CertBuilder, error) {
-	logger, err := createLogger()
-	if err != nil {
-		return nil, fmt.Errorf("create logger: %v", err)
-	}
-
-	ethClient, err := createEthClient(logger)
-	if err != nil {
-		return nil, fmt.Errorf("create eth client: %w", err)
-	}
-
-	return clients.NewCertBuilder(
-		logger,
-		gethcommon.HexToAddress(operatorStateRetrieverAddress),
-		gethcommon.HexToAddress(registryCoordinatorAddress),
-		ethClient,
-	)
+	//nolint:wrapcheck
+	return verification.NewCertVerifier(logger, ethClient, routerAddressProvider)
 }
 
 func createBlockNumberMonitor() (*verification.BlockNumberMonitor, error) {
@@ -325,32 +354,23 @@ func createEthClient(logger logging.Logger) (*geth.EthClient, error) {
 		logger)
 }
 
-func createKzgConfig() kzg.KzgConfig {
+func createVerifierConfig() verifier.Config {
 	srsPath := "../../../../resources/srs"
-	return kzg.KzgConfig{
-		LoadG2Points:    true,
+	return verifier.Config{
 		G1Path:          filepath.Join(srsPath, "g1.point"),
-		G2Path:          filepath.Join(srsPath, "g2.point"),
-		G2TrailingPath:  filepath.Join(srsPath, "g2.trailing.point"),
-		CacheDir:        filepath.Join(srsPath, "SRSTables"),
-		SRSOrder:        268435456, // must always be this constant, which was used during eigenDA SRS generation
 		SRSNumberToLoad: uint64(1<<13) / encoding.BYTES_PER_SYMBOL,
 		NumWorker:       4,
 	}
 }
 
-func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Reader, error) {
-	ethReader, err := eth.NewReader(
-		logger,
-		ethClient,
-		operatorStateRetrieverAddress,
-		eigenDAServiceManagerAddress,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("new reader: %w", err)
+func createCommitterConfig() committer.Config {
+	srsPath := "../../../../resources/srs"
+	return committer.Config{
+		G1SRSPath:         filepath.Join(srsPath, "g1.point"),
+		G2SRSPath:         filepath.Join(srsPath, "g2.point"),
+		G2TrailingSRSPath: filepath.Join(srsPath, "g2.trailing.point"),
+		SRSNumberToLoad:   uint64(1<<13) / encoding.BYTES_PER_SYMBOL,
 	}
-
-	return ethReader, nil
 }
 
 func createLogger() (logging.Logger, error) {
@@ -362,4 +382,154 @@ func createLogger() (logging.Logger, error) {
 	}
 
 	return logger, nil
+}
+
+func createEigenDADirectory(
+	ctx context.Context,
+	logger logging.Logger,
+	ethClient common.EthClient,
+) (*directory.ContractDirectory, error) {
+	directoryAddress := gethcommon.HexToAddress(eigenDADirectoryAddress)
+	contractDirectory, err := directory.NewContractDirectory(ctx, logger, ethClient, directoryAddress)
+	if err != nil {
+		return nil, fmt.Errorf("new contract directory: %w", err)
+	}
+	return contractDirectory, nil
+}
+
+func createClientLedger(
+	ctx context.Context,
+	logger logging.Logger,
+	mode clientledger.ClientLedgerMode,
+	ethClient common.EthClient,
+	accountID gethcommon.Address,
+	contractDirectory *directory.ContractDirectory,
+	disperserClient *clients.DisperserClient,
+) (*clientledger.ClientLedger, error) {
+	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddr)
+	if err != nil {
+		return nil, fmt.Errorf("new payment vault: %w", err)
+	}
+
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get min num symbols: %w", err)
+	}
+
+	var reservationLedger *reservation.ReservationLedger
+	var onDemandLedger *ondemand.OnDemandLedger
+
+	reservationLedger, err = createReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
+	if err != nil {
+		return nil, fmt.Errorf("create reservation ledger: %w", err)
+	}
+	onDemandLedger, err = createOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+	if err != nil {
+		return nil, fmt.Errorf("create on-demand ledger: %w", err)
+	}
+
+	ledger := clientledger.NewClientLedger(
+		ctx,
+		logger,
+		metrics.NoopAccountantMetrics,
+		accountID,
+		mode,
+		reservationLedger,
+		onDemandLedger,
+		time.Now,
+		paymentVault,
+		5*time.Minute,
+	)
+
+	return ledger, nil
+}
+
+func createReservationLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID gethcommon.Address,
+	minNumSymbols uint32,
+) (*reservation.ReservationLedger, error) {
+	reservationData, err := paymentVault.GetReservation(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation: %w", err)
+	}
+	if reservationData == nil {
+		return nil, fmt.Errorf("no reservation found for account %s", accountID.Hex())
+	}
+
+	clientReservation, err := reservation.NewReservation(
+		reservationData.SymbolsPerSecond,
+		time.Unix(int64(reservationData.StartTimestamp), 0),
+		time.Unix(int64(reservationData.EndTimestamp), 0),
+		reservationData.QuorumNumbers,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation: %w", err)
+	}
+
+	reservationConfig, err := reservation.NewReservationLedgerConfig(
+		*clientReservation,
+		minNumSymbols,
+		true,
+		ratelimit.OverfillOncePermitted,
+		time.Minute,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger config: %w", err)
+	}
+
+	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, time.Now)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger: %w", err)
+	}
+
+	return reservationLedger, nil
+}
+
+func createOnDemandLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID gethcommon.Address,
+	minNumSymbols uint32,
+	disperserClient *clients.DisperserClient,
+) (*ondemand.OnDemandLedger, error) {
+	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get price per symbol: %w", err)
+	}
+
+	totalDeposits, err := paymentVault.GetTotalDeposit(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get total deposit from vault: %w", err)
+	}
+
+	paymentState, err := disperserClient.GetPaymentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get payment state from disperser: %w", err)
+	}
+
+	var cumulativePayment *big.Int
+	if paymentState.GetCumulativePayment() == nil {
+		cumulativePayment = big.NewInt(0)
+	} else {
+		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
+	}
+
+	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
+		totalDeposits,
+		new(big.Int).SetUint64(pricePerSymbol),
+		minNumSymbols,
+		cumulativePayment,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new on-demand ledger: %w", err)
+	}
+
+	return onDemandLedger, nil
 }

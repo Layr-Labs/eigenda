@@ -2,12 +2,16 @@ package main
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
@@ -20,18 +24,16 @@ import (
 const MaxUint16 = ^uint16(0)
 
 type Config struct {
-	EncodingManagerConfig          controller.EncodingManagerConfig
-	DispatcherConfig               controller.DispatcherConfig
-	NumConcurrentEncodingRequests  int
-	NumConcurrentDispersalRequests int
-	NodeClientCacheSize            int
+	EncodingManagerConfig controller.EncodingManagerConfig
+	DispatcherConfig      controller.DispatcherConfig
 
 	DynamoDBTableName string
+	DisperserID       uint32
 
 	EthClientConfig                     geth.EthClientConfig
 	AwsClientConfig                     aws.ClientConfig
 	DisperserStoreChunksSigningDisabled bool
-	DisperserKMSKeyID                   string
+	DispersalRequestSignerConfig        clients.DispersalRequestSignerConfig
 	LoggerConfig                        common.LoggerConfig
 	IndexerConfig                       indexer.Config
 	ChainStateConfig                    thegraph.Config
@@ -41,11 +43,10 @@ type Config struct {
 
 	MetricsPort                  int
 	ControllerReadinessProbePath string
-	ControllerHealthProbePath    string
 	ServerConfig                 server.Config
+	HeartbeatMonitorConfig       healthcheck.HeartbeatMonitorConfig
 
-	OnDemandConfig    ondemand.OnDemandLedgerCacheConfig
-	ReservationConfig reservation.ReservationLedgerCacheConfig
+	PaymentAuthorizationConfig controller.PaymentAuthorizationConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -92,7 +93,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 
 	paymentVaultUpdateInterval := ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name)
 
-	onDemandConfig, err := ondemand.NewOnDemandLedgerCacheConfig(
+	onDemandConfig, err := ondemandvalidation.NewOnDemandLedgerCacheConfig(
 		ctx.GlobalInt(flags.OnDemandPaymentsLedgerCacheSizeFlag.Name),
 		ctx.GlobalString(flags.OnDemandPaymentsTableNameFlag.Name),
 		paymentVaultUpdateInterval,
@@ -101,24 +102,49 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("create on-demand config: %w", err)
 	}
 
-	reservationConfig, err := reservation.NewReservationLedgerCacheConfig(
+	reservationConfig, err := reservationvalidation.NewReservationLedgerCacheConfig(
 		ctx.GlobalInt(flags.ReservationPaymentsLedgerCacheSizeFlag.Name),
-		ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		90*time.Second,
 		// this doesn't need to be configurable. there are no plans to ever use a different value
-		reservation.OverfillOncePermitted,
+		ratelimit.OverfillOncePermitted,
 		paymentVaultUpdateInterval,
 	)
 	if err != nil {
 		return Config{}, fmt.Errorf("create reservation config: %w", err)
 	}
 
+	paymentAuthorizationConfig := controller.PaymentAuthorizationConfig{
+		OnDemandConfig:                 onDemandConfig,
+		ReservationConfig:              reservationConfig,
+		EnablePerAccountPaymentMetrics: ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
+	}
+
+	heartbeatMonitorConfig := healthcheck.HeartbeatMonitorConfig{
+		FilePath:         ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
+		MaxStallDuration: ctx.GlobalDuration(flags.ControllerHeartbeatMaxStallDurationFlag.Name),
+	}
+	if err := heartbeatMonitorConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid heartbeat monitor config: %w", err)
+	}
+
+	awsClientConfig := aws.ReadClientConfig(ctx, flags.FlagPrefix)
+	disperserID := uint32(ctx.GlobalUint64(flags.DisperserIDFlag.Name))
 	config := Config{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+		DisperserID:                         disperserID,
 		EthClientConfig:                     ethClientConfig,
 		AwsClientConfig:                     aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		DisperserStoreChunksSigningDisabled: ctx.GlobalBool(flags.DisperserStoreChunksSigningDisabledFlag.Name),
-		DisperserKMSKeyID:                   ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
 		LoggerConfig:                        *loggerConfig,
+		DispersalRequestSignerConfig: clients.DispersalRequestSignerConfig{
+			KeyID:      ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
+			PrivateKey: ctx.GlobalString(flags.DisperserPrivateKeyFlag.Name),
+			Region:     awsClientConfig.Region,
+			Endpoint:   awsClientConfig.EndpointURL,
+		},
 		EncodingManagerConfig: controller.EncodingManagerConfig{
 			PullInterval:                ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
 			EncodingRequestTimeout:      ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
@@ -129,35 +155,48 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EncoderAddress:              ctx.GlobalString(flags.EncoderAddressFlag.Name),
 			MaxNumBlobsPerIteration:     int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
 			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
+			MaxDispersalAge:             ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 		},
 		DispatcherConfig: controller.DispatcherConfig{
-			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
-			FinalizationBlockDelay:                ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
-			AttestationTimeout:                    ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
-			BatchMetadataUpdatePeriod:             ctx.GlobalDuration(flags.BatchMetadataUpdatePeriodFlag.Name),
-			BatchAttestationTimeout:               ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
-			SignatureTickInterval:                 ctx.GlobalDuration(flags.SignatureTickIntervalFlag.Name),
-			NumRequestRetries:                     ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
-			MaxBatchSize:                          int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
-			SignificantSigningThresholdPercentage: uint8(ctx.GlobalUint(flags.SignificantSigningThresholdPercentageFlag.Name)),
-			SignificantSigningMetricsThresholds:   ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
+			PullInterval:                           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
+			DisperserID:                            disperserID,
+			FinalizationBlockDelay:                 ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
+			AttestationTimeout:                     ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
+			BatchMetadataUpdatePeriod:              ctx.GlobalDuration(flags.BatchMetadataUpdatePeriodFlag.Name),
+			BatchAttestationTimeout:                ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
+			SignatureTickInterval:                  ctx.GlobalDuration(flags.SignatureTickIntervalFlag.Name),
+			NumRequestRetries:                      ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
+			MaxBatchSize:                           int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
+			SignificantSigningThresholdFraction:    ctx.GlobalFloat64(flags.SignificantSigningThresholdFractionFlag.Name),
+			NumConcurrentRequests:                  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
+			NodeClientCacheSize:                    ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
+			CollectDetailedValidatorSigningMetrics: ctx.GlobalBool(flags.DetailedValidatorMetricsFlag.Name),
+			MaxDispersalAge:                        ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 		},
-		NumConcurrentEncodingRequests:   ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-		NumConcurrentDispersalRequests:  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
-		NodeClientCacheSize:             ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),
 		UseGraph:                        ctx.GlobalBool(flags.UseGraphFlag.Name),
 		EigenDAContractDirectoryAddress: ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
 		MetricsPort:                     ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
-		ControllerHealthProbePath:       ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 		ServerConfig:                    serverConfig,
-		OnDemandConfig:                  onDemandConfig,
-		ReservationConfig:               reservationConfig,
+		HeartbeatMonitorConfig:          heartbeatMonitorConfig,
+		PaymentAuthorizationConfig:      paymentAuthorizationConfig,
 	}
-	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
-		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")
+
+	if err := config.DispersalRequestSignerConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid dispersal request signer config: %w", err)
+	}
+
+	if err := config.EncodingManagerConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid encoding manager config: %w", err)
+	}
+	if err := config.DispatcherConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid dispatcher config: %w", err)
+	}
+	if err := config.PaymentAuthorizationConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("invalid payment authorization config: %w", err)
 	}
 
 	return config, nil

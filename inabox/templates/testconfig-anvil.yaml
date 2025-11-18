@@ -3,20 +3,23 @@ environment:
   type: "local"
 
 deployers:
-- name: "default"
-  rpc: http://localhost:8545
-  verifyContracts: false
-  verifierUrl: http://localhost:4000/api
-  deploySubgraphs: true
-  slow: false
+  - name: "default"
+    rpc: http://localhost:8545
+    verifyContracts: false
+    verifierUrl: http://localhost:4000/api
+    deploySubgraphs: true
+    slow: false
 
 eigenda:
   deployer: "default"
 
+# NOTE: This uses a different blob version configuration than live deployments.
+# Live deployments typically use higher coding rates (e.g., 8) with more chunks and operators.
+# TODO: Investigate the revert that occurs when trying to use codingRate 2.
 blobVersions:
   - codingRate: 8
-    numChunks: 8192
-    maxNumOperators: 3537
+    numChunks: 16
+    maxNumOperators: 3
 
 privateKeys:
   ecdsaMap:
@@ -27,6 +30,9 @@ privateKeys:
 
 services:
   counts:
+    # We use 4 operators to test churn functionality.
+    # The last operator will churn the first one (which only has 1 stake),
+    # and inabox tests for this.
     operators: 4
     maxOperatorCount: 3
     relays: 4
@@ -44,6 +50,7 @@ services:
       CHAIN_ID: 40525
       G1_PATH: ../resources/srs/g1.point
       G2_PATH: ../resources/srs/g2.point
+      G2_POWER_OF_2_PATH: ../resources/srs/g2.point.powerOf2
       CACHE_PATH: ../resources/srs/SRSTables
       SRS_ORDER: 10000
       SRS_LOAD: 10000

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetFixedSupply.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -39,7 +39,7 @@ contract DeployOpenEigenLayer is Script, Test {
     uint32 MAX_REWARDS_DURATION = 70 days;
     uint32 MAX_RETROACTIVE_LENGTH = 84 days;
     uint32 MAX_FUTURE_LENGTH = 28 days;
-    uint32 GENESIS_REWARDS_TIMESTAMP = 1712188800;
+    uint32 GENESIS_REWARDS_TIMESTAMP = 1_712_188_800;
     uint32 activationDelay = 7 days;
     uint16 globalCommissionBips = 1000;
 
@@ -99,10 +99,8 @@ contract DeployOpenEigenLayer is Script, Test {
             eigenLayerPauserReg = new PauserRegistry(pausers, executorMultisig);
         }
 
-        /**
-         * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
-         * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
-         */
+        /// First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
+        /// not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
         emptyContract = new EmptyContract();
         delegation = DelegationManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
@@ -113,8 +111,9 @@ contract DeployOpenEigenLayer is Script, Test {
         strategyManager = StrategyManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
         );
-        slasher =
-            Slasher(address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), "")));
+        slasher = Slasher(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
+        );
         eigenPodManager = EigenPodManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
         );

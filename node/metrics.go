@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	Namespace = "node"
+	Namespace         = "node"
+	PaymentsSubsystem = "payments"
 )
 
 type Metrics struct {
