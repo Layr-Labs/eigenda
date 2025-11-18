@@ -110,11 +110,11 @@ type Handlers struct {
 
 // NewHandlers is a constructor
 func NewHandlers(
-	m store.IEigenDAManager, l logging.Logger, pic bool, compatCfg proxy_common.CompatibilityConfig,
+	m store.IEigenDAManager, l logging.Logger, processInvalidCert bool, compatCfg proxy_common.CompatibilityConfig,
 ) IHandlers {
 	return &Handlers{
 		log:                l,
-		processInvalidCert: pic,
+		processInvalidCert: processInvalidCert,
 		eigenDAManager:     m,
 		compatibilityCfg:   compatCfg,
 	}
@@ -199,7 +199,7 @@ func (h *Handlers) RecoverPayload(
 	daCert, err := h.deserializeCertFromSequencerMsg(sequencerMsg)
 	if err != nil {
 		if h.processInvalidCert {
-			err = errors.Join(err, CertificateValidationError)
+			err = errors.Join(err, ErCertValidationError)
 		}
 		return nil, fmt.Errorf("deserialize DA Cert from message: %w", err)
 	}
@@ -208,7 +208,7 @@ func (h *Handlers) RecoverPayload(
 	if err != nil {
 		var dpError *coretypes.DerivationError
 		if errors.As(err, &dpError) && h.processInvalidCert {
-			err = errors.Join(err, CertificateValidationError)
+			err = errors.Join(err, ErCertValidationError)
 		}
 
 		return nil, fmt.Errorf("get rollup payload from DA Cert: %w", err)
