@@ -459,25 +459,19 @@ mod tests {
         // Test sizes that are power of two but still too small for header
         for size in [1, 2, 4, 8, 16] {
             let small_encoded_payload = vec![0u8; size];
-            assert!(
-                matches!(
-                    decode_encoded_payload(&small_encoded_payload),
-                    Err(EncodedPayloadTooSmallForHeader(len)) if len == size
-                ),
-                "Size {size} should fail with BlobTooSmallForHeader"
-            );
+            assert!(matches!(
+                decode_encoded_payload(&small_encoded_payload),
+                Err(EncodedPayloadTooSmallForHeader(len)) if len == size
+            ),);
         }
 
         // Also test that non-power-of-two sizes fail with the power-of-two check
         for size in [0, 3, 5, 17, 31] {
             let small_encoded_payload = vec![0u8; size];
-            assert!(
-                matches!(
-                    decode_encoded_payload(&small_encoded_payload),
-                    Err(EncodedPayloadLengthNotPowerOfTwo(len)) if len == size
-                ),
-                "Size {size} should fail with EncodedPayloadLengthNotPowerOfTwo"
-            );
+            assert!(matches!(
+                decode_encoded_payload(&small_encoded_payload),
+                Err(EncodedPayloadLengthNotPowerOfTwo(len)) if len == size
+            ),);
         }
     }
 
