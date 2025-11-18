@@ -42,8 +42,9 @@
 //! - **Field**: BN254 elliptic curve field (order ≈ 2^254)
 
 use crate::verification::blob::BlobVerificationError::{
-    self, EncodedPayloadLengthNotPowerOfTwo, EncodedPayloadInvalidGuardByte, EncodedPayloadInvalidHeaderPadding,
-    EncodedPayloadInvalidPadding, EncodedPayloadHeaderInvalidVersion, *,
+    self, EncodedPayloadHeaderInvalidVersion, EncodedPayloadInvalidGuardByte,
+    EncodedPayloadInvalidHeaderPadding, EncodedPayloadInvalidPadding,
+    EncodedPayloadLengthNotPowerOfTwo, *,
 };
 
 /// Size of each symbol in bytes.
