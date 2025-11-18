@@ -173,7 +173,7 @@ fn decode_payload(
 
     // Decode the body by removing internal 0 byte padding (0x00 initial byte for every 32 byte chunk)
     // this ensures every 32 bytes is a valid field element
-    let mut decoded_body = check_and_remove_zero_padding_for_field_elements(&body)?;
+    let mut decoded_body = check_and_remove_zero_padding_for_field_elements(body)?;
 
     // data length is checked when constructing an encoded payload. If this error is encountered, that means there
     // must be a flaw in the logic at construction time (or someone was bad and didn't use the proper construction methods)
