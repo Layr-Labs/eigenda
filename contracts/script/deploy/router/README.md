@@ -4,7 +4,8 @@ This directory contains the deployment script for the EigenDACertVerifierRouter 
 
 ## Overview
 
-The EigenDACertVerifierRouter is a routing contract that directs certificate verification requests to the appropriate cert verifier contract based on the reference block number (RBN) in the certificate.
+The EigenDACertVerifierRouter is a routing contract that directs certificate verification requests to the appropriate cert verifier contract based on the reference block number (RBN) in the certificate. This contract is deployed as implementation behind an OpenZeppelin [ERC1967](https://eips.ethereum.org/EIPS/eip-1967) proxy.
+
 
 ## Deployment
 
@@ -30,8 +31,8 @@ Create a configuration file in the `config/` directory with the following format
   "initialOwner": "0x0000000000000000000000000000000000000001",
   "initABNConfigs" : [
     {
-      "0_blockNumber": 0,
-      "1_certVerifierAddress": "0x0000000000000000000000000000000000000002"
+      "blockNumber": 0,
+      "certVerifier": "0x0000000000000000000000000000000000000002"
     }
   ],
   "proxyAdmin": "0x0000000000000000000000000000000000000003"
@@ -39,7 +40,7 @@ Create a configuration file in the `config/` directory with the following format
 ```
 
 - The `initialOwner` parameter specifies the address that will be set as the owner of the deployed router contract.
-- The `initABNConfigs` specifies the reference block numbers that each initial cert verifier will be placed at, and the address of each.
+- The `initABNConfigs` specifies the activation block numbers that each initial cert verifier will be placed at with respect to block history, and the address of each.
 - The `proxyAdmin` parameter specifies the address of the proxy admin for the transparent proxy.
 
 ### Post-Deployment
