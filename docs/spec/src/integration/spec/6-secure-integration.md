@@ -223,17 +223,6 @@ Proxy behavior. The EigenDA proxy can return either the encoded payload or the d
   - With `?return_encoded_payload=true` or `?return_encoded_payload=1`, it only checks the blob against the kzg commitment and returns the encoded payload, it is useful when integrating with proof systems to control the data transformation.
   - Without parameters, it decodes and returns the rollup payload; on any decoding error, it returns HTTP 418.
 
-### Notes on Dispersal
-Dispersal:
-
-1. If the `BlobCertificate` was generated using the disperser’s `GetBlobCommitment` RPC endpoint, verify its contents:
-    1. verify KZG commitment
-    2. verify that `length` matches the expected value, based on the blob that was actually sent
-    3. verify the `lengthProof` using the `length` and `lengthCommitment`
-2. After dispersal, verify that the `BlobKey` actually dispersed by the disperser matches the locally computed `BlobKey`
-
-Note: The verification steps in point 1. for dispersal are not currently implemented. This route only makes sense for clients that want to avoid having large amounts of SRS data, but KZG commitment verification via Fiat-Shamir is required to do the verification without this data. Until the alternate verification method is implemented, usage of `GetBlobCommitment` places a correctness trust assumption on the disperser generating the commitment.
-
 ## Upgradable Quorums and Thresholds for Optimistic Verification
 ![image.png](../../assets/integration/router-in-fraud-proof.png)
 

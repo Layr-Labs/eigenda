@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -17,6 +18,13 @@ func TestConstructor(t *testing.T) {
 	store, err := ondemand.NewCumulativePaymentStore(nil, tableName, accountID)
 	require.Error(t, err, "nil client should error")
 	require.Nil(t, store)
+
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
+	require.NoError(t, err)
+	defer cleanup()
+
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err)
 
 	store, err = ondemand.NewCumulativePaymentStore(dynamoClient, "", accountID)
 	require.Error(t, err, "empty table name should error")
@@ -30,6 +38,13 @@ func TestConstructor(t *testing.T) {
 func TestStoreCumulativePaymentInputValidation(t *testing.T) {
 	tableName := createPaymentTable(t, "StoreInputValidation")
 	defer deleteTable(t, tableName)
+
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
+	require.NoError(t, err)
+	defer cleanup()
+
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err)
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	store, err := ondemand.NewCumulativePaymentStore(dynamoClient, tableName, accountID)
@@ -47,6 +62,13 @@ func TestStoreCumulativePaymentInputValidation(t *testing.T) {
 func TestStoreThenGet(t *testing.T) {
 	tableName := createPaymentTable(t, "StoreThenGet")
 	defer deleteTable(t, tableName)
+
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
+	require.NoError(t, err)
+	defer cleanup()
+
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err)
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	store, err := ondemand.NewCumulativePaymentStore(dynamoClient, tableName, accountID)
@@ -77,6 +99,12 @@ func TestStoreThenGet(t *testing.T) {
 func TestDifferentAddresses(t *testing.T) {
 	tableName := createPaymentTable(t, "DifferentAddresses")
 	defer deleteTable(t, tableName)
+	cleanup, err := test.DeployDynamoLocalstack(t.Context())
+	require.NoError(t, err)
+	defer cleanup()
+
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err)
 
 	accountA := gethcommon.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	accountB := gethcommon.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")

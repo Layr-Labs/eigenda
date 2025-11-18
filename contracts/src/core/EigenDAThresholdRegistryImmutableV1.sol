@@ -5,14 +5,12 @@ import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRe
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-/**
- * @title The `EigenDAThresholdRegistryImmutableV1` contract.
- * @author Layr Labs, Inc.
- * @notice this contract is an immutable version of the `EigenDAThresholdRegistry` contract and is only
- *         intended to be used for enabling custom quorums/thresholds for rollups using EigenDAV1.
- *         The lifespan of this contract is expected to be short, as it is intended to be used
- *         for a soon-to-be deprecated protocol version.
- */
+/// @title The `EigenDAThresholdRegistryImmutableV1` contract.
+/// @author Layr Labs, Inc.
+/// @notice this contract is an immutable version of the `EigenDAThresholdRegistry` contract and is only
+///         intended to be used for enabling custom quorums/thresholds for rollups using EigenDAV1.
+///         The lifespan of this contract is expected to be short, as it is intended to be used
+///         for a soon-to-be deprecated protocol version.
 contract EigenDAThresholdRegistryImmutableV1 is IEigenDAThresholdRegistry {
     /// @notice The adversary threshold percentage for the quorum at position `quorumNumber`
     bytes public quorumAdversaryThresholdPercentages;

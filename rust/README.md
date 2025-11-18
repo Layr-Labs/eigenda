@@ -11,12 +11,12 @@ The project is built using a modular architecture with specialized crates:
 
 ### Core Crates
 
-| Crate | Purpose | Key Features |
-|-------|---------|--------------|
-| **`eigenda-ethereum`** | Ethereum contract interaction | Provider utilities, contract bindings |
-| **`eigenda-proxy`** | EigenDA proxy service communication | Blob retrieval, certificate generation, retry logic |
+| Crate                      | Purpose                                                      | Key Features                                                                                      |
+| -------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| **`eigenda-ethereum`**     | Ethereum contract interaction                                | Provider utilities, contract bindings                                                             |
+| **`eigenda-proxy`**        | EigenDA proxy service communication                          | Blob retrieval, certificate generation, retry logic                                               |
 | **`eigenda-verification`** | Cryptographic verification, validation, and state extraction | Certificate parsing, storage proofs, operator stake extraction, BLS signatures, commitment proofs |
-| **`eigenda-srs-data`** | Structured reference string data | BN254 curve parameters for KZG commitments |
+| **`eigenda-srs-data`**     | Structured reference string data                             | BN254 curve parameters for KZG commitments                                                        |
 
 ## 🎯 Usage
 
@@ -111,7 +111,8 @@ eigenda/rust/
 │   ├── eigenda-ethereum/        # Ethereum contract utilities
 │   ├── eigenda-proxy/           # EigenDA proxy client
 │   ├── eigenda-verification/    # Cryptographic verification
-│   └── eigenda-srs-data/        # Structured reference string data
+│   ├── eigenda-srs-data/        # Structured reference string data
+|   └── eigenda-tests/           # Integration tests using other crates
 ```
 
 ### Building from Source

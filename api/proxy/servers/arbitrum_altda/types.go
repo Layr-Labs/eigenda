@@ -1,9 +1,20 @@
 package arbitrum_altda
 
 import (
+	"errors"
+
 	proxy_common "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+)
+
+var (
+	// Vendored from:
+	// https://github.com/OffchainLabs/nitro/blob/d298d2b62e033e3195f33740c55e5396ff76a478/daprovider/writer.go
+	//
+	// ErrFallbackRequested is returned by a CustomDA provider to explicitly signal that
+	// the batch poster should fall back to the next available DA writer (e.g, AnyTrust).
+	ErrFallbackRequested = errors.New("DA provider requests fallback to next writer")
 )
 
 const (
@@ -117,7 +128,7 @@ type PayloadResult struct {
 // SupportedHeaderBytesResult is the result struct that data availability providers should use to respond with
 // their supported header bytes
 type SupportedHeaderBytesResult struct {
-	HeaderBytes hexutil.Bytes `json:"headerBytes,omitempty"`
+	HeaderBytes []hexutil.Bytes `json:"headerBytes,omitempty"`
 }
 
 // StoreResult is the result struct that data availability providers should use to respond with a commitment to a

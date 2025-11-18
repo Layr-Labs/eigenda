@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {IRegistryCoordinator, EigenDARegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
@@ -164,10 +164,6 @@ library InitParamsLib {
             quorumNumbersRequiredBytes[i] = bytes1(uint8(certQuorumNumbersRequired[i]));
         }
         return quorumNumbersRequiredBytes;
-    }
-
-    function certVerifierRecencyWindow(string memory configData) internal pure returns (uint32) {
-        return uint32(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.recencyWindow"));
     }
 
     function dispersers(string memory configData) internal pure returns (address[] memory) {

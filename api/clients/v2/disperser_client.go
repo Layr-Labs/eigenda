@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -13,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -32,16 +30,12 @@ type DisperserClientConfig struct {
 
 // DisperserClient manages communication with the disperser server.
 type DisperserClient struct {
-	logger                  logging.Logger
-	config                  *DisperserClientConfig
-	signer                  corev2.BlobRequestSigner
-	clientPool              *common.GRPCClientPool[disperser_rpc.DisperserClient]
-	committer               *committer.Committer
-	accountant              *Accountant
-	accountantLock          sync.Mutex
-	initOnceAccountant      sync.Once
-	initOnceAccountantError error
-	metrics                 metrics.DispersalMetricer
+	logger     logging.Logger
+	config     *DisperserClientConfig
+	signer     corev2.BlobRequestSigner
+	clientPool *common.GRPCClientPool[disperser_rpc.DisperserClient]
+	committer  *committer.Committer
+	metrics    metrics.DispersalMetricer
 }
 
 // DisperserClient maintains a single underlying grpc connection to the disperser server,
@@ -69,7 +63,6 @@ func NewDisperserClient(
 	config *DisperserClientConfig,
 	signer corev2.BlobRequestSigner,
 	committer *committer.Committer,
-	accountant *Accountant,
 	metrics metrics.DispersalMetricer,
 ) (*DisperserClient, error) {
 	if config == nil {
@@ -83,6 +76,9 @@ func NewDisperserClient(
 	}
 	if signer == nil {
 		return nil, fmt.Errorf("signer must be provided")
+	}
+	if committer == nil {
+		return nil, fmt.Errorf("committer must be provided")
 	}
 	if metrics == nil {
 		return nil, fmt.Errorf("metrics must be provided")
@@ -114,28 +110,8 @@ func NewDisperserClient(
 		signer:     signer,
 		clientPool: clientPool,
 		committer:  committer,
-		accountant: accountant,
 		metrics:    metrics,
 	}, nil
-}
-
-// PopulateAccountant populates the accountant with the payment state from the disperser.
-func (c *DisperserClient) PopulateAccountant(ctx context.Context) error {
-	if c.accountant == nil {
-		return fmt.Errorf("accountant is nil")
-	}
-
-	paymentState, err := c.GetPaymentState(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
-	}
-
-	err = c.accountant.SetPaymentState(paymentState)
-	if err != nil {
-		return fmt.Errorf("error setting payment state for accountant: %w", err)
-	}
-
-	return nil
 }
 
 // Close closes the grpc connection to the disperser server.
@@ -160,7 +136,6 @@ func (c *DisperserClient) DisperseBlob(
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
 	probe *common.SequenceProbe,
-	// if this is nil, that indicates we will use the legacy payment system to create the paymentMetadata
 	paymentMetadata *core.PaymentMetadata,
 ) (*corev2.BlobHeader, *disperser_rpc.DisperseBlobReply, error) {
 	if len(quorums) == 0 {
@@ -178,34 +153,9 @@ func (c *DisperserClient) DisperseBlob(
 		}
 	}
 
-	symbolLength := encoding.GetBlobLengthPowerOf2(uint32(len(data)))
-
 	if paymentMetadata == nil {
-		// we are using the legacy payment system
-		probe.SetStage("acquire_accountant_lock")
-		c.accountantLock.Lock()
-
-		probe.SetStage("accountant")
-
-		err := c.initOncePopulateAccountant(ctx)
-		if err != nil {
-			c.accountantLock.Unlock()
-			return nil, nil, fmt.Errorf("error initializing accountant: %w", err)
-		}
-
-		paymentMetadata, err = c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
-		if err != nil {
-			c.accountantLock.Unlock()
-			return nil, nil, fmt.Errorf("error accounting blob: %w", err)
-		}
-
-		if paymentMetadata.CumulativePayment == nil || paymentMetadata.CumulativePayment.Sign() == 0 {
-			// This request is using reserved bandwidth, no need to prevent parallel dispersal.
-			c.accountantLock.Unlock()
-		} else {
-			// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
-			defer c.accountantLock.Unlock()
-		}
+		//nolint:wrapcheck
+		return nil, nil, api.NewErrorInvalidArg("payment metadata must be provided")
 	}
 
 	probe.SetStage("verify_field_element")
@@ -221,37 +171,9 @@ func (c *DisperserClient) DisperseBlob(
 
 	probe.SetStage("get_commitments")
 
-	var blobCommitments encoding.BlobCommitments
-	if c.committer == nil {
-		// if committer is not configured, get blob commitments from disperser
-		commitments, err := c.GetBlobCommitment(ctx, data)
-		if err != nil {
-			// Failover worthy error because it means the disperser is not responsive.
-			return nil, nil, api.NewErrorFailover(fmt.Errorf("GetBlobCommitment rpc: %w", err))
-		}
-		deserialized, err := encoding.BlobCommitmentsFromProtobuf(commitments.GetBlobCommitment())
-		if err != nil {
-			return nil, nil, fmt.Errorf("error deserializing blob commitments: %w", err)
-		}
-		blobCommitments = *deserialized
-
-		// We need to check that the disperser used the correct length. Even once checking the commitment from the
-		// disperser has been implemented, there is still an edge case where the disperser could truncate trailing 0s,
-		// yielding the wrong blob length, but not causing commitment verification to fail. It is important that the
-		// commitment doesn't report a blob length smaller than expected, since this could cause payload parsing to
-		// fail, if the length claimed in the encoded payload header is larger than the blob length in the commitment.
-		lengthFromCommitment := commitments.GetBlobCommitment().GetLength()
-		if lengthFromCommitment != uint32(symbolLength) {
-			return nil, nil, fmt.Errorf(
-				"blob commitment length (%d) from disperser doesn't match expected length (%d): %w",
-				lengthFromCommitment, symbolLength, err)
-		}
-	} else {
-		// if committer is configured, get commitments from committer
-		blobCommitments, err = c.committer.GetCommitmentsForPaddedLength(data)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error getting blob commitments: %w", err)
-		}
+	blobCommitments, err := c.committer.GetCommitmentsForPaddedLength(data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get commitments for padded length: %w", err)
 	}
 
 	blobHeader := &corev2.BlobHeader{
@@ -328,38 +250,4 @@ func (c *DisperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error while calling GetPaymentState: %w", err)
 	}
 	return reply, nil
-}
-
-// GetBlobCommitment is a utility method that calculates commitment for a blob payload.
-// While the blob commitment can be calculated by anyone, it requires SRS points to
-// be loaded. For service that does not have access to SRS points, this method can be
-// used to calculate the blob commitment in blob header, which is required for dispersal.
-func (c *DisperserClient) GetBlobCommitment(
-	ctx context.Context,
-	data []byte,
-) (*disperser_rpc.BlobCommitmentReply, error) {
-	request := &disperser_rpc.BlobCommitmentRequest{
-		Blob: data,
-	}
-	reply, err := c.clientPool.GetClient().GetBlobCommitment(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("error while calling GetBlobCommitment: %w", err)
-	}
-	return reply, nil
-}
-
-// initOncePopulateAccountant initializes the accountant if it is not already initialized.
-// If initialization fails, it caches the error and will return it on every subsequent call.
-func (c *DisperserClient) initOncePopulateAccountant(ctx context.Context) error {
-	c.initOnceAccountant.Do(func() {
-		err := c.PopulateAccountant(ctx)
-		if err != nil {
-			c.initOnceAccountantError = err
-			return
-		}
-	})
-	if c.initOnceAccountantError != nil {
-		return fmt.Errorf("populating accountant: %w", c.initOnceAccountantError)
-	}
-	return nil
 }

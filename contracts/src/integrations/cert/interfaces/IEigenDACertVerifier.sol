@@ -2,7 +2,6 @@
 pragma solidity ^0.8.9;
 
 import {IEigenDACertVerifierBase} from "src/integrations/cert/interfaces/IEigenDACertVerifierBase.sol";
-import {IVersionedEigenDACertVerifier} from "src/integrations/cert/interfaces/IVersionedEigenDACertVerifier.sol";
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
@@ -24,8 +23,4 @@ interface IEigenDACertVerifier {
 
     /// @notice Returns the quorum numbers required in bytes format for certificate verification.
     function quorumNumbersRequired() external view returns (bytes memory);
-
-    /// @notice Returns the recency window for certificate verification.
-    ///         This is only present in CertVerifier with semver >= 3.2.0.
-    function recencyWindow() external view returns (uint32);
 }

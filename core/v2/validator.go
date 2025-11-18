@@ -46,7 +46,11 @@ func NewShardValidator(v *verifier.Verifier, operatorID core.OperatorID, logger 
 	}
 }
 
-func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.BlobVersionParameters, operatorState *core.OperatorState) (*Assignment, error) {
+func (v *shardValidator) validateBlobParams(
+	blob *BlobShard,
+	blobParams *core.BlobVersionParameters,
+	operatorState *core.OperatorState,
+) (*Assignment, error) {
 
 	// Get the assignments for the quorum
 
@@ -60,7 +64,8 @@ func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.Bl
 		return nil, fmt.Errorf("operator %s has no chunks assigned", v.operatorID.Hex())
 	}
 	if assignment.NumChunks() != uint32(len(blob.Bundle)) {
-		return nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d)", len(blob.Bundle), assignment.NumChunks())
+		return nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d)",
+			len(blob.Bundle), assignment.NumChunks())
 	}
 
 	// Get the chunk length
@@ -99,7 +104,14 @@ func (v *shardValidator) ValidateBatchHeader(ctx context.Context, header *BatchH
 	return nil
 }
 
-func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, blobVersionParams *BlobVersionParameterMap, pool common.WorkerPool, state *core.OperatorState) error {
+func (v *shardValidator) ValidateBlobs(
+	ctx context.Context,
+	blobs []*BlobShard,
+	blobVersionParams *BlobVersionParameterMap,
+	pool common.WorkerPool,
+	state *core.OperatorState,
+) error {
+
 	if len(blobs) == 0 {
 		return fmt.Errorf("no blobs")
 	}
@@ -123,12 +135,12 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 		}
 		assignment, err := v.validateBlobParams(blob, blobParams, state)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to validate blob params: %w", err)
 		}
 
 		params, err := GetEncodingParams(blob.BlobHeader.BlobCommitments.Length, blobParams)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get encoding params: %w", err)
 		}
 
 		// Check the received chunks against the commitment

@@ -1,25 +1,20 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
-import {EigenDAServiceManager, IRewardsCoordinator} from "src/core/EigenDAServiceManager.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDACertVerificationV1Lib} from "src/integrations/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
-import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
-import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
-import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
+import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
-import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
-import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
-import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
+import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
 import "forge-std/StdStorage.sol";
 
@@ -49,7 +44,6 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     bytes quorumConfirmationThresholdPercentages = hex"373737";
     bytes quorumNumbersRequired = hex"0001";
     DATypesV1.SecurityThresholds defaultSecurityThresholds = DATypesV1.SecurityThresholds(55, 33);
-    uint32 recencyWindow = 0;
 
     uint32 defaultReferenceBlockNumber = 100;
     uint32 defaultConfirmationBlockNumber = 1000;
@@ -179,8 +173,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             defaultSecurityThresholds,
-            quorumNumbersRequired,
-            recencyWindow
+            quorumNumbersRequired
         );
     }
 
@@ -252,16 +245,13 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             if (i < 2) {
                 blobHeader.quorumBlobParams[i].quorumNumber = uint8(i); // Typecast is checked above.
             } else {
-                blobHeader.quorumBlobParams[i].quorumNumber =
-                    uint8( // Typecast is checked above.
-                            uint256(
-                                keccak256(
-                                    abi.encodePacked(
-                                        pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i
-                                    )
-                                )
-                            )
-                        ) % 192;
+                blobHeader.quorumBlobParams[i].quorumNumber = uint8( // Typecast is checked above.
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i)
+                        )
+                    )
+                ) % 192;
 
                 // make sure it isn't already used
                 while (quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber]) {
