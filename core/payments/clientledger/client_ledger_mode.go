@@ -7,9 +7,6 @@ import "fmt"
 type ClientLedgerMode string
 
 const (
-	// Old payment system is used (bin based instead of leaky bucket)
-	ClientLedgerModeLegacy ClientLedgerMode = "legacy"
-
 	// Only reservation payments are active
 	ClientLedgerModeReservationOnly ClientLedgerMode = "reservation-only"
 
@@ -23,8 +20,6 @@ const (
 // Converts a string to ClientLedgerMode. Panics if an unrecognized mode string is provided.
 func ParseClientLedgerMode(mode string) ClientLedgerMode {
 	switch mode {
-	case string(ClientLedgerModeLegacy):
-		return ClientLedgerModeLegacy
 	case string(ClientLedgerModeReservationOnly):
 		return ClientLedgerModeReservationOnly
 	case string(ClientLedgerModeOnDemandOnly):

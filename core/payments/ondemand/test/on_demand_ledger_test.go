@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -230,15 +231,18 @@ func TestOnDemandLedgerFromStore(t *testing.T) {
 
 // Creates a payment table and store for testing, returning the store and a cleanup function
 func createTestStore(t *testing.T, tableNameSuffix string) (*ondemand.CumulativePaymentStore, func()) {
+	dynamoClient, err := test.GetDynamoClient()
+	require.NoError(t, err)
+
 	tableName := createPaymentTable(t, tableNameSuffix)
 	testAccountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	store, err := ondemand.NewCumulativePaymentStore(dynamoClient, tableName, testAccountID)
 	require.NoError(t, err)
 	require.NotNil(t, store)
 
-	cleanup := func() {
+	cleanupFunc := func() {
 		deleteTable(t, tableName)
 	}
 
-	return store, cleanup
+	return store, cleanupFunc
 }

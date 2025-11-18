@@ -905,6 +905,7 @@ func startController(
 	// Create dispatcher
 	dispatcher, err := controller.NewDispatcher(
 		dispatcherConfig,
+		time.Now,
 		metadataStore,
 		dispatcherPool,
 		ics,

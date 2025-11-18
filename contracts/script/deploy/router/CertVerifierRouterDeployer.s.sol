@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {IEigenDACertVerifier} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
@@ -14,21 +14,19 @@ struct ABNConfig {
     address certVerifier;
 }
 
-/**
- * @title CertVerifierRouterDeployer
- * @notice Deployment script for upgradable EigenDACertVerifierRouter
- * @dev This script deploys the EigenDACertVerifierRouter contract and initializes it through the proxy
- *      with the initial owner and cert verifier.
- * @dev Run with:
- *      forge script script/deploy/router/CertVerifierRouterDeployer.s.sol:CertVerifierRouterDeployer \
- *      --sig "run(string, string)" <config.json> <output.json> \
- *      --rpc-url $RPC \
- *      --private-key $PRIVATE_KEY \
- *      -vvvv \
- *      --etherscan-api-key $ETHERSCAN_API_KEY \
- *      --verify \
- *      --broadcast
- */
+/// @title CertVerifierRouterDeployer
+/// @notice Deployment script for upgradable EigenDACertVerifierRouter
+/// @dev This script deploys the EigenDACertVerifierRouter contract and initializes it through the proxy
+///      with the initial owner and cert verifier.
+/// @dev Run with:
+///      forge script script/deploy/router/CertVerifierRouterDeployer.s.sol:CertVerifierRouterDeployer \
+///      --sig "run(string, string)" <config.json> <output.json> \
+///      --rpc-url $RPC \
+///      --private-key $PRIVATE_KEY \
+///      -vvvv \
+///      --etherscan-api-key $ETHERSCAN_API_KEY \
+///      --verify \
+///      --broadcast
 contract CertVerifierRouterDeployer is Script, Test {
     // Configuration parameters
     address initialOwner;

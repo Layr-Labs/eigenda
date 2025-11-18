@@ -251,7 +251,7 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", s.listener.Addr().String())
 
 	if err := s.grpcServer.Serve(s.listener); err != nil {
-		return errors.New("could not start GRPC server")
+		return fmt.Errorf("could not start GRPC server: %w", err)
 	}
 
 	return nil
@@ -291,19 +291,19 @@ func (s *DispersalServerV2) getBlobCommitment(
 	}
 	c, err := s.committer.GetCommitmentsForPaddedLength(req.GetBlob())
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to compute commitments")
+		return nil, status.Newf(codes.Internal, "failed to compute commitments: %v", err)
 	}
 	commitment, err := c.Commitment.Serialize()
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to serialize commitment")
+		return nil, status.Newf(codes.Internal, "failed to serialize commitment: %v", err)
 	}
 	lengthCommitment, err := c.LengthCommitment.Serialize()
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to serialize length commitment")
+		return nil, status.Newf(codes.Internal, "failed to serialize length commitment: %v", err)
 	}
 	lengthProof, err := c.LengthProof.Serialize()
 	if err != nil {
-		return nil, status.New(codes.Internal, "failed to serialize length proof")
+		return nil, status.Newf(codes.Internal, "failed to serialize length proof: %v", err)
 	}
 
 	return &pb.BlobCommitmentReply{

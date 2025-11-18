@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
@@ -32,7 +32,6 @@ contract CertVerifierDeployerV2 is Script, Test {
 
     DATypesV1.SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
-    uint32 recencyWindow;
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
         // 1 - ingest JSON config file as string and extract dependency fields used for
@@ -49,9 +48,6 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         raw = stdJson.parseRaw(data, ".quorumNumbersRequired");
         quorumNumbersRequired = abi.decode(raw, (bytes));
-
-        raw = stdJson.parseRaw(data, ".recencyWindow");
-        recencyWindow = abi.decode(raw, (uint32));
 
         // 2 - read dependency contract addresses from EigenDA Directory namespaced resolution
         //     contract and ensure that addresses are correct w.r.t their intended interfaces
@@ -106,8 +102,7 @@ contract CertVerifierDeployerV2 is Script, Test {
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
                 defaultSecurityThresholds,
-                quorumNumbersRequired,
-                recencyWindow
+                quorumNumbersRequired
             )
         );
 

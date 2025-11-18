@@ -1,9 +1,11 @@
 package meterer
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/payments"
 	"golang.org/x/time/rate"
 )
 
@@ -12,29 +14,49 @@ import (
 //
 // This struct is safe for use by multiple goroutines.
 type OnDemandMeterer struct {
-	limiter *rate.Limiter
-	getNow  func() time.Time
-	metrics *OnDemandMetererMetrics
+	limiter       *rate.Limiter
+	getNow        func() time.Time
+	metrics       *OnDemandMetererMetrics
+	minNumSymbols uint32
 }
 
 // Creates a new OnDemandMeterer with the specified rate limiting parameters.
 func NewOnDemandMeterer(
-	globalSymbolsPerSecond uint64,
-	globalRatePeriodInterval uint64,
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
 	getNow func() time.Time,
 	metrics *OnDemandMetererMetrics,
-) *OnDemandMeterer {
+) (*OnDemandMeterer, error) {
+	globalSymbolsPerSecond, err := paymentVault.GetGlobalSymbolsPerSecond(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get global symbols per second: %w", err)
+	}
+
+	globalRatePeriodInterval, err := paymentVault.GetGlobalRatePeriodInterval(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get global rate period interval: %w", err)
+	}
+
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get min num symbols: %w", err)
+	}
+
 	burstSize := int(globalSymbolsPerSecond * globalRatePeriodInterval)
 	limiter := rate.NewLimiter(rate.Limit(globalSymbolsPerSecond), burstSize)
 
 	return &OnDemandMeterer{
-		limiter: limiter,
-		getNow:  getNow,
-		metrics: metrics,
-	}
+		limiter:       limiter,
+		getNow:        getNow,
+		metrics:       metrics,
+		minNumSymbols: minNumSymbols,
+	}, nil
 }
 
 // Reserves tokens for a dispersal with the given number of symbols.
+//
+// The actual number of tokens reserved is the billable symbols (applying the minNumSymbols threshold),
+// not the raw symbol count.
 //
 // Returns a reservation that can be cancelled if the dispersal is not performed (e.g., if payment verification fails).
 // The reservation will automatically take effect if not cancelled.
@@ -42,15 +64,18 @@ func NewOnDemandMeterer(
 // This method only succeeds if tokens are immediately available (no queueing/waiting). If a reservation is returned,
 // it is safe to proceed with dispersal without checking the delay.
 func (m *OnDemandMeterer) MeterDispersal(symbolCount uint32) (*rate.Reservation, error) {
-	reservation := m.limiter.ReserveN(m.getNow(), int(symbolCount))
+	now := m.getNow()
 
-	if !reservation.OK() || reservation.Delay() > 0 {
+	billableSymbols := payments.CalculateBillableSymbols(symbolCount, m.minNumSymbols)
+	reservation := m.limiter.ReserveN(now, int(billableSymbols))
+
+	if !reservation.OK() || reservation.DelayFrom(now) > 0 {
 		reservation.Cancel()
-		m.metrics.RecordGlobalMeterExhaustion(symbolCount)
-		return nil, fmt.Errorf("global rate limit exceeded: cannot reserve %d symbols", symbolCount)
+		m.metrics.RecordGlobalMeterExhaustion(billableSymbols)
+		return nil, fmt.Errorf("global rate limit exceeded: cannot reserve %d symbols", billableSymbols)
 	}
 
-	m.metrics.RecordGlobalMeterThroughput(symbolCount)
+	m.metrics.RecordGlobalMeterThroughput(billableSymbols)
 	return reservation, nil
 }
 

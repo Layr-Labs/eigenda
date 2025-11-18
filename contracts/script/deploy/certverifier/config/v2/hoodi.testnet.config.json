@@ -4,6 +4,5 @@
         "0_confirmationThreshold": 55,
         "1_adversaryThreshold": 33
     },
-    "quorumNumbersRequired": "0x0001",
-    "recencyWindow": 14400
+    "quorumNumbersRequired": "0x0001"
 }

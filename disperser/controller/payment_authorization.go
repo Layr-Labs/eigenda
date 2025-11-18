@@ -79,16 +79,6 @@ func BuildPaymentAuthorizationHandler(
 		return nil, fmt.Errorf("create payment vault: %w", err)
 	}
 
-	globalSymbolsPerSecond, err := paymentVault.GetGlobalSymbolsPerSecond(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get global symbols per second: %w", err)
-	}
-
-	globalRatePeriodInterval, err := paymentVault.GetGlobalRatePeriodInterval(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get global rate period interval: %w", err)
-	}
-
 	// Create on-demand meterer (use nil metrics if registry is nil)
 	var onDemandMetererMetrics *meterer.OnDemandMetererMetrics
 	if metricsRegistry != nil {
@@ -99,12 +89,15 @@ func BuildPaymentAuthorizationHandler(
 		)
 	}
 
-	onDemandMeterer := meterer.NewOnDemandMeterer(
-		globalSymbolsPerSecond,
-		globalRatePeriodInterval,
+	onDemandMeterer, err := meterer.NewOnDemandMeterer(
+		ctx,
+		paymentVault,
 		time.Now,
 		onDemandMetererMetrics,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("create on-demand meterer: %w", err)
+	}
 
 	// Create on-demand validator (use nil metrics if registry is nil)
 	var onDemandValidatorMetrics *ondemandvalidation.OnDemandValidatorMetrics

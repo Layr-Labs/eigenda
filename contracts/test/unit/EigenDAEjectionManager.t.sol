@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {Test} from "forge-std/Test.sol";
 
 import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
 import {EigenDAEjectionLib} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
-import {EigenDAEjectionTypes} from "src/periphery/ejection/libraries/EigenDAEjectionTypes.sol";
 
 import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
 import {EigenDADirectory} from "src/core/EigenDADirectory.sol";
@@ -30,8 +29,8 @@ contract EigenDAEjectionManagerTest is Test {
     ERC20Mintable token;
 
     uint256 constant DEPOSIT_BASE_FEE_MULTIPLIER = 7;
-    uint256 constant CANCEL_EJECTION_WITHOUT_SIG_GAS_REFUND = 39128;
-    uint256 constant CANCEL_EJECTION_WITH_SIG_GAS_REFUND = 70000;
+    uint256 constant CANCEL_EJECTION_WITHOUT_SIG_GAS_REFUND = 39_128;
+    uint256 constant CANCEL_EJECTION_WITH_SIG_GAS_REFUND = 70_000;
     uint256 constant BASE_FEE = 10;
     uint256 constant EXPECTED_DEPOSIT = BASE_FEE * DEPOSIT_BASE_FEE_MULTIPLIER * CANCEL_EJECTION_WITH_SIG_GAS_REFUND;
     /// TODO: PLACEHOLDER UNTIL GAS COST FOR SIGNATURES IS KNOWN
@@ -43,7 +42,7 @@ contract EigenDAEjectionManagerTest is Test {
         directory = new EigenDADirectory();
         directory.initialize(address(accessControl));
         ejectionManager =
-            new EigenDAEjectionManager(address(token), DEPOSIT_BASE_FEE_MULTIPLIER, address(directory), 39128, 70000);
+            new EigenDAEjectionManager(address(token), DEPOSIT_BASE_FEE_MULTIPLIER, address(directory), 39_128, 70_000);
         accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, address(this));
         directory.addAddress(AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(ejectionManager));
         directory.addAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME, address(this));

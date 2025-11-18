@@ -15,7 +15,8 @@ import (
 // Note: we purposefully don't use StatusCode 0 here, to prevent default value bugs in case people
 // create a DerivationError by hand without using the constructors or sentinel errors defined here.
 var (
-	// Signifies that the input can't be parsed into a versioned cert.
+	// Signifies that the input can't be parsed into a versioned cert,
+	// meaning either the cert has an invalid version byte, or failed to get rlp.decoded from the given hex string
 	ErrCertParsingFailedDerivationError = DerivationError{StatusCode: 1}
 	// Signifies that the cert is invalid due to a recency check failure,
 	// meaning that `cert.L1InclusionBlock > batch.RBN + rbnRecencyWindowSize`.
