@@ -11,57 +11,9 @@ use thiserror::Error;
 /// Errors that can occur during blob verification
 #[derive(Debug, Error, PartialEq)]
 pub enum BlobVerificationError {
-    /// Encoded payload length is not a power of two
-    #[error("Encoded payload length ({0} bytes) is not a power of two")]
-    EncodedPayloadLengthNotPowerOfTwo(usize),
-
-    /// Invalid guard byte in header or symbol
-    #[error("Invalid guard byte at offset {offset}: expected 0x00, found 0x{found:02x}")]
-    EncodedPayloadInvalidGuardByte {
-        /// Offset where the invalid guard byte was found
-        offset: usize,
-        /// The actual byte value found
-        found: u8,
-    },
-
-    /// Invalid version byte in header
-    #[error("Invalid version byte: expected 0x00, found 0x{0:02x}")]
-    EncodedPayloadHeaderInvalidVersion(u8),
-
-    /// Invalid padding in header (bytes 6-31 must be zeros)
-    #[error("Invalid header padding at offset {offset}: expected 0x00, found 0x{found:02x}")]
-    EncodedPayloadInvalidHeaderPadding {
-        /// Offset where the invalid padding was found
-        offset: usize,
-        /// The actual byte value found
-        found: u8,
-    },
-
-    /// Invalid padding bytes (all padding must be zeros)
-    #[error(
-        "Invalid encoded payload padding at offset {offset}: expected 0x00, found 0x{found:02x}"
-    )]
-    EncodedPayloadInvalidPadding {
-        /// Offset where the invalid padding was found
-        offset: usize,
-        /// The actual byte value found
-        found: u8,
-    },
-
-    /// EncodedPayload is too small to contain the required 32-byte header
-    #[error("EncodedPayload is too small ({0} bytes), it is shorter than the 32 byte header")]
-    EncodedPayloadTooSmallForHeader(usize),
-
-    /// EncodedPayload is too small to contain the claimed payload length
-    #[error(
-        "EncodedPayload is too small ({encoded_payload_bytes_len} bytes), it can't hold claimed encoded payload length ({claimed_encoded_payload_bytes_len} bytes)"
-    )]
-    EncodedPayloadTooSmallForHeaderAndPayload {
-        /// Actual size of the encoded payload in bytes
-        encoded_payload_bytes_len: usize,
-        /// Claimed size of the encoded payload in bytes
-        claimed_encoded_payload_bytes_len: usize,
-    },
+    /// encoded payload decoding error
+    #[error("cannot decode an encoded payload")]
+    DecodingError(#[from] EncodedPayloadDecodingError),
 
     /// Blob length exceeds the maximum representable size (u32::MAX)
     #[error("Blob length does not fit into a u32 variable: {0}")]
@@ -86,4 +38,52 @@ pub enum BlobVerificationError {
     /// Arithmetic overflow occurred during payload processing
     #[error("Arithmetic overflow during payload processing")]
     Overflow,
+}
+
+/// List of error can happen during decoding an encoded payload
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum EncodedPayloadDecodingError {
+    /// the input encoded payload has wrong size
+    #[error(
+        "invalid number of bytes in the encoded payload {0}, that is not multiple of bytes per field element"
+    )]
+    InvalidLengthEncodedPayload(u64),
+    /// encoded payload must contain a power of 2 number of field elements
+    #[error(
+        "encoded payload must be a power of 2 field elements (32 bytes chunks), but got {0} field elements"
+    )]
+    InvalidPowerOfTwoLength(usize),
+    /// encoded payload header validation error
+    #[error("encoded payload header first byte must be 0x00, but got {0:#04x}")]
+    InvalidHeaderFirstByte(u8),
+    /// encoded payload too short for header
+    #[error(
+        "encoded payload is too small ({0} bytes), it is shorter than the 32 byte header required"
+    )]
+    EncodedPayloadTooShortForHeader(
+        /// Actual payload length
+        usize,
+    ),
+    /// unknown encoded payload header version
+    #[error("unknown encoded payload header version: {0}")]
+    UnknownEncodingVersion(u8),
+    /// length of unpadded data is less than claimed in header
+    #[error(
+        "length of unpadded data {actual} is less than length claimed in encoded payload header {claimed}"
+    )]
+    DecodedPayloadBodyTooShort {
+        /// Actual decoded body length that potentially has padding
+        actual: usize,
+        /// Claimed length from header
+        claimed: u32,
+    },
+    /// every multiple 32 bytes for storing a field element requires the first byte to be zero
+    #[error("non-zero byte encountered in the first byte of multiples of 32 bytes: {0}")]
+    InvalidFirstByteFieldElementPadding(u8),
+    /// padding are applied to the encoded payload body to ensure encoded length is power of 2, padding must be 0
+    #[error("non-zero padding byte encountered in the encoded payload body: {0}")]
+    InvalidEncodedPayloadBodyPadding(u8),
+    /// padding are applied to the encoded payload header to ensure the header takes 32 bytes, padding must be 0
+    #[error("non-zero padding byte encountered in the encoded payload header: {0}")]
+    InvalidEncodedPayloadHeaderPadding(u8),
 }
