@@ -20,19 +20,12 @@ import {IEigenDARelayRegistry, EigenDARelayRegistry} from "src/core/EigenDARelay
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {IEigenDADisperserRegistry, EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
-import {EigenDAServiceManager, IServiceManager} from "src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
+import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
 import {IAVSDirectory} from
     "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
 import {IRewardsCoordinator} from
     "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
-import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
-import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
-import {
-    IAVSDirectory
-} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
-import {
-    IRewardsCoordinator
-} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 import {
     IPauserRegistry,
     PauserRegistry
