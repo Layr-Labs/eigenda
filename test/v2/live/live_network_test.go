@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common"
@@ -468,13 +468,13 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	})
 	require.NoError(t, err, "new committer")
 
-	disperserConfig := &clients.DisperserClientConfig{
+	disperserConfig := &dispersal.DisperserClientConfig{
 		Hostname:          c.GetConfig().DisperserHostname,
 		Port:              fmt.Sprintf("%d", c.GetConfig().DisperserPort),
 		UseSecureGrpcFlag: true,
 	}
 
-	disperserClient, err := clients.NewDisperserClient(
+	disperserClient, err := dispersal.NewDisperserClient(
 		logger,
 		disperserConfig,
 		signer,
