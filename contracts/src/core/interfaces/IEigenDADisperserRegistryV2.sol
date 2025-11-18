@@ -91,6 +91,10 @@ interface IEigenDADisperserRegistryV2 {
     /// @param signature The signature from the disperser that authorizes this update.
     function updateRelayURL(uint32 disperserId, string memory relayURL, bytes memory signature) external;
 
+    /// @notice This function revokes the nonce for the caller.
+    /// @dev This function is used to revoke the caller's current nonce.
+    function revokeNonce() external;
+
     /// -----------------------------------------------------------------------
     /// View Functions
     /// -----------------------------------------------------------------------

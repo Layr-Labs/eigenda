@@ -72,7 +72,7 @@ contract EigenDADisperserRegistryV2 is
     function deregisterDisperser(uint32 disperserId, bytes memory signature) external virtual {
         EigenDATypesV2.DisperserInfoV2 storage disperserInfo = _disperserInfo[disperserId];
 
-        bytes32 digest = keccak256(abi.encode(DEREGISTRATION_TYPEHASH, disperserId));
+        bytes32 digest = keccak256(abi.encode(DEREGISTRATION_TYPEHASH, disperserId, nonces[disperserInfo.disperser]++));
 
         // Assert that the disperser is not in the default or on-demand dispersers sets.
         // This means owner can only deregister dispersers after revoking their default or on-demand status.
@@ -95,7 +95,8 @@ contract EigenDADisperserRegistryV2 is
     function updateRelayURL(uint32 disperserId, string memory relayURL, bytes memory signature) external {
         EigenDATypesV2.DisperserInfoV2 storage disperserInfo = _disperserInfo[disperserId];
 
-        bytes32 digest = keccak256(abi.encode(UPDATE_RELAY_URL_TYPEHASH, disperserId, relayURL));
+        bytes32 digest =
+            keccak256(abi.encode(UPDATE_RELAY_URL_TYPEHASH, disperserId, relayURL, nonces[disperserInfo.disperser]++));
 
         // Assert that the signature is valid (supports EIP-1271).
         _checkSignature(disperserInfo.disperser, digest, signature);
@@ -106,6 +107,11 @@ contract EigenDADisperserRegistryV2 is
         disperserInfo.relayURL = relayURL;
 
         emit RelayURLUpdated(disperserId, relayURL);
+    }
+
+    /// @inheritdoc IEigenDADisperserRegistryV2
+    function revokeNonce() external {
+        ++nonces[msg.sender];
     }
 
     /// @dev Verifies that the signature is valid if caller is not the disperser.
