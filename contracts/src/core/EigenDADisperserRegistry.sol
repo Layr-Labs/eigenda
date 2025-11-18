@@ -6,10 +6,8 @@ import {EigenDADisperserRegistryStorage} from "./EigenDADisperserRegistryStorage
 import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
-/**
- * @title Registry for EigenDA disperser info
- * @author Layr Labs, Inc.
- */
+/// @title Registry for EigenDA disperser info
+/// @author Layr Labs, Inc.
 contract EigenDADisperserRegistry is OwnableUpgradeable, EigenDADisperserRegistryStorage, IEigenDADisperserRegistry {
     constructor() {
         _disableInitializers();

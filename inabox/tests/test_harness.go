@@ -27,6 +27,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -272,23 +273,26 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("error getting account ID: %w", err)
 	}
 
-	accountant := clientsv2.NewAccountant(
-		accountId,
-		nil,
-		nil,
-		0,
-		0,
-		0,
-		0,
-		metrics.NoopAccountantMetrics,
-	)
+	g1Path, g2Path, g2TrailingPath, err := getSRSPaths()
+	if err != nil {
+		return nil, fmt.Errorf("get SRS paths: %w", err)
+	}
+
+	kzgCommitter, err := committer.NewFromConfig(committer.Config{
+		SRSNumberToLoad:   10000,
+		G1SRSPath:         g1Path,
+		G2SRSPath:         g2Path,
+		G2TrailingSRSPath: g2TrailingPath,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create kzg committer: %w", err)
+	}
 
 	disperserClient, err := clientsv2.NewDisperserClient(
 		logger,
 		disperserClientConfig,
 		signer,
-		nil, // no prover so will query disperser for generating commitments
-		accountant,
+		kzgCommitter,
 		metrics.NoopDispersalMetrics,
 	)
 	if err != nil {
@@ -303,26 +307,22 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		ContractCallTimeout:    5 * time.Second,
 	}
 
-	// Create ClientLedger based on configured mode
-	var clientLedger *clientledger.ClientLedger
-	if config.ClientLedgerMode != clientledger.ClientLedgerModeLegacy {
-		paymentVaultAddr, err := tc.ContractDirectory.GetContractAddress(ctx, directory.PaymentVault)
-		if err != nil {
-			return nil, fmt.Errorf("get PaymentVault address: %w", err)
-		}
+	paymentVaultAddr, err := tc.ContractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
 
-		clientLedger, err = buildClientLedger(
-			ctx,
-			logger,
-			tc.EthClient,
-			paymentVaultAddr,
-			accountId,
-			config.ClientLedgerMode,
-			disperserClient,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("build client ledger: %w", err)
-		}
+	clientLedger, err := buildClientLedger(
+		ctx,
+		logger,
+		tc.EthClient,
+		paymentVaultAddr,
+		accountId,
+		config.ClientLedgerMode,
+		disperserClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build client ledger: %w", err)
 	}
 
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(

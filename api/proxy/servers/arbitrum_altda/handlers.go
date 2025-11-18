@@ -28,7 +28,7 @@ import (
 
 	TODO: Method implementations:
 		[X] GetSupportedHeaderBytes // trusted integration
-		[-] Store // trusted integration
+		[X] Store // trusted integration
 		[X] RecoveryPayload // trusted integration
 		[-] CollectPreimages // trusted integration
 		[ ] GenerateProof // trustless AND secure integration

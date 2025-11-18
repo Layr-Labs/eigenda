@@ -92,7 +92,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     uint64 _minNumSymbols = 4096;
     uint64 _pricePerSymbol = 0.447 gwei;
     uint64 _priceUpdateCooldown = 1;
-    uint64 _globalSymbolsPerPeriod = 131072;
+    uint64 _globalSymbolsPerPeriod = 131_072;
     uint64 _reservationPeriodInterval = 10;
     uint64 _globalRatePeriodInterval = 30;
 
@@ -165,10 +165,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             )
         );
 
-        /**
-         * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
-         * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
-         */
+        /// First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
+        /// not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
@@ -284,7 +282,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 // forge-lint: disable-next-item(unsafe-typecast)
                 operatorSetParams[i] = IRegistryCoordinator.OperatorSetParam({
                     maxOperatorCount: uint32(maxOperatorCount), // Typecast is checked above.
-                    kickBIPsOfOperatorStake: 11000, // an operator needs to have kickBIPsOfOperatorStake / 10000 times the stake of the operator with the least stake to kick them out
+                    kickBIPsOfOperatorStake: 11_000, // an operator needs to have kickBIPsOfOperatorStake / 10000 times the stake of the operator with the least stake to kick them out
                     kickBIPsOfTotalStake: 1001 // an operator needs to have less than kickBIPsOfTotalStake / 10000 of the total stake to be kicked out
                 });
             }
@@ -415,8 +413,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         // Using the first deployed strategy token as deposit token
         address depositToken = address(deployedStrategyArray[0].underlyingToken());
         uint256 depositBaseFeeMultiplier = 100; // 100x base fee multiplier
-        uint256 estimatedGasUsedWithoutSig = 100000; // 100k gas estimate
-        uint256 estimatedGasUsedWithSig = 200000; // 200k gas estimate with signature verification
+        uint256 estimatedGasUsedWithoutSig = 100_000; // 100k gas estimate
+        uint256 estimatedGasUsedWithSig = 200_000; // 200k gas estimate with signature verification
 
         eigenDAEjectionManager = new EigenDAEjectionManager(
             depositToken,
