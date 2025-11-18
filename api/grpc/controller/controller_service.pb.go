@@ -324,7 +324,7 @@ type GetValidatorSigningRateDumpReply struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The signing rate data for all validators after the specified start time. If a too much data is requested
+	// The signing rate data for all validators after the specified start time. If too much data is requested
 	// in a single request, the server may only send a partial dump. To get a full dump, call this RPC
 	// multiple times, using the end_timestamp of the last bucket received as the start_timestamp of the next request.
 	SigningRateBuckets []*validator.SigningRateBucket `protobuf:"bytes,1,rep,name=signing_rate_buckets,json=signingRateBuckets,proto3" json:"signing_rate_buckets,omitempty"`
