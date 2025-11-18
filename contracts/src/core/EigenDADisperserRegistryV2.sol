@@ -121,7 +121,7 @@ contract EigenDADisperserRegistryV2 is
     /// @param signature The signature of the disperser that is updating their relay URL.
     function _checkSignature(address disperser, bytes32 digest, bytes memory signature) internal view {
         if (msg.sender != disperser) {
-            if (!disperser.isValidSignatureNow(digest, signature)) revert InvalidSignature();
+            if (!disperser.isValidSignatureNow(_hashTypedDataV4(digest), signature)) revert InvalidSignature();
         }
     }
 
