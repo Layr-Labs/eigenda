@@ -3,11 +3,11 @@ pragma solidity ^0.8.9;
 
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {
-    EnumerableMapUpgradeable
-} from "lib/openzeppelin-contracts-upgradeable/contracts/utils/structs/EnumerableMapUpgradeable.sol";
+    EnumerableSetUpgradeable
+} from "lib/openzeppelin-contracts-upgradeable/contracts/utils/structs/EnumerableSetUpgradeable.sol";
 
 abstract contract EigenDADisperserRegistryStorageV2 {
-    using EnumerableMapUpgradeable for EnumerableMapUpgradeable.UintToAddressMap;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
 
     /// -----------------------------------------------------------------------
     /// Constants
@@ -26,19 +26,22 @@ abstract contract EigenDADisperserRegistryStorageV2 {
     /// Mutable Storage
     /// -----------------------------------------------------------------------
 
-    /// @notice Returns the total number of registered dispersers.
-    uint32 public totalDispersers;
+    /// @notice Returns the total number of registrations.
+    uint32 public totalRegistrations;
+    /// @notice Returns the nonce for a given disperser address.
+    mapping(address disperser => uint256 nonce) public nonces;
+
     /// @dev Mapping from disperser ID to disperser address for default dispersers.
-    EnumerableMapUpgradeable.UintToAddressMap internal _defaultDispersers;
+    EnumerableSetUpgradeable.UintSet internal _defaultDispersers;
     /// @dev Mapping from disperser ID to disperser address for on-demand dispersers.
-    EnumerableMapUpgradeable.UintToAddressMap internal _onDemandDispersers;
+    EnumerableSetUpgradeable.UintSet internal _onDemandDispersers;
     /// @dev Mapping from disperser ID to disperser info.
-    mapping(uint32 disperserId => EigenDATypesV2.DisperserInfoV2 disperserInfo) public _disperserInfo;
+    mapping(uint32 disperserId => EigenDATypesV2.DisperserInfoV2 disperserInfo) internal _disperserInfo;
 
     /// -----------------------------------------------------------------------
     /// Storage Gap
     /// -----------------------------------------------------------------------
 
     // slither-disable-next-line shadowing-state
-    uint256[44] private __GAP; // TODO: Update gap to accounts for enumerable maps.
+    uint256[41] private __GAP;
 }

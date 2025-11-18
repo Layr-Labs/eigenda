@@ -77,11 +77,15 @@ interface IEigenDADisperserRegistryV2 {
     function registerDisperser(address disperser, string memory relayURL) external returns (uint32 disperserId);
 
     /// @notice This function deregisters a disperser from the registry using a valid signature.
+    /// @dev The `signature` parameter can be empty if `msg.sender` is the registered disperser.
+    /// Reverts if the signature is invalid and the caller is not the disperser.
     /// @param disperserId The ID of the disperser that should be deregistered.
     /// @param signature The signature from the disperser that authorizes this deregistration.
     function deregisterDisperser(uint32 disperserId, bytes memory signature) external;
 
     /// @notice This function updates the relay URL for a disperser using a valid signature.
+    /// @dev The `signature` parameter can be empty if `msg.sender` is the registered disperser.
+    /// Reverts if the signature is invalid and the caller is not the disperser.
     /// @param disperserId The ID of the disperser whose relay URL should be updated.
     /// @param relayURL The new relay URL that should be set for this disperser.
     /// @param signature The signature from the disperser that authorizes this update.
@@ -92,14 +96,12 @@ interface IEigenDADisperserRegistryV2 {
     /// -----------------------------------------------------------------------
 
     /// @notice This function adds a disperser to the default dispersers set (only callable by owner).
-    /// @param disperser The address of the disperser that should be added to the default set.
     /// @param disperserId The ID of the disperser that should be added to the default set.
-    function addDefaultDisperser(address disperser, uint32 disperserId) external;
+    function addDefaultDisperser(uint32 disperserId) external;
 
     /// @notice This function adds a disperser to the on-demand dispersers set (only callable by owner).
-    /// @param disperser The address of the disperser that should be added to the on-demand set.
     /// @param disperserId The ID of the disperser that should be added to the on-demand set.
-    function addOnDemandDisperser(address disperser, uint32 disperserId) external;
+    function addOnDemandDisperser(uint32 disperserId) external;
 
     /// @notice This function removes a disperser from the default dispersers set (only callable by owner).
     /// @param disperserId The ID of the disperser that should be removed from the default set.
@@ -113,20 +115,10 @@ interface IEigenDADisperserRegistryV2 {
     /// View Functions
     /// -----------------------------------------------------------------------
 
-    // /// @notice This function returns the disperser information for the provided array of disperser IDs.
-    // /// @param ids The array of disperser IDs for which information should be retrieved.
-    // /// @return An array of DisperserInfoV2 structs containing the information for each requested disperser.
-    // function getDisperserInfo(uint32[] memory ids) external view returns (EigenDATypesV2.DisperserInfoV2[] memory);
-
-    // /// @notice This function returns the disperser address for a given disperser key.
-    // /// @param key The disperser key that should be looked up.
-    // /// @return The address associated with the provided disperser key.
-    // function disperserKeyToAddress(uint32 key) external view returns (address);
-
-    // /// @notice This function returns the disperser ID for a given disperser address.
-    // /// @param disperser The address of the disperser to look up.
-    // /// @return The disperser ID associated with the provided address.
-    // function getDisperserIdByAddress(address disperser) external view returns (uint32);
+    /// @notice This function returns the disperser information for the provided array of disperser IDs.
+    /// @param ids The array of disperser IDs for which information should be retrieved.
+    /// @return An array of DisperserInfoV2 structs containing the information for each requested disperser.
+    function getDisperserInfo(uint32[] memory ids) external view returns (EigenDATypesV2.DisperserInfoV2[] memory);
 
     /// @notice This function returns all disperser IDs that are in the default dispersers set.
     /// @return An array containing all disperser IDs in the default dispersers set.
