@@ -54,43 +54,50 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         address eigenDAServiceManager =
             IEigenDADirectory(eigenDADirectory).getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME);
-        if (eigenDAServiceManager == address(0)) {
-            revert("EigenDAServiceManager contract address not set in provided EigenDADirectory contract");
-        }
+        assertFalse(
+            eigenDAServiceManager == address(0),
+            "EigenDAServiceManager contract address not set in provided EigenDADirectory contract"
+        );
 
-        // 2.a - assume we can read a batch number that's greater than zero
-        uint32 batchNumber = IEigenDAServiceManager(eigenDAServiceManager).taskNumber();
-        if (batchNumber == 0) {
-            revert("Expected to have batch ID > 0 in EigenDAServiceManager contract storage");
-        }
+        // 2.a - assume we can probe the batchNumber view call for a return value that's greater than 0
+        //       indicative of legacy EigenDAV1 batching
+        assertGt(
+            IEigenDAServiceManager(eigenDAServiceManager).taskNumber(),
+            0,
+            "Expected to have batch ID > 0 in EigenDAServiceManager contract storage"
+        );
 
         // 2.b - assume we can read the blob params at version index 0 and that the struct
         //       is initialized
         address eigenDAThresholdRegistry =
             IEigenDADirectory(eigenDADirectory).getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME);
-        if (eigenDAThresholdRegistry == address(0)) {
-            revert("EigenDAThresholdRegistry contract address not set in provided EigenDADirectory contract");
-        }
+        assertFalse(
+            eigenDAThresholdRegistry == address(0),
+            "EigenDAThresholdRegistry contract address not set in provided EigenDADirectory contract"
+        );
 
         DATypesV1.VersionedBlobParams memory blobParams =
             IEigenDAThresholdRegistry(eigenDAThresholdRegistry).getBlobParams(0);
 
-        if (blobParams.codingRate == 0) {
-            revert(
-                "EigenDAThresholdRegistry contract should return blob params that have been initialized at version index 0"
-            );
-        }
+        assertGt(
+            blobParams.codingRate,
+            0,
+            "EigenDAThresholdRegistry contract should return blob params that have been initialized at version index 0"
+        );
 
         // 3 - validate arbitrary user input for correctness
         //
         //     these checks are done in constructor but saves user some gas if caught here
-        if (quorumNumbersRequired.length == 0 || quorumNumbersRequired.length > 256) {
-            revert("quorumNumbersRequired must be in size range (0, 256]");
-        }
+        assertTrue(
+            quorumNumbersRequired.length > 0 && quorumNumbersRequired.length <= 256,
+            "quorumNumbersRequired must be in size range (0, 256]"
+        );
 
-        if (defaultSecurityThresholds.adversaryThreshold >= defaultSecurityThresholds.confirmationThreshold) {
-            revert("adversaryThreshold cannot be greater than the confirmationThreshold");
-        }
+        assertLt(
+            defaultSecurityThresholds.adversaryThreshold,
+            defaultSecurityThresholds.confirmationThreshold,
+            "adversaryThreshold cannot be greater than the confirmationThreshold"
+        );
 
         // 4 - broadcast single deploy tx which constructs the immutable EigenDACertVerifier contract
         //     using standard CREATE
