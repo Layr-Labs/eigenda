@@ -34,7 +34,7 @@ abstract contract EigenDADisperserRegistryStorageV2 {
     /// @dev Set of disperser IDs for default dispersers.
     /// Validators should default to accepting dispersals from dispersers in this set.
     EnumerableSetUpgradeable.UintSet internal _defaultDispersers;
-    
+
     /// @dev Set of disperser IDs for on-demand dispersers.
     /// Dispersers in this set are authorized to use on-demand (pay-per-use) payments.
     EnumerableSetUpgradeable.UintSet internal _onDemandDispersers;

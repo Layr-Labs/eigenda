@@ -133,16 +133,16 @@ contract EigenDADisperserRegistryV2 is
     /// Owner-only Logic
     /// -----------------------------------------------------------------------
 
-    // TODO: Extra checks?
-
     /// @inheritdoc IEigenDADisperserRegistryV2
     function addDefaultDisperser(uint32 disperserId) external onlyOwner {
+        if (_disperserInfo[disperserId].disperser == address(0)) revert DisperserIsNotRegistered();
         if (!_defaultDispersers.add(disperserId)) revert DisperserInSet();
         emit DefaultDisperserAdded(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function addOnDemandDisperser(uint32 disperserId) external onlyOwner {
+        if (_disperserInfo[disperserId].disperser == address(0)) revert DisperserIsNotRegistered();
         if (!_onDemandDispersers.add(disperserId)) revert DisperserInSet();
         emit OnDemandDisperserAdded(disperserId);
     }
