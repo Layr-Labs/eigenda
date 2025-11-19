@@ -19,7 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	ControllerService_AuthorizePayment_FullMethodName = "/controller.ControllerService/AuthorizePayment"
+	ControllerService_AuthorizePayment_FullMethodName            = "/controller.ControllerService/AuthorizePayment"
+	ControllerService_GetValidatorSigningRate_FullMethodName     = "/controller.ControllerService/GetValidatorSigningRate"
+	ControllerService_GetValidatorSigningRateDump_FullMethodName = "/controller.ControllerService/GetValidatorSigningRateDump"
 )
 
 // ControllerServiceClient is the client API for ControllerService service.
@@ -40,6 +42,10 @@ type ControllerServiceClient interface {
 	// able to waste user funds. They would only be able to attack the liveness of the Controller through high submission
 	// volume, which would be a vulnerability regardless of whether we had auth between the API server and the Controller.
 	AuthorizePayment(ctx context.Context, in *AuthorizePaymentRequest, opts ...grpc.CallOption) (*AuthorizePaymentResponse, error)
+	// GetValidatorSigningRate returns the signing rate of a validator during a time range.
+	GetValidatorSigningRate(ctx context.Context, in *GetValidatorSigningRateRequest, opts ...grpc.CallOption) (*GetValidatorSigningRateReply, error)
+	// Request a dump of signing rate data for all validators after a specified start time.
+	GetValidatorSigningRateDump(ctx context.Context, in *GetValidatorSigningRateDumpRequest, opts ...grpc.CallOption) (*GetValidatorSigningRateDumpReply, error)
 }
 
 type controllerServiceClient struct {
@@ -53,6 +59,24 @@ func NewControllerServiceClient(cc grpc.ClientConnInterface) ControllerServiceCl
 func (c *controllerServiceClient) AuthorizePayment(ctx context.Context, in *AuthorizePaymentRequest, opts ...grpc.CallOption) (*AuthorizePaymentResponse, error) {
 	out := new(AuthorizePaymentResponse)
 	err := c.cc.Invoke(ctx, ControllerService_AuthorizePayment_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controllerServiceClient) GetValidatorSigningRate(ctx context.Context, in *GetValidatorSigningRateRequest, opts ...grpc.CallOption) (*GetValidatorSigningRateReply, error) {
+	out := new(GetValidatorSigningRateReply)
+	err := c.cc.Invoke(ctx, ControllerService_GetValidatorSigningRate_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controllerServiceClient) GetValidatorSigningRateDump(ctx context.Context, in *GetValidatorSigningRateDumpRequest, opts ...grpc.CallOption) (*GetValidatorSigningRateDumpReply, error) {
+	out := new(GetValidatorSigningRateDumpReply)
+	err := c.cc.Invoke(ctx, ControllerService_GetValidatorSigningRateDump_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -77,6 +101,10 @@ type ControllerServiceServer interface {
 	// able to waste user funds. They would only be able to attack the liveness of the Controller through high submission
 	// volume, which would be a vulnerability regardless of whether we had auth between the API server and the Controller.
 	AuthorizePayment(context.Context, *AuthorizePaymentRequest) (*AuthorizePaymentResponse, error)
+	// GetValidatorSigningRate returns the signing rate of a validator during a time range.
+	GetValidatorSigningRate(context.Context, *GetValidatorSigningRateRequest) (*GetValidatorSigningRateReply, error)
+	// Request a dump of signing rate data for all validators after a specified start time.
+	GetValidatorSigningRateDump(context.Context, *GetValidatorSigningRateDumpRequest) (*GetValidatorSigningRateDumpReply, error)
 	mustEmbedUnimplementedControllerServiceServer()
 }
 
@@ -86,6 +114,12 @@ type UnimplementedControllerServiceServer struct {
 
 func (UnimplementedControllerServiceServer) AuthorizePayment(context.Context, *AuthorizePaymentRequest) (*AuthorizePaymentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AuthorizePayment not implemented")
+}
+func (UnimplementedControllerServiceServer) GetValidatorSigningRate(context.Context, *GetValidatorSigningRateRequest) (*GetValidatorSigningRateReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetValidatorSigningRate not implemented")
+}
+func (UnimplementedControllerServiceServer) GetValidatorSigningRateDump(context.Context, *GetValidatorSigningRateDumpRequest) (*GetValidatorSigningRateDumpReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetValidatorSigningRateDump not implemented")
 }
 func (UnimplementedControllerServiceServer) mustEmbedUnimplementedControllerServiceServer() {}
 
@@ -118,6 +152,42 @@ func _ControllerService_AuthorizePayment_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ControllerService_GetValidatorSigningRate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetValidatorSigningRateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServiceServer).GetValidatorSigningRate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControllerService_GetValidatorSigningRate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServiceServer).GetValidatorSigningRate(ctx, req.(*GetValidatorSigningRateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ControllerService_GetValidatorSigningRateDump_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetValidatorSigningRateDumpRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServiceServer).GetValidatorSigningRateDump(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControllerService_GetValidatorSigningRateDump_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServiceServer).GetValidatorSigningRateDump(ctx, req.(*GetValidatorSigningRateDumpRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ControllerService_ServiceDesc is the grpc.ServiceDesc for ControllerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -128,6 +198,14 @@ var ControllerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AuthorizePayment",
 			Handler:    _ControllerService_AuthorizePayment_Handler,
+		},
+		{
+			MethodName: "GetValidatorSigningRate",
+			Handler:    _ControllerService_GetValidatorSigningRate_Handler,
+		},
+		{
+			MethodName: "GetValidatorSigningRateDump",
+			Handler:    _ControllerService_GetValidatorSigningRateDump_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

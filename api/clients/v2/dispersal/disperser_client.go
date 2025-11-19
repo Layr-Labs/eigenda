@@ -1,4 +1,4 @@
-package clients
+package dispersal
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -93,7 +94,7 @@ func NewDisperserClient(
 	}
 
 	addr := fmt.Sprintf("%v:%v", config.Hostname, config.Port)
-	dialOptions := GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB)
+	dialOptions := clients.GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB)
 	clientPool, err := common.NewGRPCClientPool(
 		logger,
 		disperser_rpc.NewDisperserClient,

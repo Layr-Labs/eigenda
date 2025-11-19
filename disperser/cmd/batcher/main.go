@@ -25,7 +25,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli"
 )
 
@@ -178,10 +177,11 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 
 	// used by non graph indexer
-	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
+	ethClient, err := geth.SafeDial(context.Background(), config.EthClientConfig.RPCURLs[0])
 	if err != nil {
 		return err
 	}
+	rpcClient := ethClient.Client()
 	tx, err := coreeth.NewWriter(logger, client, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
