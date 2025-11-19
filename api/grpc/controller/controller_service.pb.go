@@ -141,9 +141,14 @@ type GetValidatorSigningRateRequest struct {
 
 	// The unique identifier of the validator (i.e. the operator ID).
 	ValidatorId []byte `protobuf:"bytes,1,opt,name=validator_id,json=validatorId,proto3" json:"validator_id,omitempty"`
-	// The time range to query the signing rate for, in seconds since Unix epoch.
+	// The start of the time range to query the signing rate for, in seconds since Unix epoch. If there is a bucket that
+	// starts before but ends after this timestamp, that bucket will be included in the response, even though
+	// some of its data is before the requested start time.
 	StartTimestamp uint64 `protobuf:"varint,2,opt,name=start_timestamp,json=startTimestamp,proto3" json:"start_timestamp,omitempty"`
-	// The end time of the range, in seconds since Unix epoch, exclusive.
+	// The end time of the range, in seconds since Unix epoch (exclusive). If a bucket's start time is greater than
+	// or equal to this timestamp, it will not be included in the response. If a bucket's start time is before this
+	// timestamp and its end time is after or equal to this timestamp, it will be included in the response, even though
+	// some of its data is after the requested end time.
 	EndTimestamp uint64 `protobuf:"varint,3,opt,name=end_timestamp,json=endTimestamp,proto3" json:"end_timestamp,omitempty"`
 }
 

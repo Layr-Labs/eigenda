@@ -29,7 +29,7 @@ service ControllerService {
   // GetValidatorSigningRate returns the signing rate of a validator during a time range.
   rpc GetValidatorSigningRate(GetValidatorSigningRateRequest) returns (GetValidatorSigningRateReply) {}
 
-    // Request a dump of signing rate data for all validators after a specified start time.
+  // Request a dump of signing rate data for all validators after a specified start time.
   rpc GetValidatorSigningRateDump(GetValidatorSigningRateDumpRequest) returns (GetValidatorSigningRateDumpReply) {}
 }
 
@@ -63,9 +63,14 @@ message AuthorizePaymentResponse {}
 message GetValidatorSigningRateRequest {
   // The unique identifier of the validator (i.e. the operator ID).
   bytes validator_id = 1;
-  // The time range to query the signing rate for, in seconds since Unix epoch.
+  // The start of the time range to query the signing rate for, in seconds since Unix epoch. If there is a bucket that
+  // starts before but ends after this timestamp, that bucket will be included in the response, even though
+  // some of its data is before the requested start time.
   uint64 start_timestamp = 2;
-  // The end time of the range, in seconds since Unix epoch, exclusive.
+  // The end time of the range, in seconds since Unix epoch (exclusive). If a bucket's start time is greater than
+  // or equal to this timestamp, it will not be included in the response. If a bucket's start time is before this 
+  // timestamp and its end time is after or equal to this timestamp, it will be included in the response, even though
+  // some of its data is after the requested end time.
   uint64 end_timestamp = 3;
 }
 
