@@ -124,7 +124,7 @@ impl EigenDaProvider {
             Network::Sepolia => STATIC_CERT_VERIFIER_SEPOLIA,
         };
 
-        let contracts = EigenDaContracts::new(&ethereum, directory_address).await?;
+        let contracts = EigenDaContracts::new(&ethereum, directory_address, cert_verifier_address).await?;
 
         Ok(Self {
             ethereum,
