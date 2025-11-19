@@ -2,12 +2,10 @@
 pragma solidity ^0.8.9;
 
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
-import {
-    EnumerableSetUpgradeable
-} from "lib/openzeppelin-contracts-upgradeable/contracts/utils/structs/EnumerableSetUpgradeable.sol";
+import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
 abstract contract EigenDADisperserRegistryStorageV2 {
-    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     /// -----------------------------------------------------------------------
     /// Constants
@@ -30,27 +28,34 @@ abstract contract EigenDADisperserRegistryStorageV2 {
     /// Mutable Storage
     /// -----------------------------------------------------------------------
 
-    /// @notice Returns the total number of registrations.
-    uint32 public totalRegistrations;
+    /// @dev Returns the ERC-7201 namespace for this contract.
+    ///      https://eips.ethereum.org/EIPS/eip-7201
+    bytes32 private constant DISPERSER_REGISTRY_STORAGE_LOCATION =
+        keccak256(abi.encode(uint256(keccak256("eigenda.disperser.registry.storage")) - 1)) & ~bytes32(uint256(0xff));
 
-    /// @notice Returns the nonce for a given disperser address.
-    mapping(address disperser => uint256 nonce) public nonces;
+    /// @dev Struct containing the storage layout for this contract (without dependencies).
+    struct Layout {
+        /// @dev Returns the total number of registrations.
+        uint32 totalRegistrations;
+        /// @dev Returns the nonce for a given disperser address.
+        mapping(address disperser => uint256 nonce) nonces;
+        /// @dev Set of disperser IDs for default dispersers.
+        /// Validators should default to accepting dispersals from dispersers in this set.
+        EnumerableSet.UintSet defaultDispersers;
+        /// @dev Set of disperser IDs for on-demand dispersers.
+        /// Dispersers in this set are authorized to use on-demand (pay-per-use) payments.
+        EnumerableSet.UintSet onDemandDispersers;
+        /// @dev Mapping from disperser ID to disperser info.
+        mapping(uint32 disperserId => EigenDATypesV2.DisperserInfoV2 disperserInfo) disperserInfo;
+    }
 
-    /// @dev Set of disperser IDs for default dispersers.
-    /// Validators should default to accepting dispersals from dispersers in this set.
-    EnumerableSetUpgradeable.UintSet internal _defaultDispersers;
-
-    /// @dev Set of disperser IDs for on-demand dispersers.
-    /// Dispersers in this set are authorized to use on-demand (pay-per-use) payments.
-    EnumerableSetUpgradeable.UintSet internal _onDemandDispersers;
-
-    /// @dev Mapping from disperser ID to disperser info.
-    mapping(uint32 disperserId => EigenDATypesV2.DisperserInfoV2 disperserInfo) internal _disperserInfo;
-
-    /// -----------------------------------------------------------------------
-    /// Storage Gap
-    /// -----------------------------------------------------------------------
-
-    // slither-disable-next-line shadowing-state
-    uint256[41] private __GAP;
+    /// @dev Returns the storage layout for this contract.
+    /// Usage: `Layout storage $ = getDisperserRegistryStorage();`.
+    function getDisperserRegistryStorage() internal pure returns (Layout storage $) {
+        bytes32 ptr = DISPERSER_REGISTRY_STORAGE_LOCATION;
+        /// @solidity memory-safe-assembly
+        assembly {
+            $.slot := ptr
+        }
+    }
 }

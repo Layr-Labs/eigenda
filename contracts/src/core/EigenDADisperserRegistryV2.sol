@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+// TODO: We MUST use OZ v5.5.0 in order to use EIP712Upgradeable.
+
 import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
-import {
-    EnumerableSetUpgradeable
-} from "lib/openzeppelin-contracts-upgradeable/contracts/utils/structs/EnumerableSetUpgradeable.sol";
+import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 import {
     EIP712Upgradeable
 } from "lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/draft-EIP712Upgradeable.sol";
@@ -29,7 +29,7 @@ contract EigenDADisperserRegistryV2 is
     IEigenDADisperserRegistryV2
 {
     using SignatureCheckerUpgradeable for address;
-    using EnumerableSetUpgradeable for *;
+    using EnumerableSet for *;
 
     /// -----------------------------------------------------------------------
     /// Initialization
@@ -55,21 +55,25 @@ contract EigenDADisperserRegistryV2 is
         virtual
         returns (uint32 disperserId)
     {
-        bytes32 digest = keccak256(abi.encode(REGISTRATION_TYPEHASH, disperser, relayURL, nonces[disperser]++));
+        // Create a reference to the contract's storage.
+        Layout storage $ = getDisperserRegistryStorage();
+        // Create a reference to the disperser info.
+        EigenDATypesV2.DisperserInfoV2 storage disperserInfo = $.disperserInfo[disperserId];
+
+        // Increment and assign the next available disperserId, starting at 1 (not 0).
+        disperserId = $.totalRegistrations + 1; // Monotonically increasing.
+
+        bytes32 digest = keccak256(abi.encode(REGISTRATION_TYPEHASH, disperser, relayURL, $.nonces[disperser]++));
 
         // Assert that the signature is valid (supports EIP-1271).
         _checkSignature(disperser, digest, signature);
         // Assert that the disperser address is non-zero.
         if (disperser == address(0)) revert InputAddressZero();
-
-        // Increment and assign the next available disperserId, starting at 1 (not 0).
-        disperserId = ++totalRegistrations; // Monotonically increasing.
-
-        EigenDATypesV2.DisperserInfoV2 storage disperserInfo = _disperserInfo[disperserId];
-
         // Assert that the disperser is not already registered.
         if (disperserInfo.disperser != address(0)) revert DisperserIsRegistered();
 
+        // Increment total registrations.
+        $.totalRegistrations = disperserId;
         // Set the disperser info.
         disperserInfo.disperser = disperser;
         disperserInfo.relayURL = relayURL;
@@ -79,19 +83,27 @@ contract EigenDADisperserRegistryV2 is
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function deregisterDisperser(uint32 disperserId, bytes memory signature) external virtual {
-        EigenDATypesV2.DisperserInfoV2 storage disperserInfo = _disperserInfo[disperserId];
+        // Create a reference to the contract's storage.
+        Layout storage $ = getDisperserRegistryStorage();
+        // Create a reference to the disperser info.
+        EigenDATypesV2.DisperserInfoV2 storage disperserInfo = $.disperserInfo[disperserId];
 
-        bytes32 digest = keccak256(abi.encode(DEREGISTRATION_TYPEHASH, disperserId, nonces[disperserInfo.disperser]++));
+        bytes32 digest =
+            keccak256(abi.encode(DEREGISTRATION_TYPEHASH, disperserId, $.nonces[disperserInfo.disperser]++));
+
+        // TODO: Instead we should simply remove them from the sets.
 
         // Assert that the disperser is not in the default or on-demand dispersers sets.
         // This means owner can only deregister dispersers after revoking their default or on-demand status.
-        if (_defaultDispersers.contains(disperserId) || _onDemandDispersers.contains(disperserId)) {
+        if ($.defaultDispersers.contains(disperserId) || $.onDemandDispersers.contains(disperserId)) {
             revert DisperserInSet();
         }
 
         _checkSignature(disperserInfo.disperser, digest, signature);
         // Assert that the disperser is registered.
         if (disperserInfo.disperser == address(0)) revert DisperserIsNotRegistered();
+
+        // Total registrations are monotonically increasing, no need to decrement.
 
         // Delete the disperser info.
         delete disperserInfo.disperser;
@@ -102,10 +114,13 @@ contract EigenDADisperserRegistryV2 is
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function updateRelayURL(uint32 disperserId, string memory relayURL, bytes memory signature) external {
-        EigenDATypesV2.DisperserInfoV2 storage disperserInfo = _disperserInfo[disperserId];
+        Layout storage $ = getDisperserRegistryStorage();
 
-        bytes32 digest =
-            keccak256(abi.encode(UPDATE_RELAY_URL_TYPEHASH, disperserId, relayURL, nonces[disperserInfo.disperser]++));
+        EigenDATypesV2.DisperserInfoV2 storage disperserInfo = $.disperserInfo[disperserId];
+
+        bytes32 digest = keccak256(
+            abi.encode(UPDATE_RELAY_URL_TYPEHASH, disperserId, relayURL, $.nonces[disperserInfo.disperser]++)
+        );
 
         // Assert that the signature is valid (supports EIP-1271).
         _checkSignature(disperserInfo.disperser, digest, signature);
@@ -120,7 +135,10 @@ contract EigenDADisperserRegistryV2 is
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function revokeNonce() external {
-        ++nonces[msg.sender];
+        Layout storage $ = getDisperserRegistryStorage();
+        unchecked {
+            ++$.nonces[msg.sender];
+        }
     }
 
     /// @dev Verifies that the signature is valid if caller is not the disperser.
@@ -140,27 +158,31 @@ contract EigenDADisperserRegistryV2 is
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function addDefaultDisperser(uint32 disperserId) external onlyOwner {
-        if (_disperserInfo[disperserId].disperser == address(0)) revert DisperserIsNotRegistered();
-        if (!_defaultDispersers.add(disperserId)) revert DisperserInSet();
+        Layout storage $ = getDisperserRegistryStorage();
+        if ($.disperserInfo[disperserId].disperser == address(0)) revert DisperserIsNotRegistered();
+        if (!$.defaultDispersers.add(disperserId)) revert DisperserInSet();
         emit DefaultDisperserAdded(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function addOnDemandDisperser(uint32 disperserId) external onlyOwner {
-        if (_disperserInfo[disperserId].disperser == address(0)) revert DisperserIsNotRegistered();
-        if (!_onDemandDispersers.add(disperserId)) revert DisperserInSet();
+        Layout storage $ = getDisperserRegistryStorage();
+        if ($.disperserInfo[disperserId].disperser == address(0)) revert DisperserIsNotRegistered();
+        if (!$.onDemandDispersers.add(disperserId)) revert DisperserInSet();
         emit OnDemandDisperserAdded(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function removeDefaultDisperser(uint32 disperserId) external onlyOwner {
-        if (!_defaultDispersers.remove(disperserId)) revert DisperserNotInSet();
+        Layout storage $ = getDisperserRegistryStorage();
+        if (!$.defaultDispersers.remove(disperserId)) revert DisperserNotInSet();
         emit DefaultDisperserRemoved(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function removeOnDemandDisperser(uint32 disperserId) external onlyOwner {
-        if (!_onDemandDispersers.remove(disperserId)) revert DisperserNotInSet();
+        Layout storage $ = getDisperserRegistryStorage();
+        if (!$.onDemandDispersers.remove(disperserId)) revert DisperserNotInSet();
         emit OnDemandDisperserRemoved(disperserId);
     }
 
@@ -168,23 +190,37 @@ contract EigenDADisperserRegistryV2 is
     /// View Logic
     /// -----------------------------------------------------------------------
 
+    // /// @inheritdoc IEigenDADisperserRegistryV2
+    // function getTotalRegistrations() external view returns (uint32) {
+    //     Layout storage $ = getDisperserRegistryStorage();
+    //     return $.totalRegistrations;
+    // }
+
+    // /// @inheritdoc IEigenDADisperserRegistryV2
+    // function getNonce(address disperser) external view returns (uint256) {
+    //     Layout storage $ = getDisperserRegistryStorage();
+    //     return $.nonces[disperser];
+    // }
+
     /// @inheritdoc IEigenDADisperserRegistryV2
     function getDisperserInfo(uint32[] memory ids)
         external
         view
         returns (EigenDATypesV2.DisperserInfoV2[] memory info)
     {
+        Layout storage $ = getDisperserRegistryStorage();
         uint256 len = ids.length;
         info = new EigenDATypesV2.DisperserInfoV2[](len);
         for (uint256 i = 0; i < len; ++i) {
-            info[i] = _disperserInfo[ids[i]];
+            info[i] = $.disperserInfo[ids[i]];
         }
         return info;
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function getDefaultDisperserIds() external view returns (uint32[] memory ids) {
-        uint256[] memory keys = _defaultDispersers.values();
+        Layout storage $ = getDisperserRegistryStorage();
+        uint256[] memory keys = $.defaultDispersers.values();
         /// @solidity memory-safe-assembly
         assembly {
             ids := keys
@@ -194,7 +230,8 @@ contract EigenDADisperserRegistryV2 is
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function getOnDemandDisperserIds() external view returns (uint32[] memory ids) {
-        uint256[] memory keys = _onDemandDispersers.values();
+        Layout storage $ = getDisperserRegistryStorage();
+        uint256[] memory keys = $.onDemandDispersers.values();
         /// @solidity memory-safe-assembly
         assembly {
             ids := keys
@@ -204,11 +241,13 @@ contract EigenDADisperserRegistryV2 is
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function isDefaultDisperserId(uint32 disperserId) external view returns (bool) {
-        return _defaultDispersers.contains(disperserId);
+        Layout storage $ = getDisperserRegistryStorage();
+        return $.defaultDispersers.contains(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function isOnDemandDisperserId(uint32 disperserId) external view returns (bool) {
-        return _onDemandDispersers.contains(disperserId);
+        Layout storage $ = getDisperserRegistryStorage();
+        return $.onDemandDispersers.contains(disperserId);
     }
 }
