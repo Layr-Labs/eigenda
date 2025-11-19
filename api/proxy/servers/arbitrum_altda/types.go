@@ -19,9 +19,9 @@ var (
 	// Vendored from:
 	// https://github.com/OffchainLabs/nitro/blob/2b3cf2138b17af6411e7e391eac346267fec121a/daprovider/reader.go#L19-L31
 	//
-	// ErCertValidationError is returned by a CustomDA provider to signal an "invalid DA Cert"
+	// ErrCertValidationError is returned by a CustomDA provider to signal an "invalid DA Cert"
 	// condition to the Arbitrum derivation pipeline.
-	ErCertValidationError = errors.New("certificate validation failed")
+	ErrCertValidationError = errors.New("certificate validation failed")
 )
 
 const (

@@ -26,7 +26,7 @@ GLOBAL OPTIONS:
     --arbitrum-da.port value            (default: 3101)                    ($EIGENDA_PROXY_ARB_DA_PORT)
           Server listening port
    
-    --arbitrum-da.process-invalid-cert  (default: false)                   ($EIGENDA_PROXY_ARB_DA_PROCESS_INVALID_CERT)
+    --arbitrum-da.return-invalid-cert-error (default: false)                   ($EIGENDA_PROXY_ARB_DA_PROCESS_INVALID_CERT)
           Whether or not the CustomDA server should return a `CertificateValidationError`
           to the arbitrum nitro derivation pipeline which "drops" the DA Cert by treating
           it as an empty batch. When disabled or set to false, an invalid DA Cert would

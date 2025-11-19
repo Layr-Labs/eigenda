@@ -223,7 +223,7 @@ func TestRecoverPayload(t *testing.T) {
 			mockGetError:       &coretypes.DerivationError{},
 			processInvalidCert: true,
 			expectError:        true,
-			errorIs:            ErCertValidationError,
+			errorIs:            ErrCertValidationError,
 		},
 		{
 			name:               "Error - Certificate Validation Without ProcessInvalidCert",

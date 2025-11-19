@@ -5,10 +5,10 @@ import (
 )
 
 const (
-	ListenAddrFlagName         = "arbitrum-da.addr"
-	PortFlagName               = "arbitrum-da.port"
-	JwtSecretFlagName          = "arbitrum-da.jwtsecret"
-	ProcessInvalidCertFlagName = "arbitrum-da.process-invalid-cert"
+	ListenAddrFlagName           = "arbitrum-da.addr"
+	PortFlagName                 = "arbitrum-da.port"
+	JwtSecretFlagName            = "arbitrum-da.jwtsecret"
+	ReturnInvalidCertErrFlagName = "arbitrum-da.return-invalid-cert-error"
 )
 
 func withEnvPrefix(prefix, s string) []string {
@@ -39,7 +39,7 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 			Category: category,
 		},
 		&cli.BoolFlag{
-			Name: ProcessInvalidCertFlagName,
+			Name: ReturnInvalidCertErrFlagName,
 			Usage: "Whether or not the CustomDA server should return a `CertificateValidationError` to the arbitrum nitro derivation pipeline which \"drops\" the DA " +
 				"Cert by treating it as an empty batch. When disabled or set to false, an invalid DA Cert would cause the derivation pipeline to halt where the nitro software " +
 				"would enter an infinite loop on calls to daprovider_RecoverPayload",
@@ -57,6 +57,6 @@ func ReadConfig(ctx *cli.Context) Config {
 		Host:               ctx.String(ListenAddrFlagName),
 		Port:               ctx.Int(PortFlagName),
 		JWTSecret:          ctx.String(JwtSecretFlagName),
-		ProcessInvalidCert: ctx.Bool(ProcessInvalidCertFlagName),
+		ProcessInvalidCert: ctx.Bool(ReturnInvalidCertErrFlagName),
 	}
 }

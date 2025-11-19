@@ -199,7 +199,7 @@ func (h *Handlers) RecoverPayload(
 	daCert, err := h.deserializeCertFromSequencerMsg(sequencerMsg)
 	if err != nil {
 		if h.processInvalidCert {
-			err = errors.Join(err, ErCertValidationError)
+			err = errors.Join(err, ErrCertValidationError)
 		}
 		return nil, fmt.Errorf("deserialize DA Cert from message: %w", err)
 	}
@@ -208,7 +208,7 @@ func (h *Handlers) RecoverPayload(
 	if err != nil {
 		var dpError *coretypes.DerivationError
 		if errors.As(err, &dpError) && h.processInvalidCert {
-			err = errors.Join(err, ErCertValidationError)
+			err = errors.Join(err, ErrCertValidationError)
 		}
 
 		return nil, fmt.Errorf("get rollup payload from DA Cert: %w", err)
