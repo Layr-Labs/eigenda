@@ -31,9 +31,12 @@ abstract contract EigenDADisperserRegistryStorageV2 {
     /// @notice Returns the nonce for a given disperser address.
     mapping(address disperser => uint256 nonce) public nonces;
 
-    /// @dev Mapping from disperser ID to disperser address for default dispersers.
+    /// @dev Set of disperser IDs for default dispersers.
+    /// Validators should default to accepting dispersals from dispersers in this set.
     EnumerableSetUpgradeable.UintSet internal _defaultDispersers;
-    /// @dev Mapping from disperser ID to disperser address for on-demand dispersers.
+    
+    /// @dev Set of disperser IDs for on-demand dispersers.
+    /// Dispersers in this set are authorized to use on-demand (pay-per-use) payments.
     EnumerableSetUpgradeable.UintSet internal _onDemandDispersers;
     /// @dev Mapping from disperser ID to disperser info.
     mapping(uint32 disperserId => EigenDATypesV2.DisperserInfoV2 disperserInfo) internal _disperserInfo;

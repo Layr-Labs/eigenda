@@ -6,7 +6,14 @@ import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 /// @title IEigenDADisperserRegistryV2
 /// @author Layr Labs, Inc.
 /// @notice This interface defines the contract for managing EigenDA disperser registration and configuration.
-/// @dev This registry manages disperser registration, deregistration, and relay URL updates.
+/// @dev This registry supports permissionless disperser registration with owner-managed authorization sets.
+///
+/// Disperser Authorization Sets:
+/// - **Default Dispersers**: Validators should default to accepting dispersals from these dispersers.
+/// - **On-Demand Dispersers**: These dispersers are authorized to use on-demand (pay-per-use) payments.
+///
+/// Registration is permissionless - anyone can call registerDisperser(). However, only the owner
+/// (EigenLabs) can manage membership in the default and on-demand disperser authorization sets.
 interface IEigenDADisperserRegistryV2 {
     /// -----------------------------------------------------------------------
     /// Events
@@ -26,18 +33,22 @@ interface IEigenDADisperserRegistryV2 {
     event RelayURLUpdated(uint32 indexed disperserId, string relayURL);
 
     /// @notice This event is emitted when a disperser is added to the default dispersers set.
+    /// @dev Validators should default to accepting dispersals from dispersers in this set.
     /// @param disperserId The ID of the disperser that has been added to the default set.
     event DefaultDisperserAdded(uint32 indexed disperserId);
 
     /// @notice This event is emitted when a disperser is added to the on-demand dispersers set.
+    /// @dev Membership in this set authorizes the disperser to use on-demand payments.
     /// @param disperserId The ID of the disperser that has been added to the on-demand set.
     event OnDemandDisperserAdded(uint32 indexed disperserId);
 
     /// @notice This event is emitted when a disperser is removed from the default dispersers set.
+    /// @dev Validators should no longer default to accepting dispersals from this disperser.
     /// @param disperserId The ID of the disperser that has been removed from the default set.
     event DefaultDisperserRemoved(uint32 indexed disperserId);
 
     /// @notice This event is emitted when a disperser is removed from the on-demand dispersers set.
+    /// @dev This disperser is no longer authorized to use on-demand payments.
     /// @param disperserId The ID of the disperser that has been removed from the on-demand set.
     event OnDemandDisperserRemoved(uint32 indexed disperserId);
 
@@ -63,6 +74,8 @@ interface IEigenDADisperserRegistryV2 {
     /// -----------------------------------------------------------------------
 
     /// @notice This function registers a new disperser with the registry and assigns it a unique ID.
+    /// @dev This function is permissionless - anyone can register a disperser. The owner must subsequently
+    /// add the disperser to the appropriate authorization sets (default and/or on-demand) for it to be functional.
     /// @param disperser The address of the disperser that should be registered.
     /// @param relayURL The relay URL that will be associated with this disperser.
     /// @return disperserId The unique ID that has been assigned to the newly registered disperser.
@@ -92,18 +105,22 @@ interface IEigenDADisperserRegistryV2 {
     /// -----------------------------------------------------------------------
 
     /// @notice This function adds a disperser to the default dispersers set (only callable by owner).
+    /// @dev Validators should default to accepting dispersals from dispersers in this set.
     /// @param disperserId The ID of the disperser that should be added to the default set.
     function addDefaultDisperser(uint32 disperserId) external;
 
     /// @notice This function adds a disperser to the on-demand dispersers set (only callable by owner).
+    /// @dev Membership in this set authorizes the disperser to use on-demand payments.
     /// @param disperserId The ID of the disperser that should be added to the on-demand set.
     function addOnDemandDisperser(uint32 disperserId) external;
 
     /// @notice This function removes a disperser from the default dispersers set (only callable by owner).
+    /// @dev Validators should no longer default to accepting dispersals from this disperser.
     /// @param disperserId The ID of the disperser that should be removed from the default set.
     function removeDefaultDisperser(uint32 disperserId) external;
 
     /// @notice This function removes a disperser from the on-demand dispersers set (only callable by owner).
+    /// @dev This disperser is no longer authorized to use on-demand payments.
     /// @param disperserId The ID of the disperser that should be removed from the on-demand set.
     function removeOnDemandDisperser(uint32 disperserId) external;
 
@@ -117,19 +134,23 @@ interface IEigenDADisperserRegistryV2 {
     function getDisperserInfo(uint32[] memory ids) external view returns (EigenDATypesV2.DisperserInfoV2[] memory);
 
     /// @notice This function returns all disperser IDs that are in the default dispersers set.
+    /// @dev Validators should default to accepting dispersals from these dispersers.
     /// @return An array containing all disperser IDs in the default dispersers set.
     function getDefaultDisperserIds() external view returns (uint32[] memory);
 
     /// @notice This function returns all disperser IDs that are in the on-demand dispersers set.
+    /// @dev These dispersers are authorized to use on-demand payments.
     /// @return An array containing all disperser IDs in the on-demand dispersers set.
     function getOnDemandDisperserIds() external view returns (uint32[] memory);
 
     /// @notice This function checks whether a disperser is in the default dispersers set.
+    /// @dev Returns true if validators should default to accepting dispersals from this disperser.
     /// @param disperserId The ID of the disperser to check.
     /// @return A boolean value indicating whether the disperser is in the default set (true) or not (false).
     function isDefaultDisperserId(uint32 disperserId) external view returns (bool);
 
     /// @notice This function checks whether a disperser is in the on-demand dispersers set.
+    /// @dev Returns true if the disperser is authorized to use on-demand payments.
     /// @param disperserId The ID of the disperser to check.
     /// @return A boolean value indicating whether the disperser is in the on-demand set (true) or not (false).
     function isOnDemandDisperserId(uint32 disperserId) external view returns (bool);

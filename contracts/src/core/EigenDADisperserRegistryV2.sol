@@ -18,6 +18,10 @@ import {EigenDADisperserRegistryStorageV2} from "src/core/EigenDADisperserRegist
 
 /// @title Registry for EigenDA disperser info V2
 /// @author Layr Labs, Inc.
+/// @notice This contract manages disperser registration and authorization for the EigenDA network.
+/// @dev Supports permissionless registration with owner-managed authorization sets:
+///      - Default dispersers: Validators should default to accepting dispersals from these dispersers
+///      - On-demand dispersers: Authorized to use on-demand (pay-per-use) payments
 contract EigenDADisperserRegistryV2 is
     OwnableUpgradeable,
     EIP712Upgradeable,
