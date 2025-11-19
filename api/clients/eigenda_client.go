@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	edasm "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
@@ -84,7 +85,7 @@ func NewEigenDAClient(log logging.Logger, config EigenDAClientConfig) (*EigenDAC
 
 	var ethClient *ethclient.Client
 	var edasmCaller *edasm.ContractEigenDAServiceManagerCaller
-	ethClient, err = ethclient.Dial(config.EthRpcUrl)
+	ethClient, err = geth.SafeDial(context.Background(), config.EthRpcUrl)
 	if err != nil {
 		return nil, fmt.Errorf("dial ETH RPC node: %w", err)
 	}

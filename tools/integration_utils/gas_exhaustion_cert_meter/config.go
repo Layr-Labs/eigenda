@@ -6,6 +6,7 @@ import (
 
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	blsapkregistry "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	contractIEigenDADirectory "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDADirectory"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
@@ -59,9 +60,9 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 	rpcURL := ctx.String(flags.EthRpcUrlFlag.Name)
 	v3CertVerifierAddr := gethcommon.HexToAddress(ctx.String(flags.CertVerifierAddrFlag.Name))
 	ethContext := context.Background()
-	client, err := ethclient.DialContext(ethContext, rpcURL)
+	client, err := geth.SafeDial(ethContext, rpcURL)
 	if err != nil {
-		return nil, fmt.Errorf("dial Ethereum node at %s: %w", rpcURL, err)
+		return nil, fmt.Errorf("dial Ethereum node: %w", err)
 	}
 
 	networkString := ctx.String(flags.NetworkFlag.Name)
