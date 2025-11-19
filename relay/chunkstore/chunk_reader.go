@@ -113,16 +113,16 @@ func (r *chunkReader) GetBinaryChunkCoefficients(
 func (r *chunkReader) GetBinaryChunkProofsRange(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
-	startIndex uint32,
-	endIndex uint32,
+	firstChunkIndex uint32,
+	endChunkIndex uint32,
 ) ([][]byte, bool, error) {
 
-	if startIndex >= endIndex {
-		return nil, false, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", startIndex, endIndex)
+	if firstChunkIndex >= endChunkIndex {
+		return nil, false, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", firstChunkIndex, endChunkIndex)
 	}
 
-	firstByteIndex := startIndex * encoding.SerializedProofLength
-	count := endIndex - startIndex
+	firstByteIndex := firstChunkIndex * encoding.SerializedProofLength
+	count := endChunkIndex - firstChunkIndex
 	size := count * encoding.SerializedProofLength
 
 	s3Key := s3.ScopedProofKey(blobKey)

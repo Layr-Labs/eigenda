@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/peer"
@@ -443,7 +444,6 @@ func getKeysFromChunkRequest(request *pb.GetChunksRequest) ([]v2.BlobKey, error)
 type downloadResult struct {
 	key   v2.BlobKey
 	found bool
-	err   error
 }
 
 // Download and compile the chunk data to send back to the client.
@@ -489,10 +489,9 @@ func (s *Server) downloadDataFromRelays(
 	coefficients = make([][][]byte, requestCount)
 	proofs = make([][][]byte, requestCount)
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	results := make(chan downloadResult, requestCount*2)
+
+	runner, ctx := errgroup.WithContext(ctx)
 
 	// Fan out and make requests in parallel
 	for i, chunkRequest := range request.GetChunkRequests() {
@@ -500,7 +499,7 @@ func (s *Server) downloadDataFromRelays(
 		metadata := metadataMap[blobKey]
 
 		// Download proofs
-		go func() {
+		runner.Go(func() error {
 			data, found, err := s.chunkReader.GetBinaryChunkProofsRange(
 				ctx,
 				blobKey,
@@ -510,12 +509,14 @@ func (s *Server) downloadDataFromRelays(
 
 			proofs[i] = data
 			if err != nil {
-				err = fmt.Errorf("failed to download proofs: %w", err)
+				return fmt.Errorf("failed to download proofs: %w", err)
 			}
-			results <- downloadResult{key: blobKey, found: found, err: err}
-		}()
+			results <- downloadResult{key: blobKey, found: found}
+
+			return nil
+		})
 		// Download coefficients
-		go func() {
+		runner.Go(func() error {
 			data, found, err := s.chunkReader.GetBinaryChunkCoefficientRange(
 				ctx,
 				blobKey,
@@ -526,21 +527,23 @@ func (s *Server) downloadDataFromRelays(
 
 			coefficients[i] = data
 			if err != nil {
-				err = fmt.Errorf("failed to download coefficients: %w", err)
+				return fmt.Errorf("failed to download coefficients: %w", err)
 			}
-			results <- downloadResult{key: blobKey, found: found, err: err}
-		}()
+			results <- downloadResult{key: blobKey, found: found}
+
+			return nil
+		})
 	}
 
 	// Await results
+	if err := runner.Wait(); err != nil {
+		return nil, nil, false, fmt.Errorf("error downloading chunk data: %w", err)
+	}
+
+	// Handle the situation where some data couldn't be found
 	for i := 0; i < requestCount*2; i++ {
 		result := <-results
-		if result.err != nil {
-			cancel()
-			return nil, nil, false, fmt.Errorf("error downloading chunk data %s: %w", result.key.Hex(), result.err)
-		}
 		if !result.found {
-			cancel()
 			return nil, nil, false, nil
 		}
 	}
@@ -565,7 +568,7 @@ func combineProofsAndCoefficients(
 		metadata := metadataMap[blobKey]
 		chunkData, err := buildChunksData(proofs[i], int(metadata.symbolsPerFrame), coefficients[i])
 		if err != nil {
-			return nil, fmt.Errorf("error building frame data: %w", err)
+			return nil, fmt.Errorf("error building chunk data: %w", err)
 		}
 		chunkDataObjects[i] = chunkData
 	}
@@ -612,7 +615,7 @@ func buildBinaryChunkData(
 
 		bundleBytes, err := chunkDataToSend.FlattenToBundle()
 		if err != nil {
-			return nil, fmt.Errorf("error serializing frame subset: %w", err)
+			return nil, fmt.Errorf("error serializing chunk subset: %w", err)
 		}
 
 		bytesToSend = append(bytesToSend, bundleBytes)
