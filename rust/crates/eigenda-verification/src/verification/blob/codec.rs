@@ -230,7 +230,9 @@ fn check_and_remove_zero_padding_for_field_elements(
 /// only available when the `test-utils` feature is enabled or during testing.
 pub mod tests_utils {
     use crate::verification::blob::BlobVerificationError::{self, *};
-    use crate::verification::blob::codec::{BYTES_PER_CHUNK, BYTES_PER_SYMBOL, HEADER_BYTES_LEN};
+    use crate::verification::blob::codec::{
+        BYTES_PER_CHUNK, BYTES_PER_SYMBOL, HEADER_BYTES_LEN, PAYLOAD_ENCODING_VERSION_0,
+    };
 
     /// Guard byte value used to prefix field elements in the EigenDA encoding.
     ///
@@ -239,11 +241,6 @@ pub mod tests_utils {
     /// operations. The value 0 ensures that the resulting 32-byte value is always
     /// less than the BN254 field modulus.
     pub const FIELD_ELEMENT_GUARD_BYTE: u8 = 0;
-
-    /// Version byte used in the encoded payload header.
-    ///
-    /// This indicates the encoding format version. Currently, only version 0 is defined.
-    pub const VERSION: u8 = 0;
 
     /// Encodes a raw payload into an EigenDA-compatible encoded payload format.
     ///
@@ -351,7 +348,7 @@ pub mod tests_utils {
     ) -> Result<[u8; HEADER_BYTES_LEN], BlobVerificationError> {
         let mut header = [0; HEADER_BYTES_LEN];
         header[0] = FIELD_ELEMENT_GUARD_BYTE;
-        header[1] = VERSION;
+        header[1] = PAYLOAD_ENCODING_VERSION_0;
         let raw_payload_len: u32 = raw_payload.len().try_into()?;
         header[2..6].copy_from_slice(&raw_payload_len.to_be_bytes());
         Ok(header)
@@ -431,7 +428,7 @@ pub mod tests_utils {
             let header = construct_header(&payload).unwrap();
 
             assert_eq!(header[0], FIELD_ELEMENT_GUARD_BYTE);
-            assert_eq!(header[1], VERSION);
+            assert_eq!(header[1], PAYLOAD_ENCODING_VERSION_0);
             assert_eq!(
                 u32::from_be_bytes([header[2], header[3], header[4], header[5]]),
                 expected_len
@@ -453,7 +450,7 @@ pub mod tests_utils {
         assert!(encoded_payload.len() >= HEADER_BYTES_LEN + BYTES_PER_SYMBOL);
 
         assert_eq!(encoded_payload[0], FIELD_ELEMENT_GUARD_BYTE);
-        assert_eq!(encoded_payload[1], VERSION);
+        assert_eq!(encoded_payload[1], PAYLOAD_ENCODING_VERSION_0);
 
         let claimed_len = u32::from_be_bytes([
             encoded_payload[2],
