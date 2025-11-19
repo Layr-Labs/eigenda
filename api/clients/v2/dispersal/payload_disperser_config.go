@@ -1,4 +1,4 @@
-package payloaddispersal
+package dispersal
 
 import (
 	"time"

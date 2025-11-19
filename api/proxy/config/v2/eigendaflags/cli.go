@@ -7,7 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
@@ -319,10 +319,10 @@ func readPayloadClientConfig(ctx *cli.Context) clients_v2.PayloadClientConfig {
 	}
 }
 
-func readPayloadDisperserCfg(ctx *cli.Context) payloaddispersal.PayloadDisperserConfig {
+func readPayloadDisperserCfg(ctx *cli.Context) dispersal.PayloadDisperserConfig {
 	payCfg := readPayloadClientConfig(ctx)
 
-	return payloaddispersal.PayloadDisperserConfig{
+	return dispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    payCfg,
 		DisperseBlobTimeout:    ctx.Duration(DisperseBlobTimeoutFlagName),
 		BlobCompleteTimeout:    ctx.Duration(BlobCertifiedTimeoutFlagName),
@@ -331,18 +331,18 @@ func readPayloadDisperserCfg(ctx *cli.Context) payloaddispersal.PayloadDisperser
 	}
 }
 
-func readDisperserCfg(ctx *cli.Context) (clients_v2.DisperserClientConfig, error) {
+func readDisperserCfg(ctx *cli.Context) (dispersal.DisperserClientConfig, error) {
 	disperserAddressString := ctx.String(DisperserFlagName)
 	if disperserAddressString == "" {
 		networkString := ctx.String(NetworkFlagName)
 		if networkString == "" {
-			return clients_v2.DisperserClientConfig{},
+			return dispersal.DisperserClientConfig{},
 				fmt.Errorf("either disperser address or EigenDANetwork must be specified")
 		}
 
 		eigenDANetwork, err := common.EigenDANetworkFromString(networkString)
 		if err != nil {
-			return clients_v2.DisperserClientConfig{}, fmt.Errorf("parse eigenDANetwork: %w", err)
+			return dispersal.DisperserClientConfig{}, fmt.Errorf("parse eigenDANetwork: %w", err)
 		}
 
 		disperserAddressString = eigenDANetwork.GetDisperserAddress()
@@ -350,11 +350,11 @@ func readDisperserCfg(ctx *cli.Context) (clients_v2.DisperserClientConfig, error
 
 	hostStr, portStr, err := net.SplitHostPort(disperserAddressString)
 	if err != nil {
-		return clients_v2.DisperserClientConfig{},
+		return dispersal.DisperserClientConfig{},
 			fmt.Errorf("split host port '%s': %w", disperserAddressString, err)
 	}
 
-	return clients_v2.DisperserClientConfig{
+	return dispersal.DisperserClientConfig{
 		Hostname:          hostStr,
 		Port:              portStr,
 		UseSecureGrpcFlag: !ctx.Bool(DisableTLSFlagName),

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ import (
 func mustSubmitPayloads(
 	t *testing.T,
 	testRandom *random.TestRandom,
-	payloadDisperser *payloaddispersal.PayloadDisperser,
+	payloadDisperser *dispersal.PayloadDisperser,
 	blobsPerSecond float32,
 	payloadSize int,
 	testDuration time.Duration,
