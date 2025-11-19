@@ -10,7 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
@@ -26,7 +26,7 @@ type Store struct {
 	log logging.Logger
 
 	// Dispersal related fields. disperser is optional, and PUT routes will return 500s if not set.
-	disperser *payloaddispersal.PayloadDisperser
+	disperser *dispersal.PayloadDisperser
 	// Number of times to try blob dispersals:
 	// - If > 0: Try N times total
 	// - If < 0: Retry indefinitely until success
@@ -53,7 +53,7 @@ var _ common.EigenDAV2Store = (*Store)(nil)
 
 func NewStore(
 	log logging.Logger,
-	disperser *payloaddispersal.PayloadDisperser,
+	disperser *dispersal.PayloadDisperser,
 	putTries int,
 	certVerifier *verification.CertVerifier,
 	rbnRecencyWindowSize uint64,

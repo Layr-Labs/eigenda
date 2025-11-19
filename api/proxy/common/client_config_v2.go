@@ -5,16 +5,15 @@ import (
 	"slices"
 	"time"
 
-	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 )
 
 // ClientConfigV2 contains all non-sensitive configuration to construct V2 clients
 type ClientConfigV2 struct {
-	DisperserClientCfg           clients_v2.DisperserClientConfig
-	PayloadDisperserCfg          payloaddispersal.PayloadDisperserConfig
+	DisperserClientCfg           dispersal.DisperserClientConfig
+	PayloadDisperserCfg          dispersal.PayloadDisperserConfig
 	RelayPayloadRetrieverCfg     payloadretrieval.RelayPayloadRetrieverConfig
 	ValidatorPayloadRetrieverCfg payloadretrieval.ValidatorPayloadRetrieverConfig
 

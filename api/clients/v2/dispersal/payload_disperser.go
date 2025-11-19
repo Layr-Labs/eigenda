@@ -1,4 +1,4 @@
-package payloaddispersal
+package dispersal
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 type PayloadDisperser struct {
 	logger          logging.Logger
 	config          PayloadDisperserConfig
-	disperserClient *clients.DisperserClient
+	disperserClient *DisperserClient
 	blockMonitor    *verification.BlockNumberMonitor
 	certBuilder     *clients.CertBuilder
 	certVerifier    *verification.CertVerifier
@@ -41,13 +41,14 @@ func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
 	// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
-	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
-	// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
+	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for
+	// computing the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these
+	// commitments.
 	//
 	// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
 	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
 	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
-	disperserClient *clients.DisperserClient,
+	disperserClient *DisperserClient,
 	blockMonitor *verification.BlockNumberMonitor,
 	certBuilder *clients.CertBuilder,
 	certVerifier *verification.CertVerifier,

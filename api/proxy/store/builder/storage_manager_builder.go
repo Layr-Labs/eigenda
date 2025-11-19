@@ -13,8 +13,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	metrics_v2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	client_validator "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
@@ -368,7 +368,7 @@ func buildEigenDAV2Backend(
 		return nil, fmt.Errorf("no payload retrievers enabled, please enable at least one retriever type")
 	}
 
-	var payloadDisperser *payloaddispersal.PayloadDisperser
+	var payloadDisperser *dispersal.PayloadDisperser
 
 	if secrets.SignerPaymentKey == "" {
 		log.Warn("No SignerPaymentKey provided: EigenDA V2 backend configured in read-only mode")
@@ -574,7 +574,7 @@ func buildPayloadDisperser(
 	operatorStateRetrieverAddr geth_common.Address,
 	registryCoordinatorAddr geth_common.Address,
 	registry *prometheus.Registry,
-) (*payloaddispersal.PayloadDisperser, error) {
+) (*dispersal.PayloadDisperser, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(secrets.SignerPaymentKey)
 	if err != nil {
 		return nil, fmt.Errorf("new local blob request signer: %w", err)
@@ -590,7 +590,7 @@ func buildPayloadDisperser(
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
-	disperserClient, err := clients_v2.NewDisperserClient(
+	disperserClient, err := dispersal.NewDisperserClient(
 		log,
 		&clientConfigV2.DisperserClientCfg,
 		signer,
@@ -631,7 +631,7 @@ func buildPayloadDisperser(
 		return nil, fmt.Errorf("new cert builder: %w", err)
 	}
 
-	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
+	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		log,
 		clientConfigV2.PayloadDisperserCfg,
 		disperserClient,
@@ -702,7 +702,7 @@ func buildOnDemandLedger(
 	paymentVault payments.PaymentVault,
 	accountID geth_common.Address,
 	minNumSymbols uint32,
-	disperserClient *clients_v2.DisperserClient,
+	disperserClient *dispersal.DisperserClient,
 ) (*ondemand.OnDemandLedger, error) {
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
 	if err != nil {
@@ -749,7 +749,7 @@ func buildClientLedger(
 	accountID geth_common.Address,
 	contractDirectory *directory.ContractDirectory,
 	accountantMetrics metrics_v2.AccountantMetricer,
-	disperserClient *clients_v2.DisperserClient,
+	disperserClient *dispersal.DisperserClient,
 ) (*clientledger.ClientLedger, error) {
 	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
