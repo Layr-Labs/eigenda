@@ -120,9 +120,9 @@ contract EigenDADisperserRegistryV2 is
 
     /// @dev Verifies that the signature is valid if caller is not the disperser.
     /// @dev Reverts if the signature is invalid and the caller is not the disperser.
-    /// @param disperser The address of the disperser that is updating their relay URL.
+    /// @param disperser The address of the disperser signaling an intent.
     /// @param digest The digest of the update relay URL transaction.
-    /// @param signature The signature of the disperser that is updating their relay URL.
+    /// @param signature The signature of the disperser signaling an intent.
     function _checkSignature(address disperser, bytes32 digest, bytes memory signature) internal view {
         if (msg.sender != disperser) {
             if (!disperser.isValidSignatureNow(_hashTypedDataV4(digest), signature)) revert InvalidSignature();
