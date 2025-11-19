@@ -22,4 +22,8 @@ type ServerConfig struct {
 
 	PprofHttpPort string
 	EnablePprof   bool
+
+	// DisableGetBlobCommitment, if true, causes the GetBlobCommitment gRPC endpoint to return
+	// a deprecation error. This endpoint is deprecated and will be removed in a future release.
+	DisableGetBlobCommitment bool
 }
