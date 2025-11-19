@@ -356,7 +356,8 @@ func (d *Dispatcher) sendChunksToValidator(
 
 	client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get node client for validator at port %s: %w", v2DispersalPort, err)
+		return nil, 0, fmt.Errorf("failed to get node client for validator at host %s port %s: %w",
+			host, v2DispersalPort, err)
 	}
 
 	validatorProbe.SetStage("put_dispersal_request")
