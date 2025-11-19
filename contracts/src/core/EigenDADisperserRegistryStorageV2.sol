@@ -13,6 +13,10 @@ abstract contract EigenDADisperserRegistryStorageV2 {
     /// Constants
     /// -----------------------------------------------------------------------
 
+    /// @notice The EIP-712 typehash signed by a disperser that signals intent to register.
+    bytes32 public constant REGISTRATION_TYPEHASH =
+        keccak256("Register(address disperser,string relayURL,uint256 nonce)");
+
     /// @notice The EIP-712 typehash signed by a disperser that signals intent to deregister.
     /// @dev Owner has the ability to censor deregistrations by not processing the signature.
     bytes32 public constant DEREGISTRATION_TYPEHASH = keccak256("Deregister(uint32 disperserId,uint256 nonce)");
@@ -28,6 +32,7 @@ abstract contract EigenDADisperserRegistryStorageV2 {
 
     /// @notice Returns the total number of registrations.
     uint32 public totalRegistrations;
+
     /// @notice Returns the nonce for a given disperser address.
     mapping(address disperser => uint256 nonce) public nonces;
 
@@ -38,6 +43,7 @@ abstract contract EigenDADisperserRegistryStorageV2 {
     /// @dev Set of disperser IDs for on-demand dispersers.
     /// Dispersers in this set are authorized to use on-demand (pay-per-use) payments.
     EnumerableSetUpgradeable.UintSet internal _onDemandDispersers;
+
     /// @dev Mapping from disperser ID to disperser info.
     mapping(uint32 disperserId => EigenDATypesV2.DisperserInfoV2 disperserInfo) internal _disperserInfo;
 

@@ -74,12 +74,15 @@ interface IEigenDADisperserRegistryV2 {
     /// -----------------------------------------------------------------------
 
     /// @notice This function registers a new disperser with the registry and assigns it a unique ID.
-    /// @dev This function is permissionless - anyone can register a disperser. The owner must subsequently
-    /// add the disperser to the appropriate authorization sets (default and/or on-demand) for it to be functional.
+    /// @dev The `signature` parameter can be empty if `msg.sender` is the registered disperser.
+    /// Reverts if the signature is invalid and the caller is not the disperser.
     /// @param disperser The address of the disperser that should be registered.
     /// @param relayURL The relay URL that will be associated with this disperser.
+    /// @param signature The signature from the disperser that authorizes this registration.
     /// @return disperserId The unique ID that has been assigned to the newly registered disperser.
-    function registerDisperser(address disperser, string memory relayURL) external returns (uint32 disperserId);
+    function registerDisperser(address disperser, string memory relayURL, bytes memory signature)
+        external
+        returns (uint32 disperserId);
 
     /// @notice This function deregisters a disperser from the registry using a valid signature.
     /// @dev The `signature` parameter can be empty if `msg.sender` is the registered disperser.

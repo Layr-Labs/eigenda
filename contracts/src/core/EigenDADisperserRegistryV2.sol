@@ -50,18 +50,23 @@ contract EigenDADisperserRegistryV2 is
     /// -----------------------------------------------------------------------
 
     /// @inheritdoc IEigenDADisperserRegistryV2
-    function registerDisperser(address disperser, string memory relayURL)
+    function registerDisperser(address disperser, string memory relayURL, bytes memory signature)
         external
         virtual
         returns (uint32 disperserId)
     {
+        bytes32 digest = keccak256(abi.encode(REGISTRATION_TYPEHASH, disperser, relayURL, nonces[disperser]++));
+
+        // Assert that the signature is valid (supports EIP-1271).
+        _checkSignature(disperser, digest, signature);
+        // Assert that the disperser address is non-zero.
+        if (disperser == address(0)) revert InputAddressZero();
+
         // Increment and assign the next available disperserId, starting at 1 (not 0).
-        disperserId = ++totalRegistrations; // Monotonic increasing.
+        disperserId = ++totalRegistrations; // Monotonically increasing.
 
         EigenDATypesV2.DisperserInfoV2 storage disperserInfo = _disperserInfo[disperserId];
 
-        // Assert that the disperser address is non-zero.
-        if (disperser == address(0)) revert InputAddressZero();
         // Assert that the disperser is not already registered.
         if (disperserInfo.disperser != address(0)) revert DisperserIsRegistered();
 
@@ -171,7 +176,7 @@ contract EigenDADisperserRegistryV2 is
     {
         uint256 len = ids.length;
         info = new EigenDATypesV2.DisperserInfoV2[](len);
-        for (uint256 i = 0; i < len; i++) {
+        for (uint256 i = 0; i < len; ++i) {
             info[i] = _disperserInfo[ids[i]];
         }
         return info;
