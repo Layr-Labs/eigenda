@@ -149,3 +149,19 @@ func (s *Server) AuthorizePayment(
 	success = true
 	return response, nil
 }
+
+// GetValidatorSigningRate returns the signing rate of a validator during a time range
+func (s *Server) GetValidatorSigningRate(
+	ctx context.Context,
+	request *controller.GetValidatorSigningRateRequest,
+) (*controller.GetValidatorSigningRateReply, error) {
+	return nil, api.NewErrorInternal("GetValidatorSigningRate is not implemented")
+}
+
+// GetValidatorSigningRateDump returns a dump of signing rate data for all validators after a specified start time
+func (s *Server) GetValidatorSigningRateDump(
+	ctx context.Context,
+	request *controller.GetValidatorSigningRateDumpRequest,
+) (*controller.GetValidatorSigningRateDumpReply, error) {
+	return nil, api.NewErrorInternal("GetValidatorSigningRateDump is not implemented")
+}

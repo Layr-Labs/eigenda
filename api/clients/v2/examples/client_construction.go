@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
@@ -45,7 +45,7 @@ const (
 	eigenDADirectoryAddress = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 )
 
-func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisperser, error) {
+func createPayloadDisperser(privateKeyHex string) (*dispersal.PayloadDisperser, error) {
 	logger, err := createLogger()
 	if err != nil {
 		panic(fmt.Sprintf("create logger: %v", err))
@@ -129,7 +129,7 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 		return nil, fmt.Errorf("create client ledger: %w", err)
 	}
 
-	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
+	payloadDisperserConfig := dispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    *clients.GetDefaultPayloadClientConfig(),
 		DisperseBlobTimeout:    30 * time.Second,
 		BlobCompleteTimeout:    30 * time.Second,
@@ -137,7 +137,8 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 		ContractCallTimeout:    5 * time.Second,
 	}
 
-	return payloaddispersal.NewPayloadDisperser(
+	//nolint:wrapcheck
+	return dispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
@@ -268,19 +269,20 @@ func createDisperserClient(
 	logger logging.Logger,
 	privateKey string,
 	kzgCommitter *committer.Committer,
-) (*clients.DisperserClient, error) {
+) (*dispersal.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create blob request signer: %w", err)
 	}
 
-	disperserClientConfig := &clients.DisperserClientConfig{
+	disperserClientConfig := &dispersal.DisperserClientConfig{
 		Hostname:          disperserHostname,
 		Port:              "443",
 		UseSecureGrpcFlag: true,
 	}
 
-	return clients.NewDisperserClient(
+	//nolint:wrapcheck
+	return dispersal.NewDisperserClient(
 		logger,
 		disperserClientConfig,
 		signer,
@@ -403,7 +405,7 @@ func createClientLedger(
 	ethClient common.EthClient,
 	accountID gethcommon.Address,
 	contractDirectory *directory.ContractDirectory,
-	disperserClient *clients.DisperserClient,
+	disperserClient *dispersal.DisperserClient,
 ) (*clientledger.ClientLedger, error) {
 	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
@@ -496,7 +498,7 @@ func createOnDemandLedger(
 	paymentVault payments.PaymentVault,
 	accountID gethcommon.Address,
 	minNumSymbols uint32,
-	disperserClient *clients.DisperserClient,
+	disperserClient *dispersal.DisperserClient,
 ) (*ondemand.OnDemandLedger, error) {
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
 	if err != nil {

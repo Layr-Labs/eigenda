@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	proxycmn "github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -101,11 +102,12 @@ func discoverAddresses(ctx *cli.Context) error {
 	// Simple logging
 	logger := log.New(os.Stderr, "[discovery] ", log.LstdFlags)
 
-	client, err := ethclient.Dial(rpcURL)
+	client, err := geth.SafeDial(ctx.Context, rpcURL)
 	if err != nil {
-		return fmt.Errorf("dial Ethereum node at %s: %w", rpcURL, err)
+		return fmt.Errorf("dial Ethereum node: %w", err)
 	}
-	logger.Printf("Connected to Ethereum node at %s", rpcURL)
+	sanitizedUrl := geth.SanitizeRpcUrl(rpcURL)
+	logger.Printf("Connected to Ethereum node at %s", sanitizedUrl)
 	validateNetworkAndEthRpcChainIDMatch(ctx.Context, network, client)
 
 	directoryAddr := ctx.String(discoverAddressFlag.Name)
