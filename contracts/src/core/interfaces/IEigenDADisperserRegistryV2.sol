@@ -88,7 +88,7 @@ interface IEigenDADisperserRegistryV2 {
     function revokeNonce() external;
 
     /// -----------------------------------------------------------------------
-    /// View Functions
+    /// Owner-only Functions
     /// -----------------------------------------------------------------------
 
     /// @notice This function adds a disperser to the default dispersers set (only callable by owner).
