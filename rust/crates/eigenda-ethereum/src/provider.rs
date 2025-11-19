@@ -19,8 +19,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::contracts::{
-    EIGENDA_DIRECTORY_HOLESKY, EIGENDA_DIRECTORY_MAINNET, EIGENDA_DIRECTORY_SEPOLIA,
-    EigenDaContracts,
+    EIGENDA_DIRECTORY_HOODI, EIGENDA_DIRECTORY_MAINNET, EIGENDA_DIRECTORY_SEPOLIA,
+    EigenDaContracts, STATIC_CERT_VERIFIER_HOODI, STATIC_CERT_VERIFIER_MAINNET,
+    STATIC_CERT_VERIFIER_SEPOLIA,
 };
 use crate::provider::IEigenDADirectory::getAddressCall;
 
@@ -44,8 +45,8 @@ const DEFAULT_COMPUTE_UNITS: u64 = u64::MAX;
 pub enum Network {
     /// Ethereum mainnet.
     Mainnet,
-    /// Holesky testnet.
-    Holesky,
+    /// Hoodi testnet.
+    Hoodi,
     /// Sepolia testnet.
     Sepolia,
 }
@@ -113,8 +114,14 @@ impl EigenDaProvider {
 
         let directory_address = match config.network {
             Network::Mainnet => EIGENDA_DIRECTORY_MAINNET,
-            Network::Holesky => EIGENDA_DIRECTORY_HOLESKY,
+            Network::Hoodi => EIGENDA_DIRECTORY_HOODI,
             Network::Sepolia => EIGENDA_DIRECTORY_SEPOLIA,
+        };
+
+        let cert_verifier_address = match config.network {
+            Network::Mainnet => STATIC_CERT_VERIFIER_MAINNET,
+            Network::Hoodi => STATIC_CERT_VERIFIER_HOODI,
+            Network::Sepolia => STATIC_CERT_VERIFIER_SEPOLIA,
         };
 
         let contracts = EigenDaContracts::new(&ethereum, directory_address).await?;
@@ -260,6 +267,7 @@ impl EigenDaContracts {
     pub async fn new(
         ethereum: &DynProvider,
         directory_address: Address,
+        cert_verifier_address: Address,
     ) -> Result<EigenDaContracts, RpcError<TransportErrorKind>> {
         let eigen_da_contracts = EigenDaContracts {
             threshold_registry: get_address(ethereum, "THRESHOLD_REGISTRY", directory_address)
@@ -269,7 +277,7 @@ impl EigenDaContracts {
             service_manager: get_address(ethereum, "SERVICE_MANAGER", directory_address).await?,
             bls_apk_registry: get_address(ethereum, "BLS_APK_REGISTRY", directory_address).await?,
             stake_registry: get_address(ethereum, "STAKE_REGISTRY", directory_address).await?,
-            cert_verifier: get_address(ethereum, "CERT_VERIFIER", directory_address).await?,
+            cert_verifier: cert_verifier_address,
             delegation_manager: get_address(ethereum, "DELEGATION_MANAGER", directory_address)
                 .await?,
         };
