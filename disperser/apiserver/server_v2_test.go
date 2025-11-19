@@ -447,7 +447,28 @@ func TestV2GetBlobCommitment(t *testing.T) {
 	require.Equal(t, uint32(commit.Length), reply.GetBlobCommitment().GetLength())
 }
 
+func TestV2GetBlobCommitment_Disabled(t *testing.T) {
+	ctx := t.Context()
+	c := newTestServerV2WithDeprecationFlag(t, true)
+	data := make([]byte, 50)
+	_, err := rand.Read(data)
+	require.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
+	reply, err := c.DispersalServerV2.GetBlobCommitment(ctx, &pbv2.BlobCommitmentRequest{
+		Blob: data,
+	})
+	require.Error(t, err)
+	require.Nil(t, reply)
+	require.ErrorContains(t, err, "GetBlobCommitment is deprecated and has been disabled")
+	require.ErrorContains(t, err, "This service will be removed in a future release")
+}
+
 func newTestServerV2(t *testing.T) *testComponents {
+	return newTestServerV2WithDeprecationFlag(t, false)
+}
+
+func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment bool) *testComponents {
 	t.Helper()
 
 	ctx := t.Context()
@@ -550,8 +571,9 @@ func newTestServerV2(t *testing.T) *testComponents {
 
 	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
-			GrpcPort:    "51002",
-			GrpcTimeout: 1 * time.Second,
+			GrpcPort:                 "51002",
+			GrpcTimeout:              1 * time.Second,
+			DisableGetBlobCommitment: disableGetBlobCommitment,
 		},
 		time.Now,
 		blobStore,
