@@ -6,15 +6,24 @@ use serde::{Deserialize, Serialize};
 /// EigenDA directory address on Ethereum mainnet.
 pub const EIGENDA_DIRECTORY_MAINNET: Address =
     address!("0x64AB2e9A86FA2E183CB6f01B2D4050c1c2dFAad4");
-/// EigenDA directory address on the Holesky test network.
-pub const EIGENDA_DIRECTORY_HOLESKY: Address =
-    address!("0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE");
+/// EigenDA directory address on the Hoodi test network.
+pub const EIGENDA_DIRECTORY_HOODI: Address = address!("0x5a44e56e88abcf610c68340c6814ae7f5c4369fd");
 /// EigenDA directory address on the Sepolia test network.
 pub const EIGENDA_DIRECTORY_SEPOLIA: Address =
     address!("0x9620dC4B3564198554e4D2b06dEFB7A369D90257");
 
+/// EigenDA CertVerifier v3.1.0 address on Ethereum mainnet.
+pub const STATIC_CERT_VERIFIER_MAINNET: Address =
+    address!("0x46766C6426eF4D3092f73F72660A8b7B510E6846");
+/// EigenDA CertVerifier v3.1.0 address on the Hoodi test network.
+pub const STATIC_CERT_VERIFIER_HOODI: Address =
+    address!("0xe0F78542A950A8695f43B19Ad1Db654249e12643");
+/// EigenDA CertVerifier v3.1.0 address on the Sepolia test network.
+pub const STATIC_CERT_VERIFIER_SEPOLIA: Address =
+    address!("0x19a469Ddb7199c7EB9E40455978b39894BB90974");
+
 /// EigenDA relevant contracts. Addresses are retrieved from the the EigenDADirectory contract for
-/// the respective network (i.e. Mainnet, Sepolia)
+/// the respective network (i.e. Mainnet, Hoodi)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EigenDaContracts {
     /// # Ethereum description
