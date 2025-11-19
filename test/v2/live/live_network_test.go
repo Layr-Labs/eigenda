@@ -61,10 +61,18 @@ func emptyBlobDispersalTest(t *testing.T, environment string) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 
+	signer, err := auth.NewLocalBlobRequestSigner(c.GetPrivateKey())
+	require.NoError(t, err)
+	accountId, err := signer.GetAccountID()
+	require.NoError(t, err)
+
+	paymentMetadata, err := core.NewPaymentMetadata(accountId, time.Now(), nil)
+	require.NoError(t, err)
+
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of an empty blob
 	// This should fail with "data is empty" error
-	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, nil)
+	_, _, err = c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, paymentMetadata)
 	require.Error(t, err)
 }
 
@@ -131,9 +139,17 @@ func zeroBlobDispersalTest(t *testing.T, environment string) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 
+	signer, err := auth.NewLocalBlobRequestSigner(c.GetPrivateKey())
+	require.NoError(t, err)
+	accountId, err := signer.GetAccountID()
+	require.NoError(t, err)
+
+	paymentMetadata, err := core.NewPaymentMetadata(accountId, time.Now(), nil)
+	require.NoError(t, err)
+
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of a blob containing all 0s
-	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, nil)
+	_, _, err = c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, paymentMetadata)
 	require.NoError(t, err)
 }
 
@@ -492,10 +508,13 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	blob, err := payload.ToBlob(codecs.PolynomialFormCoeff)
 	require.NoError(t, err)
 
+	paymentMetadata, err := core.NewPaymentMetadata(accountId, time.Now(), nil)
+	require.NoError(t, err)
+
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	_, _, err = disperserClient.DisperseBlob(ctx, blob.Serialize(), 0, quorums, nil, nil)
+	_, _, err = disperserClient.DisperseBlob(ctx, blob.Serialize(), 0, quorums, nil, paymentMetadata)
 	require.Error(t, err)
 }
 
