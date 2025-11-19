@@ -59,7 +59,7 @@ contract EigenDADisperserRegistryV2 is
         // Assert that the disperser address is non-zero.
         if (disperser == address(0)) revert InputAddressZero();
         // Assert that the disperser is not already registered.
-        if (disperserInfo.disperser != address(0)) revert AlreadyRegistered();
+        if (disperserInfo.disperser != address(0)) revert DisperserIsRegistered();
 
         // Set the disperser info.
         disperserInfo.disperser = disperser;
@@ -82,7 +82,7 @@ contract EigenDADisperserRegistryV2 is
 
         _checkSignature(disperserInfo.disperser, digest, signature);
         // Assert that the disperser is registered.
-        if (disperserInfo.disperser == address(0)) revert NotRegistered();
+        if (disperserInfo.disperser == address(0)) revert DisperserIsNotRegistered();
 
         // Delete the disperser info.
         delete disperserInfo.disperser;
@@ -101,7 +101,7 @@ contract EigenDADisperserRegistryV2 is
         // Assert that the signature is valid (supports EIP-1271).
         _checkSignature(disperserInfo.disperser, digest, signature);
         // Assert that the disperser is registered.
-        if (disperserInfo.disperser == address(0)) revert NotRegistered();
+        if (disperserInfo.disperser == address(0)) revert DisperserIsNotRegistered();
 
         // Set the relay URL.
         disperserInfo.relayURL = relayURL;
@@ -133,25 +133,25 @@ contract EigenDADisperserRegistryV2 is
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function addDefaultDisperser(uint32 disperserId) external onlyOwner {
-        if (!_defaultDispersers.add(disperserId)) revert DisperserAlreadyExists();
+        if (!_defaultDispersers.add(disperserId)) revert DisperserInSet();
         emit DefaultDisperserAdded(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function addOnDemandDisperser(uint32 disperserId) external onlyOwner {
-        if (!_onDemandDispersers.add(disperserId)) revert DisperserAlreadyExists();
+        if (!_onDemandDispersers.add(disperserId)) revert DisperserInSet();
         emit OnDemandDisperserAdded(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function removeDefaultDisperser(uint32 disperserId) external onlyOwner {
-        if (!_defaultDispersers.remove(disperserId)) revert DisperserNotFound();
+        if (!_defaultDispersers.remove(disperserId)) revert DisperserNotInSet();
         emit DefaultDisperserRemoved(disperserId);
     }
 
     /// @inheritdoc IEigenDADisperserRegistryV2
     function removeOnDemandDisperser(uint32 disperserId) external onlyOwner {
-        if (!_onDemandDispersers.remove(disperserId)) revert DisperserNotFound();
+        if (!_onDemandDispersers.remove(disperserId)) revert DisperserNotInSet();
         emit OnDemandDisperserRemoved(disperserId);
     }
 

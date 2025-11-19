@@ -45,26 +45,18 @@ interface IEigenDADisperserRegistryV2 {
     /// Errors
     /// -----------------------------------------------------------------------
 
-    /// @notice This error is thrown when a zero address is provided as input where a valid address is required.
+    /// @notice Thrown when a zero address is provided as input.
     error InputAddressZero();
-
-    /// @notice This error is thrown when attempting to register a disperser that has already been registered.
-    error AlreadyRegistered();
-
-    /// @notice This error is thrown when an invalid signature is provided for verification.
+    /// @notice Thrown when an invalid signature is provided for verification.
     error InvalidSignature();
-
-    /// @notice This error is thrown when attempting an operation on a disperser that is not registered.
-    error NotRegistered();
-
-    /// @notice This error is thrown when attempting to add a disperser that already exists in the specified set.
-    error DisperserAlreadyExists();
-
-    /// @notice This error is thrown when attempting to remove a disperser that does not exist in the specified set.
-    error DisperserNotFound();
-
-    /// @notice This error is thrown when attempting to perform an operation on a disperser that is in the default or on-demand dispersers sets.
+    /// @notice Thrown when attempting to register a disperser that is already registered.
+    error DisperserIsRegistered();
+    /// @notice Thrown when attempting to deregister a disperser that is not registered.
+    error DisperserIsNotRegistered();
+    /// @notice Thrown when attempting to add an existing disperser to the specified set.
     error DisperserInSet();
+    /// @notice Thrown when attempting to remove a disperser that is not in the specified set.
+    error DisperserNotInSet();
 
     /// -----------------------------------------------------------------------
     /// External Functions
