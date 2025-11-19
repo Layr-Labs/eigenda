@@ -2,6 +2,7 @@ package geth
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -57,8 +58,8 @@ func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Addre
 	for i := 0; i < len(rpcUrls); i++ {
 		rpc, err := NewClient(config, senderAddress, i, logger)
 		if err != nil {
-			logger.Info("cannot connect to rpc at start", "url", rpcUrls[i])
-			return nil, err
+			sanitizedUrl := SanitizeRpcUrl(rpcUrls[i])
+			return nil, fmt.Errorf("cannot connect to rpc at start: endpoint=%s index=%d: %w", sanitizedUrl, i, err)
 		}
 		client.RPCs = append(client.RPCs, rpc)
 	}
