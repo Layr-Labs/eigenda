@@ -6,13 +6,13 @@ import {ConfigRegistryTypes as T} from "src/core/libraries/v3/config-registry/Co
 /// @notice Defines the storage layout for a config registry based on ERC-7201
 ///         https://eips.ethereum.org/EIPS/eip-7201
 library ConfigRegistryStorage {
-    /// @custom: storage-location erc7201:config.registry.storage
+    /// @custom: storage-location erc7201:contract-directory.config-registry.storage
     struct Layout {
         T.BlockNumberCfg BlockNumberCfg;
         T.TimeStampCfg TimeStampCfg;
     }
 
-    string internal constant STORAGE_ID = "config.registry.storage";
+    string internal constant STORAGE_ID = "contract-directory.config-registry.storage";
     bytes32 internal constant STORAGE_POSITION =
         keccak256(abi.encode(uint256(keccak256(abi.encodePacked(STORAGE_ID))) - 1)) & ~bytes32(uint256(0xff));
 

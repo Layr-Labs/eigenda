@@ -203,7 +203,7 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     /// @inheritdoc IEigenDASemVer
     function semver() external pure returns (uint8 major, uint8 minor, uint8 patch) {
         major = 1;
-        minor = 1;
+        minor = 2;
         patch = 0;
     }
 }
