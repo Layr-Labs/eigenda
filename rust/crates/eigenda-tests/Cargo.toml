@@ -6,7 +6,7 @@ publish = false        # keep private
 
 [dependencies]
 eigenda-proxy = { path = "../eigenda-proxy" }
-eigenda-ethereum = { path = "../eigenda-ethereum", features = ["native"] }
+eigenda-ethereum = { path = "../eigenda-ethereum" }
 eigenda-verification = { path = "../eigenda-verification" }
 
 testcontainers = { workspace = true }
