@@ -8,8 +8,8 @@ import {ConfigRegistryTypes as T} from "src/core/libraries/v3/config-registry/Co
 library ConfigRegistryStorage {
     /// @custom: storage-location erc7201:config.registry.storage
     struct Layout {
-        T.Bytes32Cfg bytes32Config;
-        T.BytesCfg bytesConfig;
+        T.BlockNumberCfg BlockNumberCfg;
+        T.TimeStampCfg TimeStampCfg;
     }
 
     string internal constant STORAGE_ID = "config.registry.storage";
