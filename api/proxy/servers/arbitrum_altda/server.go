@@ -22,9 +22,10 @@ import (
 // REST status code signals (i.e, "drop cert", "failover") into arbitrum specific
 // errors
 type Config struct {
-	Host      string
-	Port      int
-	JWTSecret string
+	Host               string
+	Port               int
+	JWTSecret          string
+	ProcessInvalidCert bool
 }
 
 type Server struct {

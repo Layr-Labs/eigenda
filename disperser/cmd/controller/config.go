@@ -166,7 +166,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			BatchMetadataUpdatePeriod:              ctx.GlobalDuration(flags.BatchMetadataUpdatePeriodFlag.Name),
 			BatchAttestationTimeout:                ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
 			SignatureTickInterval:                  ctx.GlobalDuration(flags.SignatureTickIntervalFlag.Name),
-			NumRequestRetries:                      ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
 			MaxBatchSize:                           int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
 			SignificantSigningThresholdFraction:    ctx.GlobalFloat64(flags.SignificantSigningThresholdFractionFlag.Name),
 			NumConcurrentRequests:                  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
