@@ -34,9 +34,9 @@ func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOpera
 	if err != nil {
 		for id := range d.state.PrivateOperators {
 			update <- core.SigningMessage{
-				Signature: nil,
-				Operator:  id,
-				Err:       err,
+				Signature:   nil,
+				ValidatorId: id,
+				Err:         err,
 			}
 		}
 	}
@@ -46,17 +46,17 @@ func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOpera
 			info := d.state.PrivateOperators[id]
 			if _, ok := nonSigners[id]; ok {
 				update <- core.SigningMessage{
-					Signature: nil,
-					Operator:  id,
-					Err:       errors.New("not a signer"),
+					Signature:   nil,
+					ValidatorId: id,
+					Err:         errors.New("not a signer"),
 				}
 			} else {
 				sig := info.KeyPair.SignMessage(message)
 
 				update <- core.SigningMessage{
-					Signature: sig,
-					Operator:  id,
-					Err:       nil,
+					Signature:   sig,
+					ValidatorId: id,
+					Err:         nil,
 				}
 			}
 		}
