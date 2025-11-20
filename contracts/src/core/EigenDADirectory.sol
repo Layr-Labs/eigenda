@@ -26,8 +26,9 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
 
     modifier onlyOwner() {
         require(
-            IAccessControl(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey().getAddress())
-                .hasRole(AccessControlConstants.OWNER_ROLE, msg.sender),
+            IAccessControl(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey().getAddress()).hasRole(
+                AccessControlConstants.OWNER_ROLE, msg.sender
+            ),
             "Caller is not the owner"
         );
         _;
@@ -118,85 +119,85 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     /// CONFIG REGISTRY FUNCTIONS ///
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function addConfigBytes32(string memory name, uint256 activationKey, bytes32 value) external onlyOwner {
+    function addConfigBlockNumber(string memory name, uint256 activationKey, bytes memory value) external onlyOwner {
         bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
-        ConfigRegistryLib.addConfigBytes32(nameDigest, activationKey, value);
-        ConfigRegistryLib.registerNameBytes32(name);
+        ConfigRegistryLib.addConfigBlockNumber(nameDigest, activationKey, value);
+        ConfigRegistryLib.registerNameBlockNumber(name);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function addConfigBytes(string memory name, uint256 activationKey, bytes memory value) external onlyOwner {
+    function addConfigTimeStamp(string memory name, uint256 activationKey, bytes memory value) external onlyOwner {
         bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
-        ConfigRegistryLib.addConfigBytes(nameDigest, activationKey, value);
-        ConfigRegistryLib.registerNameBytes(name);
+        ConfigRegistryLib.addConfigTimeStamp(nameDigest, activationKey, value);
+        ConfigRegistryLib.registerNameTimeStamp(name);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getNumCheckpointsBytes32(bytes32 nameDigest) external view returns (uint256) {
-        return ConfigRegistryLib.getNumCheckpointsBytes32(nameDigest);
+    function getNumCheckpointsBlockNumber(bytes32 nameDigest) external view returns (uint256) {
+        return ConfigRegistryLib.getNumCheckpointsBlockNumber(nameDigest);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getNumCheckpointsBytes(bytes32 nameDigest) external view returns (uint256) {
-        return ConfigRegistryLib.getNumCheckpointsBytes(nameDigest);
+    function getNumCheckpointsTimeStamp(bytes32 nameDigest) external view returns (uint256) {
+        return ConfigRegistryLib.getNumCheckpointsTimeStamp(nameDigest);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getConfigBytes32(bytes32 nameDigest, uint256 index) external view returns (bytes32) {
-        return ConfigRegistryLib.getConfigBytes32(nameDigest, index);
+    function getConfigBlockNumber(bytes32 nameDigest, uint256 index) external view returns (bytes memory) {
+        return ConfigRegistryLib.getConfigBlockNumber(nameDigest, index);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getConfigBytes(bytes32 nameDigest, uint256 index) external view returns (bytes memory) {
-        return ConfigRegistryLib.getConfigBytes(nameDigest, index);
+    function getConfigTimeStamp(bytes32 nameDigest, uint256 index) external view returns (bytes memory) {
+        return ConfigRegistryLib.getConfigTimeStamp(nameDigest, index);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getActivationKeyBytes32(bytes32 nameDigest, uint256 index) external view returns (uint256) {
-        return ConfigRegistryLib.getActivationKeyBytes32(nameDigest, index);
+    function getActivationKeyBlockNumber(bytes32 nameDigest, uint256 index) external view returns (uint256) {
+        return ConfigRegistryLib.getActivationKeyBlockNumber(nameDigest, index);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getActivationKeyBytes(bytes32 nameDigest, uint256 index) external view returns (uint256) {
-        return ConfigRegistryLib.getActivationKeyBytes(nameDigest, index);
+    function getActivationKeyTimeStamp(bytes32 nameDigest, uint256 index) external view returns (uint256) {
+        return ConfigRegistryLib.getActivationKeyTimeStamp(nameDigest, index);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getCheckpointBytes32(bytes32 nameDigest, uint256 index)
+    function getCheckpointBlockNumber(bytes32 nameDigest, uint256 index)
         external
         view
-        returns (ConfigRegistryTypes.Bytes32Checkpoint memory)
+        returns (ConfigRegistryTypes.BlockNumberCheckpoint memory)
     {
-        return ConfigRegistryLib.getCheckpointBytes32(nameDigest, index);
+        return ConfigRegistryLib.getCheckpointBlockNumber(nameDigest, index);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getCheckpointBytes(bytes32 nameDigest, uint256 index)
+    function getCheckpointTimeStamp(bytes32 nameDigest, uint256 index)
         external
         view
-        returns (ConfigRegistryTypes.BytesCheckpoint memory)
+        returns (ConfigRegistryTypes.TimeStampCheckpoint memory)
     {
-        return ConfigRegistryLib.getCheckpointBytes(nameDigest, index);
+        return ConfigRegistryLib.getCheckpointTimeStamp(nameDigest, index);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getConfigNameBytes32(bytes32 nameDigest) external view returns (string memory) {
-        return ConfigRegistryLib.getNameBytes32(nameDigest);
+    function getConfigNameBlockNumber(bytes32 nameDigest) external view returns (string memory) {
+        return ConfigRegistryLib.getNameBlockNumber(nameDigest);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getConfigNameBytes(bytes32 nameDigest) external view returns (string memory) {
-        return ConfigRegistryLib.getNameBytes(nameDigest);
+    function getConfigNameTimeStamp(bytes32 nameDigest) external view returns (string memory) {
+        return ConfigRegistryLib.getNameTimeStamp(nameDigest);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getAllConfigNamesBytes32() external view returns (string[] memory) {
-        return ConfigRegistryLib.getNameListBytes32();
+    function getAllConfigNamesBlockNumber() external view returns (string[] memory) {
+        return ConfigRegistryLib.getNameListBlockNumber();
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getAllConfigNamesBytes() external view returns (string[] memory) {
-        return ConfigRegistryLib.getNameListBytes();
+    function getAllConfigNamesTimeStamp() external view returns (string[] memory) {
+        return ConfigRegistryLib.getNameListTimeStamp();
     }
 
     /// @inheritdoc IEigenDASemVer
