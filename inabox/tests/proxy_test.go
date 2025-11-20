@@ -6,12 +6,14 @@ import (
 	"net"
 	"path/filepath"
 	"runtime"
+	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
+	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
@@ -26,8 +28,69 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	integration "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/require"
 )
+
+// TestProxyAPIsEnabledRestALTDA tests to ensure that the enabled APIs expression is
+// getting respected by the REST ALTDA Server when wiring up a proxy application instance
+// with just `op-generic` mode enabled.
+//
+// This test has been migrated from api/proxy/test/e2e/server_rest_test.go to use inabox infrastructure.
+func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
+	// Create fresh test harness from global infrastructure
+	testHarness, err := integration.NewTestHarnessWithSetup(globalInfra)
+	require.NoError(t, err)
+	defer testHarness.Cleanup()
+
+	ctx := context.Background()
+
+	// Create proxy config with only op-generic API enabled
+	proxyConfig, err := createProxyConfig(
+		&enabled_apis.RestApisEnabled{
+			OpGenericCommitment: true,  // only op-generic enabled
+			StandardCommitment:  false, // standard disabled
+			OpKeccakCommitment:  false, // keccak disabled
+		},
+	)
+	require.NoError(t, err)
+
+	// Start proxy REST server
+	restServer, restURL, cleanup, err := startProxyServer(ctx, globalInfra.Logger, proxyConfig)
+	require.NoError(t, err)
+	defer cleanup()
+
+	t.Logf("Proxy server started at %s", restURL)
+
+	// Test that standard commitment mode is disabled (should return 403)
+	standardClient := standard_client.New(&standard_client.Config{
+		URL: restURL,
+	})
+
+	testBlob := []byte("hello world")
+	t.Log("Attempting to set data using standard commitment (should fail with 403)...")
+	_, err = standardClient.SetData(ctx, testBlob)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "403")
+
+	// Test that op-generic mode works (should succeed)
+	opGenericClient := altda.NewDAClient(restURL, false, false)
+
+	t.Log("Setting data using op-generic commitment (should succeed)...")
+	daCommit, err := opGenericClient.SetInput(ctx, testBlob)
+	require.NoError(t, err)
+
+	t.Log("Getting data using op-generic commitment (should succeed)...")
+	preimage, err := opGenericClient.GetInput(ctx, daCommit, 0)
+	require.NoError(t, err)
+	require.Equal(t, testBlob, preimage)
+
+	t.Log("TestProxyAPIsEnabledRestALTDA completed successfully")
+
+	// Verify the server is still running
+	require.NotNil(t, restServer)
+}
 
 // createProxyConfig creates a proxy configuration that connects to the inabox disperser
 func createProxyConfig(
