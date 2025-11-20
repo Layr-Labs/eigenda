@@ -42,4 +42,4 @@ jobs:
           yarn install
           yarn prepare:devnet
           yarn codegen
-          yarn test 
+          yarn test

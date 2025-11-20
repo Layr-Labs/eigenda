@@ -184,6 +184,11 @@ func deploySubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, pa
 		return fmt.Errorf("failed to execute yarn install: %w", err)
 	}
 
+	config.Logger.Debug("Executing yarn prepare:devnet")
+	if err := execYarnCmd("prepare:devnet", subgraphPath, config.Logger); err != nil {
+		return fmt.Errorf("failed to execute yarn prepare:devnet %w", err)
+	}
+
 	config.Logger.Debug("Executing yarn codegen")
 	if err := execYarnCmd("codegen", subgraphPath, config.Logger); err != nil {
 		return fmt.Errorf("failed to execute yarn codegen: %w", err)
@@ -241,13 +246,6 @@ func updateSubgraph(
 		return fmt.Errorf("error writing templates/devnet.json: %w", err)
 	}
 	config.Logger.Info("templates/devnet.json written")
-
-	// Run yarn prepare:devnet to generate subgraph.yaml from the template
-	config.Logger.Debug("Executing yarn prepare:devnet")
-	if err := execYarnCmd("prepare:devnet", subgraphPath, config.Logger); err != nil {
-		return fmt.Errorf("failed to execute yarn prepare:devnet: %w", err)
-	}
-	config.Logger.Info("subgraph.yaml generated from template")
 
 	return nil
 }
