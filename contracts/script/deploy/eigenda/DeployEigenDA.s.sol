@@ -302,22 +302,19 @@ contract DeployEigenDA is Script {
             AddressDirectoryConstants.OPERATOR_STATE_RETRIEVER_NAME, address(new OperatorStateRetriever())
         );
 
-        directory.addAddress(
-            AddressDirectoryConstants.CERT_VERIFIER_NAME,
-            address(
-                new EigenDACertVerifier(
-                    IEigenDAThresholdRegistry(directory.getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME)),
-                    IEigenDASignatureVerifier(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
-                    cfg.certVerifierSecurityThresholds(),
-                    cfg.certVerifierQuorumNumbersRequired()
-                )
+        address certVerifier = address(
+            new EigenDACertVerifier(
+                IEigenDAThresholdRegistry(directory.getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME)),
+                IEigenDASignatureVerifier(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
+                cfg.certVerifierSecurityThresholds(),
+                cfg.certVerifierQuorumNumbersRequired()
             )
         );
 
         address routerImpl = address(new EigenDACertVerifierRouter());
         address[] memory certVerifiers = new address[](1);
 
-        certVerifiers[0] = directory.getAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME);
+        certVerifiers[0] = certVerifier;
 
         directory.addAddress(
             AddressDirectoryConstants.CERT_VERIFIER_ROUTER_NAME,
