@@ -39,10 +39,7 @@ jobs:
       - name: Test ${{ matrix.subgraph }} subgraph
         working-directory: subgraphs/${{ matrix.subgraph }}
         run: |
-          # Copy template files
-          cp ./templates/subgraph.yaml .
-          cp ./templates/networks.json .
-          
           yarn install
+          yarn prepare:devnet
           yarn codegen
           yarn test 
