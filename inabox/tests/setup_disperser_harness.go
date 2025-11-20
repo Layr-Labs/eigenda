@@ -633,7 +633,7 @@ func startEncoder(
 	encoderMetrics.Start(ctx)
 
 	// Get SRS paths using the utility function
-	g1Path, _, _, err := getSRSPaths()
+	g1Path, _, _, err := GetSRSPaths()
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}
@@ -1135,7 +1135,7 @@ func startAPIServer(
 	blobStore := blobstore.NewBlobStore(config.S3BucketName, s3Client, apiServerLogger)
 
 	// Create committer
-	g1Path, g2Path, g2TrailingPath, err := getSRSPaths()
+	g1Path, g2Path, g2TrailingPath, err := GetSRSPaths()
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}
