@@ -17,6 +17,7 @@ use eigenda_verification::verification::{
 };
 
 #[tokio::test]
+#[ignore = "Live test that runs against sepolia network"]
 async fn post_payload_to_proxy() {
     common::tracing::init_tracing();
 

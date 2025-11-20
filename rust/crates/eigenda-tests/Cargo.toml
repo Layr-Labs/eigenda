@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2024"
 publish = false        # keep private
 
-[dependencies]
+[dev-dependencies]
 eigenda-proxy = { path = "../eigenda-proxy" }
-eigenda-ethereum = { path = "../eigenda-ethereum", features = ["native"] }
+eigenda-ethereum = { path = "../eigenda-ethereum" }
 eigenda-verification = { path = "../eigenda-verification" }
 
 testcontainers = { workspace = true }
