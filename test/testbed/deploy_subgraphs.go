@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"gopkg.in/yaml.v3"
 )
 
 // Subgraph yaml
@@ -63,7 +62,7 @@ type BlockHandler struct {
 	Handler string `yaml:"handler"`
 }
 
-type Networks map[string]map[string]map[string]any
+type Networks map[string]any
 
 type SubgraphUpdater interface {
 	UpdateSubgraph(s *Subgraph, startBlock int)
@@ -89,17 +88,15 @@ func (u EigenDAOperatorStateSubgraphUpdater) UpdateSubgraph(s *Subgraph, startBl
 }
 
 func (u EigenDAOperatorStateSubgraphUpdater) UpdateNetworks(n Networks, startBlock int) {
-	n["devnet"]["RegistryCoordinator"]["address"] = u.RegistryCoordinator
-	n["devnet"]["RegistryCoordinator"]["startBlock"] = startBlock
-	n["devnet"]["RegistryCoordinator_Operator"]["address"] = u.RegistryCoordinator
-	n["devnet"]["RegistryCoordinator_Operator"]["startBlock"] = startBlock
-
-	n["devnet"]["BLSApkRegistry"]["address"] = u.BlsApkRegistry
-	n["devnet"]["BLSApkRegistry"]["startBlock"] = startBlock
-	n["devnet"]["BLSApkRegistry_Operator"]["address"] = u.BlsApkRegistry
-	n["devnet"]["BLSApkRegistry_Operator"]["startBlock"] = startBlock
-	n["devnet"]["BLSApkRegistry_QuorumApkUpdates"]["address"] = u.BlsApkRegistry
-	n["devnet"]["BLSApkRegistry_QuorumApkUpdates"]["startBlock"] = startBlock
+	// Update the devnet template with actual contract addresses
+	n["network"] = "devnet"
+	n["RegistryCoordinator_address"] = u.RegistryCoordinator
+	n["RegistryCoordinator_startBlock"] = startBlock
+	n["BLSApkRegistry_address"] = u.BlsApkRegistry
+	n["BLSApkRegistry_startBlock"] = startBlock
+	// EjectionManager is set to zero address for now
+	n["EjectionManager_address"] = "0x0000000000000000000000000000000000000000"
+	n["EjectionManager_startBlock"] = startBlock
 }
 
 type EigenDAUIMonitoringUpdater struct {
@@ -112,8 +109,10 @@ func (u EigenDAUIMonitoringUpdater) UpdateSubgraph(s *Subgraph, startBlock int) 
 }
 
 func (u EigenDAUIMonitoringUpdater) UpdateNetworks(n Networks, startBlock int) {
-	n["devnet"]["EigenDAServiceManager"]["address"] = u.ServiceManager
-	n["devnet"]["EigenDAServiceManager"]["startBlock"] = startBlock
+	// Update the devnet template with actual contract addresses
+	n["network"] = "devnet"
+	n["EigenDAServiceManager_address"] = u.ServiceManager
+	n["EigenDAServiceManager_startBlock"] = startBlock
 }
 
 // SubgraphDeploymentConfig contains configuration for deploying subgraphs
@@ -175,16 +174,7 @@ func deploySubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, pa
 		return fmt.Errorf("failed to install parent subgraphs dependencies: %w", err)
 	}
 
-	config.Logger.Debug("Executing bash command", "command", `cp "./templates/subgraph.yaml" "./"`)
-	if err := execBashCmd(`cp "./templates/subgraph.yaml" "./"`, subgraphPath, config.Logger); err != nil {
-		return fmt.Errorf("failed to copy subgraph.yaml: %w", err)
-	}
-
-	config.Logger.Debug("Executing bash command", "command", `cp "./templates/networks.json" "./"`)
-	if err := execBashCmd(`cp "./templates/networks.json" "./"`, subgraphPath, config.Logger); err != nil {
-		return fmt.Errorf("failed to copy networks.json: %w", err)
-	}
-
+	// Update the devnet template and generate subgraph.yaml using mustache
 	if err := updateSubgraph(config, updater, startBlock, subgraphPath); err != nil {
 		return fmt.Errorf("failed to update subgraph: %w", err)
 	}
@@ -192,6 +182,11 @@ func deploySubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, pa
 	config.Logger.Debug("Executing yarn install")
 	if err := execYarnCmd("install", subgraphPath, config.Logger); err != nil {
 		return fmt.Errorf("failed to execute yarn install: %w", err)
+	}
+
+	config.Logger.Debug("Executing yarn prepare:devnet")
+	if err := execYarnCmd("prepare:devnet", subgraphPath, config.Logger); err != nil {
+		return fmt.Errorf("failed to execute yarn prepare:devnet %w", err)
 	}
 
 	config.Logger.Debug("Executing yarn codegen")
@@ -223,55 +218,35 @@ func updateSubgraph(
 	startBlock int,
 	subgraphPath string,
 ) error {
-	const (
-		networkFile  = "networks.json"
-		subgraphFile = "subgraph.yaml"
-	)
+	// Path to the devnet template file
+	devnetTemplatePath := filepath.Join(subgraphPath, "templates", "devnet.json")
 
-	networkFilePath := filepath.Join(subgraphPath, networkFile)
-	subgraphFilePath := filepath.Join(subgraphPath, subgraphFile)
-
-	networkData, err := os.ReadFile(networkFilePath)
+	// Read the devnet template
+	templateData, err := os.ReadFile(devnetTemplatePath)
 	if err != nil {
-		return fmt.Errorf("error reading networks.json: %w", err)
+		return fmt.Errorf("error reading templates/devnet.json: %w", err)
 	}
 
-	var networkTemplate Networks
-	if err := json.Unmarshal(networkData, &networkTemplate); err != nil {
-		return fmt.Errorf("failed to unmarshal networks.json: %w", err)
+	// Parse the template
+	var devnetTemplate Networks
+	if err := json.Unmarshal(templateData, &devnetTemplate); err != nil {
+		return fmt.Errorf("failed to unmarshal templates/devnet.json: %w", err)
 	}
-	updater.UpdateNetworks(networkTemplate, startBlock)
-	networkJson, err := json.MarshalIndent(networkTemplate, "", "  ")
+
+	// Update the template with actual contract addresses and start blocks
+	updater.UpdateNetworks(devnetTemplate, startBlock)
+
+	// Write the updated template back
+	updatedJson, err := json.MarshalIndent(devnetTemplate, "", "  ")
 	if err != nil {
-		return fmt.Errorf("error marshaling networks.json: %w", err)
+		return fmt.Errorf("error marshaling templates/devnet.json: %w", err)
 	}
 
-	if err := os.WriteFile(networkFilePath, networkJson, 0644); err != nil {
-		return fmt.Errorf("error writing networks.json: %w", err)
+	if err := os.WriteFile(devnetTemplatePath, updatedJson, 0644); err != nil {
+		return fmt.Errorf("error writing templates/devnet.json: %w", err)
 	}
-	if config.Logger != nil {
-		config.Logger.Info("networks.json written")
-	}
+	config.Logger.Info("templates/devnet.json written")
 
-	subgraphTemplateData, err := os.ReadFile(subgraphFilePath)
-	if err != nil {
-		return fmt.Errorf("error reading subgraph.yaml: %w", err)
-	}
-
-	var sub Subgraph
-	if err := yaml.Unmarshal(subgraphTemplateData, &sub); err != nil {
-		return fmt.Errorf("error unmarshaling subgraph.yaml: %w", err)
-	}
-	updater.UpdateSubgraph(&sub, startBlock)
-	subgraphYaml, err := yaml.Marshal(&sub)
-	if err != nil {
-		return fmt.Errorf("error marshaling subgraph: %w", err)
-	}
-	if err := os.WriteFile(subgraphFilePath, subgraphYaml, 0644); err != nil {
-		return fmt.Errorf("error writing subgraph.yaml: %w", err)
-	}
-
-	config.Logger.Info("subgraph.yaml written")
 	return nil
 }
 

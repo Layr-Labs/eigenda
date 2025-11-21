@@ -1,0 +1,5 @@
+{
+  "network": "devnet",
+  "EigenDAServiceManager_address": "0x0000000000000000000000000000000000000000",
+  "EigenDAServiceManager_startBlock": 0
+}

@@ -107,10 +107,8 @@ func runRandomProofsTest(t *testing.T, client s3common.S3Client) {
 	t.Helper()
 	ctx := t.Context()
 
-	fragmentSize := rand.Intn(1024) + 100 // ignored since we aren't writing coefficients
-
-	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
-	reader := NewChunkReader(logger, client, bucket)
+	writer := NewChunkWriter(client, bucket)
+	reader := NewChunkReader(client, bucket)
 
 	expectedValues := make(map[corev2.BlobKey][]*encoding.Proof)
 
@@ -164,14 +162,13 @@ func runRandomCoefficientsTest(t *testing.T, client s3common.S3Client) {
 	ctx := t.Context()
 
 	chunkSize := uint64(rand.Intn(1024) + 100)
-	fragmentSize := int(chunkSize / 2)
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
 	encoder, err := rs.NewEncoder(logger, cfg)
 	require.NoError(t, err)
 
-	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
-	reader := NewChunkReader(logger, client, bucket)
+	writer := NewChunkWriter(client, bucket)
+	reader := NewChunkReader(client, bucket)
 
 	expectedValues := make(map[corev2.BlobKey][]rs.FrameCoeffs)
 	metadataMap := make(map[corev2.BlobKey]*encoding.FragmentInfo)
@@ -191,7 +188,7 @@ func runRandomCoefficientsTest(t *testing.T, client s3common.S3Client) {
 	// Read data
 	for key, expectedCoefficients := range expectedValues {
 		elementCount, binaryCoefficients, err :=
-			reader.GetBinaryChunkCoefficients(ctx, key, metadataMap[key])
+			reader.GetBinaryChunkCoefficients(ctx, key)
 		require.NoError(t, err, "failed to get binary chunk coefficients for blob key %x", key)
 		coefficients := rs.DeserializeSplitFrameCoeffs(elementCount, binaryCoefficients)
 		require.NoError(t, err, "failed to deserialize frame coefficients for blob key %x", key)
@@ -222,14 +219,13 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 	client := s3common.NewMockS3Client()
 
 	chunkSize := uint64(rand.Intn(1024) + 100)
-	fragmentSize := int(chunkSize / 2)
 
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
 	encoder, err := rs.NewEncoder(logger, cfg)
 	require.NoError(t, err)
 
-	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
+	writer := NewChunkWriter(client, bucket)
 	ctx := t.Context()
 	for i := 0; i < 100; i++ {
 		key := corev2.BlobKey(random.RandomBytes(32))
@@ -240,10 +236,9 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 		require.True(t, writer.ProofExists(ctx, key), "proof should exist for blob key %x", key)
 
 		coefficients := generateRandomFrameCoeffs(t, encoder, int(chunkSize), params)
-		metadata, err := writer.PutFrameCoefficients(ctx, key, coefficients)
+		_, err = writer.PutFrameCoefficients(ctx, key, coefficients)
 		require.NoError(t, err, "failed to put frame coefficients for blob key %x", key)
-		exist, fragmentInfo := writer.CoefficientsExists(ctx, key)
+		exist := writer.CoefficientsExists(ctx, key)
 		require.True(t, exist, "coefficients should exist for blob key %x", key)
-		require.Equal(t, metadata, fragmentInfo, "fragment info mismatch for blob key %x", key)
 	}
 }

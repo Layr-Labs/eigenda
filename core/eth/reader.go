@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
-	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
 	disperserreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
@@ -40,7 +39,6 @@ type ContractBindings struct {
 	RegCoordinatorAddr    gethcommon.Address
 	ServiceManagerAddr    gethcommon.Address
 	RelayRegistryAddress  gethcommon.Address
-	DelegationManager     *delegationmgr.ContractDelegationManager
 	OpStateRetriever      *opstateretriever.ContractOperatorStateRetriever
 	BLSApkRegistry        *blsapkreg.ContractBLSApkRegistry
 	IndexRegistry         *indexreg.ContractIIndexRegistry
@@ -100,12 +98,6 @@ func (t *Reader) updateContractBindings(
 		return err
 	}
 
-	delegationManagerAddr, err := contractEigenDAServiceManager.Delegation(&bind.CallOpts{})
-	if err != nil {
-		t.logger.Error("Failed to fetch DelegationManager address", "err", err)
-		return err
-	}
-
 	avsDirectoryAddr, err := contractEigenDAServiceManager.AvsDirectory(&bind.CallOpts{})
 	if err != nil {
 		t.logger.Error("Failed to fetch AVSDirectory address", "err", err)
@@ -115,12 +107,6 @@ func (t *Reader) updateContractBindings(
 	contractAVSDirectory, err := avsdir.NewContractAVSDirectory(avsDirectoryAddr, t.ethClient)
 	if err != nil {
 		t.logger.Error("Failed to fetch AVSDirectory contract", "err", err)
-		return err
-	}
-
-	contractDelegationManager, err := delegationmgr.NewContractDelegationManager(delegationManagerAddr, t.ethClient)
-	if err != nil {
-		t.logger.Error("Failed to fetch DelegationManager contract", "err", err)
 		return err
 	}
 
@@ -272,7 +258,6 @@ func (t *Reader) updateContractBindings(
 		EjectionManager:       contractEjectionManager,
 		StakeRegistry:         contractStakeRegistry,
 		EigenDAServiceManager: contractEigenDAServiceManager,
-		DelegationManager:     contractDelegationManager,
 		PaymentVault:          contractPaymentVault,
 		ThresholdRegistry:     contractThresholdRegistry,
 		DisperserRegistry:     contractEigenDADisperserRegistry,
