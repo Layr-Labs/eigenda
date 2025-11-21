@@ -600,8 +600,16 @@ impl DataDecoder for OperatorStakeHistoryExtractor {
 pub struct CertVerifierABNsLenExtractor;
 
 impl CertVerifierABNsLenExtractor {
+    /// Create a new certificate verifier ABNs length extractor
     pub fn new() -> Self {
         Self {}
+    }
+}
+
+impl Default for CertVerifierABNsLenExtractor {
+    /// Create a default instance of the extractor
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -624,6 +632,10 @@ pub struct CertVerifierABNsExtractor {
 }
 
 impl CertVerifierABNsExtractor {
+    /// Create a new certificate verifier ABNs extractor
+    ///
+    /// # Arguments
+    /// * `num_abns` - Number of ABNs to extract from storage
     pub fn new(num_abns: usize) -> Self {
         Self { num_abns }
     }
@@ -654,6 +666,10 @@ pub struct CertVerifiersExtractor<'a> {
 }
 
 impl<'a> CertVerifiersExtractor<'a> {
+    /// Create a new cert verifiers extractor
+    ///
+    /// # Arguments
+    /// * `abns` - Slice of activation block numbers identifying cert verifiers
     pub fn new(abns: &'a [u32]) -> Self {
         Self { abns }
     }

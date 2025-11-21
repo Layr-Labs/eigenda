@@ -122,6 +122,10 @@ impl EigenDaThresholdRegistry {
     }
 }
 
+/// Interface for the EigenDaCertVerifierRouter contract
+///
+/// Routes certificate verification requests to the appropriate
+/// CertVerifier contract based on activation block numbers.
 pub struct EigenDaCertVerifierRouter;
 
 impl EigenDaCertVerifierRouter {
