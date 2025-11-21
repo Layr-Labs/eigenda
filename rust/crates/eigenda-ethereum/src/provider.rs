@@ -236,7 +236,7 @@ impl EigenDaProvider {
             .get_proof(self.contracts.threshold_registry, keys)
             .number(block_height)
             .into_future()
-            .map_err(|e| alloy_contract::Error::TransportError(e));
+            .map_err(alloy_contract::Error::TransportError);
 
         let keys = contract::RegistryCoordinator::storage_keys(cert);
         let registry_coordinator_fut = self
@@ -244,7 +244,7 @@ impl EigenDaProvider {
             .get_proof(self.contracts.registry_coordinator, keys)
             .number(block_height)
             .into_future()
-            .map_err(|e| alloy_contract::Error::TransportError(e));
+            .map_err(alloy_contract::Error::TransportError);
 
         let keys = contract::ServiceManager::storage_keys(cert);
         let service_manager_fut = self
@@ -252,7 +252,7 @@ impl EigenDaProvider {
             .get_proof(self.contracts.service_manager, keys)
             .number(block_height)
             .into_future()
-            .map_err(|e| alloy_contract::Error::TransportError(e));
+            .map_err(alloy_contract::Error::TransportError);
 
         let keys = contract::BlsApkRegistry::storage_keys(cert);
         let bls_apk_registry_fut = self
@@ -260,7 +260,7 @@ impl EigenDaProvider {
             .get_proof(self.contracts.bls_apk_registry, keys)
             .number(block_height)
             .into_future()
-            .map_err(|e| alloy_contract::Error::TransportError(e));
+            .map_err(alloy_contract::Error::TransportError);
 
         let keys = contract::StakeRegistry::storage_keys(cert);
         let stake_registry_fut = self
@@ -268,7 +268,7 @@ impl EigenDaProvider {
             .get_proof(self.contracts.stake_registry, keys)
             .number(block_height)
             .into_future()
-            .map_err(|e| alloy_contract::Error::TransportError(e));
+            .map_err(alloy_contract::Error::TransportError);
 
         let keys = contract::DelegationManager::storage_keys(cert);
         let delegation_manager_fut = self
@@ -276,7 +276,7 @@ impl EigenDaProvider {
             .get_proof(self.contracts.delegation_manager, keys)
             .number(block_height)
             .into_future()
-            .map_err(|e| alloy_contract::Error::TransportError(e));
+            .map_err(alloy_contract::Error::TransportError);
 
         let cert_verifier_router_fut = async {
             let abns = self.get_router_abns().await?;
@@ -285,7 +285,7 @@ impl EigenDaProvider {
                 .get_proof(self.contracts.cert_verifier_router, keys)
                 .number(block_height)
                 .await
-                .map_err(|e| alloy_contract::Error::TransportError(e))
+                .map_err(alloy_contract::Error::TransportError)
         };
 
         let cert_verifier_fut = async {
@@ -299,7 +299,7 @@ impl EigenDaProvider {
                 .get_proof(cert_verifier_addr, keys)
                 .number(block_height)
                 .await
-                .map_err(|e| alloy_contract::Error::TransportError(e))
+                .map_err(alloy_contract::Error::TransportError)
         };
 
         let (
