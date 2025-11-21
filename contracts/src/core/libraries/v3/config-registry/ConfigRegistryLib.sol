@@ -144,7 +144,7 @@ library ConfigRegistryLib {
         if (cfg.values[nameDigest].length > 0) {
             uint256 lastABN = cfg.values[nameDigest][cfg.values[nameDigest].length - 1].activationBlock;
             if (abn <= lastABN) {
-                revert NotIncreasingActivationKey(lastABN, abn);
+                revert NotIncreasingBlockNumber(lastABN, abn);
             }
         }
 
