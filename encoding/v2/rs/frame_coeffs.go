@@ -106,3 +106,25 @@ func DeserializeSplitFrameCoeffs(elementCount uint32, binaryFrameCoeffs [][]byte
 
 	return coeffs
 }
+
+// SplitSerializedFrameCoeffsWithElementCount splits serialized frame coefficients data into a slice of byte slices,
+// each containing the serialized data for a single FrameCoeffs object.
+func SplitSerializedFrameCoeffsWithElementCount(serializedData []byte, symbolsPerFrame uint32) ([][]byte, error) {
+	index := uint32(0)
+	remainingBytes := uint32(len(serializedData))
+	bytesPerFrameCoeffs := encoding.BYTES_PER_SYMBOL * symbolsPerFrame
+
+	if remainingBytes%bytesPerFrameCoeffs != 0 {
+		return nil, fmt.Errorf("invalid data size: %d", remainingBytes)
+	}
+
+	frameCoeffCount := remainingBytes / bytesPerFrameCoeffs
+	binaryFrameCoeffs := make([][]byte, frameCoeffCount)
+
+	for i := uint32(0); i < frameCoeffCount; i++ {
+		binaryFrameCoeffs[i] = serializedData[index : index+bytesPerFrameCoeffs]
+		index += bytesPerFrameCoeffs
+	}
+
+	return binaryFrameCoeffs, nil
+}

@@ -2,8 +2,6 @@ package aws_test
 
 import (
 	"context"
-	"math"
-	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -80,28 +78,26 @@ func runRandomOperationsTest(t *testing.T, client s3common.S3Client) {
 	numberToWrite := 100
 	expectedData := make(map[string][]byte)
 
-	fragmentSize := rand.Intn(1000) + 1000
 	for i := 0; i < numberToWrite; i++ {
 		key := random.RandomString(10)
-		fragmentMultiple := rand.Float64() * 10
-		dataSize := int(fragmentMultiple*float64(fragmentSize)) + 1
+		dataSize := 100
 		data := random.RandomBytes(dataSize)
 		expectedData[key] = data
-		err := client.FragmentedUploadObject(ctx, bucket, key, data, fragmentSize)
+		err := client.UploadObject(ctx, bucket, key, data)
 		require.NoError(t, err, "failed to upload fragmented object for key %s", key)
 	}
 
 	// Read back the data
 	for key, expected := range expectedData {
-		data, err := client.FragmentedDownloadObject(ctx, bucket, key, len(expected), fragmentSize)
+		data, found, err := client.DownloadObject(ctx, bucket, key)
 		require.NoError(t, err, "failed to download fragmented object for key %s", key)
+		require.True(t, found, "object not found for key %s", key)
 		require.Equal(t, expected, data, "downloaded data should match uploaded data for key %s", key)
 
 		// List the objects
 		objects, err := client.ListObjects(ctx, bucket, key)
 		require.NoError(t, err, "failed to list objects for key %s", key)
-		numFragments := math.Ceil(float64(len(expected)) / float64(fragmentSize))
-		require.Len(t, objects, int(numFragments), "should have correct number of fragments for key %s", key)
+		require.Len(t, objects, 1, "should have exactly one object for key %s", key)
 		totalSize := int64(0)
 		for _, object := range objects {
 			totalSize += object.Size
@@ -148,12 +144,14 @@ func runReadNonExistentValueTest(t *testing.T, client s3common.S3Client) {
 	t.Helper()
 	ctx := t.Context()
 
-	_, err := client.FragmentedDownloadObject(ctx, bucket, "nonexistent", 1000, 1000)
-	require.Error(t, err, "should fail to download non-existent object")
+	_, found, err := client.DownloadObject(ctx, bucket, "nonexistent")
+	require.NoError(t, err, "should not error when downloading non-existent object")
+	require.False(t, found, "should not find non-existent object")
 
 	randomKey := random.RandomString(10)
-	_, err = client.FragmentedDownloadObject(ctx, bucket, randomKey, 0, 0)
-	require.Error(t, err, "should fail to download random non-existent object")
+	_, found, err = client.DownloadObject(ctx, bucket, randomKey)
+	require.NoError(t, err, "should not error when downloading non-existent object")
+	require.False(t, found, "should not find non-existent object")
 }
 
 func TestHeadObject(t *testing.T) {
