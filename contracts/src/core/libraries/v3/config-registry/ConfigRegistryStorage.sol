@@ -12,7 +12,7 @@ library ConfigRegistryStorage {
         T.TimeStampCfg TimeStampCfg;
     }
     
-    /// v3 suffix is appended to migrate away from legacy layout that used
+    /// v2 suffix is appended to migrate away from legacy layout that used
     /// bytes32 and bytes mapping types
     string internal constant STORAGE_ID = "config.registry.storage-v2";
     bytes32 internal constant STORAGE_POSITION =
