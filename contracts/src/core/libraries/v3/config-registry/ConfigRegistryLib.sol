@@ -5,26 +5,32 @@ import {ConfigRegistryStorage as S} from "src/core/libraries/v3/config-registry/
 import {ConfigRegistryTypes as T} from "src/core/libraries/v3/config-registry/ConfigRegistryTypes.sol";
 
 library ConfigRegistryLib {
-    event ConfigBytesSet(bytes32 nameDigest, uint256 activationKey, bytes value);
+    event TimestampConfigBytesSet(bytes32 nameDigest, uint256 activationTS, bytes value);
+    event BlockNumberConfigBytesSet(bytes32 nameDigest, uint256 abn, bytes value);
 
     /// @notice Thrown when attempting to retrieve a configuration by an unregistered name digest
     /// @param nameDigest The unregistered name digest
     error NameDigestNotRegistered(bytes32 nameDigest);
 
-    /// @notice Thrown when trying to add a configuration with an activation key that is not strictly increasing
-    /// @param previousActivationKey The last activation key for this configuration
-    /// @param newActivationKey The activation key being added (must be > previousActivationKey)
-    error NotIncreasingActivationKey(uint256 previousActivationKey, uint256 newActivationKey);
+    /// @notice Thrown when trying to add a configuration with a timestamp that is not strictly increasing
+    /// @param prevTS The last activation timestamp for this configuration
+    /// @param newTS The timestamp being added (must be > prevTS)
+    error NotIncreasingTimestamp(uint256 prevTS, uint256 newTS);
+
+    /// @notice Thrown when trying to add a configuration with a block number that is not strictly increasing
+    /// @param prevABN The last activation block number for this configuration
+    /// @param newABN The activation block number being added (must be > prevABN)
+    error NotIncreasingBlockNumber(uint256 prevABN, uint256 newABN);
 
     /// @notice Thrown when adding the first block number configuration with an activation block in the past
-    /// @param currBlock The current block number
+    /// @param currBlock The current block number (sourced via block.number)
     /// @param abn The activation block number being added (must be >= currBlock)
-    error BlockNumberActivationKeyInPast(uint256 currBlock, uint256 abn);
+    error BlockNumberActivationInPast(uint256 currBlock, uint256 abn);
 
     /// @notice Thrown when adding the first timestamp configuration with an activation timestamp in the past
-    /// @param currTS The current timestamp
-    /// @param ats The activation timestamp being added (must be >= currTS)
-    error TimeStampActivationKeyInPast(uint256 currTS, uint256 ats);
+    /// @param currTS The current timestamp (sourced via block.timestamp)
+    /// @param activationTS The activation timestamp being added (must be >= currTS)
+    error TimeStampActivationInPast(uint256 currTS, uint256 activationTS);
 
     /// @notice Computes the keccak256 hash of a configuration name
     /// @param name The configuration name
@@ -114,17 +120,17 @@ library ConfigRegistryLib {
         if (cfg.values[nameDigest].length > 0) {
             uint256 lastActivationTS = cfg.values[nameDigest][cfg.values[nameDigest].length - 1].activationTime;
             if (activationTS <= lastActivationTS) {
-                revert NotIncreasingActivationKey(lastActivationTS, activationTS);
+                revert NotIncreasingTimestamp(lastActivationTS, activationTS);
             }
         }
 
         /// @dev activation timestamps being provided must always be at a future timestamp
         if (activationTS < block.timestamp) {
-            revert TimeStampActivationKeyInPast(block.timestamp, activationTS);
+            revert TimeStampActivationInPast(block.timestamp, activationTS);
         }
 
         cfg.values[nameDigest].push(T.TimeStampCheckpoint({value: value, activationTime: activationTS}));
-        emit ConfigBytesSet(nameDigest, activationTS, value);
+        emit TimestampConfigBytesSet(nameDigest, activationTS, value);
     }
 
     /// @notice Adds a new block number-based configuration checkpoint
@@ -144,11 +150,11 @@ library ConfigRegistryLib {
 
         /// @dev abn being provided must always be at a future block
         if (abn < block.number) {
-            revert BlockNumberActivationKeyInPast(block.number, abn);
+            revert BlockNumberActivationInPast(block.number, abn);
         }
 
         cfg.values[nameDigest].push(T.BlockNumberCheckpoint({value: value, activationBlock: abn}));
-        emit ConfigBytesSet(nameDigest, abn, value);
+        emit BlockNumberConfigBytesSet(nameDigest, abn, value);
     }
 
     /// @notice Registers a configuration name for timestamp-based configurations
