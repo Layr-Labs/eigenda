@@ -125,7 +125,10 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function addConfigTimeStamp(string memory name, uint256 activationTimeStamp, bytes memory value) external onlyOwner {
+    function addConfigTimeStamp(string memory name, uint256 activationTimeStamp, bytes memory value)
+        external
+        onlyOwner
+    {
         bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
         ConfigRegistryLib.addConfigTimeStamp(nameDigest, activationTimeStamp, value);
         ConfigRegistryLib.registerNameTimeStamp(name);

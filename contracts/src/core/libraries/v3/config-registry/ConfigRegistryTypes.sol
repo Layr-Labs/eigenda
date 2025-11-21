@@ -37,7 +37,7 @@ library ConfigRegistryTypes {
 
     /// @notice Struct to hold all block number configuration checkpoints and associated names
     /// @dev See docs for the structs for more information
-    struct BlockNumberCfg {
+    struct BlockNumberConfig {
         mapping(bytes32 => BlockNumberCheckpoint[]) values;
         NameSet nameSet;
     }

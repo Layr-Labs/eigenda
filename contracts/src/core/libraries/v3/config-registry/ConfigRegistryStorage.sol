@@ -8,10 +8,10 @@ import {ConfigRegistryTypes as T} from "src/core/libraries/v3/config-registry/Co
 library ConfigRegistryStorage {
     ///@custom: storage-location erc7201:config.registry.storage
     struct Layout {
-        T.BlockNumberCfg blockNumberCfg;
-        T.TimeStampCfg timestampCfg;
+        T.BlockNumberConfig blockNumberCfg;
+        T.TimestampConfig timestampCfg;
     }
-    
+
     /// v2 suffix is appended to migrate away from legacy layout that used
     /// bytes32 and bytes mapping types
     string internal constant STORAGE_ID = "config.registry.storage-v2";

@@ -43,7 +43,7 @@ type ConfigRegistryTypesTimeStampCheckpoint struct {
 
 // ContractIEigenDADirectoryMetaData contains all meta data concerning the ContractIEigenDADirectory contract.
 var ContractIEigenDADirectoryMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"addAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addConfigBlockNumber\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"activationKey\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addConfigTimeStamp\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"activationKey\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getActivationKeyBlockNumber\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getActivationKeyTimeStamp\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllConfigNamesBlockNumber\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllConfigNamesTimeStamp\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllNames\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCheckpointBlockNumber\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structConfigRegistryTypes.BlockNumberCheckpoint\",\"components\":[{\"name\":\"activationBlock\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCheckpointTimeStamp\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structConfigRegistryTypes.TimeStampCheckpoint\",\"components\":[{\"name\":\"activationTime\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBlockNumber\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigNameBlockNumber\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigNameTimeStamp\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigTimeStamp\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getName\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getNumCheckpointsBlockNumber\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getNumCheckpointsTimeStamp\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"removeAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"replaceAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AddressAdded\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"value\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressRemoved\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressReplaced\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"oldValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AddressAlreadyExists\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"AddressDoesNotExist\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"NewValueIsOldValue\",\"inputs\":[{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddress\",\"inputs\":[]}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"addAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addConfigBlockNumber\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"abn\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addConfigTimeStamp\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"activationTS\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getActivationBlockNumber\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getActivationTimeStamp\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllConfigNamesBlockNumber\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllConfigNamesTimeStamp\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllNames\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCheckpointBlockNumber\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structConfigRegistryTypes.BlockNumberCheckpoint\",\"components\":[{\"name\":\"activationBlock\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCheckpointTimeStamp\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structConfigRegistryTypes.TimeStampCheckpoint\",\"components\":[{\"name\":\"activationTime\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBlockNumber\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigNameBlockNumber\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigNameTimeStamp\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigTimeStamp\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getName\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getNumCheckpointsBlockNumber\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getNumCheckpointsTimeStamp\",\"inputs\":[{\"name\":\"nameDigest\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"removeAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"replaceAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AddressAdded\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"value\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressRemoved\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressReplaced\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"oldValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AddressAlreadyExists\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"AddressDoesNotExist\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"NewValueIsOldValue\",\"inputs\":[{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddress\",\"inputs\":[]}]",
 }
 
 // ContractIEigenDADirectoryABI is the input ABI used to generate the binding from.
@@ -192,12 +192,12 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorRaw) Transa
 	return _ContractIEigenDADirectory.Contract.contract.Transact(opts, method, params...)
 }
 
-// GetActivationKeyBlockNumber is a free data retrieval call binding the contract method 0x56b66878.
+// GetActivationBlockNumber is a free data retrieval call binding the contract method 0xa78735a2.
 //
-// Solidity: function getActivationKeyBlockNumber(bytes32 nameDigest, uint256 index) view returns(uint256)
-func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetActivationKeyBlockNumber(opts *bind.CallOpts, nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+// Solidity: function getActivationBlockNumber(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetActivationBlockNumber(opts *bind.CallOpts, nameDigest [32]byte, index *big.Int) (*big.Int, error) {
 	var out []interface{}
-	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getActivationKeyBlockNumber", nameDigest, index)
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getActivationBlockNumber", nameDigest, index)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -209,26 +209,26 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetActivation
 
 }
 
-// GetActivationKeyBlockNumber is a free data retrieval call binding the contract method 0x56b66878.
+// GetActivationBlockNumber is a free data retrieval call binding the contract method 0xa78735a2.
 //
-// Solidity: function getActivationKeyBlockNumber(bytes32 nameDigest, uint256 index) view returns(uint256)
-func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetActivationKeyBlockNumber(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
-	return _ContractIEigenDADirectory.Contract.GetActivationKeyBlockNumber(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+// Solidity: function getActivationBlockNumber(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetActivationBlockNumber(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetActivationBlockNumber(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
 }
 
-// GetActivationKeyBlockNumber is a free data retrieval call binding the contract method 0x56b66878.
+// GetActivationBlockNumber is a free data retrieval call binding the contract method 0xa78735a2.
 //
-// Solidity: function getActivationKeyBlockNumber(bytes32 nameDigest, uint256 index) view returns(uint256)
-func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetActivationKeyBlockNumber(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
-	return _ContractIEigenDADirectory.Contract.GetActivationKeyBlockNumber(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+// Solidity: function getActivationBlockNumber(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetActivationBlockNumber(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetActivationBlockNumber(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
 }
 
-// GetActivationKeyTimeStamp is a free data retrieval call binding the contract method 0x5c7fc41d.
+// GetActivationTimeStamp is a free data retrieval call binding the contract method 0x16e34391.
 //
-// Solidity: function getActivationKeyTimeStamp(bytes32 nameDigest, uint256 index) view returns(uint256)
-func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetActivationKeyTimeStamp(opts *bind.CallOpts, nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+// Solidity: function getActivationTimeStamp(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetActivationTimeStamp(opts *bind.CallOpts, nameDigest [32]byte, index *big.Int) (*big.Int, error) {
 	var out []interface{}
-	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getActivationKeyTimeStamp", nameDigest, index)
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getActivationTimeStamp", nameDigest, index)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -240,18 +240,18 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetActivation
 
 }
 
-// GetActivationKeyTimeStamp is a free data retrieval call binding the contract method 0x5c7fc41d.
+// GetActivationTimeStamp is a free data retrieval call binding the contract method 0x16e34391.
 //
-// Solidity: function getActivationKeyTimeStamp(bytes32 nameDigest, uint256 index) view returns(uint256)
-func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetActivationKeyTimeStamp(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
-	return _ContractIEigenDADirectory.Contract.GetActivationKeyTimeStamp(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+// Solidity: function getActivationTimeStamp(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetActivationTimeStamp(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetActivationTimeStamp(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
 }
 
-// GetActivationKeyTimeStamp is a free data retrieval call binding the contract method 0x5c7fc41d.
+// GetActivationTimeStamp is a free data retrieval call binding the contract method 0x16e34391.
 //
-// Solidity: function getActivationKeyTimeStamp(bytes32 nameDigest, uint256 index) view returns(uint256)
-func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetActivationKeyTimeStamp(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
-	return _ContractIEigenDADirectory.Contract.GetActivationKeyTimeStamp(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
+// Solidity: function getActivationTimeStamp(bytes32 nameDigest, uint256 index) view returns(uint256)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetActivationTimeStamp(nameDigest [32]byte, index *big.Int) (*big.Int, error) {
+	return _ContractIEigenDADirectory.Contract.GetActivationTimeStamp(&_ContractIEigenDADirectory.CallOpts, nameDigest, index)
 }
 
 // GetAddress is a free data retrieval call binding the contract method 0x21f8a721.
@@ -711,44 +711,44 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) Ad
 
 // AddConfigBlockNumber is a paid mutator transaction binding the contract method 0x3a45bc4f.
 //
-// Solidity: function addConfigBlockNumber(string name, uint256 activationKey, bytes value) returns()
-func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) AddConfigBlockNumber(opts *bind.TransactOpts, name string, activationKey *big.Int, value []byte) (*types.Transaction, error) {
-	return _ContractIEigenDADirectory.contract.Transact(opts, "addConfigBlockNumber", name, activationKey, value)
+// Solidity: function addConfigBlockNumber(string name, uint256 abn, bytes value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) AddConfigBlockNumber(opts *bind.TransactOpts, name string, abn *big.Int, value []byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.contract.Transact(opts, "addConfigBlockNumber", name, abn, value)
 }
 
 // AddConfigBlockNumber is a paid mutator transaction binding the contract method 0x3a45bc4f.
 //
-// Solidity: function addConfigBlockNumber(string name, uint256 activationKey, bytes value) returns()
-func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) AddConfigBlockNumber(name string, activationKey *big.Int, value []byte) (*types.Transaction, error) {
-	return _ContractIEigenDADirectory.Contract.AddConfigBlockNumber(&_ContractIEigenDADirectory.TransactOpts, name, activationKey, value)
+// Solidity: function addConfigBlockNumber(string name, uint256 abn, bytes value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) AddConfigBlockNumber(name string, abn *big.Int, value []byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigBlockNumber(&_ContractIEigenDADirectory.TransactOpts, name, abn, value)
 }
 
 // AddConfigBlockNumber is a paid mutator transaction binding the contract method 0x3a45bc4f.
 //
-// Solidity: function addConfigBlockNumber(string name, uint256 activationKey, bytes value) returns()
-func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) AddConfigBlockNumber(name string, activationKey *big.Int, value []byte) (*types.Transaction, error) {
-	return _ContractIEigenDADirectory.Contract.AddConfigBlockNumber(&_ContractIEigenDADirectory.TransactOpts, name, activationKey, value)
+// Solidity: function addConfigBlockNumber(string name, uint256 abn, bytes value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) AddConfigBlockNumber(name string, abn *big.Int, value []byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigBlockNumber(&_ContractIEigenDADirectory.TransactOpts, name, abn, value)
 }
 
 // AddConfigTimeStamp is a paid mutator transaction binding the contract method 0xa2e91eb9.
 //
-// Solidity: function addConfigTimeStamp(string name, uint256 activationKey, bytes value) returns()
-func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) AddConfigTimeStamp(opts *bind.TransactOpts, name string, activationKey *big.Int, value []byte) (*types.Transaction, error) {
-	return _ContractIEigenDADirectory.contract.Transact(opts, "addConfigTimeStamp", name, activationKey, value)
+// Solidity: function addConfigTimeStamp(string name, uint256 activationTS, bytes value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) AddConfigTimeStamp(opts *bind.TransactOpts, name string, activationTS *big.Int, value []byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.contract.Transact(opts, "addConfigTimeStamp", name, activationTS, value)
 }
 
 // AddConfigTimeStamp is a paid mutator transaction binding the contract method 0xa2e91eb9.
 //
-// Solidity: function addConfigTimeStamp(string name, uint256 activationKey, bytes value) returns()
-func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) AddConfigTimeStamp(name string, activationKey *big.Int, value []byte) (*types.Transaction, error) {
-	return _ContractIEigenDADirectory.Contract.AddConfigTimeStamp(&_ContractIEigenDADirectory.TransactOpts, name, activationKey, value)
+// Solidity: function addConfigTimeStamp(string name, uint256 activationTS, bytes value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) AddConfigTimeStamp(name string, activationTS *big.Int, value []byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigTimeStamp(&_ContractIEigenDADirectory.TransactOpts, name, activationTS, value)
 }
 
 // AddConfigTimeStamp is a paid mutator transaction binding the contract method 0xa2e91eb9.
 //
-// Solidity: function addConfigTimeStamp(string name, uint256 activationKey, bytes value) returns()
-func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) AddConfigTimeStamp(name string, activationKey *big.Int, value []byte) (*types.Transaction, error) {
-	return _ContractIEigenDADirectory.Contract.AddConfigTimeStamp(&_ContractIEigenDADirectory.TransactOpts, name, activationKey, value)
+// Solidity: function addConfigTimeStamp(string name, uint256 activationTS, bytes value) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) AddConfigTimeStamp(name string, activationTS *big.Int, value []byte) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigTimeStamp(&_ContractIEigenDADirectory.TransactOpts, name, activationTS, value)
 }
 
 // RemoveAddress is a paid mutator transaction binding the contract method 0xf94d1312.

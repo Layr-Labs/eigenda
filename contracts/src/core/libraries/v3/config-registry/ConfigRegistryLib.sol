@@ -134,7 +134,7 @@ library ConfigRegistryLib {
     /// @dev For the first checkpoint, abn must be >= block.number
     /// @dev Subsequent checkpoints must have strictly increasing activation block numbers
     function addConfigBlockNumber(bytes32 nameDigest, uint256 abn, bytes memory value) internal {
-        T.BlockNumberCfg storage cfg = S.layout().blockNumberCfg;
+        T.BlockNumberConfig storage cfg = S.layout().blockNumberCfg;
         if (cfg.values[nameDigest].length > 0) {
             uint256 lastABN = cfg.values[nameDigest][cfg.values[nameDigest].length - 1].activationBlock;
             if (abn <= lastABN) {
@@ -144,7 +144,7 @@ library ConfigRegistryLib {
 
         /// @dev abn being provided must always be at a future block
         if (abn < block.number) {
-                revert BlockNumberActivationKeyInPast(block.number, abn);
+            revert BlockNumberActivationKeyInPast(block.number, abn);
         }
 
         cfg.values[nameDigest].push(T.BlockNumberCheckpoint({value: value, activationBlock: abn}));
