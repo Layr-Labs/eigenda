@@ -256,7 +256,7 @@ func newControllerMetrics(
 			Help:       "The latency of signing messages for each validator.",
 			Objectives: objectives,
 		},
-		[]string{},
+		[]string{"id"},
 	)
 
 	globalSignedBatchCount := promauto.With(registry).NewCounterVec(
@@ -531,5 +531,5 @@ func (m *controllerMetrics) ReportValidatorSigningLatency(id core.OperatorID, la
 		return
 	}
 
-	m.validatorSigningLatency.WithLabelValues().Observe(common.ToMilliseconds(latency))
+	m.validatorSigningLatency.WithLabelValues(id.Hex()).Observe(common.ToMilliseconds(latency))
 }
