@@ -39,6 +39,7 @@ type controllerMetrics struct {
 	validatorSignedByteCount    *prometheus.CounterVec
 	validatorUnsignedBatchCount *prometheus.CounterVec
 	validatorUnsignedByteCount  *prometheus.CounterVec
+	validatorSigningLatency     *prometheus.SummaryVec
 
 	globalSignedBatchCount   *prometheus.CounterVec
 	globalUnsignedBatchCount *prometheus.CounterVec
@@ -248,6 +249,16 @@ func newControllerMetrics(
 		signingRateLabels,
 	)
 
+	validatorSigningLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  controllerNamespace,
+			Name:       "validator_signing_latency_ms",
+			Help:       "The latency of signing messages for each validator.",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
 	globalSignedBatchCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
@@ -315,6 +326,7 @@ func newControllerMetrics(
 		validatorSignedByteCount:        validatorSignedByteCount,
 		validatorUnsignedBatchCount:     validatorUnsignedBatchCount,
 		validatorUnsignedByteCount:      validatorUnsignedByteCount,
+		validatorSigningLatency:         validatorSigningLatency,
 		collectDetailedValidatorMetrics: collectDetailedValidatorMetrics,
 		globalSignedBatchCount:          globalSignedBatchCount,
 		globalUnsignedBatchCount:        globalUnsignedBatchCount,
@@ -511,6 +523,13 @@ func (m *controllerMetrics) ReportValidatorSigningResult(
 		m.validatorUnsignedBatchCount.With(label).Add(1)
 		m.validatorUnsignedByteCount.With(label).Add(float64(batchSize) * stakeFraction)
 	}
+}
 
-	// TODO(cody.littley): consider measuring per-validator latency
+// Report the signing latency for a validator. Should only be used for validators that successfully signed a batch.
+func (m *controllerMetrics) ReportValidatorSigningLatency(id core.OperatorID, latency time.Duration) {
+	if m == nil || !m.collectDetailedValidatorMetrics {
+		return
+	}
+
+	m.validatorSigningLatency.WithLabelValues().Observe(common.ToMilliseconds(latency))
 }

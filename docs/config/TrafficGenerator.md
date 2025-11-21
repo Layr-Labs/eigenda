@@ -18,7 +18,7 @@
 
 | Name | Type<br>Default | Description |
 |------|--------------|-------------|
-| $${\color{red}\texttt{Environment.ClientLedgerPaymentMode}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_CLIENT_LEDGER_PAYMENT_MODE` | `string`<br>`"legacy"` | Client ledger mode used for payments. |
+| $${\color{red}\texttt{Environment.ClientLedgerPaymentMode}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_CLIENT_LEDGER_PAYMENT_MODE` | `string`<br>`"reservation-only"` | Client ledger mode used for payments. |
 | $${\color{red}\texttt{Environment.DisableMetrics}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISABLE_METRICS` | `bool`<br>`false` | If true, do not start the metrics server. |
 | $${\color{red}\texttt{Environment.DisperserConnectionCount}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSER_CONNECTION_COUNT` | `uint`<br>`8` | The number of connections to open for each disperser. |
 | $${\color{red}\texttt{Environment.MaxBlobSize}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_MAX_BLOB_SIZE` | `uint64`<br>`16777216` | The maximum blob size supported by the EigenDA network |
