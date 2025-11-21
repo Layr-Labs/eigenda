@@ -1,0 +1,9 @@
+{
+  "network": "anvil",
+  "RegistryCoordinator_address": "0x0000000000000000000000000000000000000000",
+  "RegistryCoordinator_startBlock": 0,
+  "BLSApkRegistry_address": "0x0000000000000000000000000000000000000000",
+  "BLSApkRegistry_startBlock": 0,
+  "EjectionManager_address": "0x0000000000000000000000000000000000000000",
+  "EjectionManager_startBlock": 0
+}
