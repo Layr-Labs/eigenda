@@ -15,6 +15,10 @@ use crate::verification::cert::types::{QuorumNumber, Stake, Version};
 
 // Storage slot constants for EigenDA contract variables
 // These correspond to specific storage slots in the deployed contracts
+// These can be verified by running for example `forge inspect RegistryCoordinator storageLayout`
+// from the contracts subdir.
+// TODO(samlaf): we need to make sure these are kept in sync with the deployed contracts!
+// Prob want to automate this in CI somehow.
 
 /// Storage slot for versioned blob parameters mapping in EigenDaThresholdRegistry
 const VERSIONED_BLOB_PARAMS_MAPPING_SLOT: u64 = 4;
@@ -36,6 +40,12 @@ const TOTAL_STAKE_HISTORY_MAPPING_SLOT: u64 = 1;
 
 /// Storage slot for operator stake history mapping in StakeRegistry
 const OPERATOR_STAKE_HISTORY_MAPPING_SLOT: u64 = 2;
+
+/// Storage slot for certificate verifiers address mapping in EigenDaCertVerifierRouter
+const CERT_VERIFIERS_ADDRESS_MAPPING_SLOT: u64 = 101;
+
+/// Storage slot for certificate verifiers ABNs array in EigenDaCertVerifierRouter
+pub const CERT_VERIFIER_ABNS_ARRAY_SLOT: u64 = 102;
 
 /// Storage slot for security thresholds V2 in EigenDaCertVerifier
 const SECURITY_THRESHOLDS_V2_VARIABLE_SLOT: u64 = 0;
@@ -250,7 +260,7 @@ impl StorageKeyProvider for OperatorBitmapHistoryExtractor {
             .iter()
             .zip(self.non_signer_quorum_bitmap_indices.iter())
             .map(|(&operator_id, &index)| {
-                storage_key_helpers::dynamic_array_key(
+                storage_key_helpers::mapping_to_dynamic_array_key(
                     operator_id.into(),
                     OPERATOR_BITMAP_HISTORY_MAPPING_SLOT,
                     index,
@@ -329,7 +339,7 @@ impl StorageKeyProvider for ApkHistoryExtractor {
             .iter()
             .zip(self.quorum_apk_indices.iter())
             .map(|(&signed_quorum_number, &index)| {
-                storage_key_helpers::dynamic_array_key(
+                storage_key_helpers::mapping_to_dynamic_array_key(
                     U256::from(signed_quorum_number),
                     APK_HISTORY_MAPPING_SLOT,
                     index,
@@ -410,7 +420,7 @@ impl StorageKeyProvider for TotalStakeHistoryExtractor {
             .iter()
             .zip(self.non_signer_total_stake_indices.iter())
             .map(|(&signed_quorum_number, &index)| {
-                storage_key_helpers::dynamic_array_key(
+                storage_key_helpers::mapping_to_dynamic_array_key(
                     U256::from(signed_quorum_number),
                     TOTAL_STAKE_HISTORY_MAPPING_SLOT,
                     index,
@@ -506,7 +516,7 @@ impl StorageKeyProvider for OperatorStakeHistoryExtractor {
                 // that map to non-existent data will return empty but won't fail. When retrieved
                 // an empty value will be returned for inexisting storage keys
                 for &stake_index in stake_index_for_each_required_non_signer {
-                    let storage_key = storage_key_helpers::nested_dynamic_array_key(
+                    let storage_key = storage_key_helpers::nested_mapping_to_dynamic_array_key(
                         operator_id.into(),
                         OPERATOR_STAKE_HISTORY_MAPPING_SLOT,
                         U256::from(signed_quorum_number),
@@ -540,7 +550,7 @@ impl DataDecoder for OperatorStakeHistoryExtractor {
             for &operator_id in &self.non_signers_pk_hashes {
                 // Same cartesian product is necessary as for the StorageKeyProvider impl
                 for &stake_index in stake_index_for_each_required_non_signer {
-                    let storage_key = storage_key_helpers::nested_dynamic_array_key(
+                    let storage_key = storage_key_helpers::nested_mapping_to_dynamic_array_key(
                         operator_id.into(),
                         OPERATOR_STAKE_HISTORY_MAPPING_SLOT,
                         U256::from(signed_quorum_number),
@@ -579,6 +589,76 @@ impl DataDecoder for OperatorStakeHistoryExtractor {
         }
 
         Ok(out)
+    }
+}
+
+/// Extractor for the length of the certificate verifiers ABNs array.
+/// This is used to determine how many certificate verifiers are registered.
+/// Needed to prove an ABN is currently active in case that ABN is the last
+/// registered in the contract.
+pub struct CertVerifierABNsLenExtractor;
+
+impl CertVerifierABNsLenExtractor {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl StorageKeyProvider for CertVerifierABNsLenExtractor {
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    fn storage_keys(&self) -> Vec<StorageKey> {
+        vec![storage_key_helpers::simple_slot_key(
+            CERT_VERIFIER_ABNS_ARRAY_SLOT,
+        )]
+    }
+}
+
+pub struct CertVerifierABNsExtractor {
+    pub num_abns: usize,
+}
+
+impl CertVerifierABNsExtractor {
+    pub fn new(num_abns: usize) -> Self {
+        Self { num_abns }
+    }
+}
+
+impl StorageKeyProvider for CertVerifierABNsExtractor {
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    fn storage_keys(&self) -> Vec<StorageKey> {
+        let keys: Vec<_> = (0..self.num_abns)
+            .map(|i| {
+                storage_key_helpers::dynamic_array_key(CERT_VERIFIER_ABNS_ARRAY_SLOT, i as u32)
+            })
+            .collect();
+        keys
+    }
+}
+
+pub struct CertVerifiersExtractor<'a> {
+    pub abns: &'a [u32],
+}
+
+impl<'a> CertVerifiersExtractor<'a> {
+    pub fn new(abns: &'a [u32]) -> Self {
+        Self { abns }
+    }
+}
+
+impl<'a> StorageKeyProvider for CertVerifiersExtractor<'a> {
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    fn storage_keys(&self) -> Vec<StorageKey> {
+        let keys: Vec<_> = self
+            .abns
+            .iter()
+            .map(|abn| {
+                storage_key_helpers::mapping_key(
+                    U256::from(*abn),
+                    CERT_VERIFIERS_ADDRESS_MAPPING_SLOT,
+                )
+            })
+            .collect();
+        keys
     }
 }
 
@@ -904,6 +984,31 @@ mod tests {
         let proofs = vec![];
         let result = extractor.decode_data(&proofs).unwrap();
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn cert_verifier_abns_len_extractor() {
+        let extractor = CertVerifierABNsLenExtractor::new();
+
+        let keys = extractor.storage_keys();
+        assert_eq!(keys.len(), 1);
+    }
+
+    #[test]
+    fn cert_verifier_abns_extractor() {
+        let extractor = CertVerifierABNsExtractor::new(3);
+
+        let keys = extractor.storage_keys();
+        assert_eq!(keys.len(), 3);
+    }
+
+    #[test]
+    fn cert_verifiers_extractor() {
+        let abns = vec![1u32, 2u32, 3u32];
+        let extractor = CertVerifiersExtractor::new(&abns);
+
+        let keys = extractor.storage_keys();
+        assert_eq!(keys.len(), abns.len());
     }
 }
 

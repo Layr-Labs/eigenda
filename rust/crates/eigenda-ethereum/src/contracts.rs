@@ -1,7 +1,19 @@
-use core::fmt::Debug;
-
 use alloy_primitives::{Address, address};
+use alloy_provider::DynProvider;
+use alloy_provider::Provider;
+use alloy_rpc_types_eth::TransactionRequest;
+use alloy_transport::{RpcError, TransportErrorKind};
+use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
+
+use crate::contracts::IEigenDADirectory::getAddressCall;
+use alloy_sol_types::{SolCall, sol};
+
+sol! {
+    interface IEigenDADirectory {
+        function getAddress(string memory name) external view returns (address);
+    }
+}
 
 /// EigenDA directory address on Ethereum mainnet.
 pub const EIGENDA_DIRECTORY_MAINNET: Address =
@@ -11,16 +23,6 @@ pub const EIGENDA_DIRECTORY_HOODI: Address = address!("0x5a44e56e88abcf610c68340
 /// EigenDA directory address on the Sepolia test network.
 pub const EIGENDA_DIRECTORY_SEPOLIA: Address =
     address!("0x9620dC4B3564198554e4D2b06dEFB7A369D90257");
-
-/// EigenDA CertVerifier v3.1.0 address on Ethereum mainnet.
-pub const STATIC_CERT_VERIFIER_MAINNET: Address =
-    address!("0x46766C6426eF4D3092f73F72660A8b7B510E6846");
-/// EigenDA CertVerifier v3.1.0 address on the Hoodi test network.
-pub const STATIC_CERT_VERIFIER_HOODI: Address =
-    address!("0xe0F78542A950A8695f43B19Ad1Db654249e12643");
-/// EigenDA CertVerifier v3.1.0 address on the Sepolia test network.
-pub const STATIC_CERT_VERIFIER_SEPOLIA: Address =
-    address!("0x19a469Ddb7199c7EB9E40455978b39894BB90974");
 
 /// EigenDA relevant contracts. Addresses are retrieved from the the EigenDADirectory contract for
 /// the respective network (i.e. Mainnet, Hoodi)
@@ -89,15 +91,15 @@ pub struct EigenDaContracts {
 
     /// # Ethereum description
     ///
-    /// A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
-    /// For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
-    /// to change these values or verification behavior a new CertVerifier must be deployed
+    /// A CertVerifierRouter is an upgradable contract that routes cert verification requests to the appropriate CertVerifier contract.
+    /// This allows for dynamic updates to the cert verification logic without changing the address that consumers interact with.
+    /// For trustless integrations, it is recommended to deploy and use a dedicated CertVerifierRouter contract.
+    /// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#upgradable-quorums-and-thresholds-for-optimistic-verification for more details.
     ///
     /// # Details
     ///
-    /// The quorumNumbersRequiredV2 variable is read from it
-    /// The securityThresholdsV2 variable is read from it
-    pub cert_verifier: Address,
+    /// The cert_verifier contract address at a specific (reference) block number is read from it
+    pub cert_verifier_router: Address,
 
     /// # Ethereum description
     ///
@@ -111,4 +113,52 @@ pub struct EigenDaContracts {
     ///
     /// The minWithdrawalDelayBlocks variable is read from it
     pub delegation_manager: Address,
+}
+
+impl EigenDaContracts {
+    /// Query the EigenDADirectory contract to fetch all required contract addresses
+    pub async fn new(
+        ethereum: &DynProvider,
+        directory_address: Address,
+        cert_verifier_router_address: Option<Address>,
+    ) -> Result<EigenDaContracts, RpcError<TransportErrorKind>> {
+        let eigen_da_contracts = EigenDaContracts {
+            threshold_registry: get_address(ethereum, "THRESHOLD_REGISTRY", directory_address)
+                .await?,
+            registry_coordinator: get_address(ethereum, "REGISTRY_COORDINATOR", directory_address)
+                .await?,
+            service_manager: get_address(ethereum, "SERVICE_MANAGER", directory_address).await?,
+            bls_apk_registry: get_address(ethereum, "BLS_APK_REGISTRY", directory_address).await?,
+            stake_registry: get_address(ethereum, "STAKE_REGISTRY", directory_address).await?,
+            cert_verifier_router: match cert_verifier_router_address {
+                Some(addr) => addr,
+                None => get_address(ethereum, "CERT_VERIFIER_ROUTER", directory_address).await?,
+            },
+            delegation_manager: get_address(ethereum, "DELEGATION_MANAGER", directory_address)
+                .await?,
+        };
+
+        Ok(eigen_da_contracts)
+    }
+}
+
+/// The function performs a contract call to the EigenDA contract directory
+/// to look up an address associated with a given contract name. It uses the
+/// `getAddress` function from the directory contract.
+async fn get_address(
+    ethereum: &DynProvider,
+    name: &'static str,
+    directory_address: Address,
+) -> Result<Address, RpcError<TransportErrorKind>> {
+    let input = getAddressCall {
+        name: name.to_string(),
+    };
+
+    let tx = TransactionRequest::default()
+        .to(directory_address)
+        .input(input.abi_encode().into());
+
+    let src = ethereum.call(tx).await?;
+
+    Ok(Address::from_slice(&src[12..32]))
 }

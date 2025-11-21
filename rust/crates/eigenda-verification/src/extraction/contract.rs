@@ -8,7 +8,8 @@ pub use stale_stakes_forbidden::*;
 
 use crate::cert::StandardCommitment;
 use crate::extraction::extractor::{
-    ApkHistoryExtractor, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
+    ApkHistoryExtractor, CertVerifierABNsExtractor, CertVerifierABNsLenExtractor,
+    CertVerifiersExtractor, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
     OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
     QuorumUpdateBlockNumberExtractor, SecurityThresholdsV2Extractor, StorageKeyProvider,
     TotalStakeHistoryExtractor, VersionedBlobParamsExtractor,
@@ -115,6 +116,30 @@ impl EigenDaThresholdRegistry {
         let next_blob_version = NextBlobVersionExtractor::new(certificate).storage_keys();
 
         [versioned_blob_params, next_blob_version]
+            .into_iter()
+            .flatten()
+            .collect()
+    }
+}
+
+pub struct EigenDaCertVerifierRouter;
+
+impl EigenDaCertVerifierRouter {
+    /// Get all storage keys needed for subsequent data extraction
+    ///
+    /// # Arguments
+    /// * `certificate` - The certificate being verified
+    ///
+    /// # Returns
+    /// Vector containing the storage key for the cert verifier contract address
+    pub fn storage_keys(abns: &[u32]) -> Vec<StorageKey> {
+        // The cert verifier router's storage key for the cert verifier address is derived from the reference block number
+        // Here we assume a hypothetical extractor exists for this purpose
+        let abns_len = CertVerifierABNsLenExtractor::new().storage_keys();
+        let abn_keys = CertVerifierABNsExtractor::new(abns.len()).storage_keys();
+        let cert_verifiers = CertVerifiersExtractor::new(abns).storage_keys();
+
+        [abns_len, abn_keys, cert_verifiers]
             .into_iter()
             .flatten()
             .collect()

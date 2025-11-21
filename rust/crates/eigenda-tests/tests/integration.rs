@@ -57,6 +57,7 @@ async fn post_payload_to_proxy() {
     let provider_config = EigenDaProviderConfig {
         network: Network::Sepolia,
         rpc_url: "wss://ethereum-sepolia-rpc.publicnode.com".to_string(),
+        cert_verifier_router_address: None,
         compute_units: None,
         max_retry_times: None,
         initial_backoff: None,
