@@ -1,0 +1,9 @@
+{
+  "network": "hoodi",
+  "RegistryCoordinator_address": "0xec03e7038Ca95cB7706a8b129CDE36635CBAF9df",
+  "RegistryCoordinator_startBlock": 1274216,
+  "BLSApkRegistry_address": "0xf2b91361f20040a0f1c2663B49bCAE6CD5ED5B98",
+  "BLSApkRegistry_startBlock": 1274205,
+  "EjectionManager_address": "0xe397F202D271d73EAB6444d634F68278B6274830",
+  "EjectionManager_startBlock": 1274229
+}
