@@ -63,7 +63,7 @@ type TestClient struct {
 	payloadClientConfig         *clientsv2.PayloadClientConfig
 	logger                      logging.Logger
 	certVerifierAddressProvider clientsv2.CertVerifierAddressProvider
-	disperserClient             *dispersal.DisperserClient
+	disperserClientMultiplexer  *dispersal.DisperserClientMultiplexer
 	payloadDisperser            *dispersal.PayloadDisperser
 	relayClient                 relay.RelayClient
 	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
@@ -140,29 +140,30 @@ func NewTestClient(
 		return nil, fmt.Errorf("new committer: %w", err)
 	}
 
-	disperserConfig := &dispersal.DisperserClientConfig{
-		Hostname:                 config.DisperserHostname,
-		Port:                     fmt.Sprintf("%d", config.DisperserPort),
-		UseSecureGrpcFlag:        true,
-		DisperserConnectionCount: config.DisperserConnectionCount,
-	}
-
 	var registry *prometheus.Registry
 	if metrics != nil {
 		registry = metrics.registry
 	}
 
 	accountantMetrics := metricsv2.NewAccountantMetrics(registry)
-	disperserClient, err := dispersal.NewDisperserClient(
+	dispersalMetrics := metricsv2.NewDispersalMetrics(registry)
+
+	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
+	connectionInfo := &clientsv2.DisperserConnectionInfo{
+		Hostname: config.DisperserHostname,
+		Port:     uint16(config.DisperserPort),
+	}
+	disperserRegistry := clientsv2.NewLegacyDisperserRegistry(connectionInfo)
+
+	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
 		logger,
-		disperserConfig,
+		multiplexerConfig,
+		disperserRegistry,
 		signer,
 		kzgCommitter,
-		metricsv2.NoopDispersalMetrics,
+		dispersalMetrics,
+		config.DisperserConnectionCount,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create disperser client: %w", err)
-	}
 
 	ethClientConfig := geth.EthClientConfig{
 		RPCURLs:          config.EthRpcUrls,
@@ -256,7 +257,7 @@ func NewTestClient(
 		paymentVaultAddr,
 		accountId,
 		clientledger.ClientLedgerMode(config.ClientLedgerPaymentMode),
-		disperserClient,
+		disperserClientMultiplexer,
 		accountantMetrics,
 	)
 	if err != nil {
@@ -266,7 +267,7 @@ func NewTestClient(
 	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
-		disperserClient,
+		disperserClientMultiplexer,
 		blockMon,
 		certBuilder,
 		certVerifier,
@@ -475,7 +476,7 @@ func NewTestClient(
 		payloadClientConfig:         payloadClientConfig,
 		logger:                      logger,
 		certVerifierAddressProvider: certVerifierAddressProvider,
-		disperserClient:             disperserClient,
+		disperserClientMultiplexer:  disperserClientMultiplexer,
 		payloadDisperser:            payloadDisperser,
 		relayClient:                 relayClient,
 		relayPayloadRetriever:       relayPayloadRetriever,
@@ -509,9 +510,9 @@ func (c *TestClient) GetLogger() logging.Logger {
 	return c.logger
 }
 
-// GetDisperserClient returns the test client's disperser client.
-func (c *TestClient) GetDisperserClient() *dispersal.DisperserClient {
-	return c.disperserClient
+// GetDisperserClient returns the test client's disperser client multiplexer.
+func (c *TestClient) GetDisperserClientMultiplexer() *dispersal.DisperserClientMultiplexer {
+	return c.disperserClientMultiplexer
 }
 
 // GetPayloadDisperser returns the test client's payload disperser.
@@ -949,7 +950,7 @@ func buildClientLedger(
 	paymentVaultAddr gethcommon.Address,
 	accountID gethcommon.Address,
 	mode clientledger.ClientLedgerMode,
-	disperserClient *dispersal.DisperserClient,
+	disperserClientMultiplexer *dispersal.DisperserClientMultiplexer,
 	accountantMetrics metricsv2.AccountantMetricer,
 ) (*clientledger.ClientLedger, error) {
 	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddr)
@@ -971,7 +972,11 @@ func buildClientLedger(
 			return nil, fmt.Errorf("build reservation ledger: %w", err)
 		}
 	case clientledger.ClientLedgerModeOnDemandOnly:
-		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		cumulativePayment, err := getCumulativePayment(ctx, disperserClientMultiplexer)
+		if err != nil {
+			return nil, fmt.Errorf("get cumulative payment: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, cumulativePayment)
 		if err != nil {
 			return nil, fmt.Errorf("build on-demand ledger: %w", err)
 		}
@@ -981,7 +986,11 @@ func buildClientLedger(
 		if err != nil {
 			return nil, fmt.Errorf("build reservation ledger: %w", err)
 		}
-		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		cumulativePayment, err := getCumulativePayment(ctx, disperserClientMultiplexer)
+		if err != nil {
+			return nil, fmt.Errorf("get cumulative payment: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, cumulativePayment)
 		if err != nil {
 			return nil, fmt.Errorf("build on-demand ledger: %w", err)
 		}
@@ -1057,7 +1066,7 @@ func buildOnDemandLedger(
 	paymentVault payments.PaymentVault,
 	accountID gethcommon.Address,
 	minNumSymbols uint32,
-	disperserClient *dispersal.DisperserClient,
+	cumulativePayment *big.Int,
 ) (*ondemand.OnDemandLedger, error) {
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
 	if err != nil {
@@ -1067,18 +1076,6 @@ func buildOnDemandLedger(
 	totalDeposits, err := paymentVault.GetTotalDeposit(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("get total deposit from vault: %w", err)
-	}
-
-	paymentState, err := disperserClient.GetPaymentState(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get payment state from disperser: %w", err)
-	}
-
-	var cumulativePayment *big.Int
-	if paymentState.GetCumulativePayment() == nil {
-		cumulativePayment = big.NewInt(0)
-	} else {
-		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
 	}
 
 	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
@@ -1092,4 +1089,24 @@ func buildOnDemandLedger(
 	}
 
 	return onDemandLedger, nil
+}
+
+func getCumulativePayment(
+	ctx context.Context,
+	disperserClientMultiplexer *dispersal.DisperserClientMultiplexer,
+) (*big.Int, error) {
+	disperserClient, err := disperserClientMultiplexer.GetDisperserClient(ctx, time.Now(), true)
+	if err != nil {
+		return nil, fmt.Errorf("get disperser client: %w", err)
+	}
+
+	paymentState, err := disperserClient.GetPaymentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get payment state: %w", err)
+	}
+
+	if paymentState.GetCumulativePayment() == nil {
+		return big.NewInt(0), nil
+	}
+	return new(big.Int).SetBytes(paymentState.GetCumulativePayment()), nil
 }

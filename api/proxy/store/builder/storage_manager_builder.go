@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"regexp"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -590,16 +591,28 @@ func buildPayloadDisperser(
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
-	disperserClient, err := dispersal.NewDisperserClient(
+	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
+
+	portUint64, err := strconv.ParseUint(clientConfigV2.DisperserClientCfg.Port, 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("parse disperser port: %w", err)
+	}
+
+	connectionInfo := &clients_v2.DisperserConnectionInfo{
+		Hostname: clientConfigV2.DisperserClientCfg.Hostname,
+		Port:     uint16(portUint64),
+	}
+	disperserRegistry := clients_v2.NewLegacyDisperserRegistry(connectionInfo)
+
+	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
 		log,
-		&clientConfigV2.DisperserClientCfg,
+		multiplexerConfig,
+		disperserRegistry,
 		signer,
 		kzgCommitter,
 		dispersalMetrics,
+		clientConfigV2.DisperserClientCfg.DisperserConnectionCount,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("new disperser client: %w", err)
-	}
 
 	clientLedger, err := buildClientLedger(
 		ctx,
@@ -609,7 +622,7 @@ func buildPayloadDisperser(
 		accountId,
 		contractDirectory,
 		accountantMetrics,
-		disperserClient,
+		disperserClientMultiplexer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build client ledger: %w", err)
@@ -634,7 +647,7 @@ func buildPayloadDisperser(
 	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		log,
 		clientConfigV2.PayloadDisperserCfg,
-		disperserClient,
+		disperserClientMultiplexer,
 		blockNumMonitor,
 		certBuilder,
 		certVerifier,
@@ -702,7 +715,7 @@ func buildOnDemandLedger(
 	paymentVault payments.PaymentVault,
 	accountID geth_common.Address,
 	minNumSymbols uint32,
-	disperserClient *dispersal.DisperserClient,
+	cumulativePayment *big.Int,
 ) (*ondemand.OnDemandLedger, error) {
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
 	if err != nil {
@@ -712,18 +725,6 @@ func buildOnDemandLedger(
 	totalDeposits, err := paymentVault.GetTotalDeposit(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("get total deposit from vault: %w", err)
-	}
-
-	paymentState, err := disperserClient.GetPaymentState(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get payment state from disperser: %w", err)
-	}
-
-	var cumulativePayment *big.Int
-	if paymentState.GetCumulativePayment() == nil {
-		cumulativePayment = big.NewInt(0)
-	} else {
-		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
 	}
 
 	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
@@ -739,6 +740,26 @@ func buildOnDemandLedger(
 	return onDemandLedger, nil
 }
 
+func getCumulativePayment(
+	ctx context.Context,
+	disperserClientMultiplexer *dispersal.DisperserClientMultiplexer,
+) (*big.Int, error) {
+	disperserClient, err := disperserClientMultiplexer.GetDisperserClient(ctx, time.Now(), true)
+	if err != nil {
+		return nil, fmt.Errorf("get disperser client: %w", err)
+	}
+
+	paymentState, err := disperserClient.GetPaymentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get payment state: %w", err)
+	}
+
+	if paymentState.GetCumulativePayment() == nil {
+		return big.NewInt(0), nil
+	}
+	return new(big.Int).SetBytes(paymentState.GetCumulativePayment()), nil
+}
+
 // buildClientLedger creates a ClientLedger for managing payment state
 // Returns nil for legacy mode
 func buildClientLedger(
@@ -749,7 +770,7 @@ func buildClientLedger(
 	accountID geth_common.Address,
 	contractDirectory *directory.ContractDirectory,
 	accountantMetrics metrics_v2.AccountantMetricer,
-	disperserClient *dispersal.DisperserClient,
+	disperserClientMultiplexer *dispersal.DisperserClientMultiplexer,
 ) (*clientledger.ClientLedger, error) {
 	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
@@ -775,7 +796,11 @@ func buildClientLedger(
 			return nil, fmt.Errorf("build reservation ledger: %w", err)
 		}
 	case clientledger.ClientLedgerModeOnDemandOnly:
-		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		cumulativePayment, err := getCumulativePayment(ctx, disperserClientMultiplexer)
+		if err != nil {
+			return nil, fmt.Errorf("get cumulative payment: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, cumulativePayment)
 		if err != nil {
 			return nil, fmt.Errorf("build on-demand ledger: %w", err)
 		}
@@ -785,7 +810,11 @@ func buildClientLedger(
 		if err != nil {
 			return nil, fmt.Errorf("build reservation ledger: %w", err)
 		}
-		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		cumulativePayment, err := getCumulativePayment(ctx, disperserClientMultiplexer)
+		if err != nil {
+			return nil, fmt.Errorf("get cumulative payment: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, cumulativePayment)
 		if err != nil {
 			return nil, fmt.Errorf("build on-demand ledger: %w", err)
 		}

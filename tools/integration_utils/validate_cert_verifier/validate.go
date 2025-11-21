@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -170,12 +171,6 @@ func initializePayloadDisperser(
 		return nil, nil, gethcommon.Address{}, fmt.Errorf("create kzg committer: %w", err)
 	}
 
-	// Create disperser client
-	disperserClient, err := createDisperserClient(logger, disperserHostname, signerAuthKey, kzgCommitter)
-	if err != nil {
-		return nil, nil, gethcommon.Address{}, fmt.Errorf("create disperser client: %w", err)
-	}
-
 	// Create Ethereum client
 	ethClient, err := createEthClient(logger, jsonRPCURL)
 	if err != nil {
@@ -253,11 +248,17 @@ func initializePayloadDisperser(
 		ContractCallTimeout:    10 * time.Second,
 	}
 
+	disperserClientMultiplexer, err := createDisperserClientMultiplexer(
+		logger, disperserHostname, signerAuthKey, kzgCommitter)
+	if err != nil {
+		return nil, nil, gethcommon.Address{}, fmt.Errorf("create disperser client multiplexer: %w", err)
+	}
+
 	// Create payload disperser (without client ledger for simplicity - legacy payment mode)
 	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
-		disperserClient,
+		disperserClientMultiplexer,
 		blockNumMonitor,
 		certBuilder,
 		certVerifier,
@@ -271,38 +272,43 @@ func initializePayloadDisperser(
 	return payloadDisperser, ethClient, certVerifierAddr, nil
 }
 
-func createDisperserClient(
+func createDisperserClientMultiplexer(
 	logger logging.Logger,
 	disperserHostName string,
 	privateKey string,
 	kzgCommitter *committer.Committer,
-) (*dispersal.DisperserClient, error) {
+) (*dispersal.DisperserClientMultiplexer, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create blob request signer: %w", err)
 	}
 
-	hostname, port, err := net.SplitHostPort(disperserHostName)
+	hostname, portStr, err := net.SplitHostPort(disperserHostName)
 	if err != nil {
-		return nil, fmt.Errorf("parse EigenDA RPC: %w", err)
+		return nil, fmt.Errorf("parse disperser host: %w", err)
 	}
 
-	disperserClientConfig := &dispersal.DisperserClientConfig{
-		Hostname:          hostname,
-		Port:              port,
-		UseSecureGrpcFlag: true,
+	portUint64, err := strconv.ParseUint(portStr, 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("parse disperser port: %w", err)
 	}
 
-	client, err := dispersal.NewDisperserClient(
+	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
+	connectionInfo := &clients.DisperserConnectionInfo{
+		Hostname: hostname,
+		Port:     uint16(portUint64),
+	}
+	disperserRegistry := clients.NewLegacyDisperserRegistry(connectionInfo)
+
+	return dispersal.NewDisperserClientMultiplexer(
 		logger,
-		disperserClientConfig,
+		multiplexerConfig,
+		disperserRegistry,
 		signer,
 		kzgCommitter,
-		metrics.NoopDispersalMetrics)
-	if err != nil {
-		return nil, fmt.Errorf("new disperser client: %w", err)
-	}
-	return client, nil
+		metrics.NoopDispersalMetrics,
+		8,
+	), nil
 }
 
 func createEthClient(logger logging.Logger, rpcURL string) (*geth.EthClient, error) {

@@ -115,6 +115,10 @@ func NewDisperserClient(
 	}, nil
 }
 
+func (c *DisperserClient) GetConfig() *DisperserClientConfig {
+	return c.config
+}
+
 // Close closes the grpc connection to the disperser server.
 // It is thread safe and can be called multiple times.
 func (c *DisperserClient) Close() error {
