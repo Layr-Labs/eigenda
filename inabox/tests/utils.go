@@ -19,10 +19,10 @@ func MineAnvilBlocks(t *testing.T, rpcClient common.RPCEthClient, numBlocks int)
 	}
 }
 
-// getSRSPaths returns the correct paths to SRS files based on the source file location.
+// GetSRSPaths returns the correct paths to SRS files based on the source file location.
 // This uses runtime.Caller to determine where this file is located and calculates
 // the relative path to the resources/srs directory from there.
-func getSRSPaths() (g1Path, g2Path, g2TrailingPath string, err error) {
+func GetSRSPaths() (g1Path, g2Path, g2TrailingPath string, err error) {
 	// Get the path of this source file
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {

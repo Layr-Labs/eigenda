@@ -85,7 +85,7 @@ type operatorListeners struct {
 // StartOperators starts all operator nodes configured in the test config
 func (oh *OperatorHarness) StartOperators(ctx context.Context, logger logging.Logger) error {
 	// Get SRS paths first - fail early if we can't find them
-	g1Path, g2Path, _, err := getSRSPaths()
+	g1Path, g2Path, _, err := GetSRSPaths()
 	if err != nil {
 		return fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}

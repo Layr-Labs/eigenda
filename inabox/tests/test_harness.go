@@ -273,7 +273,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("error getting account ID: %w", err)
 	}
 
-	g1Path, g2Path, g2TrailingPath, err := getSRSPaths()
+	g1Path, g2Path, g2TrailingPath, err := GetSRSPaths()
 	if err != nil {
 		return nil, fmt.Errorf("get SRS paths: %w", err)
 	}
