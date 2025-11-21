@@ -1,0 +1,5 @@
+{
+  "network": "sepolia",
+  "EigenDAServiceManager_address": "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764",
+  "EigenDAServiceManager_startBlock": 8153008
+}

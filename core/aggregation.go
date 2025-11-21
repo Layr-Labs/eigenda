@@ -26,14 +26,18 @@ var (
 	ErrAggSigNotValid      = errors.New("aggregated signature is not valid")
 )
 
+// The result of asking for a validator to sign for the custody of chunks in a batch.
 type SigningMessage struct {
-	Signature       *Signature
-	Operator        OperatorID
+	// The signature returned by the validator.
+	Signature *Signature
+	// The ID of the signing validator.
+	ValidatorId OperatorID
+	// The hash of the batch header that was signed.
 	BatchHeaderHash [32]byte
-	// Undefined if this value <= 0.
-	AttestationLatencyMs float64
-	TimeReceived         time.Time
-	Err                  error
+	// The time taken for the validator to return a signature.
+	Latency time.Duration
+	// Nil if no error occurred during signing, otherwise contains the error.
+	Err error
 }
 
 // QuorumAttestation contains the results of aggregating signatures from a set of operators by quorums
@@ -173,27 +177,27 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			break
 		}
 
-		if _, seen := signerMap[r.Operator]; seen {
-			a.Logger.Warn("duplicate signature received", "operatorID", r.Operator.Hex())
+		if _, seen := signerMap[r.ValidatorId]; seen {
+			a.Logger.Warn("duplicate signature received", "operatorID", r.ValidatorId.Hex())
 			continue
 		}
 
-		operatorIDHex := r.Operator.Hex()
-		operatorAddr, ok := a.OperatorAddresses.Get(r.Operator)
+		operatorIDHex := r.ValidatorId.Hex()
+		operatorAddr, ok := a.OperatorAddresses.Get(r.ValidatorId)
 		if !ok && a.Transactor != nil {
-			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.Operator)
+			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.ValidatorId)
 			if err != nil {
 				a.Logger.Warn("failed to get operator address from registry", "operatorID", operatorIDHex)
 				operatorAddr = gethcommon.Address{}
 			} else {
-				a.OperatorAddresses.Add(r.Operator, operatorAddr)
+				a.OperatorAddresses.Add(r.ValidatorId, operatorAddr)
 			}
 		} else if !ok {
 			operatorAddr = gethcommon.Address{}
 		}
 
 		socket := ""
-		if op, ok := state.IndexedOperators[r.Operator]; ok {
+		if op, ok := state.IndexedOperators[r.ValidatorId]; ok {
 			socket = op.Socket
 		}
 		batchHeaderHashHex := hex.EncodeToString(r.BatchHeaderHash[:])
@@ -203,12 +207,12 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 				"operatorAddress", operatorAddr,
 				"socket", socket,
 				"batchHeaderHash", batchHeaderHashHex,
-				"attestationLatencyMs", r.AttestationLatencyMs,
+				"attestationLatencyMs", r.Latency.Milliseconds(),
 				"err", r.Err)
 			continue
 		}
 
-		op, found := state.IndexedOperators[r.Operator]
+		op, found := state.IndexedOperators[r.ValidatorId]
 		if !found {
 			a.Logger.Error("Operator not found in state",
 				"operatorID", operatorIDHex,
@@ -233,14 +237,14 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 		for _, quorumID := range quorumIDs {
 			// Get stake amounts for operator
 			ops := state.Operators[quorumID]
-			opInfo, ok := ops[r.Operator]
+			opInfo, ok := ops[r.ValidatorId]
 			// If operator is not in quorum, skip
 			if !ok {
 				continue
 			}
 			operatorQuorums = append(operatorQuorums, quorumID)
 
-			signerMap[r.Operator] = struct{}{}
+			signerMap[r.ValidatorId] = struct{}{}
 
 			// Add to stake signed
 			stakeSigned[quorumID].Add(stakeSigned[quorumID], opInfo.Stake)
@@ -260,7 +264,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			"socket", socket,
 			"quorumIDs", fmt.Sprint(operatorQuorums), //nolint:staticcheck // printing byte slices is fine here
 			"batchHeaderHash", batchHeaderHashHex,
-			"attestationLatencyMs", r.AttestationLatencyMs)
+			"attestationLatencyMs", r.Latency.Milliseconds())
 	}
 
 	// Aggregate Non signer Pubkey Id

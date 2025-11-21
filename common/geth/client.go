@@ -48,9 +48,9 @@ func NewClient(config EthClientConfig, senderAddress gethcommon.Address, rpcInde
 	logger := _logger.With("component", "EthClient")
 
 	rpcUrl := config.RPCURLs[rpcIndex]
-	chainClient, err := ethclient.Dial(rpcUrl)
+	chainClient, err := SafeDial(context.Background(), rpcUrl)
 	if err != nil {
-		return nil, fmt.Errorf("NewClient: cannot connect to provider: %w", err)
+		return nil, fmt.Errorf("dial RPC node: %w", err)
 	}
 	var privateKey *ecdsa.PrivateKey
 

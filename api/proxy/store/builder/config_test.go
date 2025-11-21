@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
-	v2_clients "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
@@ -61,7 +61,7 @@ func validCfg() Config {
 			}),
 		MemstoreEnabled: false,
 		ClientConfigV2: common.ClientConfigV2{
-			DisperserClientCfg: v2_clients.DisperserClientConfig{
+			DisperserClientCfg: dispersal.DisperserClientConfig{
 				Hostname:          "http://localhost",
 				Port:              "9999",
 				UseSecureGrpcFlag: true,

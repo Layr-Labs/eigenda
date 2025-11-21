@@ -795,7 +795,6 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 			BatchMetadataUpdatePeriod: 1 * time.Minute,
 			BatchAttestationTimeout:   2 * time.Second,
 			SignatureTickInterval:     1 * time.Second,
-			NumRequestRetries:         3,
 			MaxBatchSize:              maxBatchSize,
 			NumConcurrentRequests:     10,
 			NodeClientCacheSize:       10,

@@ -163,13 +163,6 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FINALIZATION_BLOCK_DELAY"),
 		Value:    75,
 	}
-	NumRequestRetriesFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "num-request-retries"),
-		Usage:    "Number of retries for node requests",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NUM_REQUEST_RETRIES"),
-		Value:    0,
-	}
 	NumConcurrentDispersalRequestsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "num-concurrent-dispersal-requests"),
 		Usage:    "Number of concurrent dispersal requests",
@@ -366,7 +359,6 @@ var optionalFlags = []cli.Flag{
 	MaxDispersalAgeFlag,
 	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,
-	NumRequestRetriesFlag,
 	NumConcurrentDispersalRequestsFlag,
 	NodeClientCacheNumEntriesFlag,
 	MaxBatchSizeFlag,

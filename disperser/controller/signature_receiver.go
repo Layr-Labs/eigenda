@@ -203,47 +203,35 @@ func (sr *signatureReceiver) handleNextSignature(
 	attestationChan chan *core.QuorumAttestation,
 ) {
 
-	if signingMessage.TimeReceived.IsZero() {
-		sr.logger.Errorf("signing message from %s time received is zero in batch %s. "+
-			"This shouldn't be possible.",
-			signingMessage.Operator.Hex(),
-			hex.EncodeToString(sr.batchHeaderHash[:]))
-	} else if sr.metrics != nil {
-		sr.metrics.reportSigningMessageChannelLatency(time.Since(signingMessage.TimeReceived))
-	}
-
-	indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
+	indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.ValidatorId]
 	if !found {
 		sr.logger.Error("operator not found in state",
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-			"operatorID", signingMessage.Operator.Hex(),
-			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
+			"validatorID", signingMessage.ValidatorId.Hex())
 		return
 	}
 
-	if seen := sr.signatureMessageReceived[signingMessage.Operator]; seen {
+	if seen := sr.signatureMessageReceived[signingMessage.ValidatorId]; seen {
 		sr.logger.Error("duplicate message from operator",
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-			"operatorID", signingMessage.Operator.Hex(),
-			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
+			"validatorID", signingMessage.ValidatorId.Hex())
 		return
 	}
 
 	// this map records messages received, whether the messages are valid or not
-	sr.signatureMessageReceived[signingMessage.Operator] = true
+	sr.signatureMessageReceived[signingMessage.ValidatorId] = true
 
 	thresholdCrossed, err := sr.processSigningMessage(signingMessage, indexedOperatorInfo)
 	if err != nil {
 		sr.errorCount++
 		sr.logger.Warn("error processing signing message",
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-			"operatorID", signingMessage.Operator.Hex(),
-			"attestationLatencyMs", signingMessage.AttestationLatencyMs,
+			"validatorID", signingMessage.ValidatorId.Hex(),
 			"error", err)
 		return
 	}
 
-	sr.validSignerMap[signingMessage.Operator] = struct{}{}
+	sr.validSignerMap[signingMessage.ValidatorId] = struct{}{}
 	sr.newSignaturesGathered = true
 
 	if thresholdCrossed {
@@ -294,7 +282,7 @@ func (sr *signatureReceiver) processSigningMessage(
 	thresholdCrossed := false
 	for _, quorumID := range sr.quorumIDs {
 		quorumOperators := sr.indexedOperatorState.Operators[quorumID]
-		quorumOperatorInfo, isOperatorInQuorum := quorumOperators[signingMessage.Operator]
+		quorumOperatorInfo, isOperatorInQuorum := quorumOperators[signingMessage.ValidatorId]
 		if !isOperatorInQuorum {
 			// if the operator which sent the signing message isn't in a given quorum, then we shouldn't make any
 			// changes to the aggregates that are tracked on a per-quorum basis
