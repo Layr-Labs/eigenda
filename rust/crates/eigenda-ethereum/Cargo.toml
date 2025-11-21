@@ -9,6 +9,7 @@ alloy-consensus = { workspace = true, features = [
   "serde-bincode-compat",
   "k256",
 ] }
+alloy-contract = { workspace = true }
 alloy-primitives = { workspace = true, features = ["serde"] }
 alloy-provider = { workspace = true, features = ["anvil-api", "default", "ws"] }
 alloy-rpc-client = { workspace = true }
@@ -16,12 +17,14 @@ alloy-rpc-types-eth = { workspace = true }
 alloy-signer-local = { workspace = true }
 alloy-sol-types = { workspace = true }
 alloy-transport = { workspace = true }
+derive_more.workspace = true
 eigenda-verification = { path = "../eigenda-verification" }
 futures = { workspace = true }
 reth-trie-common = { workspace = true, features = ["serde", "eip1186"] }
 rustls = { workspace = true, features = ["aws-lc-rs"] }
 schemars = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["alloc", "derive"] }
+serde_json.workspace = true
 
 [dev-dependencies]
 alloy-rpc-types = { workspace = true, features = ["anvil"] }

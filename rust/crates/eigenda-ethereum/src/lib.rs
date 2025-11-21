@@ -22,3 +22,6 @@ pub mod contracts;
 
 /// Ethereum provider utilities and helper functions.
 pub mod provider;
+
+/// Ethereum address wrapper to implement jsonSchema trait.
+pub mod address;

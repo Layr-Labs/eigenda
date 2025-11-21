@@ -48,7 +48,26 @@ pub fn mapping_key(key: U256, slot: u64) -> StorageKey {
     keccak256((key, slot).abi_encode())
 }
 
-/// Generate storage key for dynamic array element
+/// Generate storage key for a dynamic array element
+///
+/// Implements the Ethereum dynamic array storage rule:
+/// `storage_key = keccak256(slot) + index`
+///
+/// The base slot for the array data is `keccak256(slot)`, and each element is stored sequentially.
+///
+/// # Arguments
+/// * `slot` - The storage slot of the dynamic array variable
+/// * `index` - The array index to access
+///
+/// # Returns
+/// Storage key for the array element
+pub fn dynamic_array_key(slot: u64, index: u32) -> StorageKey {
+    let slot = U256::from(slot);
+    let data_base: U256 = keccak256(slot.abi_encode()).into();
+    (data_base + U256::from(index)).into()
+}
+
+/// Generate storage key for mapping with dynamic array element value
 ///
 /// Implements the Ethereum dynamic array storage rule:
 /// `storage_key = keccak256(keccak256(abi.encode(key, slot))) + index`
@@ -63,7 +82,7 @@ pub fn mapping_key(key: U256, slot: u64) -> StorageKey {
 ///
 /// # Returns
 /// Storage key for the array element
-pub fn dynamic_array_key(key: U256, slot: u64, index: u32) -> StorageKey {
+pub fn mapping_to_dynamic_array_key(key: U256, slot: u64, index: u32) -> StorageKey {
     let slot = U256::from(slot);
     let length_base = keccak256((key, slot).abi_encode());
     let data_base: U256 = keccak256(length_base).into();
@@ -85,7 +104,7 @@ pub fn dynamic_array_key(key: U256, slot: u64, index: u32) -> StorageKey {
 ///
 /// # Returns
 /// Storage key for the nested array element
-pub fn nested_dynamic_array_key(
+pub fn nested_mapping_to_dynamic_array_key(
     first_key: U256,
     slot: u64,
     second_key: U256,
@@ -122,15 +141,24 @@ mod tests {
 
     #[test]
     fn dynamic_array_key_test() {
-        let result = dynamic_array_key(U256::from(0x123), 10, 5);
+        let result = dynamic_array_key(7, 3);
+        let value = hex!("0xa66cc928b5edb82af9bd49922954155ab7b0942694bea4ce44661d9a8736c68b");
+        let expected = StorageKey::from(value);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn mapping_to_dynamic_array_key_test() {
+        let result = mapping_to_dynamic_array_key(U256::from(0x123), 10, 5);
         let value = hex!("7fe76a52931b48d767fa7e54a1d7007662ab2827fd4b83ca6b158f06dbdbed88");
         let expected = StorageKey::from(value);
         assert_eq!(result, expected);
     }
 
     #[test]
-    fn nested_dynamic_array_key_test() {
-        let result = nested_dynamic_array_key(U256::from(0x456), 15, U256::from(0x789), 3);
+    fn nested_mapping_to_dynamic_array_key_test() {
+        let result =
+            nested_mapping_to_dynamic_array_key(U256::from(0x456), 15, U256::from(0x789), 3);
         let value = hex!("7b559e449c242de80687a166a5b9feebff23ad66e81b26e687aa932f8ef0afca");
         let expected = StorageKey::from(value);
         assert_eq!(result, expected);
