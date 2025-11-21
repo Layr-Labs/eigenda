@@ -40,12 +40,4 @@ forge test -v
 
 ## (ERC-7201) Namespaced Storage Schemas
 
-Some EigenDA core contracts implement the [ERC-7201](https://eips.ethereum.org/EIPS/eip-7201) namespaced storage standard. Contracts using this standard follow the namespace pattern:
-```
-eigenda.<contract_name>.storage
-```
-
-For example, the `EigenDAEjectionsManager` contract would declare its namespaced starting slot as:
-```
-eigenda.ejections-manager.storage
-```
+Some EigenDA core contracts implement the [ERC-7201](https://eips.ethereum.org/EIPS/eip-7201) namespaced storage standard. Contracts using this standard follow the namespace pattern based on the storage library name, e.g a library named `ConfigRegistryStorage` would have a namespaced storage ID preimage of `config.registry.storage`.
