@@ -115,7 +115,7 @@ func SplitSerializedFrameCoeffsWithElementCount(serializedData []byte, symbolsPe
 	bytesPerFrameCoeffs := encoding.BYTES_PER_SYMBOL * symbolsPerFrame
 
 	if remainingBytes%bytesPerFrameCoeffs != 0 {
-		return nil, fmt.Errorf("invalid data size: %d", len(serializedData))
+		return nil, fmt.Errorf("invalid data size: %d", remainingBytes)
 	}
 
 	frameCoeffCount := remainingBytes / bytesPerFrameCoeffs
