@@ -49,19 +49,17 @@ interface IEigenDAAddressDirectory {
 interface IEigenDAConfigRegistry {
     /// @notice Adds a variable length byte configuration value to the configuration registry using block number as activation key.
     /// @param name The name of the configuration entry.
-    /// @param activationKey The activation key for the configuration entry.
-    ///                      This is an arbitrary key defined by the caller to indicate when the configuration should become active.
+    /// @param abn The activation block number for the configuration entry.
     /// @param value The variable length byte configuration value.
-    /// @dev The activationKey must be strictly greater than the last activationKey for the same name.
-    function addConfigBlockNumber(string memory name, uint256 activationKey, bytes memory value) external;
+    /// @dev The abn must be strictly greater than the last abn for the same name.
+    function addConfigBlockNumber(string memory name, uint256 abn, bytes memory value) external;
 
     /// @notice Adds a variable length byte configuration value to the configuration registry using timestamp as activation key.
     /// @param name The name of the configuration entry.
-    /// @param activationKey The activation key for the configuration entry.
-    ///                      This is an arbitrary key defined by the caller to indicate when the configuration should become active.
+    /// @param activationTS The activation timestamp for the configuration entry.
     /// @param value The variable length byte configuration value.
-    /// @dev The activationKey must be strictly greater than the last activationKey for the same name.
-    function addConfigTimeStamp(string memory name, uint256 activationKey, bytes memory value) external;
+    /// @dev The activationTS must be strictly greater than the last activationTS for the same name.
+    function addConfigTimeStamp(string memory name, uint256 activationTS, bytes memory value) external;
 
     /// @notice Gets the number of checkpoints for a block number configuration entry.
     /// @param nameDigest The hash of the name of the configuration entry.
@@ -89,13 +87,13 @@ interface IEigenDAConfigRegistry {
     /// @param nameDigest The hash of the name of the configuration entry.
     /// @param index The index of the configuration value to retrieve the activation key for.
     /// @return The activation key at the specified index.
-    function getActivationKeyBlockNumber(bytes32 nameDigest, uint256 index) external view returns (uint256);
+    function getActivationBlockNumber(bytes32 nameDigest, uint256 index) external view returns (uint256);
 
     /// @notice Gets the activation key for a timestamp configuration entry at a specific index.
     /// @param nameDigest The hash of the name of the configuration entry.
     /// @param index The index of the configuration value to retrieve the activation key for.
     /// @return The activation key at the specified index.
-    function getActivationKeyTimeStamp(bytes32 nameDigest, uint256 index) external view returns (uint256);
+    function getActivationTimeStamp(bytes32 nameDigest, uint256 index) external view returns (uint256);
 
     /// @notice Gets the full checkpoint (value and activation key) for a timestamp configuration entry at a specific index.
     /// @param nameDigest The hash of the name of the configuration entry.

@@ -46,16 +46,16 @@ contract MockConfigRetriever {
     /// @param key The hash of the configuration name
     /// @param index The index of the checkpoint to retrieve
     /// @return The activation block number at the specified index
-    function getActivationKeyBlockNumber(bytes32 key, uint256 index) external view returns (uint256) {
-        return directory.getActivationKeyBlockNumber(key, index);
+    function getActivationBlockNumber(bytes32 key, uint256 index) external view returns (uint256) {
+        return directory.getActivationBlockNumber(key, index);
     }
 
     /// @notice Gets the activation timestamp at a specific index for a timestamp-based configuration
     /// @param key The hash of the configuration name
     /// @param index The index of the checkpoint to retrieve
     /// @return The activation timestamp at the specified index
-    function getActivationKeyTimeStamp(bytes32 key, uint256 index) external view returns (uint256) {
-        return directory.getActivationKeyTimeStamp(key, index);
+    function getActivationTimeStamp(bytes32 key, uint256 index) external view returns (uint256) {
+        return directory.getActivationTimeStamp(key, index);
     }
 
     /// @notice Retrieves all block number-based configs with activation blocks greater than or equal to the specified block number
@@ -71,7 +71,7 @@ contract MockConfigRetriever {
         uint256 numCheckpoints = directory.getNumCheckpointsBlockNumber(key);
         uint256 count = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            if (directory.getActivationKeyBlockNumber(key, i) >= activationBlock) {
+            if (directory.getActivationBlockNumber(key, i) >= activationBlock) {
                 count++;
             }
         }
@@ -80,7 +80,7 @@ contract MockConfigRetriever {
         bytes32[] memory configs = new bytes32[](count);
         uint256 index = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            uint256 activationKeyAtIdx = directory.getActivationKeyBlockNumber(key, i);
+            uint256 activationKeyAtIdx = directory.getActivationBlockNumber(key, i);
             if (activationKeyAtIdx >= activationBlock) {
                 activationKeys[index] = activationKeyAtIdx;
                 bytes memory config = directory.getConfigBlockNumber(key, i);
@@ -105,7 +105,7 @@ contract MockConfigRetriever {
         uint256 numCheckpoints = directory.getNumCheckpointsTimeStamp(key);
         uint256 count = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            if (directory.getActivationKeyTimeStamp(key, i) >= activationKey) {
+            if (directory.getActivationTimeStamp(key, i) >= activationKey) {
                 count++;
             }
         }
@@ -114,7 +114,7 @@ contract MockConfigRetriever {
         bytes[] memory configs = new bytes[](count);
         uint256 index = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            uint256 activationKeyAtIdx = directory.getActivationKeyTimeStamp(key, i);
+            uint256 activationKeyAtIdx = directory.getActivationTimeStamp(key, i);
             if (activationKeyAtIdx >= activationKey) {
                 activationKeys[index] = activationKeyAtIdx;
                 configs[index] = directory.getConfigTimeStamp(key, i);

@@ -12,7 +12,7 @@ library ConfigRegistryTypes {
 
     /// @notice Struct to represent checkpoints for fixed-size byte32 configurations
     /// @param activationTime The activation timestamp for the checkpoint
-    /// @param value The bytes32 configuration value at this checkpoint
+    /// @param value The bytes configuration value at this checkpoint
     struct TimeStampCheckpoint {
         uint256 activationTime;
         bytes value;
@@ -26,7 +26,7 @@ library ConfigRegistryTypes {
         bytes value;
     }
 
-    /// @notice Struct to hold all bytes32 configuration checkpoints and associated names
+    /// @notice Struct to hold all timestamp configuration checkpoints and associated names
     /// @param values Mapping from name digest to array of TimeStampCheckpoint structs. This entire structure is meant to be able to be queried.
     /// @param nameSet The NameSet struct to manage names associated with the configuration entries
     /// @dev See docs for the structs for more information
@@ -35,7 +35,7 @@ library ConfigRegistryTypes {
         NameSet nameSet;
     }
 
-    /// @notice Struct to hold all bytes configuration checkpoints and associated names
+    /// @notice Struct to hold all block number configuration checkpoints and associated names
     /// @dev See docs for the structs for more information
     struct BlockNumberCfg {
         mapping(bytes32 => BlockNumberCheckpoint[]) values;

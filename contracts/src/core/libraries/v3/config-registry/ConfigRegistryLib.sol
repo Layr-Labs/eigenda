@@ -37,14 +37,14 @@ library ConfigRegistryLib {
     /// @param nameDigest The hash of the configuration name
     /// @return The number of checkpoints stored for this configuration
     function getNumCheckpointsTimeStamp(bytes32 nameDigest) internal view returns (uint256) {
-        return S.layout().TimeStampCfg.values[nameDigest].length;
+        return S.layout().timestampCfg.values[nameDigest].length;
     }
 
     /// @notice Gets the number of checkpoints for a block number-based configuration entry
     /// @param nameDigest The hash of the configuration name
     /// @return The number of checkpoints stored for this configuration
     function getNumCheckpointsBlockNumber(bytes32 nameDigest) internal view returns (uint256) {
-        return S.layout().BlockNumberCfg.values[nameDigest].length;
+        return S.layout().blockNumberCfg.values[nameDigest].length;
     }
 
     /// @notice Gets the configuration value at a specific index for a timestamp-based configuration
@@ -52,7 +52,7 @@ library ConfigRegistryLib {
     /// @param index The index of the checkpoint to retrieve
     /// @return The bytes configuration value at the specified index
     function getConfigTimeStamp(bytes32 nameDigest, uint256 index) internal view returns (bytes memory) {
-        return S.layout().TimeStampCfg.values[nameDigest][index].value;
+        return S.layout().timestampCfg.values[nameDigest][index].value;
     }
 
     /// @notice Gets the configuration value at a specific index for a block number-based configuration
@@ -60,23 +60,23 @@ library ConfigRegistryLib {
     /// @param index The index of the checkpoint to retrieve
     /// @return The bytes configuration value at the specified index
     function getConfigBlockNumber(bytes32 nameDigest, uint256 index) internal view returns (bytes memory) {
-        return S.layout().BlockNumberCfg.values[nameDigest][index].value;
+        return S.layout().blockNumberCfg.values[nameDigest][index].value;
     }
 
     /// @notice Gets the activation timestamp at a specific index for a timestamp-based configuration
     /// @param nameDigest The hash of the configuration name
     /// @param index The index of the checkpoint to retrieve
     /// @return The activation timestamp at the specified index
-    function getActivationKeyTimeStamp(bytes32 nameDigest, uint256 index) internal view returns (uint256) {
-        return S.layout().TimeStampCfg.values[nameDigest][index].activationTime;
+    function getActivationTimeStamp(bytes32 nameDigest, uint256 index) internal view returns (uint256) {
+        return S.layout().timestampCfg.values[nameDigest][index].activationTime;
     }
 
     /// @notice Gets the activation block number at a specific index for a block number-based configuration
     /// @param nameDigest The hash of the configuration name
     /// @param index The index of the checkpoint to retrieve
     /// @return The activation block number at the specified index
-    function getActivationKeyBlockNumber(bytes32 nameDigest, uint256 index) internal view returns (uint256) {
-        return S.layout().BlockNumberCfg.values[nameDigest][index].activationBlock;
+    function getActivationBlockNumber(bytes32 nameDigest, uint256 index) internal view returns (uint256) {
+        return S.layout().blockNumberCfg.values[nameDigest][index].activationBlock;
     }
 
     /// @notice Gets the full checkpoint at a specific index for a timestamp-based configuration
@@ -88,7 +88,7 @@ library ConfigRegistryLib {
         view
         returns (T.TimeStampCheckpoint memory)
     {
-        return S.layout().TimeStampCfg.values[nameDigest][index];
+        return S.layout().timestampCfg.values[nameDigest][index];
     }
 
     /// @notice Gets the full checkpoint at a specific index for a block number-based configuration
@@ -100,7 +100,7 @@ library ConfigRegistryLib {
         view
         returns (T.BlockNumberCheckpoint memory)
     {
-        return S.layout().BlockNumberCfg.values[nameDigest][index];
+        return S.layout().blockNumberCfg.values[nameDigest][index];
     }
 
     /// @notice Adds a new timestamp-based configuration checkpoint
@@ -110,16 +110,17 @@ library ConfigRegistryLib {
     /// @dev For the first checkpoint, activationTS must be >= block.timestamp
     /// @dev Subsequent checkpoints must have strictly increasing activation timestamps
     function addConfigTimeStamp(bytes32 nameDigest, uint256 activationTS, bytes memory value) internal {
-        T.TimeStampCfg storage cfg = S.layout().TimeStampCfg;
+        T.TimeStampCfg storage cfg = S.layout().timestampCfg;
         if (cfg.values[nameDigest].length > 0) {
             uint256 lastActivationTS = cfg.values[nameDigest][cfg.values[nameDigest].length - 1].activationTime;
             if (activationTS <= lastActivationTS) {
                 revert NotIncreasingActivationKey(lastActivationTS, activationTS);
             }
-        } else {
-            if (activationTS < block.timestamp) {
-                revert TimeStampActivationKeyInPast(block.timestamp, activationTS);
-            }
+        }
+
+        /// @dev activation timestamps being provided must always be at a future timestamp
+        if (activationTS < block.timestamp) {
+            revert TimeStampActivationKeyInPast(block.timestamp, activationTS);
         }
 
         cfg.values[nameDigest].push(T.TimeStampCheckpoint({value: value, activationTime: activationTS}));
@@ -133,16 +134,17 @@ library ConfigRegistryLib {
     /// @dev For the first checkpoint, abn must be >= block.number
     /// @dev Subsequent checkpoints must have strictly increasing activation block numbers
     function addConfigBlockNumber(bytes32 nameDigest, uint256 abn, bytes memory value) internal {
-        T.BlockNumberCfg storage cfg = S.layout().BlockNumberCfg;
+        T.BlockNumberCfg storage cfg = S.layout().blockNumberCfg;
         if (cfg.values[nameDigest].length > 0) {
-            uint256 lastActivationKey = cfg.values[nameDigest][cfg.values[nameDigest].length - 1].activationBlock;
-            if (abn <= lastActivationKey) {
-                revert NotIncreasingActivationKey(lastActivationKey, abn);
+            uint256 lastABN = cfg.values[nameDigest][cfg.values[nameDigest].length - 1].activationBlock;
+            if (abn <= lastABN) {
+                revert NotIncreasingActivationKey(lastABN, abn);
             }
-        } else {
-            if (abn < block.number) {
+        }
+
+        /// @dev abn being provided must always be at a future block
+        if (abn < block.number) {
                 revert BlockNumberActivationKeyInPast(block.number, abn);
-            }
         }
 
         cfg.values[nameDigest].push(T.BlockNumberCheckpoint({value: value, activationBlock: abn}));
@@ -153,14 +155,14 @@ library ConfigRegistryLib {
     /// @param name The configuration name to register
     /// @dev Idempotent - safe to call multiple times with the same name
     function registerNameTimeStamp(string memory name) internal {
-        registerName(S.layout().TimeStampCfg.nameSet, name);
+        registerName(S.layout().timestampCfg.nameSet, name);
     }
 
     /// @notice Registers a configuration name for block number-based configurations
     /// @param name The configuration name to register
     /// @dev Idempotent - safe to call multiple times with the same name
     function registerNameBlockNumber(string memory name) internal {
-        registerName(S.layout().BlockNumberCfg.nameSet, name);
+        registerName(S.layout().blockNumberCfg.nameSet, name);
     }
 
     /// @notice Internal function to register a configuration name in a name set
@@ -188,40 +190,40 @@ library ConfigRegistryLib {
     /// @param nameDigest The hash of the name to check
     /// @return True if registered, false otherwise
     function isNameRegisteredTimeStamp(bytes32 nameDigest) internal view returns (bool) {
-        return isNameDigestRegistered(S.layout().TimeStampCfg.nameSet, nameDigest);
+        return isNameDigestRegistered(S.layout().timestampCfg.nameSet, nameDigest);
     }
 
     /// @notice Checks if a name digest is registered for block number-based configurations
     /// @param nameDigest The hash of the name to check
     /// @return True if registered, false otherwise
     function isNameRegisteredBlockNumber(bytes32 nameDigest) internal view returns (bool) {
-        return isNameDigestRegistered(S.layout().BlockNumberCfg.nameSet, nameDigest);
+        return isNameDigestRegistered(S.layout().blockNumberCfg.nameSet, nameDigest);
     }
 
     /// @notice Gets the total number of registered timestamp-based configuration names
     /// @return The count of registered timestamp-based configuration names
     function getNumRegisteredNamesTimeStamp() internal view returns (uint256) {
-        return S.layout().TimeStampCfg.nameSet.nameList.length;
+        return S.layout().timestampCfg.nameSet.nameList.length;
     }
 
     /// @notice Gets the total number of registered block number-based configuration names
     /// @return The count of registered block number-based configuration names
     function getNumRegisteredNamesBlockNumber() internal view returns (uint256) {
-        return S.layout().BlockNumberCfg.nameSet.nameList.length;
+        return S.layout().blockNumberCfg.nameSet.nameList.length;
     }
 
     /// @notice Gets a registered timestamp-based configuration name by its index in the name list
     /// @param index The index of the name to retrieve
     /// @return The configuration name at the specified index
     function getRegisteredNameTimeStamp(uint256 index) internal view returns (string memory) {
-        return S.layout().TimeStampCfg.nameSet.nameList[index];
+        return S.layout().timestampCfg.nameSet.nameList[index];
     }
 
     /// @notice Gets a registered block number-based configuration name by its index in the name list
     /// @param index The index of the name to retrieve
     /// @return The configuration name at the specified index
     function getRegisteredNameBlockNumber(uint256 index) internal view returns (string memory) {
-        return S.layout().BlockNumberCfg.nameSet.nameList[index];
+        return S.layout().blockNumberCfg.nameSet.nameList[index];
     }
 
     /// @notice Gets the configuration name for a timestamp-based configuration by its name digest
@@ -229,7 +231,7 @@ library ConfigRegistryLib {
     /// @return The configuration name
     /// @dev Reverts with NameDigestNotRegistered if the name digest is not registered
     function getNameTimeStamp(bytes32 nameDigest) internal view returns (string memory) {
-        string memory name = S.layout().TimeStampCfg.nameSet.names[nameDigest];
+        string memory name = S.layout().timestampCfg.nameSet.names[nameDigest];
         if (bytes(name).length == 0) {
             revert NameDigestNotRegistered(nameDigest);
         }
@@ -241,7 +243,7 @@ library ConfigRegistryLib {
     /// @return The configuration name
     /// @dev Reverts with NameDigestNotRegistered if the name digest is not registered
     function getNameBlockNumber(bytes32 nameDigest) internal view returns (string memory) {
-        string memory name = S.layout().BlockNumberCfg.nameSet.names[nameDigest];
+        string memory name = S.layout().blockNumberCfg.nameSet.names[nameDigest];
         if (bytes(name).length == 0) {
             revert NameDigestNotRegistered(nameDigest);
         }
@@ -251,12 +253,12 @@ library ConfigRegistryLib {
     /// @notice Gets the list of all registered timestamp-based configuration names
     /// @return An array containing all registered timestamp-based configuration names
     function getNameListTimeStamp() internal view returns (string[] memory) {
-        return S.layout().TimeStampCfg.nameSet.nameList;
+        return S.layout().timestampCfg.nameSet.nameList;
     }
 
     /// @notice Gets the list of all registered block number-based configuration names
     /// @return An array containing all registered block number-based configuration names
     function getNameListBlockNumber() internal view returns (string[] memory) {
-        return S.layout().BlockNumberCfg.nameSet.nameList;
+        return S.layout().blockNumberCfg.nameSet.nameList;
     }
 }

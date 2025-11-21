@@ -118,9 +118,9 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     /// CONFIG REGISTRY FUNCTIONS ///
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function addConfigBlockNumber(string memory name, uint256 activationBlockNum, bytes memory value) external onlyOwner {
+    function addConfigBlockNumber(string memory name, uint256 abn, bytes memory value) external onlyOwner {
         bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
-        ConfigRegistryLib.addConfigBlockNumber(nameDigest, activationBlockNum, value);
+        ConfigRegistryLib.addConfigBlockNumber(nameDigest, abn, value);
         ConfigRegistryLib.registerNameBlockNumber(name);
     }
 
@@ -152,13 +152,13 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getActivationKeyBlockNumber(bytes32 nameDigest, uint256 index) external view returns (uint256) {
-        return ConfigRegistryLib.getActivationKeyBlockNumber(nameDigest, index);
+    function getActivationBlockNumber(bytes32 nameDigest, uint256 index) external view returns (uint256) {
+        return ConfigRegistryLib.getActivationBlockNumber(nameDigest, index);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function getActivationKeyTimeStamp(bytes32 nameDigest, uint256 index) external view returns (uint256) {
-        return ConfigRegistryLib.getActivationKeyTimeStamp(nameDigest, index);
+    function getActivationTimeStamp(bytes32 nameDigest, uint256 index) external view returns (uint256) {
+        return ConfigRegistryLib.getActivationTimeStamp(nameDigest, index);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
