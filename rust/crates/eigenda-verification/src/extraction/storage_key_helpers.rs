@@ -48,6 +48,19 @@ pub fn mapping_key(key: U256, slot: u64) -> StorageKey {
     keccak256((key, slot).abi_encode())
 }
 
+/// Generate storage key for a dynamic array element
+///
+/// Implements the Ethereum dynamic array storage rule:
+/// `storage_key = keccak256(slot) + index`
+///
+/// The base slot for the array data is `keccak256(slot)`, and each element is stored sequentially.
+///
+/// # Arguments
+/// * `slot` - The storage slot of the dynamic array variable
+/// * `index` - The array index to access
+///
+/// # Returns
+/// Storage key for the array element
 pub fn dynamic_array_key(slot: u64, index: u32) -> StorageKey {
     let slot = U256::from(slot);
     let data_base: U256 = keccak256(slot.abi_encode()).into();

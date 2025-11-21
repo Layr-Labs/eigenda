@@ -5,7 +5,7 @@ use alloy_primitives::AddressError;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// Ethereum address wrapper to implement jsonSchema trait.
+/// Ethereum address wrapper to implement JsonSchema trait.
 /// This is needed to comply with the sovereign sdk.
 /// See [crate::provider::EigenDaProviderConfig] for more details.
 #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

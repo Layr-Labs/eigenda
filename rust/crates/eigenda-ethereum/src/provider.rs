@@ -209,8 +209,6 @@ impl EigenDaProvider {
 
     /// Fetches the address of the cert verifier active at a given reference block number
     /// according to the cert verifier router stored in self.contracts.
-    /// Will panic if the router call fails for any reason other than a transport error,
-    /// since we expect that self.contracts correctly points to a valid router contract.
     async fn get_cert_verifier_at_rbn(
         &self,
         reference_block_number: u32,

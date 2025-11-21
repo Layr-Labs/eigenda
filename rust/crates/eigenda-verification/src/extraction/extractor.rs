@@ -593,8 +593,9 @@ impl DataDecoder for OperatorStakeHistoryExtractor {
 }
 
 /// Extractor for the length of the certificate verifiers ABNs array.
-/// This is used to determine how many certificate verifiers are registered.
-/// Needed to prove an ABN is currently active in case that ABN is the last
+///
+/// This extractor is used to determine how many certificate verifiers are registered.
+/// It is needed to prove an ABN is currently active in case that ABN is the last
 /// registered in the contract.
 pub struct CertVerifierABNsLenExtractor;
 
@@ -613,7 +614,12 @@ impl StorageKeyProvider for CertVerifierABNsLenExtractor {
     }
 }
 
+/// Extractor for the certificate verifiers ABNs array.
+/// This struct is used to extract a specified number of certificate verifier ABNs from storage.
 pub struct CertVerifierABNsExtractor {
+    /// The number of certificate verifier ABNs to extract.
+    /// Should be fetched using CertVerifierABNsLenExtractor beforehand,
+    /// to make sure all ABNs are retrieved.
     pub num_abns: usize,
 }
 
@@ -635,7 +641,15 @@ impl StorageKeyProvider for CertVerifierABNsExtractor {
     }
 }
 
+/// Extracts cert verifier information for a given set of ABNs (activation block numbers).
+///
+/// This struct is used to retrieve the cert verifiers associated with the provided ABNs.
+/// ABNs are required to identify which cert verifiers' data should be extracted from storage,
+/// as each ABN corresponds to a specific cert verifier in the mapping.
 pub struct CertVerifiersExtractor<'a> {
+    /// The list of ABNs (activation block numbers) for which cert verifiers are to be extracted.
+    ///
+    /// Each ABN uniquely identifies a cert verifier in the contract's storage mapping.
     pub abns: &'a [u32],
 }
 
