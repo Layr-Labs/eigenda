@@ -118,16 +118,16 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     /// CONFIG REGISTRY FUNCTIONS ///
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function addConfigBlockNumber(string memory name, uint256 activationKey, bytes memory value) external onlyOwner {
+    function addConfigBlockNumber(string memory name, uint256 activationBlockNum, bytes memory value) external onlyOwner {
         bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
-        ConfigRegistryLib.addConfigBlockNumber(nameDigest, activationKey, value);
+        ConfigRegistryLib.addConfigBlockNumber(nameDigest, activationBlockNum, value);
         ConfigRegistryLib.registerNameBlockNumber(name);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
-    function addConfigTimeStamp(string memory name, uint256 activationKey, bytes memory value) external onlyOwner {
+    function addConfigTimeStamp(string memory name, uint256 activationTimeStamp, bytes memory value) external onlyOwner {
         bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
-        ConfigRegistryLib.addConfigTimeStamp(nameDigest, activationKey, value);
+        ConfigRegistryLib.addConfigTimeStamp(nameDigest, activationTimeStamp, value);
         ConfigRegistryLib.registerNameTimeStamp(name);
     }
 
@@ -201,8 +201,8 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
 
     /// @inheritdoc IEigenDASemVer
     function semver() external pure returns (uint8 major, uint8 minor, uint8 patch) {
-        major = 1;
-        minor = 2;
+        major = 2;
+        minor = 0;
         patch = 0;
     }
 }

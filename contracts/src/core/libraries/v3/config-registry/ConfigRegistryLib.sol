@@ -117,7 +117,7 @@ library ConfigRegistryLib {
                 revert NotIncreasingActivationKey(lastActivationTS, activationTS);
             }
         } else {
-            if (block.timestamp > activationTS) {
+            if (activationTS < block.timestamp) {
                 revert TimeStampActivationKeyInPast(block.timestamp, activationTS);
             }
         }
@@ -140,7 +140,7 @@ library ConfigRegistryLib {
                 revert NotIncreasingActivationKey(lastActivationKey, abn);
             }
         } else {
-            if (block.number > abn) {
+            if (abn < block.number) {
                 revert BlockNumberActivationKeyInPast(block.number, abn);
             }
         }
