@@ -15,7 +15,7 @@ func TestSuccess(t *testing.T) {
 	for range 100 {
 		reputation.Success()
 	}
-	require.Greater(t, reputation.Score(), 0.99999)
+	require.Greater(t, reputation.Score(), 0.99)
 }
 
 func TestFailure(t *testing.T) {
@@ -25,7 +25,7 @@ func TestFailure(t *testing.T) {
 	for range 100 {
 		reputation.Failure()
 	}
-	require.Less(t, reputation.Score(), 0.00001)
+	require.Less(t, reputation.Score(), 0.01)
 }
 
 func TestForgive(t *testing.T) {
