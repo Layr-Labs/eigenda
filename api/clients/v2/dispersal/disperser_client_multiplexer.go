@@ -15,17 +15,23 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
+// Supplies DisperserClients based on a dynamic set of eligible dispersers and their reputations.
+//
+// This struct is goroutine safe.
 type DisperserClientMultiplexer struct {
-	logger                   logging.Logger
-	config                   *DisperserClientMultiplexerConfig
-	disperserRegistry        clients.DisperserRegistry
-	signer                   corev2.BlobRequestSigner
-	committer                *committer.Committer
-	dispersalMetrics         metrics.DispersalMetricer
+	logger            logging.Logger
+	config            *DisperserClientMultiplexerConfig
+	disperserRegistry clients.DisperserRegistry
+	signer            corev2.BlobRequestSigner
+	committer         *committer.Committer
+	dispersalMetrics  metrics.DispersalMetricer
+	// number of grpc connections to each disperser
 	disperserConnectionCount uint
-	clients                  map[uint32]*DisperserClient
-	reputations              map[uint32]*reputation.Reputation
-	mu                       sync.Mutex
+	// map from disperser ID to corresponding client that can communicate with that disperser
+	clients map[uint32]*DisperserClient
+	// map from disperser ID to its reputation tracker
+	reputations map[uint32]*reputation.Reputation
+	lock        sync.Mutex
 }
 
 func NewDisperserClientMultiplexer(
@@ -38,18 +44,19 @@ func NewDisperserClientMultiplexer(
 	disperserConnectionCount uint,
 ) *DisperserClientMultiplexer {
 	return &DisperserClientMultiplexer{
-		config:                   config,
-		clients:                  make(map[uint32]*DisperserClient),
-		disperserRegistry:        disperserRegistry,
-		reputations:              make(map[uint32]*reputation.Reputation),
 		logger:                   logger,
+		config:                   config,
+		disperserRegistry:        disperserRegistry,
 		signer:                   signer,
 		committer:                committer,
 		dispersalMetrics:         dispersalMetrics,
 		disperserConnectionCount: disperserConnectionCount,
+		clients:                  make(map[uint32]*DisperserClient),
+		reputations:              make(map[uint32]*reputation.Reputation),
 	}
 }
 
+// Closes all underlying [DisperserClient]s
 func (dcm *DisperserClientMultiplexer) Close() error {
 	var errs []error
 	for id, client := range dcm.clients {
@@ -63,15 +70,17 @@ func (dcm *DisperserClientMultiplexer) Close() error {
 	return nil
 }
 
+// Returns a client for the best available disperser based on the current reputations.
 func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 	ctx context.Context,
 	now time.Time,
+	// if true, only consider dispersers that support on-demand payments
 	onDemandPayment bool,
 ) (*DisperserClient, error) {
 	// we could try to be more fine-grained about our locking, but it's probably not worth the complexity unless
 	// contention actually becomes an issue
-	dcm.mu.Lock()
-	defer dcm.mu.Unlock()
+	dcm.lock.Lock()
+	defer dcm.lock.Unlock()
 
 	eligibleDispersers, err := dcm.getEligibleDispersers(ctx, now, onDemandPayment)
 	if err != nil {
@@ -92,6 +101,7 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 
 	client, exists := dcm.clients[chosenDisperser]
 	if !exists {
+		// create a new client for the chosen disperser
 		clientConfig := &DisperserClientConfig{
 			Hostname:                 connectionInfo.Hostname,
 			Port:                     fmt.Sprintf("%d", connectionInfo.Port),
@@ -124,19 +134,25 @@ func (dcm *DisperserClientMultiplexer) cleanupOutdatedClient(
 ) {
 	client, exists := dcm.clients[disperserID]
 	if !exists {
+		// nothing to clean up, if the client doesn't exist
 		return
 	}
 
+	// check if the latest connection info matches the existing client's config
+	// if not, the existing client is outdated and should be closed and removed
 	oldConfig := client.GetConfig()
 	if oldConfig.Hostname != latestConnectionInfo.Hostname ||
 		oldConfig.Port != fmt.Sprintf("%d", latestConnectionInfo.Port) {
 		if err := client.Close(); err != nil {
 			dcm.logger.Warn("failed to close outdated disperser client", "disperserID", disperserID, "err", err)
 		}
+		// remove the outdated client from the map, but don't delete the reputation. reputation is presumed to remain
+		// relevant for a given disperser ID, even if the connection info changes
 		delete(dcm.clients, disperserID)
 	}
 }
 
+// Returns the IDs of all eligible dispersers, along with their reputations.
 func (dcm *DisperserClientMultiplexer) getEligibleDispersers(
 	ctx context.Context,
 	now time.Time,
@@ -147,14 +163,16 @@ func (dcm *DisperserClientMultiplexer) getEligibleDispersers(
 		return nil, fmt.Errorf("get default dispersers: %w", err)
 	}
 
+	// start by assuming that all default dispersers are eligible
 	eligibleDispersers := make(map[uint32]*reputation.Reputation)
-	for _, id := range defaultDispersers {
+	for id := range defaultDispersers {
 		if _, exists := dcm.reputations[id]; !exists {
 			dcm.reputations[id] = reputation.NewReputation(dcm.config.ReputationConfig, now)
 		}
 		eligibleDispersers[id] = dcm.reputations[id]
 	}
 
+	// add any additional dispersers specified in the config
 	for _, id := range dcm.config.AdditionalDispersers {
 		if _, exists := dcm.reputations[id]; !exists {
 			dcm.reputations[id] = reputation.NewReputation(dcm.config.ReputationConfig, now)
@@ -162,51 +180,54 @@ func (dcm *DisperserClientMultiplexer) getEligibleDispersers(
 		eligibleDispersers[id] = dcm.reputations[id]
 	}
 
+	// remove any dispersers that are blacklisted
 	for _, id := range dcm.config.DisperserBlacklist {
 		delete(eligibleDispersers, id)
 	}
 
+	// if on-demand payment support is required, filter out dispersers that don't support it
 	if onDemandPayment {
 		onDemandDispersers, err := dcm.disperserRegistry.GetOnDemandDispersers(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("get on-demand dispersers: %w", err)
 		}
 
-		onDemandSet := make(map[uint32]struct{})
-		for _, id := range onDemandDispersers {
-			onDemandSet[id] = struct{}{}
-		}
-
-		for id := range eligibleDispersers {
-			if _, exists := onDemandSet[id]; !exists {
-				delete(eligibleDispersers, id)
+		// Rebuild eligibleDispersers with only on-demand dispersers
+		filtered := make(map[uint32]*reputation.Reputation, len(onDemandDispersers))
+		for id := range onDemandDispersers {
+			if reputation, exists := eligibleDispersers[id]; exists {
+				filtered[id] = reputation
 			}
 		}
+		eligibleDispersers = filtered
 	}
 
 	return eligibleDispersers, nil
 }
 
+// Chooses the best disperser from the eligible set based on their reputations.
 func (dcm *DisperserClientMultiplexer) chooseDisperser(
 	now time.Time,
 	eligibleDispersers map[uint32]*reputation.Reputation,
 ) (uint32, error) {
 	if len(eligibleDispersers) == 0 {
-		return 0, fmt.Errorf("no eligible dispersers available")
+		return 0, fmt.Errorf("no eligible dispersers")
 	}
 
 	// Apply forgiveness to all eligible dispersers
-	for _, rep := range eligibleDispersers {
-		rep.Forgive(now)
+	for _, disperserReputation := range eligibleDispersers {
+		disperserReputation.Forgive(now)
 	}
 
 	// Choose the disperser with the highest reputation
+	//
+	// TODO(litt3): At some point, we might consider adding some randomness here
 	var bestID uint32
 	bestScore := -1.0
-	for id, rep := range eligibleDispersers {
-		if rep.ReputationScore > bestScore {
-			bestScore = rep.ReputationScore
-			bestID = id
+	for disperserId, disperserReputation := range eligibleDispersers {
+		if disperserReputation.ReputationScore > bestScore {
+			bestScore = disperserReputation.ReputationScore
+			bestID = disperserId
 		}
 	}
 
