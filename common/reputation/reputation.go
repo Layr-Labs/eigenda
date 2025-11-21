@@ -17,30 +17,30 @@ import (
 // interactions. This prevents entities from being permanently penalized based on old
 // failures when we lack recent information.
 type Reputation struct {
-	config          ReputationConfig
-	ReputationScore float64
-	LastUpdatedAt   time.Time
+	config        ReputationConfig
+	Reputation    float64
+	LastUpdatedAt time.Time
 }
 
 // Creates a new reputation tracker starting at the neutral forgiveness target.
 func NewReputation(config ReputationConfig, now time.Time) *Reputation {
 	return &Reputation{
-		config:          config,
-		ReputationScore: config.ForgivenessTarget,
-		LastUpdatedAt:   now,
+		config:        config,
+		Reputation:    config.ForgivenessTarget,
+		LastUpdatedAt: now,
 	}
 }
 
 // Updates the reputation after a successful interaction.
 // Moves the score toward 1.0 based on the configured success update rate.
 func (r *Reputation) Success() {
-	r.ReputationScore = (1-r.config.SuccessUpdateRate)*r.ReputationScore + r.config.SuccessUpdateRate
+	r.Reputation = (1-r.config.SuccessUpdateRate)*r.Reputation + r.config.SuccessUpdateRate
 }
 
 // Failure updates the reputation after a failed interaction.
 // Moves the score toward 0.0 based on the configured failure update rate.
 func (r *Reputation) Failure() {
-	r.ReputationScore = (1 - r.config.FailureUpdateRate) * r.ReputationScore
+	r.Reputation = (1 - r.config.FailureUpdateRate) * r.Reputation
 }
 
 // Forgive applies time-based drift toward the neutral forgiveness target.
@@ -55,7 +55,7 @@ func (r *Reputation) Forgive(now time.Time) {
 	}
 
 	// Only forgive if score is below the forgiveness target
-	if r.ReputationScore >= r.config.ForgivenessTarget {
+	if r.Reputation >= r.config.ForgivenessTarget {
 		return
 	}
 
@@ -67,6 +67,6 @@ func (r *Reputation) Forgive(now time.Time) {
 	rate := math.Log(2) / r.config.ForgivenessHalfLife.Seconds()
 	recoveryFraction := 1 - math.Exp(-rate*elapsed)
 
-	r.ReputationScore = (1-recoveryFraction)*r.ReputationScore + recoveryFraction*r.config.ForgivenessTarget
+	r.Reputation = (1-recoveryFraction)*r.Reputation + recoveryFraction*r.config.ForgivenessTarget
 	r.LastUpdatedAt = now
 }

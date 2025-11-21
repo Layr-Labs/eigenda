@@ -225,8 +225,8 @@ func (dcm *DisperserClientMultiplexer) chooseDisperser(
 	var bestID uint32
 	bestScore := -1.0
 	for disperserId, disperserReputation := range eligibleDispersers {
-		if disperserReputation.ReputationScore > bestScore {
-			bestScore = disperserReputation.ReputationScore
+		if disperserReputation.Reputation > bestScore {
+			bestScore = disperserReputation.Reputation
 			bestID = disperserId
 		}
 	}
