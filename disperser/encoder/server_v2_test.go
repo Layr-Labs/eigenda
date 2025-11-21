@@ -129,29 +129,18 @@ func TestEncodeBlob(t *testing.T) {
 	}
 
 	expectedUploadCalls := 1
-	expectedFragmentedUploadObjectCalls := 0
 	assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
-	assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 	resp, err := server.EncodeBlob(ctx, req)
 	if !assert.NoError(t, err, "EncodeBlob failed") {
 		t.FailNow()
 	}
-	expectedUploadCalls++
-	expectedFragmentedUploadObjectCalls++
+	expectedUploadCalls += 2
 	assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
-	assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 
 	// Verify encoding results
 	t.Run("Verify Encoding Results", func(t *testing.T) {
 		assert.NotNil(t, resp, "Response should not be nil")
-		assert.Equal(t, uint32(262148), resp.GetFragmentInfo().GetTotalChunkSizeBytes(), "Unexpected total chunk size")
-		assert.Equal(t, uint32(512*1024), resp.GetFragmentInfo().GetFragmentSizeBytes(), "Unexpected fragment size")
 	})
-
-	expectedFragmentInfo := &encoding.FragmentInfo{
-		TotalChunkSizeBytes: resp.GetFragmentInfo().GetTotalChunkSizeBytes(),
-		FragmentSizeBytes:   resp.GetFragmentInfo().GetFragmentSizeBytes(),
-	}
 
 	// Verify chunk store data
 	t.Run("Verify Chunk Store Data", func(t *testing.T) {
@@ -164,12 +153,11 @@ func TestEncodeBlob(t *testing.T) {
 		assert.Len(t, proofs, int(numChunks), "Unexpected number of proofs")
 
 		// Check coefficients
-		coefExist, fetchedFragmentInfo := c.chunkStoreWriter.CoefficientsExists(ctx, blobKey)
+		coefExist := c.chunkStoreWriter.CoefficientsExists(ctx, blobKey)
 		assert.True(t, coefExist, "Coefficients should exist")
-		assert.Equal(t, expectedFragmentInfo, fetchedFragmentInfo, "Unexpected fragment info")
 
 		elementCount, binarycoefficients, err :=
-			c.chunkStoreReader.GetBinaryChunkCoefficients(ctx, blobKey, expectedFragmentInfo)
+			c.chunkStoreReader.GetBinaryChunkCoefficients(ctx, blobKey)
 		assert.NoError(t, err, "Failed to get chunk coefficients")
 		coefficients := rs.DeserializeSplitFrameCoeffs(elementCount, binarycoefficients)
 		assert.Len(t, coefficients, int(numChunks), "Unexpected number of coefficients")
@@ -177,20 +165,9 @@ func TestEncodeBlob(t *testing.T) {
 
 	t.Run("Verify Re-encoding is prevented", func(t *testing.T) {
 		assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
-		assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 		// Create and execute encoding request again
-		resp, err := server.EncodeBlob(ctx, req)
-		assert.NoError(t, err)
-
-		if !assert.NotNil(t, resp, "Response should not be nil") {
-			t.FailNow() // Stop the test here to prevent nil pointer panic
-			return
-		}
-
-		assert.Equal(t, uint32(262148), resp.GetFragmentInfo().GetTotalChunkSizeBytes(), "Unexpected total chunk size")
-		assert.Equal(t, uint32(512*1024), resp.GetFragmentInfo().GetFragmentSizeBytes(), "Unexpected fragment size")
-		assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
-		assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
+		_, err := server.EncodeBlob(ctx, req)
+		require.Error(t, err)
 	})
 }
 
@@ -223,8 +200,8 @@ func createTestComponents(t *testing.T) *testComponents {
 	s3Client := s3common.NewMockS3Client()
 	dynamoDBClient := &mock.MockDynamoDBClient{}
 	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)
-	chunkStoreWriter := chunkstore.NewChunkWriter(logger, s3Client, s3BucketName, 512*1024)
-	chunkStoreReader := chunkstore.NewChunkReader(logger, s3Client, s3BucketName)
+	chunkStoreWriter := chunkstore.NewChunkWriter(s3Client, s3BucketName)
+	chunkStoreReader := chunkstore.NewChunkReader(s3Client, s3BucketName)
 	encoderServer := encoder.NewEncoderServerV2(encoder.ServerConfig{
 		MaxConcurrentRequestsDangerous: 10,
 		RequestQueueSize:               5,

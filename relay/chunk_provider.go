@@ -10,7 +10,6 @@ import (
 	cachecommon "github.com/Layr-Labs/eigenda/common/cache"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -89,7 +88,7 @@ func (s *chunkProvider) computeFramesCacheWeight(_ blobKeyWithMetadata, frames *
 }
 
 // GetFrames retrieves the frames for a blob.
-func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameMap, error) {
+func (s *chunkProvider) GetFrames(ctx context.Context, mMap map[v2.BlobKey]*blobMetadata) (frameMap, error) {
 
 	if len(mMap) == 0 {
 		return nil, fmt.Errorf("no metadata provided")
@@ -161,15 +160,10 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 		proofs, proofsErr = s.chunkReader.GetBinaryChunkProofs(ctx, key.blobKey)
 	}()
 
-	fragmentInfo := &encoding.FragmentInfo{
-		TotalChunkSizeBytes: key.metadata.totalChunkSizeBytes,
-		FragmentSizeBytes:   key.metadata.fragmentSizeBytes,
-	}
-
 	ctx, cancel := context.WithTimeout(s.ctx, s.coefficientFetchTimeout)
 	defer cancel()
 
-	elementCount, coefficients, err := s.chunkReader.GetBinaryChunkCoefficients(ctx, key.blobKey, fragmentInfo)
+	elementCount, coefficients, err := s.chunkReader.GetBinaryChunkCoefficients(ctx, key.blobKey)
 	if err != nil {
 		return nil, err
 	}

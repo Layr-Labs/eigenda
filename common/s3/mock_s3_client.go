@@ -17,26 +17,24 @@ func NewMockS3Client() *MockS3Client {
 	return &MockS3Client{
 		bucket: make(map[string][]byte),
 		Called: map[string]int{
-			"DownloadObject":           0,
-			"HeadObject":               0,
-			"UploadObject":             0,
-			"DeleteObject":             0,
-			"ListObjects":              0,
-			"CreateBucket":             0,
-			"FragmentedUploadObject":   0,
-			"FragmentedDownloadObject": 0,
-			"DownloadPartialObject":    0,
+			"DownloadObject":        0,
+			"HeadObject":            0,
+			"UploadObject":          0,
+			"DeleteObject":          0,
+			"ListObjects":           0,
+			"CreateBucket":          0,
+			"DownloadPartialObject": 0,
 		},
 	}
 }
 
-func (s *MockS3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
+func (s *MockS3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, bool, error) {
 	s.Called["DownloadObject"]++
 	data, ok := s.bucket[key]
 	if !ok {
-		return []byte{}, ErrObjectNotFound
+		return []byte{}, false, nil
 	}
-	return data, nil
+	return data, true, nil
 }
 
 func (s *MockS3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
@@ -82,75 +80,20 @@ func (s *MockS3Client) CreateBucket(ctx context.Context, bucket string) error {
 	return nil
 }
 
-func (s *MockS3Client) FragmentedUploadObject(
-	ctx context.Context,
-	bucket string,
-	key string,
-	data []byte,
-	fragmentSize int) error {
-	s.Called["FragmentedUploadObject"]++
-	fragments, err := BreakIntoFragments(key, data, fragmentSize)
-	if err != nil {
-		return err
-	}
-	for _, fragment := range fragments {
-		s.bucket[fragment.FragmentKey] = fragment.Data
-	}
-	return nil
-}
-
-func (s *MockS3Client) FragmentedDownloadObject(
-	ctx context.Context,
-	bucket string,
-	key string,
-	fileSize int,
-	fragmentSize int) ([]byte, error) {
-	s.Called["FragmentedDownloadObject"]++
-	if fileSize <= 0 {
-		return nil, errors.New("fileSize must be greater than 0")
-	}
-	if fragmentSize <= 0 {
-		return nil, errors.New("fragmentSize must be greater than 0")
-	}
-
-	count := 0
-	if fileSize < fragmentSize {
-		count = 1
-	} else if fileSize%fragmentSize == 0 {
-		count = fileSize / fragmentSize
-	} else {
-		count = fileSize/fragmentSize + 1
-	}
-	fragmentKeys, err := GetFragmentKeys(key, count)
-	if err != nil {
-		return nil, err
-	}
-
-	data := make([]byte, 0, fileSize)
-	for _, fragmentKey := range fragmentKeys {
-		fragmentData, ok := s.bucket[fragmentKey]
-		if !ok {
-			return nil, ErrObjectNotFound
-		}
-		data = append(data, fragmentData...)
-	}
-	return data, nil
-}
-
 func (s *MockS3Client) DownloadPartialObject(
 	ctx context.Context,
 	bucket string,
 	key string,
 	startIndex int64,
 	endIndex int64,
-) ([]byte, error) {
+) ([]byte, bool, error) {
 	s.Called["DownloadPartialObject"]++
 	data, ok := s.bucket[key]
 	if !ok {
-		return []byte{}, ErrObjectNotFound
+		return []byte{}, false, nil
 	}
 	if startIndex < 0 || endIndex > int64(len(data)) || startIndex >= endIndex {
-		return []byte{}, errors.New("invalid startIndex or endIndex")
+		return []byte{}, false, errors.New("invalid startIndex or endIndex")
 	}
-	return data[startIndex:endIndex], nil
+	return data[startIndex:endIndex], true, nil
 }
