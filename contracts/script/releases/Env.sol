@@ -10,7 +10,9 @@ import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 /// Core contracts from eigenlayer-middleware
-import {IPauserRegistry} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
+import {
+    IPauserRegistry
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {BLSApkRegistry} from "lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
 import {IndexRegistry} from "lib/eigenlayer-middleware/src/IndexRegistry.sol";
 import {StakeRegistry} from "lib/eigenlayer-middleware/src/StakeRegistry.sol";
@@ -56,9 +58,7 @@ library Env {
     DeployedImpl internal constant impl = DeployedImpl.A;
     DeployedInstance internal constant instance = DeployedInstance.A;
 
-    /**
-     * env
-     */
+    /// env
     function env() internal view returns (string memory) {
         return _string("ZEUS_ENV");
     }
@@ -95,232 +95,160 @@ library Env {
         return TimelockController(payable(_envAddress("timelockController")));
     }
 
-    /**
-     * Core EigenDA Contracts
-     */
+    /// Core EigenDA Contracts
 
     /// Directory
-    function directory(
-        DeployedProxy
-    ) internal view returns (EigenDADirectory) {
+    function directory(DeployedProxy) internal view returns (EigenDADirectory) {
         return EigenDADirectory(_deployedProxy(type(EigenDADirectory).name));
     }
 
-    function directory(
-        DeployedImpl
-    ) internal view returns (EigenDADirectory) {
+    function directory(DeployedImpl) internal view returns (EigenDADirectory) {
         return EigenDADirectory(_deployedImpl(type(EigenDADirectory).name));
     }
 
     /// Service Manager
-    function serviceManager(
-        DeployedProxy
-    ) internal view returns (EigenDAServiceManager) {
+    function serviceManager(DeployedProxy) internal view returns (EigenDAServiceManager) {
         return EigenDAServiceManager(_deployedProxy(type(EigenDAServiceManager).name));
     }
 
-    function serviceManager(
-        DeployedImpl
-    ) internal view returns (EigenDAServiceManager) {
+    function serviceManager(DeployedImpl) internal view returns (EigenDAServiceManager) {
         return EigenDAServiceManager(_deployedImpl(type(EigenDAServiceManager).name));
     }
 
     /// Registry Coordinator
-    function registryCoordinator(
-        DeployedProxy
-    ) internal view returns (EigenDARegistryCoordinator) {
+    function registryCoordinator(DeployedProxy) internal view returns (EigenDARegistryCoordinator) {
         return EigenDARegistryCoordinator(_deployedProxy(type(EigenDARegistryCoordinator).name));
     }
 
-    function registryCoordinator(
-        DeployedImpl
-    ) internal view returns (EigenDARegistryCoordinator) {
+    function registryCoordinator(DeployedImpl) internal view returns (EigenDARegistryCoordinator) {
         return EigenDARegistryCoordinator(_deployedImpl(type(EigenDARegistryCoordinator).name));
     }
 
     /// BLS APK Registry
-    function blsApkRegistry(
-        DeployedProxy
-    ) internal view returns (BLSApkRegistry) {
+    function blsApkRegistry(DeployedProxy) internal view returns (BLSApkRegistry) {
         return BLSApkRegistry(_deployedProxy(type(BLSApkRegistry).name));
     }
 
-    function blsApkRegistry(
-        DeployedImpl
-    ) internal view returns (BLSApkRegistry) {
+    function blsApkRegistry(DeployedImpl) internal view returns (BLSApkRegistry) {
         return BLSApkRegistry(_deployedImpl(type(BLSApkRegistry).name));
     }
 
     /// Index Registry
-    function indexRegistry(
-        DeployedProxy
-    ) internal view returns (IndexRegistry) {
+    function indexRegistry(DeployedProxy) internal view returns (IndexRegistry) {
         return IndexRegistry(_deployedProxy(type(IndexRegistry).name));
     }
 
-    function indexRegistry(
-        DeployedImpl
-    ) internal view returns (IndexRegistry) {
+    function indexRegistry(DeployedImpl) internal view returns (IndexRegistry) {
         return IndexRegistry(_deployedImpl(type(IndexRegistry).name));
     }
 
     /// Stake Registry
-    function stakeRegistry(
-        DeployedProxy
-    ) internal view returns (StakeRegistry) {
+    function stakeRegistry(DeployedProxy) internal view returns (StakeRegistry) {
         return StakeRegistry(_deployedProxy(type(StakeRegistry).name));
     }
 
-    function stakeRegistry(
-        DeployedImpl
-    ) internal view returns (StakeRegistry) {
+    function stakeRegistry(DeployedImpl) internal view returns (StakeRegistry) {
         return StakeRegistry(_deployedImpl(type(StakeRegistry).name));
     }
 
     /// Socket Registry
-    function socketRegistry(
-        DeployedProxy
-    ) internal view returns (SocketRegistry) {
+    function socketRegistry(DeployedProxy) internal view returns (SocketRegistry) {
         return SocketRegistry(_deployedProxy(type(SocketRegistry).name));
     }
 
-    function socketRegistry(
-        DeployedImpl
-    ) internal view returns (SocketRegistry) {
+    function socketRegistry(DeployedImpl) internal view returns (SocketRegistry) {
         return SocketRegistry(_deployedImpl(type(SocketRegistry).name));
     }
 
     /// Threshold Registry
-    function thresholdRegistry(
-        DeployedProxy
-    ) internal view returns (EigenDAThresholdRegistry) {
+    function thresholdRegistry(DeployedProxy) internal view returns (EigenDAThresholdRegistry) {
         return EigenDAThresholdRegistry(_deployedProxy(type(EigenDAThresholdRegistry).name));
     }
 
-    function thresholdRegistry(
-        DeployedImpl
-    ) internal view returns (EigenDAThresholdRegistry) {
+    function thresholdRegistry(DeployedImpl) internal view returns (EigenDAThresholdRegistry) {
         return EigenDAThresholdRegistry(_deployedImpl(type(EigenDAThresholdRegistry).name));
     }
 
     /// Relay Registry
-    function relayRegistry(
-        DeployedProxy
-    ) internal view returns (EigenDARelayRegistry) {
+    function relayRegistry(DeployedProxy) internal view returns (EigenDARelayRegistry) {
         return EigenDARelayRegistry(_deployedProxy(type(EigenDARelayRegistry).name));
     }
 
-    function relayRegistry(
-        DeployedImpl
-    ) internal view returns (EigenDARelayRegistry) {
+    function relayRegistry(DeployedImpl) internal view returns (EigenDARelayRegistry) {
         return EigenDARelayRegistry(_deployedImpl(type(EigenDARelayRegistry).name));
     }
 
     /// Disperser Registry
-    function disperserRegistry(
-        DeployedProxy
-    ) internal view returns (EigenDADisperserRegistry) {
+    function disperserRegistry(DeployedProxy) internal view returns (EigenDADisperserRegistry) {
         return EigenDADisperserRegistry(_deployedProxy(type(EigenDADisperserRegistry).name));
     }
 
-    function disperserRegistry(
-        DeployedImpl
-    ) internal view returns (EigenDADisperserRegistry) {
+    function disperserRegistry(DeployedImpl) internal view returns (EigenDADisperserRegistry) {
         return EigenDADisperserRegistry(_deployedImpl(type(EigenDADisperserRegistry).name));
     }
 
     /// Payment Vault
-    function paymentVault(
-        DeployedProxy
-    ) internal view returns (PaymentVault) {
+    function paymentVault(DeployedProxy) internal view returns (PaymentVault) {
         return PaymentVault(_deployedProxy(type(PaymentVault).name));
     }
 
-    function paymentVault(
-        DeployedImpl
-    ) internal view returns (PaymentVault) {
+    function paymentVault(DeployedImpl) internal view returns (PaymentVault) {
         return PaymentVault(_deployedImpl(type(PaymentVault).name));
     }
 
     /// Access Control
-    function accessControl(
-        DeployedImpl
-    ) internal view returns (EigenDAAccessControl) {
+    function accessControl(DeployedImpl) internal view returns (EigenDAAccessControl) {
         return EigenDAAccessControl(_deployedImpl(type(EigenDAAccessControl).name));
     }
 
     /// Operator State Retriever
-    function operatorStateRetriever(
-        DeployedImpl
-    ) internal view returns (OperatorStateRetriever) {
+    function operatorStateRetriever(DeployedImpl) internal view returns (OperatorStateRetriever) {
         return OperatorStateRetriever(_deployedImpl(type(OperatorStateRetriever).name));
     }
 
     /// Pauser Registry
-    function pauserRegistry(
-        DeployedImpl
-    ) internal view returns (IPauserRegistry) {
+    function pauserRegistry(DeployedImpl) internal view returns (IPauserRegistry) {
         return IPauserRegistry(_deployedImpl("PauserRegistry"));
     }
 
-    /**
-     * Periphery Contracts
-     */
+    /// Periphery Contracts
 
     /// Ejection Manager
-    function ejectionManager(
-        DeployedProxy
-    ) internal view returns (EigenDAEjectionManager) {
+    function ejectionManager(DeployedProxy) internal view returns (EigenDAEjectionManager) {
         return EigenDAEjectionManager(_deployedProxy(type(EigenDAEjectionManager).name));
     }
 
-    function ejectionManager(
-        DeployedImpl
-    ) internal view returns (EigenDAEjectionManager) {
+    function ejectionManager(DeployedImpl) internal view returns (EigenDAEjectionManager) {
         return EigenDAEjectionManager(_deployedImpl(type(EigenDAEjectionManager).name));
     }
 
-    /**
-     * Certificate Verification Contracts
-     */
+    /// Certificate Verification Contracts
 
     /// Certificate Verifier
-    function certVerifier(
-        DeployedImpl
-    ) internal view returns (EigenDACertVerifier) {
+    function certVerifier(DeployedImpl) internal view returns (EigenDACertVerifier) {
         return EigenDACertVerifier(_deployedImpl(type(EigenDACertVerifier).name));
     }
 
     /// Certificate Verifier Router
-    function certVerifierRouter(
-        DeployedProxy
-    ) internal view returns (EigenDACertVerifierRouter) {
+    function certVerifierRouter(DeployedProxy) internal view returns (EigenDACertVerifierRouter) {
         return EigenDACertVerifierRouter(_deployedProxy(type(EigenDACertVerifierRouter).name));
     }
 
-    function certVerifierRouter(
-        DeployedImpl
-    ) internal view returns (EigenDACertVerifierRouter) {
+    function certVerifierRouter(DeployedImpl) internal view returns (EigenDACertVerifierRouter) {
         return EigenDACertVerifierRouter(_deployedImpl(type(EigenDACertVerifierRouter).name));
     }
 
     /// Legacy Certificate Verifiers
-    function certVerifierLegacyV1(
-        DeployedImpl
-    ) internal view returns (address) {
+    function certVerifierLegacyV1(DeployedImpl) internal view returns (address) {
         return _deployedImpl("EigenDACertVerifierLegacyV1");
     }
 
-    function certVerifierLegacyV2(
-        DeployedImpl
-    ) internal view returns (address) {
+    function certVerifierLegacyV2(DeployedImpl) internal view returns (address) {
         return _deployedImpl("EigenDACertVerifierLegacyV2");
     }
 
-    /**
-     * Helpers
-     */
-    
+    /// Helpers
+
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
 
@@ -343,7 +271,7 @@ library Env {
     function _deployedInstance(string memory name, uint256 idx) private view returns (address) {
         string memory json = _getDeploymentState();
         if (bytes(json).length == 0) return address(0);
-        
+
         string memory key = string.concat(".instances.", name, "[", vm.toString(idx), "]");
         try vm.parseJsonAddress(json, key) returns (address addr) {
             return addr;
@@ -355,7 +283,7 @@ library Env {
     function _deployedInstanceCount(string memory name) private view returns (uint256) {
         string memory json = _getDeploymentState();
         if (bytes(json).length == 0) return 0;
-        
+
         // Try to parse the array and get its length
         // This is a simplified approach - you may need to adjust based on your JSON structure
         return 0;
@@ -364,7 +292,7 @@ library Env {
     function _deployedProxy(string memory name) private view returns (address) {
         string memory json = _getDeploymentState();
         if (bytes(json).length == 0) return address(0);
-        
+
         string memory key = string.concat(".proxies.", name);
         try vm.parseJsonAddress(json, key) returns (address addr) {
             return addr;
@@ -376,7 +304,7 @@ library Env {
     function _deployedBeacon(string memory name) private view returns (address) {
         string memory json = _getDeploymentState();
         if (bytes(json).length == 0) return address(0);
-        
+
         string memory key = string.concat(".beacons.", name);
         try vm.parseJsonAddress(json, key) returns (address addr) {
             return addr;
@@ -388,7 +316,7 @@ library Env {
     function _deployedImpl(string memory name) private view returns (address) {
         string memory json = _getDeploymentState();
         if (bytes(json).length == 0) return address(0);
-        
+
         string memory key = string.concat(".implementations.", name);
         try vm.parseJsonAddress(json, key) returns (address addr) {
             return addr;
@@ -453,21 +381,15 @@ library Env {
         }
     }
 
-    /**
-     * Test Helpers
-     */
+    /// Test Helpers
 
     /// @dev Query and return `proxyAdmin.getProxyImplementation(proxy)`
-    function _getProxyImpl(
-        address _proxy
-    ) internal view returns (address) {
+    function _getProxyImpl(address _proxy) internal view returns (address) {
         return ProxyAdmin(Env.proxyAdmin()).getProxyImplementation(ITransparentUpgradeableProxy(_proxy));
     }
 
     /// @dev Query and return `proxyAdmin.getProxyAdmin(proxy)`
-    function _getProxyAdmin(
-        address _proxy
-    ) internal view returns (address) {
+    function _getProxyAdmin(address _proxy) internal view returns (address) {
         return ProxyAdmin(Env.proxyAdmin()).getProxyAdmin(ITransparentUpgradeableProxy(_proxy));
     }
 
