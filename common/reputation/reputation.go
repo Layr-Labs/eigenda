@@ -13,23 +13,21 @@ import (
 // The update rates control how quickly the score adapts. A higher rate means recent outcomes
 // matter more. A lower rate means the score is more stable and takes longer to change.
 //
-// Forgiveness increases low scores toward a neutral point over time, even without new
-// interactions. This prevents entities from being permanently penalized based on old
-// failures when we lack recent information.
+// Forgiveness increases low scores toward a neutral point over time.
 //
 // This structure is NOT goroutine safe.
 type Reputation struct {
-	config        ReputationConfig
-	score         float64
-	lastUpdatedAt time.Time
+	config                  ReputationConfig
+	score                   float64
+	previousForgivenessTime time.Time
 }
 
 // Creates a new reputation tracker starting at the neutral forgiveness target.
 func NewReputation(config ReputationConfig, now time.Time) *Reputation {
 	return &Reputation{
-		config:        config,
-		score:         config.ForgivenessTarget,
-		lastUpdatedAt: now,
+		config:                  config,
+		score:                   config.ForgivenessTarget,
+		previousForgivenessTime: now,
 	}
 }
 
@@ -52,12 +50,9 @@ func (r *Reputation) Score() float64 {
 
 // Forgive applies time-based drift toward the neutral forgiveness target.
 // Only increases scores that are below the target - scores above the target are unchanged.
-// This should be called on all reputations before making selection decisions,
-// so that entities which haven't been interacted with recently have their
-// low scores recover rather than remaining at their old values.
 func (r *Reputation) Forgive(now time.Time) {
-	if r.lastUpdatedAt.IsZero() {
-		r.lastUpdatedAt = now
+	if r.previousForgivenessTime.IsZero() {
+		r.previousForgivenessTime = now
 		return
 	}
 
@@ -66,7 +61,7 @@ func (r *Reputation) Forgive(now time.Time) {
 		return
 	}
 
-	elapsed := now.Sub(r.lastUpdatedAt).Seconds()
+	elapsed := now.Sub(r.previousForgivenessTime).Seconds()
 	if elapsed <= 0 {
 		return
 	}
@@ -75,5 +70,5 @@ func (r *Reputation) Forgive(now time.Time) {
 	forgivenessFraction := 1 - math.Exp(-forgivenessRate*elapsed)
 
 	r.score = (1-forgivenessFraction)*r.score + forgivenessFraction*r.config.ForgivenessTarget
-	r.lastUpdatedAt = now
+	r.previousForgivenessTime = now
 }

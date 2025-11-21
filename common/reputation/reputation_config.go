@@ -16,7 +16,7 @@ type ReputationConfig struct {
 	FailureUpdateRate float64
 	// How long it takes for a score to drift halfway back to the neutral point.
 	ForgivenessHalfLife time.Duration
-	// The score that a poor reputations score drifts up toward over time when there are no interactions.
+	// The score that a poor reputation score drifts up toward over time.
 	ForgivenessTarget float64
 }
 
