@@ -110,7 +110,7 @@ library ConfigRegistryLib {
     /// @dev For the first checkpoint, activationTS must be >= block.timestamp
     /// @dev Subsequent checkpoints must have strictly increasing activation timestamps
     function addConfigTimeStamp(bytes32 nameDigest, uint256 activationTS, bytes memory value) internal {
-        T.TimeStampCfg storage cfg = S.layout().timestampCfg;
+        T.TimestampConfig storage cfg = S.layout().timestampCfg;
         if (cfg.values[nameDigest].length > 0) {
             uint256 lastActivationTS = cfg.values[nameDigest][cfg.values[nameDigest].length - 1].activationTime;
             if (activationTS <= lastActivationTS) {

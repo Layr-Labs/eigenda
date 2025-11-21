@@ -30,7 +30,7 @@ library ConfigRegistryTypes {
     /// @param values Mapping from name digest to array of TimeStampCheckpoint structs. This entire structure is meant to be able to be queried.
     /// @param nameSet The NameSet struct to manage names associated with the configuration entries
     /// @dev See docs for the structs for more information
-    struct TimeStampCfg {
+    struct TimestampConfig {
         mapping(bytes32 => TimeStampCheckpoint[]) values;
         NameSet nameSet;
     }
