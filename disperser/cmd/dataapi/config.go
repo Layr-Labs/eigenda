@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -39,6 +40,7 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
+	FeedDelay          time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -85,6 +87,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		DisperserHostname:  ctx.GlobalString(flags.DisperserHostnameFlag.Name),
 		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
+		FeedDelay:          ctx.GlobalDuration(flags.FeedDelayFlag.Name),
 		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
 	}
 	return config, nil

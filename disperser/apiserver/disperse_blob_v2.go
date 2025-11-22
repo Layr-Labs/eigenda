@@ -314,9 +314,12 @@ func (s *DispersalServerV2) validateDispersalRequest(
 func (s *DispersalServerV2) validateDispersalTimestamp(blobHeader *corev2.BlobHeader) error {
 	dispersalTime := time.Unix(0, blobHeader.PaymentMetadata.Timestamp)
 	dispersalAge := s.getNow().Sub(dispersalTime)
+	driftSeconds := dispersalAge.Seconds()
+	accountID := blobHeader.PaymentMetadata.AccountID.Hex()
 
 	if dispersalAge > s.MaxDispersalAge {
 		s.metrics.reportDispersalTimestampRejected("stale")
+		s.metrics.reportDispersalTimestampDrift(driftSeconds, "rejected", accountID)
 		return fmt.Errorf("potential clock drift detected: dispersal timestamp is too old. "+
 			"age=%v, max_age=%v, timestamp_unix_nanos=%d, timestamp_utc=%s",
 			dispersalAge,
@@ -329,6 +332,7 @@ func (s *DispersalServerV2) validateDispersalTimestamp(blobHeader *corev2.BlobHe
 	// If dispersalAge is negative, the timestamp is in the future
 	if dispersalAge < -s.MaxFutureDispersalTime {
 		s.metrics.reportDispersalTimestampRejected("future")
+		s.metrics.reportDispersalTimestampDrift(driftSeconds, "rejected", accountID)
 		return fmt.Errorf("potential clock drift detected: dispersal timestamp is too far in the future. "+
 			"future_offset=%v, max_future_offset=%v, timestamp_unix_nanos=%d, timestamp_utc=%s",
 			-dispersalAge,
@@ -336,6 +340,9 @@ func (s *DispersalServerV2) validateDispersalTimestamp(blobHeader *corev2.BlobHe
 			blobHeader.PaymentMetadata.Timestamp,
 			dispersalTime.UTC().Format(time.RFC3339))
 	}
+
+	// Record accepted timestamp drift
+	s.metrics.reportDispersalTimestampDrift(driftSeconds, "accepted", accountID)
 
 	return nil
 }

@@ -1,5 +1,7 @@
 package dataapi
 
+import "time"
+
 type Config struct {
 	SocketAddr         string
 	ServerMode         string
@@ -7,6 +9,7 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
+	FeedDelay          time.Duration
 }
 
 type DataApiVersion uint

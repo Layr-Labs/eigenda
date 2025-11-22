@@ -38,6 +38,7 @@ func ParseFeedParams(c *gin.Context, metrics *dataapi.Metrics, handlerName strin
 	}
 
 	// Parse before parameter
+	// Note: feedDelay is handled in the caller (FetchBatchFeed) by capping beforeTime
 	params.beforeTime = now
 	if c.Query("before") != "" {
 		beforeTime, err := parseQueryParamTime(c.Query("before"))
@@ -118,6 +119,11 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 	if err != nil {
 		invalidParamsErrorResponse(c, err)
 		return
+	}
+
+	maxBeforeTime := handlerStart.Add(-s.feedDelay)
+	if maxBeforeTime.Before(params.beforeTime) {
+		params.beforeTime = maxBeforeTime
 	}
 
 	var attestations []*corev2.Attestation

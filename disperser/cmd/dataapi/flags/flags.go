@@ -1,6 +1,8 @@
 package flags
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -153,6 +155,13 @@ var (
 		Value:    1,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DATA_API_VERSION"),
 	}
+	FeedDelayFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "feed-delay"),
+		Usage:    "Minimum age (duration) a blob/batch must have before appearing in feed endpoints. This prevents replay attacks by delaying public visibility of dispersal requests.",
+		Required: false,
+		Value:    10 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FEED_DELAY"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -180,6 +189,7 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	FeedDelayFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
