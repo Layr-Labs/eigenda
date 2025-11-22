@@ -332,6 +332,20 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_ID"),
 	}
+	SigningRateRetentionPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-retention-period"),
+		Usage:    "The amount of time to retain signing rate data",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_RETENTION_PERIOD"),
+		Value:    14 * 24 * time.Hour,
+	}
+	SigningRateBucketSpanFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-bucket-span"),
+		Usage:    "The duration of each signing rate bucket. Smaller buckets yield more granular data, at the cost of memory and storage overhead",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_BUCKET_SPAN"),
+		Value:    10 * time.Minute,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -385,6 +399,8 @@ var optionalFlags = []cli.Flag{
 	PaymentVaultUpdateIntervalFlag,
 	EnablePerAccountPaymentMetricsFlag,
 	DetailedValidatorMetricsFlag,
+	SigningRateRetentionPeriodFlag,
+	SigningRateBucketSpanFlag,
 }
 
 var Flags []cli.Flag

@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -901,8 +902,8 @@ func startController(
 	}
 	dispatcherBlobSet := controller.NewBlobSet()
 
-	// Create dispatcher
-	dispatcher, err := controller.NewDispatcher(
+	// Create controller
+	dispatcher, err := controller.NewController(
 		dispatcherConfig,
 		time.Now,
 		metadataStore,
@@ -916,6 +917,7 @@ func startController(
 		beforeDispatch,
 		dispatcherBlobSet,
 		controllerLivenessChan,
+		signingrate.NewNoOpSigningRateTracker(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dispatcher: %w", err)
