@@ -1,8 +1,6 @@
 package flags
 
 import (
-	"time"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -159,7 +157,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "feed-delay"),
 		Usage:    "Minimum age (duration) a blob/batch must have before appearing in feed endpoints. This prevents replay attacks by delaying public visibility of dispersal requests.",
 		Required: false,
-		Value:    10 * time.Second,
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FEED_DELAY"),
 	}
 )
