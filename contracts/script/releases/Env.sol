@@ -189,11 +189,11 @@ library Env {
 
     /// Payment Vault
     function paymentVault(DeployedProxy) internal view returns (PaymentVault) {
-        return PaymentVault(_deployedProxy(type(PaymentVault).name));
+        return PaymentVault(payable(_deployedProxy(type(PaymentVault).name)));
     }
 
     function paymentVault(DeployedImpl) internal view returns (PaymentVault) {
-        return PaymentVault(_deployedImpl(type(PaymentVault).name));
+        return PaymentVault(payable(_deployedImpl(type(PaymentVault).name)));
     }
 
     /// Access Control
@@ -280,7 +280,13 @@ library Env {
         }
     }
 
-    function _deployedInstanceCount(string memory name) private view returns (uint256) {
+    function _deployedInstanceCount(
+        string memory /*name*/
+    )
+        private
+        view
+        returns (uint256)
+    {
         string memory json = _getDeploymentState();
         if (bytes(json).length == 0) return 0;
 
@@ -383,14 +389,33 @@ library Env {
 
     /// Test Helpers
 
-    /// @dev Query and return `proxyAdmin.getProxyImplementation(proxy)`
+    /// @dev Storage slot with the address of the current implementation.
+    /// This is the keccak-256 hash of "eip1967.proxy.implementation" subtracted by 1, and is
+    /// validated in the constructor.
+    bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+    /// @dev Storage slot with the admin of the contract.
+    /// This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
+    /// validated in the constructor.
+    bytes32 internal constant _ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    /// @dev The storage slot of the UpgradeableBeacon contract which defines the implementation for this proxy.
+    /// This is bytes32(uint256(keccak256('eip1967.proxy.beacon')) - 1)) and is validated in the constructor.
+    bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+
+    /// @dev Query and return the implementation address of the proxy.
     function _getProxyImpl(address _proxy) internal view returns (address) {
-        return ProxyAdmin(Env.proxyAdmin()).getProxyImplementation(ITransparentUpgradeableProxy(_proxy));
+        return address(uint160(uint256(vm.load(_proxy, _IMPLEMENTATION_SLOT))));
     }
 
-    /// @dev Query and return `proxyAdmin.getProxyAdmin(proxy)`
+    /// @dev Query and return the admin address of the proxy.
     function _getProxyAdmin(address _proxy) internal view returns (address) {
-        return ProxyAdmin(Env.proxyAdmin()).getProxyAdmin(ITransparentUpgradeableProxy(_proxy));
+        return address(uint160(uint256(vm.load(_proxy, _ADMIN_SLOT))));
+    }
+
+    /// @dev Query and return the beacon address of the proxy.
+    function _getBeacon(address _proxy) internal view returns (address) {
+        return address(uint160(uint256(vm.load(_proxy, _BEACON_SLOT))));
     }
 
     function _strEq(string memory a, string memory b) internal pure returns (bool) {
