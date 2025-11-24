@@ -51,14 +51,14 @@ interface IEigenDAConfigRegistry {
     /// @param name The name of the configuration entry.
     /// @param abn The activation block number for the configuration entry.
     /// @param value The variable length byte configuration value.
-    /// @dev The abn must be strictly greater than the last abn for the same name.
+    /// @dev The abn must be strictly greater than the last abn for the same name and must be greater than the current block number.
     function addConfigBlockNumber(string memory name, uint256 abn, bytes memory value) external;
 
     /// @notice Adds a variable length byte configuration value to the configuration registry using timestamp as activation key.
     /// @param name The name of the configuration entry.
     /// @param activationTS The activation timestamp for the configuration entry.
     /// @param value The variable length byte configuration value.
-    /// @dev The activationTS must be strictly greater than the last activationTS for the same name.
+    /// @dev The activationTS must be strictly greater than the last activationTS for the same name and greater than the current block timestamp.
     function addConfigTimeStamp(string memory name, uint256 activationTS, bytes memory value) external;
 
     /// @notice Gets the number of checkpoints for a block number configuration entry.
