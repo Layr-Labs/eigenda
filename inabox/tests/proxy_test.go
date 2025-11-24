@@ -174,6 +174,43 @@ func TestOptimismClientWithKeccak256Commitment(t *testing.T) {
 	require.NotNil(t, restServer)
 }
 
+func TestOptimismClientWithGenericCommitment(t *testing.T) {
+	t.Parallel()
+
+	// Create fresh test harness from global infrastructure
+	testHarness, err := integration.NewTestHarnessWithSetup(globalInfra)
+	require.NoError(t, err)
+	defer testHarness.Cleanup()
+
+	ctx := context.Background()
+
+	// Create proxy config with only op-generic API enabled
+	proxyConfig, err := createProxyConfig(
+		&enabled_apis.RestApisEnabled{
+			OpGenericCommitment: true,  // op-generic enabled
+			StandardCommitment:  false, // standard disabled
+			OpKeccakCommitment:  false, // keccak disabled
+		},
+		true,
+	)
+	require.NoError(t, err)
+
+	metrics := proxy_metrics.NewEmulatedMetricer()
+
+	// Start proxy REST server
+	restServer, restURL, cleanup, err := startProxyServer(ctx, globalInfra.Logger, proxyConfig, metrics)
+	require.NoError(t, err)
+	defer cleanup()
+
+	t.Logf("Proxy server started at %s", restURL)
+
+	requireOPClientSetGet(t, ctx, restURL, testutils.RandBytes(100), false)
+	requireDispersalRetrievalEigenDA(t, metrics.HTTPServerRequestsTotal, commitments.OptimismGenericCommitmentMode)
+
+	// Verify the server is still running
+	require.NotNil(t, restServer)
+}
+
 // requireStandardClientSetGet ... ensures that std proxy client can disperse and read a blob
 func requireStandardClientSetGet(t *testing.T, ctx context.Context, restEndpoint string, blob []byte) {
 	cfg := &standard_client.Config{
@@ -300,7 +337,6 @@ func createProxyConfig(
 
 	localstack := globalInfra.DisperserHarness.LocalStack
 	awsConfig := localstack.GetAWSClientConfig()
-	// return config.AppConfig{}, fmt.Errorf("aws endpoint: %s", awsConfig.EndpointURL)
 	awsEndpoint := strings.TrimPrefix(awsConfig.EndpointURL, "http://")
 
 	switch {
