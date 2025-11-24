@@ -1,0 +1,151 @@
+{
+  "block": 1687605,
+  "contracts": [
+    {
+      "address": "0x82709Af24146467AC3B55AD4b9cf51323302ade0",
+      "admin": "0x0000000000000000000000000000000000000000",
+      "implementation": "0x0000000000000000000000000000000000000000",
+      "isOwnable": false,
+      "isProxy": false,
+      "name": "PAUSER_REGISTRY",
+      "owner": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "address": "0xcBA24F6576dAEA8d9BAA3308C8408849e8d1dF63",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0x204f05Bc72f84dBeb11750257faf7586ebd33697",
+      "isOwnable": false,
+      "isProxy": true,
+      "name": "INDEX_REGISTRY",
+      "owner": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "address": "0x108e0D939802f060659758851f1B259D9c0170cC",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0xf43D40E50299178ECBfCd955cffFBc1a01E649e0",
+      "isOwnable": false,
+      "isProxy": true,
+      "name": "SOCKET_REGISTRY",
+      "owner": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "address": "0xe175Eae102Dda253c00d921fd49657CdA94AC003",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0xf5cdc3f1Cd861CC8cDeEeeA6eC82BfC960e9d39f",
+      "isOwnable": false,
+      "isProxy": true,
+      "name": "BLS_APK_REGISTRY",
+      "owner": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "address": "0xdC529F6E864AB6213741Cd7d7e93BB7d8a88c9b2",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0x7f1ecE48B2970DC801f6b4bE0127B39E3E04C3f9",
+      "isOwnable": false,
+      "isProxy": true,
+      "name": "STAKE_REGISTRY",
+      "owner": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "address": "0xB5b76D561eeF36CD772890C94C6Bde8b895455e2",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0x857760850d7f64386Bdb62A0ef313779742810Fa",
+      "isOwnable": true,
+      "isProxy": true,
+      "name": "REGISTRY_COORDINATOR",
+      "owner": "0x72447Fea3354F525263F36544A548982e64F230C"
+    },
+    {
+      "address": "0x4Bc2E03A7a14c203031F3A1Edf2b41f83296f55a",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0x2411bb237a40e95c36ba47A91129b689b4C58988",
+      "isOwnable": true,
+      "isProxy": true,
+      "name": "THRESHOLD_REGISTRY",
+      "owner": "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
+    },
+    {
+      "address": "0xA4B7d142Ab1F73763f58364b146e60E108eDa705",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0x69167D25d4Bbd72c61BC40761Fc5D6834fa8F67a",
+      "isOwnable": true,
+      "isProxy": true,
+      "name": "RELAY_REGISTRY",
+      "owner": "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
+    },
+    {
+      "address": "0xBE414375C8053E777BaabaF736d7F9f469136a62",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0xc23e8Fc2113e2dA6B30A0dE16227C6399340031e",
+      "isOwnable": true,
+      "isProxy": true,
+      "name": "DISPERSER_REGISTRY",
+      "owner": "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
+    },
+    {
+      "address": "0x3FF2204A567C15dC3731140B95362ABb4b17d8ED",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0x84063ACb999629e8a5B391b39fc9DF019627FEb4",
+      "isOwnable": true,
+      "isProxy": true,
+      "name": "SERVICE_MANAGER",
+      "owner": "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
+    },
+    {
+      "address": "0xc043730ec3069171961aB995801f230d70B2bFb2",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0xC179EB2dC024ABEF62D52eF466906bC9D7952bE3",
+      "isOwnable": true,
+      "isProxy": true,
+      "name": "PAYMENT_VAULT",
+      "owner": "0x72447Fea3354F525263F36544A548982e64F230C"
+    },
+    {
+      "address": "0x3e48f73A63b488B88d26677c383DeEE15A9ab55b",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0x860E7B8FcCBB2B1BE350F6A836C6eAF73eb45b96",
+      "isOwnable": true,
+      "isProxy": true,
+      "name": "EJECTION_MANAGER",
+      "owner": "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
+    },
+    {
+      "address": "0xd0f7FFE228e0D1D47f9df5726ad06FEd01bb9A1E",
+      "admin": "0x0000000000000000000000000000000000000000",
+      "implementation": "0x0000000000000000000000000000000000000000",
+      "isOwnable": false,
+      "isProxy": false,
+      "name": "OPERATOR_STATE_RETRIEVER",
+      "owner": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "address": "0xe0F78542A950A8695f43B19Ad1Db654249e12643",
+      "admin": "0x0000000000000000000000000000000000000000",
+      "implementation": "0x0000000000000000000000000000000000000000",
+      "isOwnable": false,
+      "isProxy": false,
+      "name": "CERT_VERIFIER",
+      "owner": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "address": "0x87Fe54C70B8bbf2F18a52c744e8CD6421D730d78",
+      "admin": "0x9186f2E2703b7d70f5DB24eB67693c1231936424",
+      "implementation": "0xC8e12c1Cab33C5d5F4afd311BdC60f2aEe10D6cd",
+      "isOwnable": true,
+      "isProxy": true,
+      "name": "CERT_VERIFIER_ROUTER",
+      "owner": "0x72447Fea3354F525263F36544A548982e64F230C"
+    },
+    {
+      "address": "0x7A0D6553941BFc3864E5EEdEa7B2d9EA6Eb5883E",
+      "admin": "0x0000000000000000000000000000000000000000",
+      "implementation": "0x0000000000000000000000000000000000000000",
+      "isOwnable": false,
+      "isProxy": false,
+      "name": "EIGEN_DA_EJECTION_MANAGER",
+      "owner": "0x0000000000000000000000000000000000000000"
+    }
+  ],
+  "timestamp": 1764000564,
+  "totalContracts": 16
+}
