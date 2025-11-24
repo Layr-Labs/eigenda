@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,14 +17,18 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
+	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
+	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
@@ -53,11 +59,12 @@ func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
 			StandardCommitment:  false, // standard disabled
 			OpKeccakCommitment:  false, // keccak disabled
 		},
+		false,
 	)
 	require.NoError(t, err)
 
 	// Start proxy REST server
-	restServer, restURL, cleanup, err := startProxyServer(ctx, globalInfra.Logger, proxyConfig)
+	restServer, restURL, cleanup, err := startProxyServer(ctx, globalInfra.Logger, proxyConfig, metrics.NewEmulatedMetricer())
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -92,9 +99,125 @@ func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
 	require.NotNil(t, restServer)
 }
 
+// TestProxyClientWriteRead tests that the proxy client can write and read data to the proxy server.
+// This is the "basic" proxy test: "is proxy working?"
+//
+// This test has been migrated from api/proxy/test/e2e/server_rest_test.go to use inabox infrastructure.
+func TestProxyClientWriteRead(t *testing.T) {
+	t.Parallel()
+
+	// Create fresh test harness from global infrastructure
+	testHarness, err := integration.NewTestHarnessWithSetup(globalInfra)
+	require.NoError(t, err)
+	defer testHarness.Cleanup()
+
+	ctx := context.Background()
+
+	// Create proxy config with only op-generic API enabled
+	proxyConfig, err := createProxyConfig(
+		&enabled_apis.RestApisEnabled{
+			OpGenericCommitment: false, // op-generic disabled
+			StandardCommitment:  true,  // only standard enabled
+			OpKeccakCommitment:  false, // keccak disabled
+		},
+		false,
+	)
+	require.NoError(t, err)
+
+	metrics := proxy_metrics.NewEmulatedMetricer()
+
+	// Start proxy REST server
+	restServer, restURL, cleanup, err := startProxyServer(ctx, globalInfra.Logger, proxyConfig, metrics)
+	require.NoError(t, err)
+	defer cleanup()
+
+	t.Logf("Proxy server started at %s", restURL)
+
+	requireStandardClientSetGet(t, ctx, restURL, testutils.RandBytes(100))
+	requireDispersalRetrievalEigenDA(t, metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
+
+	// Verify the server is still running
+	require.NotNil(t, restServer)
+}
+
+func TestOptimismClientWithKeccak256Commitment(t *testing.T) {
+	t.Parallel()
+
+	// Create fresh test harness from global infrastructure
+	testHarness, err := integration.NewTestHarnessWithSetup(globalInfra)
+	require.NoError(t, err)
+	defer testHarness.Cleanup()
+
+	ctx := context.Background()
+
+	// Create proxy config with only op-generic API enabled
+	proxyConfig, err := createProxyConfig(
+		&enabled_apis.RestApisEnabled{
+			OpGenericCommitment: false, // op-generic disabled
+			StandardCommitment:  false, // standard disabled
+			OpKeccakCommitment:  true,  // only keccak enabled
+		},
+		true,
+	)
+	require.NoError(t, err)
+
+	metrics := proxy_metrics.NewEmulatedMetricer()
+
+	// Start proxy REST server
+	restServer, restURL, cleanup, err := startProxyServer(ctx, globalInfra.Logger, proxyConfig, metrics)
+	require.NoError(t, err)
+	defer cleanup()
+
+	requireOPClientSetGet(t, ctx, restURL, testutils.RandBytes(100), true)
+
+	// Verify the server is still running
+	require.NotNil(t, restServer)
+}
+
+// requireStandardClientSetGet ... ensures that std proxy client can disperse and read a blob
+func requireStandardClientSetGet(t *testing.T, ctx context.Context, restEndpoint string, blob []byte) {
+	cfg := &standard_client.Config{
+		URL: restEndpoint,
+	}
+	daClient := standard_client.New(cfg)
+
+	t.Log("Setting input data on proxy server...")
+	blobInfo, err := daClient.SetData(ctx, blob)
+	require.NoError(t, err)
+
+	t.Log("Getting input data from proxy server...")
+	preimage, err := daClient.GetData(ctx, blobInfo)
+	require.NoError(t, err)
+	require.Equal(t, blob, preimage)
+}
+
+// requireDispersalRetrievalEigenDA ... ensure that blob was successfully dispersed/read to/from EigenDA
+func requireDispersalRetrievalEigenDA(t *testing.T, cm *metrics.CountMap, mode commitments.CommitmentMode) {
+	writeCount, err := cm.Get(string(mode), http.MethodPost)
+	require.NoError(t, err)
+	require.True(t, writeCount > 0)
+
+	readCount, err := cm.Get(string(mode), http.MethodGet)
+	require.NoError(t, err)
+	require.True(t, readCount > 0)
+}
+
+// requireOPClientSetGet ... ensures that alt-da client can disperse and read a blob
+func requireOPClientSetGet(t *testing.T, ctx context.Context, restEndpoint string, blob []byte, precompute bool) {
+	daClient := altda.NewDAClient(restEndpoint, false, precompute)
+
+	commit, err := daClient.SetInput(ctx, blob)
+	require.NoError(t, err)
+
+	preimage, err := daClient.GetInput(ctx, commit, 0)
+	require.NoError(t, err)
+	require.Equal(t, blob, preimage)
+}
+
 // createProxyConfig creates a proxy configuration that connects to the inabox disperser
 func createProxyConfig(
 	enabledAPIs *enabled_apis.RestApisEnabled,
+	useKeccak256ModeS3 bool,
 ) (config.AppConfig, error) {
 	payloadClientConfig := clientsv2.PayloadClientConfig{
 		PayloadPolynomialForm: codecs.PolynomialFormEval,
@@ -175,6 +298,30 @@ func createProxyConfig(
 		},
 	}
 
+	localstack := globalInfra.DisperserHarness.LocalStack
+	awsConfig := localstack.GetAWSClientConfig()
+	// return config.AppConfig{}, fmt.Errorf("aws endpoint: %s", awsConfig.EndpointURL)
+	awsEndpoint := strings.TrimPrefix(awsConfig.EndpointURL, "http://")
+
+	switch {
+	case useKeccak256ModeS3:
+		builderConfig.S3Config = s3.Config{
+			Bucket:          globalInfra.DisperserHarness.S3Buckets.BlobStore,
+			Path:            "",
+			Endpoint:        awsEndpoint,
+			EnableTLS:       false,
+			AccessKeySecret: awsConfig.SecretAccessKey,
+			AccessKeyID:     awsConfig.AccessKey,
+			CredentialType:  s3.CredentialTypeStatic,
+		}
+		// case testCfg.UseS3Caching:
+		// 	builderConfig.StoreConfig.CacheTargets = []string{"S3"}
+		// 	builderConfig.S3Config = createS3Config()
+		// case testCfg.UseS3Fallback:
+		// 	builderConfig.StoreConfig.FallbackTargets = []string{"S3"}
+		// 	builderConfig.S3Config = createS3Config()
+	}
+
 	secretConfig := common.SecretConfigV2{
 		SignerPaymentKey: integration.GetDefaultTestPayloadDisperserConfig().PrivateKey,
 		EthRPCURL:        ethRPCURL,
@@ -184,11 +331,14 @@ func createProxyConfig(
 		StoreBuilderConfig: builderConfig,
 		SecretConfig:       secretConfig,
 		EnabledServersConfig: &enabled_apis.EnabledServersConfig{
-			Metric:        false,
+			Metric:        true,
 			ArbCustomDA:   false,
 			RestAPIConfig: *enabledAPIs,
 		},
-		MetricsSvrConfig: proxy_metrics.Config{},
+		MetricsSvrConfig: proxy_metrics.Config{
+			Host: "127.0.0.1",
+			Port: 0, // let OS assign a free port
+		},
 		RestSvrCfg: rest.Config{
 			Host:        "127.0.0.1",
 			Port:        0, // let OS assign a free port
@@ -197,7 +347,6 @@ func createProxyConfig(
 		ArbCustomDASvrCfg: arbitrum_altda.Config{
 			Host: "127.0.0.1",
 			Port: 0, // let OS assign a free port
-
 		},
 	}, nil
 }
@@ -207,12 +356,11 @@ func startProxyServer(
 	ctx context.Context,
 	logger logging.Logger,
 	appConfig config.AppConfig,
+	metrics *proxy_metrics.EmulatedMetricer,
 ) (*rest.Server, string, func(), error) {
 	if err := appConfig.Check(); err != nil {
 		return nil, "", nil, fmt.Errorf("invalid app config: %w", err)
 	}
-
-	metrics := proxy_metrics.NewEmulatedMetricer()
 
 	// Build the eth client for contract interactions
 	ethClient, _, err := common.BuildEthClient(
