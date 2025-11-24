@@ -15,6 +15,7 @@ func validClientConfigV2() common.ClientConfigV2 {
 		DisperserClientCfg: dispersal.DisperserClientConfig{
 			Hostname: "localhost",
 			Port:     "8080",
+			DisperserID: 0,
 		},
 		PayloadDisperserCfg:                dispersal.PayloadDisperserConfig{},
 		RelayPayloadRetrieverCfg:           payloadretrieval.RelayPayloadRetrieverConfig{},

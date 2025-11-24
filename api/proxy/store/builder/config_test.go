@@ -65,6 +65,7 @@ func validCfg() Config {
 				Hostname:          "http://localhost",
 				Port:              "9999",
 				UseSecureGrpcFlag: true,
+				DisperserID:       0,
 			},
 			EigenDACertVerifierOrRouterAddress: "0x0000000000032443134",
 			MaxBlobSizeBytes:                   maxBlobLengthBytes,

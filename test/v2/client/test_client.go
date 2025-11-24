@@ -441,6 +441,7 @@ func NewTestClient(
 						Hostname:          config.DisperserHostname,
 						Port:              fmt.Sprintf("%d", config.DisperserPort),
 						UseSecureGrpcFlag: true,
+						DisperserID:       0,
 					},
 					PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 						PayloadClientConfig:    *payloadClientConfig,

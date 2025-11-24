@@ -332,6 +332,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 				Hostname:          disperserHostname,
 				Port:              disperserPort,
 				UseSecureGrpcFlag: true,
+				DisperserID:       0,
 			},
 			PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 				PayloadClientConfig:    payloadClientConfig,

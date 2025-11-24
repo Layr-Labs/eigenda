@@ -127,6 +127,15 @@ func (pd *PayloadDisperser) SendPayload(
 		return nil, fmt.Errorf("get disperser client: %w", err)
 	}
 
+	disperserID := disperserClient.GetDisperserID()
+	dispersalSuccess := false
+	defer func() {
+		err := pd.disperserClientMultiplexer.ReportDispersalOutcome(disperserID, dispersalSuccess)
+		if err != nil {
+			pd.logger.Errorf("failed to report dispersal outcome for disperserID %d: %v", disperserID, err)
+		}
+	}()
+
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
 
@@ -157,7 +166,13 @@ func (pd *PayloadDisperser) SendPayload(
 		return nil, fmt.Errorf("verify received blob key: %w", err)
 	}
 
-	return pd.buildEigenDACert(ctx, disperserClient, reply.GetResult(), blobKey, probe)
+	cert, err := pd.buildEigenDACert(ctx, disperserClient, reply.GetResult(), blobKey, probe)
+	if err != nil {
+		return cert, err
+	}
+
+	dispersalSuccess = true
+	return cert, nil
 }
 
 // Waits for a blob to be signed, and builds the EigenDA cert with the operator signatures

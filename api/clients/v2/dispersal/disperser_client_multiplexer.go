@@ -107,6 +107,7 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 			Port:                     fmt.Sprintf("%d", connectionInfo.Port),
 			UseSecureGrpcFlag:        true,
 			DisperserConnectionCount: dcm.disperserConnectionCount,
+			DisperserID:              chosenDisperser,
 		}
 
 		client, err = NewDisperserClient(
@@ -232,4 +233,25 @@ func (dcm *DisperserClientMultiplexer) chooseDisperser(
 	}
 
 	return bestID, nil
+}
+
+// Reports the outcome of a dispersal attempt to the reputation system.
+// If success is true, the disperser's reputation is improved; otherwise, it is degraded.
+// Returns an error if the disperserID is not found in the reputation system.
+func (dcm *DisperserClientMultiplexer) ReportDispersalOutcome(disperserID uint32, success bool) error {
+	dcm.lock.Lock()
+	defer dcm.lock.Unlock()
+
+	reputation, exists := dcm.reputations[disperserID]
+	if !exists {
+		return fmt.Errorf("disperser ID %d not found in reputation system", disperserID)
+	}
+
+	if success {
+		reputation.Success()
+	} else {
+		reputation.Failure()
+	}
+
+	return nil
 }
