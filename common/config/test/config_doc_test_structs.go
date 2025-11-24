@@ -22,6 +22,7 @@ type StandardConfig struct {
 	Nested NestedConfig
 
 	// This field is unexported and should be ignored.
+	// nolint: unused
 	privateIgnoredField string
 }
 
