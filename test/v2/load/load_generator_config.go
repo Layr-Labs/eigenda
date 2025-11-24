@@ -1,6 +1,8 @@
 package load
 
 import (
+	"fmt"
+
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 )
@@ -25,6 +27,8 @@ func DefaultTrafficGeneratorConfig() *TrafficGeneratorConfig {
 		Load:        *DefaultLoadGeneratorConfig(),
 	}
 }
+
+var _ config.VerifiableConfig = (*LoadGeneratorConfig)(nil)
 
 // LoadGeneratorConfig is the configuration for the load generator.
 type LoadGeneratorConfig struct {
@@ -115,7 +119,63 @@ func (c *TrafficGeneratorConfig) GetPackagePaths() []string {
 	}
 }
 
+func (l *LoadGeneratorConfig) Verify() error {
+	if l.MbPerSecond <= 0 {
+		return fmt.Errorf("MbPerSecond must be greater than 0")
+	}
+	if l.BlobSizeMb <= 0 {
+		return fmt.Errorf("BlobSizeMb must be greater than 0")
+	}
+	if l.RelayReadAmplification < 0 {
+		return fmt.Errorf("RelayReadAmplification must be non-negative")
+	}
+	if l.ValidatorReadAmplification < 0 {
+		return fmt.Errorf("ValidatorReadAmplification must be non-negative")
+	}
+	if l.ValidatorVerificationFraction < 0 || l.ValidatorVerificationFraction > 1.0 {
+		return fmt.Errorf("ValidatorVerificationFraction must be between 0 and 1.0")
+	}
+	if l.SubmissionParallelism == 0 {
+		return fmt.Errorf("SubmissionParallelism must be greater than 0")
+	}
+	if l.RelayReadParallelism == 0 {
+		return fmt.Errorf("RelayReadParallelism must be greater than 0")
+	}
+	if l.ValidatorReadParallelism == 0 {
+		return fmt.Errorf("ValidatorReadParallelism must be greater than 0")
+	}
+	if l.GasEstimationParallelism == 0 {
+		return fmt.Errorf("GasEstimationParallelism must be greater than 0")
+	}
+	if l.DispersalTimeout == 0 {
+		return fmt.Errorf("DispersalTimeout must be greater than 0")
+	}
+	if l.RelayReadTimeout == 0 {
+		return fmt.Errorf("RelayReadTimeout must be greater than 0")
+	}
+	if l.ValidatorReadTimeout == 0 {
+		return fmt.Errorf("ValidatorReadTimeout must be greater than 0")
+	}
+	if l.GasEstimationTimeout == 0 {
+		return fmt.Errorf("GasEstimationTimeout must be greater than 0")
+	}
+	if l.EnablePprof && (l.PprofHttpPort <= 0 || l.PprofHttpPort > 65535) {
+		return fmt.Errorf("PprofHttpPort must be a valid port number when EnablePprof is true")
+	}
+	if l.FrequencyAcceleration < 0 {
+		return fmt.Errorf("FrequencyAcceleration must be non-negative")
+	}
+	return nil
+}
+
 func (c *TrafficGeneratorConfig) Verify() error {
-	// TODO(cody.littley): This is a place holder. Implement this when integrating new config with traffic generator.
+	err := c.Load.Verify()
+	if err != nil {
+		return fmt.Errorf("load generator config verification failed: %w", err)
+	}
+	err = c.Environment.Verify()
+	if err != nil {
+		return fmt.Errorf("environment config verification failed: %w", err)
+	}
 	return nil
 }
