@@ -85,6 +85,13 @@ func (cfg *ClientConfigV2) Check() error {
 		return fmt.Errorf("at least one retriever type must be enabled for using EigenDA V2 backend")
 	}
 
+	// Check that relay retriever is not the only retriever enabled
+	if slices.Contains(cfg.RetrieversToEnable, RelayRetrieverType) {
+		if !slices.Contains(cfg.RetrieversToEnable, ValidatorRetrieverType) {
+			return fmt.Errorf("relay retriever cannot be the only retriever enabled in EigenDA V2 backend")
+		}
+	}
+
 	if slices.Contains(cfg.RetrieversToEnable, ValidatorRetrieverType) {
 		if cfg.EigenDADirectory == "" {
 			return fmt.Errorf("EigenDA directory is required for validator retrieval in EigenDA V2 backend")
