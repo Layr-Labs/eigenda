@@ -202,7 +202,12 @@ func (c *DisperserClient) DisperseBlob(
 
 	probe.SetStage("send_to_disperser")
 
-	reply, err := c.clientPool.GetClient().DisperseBlob(ctx, request)
+	client, err := c.clientPool.GetClient()
+	if err != nil {
+		return nil, nil, fmt.Errorf("get client: %w", err)
+	}
+
+	reply, err := client.DisperseBlob(ctx, request)
 	if err != nil {
 		return nil, nil, api.NewErrorFailover(fmt.Errorf("DisperseBlob rpc: %w", err))
 	}
@@ -220,7 +225,13 @@ func (c *DisperserClient) GetBlobStatus(
 	request := &disperser_rpc.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	}
-	reply, err := c.clientPool.GetClient().GetBlobStatus(ctx, request)
+
+	client, err := c.clientPool.GetClient()
+	if err != nil {
+		return nil, fmt.Errorf("get client: %w", err)
+	}
+
+	reply, err := client.GetBlobStatus(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("error while calling GetBlobStatus: %w", err)
 	}
@@ -246,7 +257,13 @@ func (c *DisperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	reply, err := c.clientPool.GetClient().GetPaymentState(ctx, request)
+
+	client, err := c.clientPool.GetClient()
+	if err != nil {
+		return nil, fmt.Errorf("get client: %w", err)
+	}
+
+	reply, err := client.GetPaymentState(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("error while calling GetPaymentState: %w", err)
 	}
