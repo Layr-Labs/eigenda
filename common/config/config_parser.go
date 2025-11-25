@@ -112,8 +112,14 @@ func ParseConfig[T VerifiableConfig](
 // aliasing are set.
 func aliasEnvVars(logger logging.Logger, aliasedEnvVars map[string]string) error {
 	for oldVar, newVar := range aliasedEnvVars {
-		value, exists := os.LookupEnv(oldVar)
-		if exists {
+		value, oldVarExists := os.LookupEnv(oldVar)
+
+		if oldVarExists {
+			_, newVarExists := os.LookupEnv(newVar)
+			if newVarExists {
+				return fmt.Errorf("cannot alias environment variable %q to %q: both are set", oldVar, newVar)
+			}
+
 			logger.Warnf("Deprecated environment variable %q is set; please use %q instead. "+
 				"Support for this environment variable may be removed in a future release.", oldVar, newVar)
 
