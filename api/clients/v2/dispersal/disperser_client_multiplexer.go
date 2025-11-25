@@ -215,19 +215,14 @@ func (dcm *DisperserClientMultiplexer) chooseDisperser(
 		return 0, fmt.Errorf("no eligible dispersers")
 	}
 
-	// Apply forgiveness to all eligible dispersers
-	for _, disperserReputation := range eligibleDispersers {
-		disperserReputation.Forgive(now)
-	}
-
 	// Choose the disperser with the highest reputation
 	//
 	// TODO(litt3): At some point, we might consider adding some randomness here
 	var bestID uint32
 	bestScore := -1.0
 	for disperserId, disperserReputation := range eligibleDispersers {
-		if disperserReputation.Score() > bestScore {
-			bestScore = disperserReputation.Score()
+		if disperserReputation.Score(now) > bestScore {
+			bestScore = disperserReputation.Score(now)
 			bestID = disperserId
 		}
 	}
@@ -238,7 +233,11 @@ func (dcm *DisperserClientMultiplexer) chooseDisperser(
 // Reports the outcome of a dispersal attempt to the reputation system.
 // If success is true, the disperser's reputation is improved; otherwise, it is degraded.
 // Returns an error if the disperserID is not found in the reputation system.
-func (dcm *DisperserClientMultiplexer) ReportDispersalOutcome(disperserID uint32, success bool) error {
+func (dcm *DisperserClientMultiplexer) ReportDispersalOutcome(
+	disperserID uint32,
+	success bool,
+	now time.Time,
+) error {
 	dcm.lock.Lock()
 	defer dcm.lock.Unlock()
 
@@ -248,9 +247,9 @@ func (dcm *DisperserClientMultiplexer) ReportDispersalOutcome(disperserID uint32
 	}
 
 	if success {
-		reputation.Success()
+		reputation.ReportSuccess(now)
 	} else {
-		reputation.Failure()
+		reputation.ReportFailure(now)
 	}
 
 	return nil

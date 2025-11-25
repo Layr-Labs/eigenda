@@ -130,7 +130,7 @@ func (pd *PayloadDisperser) SendPayload(
 	disperserID := disperserClient.GetDisperserID()
 	dispersalSuccess := false
 	defer func() {
-		err := pd.disperserClientMultiplexer.ReportDispersalOutcome(disperserID, dispersalSuccess)
+		err := pd.disperserClientMultiplexer.ReportDispersalOutcome(disperserID, dispersalSuccess, time.Now())
 		if err != nil {
 			pd.logger.Errorf("failed to report dispersal outcome for disperserID %d: %v", disperserID, err)
 		}
