@@ -99,6 +99,8 @@ func DefaultDispatcherConfig() *ControllerConfig {
 		MaxDispersalAge:                     45 * time.Second,
 		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
 		SigningRateBucketSpan:               10 * time.Minute,
+		SigningRateFlushPeriod:              1 * time.Minute,
+		SigningRateDynamoDbTableName:        "validator-signing-rates",
 	}
 }
 
@@ -144,6 +146,12 @@ func (c *ControllerConfig) Verify() error {
 	}
 	if c.SigningRateBucketSpan <= 0 {
 		return fmt.Errorf("SigningRateBucketSpan must be positive, got %v", c.SigningRateBucketSpan)
+	}
+	if c.SigningRateFlushPeriod <= 0 {
+		return fmt.Errorf("SigningRateFlushPeriod must be positive, got %v", c.SigningRateFlushPeriod)
+	}
+	if c.SigningRateDynamoDbTableName == "" {
+		return fmt.Errorf("SigningRateDynamoDbTableName must not be empty")
 	}
 	return nil
 }
