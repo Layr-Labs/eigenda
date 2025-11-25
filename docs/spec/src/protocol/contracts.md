@@ -1,22 +1,295 @@
-# EigenDA Managed Contracts
+# EigenDA Protocol Contracts
 
 This page describes EigenDA contracts that are managed by EigenDA related actors (see the exact [roles](#governance-roles)). For EigenDA-related contracts that are managed by rollups, see the [rollup managed contracts](../integration/spec/4-contracts.md) page.
 
 > Warning: This page is incomplete and a work in progress as we are undergoing refactors of our contracts as well as some protocol upgrades. The details will change, but the information contained here should at least help to understand the important concepts.
 
-## Middlewares Contracts
+## Overview
+![image](../../assets/contracts-overview.png)
 
-We make use of eigenlayer-middleware contracts, which are fully documented [here](https://github.com/Layr-Labs/eigenlayer-middleware/tree/dev/docs).
+### Middlewares Contracts
 
-## EigenDA Specific Contracts
+We make use of eigenlayer-middleware contracts, which are fully documented [here](https://github.com/Layr-Labs/eigenlayer-middleware/tree/dev/docs). These contracts provide standard interfacing logic for operator state management and AVS representation. 
+
+### Middeware Vendored Contracts
+
+Some of the middleware contracts (e.g, `EjectionsManager`, `RegistryCoordinator`) have been directly vendored into the EigenDA project with minor modifications made.
+
+### EigenDA Specific Contracts
 
 The smart contracts can be found in our [repo](https://github.com/Layr-Labs/eigenda/tree/master/contracts/src/core), and the deployment addresses on different chains can be found in the [Networks](https://docs.eigenda.xyz/networks/mainnet#contract-addresses) section of our docs.
 
+
+## Contracts Overview
+
+| Contract Name                                                         | Project Category     | Deployed Behind ERC1967 Proxy? | isUsedByOffchainProtocol? |
+|-----------------------------------------------------------------------|-----------------------|---------------------------------|----------------------------|
+| [EigenDA Directory](#eigendadirectory)                                | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
+| [Service Manager](#eigendaservicemanager)                             | [eigenda](#eigenda-specific-contracts)              | No                              | Yes                        |
+| [Threshold Registry](#eigendathresholdregistry)                       | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
+| [Relay Registry](#eigendarelayregistry)                               | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
+| [Disperser Registry](#eigendadisperserregistry)                       | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
+| [Payment Vault](#paymentvault)                                        | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
+| [Pauser Registry](#pauserregistry)                                    | [middleware](#middlewares-contracts)           | No                              | No                         |
+| [BLS APK Registry](#blsapkblsapkregistry)                             | [middleware](#middlewares-contracts)           | Yes                             | Yes                        |
+| [Index Registry](#indexregistry)                                      | [middleware](#middlewares-contracts)           | Yes                             | Yes                        |
+| [Stake Registry](#stakeregistry)                                      | [middleware](#middlewares-contracts)           | Yes                             | Yes                        |
+| [Socket Registry](#socketregistry)                                    | [middleware](#middlewares-contracts)           | Yes                             | Yes                        |
+| [Operator State Retriever](#operatorstateretriever)                   | [middleware](#middlewares-contracts)           | No                              | Yes                        |
+| [Registry Coordinator](#eigendaregistrycoordinator)                   | [middleware vendored](#middeware-vendored-contracts)  | Yes                             | Yes                        |
+| [Ejections Manager](#eigendaejectionsmanager)                         | [middleware vendored](#middeware-vendored-contracts)  | Yes                             | No                         |
+
+
+<br />
+<br />
+
+------
+### [`EigenDADirectory`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/EigenDADirectory.sol)
+**Description**
+
+This contract serves as the central discovery and reference point for all contracts composing the EigenDA system. It implements a lightweight namespace resolution protocol in which human-readable string keys are deterministically mapped to fixed storage slots containing `20-byte` contract address references.
+
+**Access Mgmt**
+
+- `Ownable` role that can do unilateral entry key modifications
+
+**Onchain Usage**
+
+N/A
+
+**Offchain Usage**
+
+This dynamic naming pattern requires off-chain management of canonical contract keys, allowing clients and services to retrieve on-chain system context from a single directory contract reference rather than requiring every contract address to be hard-coded or passed through environment configuration.
+
+### [`OperatorStateRetriever`](https://github.com/Layr-Labs/eigenlayer-middleware/blob/2f7c93e38f56f292f247981a52bd3619a16b9918/src/OperatorStateRetriever.sol)
+**Description**
+
+A stateless read-only contract that does exhaustive lookups against the registry coordinator for fetching operator metadata. This bundles stored procedure logic to avoid exhaustive RPC calls made to view functions by offchain EigenDA services.
+
+**Access Mgmt**
+
+N/A
+
+**Onchain Usage**
+
+N/A
+
+**Offchain Usage**
+
+TODO
+
+### [`PaymentVault`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/PaymentVault.sol)
+**Description**
+
+Payment contract used to escrow on-demand funds, hold user reservations, and define global payment parameters used by the network (i.e, `globalSymbolsPerPeriod`, `reservationPeriodInterval`, `globalRatePeriodInterval`).
+
+**Access Mgmt**
+
+- `Ownable` role that can set payment reservations
+
+**Onchain Usage**
+
+N/A
+
+**Offchain Usage**
+
+TODO
+
+### [`EigenDARelayRegistry`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/EigenDARelayRegistry.so)
+
+**Description**
+
+Contains EigenDA network registered Relays’ Ethereum address and DNS hostname or IP address. `BlobCertificates` contain `relayKeys`, which can be transformed into that relay’s URL by calling [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/77d4442aa1b37bdc275173a6b27d917cc161474c/contracts/src/core/EigenDARelayRegistry.sol#L35).
+
+**Access Mgmt**
+
+- `Ownable` role that can register new relay entries
+
+**Onchain Usage**
+
+N/A
+
+**Offchain Usage**
+
+TODO
+
+### [`EigenDADisperserRegistry`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/EigenDADisperserRegistry.sol)
+
+**Description**
+
+Contains EigenDA network registered Dispersers’ Ethereum address. The EigenDA Network currently only supports a single Disperser, hosted by EigenLabs. The Disperser’s URL is currently static and unchanging, and can be found on our docs site in the [Networks](https://docs.eigenda.xyz/networks/mainnet) section.
+
+**Access Mgmt**
+
+- `Ownable` role that can register new dispersers
+
+**Onchain Usage**
+
+N/A
+
+**Offchain Usage**
+
+TODO
+
+### [`EigenDARegistryCoordinator`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/EigenDARegistryCoordinator.sol)
+
+**Description**
+
+This contract orchestrates operator lifecycle across EigenDA’s stake, BLS key, index, and socket registries - handling: 
+- registration, deregistration 
+- churning
+- stake-updates
+- quorum creation/config
+- historical quorum-bitmap tracking
+
+**Access Mgmt**
+
+- `Pauser` role that can halt operator state updates
+- `Ownable` role that can add new quorums, operator set params, & ejector params / role changes
+- `Ejector` role that invoke an ejection function to forcibly deregister an operator 
+
+**Onchain Usage**
+
+TODO
+
+**Offchain Usage**
+
+TODO
+
+### [`EigenDAServiceManager`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/EigenDAServiceManager.sol)
+
+**Description**
+
+TODO
+
+**Access Mgmt**
+
+- `Pauser` role that can halt EigenDA V1 batch confirmations from happening
+- `Ownable` role that can set batch confirmer EOAs
+- Stateful write functions only callable by `RegistryCoordinator`
+- `RewardsInitiator` 
+
+**Onchain Usage**
+
+- Called by `RegistryCoordinator` to register/de-register operators through the `AVSDirectory` contract
+- Called by `RewardsInitiator` to delegate AVS rewards
+
+**Offchain Usage**
+
+TODO
+
+### [`BLSAPKBLSApkRegistry`](https://github.com/Layr-Labs/eigenlayer-middleware/blob/2f7c93e38f56f292f247981a52bd3619a16b9918/src/BLSApkRegistry.sol)
+
+**Description**
+This contract stores each operator’s BLS public key as well as per quorum aggregate public keys.
+
+**Access Mgmt**
+- Stateful write functions only callable by `RegistryCoordinator`
+- `ProxyAdmin` that can update implementation contract
+
+**Onchain Usage**
+- Called by `RegistryCoordinator` when registering/de-registering AVS operators
+
+**Offchain Usage**
+
+TODO
+
+### [`IndexRegistry`](https://github.com/Layr-Labs/eigenlayer-middleware/blob/2f7c93e38f56f292f247981a52bd3619a16b9918/src/IndexRegistry.sol)
+
+**Description**
+Maintains an ordered, historically versioned list of operators for each quorum, allowing the RegistryCoordinator to register or deregister operators while preserving full block-by-block history of operator counts and index assignments. It provides efficient read functions to reconstruct the operator set at any block
+
+**Access Mgmt**
+- Stateful write functions only callable by `RegistryCoordinator`
+
+**Onchain Usage**
+- Called by `RegistryCoordinator` when registering/de-registering AVS operators
+
+**Offchain Usage**
+
+TODO
+
+### [`StakeRegistry`](https://github.com/Layr-Labs/eigenlayer-middleware/blob/2f7c93e38f56f292f247981a52bd3619a16b9918/src/StakeRegistry.sol)
+
+**Description**
+Stores stake updates bounded by block number and quorum strategy:
+```solidity
+    struct StakeUpdate {
+        // the block number at which the stake amounts were updated and stored
+        uint32 updateBlockNumber;
+        // the block number at which the *next update* occurred.
+        /// @notice This entry has the value **0** until another update takes place.
+        uint32 nextUpdateBlockNumber;
+        // stake weight for the quorum
+        uint96 stake;
+    }
+```
+
+**Access Mgmt**
+- `Ownable` role that can deploy and modify staking strategies
+- Stateful write functions only callable by `RegistryCoordinator`
+
+**Onchain Usage**
+- Called by `RegistryCoordinator` when making stateful updates via registering / deregistering quourm operators
+
+**Offchain Usage**
+
+TODO
+
+### [`SocketRegistry`](https://github.com/Layr-Labs/eigenlayer-middleware/blob/2f7c93e38f56f292f247981a52bd3619a16b9918/src/SocketRegistry.sol)
+
+**Description**
+Stores stateful mapping of `operator ID => socket` where socket is the operator's DNS hostname.
+
+**Access Mgmt**
+- Stateful write functions only callable by `RegistryCoordinator`
+
+**Onchain Usage**
+- Called by `RegistryCoordinator` when making stateful updates via registering / deregistering quourm operators
+
+
+**Offchain Usage**
+
+TODO
+
+### [`PauserRegistry`](https://github.com/Layr-Labs/eigenlayer-contracts/blob/ac57bc1b28c83d9d7143c0da19167c148c3596a3/src/contracts/permissions/PauserRegistry.sol)
+
+**Description**
+Manages a stateful mapping of pausers that can be arbitrarily added or revoked. This contract is assumed to be deployed immutably.
+
+**Access Mgmt**
+- `Unpauser` (or admin) role that can set / remove existing pausers
+
+**Onchain Usage**
+- Mapping checked as prequisite for pausing batch confirmation logic in [`EigenDAServiceManager`](#eigendaservicemanager)
+- Mapping checked as prequisite for pausing operator state update logic in [`RegistryCoordinator`](#eigendaregistrycoordinator)
+
+**Offchain Usage**
+
+TODO
+
+### [`EigenDAEjectionsManager`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/periphery/ejection/EigenDAEjectionManager.sol)
+
+**Description**
+Coordinates the lifecycle of ejecting non-responsive operators from EigenDA. It allows an `Ejector` role to queue and complete ejections. Eached queued ejection has a corresponding bond attached by the `Ejector` where a targetted operator can cancel the ejection by providing a signature before it becomes "confirmable" after a number of `DelayBlocks`.
+
+**Access Mgmt**
+- `Ownable` role that can change public parameters (i.e, `DelayBlocks`, `CooldownBlocks`)
+- `Ejector` role that invoke an ejection function to forcibly deregister an operator 
+
+**Onchain Usage**
+- Called by the `EjectionsManager` to eject operators from the opra
+
+**Offchain Usage**
+
+TODO
+
+### [`EigenDAThresholdRegistry`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/EigenDAThresholdRegistry.sol)
+**Description**
+<!-- TODO: Cleanup this description and better coalesce wrt other contract doc entries -->
 ![image.png](../../assets/integration/contracts-eigenda.png)
 
-### EigenDAThreshold Registry
-
-The [EigenDAThresholdRegistry](https://github.com/Layr-Labs/eigenda/blob/c4567f90e835678fae4749f184857dea10ff330c/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L22) contains two sets of fundamental parameters:
+The [EigenDAThresholdRegistry](https://github.com/Layr-Labs/eigenda/blob/c4567f90e835678fae4749f184857dea10ff330c/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L22) contains two sets of protocol parameters:
 
 ```solidity
 
@@ -67,17 +340,12 @@ $$
 
 where $\gamma = confirmationThreshold - adversaryThreshold$
 
-### EigenDARelayRegistry
 
-Contains EigenDA network registered Relays’ Ethereum address and DNS hostname or IP address. `BlobCertificates` contain `relayKeys`, which can be transformed into that relay’s URL by calling [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/77d4442aa1b37bdc275173a6b27d917cc161474c/contracts/src/core/EigenDARelayRegistry.sol#L35).
-
-### EigenDADisperserRegistry
-
-Contains EigenDA network registered Dispersers’ Ethereum address. The EigenDA Network currently only supports a single Disperser, hosted by EigenLabs. The Disperser’s URL is currently static and unchanging, and can be found on our docs site in the [Networks](https://docs.eigenda.xyz/networks/mainnet) section.
 
 ## Governance Roles
 
-<!-- TODO: we have this old doc https://www.notion.so/eigen-labs/EigenDA-V2-Governance-17513c11c3e0806999cfe5e8b9bf7e6a -->
-<!-- Not sure if it's still relevant or all outdated... will need to be written by @pakim249CAL once roles are stabilized. -->
-
-TODO
+There are four key governance roles in the EigenDA contracts seen across network environments (i.e, `mainnet`, `hoodi-testnet`, `hoodi-preprod`, `sepolia-testnet`):
+- [ERC1967](https://eips.ethereum.org/EIPS/eip-1967) `ProxyAdmin` that can upgrade implementation contracts
+- `Owner` that can perform sensitive stateful operations across protocol contracts
+- `Pauser` that can halt stateful updates on the `ServiceManager` and `RegistryCoordinator` contracts. This role is managed by the immutable [`PauserRegistry`](#pauserregistry) contract
+- `Ejector` that can initialize and complete ejection requests via the [`EjectionsManager`](#eigendaejectionsmanager) contract
