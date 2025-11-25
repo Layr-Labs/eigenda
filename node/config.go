@@ -97,8 +97,6 @@ type Config struct {
 	PprofHttpPort string
 	EnablePprof   bool
 
-	// if true then the node will not authenticate StoreChunks requests from dispersers (v2 only)
-	DisableDispersalAuthentication bool
 	// the size of the cache for storing public keys of dispersers
 	DispersalAuthenticationKeyCacheSize int
 	// the timeout for disperser keys (after which the disperser key is reloaded from the chain)
@@ -468,7 +466,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		GRPCMsgSizeLimitV2:                  ctx.GlobalInt(flags.GRPCMsgSizeLimitV2Flag.Name),
 		PprofHttpPort:                       ctx.GlobalString(flags.PprofHttpPort.Name),
 		EnablePprof:                         ctx.GlobalBool(flags.EnablePprof.Name),
-		DisableDispersalAuthentication:      ctx.GlobalBool(flags.DisableDispersalAuthenticationFlag.Name),
 		DispersalAuthenticationKeyCacheSize: ctx.GlobalInt(flags.DispersalAuthenticationKeyCacheSizeFlag.Name),
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),

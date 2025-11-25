@@ -42,6 +42,7 @@
 //! - **Field**: BN254 elliptic curve field (order ≈ 2^254)
 
 use crate::verification::blob::{BlobVerificationError, EncodedPayloadDecodingError};
+use tracing::instrument;
 
 /// Size of each symbol in bytes.
 ///
@@ -85,6 +86,7 @@ pub const PAYLOAD_ENCODING_VERSION_0: u8 = 0x0;
 ///
 /// * `Ok(Vec<u8>)` - The raw payload data
 /// * Err([EncodedPayloadDecodingError]) - if some encoding invariants are violated
+#[instrument(skip_all)]
 pub fn decode_encoded_payload(encoded_payload: &[u8]) -> Result<Vec<u8>, BlobVerificationError> {
     // Check length invariant
     check_len_invariant(encoded_payload)?;
@@ -102,6 +104,7 @@ pub fn decode_encoded_payload(encoded_payload: &[u8]) -> Result<Vec<u8>, BlobVer
 ///
 /// Note that this function only checks the length invariant, meaning that it doesn't check that
 /// the 32 byte chunks are valid bn254 elements.
+#[instrument(skip_all)]
 fn check_len_invariant(encoded_payload: &[u8]) -> Result<(), BlobVerificationError> {
     // this check is redundant since 0 is not a valid power of 32, but we keep it for clarity.
     if encoded_payload.len() < HEADER_BYTES_LEN {
@@ -130,6 +133,7 @@ fn check_len_invariant(encoded_payload: &[u8]) -> Result<(), BlobVerificationErr
 
 /// Validates the header (first field element = 32 bytes) of the encoded payload,
 /// and returns the claimed length of the payload if the header is valid.
+#[instrument(skip_all)]
 fn decode_header(encoded_payload: &[u8]) -> Result<u32, BlobVerificationError> {
     if encoded_payload.len() < HEADER_BYTES_LEN {
         return Err(
@@ -165,6 +169,7 @@ fn decode_header(encoded_payload: &[u8]) -> Result<u32, BlobVerificationError> {
 
 /// Decodes the payload from the encoded payload bytes.
 /// Removes internal padding and extracts the payload data based on the claimed length.
+#[instrument(skip_all)]
 fn decode_payload(
     encoded_payload: &[u8],
     payload_len: u32,

@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
@@ -227,7 +228,21 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
-	dispatcher, err := controller.NewDispatcher(
+	// TODO(cody.littley):
+	// 1. wire up signing rate tracker to answer gRPC signing rate queries
+	// 2. set up background goroutine to periodically flush signing rate data to persistent storage
+	// 3. load signing rate data from persistent storage on startup
+	signingRateTracker, err := signingrate.NewSigningRateTracker(
+		logger,
+		config.DispatcherConfig.SigningRateRetentionPeriod,
+		config.DispatcherConfig.SigningRateBucketSpan,
+		time.Now)
+	if err != nil {
+		return fmt.Errorf("failed to create signing rate tracker: %w", err)
+	}
+	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
+
+	dispatcher, err := controller.NewController(
 		&config.DispatcherConfig,
 		time.Now,
 		blobMetadataStore,
@@ -241,6 +256,7 @@ func RunController(cliCtx *cli.Context) error {
 		beforeDispatch,
 		dispatcherBlobSet,
 		controllerLivenessChan,
+		signingRateTracker,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
