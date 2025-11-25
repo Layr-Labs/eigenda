@@ -172,6 +172,16 @@ func (dcm *DisperserClientMultiplexer) ReportDispersalOutcome(
 
 // Checks if the existing client for the given disperser ID is outdated based on the current connection info.
 // If it is outdated, closes the existing client and removes it from the map.
+//
+// NOTE: This method has an edge case where clients that have already been returned to callers
+// via GetDisperserClient() may be closed while still in use. This will cause those in-flight operations
+// to fail.
+//
+// This is an acceptable trade-off because:
+//  1. Connection info changes for dispersers are rare in practice
+//  2. When they do occur, the affected dispersals will fail gracefully with errors
+//  3. Failed dispersals during a disperser's endpoint transition are tolerable
+//  4. The alternative (reference counting) adds significant complexity for a rare edge case
 func (dcm *DisperserClientMultiplexer) cleanupOutdatedClient(
 	disperserID uint32,
 	latestConnectionInfo *clients.DisperserConnectionInfo,
