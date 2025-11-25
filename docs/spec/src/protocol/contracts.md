@@ -278,7 +278,7 @@ Coordinates the lifecycle of ejecting non-responsive operators from EigenDA. It 
 - `Ejector` role that invoke an ejection function to forcibly deregister an operator 
 
 **Onchain Usage**
-- Called by the `EjectionsManager` to eject operators from the opra
+- Called by the `EjectionsManager` to eject operators from the operator set
 
 **Offchain Usage**
 
