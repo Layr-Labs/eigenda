@@ -453,11 +453,11 @@ func (s *ServerV2) validateDispersalRequest(
 	}
 
 	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
-	commitedBlobLength := blobCert.BlobHeader.BlobCommitments.Length
-	if commitedBlobLength == 0 {
+	committedBlobLength := blobCert.BlobHeader.BlobCommitments.Length
+	if committedBlobLength == 0 {
 		return nil, errors.New("blob size must be greater than 0")
 	}
-	if uint64(commitedBlobLength) != math.NextPowOf2u64(uint64(commitedBlobLength)) {
+	if uint64(committedBlobLength) != math.NextPowOf2u64(uint64(committedBlobLength)) {
 		return nil, errors.New("invalid commitment length, must be a power of 2")
 	}
 
