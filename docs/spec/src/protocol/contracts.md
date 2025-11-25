@@ -178,7 +178,7 @@ TODO
 
 TODO
 
-### [`BLSAPKBLSApkRegistry`](https://github.com/Layr-Labs/eigenlayer-middleware/blob/2f7c93e38f56f292f247981a52bd3619a16b9918/src/BLSApkRegistry.sol)
+### [`BLSApkRegistry`](https://github.com/Layr-Labs/eigenlayer-middleware/blob/2f7c93e38f56f292f247981a52bd3619a16b9918/src/BLSApkRegistry.sol)
 
 **Description**
 This contract stores each operator’s BLS public key as well as per quorum aggregate public keys.
@@ -230,7 +230,7 @@ Stores stake updates bounded by block number and quorum strategy:
 - Stateful write functions only callable by `RegistryCoordinator`
 
 **Onchain Usage**
-- Called by `RegistryCoordinator` when making stateful updates via registering / deregistering quourm operators
+- Called by `RegistryCoordinator` when making stateful updates via registering / deregistering quorum operators
 
 **Offchain Usage**
 
