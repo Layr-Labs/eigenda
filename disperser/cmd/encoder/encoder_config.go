@@ -64,7 +64,7 @@ func DefaultRootEncoderConfig() *RootEncoderConfig {
 }
 
 func (e *RootEncoderConfig) GetEnvVarPrefix() string {
-	return "DISPERSER_ENCODER"
+	return "ENCODER"
 }
 
 func (e *RootEncoderConfig) GetName() string {
