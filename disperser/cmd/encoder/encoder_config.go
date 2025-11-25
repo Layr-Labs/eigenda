@@ -47,10 +47,11 @@ type EncoderConfig struct {
 	Metrics encoder.MetricsConfig
 
 	// Logger configuration
-	LogOutputType string
-	LogColor      bool
+	LogFormat string
+	LogColor  bool
+	LogLevel  string
 
-	// AWS client configuration (non-secret parts)
+	// AWS client configuration
 	Aws aws.ClientConfig
 }
 
@@ -135,8 +136,8 @@ func DefaultEncoderConfig() *EncoderConfig {
 			HTTPPort:      "9100",
 			EnableMetrics: false,
 		},
-		LogOutputType: string(common.JSONLogFormat),
-		LogColor:      false,
+		LogFormat: string(common.JSONLogFormat),
+		LogColor:  false,
 		Aws: aws.ClientConfig{
 			Region: "us-east-1",
 		},

@@ -40,7 +40,7 @@ func main() {
 }
 
 // Run the encoder. This method is split from main() so we only have to use log.Fatalf() once.
-func run(ctx context.Context) error {
+func run(_ context.Context) error {
 	rootCfg, err := config.Bootstrap(DefaultRootEncoderConfig)
 	if err != nil {
 		return fmt.Errorf("failed to bootstrap config: %w", err)
@@ -50,8 +50,13 @@ func run(ctx context.Context) error {
 	rootCfg = nil
 
 	loggerConfig := common.DefaultLoggerConfig()
-	loggerConfig.Format = common.LogFormat(encoderConfig.LogOutputType)
+	loggerConfig.Format = common.LogFormat(encoderConfig.LogFormat)
 	loggerConfig.HandlerOpts.NoColor = !encoderConfig.LogColor
+	level, err := common.StringToLogLevel(encoderConfig.LogLevel)
+	if err != nil {
+		return fmt.Errorf("failed to parse log level: %w", err)
+	}
+	loggerConfig.HandlerOpts.Level = level
 
 	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
