@@ -181,6 +181,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 	hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
 	if err != nil {
+		//nolint:wrapcheck
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
 	}
 
@@ -193,12 +194,14 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	timestamp := time.Unix(int64(in.GetTimestamp()), 0)
 	err = s.replayGuardian.VerifyRequest(hash, timestamp)
 	if err != nil {
+		//nolint:wrapcheck
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
 	}
 
 	for _, blobCert := range batch.BlobCertificates {
 		_, err = s.validateDispersalRequest(blobCert)
 		if err != nil {
+			//nolint:wrapcheck
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 		}
 	}
