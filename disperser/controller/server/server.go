@@ -183,5 +183,13 @@ func (s *Server) GetValidatorSigningRateDump(
 	ctx context.Context,
 	request *controller.GetValidatorSigningRateDumpRequest,
 ) (*controller.GetValidatorSigningRateDumpReply, error) {
-	return nil, api.NewErrorInternal("GetValidatorSigningRateDump is not implemented")
+
+	dump, err := s.signingRateTracker.GetSigningRateDump(time.Unix(int64(request.GetStartTimestamp()), 0))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing rate dump: %w", err)
+	}
+
+	return &controller.GetValidatorSigningRateDumpReply{
+		SigningRateBuckets: dump,
+	}, nil
 }
