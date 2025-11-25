@@ -184,7 +184,8 @@ pub struct Cert {
 /// - Historical operator state is accurately reflected at reference blocks
 /// - BLS signature aggregation is performed correctly to prevent forgeries
 /// - Security parameters enforce adequate redundancy for data recovery
-#[instrument]
+#[instrument(skip_all)]
+#[instrument(level = "debug")]
 pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationError> {
     let CertVerificationInputs { cert, storage } = inputs;
 

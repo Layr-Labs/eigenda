@@ -16,7 +16,7 @@ use reqwest::{Request, Url};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::{error, trace};
+use tracing::{error, instrument, trace};
 
 /// Default max number of times we retry requests.
 const DEFAULT_MAX_RETRY_TIMES: u64 = 10;
@@ -93,6 +93,7 @@ impl ProxyClient {
     }
 
     /// Fetch encoded payload data for the given certificate.
+    #[instrument(skip_all)]
     pub async fn get_encoded_payload(
         &self,
         certificate: &StandardCommitment,
@@ -107,6 +108,7 @@ impl ProxyClient {
     }
 
     /// Stores the payload and returns a certificate
+    #[instrument(skip_all)]
     pub async fn store_payload(&self, payload: &[u8]) -> Result<StandardCommitment, ProxyError> {
         let mut url = self.url.join("/put")?;
         url.set_query(Some("commitment_mode=standard"));
@@ -136,7 +138,10 @@ impl ProxyClient {
         }
     }
 
-    async fn call(&self, request: Request) -> Result<Bytes, reqwest::Error> {
+    // Note: proxy is meant to be run locally or in a trusted environment, so we assume that the URL
+    // does not contain sensitive info that needs to be redacted from logs.
+    #[instrument(level = "debug", skip_all, fields(method = %request.method(), url = %request.url()))]
+    async fn call(&self, request: Request) -> Result<Bytes, ProxyError> {
         // If there is retry strategy, run with retries, otherwise just call once
         if let Some(backoff) = self.backoff.as_ref() {
             // The operation to be retried
@@ -149,11 +154,11 @@ impl ProxyClient {
             };
 
             // Notification on each retry
-            let notify = |err: &reqwest::Error, dur: Duration| trace!(?request, ?dur, %err, "eigenda proxy error");
+            let notify = |err: &ProxyError, dur: Duration| trace!(?request, ?dur, %err, "eigenda proxy error");
 
             operation
                 .retry(backoff)
-                .when(|err| err.is_connect() || err.is_timeout())
+                .when(|err| err.is_retryable())
                 .notify(notify)
                 .await
         } else {
@@ -161,9 +166,23 @@ impl ProxyClient {
         }
     }
 
-    async fn call_inner(&self, request: Request) -> Result<Bytes, reqwest::Error> {
-        let request = self.inner.execute(request).await?;
-        let bytes = request.bytes().await?;
+    async fn call_inner(&self, request: Request) -> Result<Bytes, ProxyError> {
+        let response = self.inner.execute(request).await?;
+        let status = response.status();
+        if !status.is_success() {
+            let url = response.url().to_owned();
+            let message = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "unable to read error body".to_string());
+
+            return Err(ProxyError::HttpError {
+                status,
+                message,
+                url,
+            });
+        }
+        let bytes = response.bytes().await?;
 
         Ok(bytes)
     }
@@ -178,22 +197,31 @@ pub enum ProxyError {
 
     /// Error when sending an HTTP request.
     #[error("HTTP error: {0}")]
-    Http(reqwest::Error),
+    Http(#[from] reqwest::Error),
 
-    /// Error when the HTTP request times out.
-    #[error("HTTP request timed out")]
-    HttpTimeout,
+    /// Error when the proxy returns a non-success HTTP status.
+    #[error("HTTP error (status {status}) at {url}: {message}")]
+    HttpError {
+        /// HTTP status code returned by the proxy
+        status: reqwest::StatusCode,
+        /// Error message returned by the proxy (text body)
+        message: String,
+        /// URL that was requested
+        url: url::Url,
+    },
 
     /// Error parsing the commitment
     #[error("StandardCommitmentParseError: {0}")]
     StandardCommitmentParseError(#[from] StandardCommitmentParseError),
 }
 
-impl From<reqwest::Error> for ProxyError {
-    fn from(error: reqwest::Error) -> Self {
-        match error {
-            error if error.is_timeout() => ProxyError::HttpTimeout,
-            error => ProxyError::Http(error),
+impl ProxyError {
+    /// Determines if the error is retryable.
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            // TODO(samlaf): do we also want to retry on 500 errors?
+            ProxyError::Http(err) => err.is_connect() || err.is_timeout(),
+            _ => false,
         }
     }
 }

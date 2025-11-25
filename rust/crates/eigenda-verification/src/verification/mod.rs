@@ -114,6 +114,7 @@ pub fn extract_certificate(
 /// - [`EigenDaVerificationError::MissingBlob`] if encoded_payload is None
 /// - [`EigenDaVerificationError::BlobVerificationError`] if blob verification fails
 #[allow(clippy::too_many_arguments)]
+#[instrument(skip_all, fields(tx = %tx))]
 pub fn verify_and_extract_payload(
     tx: B256,
     cert: &StandardCommitment,
@@ -182,6 +183,7 @@ pub fn verify_and_extract_payload(
 ///
 /// # Reference
 /// [EigenDA Specification - RBN Recency Validation](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation)
+#[instrument]
 pub fn verify_cert_recency(
     inclusion_height: u64,
     referenced_height: u64,
