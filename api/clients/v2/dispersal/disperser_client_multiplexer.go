@@ -197,6 +197,9 @@ func (dcm *DisperserClientMultiplexer) cleanupOutdatedClient(
 }
 
 // Returns the IDs of all eligible dispersers, along with their reputations.
+//
+// All dispersers returned by this function will have corresponding entries in dcm.reputations, since new reputations
+// are created internally as needed.
 func (dcm *DisperserClientMultiplexer) getEligibleDispersers(
 	ctx context.Context,
 	now time.Time,
