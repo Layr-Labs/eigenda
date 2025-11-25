@@ -57,7 +57,7 @@ contract DeployImplementations is EOADeployer {
         EigenDADirectory directory = Env.proxy.directory();
 
         deployImpl({
-            name: type(EigenDAServiceManager).name,
+            name: "ServiceManager",
             deployedTo: address(
                 new EigenDAServiceManager(
                     IAVSDirectory(Env.proxy.avsDirectory()),
@@ -74,25 +74,25 @@ contract DeployImplementations is EOADeployer {
 
         // Deploy new RegistryCoordinator implementation
         deployImpl({
-            name: type(EigenDARegistryCoordinator).name,
+            name: "RegistryCoordinator",
             deployedTo: address(new EigenDARegistryCoordinator(address(directory)))
         });
 
         // Deploy new ThresholdRegistry implementation
         deployImpl({
-            name: type(EigenDAThresholdRegistry).name,
+            name: "ThresholdRegistry",
             deployedTo: address(new EigenDAThresholdRegistry())
         });
 
         // Deploy new RelayRegistry implementation
         deployImpl({
-            name: type(EigenDARelayRegistry).name,
+            name: "RelayRegistry",
             deployedTo: address(new EigenDARelayRegistry())
         });
 
         // Deploy new DisperserRegistry implementation
         deployImpl({
-            name: type(EigenDADisperserRegistry).name,
+            name: "DisperserRegistry",
             deployedTo: address(new EigenDADisperserRegistry())
         });
 
@@ -149,7 +149,7 @@ contract DeployImplementations is EOADeployer {
         uint256 estimatedGasWithSig = vm.envOr("EJECTION_ESTIMATED_GAS_WITH_SIG", uint256(150000));
         
         deployImpl({
-            name: type(EigenDAEjectionManager).name,
+            name: "EjectionManager",
             deployedTo: address(
                 new EigenDAEjectionManager(
                     depositToken,
@@ -169,7 +169,7 @@ contract DeployImplementations is EOADeployer {
         });
         
         deployImpl({
-            name: type(EigenDACertVerifier).name,
+            name: "CertVerifier",
             deployedTo: address(
                 new EigenDACertVerifier(
                     IEigenDAThresholdRegistry(address(Env.proxy.thresholdRegistry())),
@@ -182,7 +182,7 @@ contract DeployImplementations is EOADeployer {
 
         // Deploy new CertVerifierRouter implementation
         deployImpl({
-            name: type(EigenDACertVerifierRouter).name,
+            name: "CertVerifierRouter",
             deployedTo: address(new EigenDACertVerifierRouter())
         });
 

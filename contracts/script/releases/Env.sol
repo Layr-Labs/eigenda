@@ -107,29 +107,29 @@ library Env {
 
     /// Directory
     function directory(DeployedProxy) internal view returns (EigenDADirectory) {
-        return EigenDADirectory(_deployedProxy(type(EigenDADirectory).name));
+        return EigenDADirectory(_deployedProxy("Directory"));
     }
 
     function directory(DeployedImpl) internal view returns (EigenDADirectory) {
-        return EigenDADirectory(_deployedImpl(type(EigenDADirectory).name));
+        return EigenDADirectory(_deployedImpl("Directory"));
     }
 
     /// Service Manager
     function serviceManager(DeployedProxy) internal view returns (EigenDAServiceManager) {
-        return EigenDAServiceManager(_deployedProxy(type(EigenDAServiceManager).name));
+        return EigenDAServiceManager(_deployedProxy("ServiceManager"));
     }
 
     function serviceManager(DeployedImpl) internal view returns (EigenDAServiceManager) {
-        return EigenDAServiceManager(_deployedImpl(type(EigenDAServiceManager).name));
+        return EigenDAServiceManager(_deployedImpl("ServiceManager"));
     }
 
     /// Registry Coordinator
     function registryCoordinator(DeployedProxy) internal view returns (EigenDARegistryCoordinator) {
-        return EigenDARegistryCoordinator(_deployedProxy(type(EigenDARegistryCoordinator).name));
+        return EigenDARegistryCoordinator(_deployedProxy("RegistryCoordinator"));
     }
 
     function registryCoordinator(DeployedImpl) internal view returns (EigenDARegistryCoordinator) {
-        return EigenDARegistryCoordinator(_deployedImpl(type(EigenDARegistryCoordinator).name));
+        return EigenDARegistryCoordinator(_deployedImpl("RegistryCoordinator"));
     }
 
     /// BLS APK Registry
@@ -170,29 +170,29 @@ library Env {
 
     /// Threshold Registry
     function thresholdRegistry(DeployedProxy) internal view returns (EigenDAThresholdRegistry) {
-        return EigenDAThresholdRegistry(_deployedProxy(type(EigenDAThresholdRegistry).name));
+        return EigenDAThresholdRegistry(_deployedProxy("ThresholdRegistry"));
     }
 
     function thresholdRegistry(DeployedImpl) internal view returns (EigenDAThresholdRegistry) {
-        return EigenDAThresholdRegistry(_deployedImpl(type(EigenDAThresholdRegistry).name));
+        return EigenDAThresholdRegistry(_deployedImpl("ThresholdRegistry"));
     }
 
     /// Relay Registry
     function relayRegistry(DeployedProxy) internal view returns (EigenDARelayRegistry) {
-        return EigenDARelayRegistry(_deployedProxy(type(EigenDARelayRegistry).name));
+        return EigenDARelayRegistry(_deployedProxy("RelayRegistry"));
     }
 
     function relayRegistry(DeployedImpl) internal view returns (EigenDARelayRegistry) {
-        return EigenDARelayRegistry(_deployedImpl(type(EigenDARelayRegistry).name));
+        return EigenDARelayRegistry(_deployedImpl("RelayRegistry"));
     }
 
     /// Disperser Registry
     function disperserRegistry(DeployedProxy) internal view returns (EigenDADisperserRegistry) {
-        return EigenDADisperserRegistry(_deployedProxy(type(EigenDADisperserRegistry).name));
+        return EigenDADisperserRegistry(_deployedProxy("DisperserRegistry"));
     }
 
     function disperserRegistry(DeployedImpl) internal view returns (EigenDADisperserRegistry) {
-        return EigenDADisperserRegistry(_deployedImpl(type(EigenDADisperserRegistry).name));
+        return EigenDADisperserRegistry(_deployedImpl("DisperserRegistry"));
     }
 
     /// Payment Vault
@@ -206,7 +206,7 @@ library Env {
 
     /// Access Control
     function accessControl(DeployedImpl) internal view returns (EigenDAAccessControl) {
-        return EigenDAAccessControl(_deployedImpl(type(EigenDAAccessControl).name));
+        return EigenDAAccessControl(_deployedImpl("AccessControl"));
     }
 
     /// Operator State Retriever
@@ -223,27 +223,27 @@ library Env {
 
     /// Ejection Manager
     function ejectionManager(DeployedProxy) internal view returns (EigenDAEjectionManager) {
-        return EigenDAEjectionManager(_deployedProxy(type(EigenDAEjectionManager).name));
+        return EigenDAEjectionManager(_deployedProxy("EjectionManager"));
     }
 
     function ejectionManager(DeployedImpl) internal view returns (EigenDAEjectionManager) {
-        return EigenDAEjectionManager(_deployedImpl(type(EigenDAEjectionManager).name));
+        return EigenDAEjectionManager(_deployedImpl("EjectionManager"));
     }
 
     /// Certificate Verification Contracts
 
     /// Certificate Verifier
     function certVerifier(DeployedImpl) internal view returns (EigenDACertVerifier) {
-        return EigenDACertVerifier(_deployedImpl(type(EigenDACertVerifier).name));
+        return EigenDACertVerifier(_deployedImpl("CertVerifier"));
     }
 
     /// Certificate Verifier Router
     function certVerifierRouter(DeployedProxy) internal view returns (EigenDACertVerifierRouter) {
-        return EigenDACertVerifierRouter(_deployedProxy(type(EigenDACertVerifierRouter).name));
+        return EigenDACertVerifierRouter(_deployedProxy("CertVerifierRouter"));
     }
 
     function certVerifierRouter(DeployedImpl) internal view returns (EigenDACertVerifierRouter) {
-        return EigenDACertVerifierRouter(_deployedImpl(type(EigenDACertVerifierRouter).name));
+        return EigenDACertVerifierRouter(_deployedImpl("CertVerifierRouter"));
     }
 
     /// Legacy Certificate Verifiers
