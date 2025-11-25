@@ -289,8 +289,15 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let payload = client.get_encoded_payload(&certificate).await.unwrap();
-        assert_eq!(payload.as_ref(), b"Internal Server Error");
+        let err = client.get_encoded_payload(&certificate).await.unwrap_err();
+        assert!(matches!(
+            err,
+            ProxyError::HttpError {
+                status: reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+                message,
+                ..
+            } if message == "Internal Server Error"
+        ));
     }
 
     #[tokio::test]
