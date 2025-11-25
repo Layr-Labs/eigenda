@@ -66,24 +66,20 @@ func NewServerV2(
 		return nil, err
 	}
 
-	var chunkAuthenticator auth.RequestAuthenticator
-	var blobAuthenticator corev2.BlobRequestAuthenticator
-	if !config.DisableDispersalAuthentication {
-		chunkAuthenticator, err = auth.NewRequestAuthenticator(
-			ctx,
-			reader,
-			logger,
-			config.DispersalAuthenticationKeyCacheSize,
-			config.DisperserKeyTimeout,
-			// TODO(litt3): once the checkpointed onchain config registry is ready, the authorized
-			// on-demand dispersers should be read from there instead of being hardcoded.
-			[]uint32{0}, // Default to disperser ID 0 for on-demand payments
-			time.Now())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create authenticator: %w", err)
-		}
-		blobAuthenticator = coreauthv2.NewBlobRequestAuthenticator()
+	chunkAuthenticator, err := auth.NewRequestAuthenticator(
+		ctx,
+		reader,
+		logger,
+		config.DispersalAuthenticationKeyCacheSize,
+		config.DisperserKeyTimeout,
+		// TODO(litt3): once the checkpointed onchain config registry is ready, the authorized
+		// on-demand dispersers should be read from there instead of being hardcoded.
+		[]uint32{0}, // Default to disperser ID 0 for on-demand payments
+		time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authenticator: %w", err)
 	}
+	blobAuthenticator := coreauthv2.NewBlobRequestAuthenticator()
 	replayGuardian := replay.NewReplayGuardian(
 		time.Now,
 		config.StoreChunksRequestMaxPastAge,
@@ -183,33 +179,27 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	if s.chunkAuthenticator != nil {
-		hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
-		if err != nil {
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
-		}
-
-		if !s.chunkAuthenticator.IsDisperserAuthorized(in.GetDisperserID(), batch) {
-			//nolint:wrapcheck
-			return nil, api.NewErrorPermissionDenied(
-				fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
-		}
-
-		timestamp := time.Unix(int64(in.GetTimestamp()), 0)
-		err = s.replayGuardian.VerifyRequest(hash, timestamp)
-		if err != nil {
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
-		}
+	hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
 	}
-	// TODO(litt3): why would we permit the blob authenticator to be nil?
-	if s.blobAuthenticator != nil {
-		// TODO: check the latency of request validation later; could be parallelized to avoid significant
-		// impact to the request latency
-		for _, blobCert := range batch.BlobCertificates {
-			_, err = s.validateDispersalRequest(blobCert)
-			if err != nil {
-				return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
-			}
+
+	if !s.chunkAuthenticator.IsDisperserAuthorized(in.GetDisperserID(), batch) {
+		//nolint:wrapcheck
+		return nil, api.NewErrorPermissionDenied(
+			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
+	}
+
+	timestamp := time.Unix(int64(in.GetTimestamp()), 0)
+	err = s.replayGuardian.VerifyRequest(hash, timestamp)
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
+	}
+
+	for _, blobCert := range batch.BlobCertificates {
+		_, err = s.validateDispersalRequest(blobCert)
+		if err != nil {
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 		}
 	}
 
