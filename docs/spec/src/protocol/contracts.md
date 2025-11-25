@@ -271,7 +271,7 @@ TODO
 ### [`EigenDAEjectionsManager`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/periphery/ejection/EigenDAEjectionManager.sol)
 
 **Description**
-Coordinates the lifecycle of ejecting non-responsive operators from EigenDA. It allows an `Ejector` role to queue and complete ejections. Eached queued ejection has a corresponding bond attached by the `Ejector` where a targetted operator can cancel the ejection by providing a signature before it becomes "confirmable" after a number of `DelayBlocks`.
+Coordinates the lifecycle of ejecting non-responsive operators from EigenDA. It allows an `Ejector` role to queue and complete ejections. Eached queued ejection has a corresponding bond attached by the `Ejector` where a targeted operator can cancel the ejection by providing a signature before it becomes "confirmable" after a number of `DelayBlocks`.
 
 **Access Mgmt**
 - `Ownable` role that can change public parameters (i.e, `DelayBlocks`, `CooldownBlocks`)
