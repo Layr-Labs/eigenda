@@ -1,0 +1,50 @@
+package secret
+
+import (
+	"reflect"
+
+	"github.com/go-viper/mapstructure/v2"
+)
+
+// DecodeHook is a mapstructure decode hook that handles Secret types.
+// It converts string inputs from config files or environment variables into Secret instances.
+//
+// Usage:
+//
+//	decoderConfig := &mapstructure.DecoderConfig{
+//	    DecodeHook: mapstructure.ComposeDecodeHookFunc(
+//	        secret.DecodeHook,
+//	        // other hooks...
+//	    ),
+//	}
+var DecodeHook mapstructure.DecodeHookFunc = func(from reflect.Type, to reflect.Type, data any) (any, error) {
+	// Check if source is a string or []byte
+	if from.Kind() != reflect.String && !(from.Kind() == reflect.Slice && from.Elem().Kind() == reflect.Uint8) {
+		return data, nil
+	}
+
+	// Check if target type is a pointer to Secret
+	if to.Kind() != reflect.Ptr {
+		return data, nil
+	}
+
+	elem := to.Elem()
+	// Check if this is a Secret type
+	if elem.PkgPath() != "github.com/Layr-Labs/eigenda/common/config/secret" || elem.Name() != "Secret" {
+		return data, nil
+	}
+
+	// Get the source data as a string
+	var sourceStr string
+	switch v := data.(type) {
+	case string:
+		sourceStr = v
+	case []byte:
+		sourceStr = string(v)
+	default:
+		// If it's not a string or []byte, let mapstructure handle it normally
+		return data, nil
+	}
+
+	return NewSecret(sourceStr), nil
+}

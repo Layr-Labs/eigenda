@@ -47,8 +47,8 @@ func TestSecretNotExposedViaPrintf(t *testing.T) {
 func TestSecretNotExposedViaJSON(t *testing.T) {
 	secretValue := "super-secret-api-key"
 	type Config struct {
-		APIKey  *Secret[string] `json:"api_key"`
-		Timeout int             `json:"timeout"`
+		APIKey  *Secret `json:"api_key"`
+		Timeout int     `json:"timeout"`
 	}
 
 	config := Config{
@@ -74,8 +74,8 @@ func TestSecretNotExposedViaJSON(t *testing.T) {
 func TestSecretNotExposedViaYAML(t *testing.T) {
 	secretValue := "super-secret-token"
 	type Config struct {
-		Token   *Secret[string] `yaml:"token"`
-		Enabled bool            `yaml:"enabled"`
+		Token   *Secret `yaml:"token"`
+		Enabled bool    `yaml:"enabled"`
 	}
 
 	config := Config{
