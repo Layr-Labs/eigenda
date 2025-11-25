@@ -185,7 +185,6 @@ pub struct Cert {
 /// - BLS signature aggregation is performed correctly to prevent forgeries
 /// - Security parameters enforce adequate redundancy for data recovery
 #[instrument(skip_all)]
-#[instrument(level = "debug")]
 pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationError> {
     let CertVerificationInputs { cert, storage } = inputs;
 
