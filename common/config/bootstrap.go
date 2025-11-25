@@ -46,8 +46,8 @@ var (
 		Aliases: []string{"c"},
 		Usage:   "Path to a configuration file. Can be specified multiple times to load multiple files.",
 	}
-	verifyConfigFlag = &cli.BoolFlag{
-		Name:    "verify-config",
+	onlyVerifyConfigFlag = &cli.BoolFlag{
+		Name:    "only-verify-config",
 		Aliases: []string{"v"},
 		Usage:   "If set, verifies configuration then exits.",
 	}
@@ -79,7 +79,7 @@ func Bootstrap[T DocumentedConfig](
 			disableEnvVarsFlag,
 			overrideEnvPrefixFlag,
 			configFileFlag,
-			verifyConfigFlag,
+			onlyVerifyConfigFlag,
 		},
 		Action: action,
 	}
@@ -116,7 +116,7 @@ func buildHandler[T DocumentedConfig](
 		disableEnvVars := cliCTX.Bool(disableEnvVarsFlag.Name)
 		overrideEnvPrefix := cliCTX.String(overrideEnvPrefixFlag.Name)
 		configFiles := cliCTX.StringSlice(configFileFlag.Name)
-		verifyConfig := cliCTX.Bool(verifyConfigFlag.Name)
+		onlyVerifyConfig := cliCTX.Bool(onlyVerifyConfigFlag.Name)
 
 		if debug {
 			waitForDebugger(logger)
@@ -140,7 +140,7 @@ func buildHandler[T DocumentedConfig](
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}
 
-		if verifyConfig {
+		if onlyVerifyConfig {
 			logger.Info("Configuration is valid. Exiting.")
 			os.Exit(0)
 		}
