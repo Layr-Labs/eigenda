@@ -18,46 +18,51 @@ contract ExecuteUpgrade is MultisigBuilder, DeployImplementations {
         // Get proxy admin
         ProxyAdmin proxyAdmin = ProxyAdmin(Env.proxyAdmin());
 
-        // Upgrade ServiceManager proxy
+        // NOTE: We must us upgradeAndCall
+
+        // Upgrade ServiceManager
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(Env.proxy.serviceManager()))),
             address(Env.impl.serviceManager())
         );
 
-        // Upgrade RegistryCoordinator proxy
+        // Upgrade RegistryCoordinator
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(Env.proxy.registryCoordinator()))),
             address(Env.impl.registryCoordinator())
         );
 
-        // Upgrade other proxies as needed
+        // Upgrade ThresholdRegistry
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(Env.proxy.thresholdRegistry()))),
             address(Env.impl.thresholdRegistry())
         );
 
+        // Upgrade RelayRegistry
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(Env.proxy.relayRegistry()))), address(Env.impl.relayRegistry())
         );
 
+        // Upgrade DisperserRegistry
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(Env.proxy.disperserRegistry()))),
             address(Env.impl.disperserRegistry())
         );
 
+        // Upgrade PaymentVault
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(Env.proxy.paymentVault()))), address(Env.impl.paymentVault())
         );
     }
 
     function testScript() public virtual override {
-        // 1 - Deploy implementations
+        // 1 - Deploy new implementations
         runAsEOA();
 
-        // 2 - Execute upgrades
+        // 2 - Execute upgrades via multisig
         execute();
 
-        // 3 - Validate upgrades
+        // 3 - Validate all upgrades were successful
         _validateUpgrades();
     }
 
@@ -91,11 +96,37 @@ contract ExecuteUpgrade is MultisigBuilder, DeployImplementations {
             "RelayRegistry proxy should point to new implementation"
         );
 
+        // Validate DisperserRegistry upgrade
+        address disperserRegistryImpl = Env._getProxyImpl(address(Env.proxy.disperserRegistry()));
+        assertTrue(
+            disperserRegistryImpl == address(Env.impl.disperserRegistry()),
+            "DisperserRegistry proxy should point to new implementation"
+        );
+
+        // Validate PaymentVault upgrade
+        address paymentVaultImpl = Env._getProxyImpl(address(Env.proxy.paymentVault()));
+        assertTrue(
+            paymentVaultImpl == address(Env.impl.paymentVault()),
+            "PaymentVault proxy should point to new implementation"
+        );
+
         // Validate ProxyAdmin ownership
         address proxyAdmin = Env._getProxyAdmin(address(Env.proxy.serviceManager()));
         assertTrue(proxyAdmin == Env.proxyAdmin(), "ServiceManager proxy admin should be correct");
 
         proxyAdmin = Env._getProxyAdmin(address(Env.proxy.registryCoordinator()));
         assertTrue(proxyAdmin == Env.proxyAdmin(), "RegistryCoordinator proxy admin should be correct");
+
+        proxyAdmin = Env._getProxyAdmin(address(Env.proxy.thresholdRegistry()));
+        assertTrue(proxyAdmin == Env.proxyAdmin(), "ThresholdRegistry proxy admin should be correct");
+
+        proxyAdmin = Env._getProxyAdmin(address(Env.proxy.relayRegistry()));
+        assertTrue(proxyAdmin == Env.proxyAdmin(), "RelayRegistry proxy admin should be correct");
+
+        proxyAdmin = Env._getProxyAdmin(address(Env.proxy.disperserRegistry()));
+        assertTrue(proxyAdmin == Env.proxyAdmin(), "DisperserRegistry proxy admin should be correct");
+
+        proxyAdmin = Env._getProxyAdmin(address(Env.proxy.paymentVault()));
+        assertTrue(proxyAdmin == Env.proxyAdmin(), "PaymentVault proxy admin should be correct");
     }
 }

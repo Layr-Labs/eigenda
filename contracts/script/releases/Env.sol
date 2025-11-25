@@ -36,6 +36,10 @@ import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionMana
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
 
+/// EigenLayer Contracts
+import {IAVSDirectory} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
+import {IRewardsCoordinator} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+
 library Env {
     using stdJson for string;
 
@@ -245,6 +249,15 @@ library Env {
 
     function certVerifierLegacyV2(DeployedImpl) internal view returns (address) {
         return _deployedImpl("EigenDACertVerifierLegacyV2");
+    }
+
+    /// EigenLayer Contracts
+    function avsDirectory(DeployedProxy) internal view returns (IAVSDirectory) {
+        return IAVSDirectory(_deployedProxy("AVSDirectory"));
+    }
+
+    function rewardsCoordinator(DeployedProxy) internal view returns (IRewardsCoordinator) {
+        return IRewardsCoordinator(_deployedProxy("RewardsCoordinator"));
     }
 
     /// Helpers

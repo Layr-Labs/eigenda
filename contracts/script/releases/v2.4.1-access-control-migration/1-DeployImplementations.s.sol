@@ -25,6 +25,7 @@ import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionMana
 // Import certificate verification
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
+import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 // Import interfaces
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
@@ -54,35 +55,13 @@ contract DeployImplementations is EOADeployer {
     function _runAsEOA() internal override {
         // Get the directory to access deployed proxies
         EigenDADirectory directory = Env.proxy.directory();
-        
-        // Get EigenLayer contract addresses from environment
-        // These should be set based on the network being deployed to
-        address avsDirectory = vm.envOr("AVS_DIRECTORY", address(0));
-        address rewardsCoordinator = vm.envOr("REWARDS_COORDINATOR", address(0));
-        
-        // If not set, try to read from a known EigenLayer deployment or config
-        if (avsDirectory == address(0)) {
-            // For mainnet: 0x135DDa560e946695d6f155dACaFC6f1F25C1F5AF
-            // For holesky: 0x055733000064333CaDDbC92763c58BF0192fFeBf
-            avsDirectory = vm.envOr("AVS_DIRECTORY", address(0));
-        }
-        if (rewardsCoordinator == address(0)) {
-            rewardsCoordinator = vm.envOr("REWARDS_COORDINATOR", address(0));
-        }
 
-        vm.startBroadcast();
-
-        // Deploy new ServiceManager implementation
-        // Constructor requires references to EigenLayer and EigenDA contracts
-        require(avsDirectory != address(0), "AVS_DIRECTORY not set");
-        require(rewardsCoordinator != address(0), "REWARDS_COORDINATOR not set");
-        
         deployImpl({
             name: type(EigenDAServiceManager).name,
             deployedTo: address(
                 new EigenDAServiceManager(
-                    IAVSDirectory(avsDirectory),
-                    IRewardsCoordinator(rewardsCoordinator),
+                    IAVSDirectory(Env.proxy.avsDirectory()),
+                    IRewardsCoordinator(Env.proxy.rewardsCoordinator()),
                     IRegistryCoordinator(address(Env.proxy.registryCoordinator())),
                     IStakeRegistry(address(Env.proxy.stakeRegistry())),
                     IEigenDAThresholdRegistry(address(Env.proxy.thresholdRegistry())),
@@ -182,18 +161,24 @@ contract DeployImplementations is EOADeployer {
             )
         });
 
-        // // Deploy new CertVerifier implementation
-        // deployImpl({
-        //     name: type(EigenDACertVerifier).name,
-        //     deployedTo: address(
-        //         new EigenDACertVerifier(
-        //             IEigenDAThresholdRegistry(address(Env.proxy.thresholdRegistry())),
-        //             IEigenDASignatureVerifier(address(Env.proxy.stakeRegistry())),
-        //             new IEigenDACertVerifier.SecurityThresholds[](0), // Empty array, configured during initialization
-        //             new uint8[](0) // Empty array, configured during initialization
-        //         )
-        //     )
-        // });
+        // Deploy new CertVerifier implementation
+        // Use default security thresholds - can be updated post-deployment
+        EigenDATypesV1.SecurityThresholds memory defaultThresholds = EigenDATypesV1.SecurityThresholds({
+            confirmationThreshold: 100, // 100% confirmation
+            adversaryThreshold: 33 // 33% adversary
+        });
+        
+        deployImpl({
+            name: type(EigenDACertVerifier).name,
+            deployedTo: address(
+                new EigenDACertVerifier(
+                    IEigenDAThresholdRegistry(address(Env.proxy.thresholdRegistry())),
+                    IEigenDASignatureVerifier(address(Env.proxy.stakeRegistry())),
+                    defaultThresholds,
+                    hex"00" // Default quorum numbers required
+                )
+            )
+        });
 
         // Deploy new CertVerifierRouter implementation
         deployImpl({
