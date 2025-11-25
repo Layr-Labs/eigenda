@@ -11,6 +11,11 @@ pub const EIGENDA_DIRECTORY_HOODI: Address = address!("0x5a44e56e88abcf610c68340
 /// EigenDA directory address on the Sepolia test network.
 pub const EIGENDA_DIRECTORY_SEPOLIA: Address =
     address!("0x9620dC4B3564198554e4D2b06dEFB7A369D90257");
+/// EigenDA directory address on the Inabox local devnet.
+/// This address could get outdated if contract deployment script changes...
+/// run `make start-inabox` and get the EIGENDA_DIRECTORY_ADDR printed to stdout.
+pub const EIGENDA_DIRECTORY_INABOX: Address =
+    address!("0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8");
 
 /// EigenDA CertVerifier v3.1.0 address on Ethereum mainnet.
 pub const STATIC_CERT_VERIFIER_MAINNET: Address =
@@ -21,6 +26,14 @@ pub const STATIC_CERT_VERIFIER_HOODI: Address =
 /// EigenDA CertVerifier v3.1.0 address on the Sepolia test network.
 pub const STATIC_CERT_VERIFIER_SEPOLIA: Address =
     address!("0x19a469Ddb7199c7EB9E40455978b39894BB90974");
+/// EigenDA CertVerifier v3.1.0 address on the Inabox local devnet.
+/// To fetch this address, run `make start-inabox` and run
+/// ```
+/// export EIGENDA_CERT_VERIFIER_ROUTER_ADDR=$(cast call $EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER")
+/// cast call $EIGENDA_CERT_VERIFIER_ROUTER_ADDR "getCertVerifierAt(uint32)(address)" 0
+/// ```
+pub const STATIC_CERT_VERIFIER_INABOX: Address =
+    address!("0x172076E0166D1F9Cc711C77Adf8488051744980C");
 
 /// EigenDA relevant contracts. Addresses are retrieved from the the EigenDADirectory contract for
 /// the respective network (i.e. Mainnet, Hoodi)
