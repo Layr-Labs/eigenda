@@ -74,6 +74,12 @@ type ControllerConfig struct {
 	// The duration of each signing rate bucket. Smaller buckets yield more granular data, at the cost of memory
 	// and storage overhead.
 	SigningRateBucketSpan time.Duration
+
+	// The period at which signing rate data is flushed to persistent storage.
+	SigningRateFlushPeriod time.Duration
+
+	// The name of the DynamoDB table used to store signing rate data.
+	SigningRateDynamoDbTableName string
 }
 
 var _ config.VerifiableConfig = &ControllerConfig{}
