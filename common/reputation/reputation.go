@@ -33,31 +33,39 @@ func NewReputation(config ReputationConfig, now time.Time) *Reputation {
 
 // Updates the reputation after a successful interaction.
 // Moves the score toward 1.0 based on the configured success update rate.
-func (r *Reputation) Success() {
+// Applies forgiveness before updating the score.
+func (r *Reputation) ReportSuccess(now time.Time) {
+	r.forgive(now)
 	r.score = (1-r.config.SuccessUpdateRate)*r.score + r.config.SuccessUpdateRate
 }
 
-// Failure updates the reputation after a failed interaction.
+// Updates the reputation after a failed interaction.
 // Moves the score toward 0.0 based on the configured failure update rate.
-func (r *Reputation) Failure() {
+// Applies forgiveness before updating the score.
+func (r *Reputation) ReportFailure(now time.Time) {
+	r.forgive(now)
 	r.score = (1 - r.config.FailureUpdateRate) * r.score
 }
 
 // Returns the current reputation score.
-func (r *Reputation) Score() float64 {
+// Applies forgiveness before returning the score.
+func (r *Reputation) Score(now time.Time) float64 {
+	r.forgive(now)
 	return r.score
 }
 
-// Forgive applies time-based drift toward the neutral forgiveness target.
-// Only increases scores that are below the target - scores above the target are unchanged.
-func (r *Reputation) Forgive(now time.Time) {
+// Applies time-based drift toward the neutral forgiveness target.
+// Only increases scores that are below the target: scores >= the target are unchanged.
+//
+// The score approaches the target exponentially. After one half-life period, the score will have recovered halfway
+// from its starting value to the target.
+//
+// Forgiveness applies only while the score is below the target. Within such periods, the forgiveness curve is
+// continuous and time-invariant: the final score depends only on the total time spent below the target, not on
+// how frequently forgiveness is applied.
+func (r *Reputation) forgive(now time.Time) {
 	if r.previousForgivenessTime.IsZero() {
 		r.previousForgivenessTime = now
-		return
-	}
-
-	// Only forgive if score is below the forgiveness target
-	if r.score >= r.config.ForgivenessTarget {
 		return
 	}
 
@@ -66,9 +74,15 @@ func (r *Reputation) Forgive(now time.Time) {
 		return
 	}
 
+	r.previousForgivenessTime = now
+
+	// Only apply forgiveness if score is below the forgiveness target
+	if r.score >= r.config.ForgivenessTarget {
+		return
+	}
+
 	forgivenessRate := math.Log(2) / r.config.ForgivenessHalfLife.Seconds()
 	forgivenessFraction := 1 - math.Exp(-forgivenessRate*elapsed)
 
 	r.score = (1-forgivenessFraction)*r.score + forgivenessFraction*r.config.ForgivenessTarget
-	r.previousForgivenessTime = now
 }
