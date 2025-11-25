@@ -57,9 +57,20 @@ var (
 func Bootstrap[T DocumentedConfig](
 	// A function that returns a new instance of the config struct with default values set.
 	constructor func() T,
+	// A map of environment variable aliases. The keys are environment variables that should be aliased to something
+	// else, and the values are the environment variables they should be aliased to.
+	//
+	// Environment variables in this map should be fully qualified, including any prefixes.
+	//
+	// If nil, then no aliasing is performed.
+	aliasedEnvVars map[string]string,
 	// A list of environment variables that should be ignored when sanity checking environment variables.
 	// Useful for situations where external systems set environment variables that would otherwise cause problems.
-	ignoredEnvVars ...string,
+	//
+	// Environment variables in this list should be fully qualified, including any prefixes.
+	//
+	// If nil, then no environment variables are ignored during sanity checking.
+	ignoredEnvVars []string,
 ) (T, error) {
 
 	// We need a logger before we have a logger config. Once we parse config, we can initialize the real logger.

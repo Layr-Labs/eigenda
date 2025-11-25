@@ -23,8 +23,19 @@ func ParseConfig[T VerifiableConfig](
 	cfg T,
 	// The prefix to use for environment variables. If empty, then environment variables are not read.
 	envPrefix string,
+	// A map of environment variable aliases. The keys are environment variables that should be aliased to something
+	// else, and the values are the environment variables they should be aliased to.
+	//
+	// Environment variables in this map should be fully qualified, including any prefixes.
+	//
+	// If nil, then no aliasing is performed.
+	aliasedEnvVars map[string]string,
 	// A list of environment variables that should be ignored when sanity checking environment variables.
 	// Useful for situations where external systems set environment variables that would otherwise cause problems.
+	//
+	// Environment variables in this list should be fully qualified, including any prefixes.
+	//
+	// If nil, then no environment variables are ignored during sanity checking.
 	ignoredEnvVars []string,
 	// A list of zero or more paths to configuration files. Later files override earlier ones.
 	// If environment variables are read, they override all configuration files.
@@ -41,6 +52,12 @@ func ParseConfig[T VerifiableConfig](
 		}
 	}
 
+	err := aliasEnvVars(aliasedEnvVars)
+	if err != nil {
+		var zero T
+		return zero, fmt.Errorf("failed to alias environment variables: %w", err)
+	}
+
 	if envPrefix != "" {
 		viperInstance.SetEnvPrefix(envPrefix)
 		viperInstance.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -54,7 +71,7 @@ func ParseConfig[T VerifiableConfig](
 		}
 
 		// Make sure there aren't any invalid environment variables set.
-		err = checkForInvalidEnvVars(logger, boundVars, envPrefix, ignoredEnvVars)
+		err = checkForInvalidEnvVars(logger, boundVars, envPrefix, aliasedEnvVars, ignoredEnvVars)
 		if err != nil {
 			var zero T
 			return zero, fmt.Errorf("invalid environment variables: %w", err)
@@ -88,6 +105,22 @@ func ParseConfig[T VerifiableConfig](
 	}
 
 	return cfg, nil
+}
+
+// Applies environment variable aliases by copying the value of each aliased variable to its target variable.
+// This function sets new environment variables using os.Setenv if old environment variables in need of
+// aliasing are set.
+func aliasEnvVars(aliasedEnvVars map[string]string) error {
+	for oldVar, newVar := range aliasedEnvVars {
+		value, exists := os.LookupEnv(oldVar)
+		if exists {
+			err := os.Setenv(newVar, value)
+			if err != nil {
+				return fmt.Errorf("failed to set aliased environment variable %q: %w", newVar, err)
+			}
+		}
+	}
+	return nil
 }
 
 func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
@@ -234,6 +267,7 @@ func checkForInvalidEnvVars(
 	logger logging.Logger,
 	boundVars map[string]struct{},
 	envPrefix string,
+	aliasedEnvVars map[string]string,
 	ignoredEnvVars []string,
 ) error {
 	if envPrefix == "" {
@@ -244,6 +278,9 @@ func checkForInvalidEnvVars(
 	ignoredSet := make(map[string]struct{}, len(ignoredEnvVars))
 	for _, v := range ignoredEnvVars {
 		ignoredSet[v] = struct{}{}
+	}
+	for k := range aliasedEnvVars {
+		ignoredSet[k] = struct{}{}
 	}
 
 	for _, env := range os.Environ() {
