@@ -80,7 +80,7 @@ func Bootstrap[T DocumentedConfig](
 		return zero, fmt.Errorf("failed to create bootstrap logger: %w", err)
 	}
 
-	action, cfgChan := buildHandler(bootstrapLogger, constructor, ignoredEnvVars)
+	action, cfgChan := buildHandler(bootstrapLogger, constructor, aliasedEnvVars, ignoredEnvVars)
 
 	app := &cli.App{
 		Flags: []cli.Flag{
@@ -116,6 +116,7 @@ func Bootstrap[T DocumentedConfig](
 func buildHandler[T DocumentedConfig](
 	logger logging.Logger,
 	constructor func() T,
+	aliasedEnvVars map[string]string,
 	ignoredEnvVars []string,
 ) (cli.ActionFunc, chan T) {
 
@@ -146,7 +147,7 @@ func buildHandler[T DocumentedConfig](
 			prefix = overrideEnvPrefix
 		}
 
-		cfg, err := ParseConfig(logger, defaultConfig, prefix, ignoredEnvVars, configFiles...)
+		cfg, err := ParseConfig(logger, defaultConfig, prefix, aliasedEnvVars, ignoredEnvVars, configFiles...)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}
