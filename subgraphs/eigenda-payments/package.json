@@ -4,6 +4,7 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
+    "prepare:inabox": "mustache templates/inabox.json templates/subgraph.template.yaml > subgraph.yaml",
     "prepare:devnet": "mustache templates/devnet.json templates/subgraph.template.yaml > subgraph.yaml",
     "prepare:preprod-hoodi": "mustache templates/preprod-hoodi.json templates/subgraph.template.yaml > subgraph.yaml",
     "prepare:hoodi": "mustache templates/hoodi.json templates/subgraph.template.yaml > subgraph.yaml",

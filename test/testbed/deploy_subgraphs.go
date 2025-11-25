@@ -184,8 +184,8 @@ func deploySubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, pa
 		return fmt.Errorf("failed to execute yarn install: %w", err)
 	}
 
-	config.Logger.Debug("Executing yarn prepare:devnet")
-	if err := execYarnCmd("prepare:devnet", subgraphPath, config.Logger); err != nil {
+	config.Logger.Debug("Executing yarn prepare:inabox")
+	if err := execYarnCmd("prepare:inabox", subgraphPath, config.Logger); err != nil {
 		return fmt.Errorf("failed to execute yarn prepare:devnet %w", err)
 	}
 
@@ -220,17 +220,18 @@ func updateSubgraph(
 ) error {
 	// Path to the devnet template file
 	devnetTemplatePath := filepath.Join(subgraphPath, "templates", "devnet.json")
+	outputTemplatePath := filepath.Join(subgraphPath, "templates", "inabox.json")
 
 	// Read the devnet template
 	templateData, err := os.ReadFile(devnetTemplatePath)
 	if err != nil {
-		return fmt.Errorf("error reading templates/devnet.json: %w", err)
+		return fmt.Errorf("error reading template: %w", err)
 	}
 
 	// Parse the template
 	var devnetTemplate Networks
 	if err := json.Unmarshal(templateData, &devnetTemplate); err != nil {
-		return fmt.Errorf("failed to unmarshal templates/devnet.json: %w", err)
+		return fmt.Errorf("failed to unmarshal template: %w", err)
 	}
 
 	// Update the template with actual contract addresses and start blocks
@@ -239,13 +240,13 @@ func updateSubgraph(
 	// Write the updated template back
 	updatedJson, err := json.MarshalIndent(devnetTemplate, "", "  ")
 	if err != nil {
-		return fmt.Errorf("error marshaling templates/devnet.json: %w", err)
+		return fmt.Errorf("error marshaling template: %w", err)
 	}
 
-	if err := os.WriteFile(devnetTemplatePath, updatedJson, 0644); err != nil {
-		return fmt.Errorf("error writing templates/devnet.json: %w", err)
+	if err := os.WriteFile(outputTemplatePath, updatedJson, 0644); err != nil {
+		return fmt.Errorf("error writing template: %w", err)
 	}
-	config.Logger.Info("templates/devnet.json written")
+	config.Logger.Info(fmt.Sprintf("template %s written", outputTemplatePath))
 
 	return nil
 }
