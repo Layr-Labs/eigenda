@@ -37,8 +37,12 @@ import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
 
 /// EigenLayer Contracts
-import {IAVSDirectory} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
-import {IRewardsCoordinator} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+import {
+    IAVSDirectory
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
+import {
+    IRewardsCoordinator
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 library Env {
     using stdJson for string;
