@@ -19,7 +19,7 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         bytes memory _quorumConfirmationThresholdPercentages,
         bytes memory _quorumNumbersRequired,
         DATypesV1.VersionedBlobParams[] memory _versionedBlobParams
-    ) external initializer {
+    ) external reinitializer(2) {
         _transferOwnership(_initialOwner);
 
         quorumAdversaryThresholdPercentages = _quorumAdversaryThresholdPercentages;

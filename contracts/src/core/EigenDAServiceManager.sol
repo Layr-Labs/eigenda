@@ -58,7 +58,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         address _initialOwner,
         address[] memory _batchConfirmers,
         address _rewardsInitiator
-    ) public initializer {
+    ) public reinitializer(2) {
         _initializePauser(_pauserRegistry, _initialPausedStatus);
         _transferOwnership(_initialOwner);
         _setRewardsInitiator(_rewardsInitiator);

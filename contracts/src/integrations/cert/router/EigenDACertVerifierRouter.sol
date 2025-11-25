@@ -41,7 +41,7 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     /// @param initCertVerifiers A list of cert verifiers corresponding to initABNs.
     function initialize(address initialOwner, uint32[] memory initABNs, address[] memory initCertVerifiers)
         external
-        initializer
+        reinitializer(2)
     {
         _transferOwnership(initialOwner);
         if (initABNs.length != initCertVerifiers.length) {

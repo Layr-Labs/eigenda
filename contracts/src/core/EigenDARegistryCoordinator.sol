@@ -76,7 +76,7 @@ contract EigenDARegistryCoordinator is
         OperatorSetParam[] memory _operatorSetParams,
         uint96[] memory _minimumStakes,
         IStakeRegistry.StrategyParams[][] memory _strategyParams
-    ) external initializer {
+    ) external reinitializer(2) {
         require(
             _operatorSetParams.length == _minimumStakes.length && _minimumStakes.length == _strategyParams.length,
             "RegCoord.initialize: input length mismatch"
