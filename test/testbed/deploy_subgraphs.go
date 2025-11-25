@@ -186,7 +186,7 @@ func deploySubgraph(config SubgraphDeploymentConfig, updater SubgraphUpdater, pa
 
 	config.Logger.Debug("Executing yarn prepare:inabox")
 	if err := execYarnCmd("prepare:inabox", subgraphPath, config.Logger); err != nil {
-		return fmt.Errorf("failed to execute yarn prepare:devnet %w", err)
+		return fmt.Errorf("failed to execute yarn prepare:inabox %w", err)
 	}
 
 	config.Logger.Debug("Executing yarn codegen")
