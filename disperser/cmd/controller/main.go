@@ -311,7 +311,8 @@ func RunController(cliCtx *cli.Context) error {
 			logger,
 			metricsRegistry,
 			paymentAuthorizationHandler,
-			listener)
+			listener,
+			signingRateTracker)
 		if err != nil {
 			return fmt.Errorf("create gRPC server: %w", err)
 		}
