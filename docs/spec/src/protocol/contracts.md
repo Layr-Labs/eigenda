@@ -95,7 +95,7 @@ N/A
 
 TODO
 
-### [`EigenDARelayRegistry`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/EigenDARelayRegistry.so)
+### [`EigenDARelayRegistry`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/EigenDARelayRegistry.sol)
 
 **Description**
 
