@@ -34,24 +34,24 @@ type EncoderConfig struct {
 	GrpcPort string `docs:"required"`
 
 	// Object storage configuration
-	BlobStoreConfig  blobstore.Config
-	ChunkStoreConfig chunkstore.Config
+	BlobStore  blobstore.Config
+	ChunkStore chunkstore.Config
 
 	// KZG configuration
-	KzgConfig kzg.KzgConfig
+	Kzg kzg.KzgConfig
 
 	// Server configuration
-	ServerConfig encoder.ServerConfig
+	Server encoder.ServerConfig
 
 	// Metrics configuration
-	MetricsConfig encoder.MetricsConfig
+	Metrics encoder.MetricsConfig
 
 	// Logger configuration
 	LogOutputType string
 	LogColor      bool
 
 	// AWS client configuration (non-secret parts)
-	AwsClientConfig aws.ClientConfig
+	Aws aws.ClientConfig
 }
 
 // Create a new root encoder config with default values.
@@ -107,20 +107,20 @@ func DefaultEncoderConfig() *EncoderConfig {
 	return &EncoderConfig{
 		EncoderVersion: 1,
 		GrpcPort:       "34000",
-		BlobStoreConfig: blobstore.Config{
+		BlobStore: blobstore.Config{
 			Backend: blobstore.S3Backend,
 		},
-		ChunkStoreConfig: chunkstore.Config{
+		ChunkStore: chunkstore.Config{
 			Backend: "s3",
 		},
-		KzgConfig: kzg.KzgConfig{
+		Kzg: kzg.KzgConfig{
 			SRSOrder:        10000,
 			SRSNumberToLoad: 10000,
 			NumWorker:       12,
 			PreloadEncoder:  false,
 			Verbose:         false,
 		},
-		ServerConfig: encoder.ServerConfig{
+		Server: encoder.ServerConfig{
 			MaxConcurrentRequestsDangerous: 16,
 			RequestPoolSize:                32,
 			RequestQueueSize:               32,
@@ -131,13 +131,13 @@ func DefaultEncoderConfig() *EncoderConfig {
 			PprofHttpPort:                  "6060",
 			EnablePprof:                    false,
 		},
-		MetricsConfig: encoder.MetricsConfig{
+		Metrics: encoder.MetricsConfig{
 			HTTPPort:      "9100",
 			EnableMetrics: false,
 		},
 		LogOutputType: string(common.JSONLogFormat),
 		LogColor:      false,
-		AwsClientConfig: aws.ClientConfig{
+		Aws: aws.ClientConfig{
 			Region: "us-east-1",
 		},
 	}
@@ -154,39 +154,38 @@ func (c *EncoderConfig) Verify() error {
 
 	// For V2, bucket name is required
 	if c.EncoderVersion == 2 {
-		if c.BlobStoreConfig.BucketName == "" {
+		if c.BlobStore.BucketName == "" {
 			return fmt.Errorf("blob store bucket name is required for encoder v2")
 		}
-		if c.ChunkStoreConfig.BucketName == "" {
+		if c.ChunkStore.BucketName == "" {
 			return fmt.Errorf("chunk store bucket name is required for encoder v2")
 		}
 	}
 
 	// Verify KZG config
-	if c.KzgConfig.G1Path == "" {
+	if c.Kzg.G1Path == "" {
 		return fmt.Errorf("G1 path is required")
 	}
 
-	if c.KzgConfig.SRSNumberToLoad == 0 {
+	if c.Kzg.SRSNumberToLoad == 0 {
 		return fmt.Errorf("SRS number to load must be greater than 0")
 	}
 
-	if c.KzgConfig.NumWorker == 0 {
+	if c.Kzg.NumWorker == 0 {
 		return fmt.Errorf("number of workers must be greater than 0")
 	}
 
-	if c.ServerConfig.MaxConcurrentRequestsDangerous <= 0 {
+	if c.Server.MaxConcurrentRequestsDangerous <= 0 {
 		return fmt.Errorf("max concurrent requests must be greater than 0")
 	}
 
-	if c.ServerConfig.RequestPoolSize <= 0 {
+	if c.Server.RequestPoolSize <= 0 {
 		return fmt.Errorf("request pool size must be greater than 0")
 	}
 
-	if c.ServerConfig.RequestQueueSize <= 0 {
+	if c.Server.RequestQueueSize <= 0 {
 		return fmt.Errorf("request queue size must be greater than 0")
 	}
 
 	return nil
 }
-
