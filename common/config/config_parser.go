@@ -52,7 +52,7 @@ func ParseConfig[T VerifiableConfig](
 		}
 	}
 
-	err := aliasEnvVars(aliasedEnvVars)
+	err := aliasEnvVars(logger, aliasedEnvVars)
 	if err != nil {
 		var zero T
 		return zero, fmt.Errorf("failed to alias environment variables: %w", err)
@@ -110,10 +110,13 @@ func ParseConfig[T VerifiableConfig](
 // Applies environment variable aliases by copying the value of each aliased variable to its target variable.
 // This function sets new environment variables using os.Setenv if old environment variables in need of
 // aliasing are set.
-func aliasEnvVars(aliasedEnvVars map[string]string) error {
+func aliasEnvVars(logger logging.Logger, aliasedEnvVars map[string]string) error {
 	for oldVar, newVar := range aliasedEnvVars {
 		value, exists := os.LookupEnv(oldVar)
 		if exists {
+			logger.Warnf("Deprecated environment variable %q is set; please use %q instead. "+
+				"Support for this environment variable may be removed in a future release.", oldVar, newVar)
+
 			err := os.Setenv(newVar, value)
 			if err != nil {
 				return fmt.Errorf("failed to set aliased environment variable %q: %w", newVar, err)
