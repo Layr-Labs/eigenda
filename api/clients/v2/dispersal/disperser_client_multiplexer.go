@@ -31,7 +31,9 @@ type DisperserClientMultiplexer struct {
 	clients map[uint32]*DisperserClient
 	// map from disperser ID to its reputation tracker
 	reputations map[uint32]*reputation.Reputation
-	lock        sync.Mutex
+	// indicates whether Close() has been called
+	closed bool
+	lock   sync.Mutex
 }
 
 func NewDisperserClientMultiplexer(
@@ -58,6 +60,14 @@ func NewDisperserClientMultiplexer(
 
 // Closes all underlying [DisperserClient]s
 func (dcm *DisperserClientMultiplexer) Close() error {
+	dcm.lock.Lock()
+	defer dcm.lock.Unlock()
+
+	if dcm.closed {
+		return nil
+	}
+	dcm.closed = true
+
 	var errs []error
 	for id, client := range dcm.clients {
 		if err := client.Close(); err != nil {
@@ -81,6 +91,10 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 	// contention actually becomes an issue
 	dcm.lock.Lock()
 	defer dcm.lock.Unlock()
+
+	if dcm.closed {
+		return nil, fmt.Errorf("disperser client multiplexer is closed")
+	}
 
 	eligibleDispersers, err := dcm.getEligibleDispersers(ctx, now, onDemandPayment)
 	if err != nil {
@@ -127,6 +141,35 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 	return client, nil
 }
 
+// Reports the outcome of a dispersal attempt to the reputation system.
+// If success is true, the disperser's reputation is improved; otherwise, it is degraded.
+// Returns an error if the disperserID is not found in the reputation system.
+func (dcm *DisperserClientMultiplexer) ReportDispersalOutcome(
+	disperserID uint32,
+	success bool,
+	now time.Time,
+) error {
+	dcm.lock.Lock()
+	defer dcm.lock.Unlock()
+
+	if dcm.closed {
+		return fmt.Errorf("disperser client multiplexer is closed")
+	}
+
+	reputation, exists := dcm.reputations[disperserID]
+	if !exists {
+		return fmt.Errorf("disperser ID %d not found in reputation system", disperserID)
+	}
+
+	if success {
+		reputation.ReportSuccess(now)
+	} else {
+		reputation.ReportFailure(now)
+	}
+
+	return nil
+}
+
 // Checks if the existing client for the given disperser ID is outdated based on the current connection info.
 // If it is outdated, closes the existing client and removes it from the map.
 func (dcm *DisperserClientMultiplexer) cleanupOutdatedClient(
@@ -145,7 +188,7 @@ func (dcm *DisperserClientMultiplexer) cleanupOutdatedClient(
 	if oldConfig.Hostname != latestConnectionInfo.Hostname ||
 		oldConfig.Port != fmt.Sprintf("%d", latestConnectionInfo.Port) {
 		if err := client.Close(); err != nil {
-			dcm.logger.Warn("failed to close outdated disperser client", "disperserID", disperserID, "err", err)
+			dcm.logger.Errorf("failed to close outdated disperser client for disperserID %d: %v", disperserID, err)
 		}
 		// remove the outdated client from the map, but don't delete the reputation. reputation is presumed to remain
 		// relevant for a given disperser ID, even if the connection info changes
@@ -221,36 +264,12 @@ func (dcm *DisperserClientMultiplexer) chooseDisperser(
 	var bestID uint32
 	bestScore := -1.0
 	for disperserId, disperserReputation := range eligibleDispersers {
-		if disperserReputation.Score(now) > bestScore {
-			bestScore = disperserReputation.Score(now)
+		score := disperserReputation.Score(now)
+		if score > bestScore {
+			bestScore = score
 			bestID = disperserId
 		}
 	}
 
 	return bestID, nil
-}
-
-// Reports the outcome of a dispersal attempt to the reputation system.
-// If success is true, the disperser's reputation is improved; otherwise, it is degraded.
-// Returns an error if the disperserID is not found in the reputation system.
-func (dcm *DisperserClientMultiplexer) ReportDispersalOutcome(
-	disperserID uint32,
-	success bool,
-	now time.Time,
-) error {
-	dcm.lock.Lock()
-	defer dcm.lock.Unlock()
-
-	reputation, exists := dcm.reputations[disperserID]
-	if !exists {
-		return fmt.Errorf("disperser ID %d not found in reputation system", disperserID)
-	}
-
-	if success {
-		reputation.ReportSuccess(now)
-	} else {
-		reputation.ReportFailure(now)
-	}
-
-	return nil
 }

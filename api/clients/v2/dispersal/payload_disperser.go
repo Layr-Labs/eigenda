@@ -43,7 +43,6 @@ func NewPayloadDisperser(
 	blockMonitor *verification.BlockNumberMonitor,
 	certBuilder *clients.CertBuilder,
 	certVerifier *verification.CertVerifier,
-	// Manages payment state for the client. May be nil for legacy payment mode.
 	clientLedger *clientledger.ClientLedger,
 	// if nil, then no metrics will be collected
 	registry *prometheus.Registry,

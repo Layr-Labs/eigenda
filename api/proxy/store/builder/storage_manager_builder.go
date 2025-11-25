@@ -761,7 +761,6 @@ func getCumulativePayment(
 }
 
 // buildClientLedger creates a ClientLedger for managing payment state
-// Returns nil for legacy mode
 func buildClientLedger(
 	ctx context.Context,
 	log logging.Logger,
