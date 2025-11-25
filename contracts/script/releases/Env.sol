@@ -246,15 +246,6 @@ library Env {
         return EigenDACertVerifierRouter(_deployedImpl("CertVerifierRouter"));
     }
 
-    /// Legacy Certificate Verifiers
-    function certVerifierLegacyV1(DeployedImpl) internal view returns (address) {
-        return _deployedImpl("EigenDACertVerifierLegacyV1");
-    }
-
-    function certVerifierLegacyV2(DeployedImpl) internal view returns (address) {
-        return _deployedImpl("EigenDACertVerifierLegacyV2");
-    }
-
     /// EigenLayer Contracts
     function avsDirectory(DeployedProxy) internal view returns (IAVSDirectory) {
         return IAVSDirectory(_deployedProxy("AVSDirectory"));
