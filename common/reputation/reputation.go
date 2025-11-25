@@ -55,15 +55,17 @@ func (r *Reputation) Score(now time.Time) float64 {
 }
 
 // Applies time-based drift toward the neutral forgiveness target.
-// Only increases scores that are below the target - scores above the target are unchanged.
+// Only increases scores that are below the target: scores >= the target are unchanged.
+//
+// The score approaches the target exponentially. After one half-life period, the score will have recovered halfway
+// from its starting value to the target.
+//
+// Forgiveness applies only while the score is below the target. Within such periods, the forgiveness curve is
+// continuous and time-invariant: the final score depends only on the total time spent below the target, not on
+// how frequently forgiveness is applied.
 func (r *Reputation) forgive(now time.Time) {
 	if r.previousForgivenessTime.IsZero() {
 		r.previousForgivenessTime = now
-		return
-	}
-
-	// Only forgive if score is below the forgiveness target
-	if r.score >= r.config.ForgivenessTarget {
 		return
 	}
 
@@ -72,9 +74,15 @@ func (r *Reputation) forgive(now time.Time) {
 		return
 	}
 
+	r.previousForgivenessTime = now
+
+	// Only apply forgiveness if score is below the forgiveness target
+	if r.score >= r.config.ForgivenessTarget {
+		return
+	}
+
 	forgivenessRate := math.Log(2) / r.config.ForgivenessHalfLife.Seconds()
 	forgivenessFraction := 1 - math.Exp(-forgivenessRate*elapsed)
 
 	r.score = (1-forgivenessFraction)*r.score + forgivenessFraction*r.config.ForgivenessTarget
-	r.previousForgivenessTime = now
 }
