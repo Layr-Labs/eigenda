@@ -142,7 +142,7 @@ contract DeployImplementations is EOADeployer {
         });
 
         // Deploy new EjectionManager implementation
-        // Get parameters from existing ejection manager or environment
+        // TODO: Get parameters from existing ejection manager.
         address depositToken = vm.envOr("EJECTION_DEPOSIT_TOKEN", address(0));
         uint256 depositBaseFeeMultiplier = vm.envOr("EJECTION_DEPOSIT_BASE_FEE_MULTIPLIER", uint256(1));
         uint256 estimatedGasWithoutSig = vm.envOr("EJECTION_ESTIMATED_GAS_WITHOUT_SIG", uint256(100000));
