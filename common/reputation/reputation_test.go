@@ -8,24 +8,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSuccess(t *testing.T) {
+func TestReportSuccess(t *testing.T) {
 	testRandom := random.NewTestRandom()
 	now := testRandom.Time()
 	reputation := NewReputation(DefaultConfig(), now)
 
 	for range 100 {
-		reputation.Success(now)
+		reputation.ReportSuccess(now)
 	}
 	require.Greater(t, reputation.Score(now), 0.99)
 }
 
-func TestFailure(t *testing.T) {
+func TestReportFailure(t *testing.T) {
 	testRandom := random.NewTestRandom()
 	now := testRandom.Time()
 	reputation := NewReputation(DefaultConfig(), now)
 
 	for range 100 {
-		reputation.Failure(now)
+		reputation.ReportFailure(now)
 	}
 	require.Less(t, reputation.Score(now), 0.01)
 }
@@ -38,7 +38,7 @@ func TestForgive(t *testing.T) {
 
 		// lots of successes will result in high reputation
 		for range 50 {
-			reputation.Success(startTime)
+			reputation.ReportSuccess(startTime)
 		}
 		scoreBeforeForgive := reputation.Score(startTime)
 
@@ -56,7 +56,7 @@ func TestForgive(t *testing.T) {
 
 		// lots of failures will result in low reputation
 		for range 50 {
-			reputation.Failure(startTime)
+			reputation.ReportFailure(startTime)
 		}
 
 		// calling Score() after time has elapsed triggers forgiveness

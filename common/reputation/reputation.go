@@ -34,15 +34,15 @@ func NewReputation(config ReputationConfig, now time.Time) *Reputation {
 // Updates the reputation after a successful interaction.
 // Moves the score toward 1.0 based on the configured success update rate.
 // Applies forgiveness before updating the score.
-func (r *Reputation) Success(now time.Time) {
+func (r *Reputation) ReportSuccess(now time.Time) {
 	r.forgive(now)
 	r.score = (1-r.config.SuccessUpdateRate)*r.score + r.config.SuccessUpdateRate
 }
 
-// Failure updates the reputation after a failed interaction.
+// Updates the reputation after a failed interaction.
 // Moves the score toward 0.0 based on the configured failure update rate.
 // Applies forgiveness before updating the score.
-func (r *Reputation) Failure(now time.Time) {
+func (r *Reputation) ReportFailure(now time.Time) {
 	r.forgive(now)
 	r.score = (1 - r.config.FailureUpdateRate) * r.score
 }
