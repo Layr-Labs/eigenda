@@ -261,8 +261,8 @@ Manages a stateful mapping of pausers that can be arbitrarily added or revoked. 
 - `Unpauser` (or admin) role that can set / remove existing pausers
 
 **Onchain Usage**
-- Mapping checked as prequisite for pausing batch confirmation logic in [`EigenDAServiceManager`](#eigendaservicemanager)
-- Mapping checked as prequisite for pausing operator state update logic in [`RegistryCoordinator`](#eigendaregistrycoordinator)
+- Mapping checked as prerequisite for pausing batch confirmation logic in [`EigenDAServiceManager`](#eigendaservicemanager)
+- Mapping checked as prerequisite for pausing operator state update logic in [`RegistryCoordinator`](#eigendaregistrycoordinator)
 
 **Offchain Usage**
 
