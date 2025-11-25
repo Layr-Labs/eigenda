@@ -10,22 +10,24 @@ import (
 
 func TestSuccess(t *testing.T) {
 	testRandom := random.NewTestRandom()
-	reputation := NewReputation(DefaultConfig(), testRandom.Time())
+	now := testRandom.Time()
+	reputation := NewReputation(DefaultConfig(), now)
 
 	for range 100 {
-		reputation.Success()
+		reputation.Success(now)
 	}
-	require.Greater(t, reputation.Score(), 0.99)
+	require.Greater(t, reputation.Score(now), 0.99)
 }
 
 func TestFailure(t *testing.T) {
 	testRandom := random.NewTestRandom()
-	reputation := NewReputation(DefaultConfig(), testRandom.Time())
+	now := testRandom.Time()
+	reputation := NewReputation(DefaultConfig(), now)
 
 	for range 100 {
-		reputation.Failure()
+		reputation.Failure(now)
 	}
-	require.Less(t, reputation.Score(), 0.01)
+	require.Less(t, reputation.Score(now), 0.01)
 }
 
 func TestForgive(t *testing.T) {
@@ -36,12 +38,12 @@ func TestForgive(t *testing.T) {
 
 		// lots of successes will result in high reputation
 		for range 50 {
-			reputation.Success()
+			reputation.Success(startTime)
 		}
-		scoreBeforeForgive := reputation.Score()
+		scoreBeforeForgive := reputation.Score(startTime)
 
-		reputation.Forgive(startTime.Add(1 * time.Minute))
-		require.Equal(t, scoreBeforeForgive, reputation.Score(),
+		// calling Score() after time has elapsed triggers forgiveness
+		require.Equal(t, scoreBeforeForgive, reputation.Score(startTime.Add(1*time.Minute)),
 			"forgiveness should only be applied to scores below the target")
 	})
 
@@ -54,11 +56,11 @@ func TestForgive(t *testing.T) {
 
 		// lots of failures will result in low reputation
 		for range 50 {
-			reputation.Failure()
+			reputation.Failure(startTime)
 		}
 
-		reputation.Forgive(startTime.Add(100 * config.ForgivenessHalfLife))
-		require.InDelta(t, config.ForgivenessTarget, reputation.Score(), 0.0001,
+		// calling Score() after time has elapsed triggers forgiveness
+		require.InDelta(t, config.ForgivenessTarget, reputation.Score(startTime.Add(100*config.ForgivenessHalfLife)), 0.0001,
 			"forgiveness after a long time period should converge to the target level")
 	})
 }
