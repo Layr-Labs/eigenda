@@ -6,16 +6,17 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/stretchr/testify/require"
 )
 
 func validClientConfigV2() common.ClientConfigV2 {
+	networkAddress, _ := common_eigenda.NewNetworkAddress("localhost", 8080)
 	return common.ClientConfigV2{
 		DisperserClientCfg: dispersal.DisperserClientConfig{
-			Hostname: "localhost",
-			Port:     "8080",
-			DisperserID: 0,
+			NetworkAddress: networkAddress,
+			DisperserID:    0,
 		},
 		PayloadDisperserCfg:                dispersal.PayloadDisperserConfig{},
 		RelayPayloadRetrieverCfg:           payloadretrieval.RelayPayloadRetrieverConfig{},

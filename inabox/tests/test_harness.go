@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -247,23 +246,6 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("create blob request signer: %w", err)
 	}
 
-	if tc.APIServerAddress == "" {
-		return nil, fmt.Errorf("APIServerAddress not set in test harness")
-	}
-
-	// Parse hostname:port from the address
-	var hostname, port string
-	for i := len(tc.APIServerAddress) - 1; i >= 0; i-- {
-		if tc.APIServerAddress[i] == ':' {
-			hostname = tc.APIServerAddress[:i]
-			port = tc.APIServerAddress[i+1:]
-			break
-		}
-	}
-	if hostname == "" || port == "" {
-		return nil, fmt.Errorf("invalid APIServerAddress format (expected hostname:port): %s", tc.APIServerAddress)
-	}
-
 	accountId, err := signer.GetAccountID()
 	if err != nil {
 		return nil, fmt.Errorf("error getting account ID: %w", err)
@@ -297,15 +279,10 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("get PaymentVault address: %w", err)
 	}
 
-	portUint64, err := strconv.ParseUint(port, 10, 16)
-	if err != nil {
-		return nil, fmt.Errorf("parse disperser port: %w", err)
-	}
-
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
-	connectionInfo := &clientsv2.DisperserConnectionInfo{
-		Hostname: hostname,
-		Port:     uint16(portUint64),
+	networkAddress, err := common.NewNetworkAddressFromString(tc.APIServerAddress)
+	if err != nil {
+		return nil, fmt.Errorf("create disperser network address: %w", err)
 	}
 	disperserRegistry := clientsv2.NewLegacyDisperserRegistry(connectionInfo)
 
