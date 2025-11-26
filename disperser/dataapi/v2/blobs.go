@@ -49,9 +49,8 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	now := handlerStart
 	oldestTime := now.Add(-maxBlobAge)
 
-	// Handle before parameter with feed delay
-	maxBeforeTime := now.Add(-s.feedDelay)
-	beforeTime := maxBeforeTime
+	// Handle before parameter
+	beforeTime := now
 	if c.Query("before") != "" {
 		beforeTime, err = parseQueryParamTime(c.Query("before"))
 		if err != nil {
@@ -64,9 +63,8 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 			invalidParamsErrorResponse(c, fmt.Errorf("`before` time cannot be more than 14 days in the past, found: %q", c.Query("before")))
 			return
 		}
-		// Cap beforeTime to maxBeforeTime (now - feedDelay)
-		if maxBeforeTime.Before(beforeTime) {
-			beforeTime = maxBeforeTime
+		if now.Before(beforeTime) {
+			beforeTime = now
 		}
 	}
 

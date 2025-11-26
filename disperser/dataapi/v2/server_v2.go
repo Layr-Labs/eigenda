@@ -108,9 +108,6 @@ type ServerV2 struct {
 
 	// Account cache
 	accountCache *lru.Cache[string, *AccountFeedResponse]
-
-	// FeedDelay is the minimum age a blob/batch must have before appearing in feed endpoints.
-	feedDelay time.Duration
 }
 
 func NewServerV2(
@@ -199,7 +196,6 @@ func NewServerV2(
 		blobAttestationInfoResponseCache: blobAttestationInfoResponseCache,
 		batchResponseCache:               batchResponseCache,
 		accountCache:                     accountCache,
-		feedDelay:                        config.FeedDelay,
 	}, nil
 }
 
