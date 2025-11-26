@@ -246,26 +246,13 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("create blob request signer: %w", err)
 	}
 
-	if tc.APIServerAddress == "" {
-		return nil, fmt.Errorf("APIServerAddress not set in test harness")
-	}
-
-	// Parse hostname:port from the address
-	var hostname, port string
-	for i := len(tc.APIServerAddress) - 1; i >= 0; i-- {
-		if tc.APIServerAddress[i] == ':' {
-			hostname = tc.APIServerAddress[:i]
-			port = tc.APIServerAddress[i+1:]
-			break
-		}
-	}
-	if hostname == "" || port == "" {
-		return nil, fmt.Errorf("invalid APIServerAddress format (expected hostname:port): %s", tc.APIServerAddress)
+	networkAddress, err := common.NewNetworkAddressFromString(tc.APIServerAddress)
+	if err != nil {
+		return nil, fmt.Errorf("create disperser network address: %w", err)
 	}
 
 	disperserClientConfig := &dispersal.DisperserClientConfig{
-		Hostname: hostname,
-		Port:     port,
+		NetworkAddress: networkAddress,
 	}
 
 	accountId, err := signer.GetAccountID()

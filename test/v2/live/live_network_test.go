@@ -484,9 +484,11 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	})
 	require.NoError(t, err, "new committer")
 
+	networkAddress, err := common.NewNetworkAddress(c.GetConfig().DisperserHostname, c.GetConfig().DisperserPort)
+	require.NoError(t, err)
+
 	disperserConfig := &dispersal.DisperserClientConfig{
-		Hostname:          c.GetConfig().DisperserHostname,
-		Port:              fmt.Sprintf("%d", c.GetConfig().DisperserPort),
+		NetworkAddress:    networkAddress,
 		UseSecureGrpcFlag: true,
 	}
 

@@ -24,6 +24,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
+	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
@@ -282,6 +283,12 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		PayloadPolynomialForm: codecs.PolynomialFormEval,
 		BlobVersion:           0,
 	}
+
+	disperserNetworkAddress, err := common_eigenda.NewNetworkAddressFromString(disperserHostname + ":" + disperserPort)
+	if err != nil {
+		panic(fmt.Sprintf("create disperser network address: %v", err))
+	}
+
 	builderConfig := builder.Config{
 		StoreConfig: store.Config{
 			AsyncPutWorkers:               testCfg.WriteThreadCount,
@@ -329,8 +336,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		MemstoreEnabled: useMemory,
 		ClientConfigV2: common.ClientConfigV2{
 			DisperserClientCfg: dispersal.DisperserClientConfig{
-				Hostname:          disperserHostname,
-				Port:              disperserPort,
+				NetworkAddress:    disperserNetworkAddress,
 				UseSecureGrpcFlag: true,
 			},
 			PayloadDisperserCfg: dispersal.PayloadDisperserConfig{

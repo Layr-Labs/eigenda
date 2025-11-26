@@ -140,9 +140,13 @@ func NewTestClient(
 		return nil, fmt.Errorf("new committer: %w", err)
 	}
 
+	networkAddress, err := common_eigenda.NewNetworkAddress(config.DisperserHostname, config.DisperserPort)
+	if err != nil {
+		return nil, fmt.Errorf("create disperser network address: %w", err)
+	}
+
 	disperserConfig := &dispersal.DisperserClientConfig{
-		Hostname:                 config.DisperserHostname,
-		Port:                     fmt.Sprintf("%d", config.DisperserPort),
+		NetworkAddress:           networkAddress,
 		UseSecureGrpcFlag:        true,
 		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
@@ -437,8 +441,7 @@ func NewTestClient(
 				},
 				ClientConfigV2: proxycommon.ClientConfigV2{
 					DisperserClientCfg: dispersal.DisperserClientConfig{
-						Hostname:          config.DisperserHostname,
-						Port:              fmt.Sprintf("%d", config.DisperserPort),
+						NetworkAddress:    networkAddress,
 						UseSecureGrpcFlag: true,
 					},
 					PayloadDisperserCfg: dispersal.PayloadDisperserConfig{

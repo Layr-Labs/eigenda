@@ -2,7 +2,6 @@ package eigendaflags
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -11,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
+	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/urfave/cli/v2"
 )
@@ -348,15 +348,14 @@ func readDisperserCfg(ctx *cli.Context) (dispersal.DisperserClientConfig, error)
 		disperserAddressString = eigenDANetwork.GetDisperserAddress()
 	}
 
-	hostStr, portStr, err := net.SplitHostPort(disperserAddressString)
+	networkAddress, err := common_eigenda.NewNetworkAddressFromString(disperserAddressString)
 	if err != nil {
 		return dispersal.DisperserClientConfig{},
-			fmt.Errorf("split host port '%s': %w", disperserAddressString, err)
+			fmt.Errorf("parse disperser network address '%s': %w", disperserAddressString, err)
 	}
 
 	return dispersal.DisperserClientConfig{
-		Hostname:          hostStr,
-		Port:              portStr,
+		NetworkAddress:    networkAddress,
 		UseSecureGrpcFlag: !ctx.Bool(DisableTLSFlagName),
 	}, nil
 }
