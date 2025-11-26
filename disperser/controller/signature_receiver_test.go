@@ -39,10 +39,10 @@ func createSigningMessage(
 	}
 
 	return core.SigningMessage{
-		Signature:            keypair.SignMessage(headerHash),
-		ValidatorId:          operatorID,
-		BatchHeaderHash:      headerHash,
-		Err:                  err,
+		Signature:       keypair.SignMessage(headerHash),
+		ValidatorId:     operatorID,
+		BatchHeaderHash: headerHash,
+		Err:             err,
 	}
 }
 

@@ -301,7 +301,7 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 		ENCODER_CONFIG_SERVER_REQUEST_QUEUE_SIZE:                "32",
 	}
 
-	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
+	env.applyDefaults(&v, "ENCODER_CONFIG", "enc", ind)
 
 	return v
 }
@@ -329,7 +329,7 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 		ENCODER_CONFIG_SERVER_REQUEST_QUEUE_SIZE:                "32",
 	}
 
-	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
+	env.applyDefaults(&v, "ENCODER_CONFIG", "enc", ind)
 
 	return v
 }

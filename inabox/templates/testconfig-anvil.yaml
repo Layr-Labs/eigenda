@@ -54,6 +54,12 @@ services:
       CACHE_PATH: ../resources/srs/SRSTables
       SRS_ORDER: 10000
       SRS_LOAD: 10000
+      KZG_G1_PATH: ../resources/srs/g1.point
+      KZG_G2_PATH: ../resources/srs/g2.point
+      KZG_G2_POWER_OF_2_PATH: ../resources/srs/g2.point.powerOf2
+      KZG_CACHE_PATH: ../resources/srs/SRSTables
+      KZG_SRS_ORDER: 10000
+      KZG_SRS_NUMBER_TO_LOAD: 10000
       CHALLENGE_ORDER: 10000
       LOG_LEVEL: "debug"
       VERBOSE: true
@@ -61,6 +67,7 @@ services:
       AWS_ENDPOINT_URL: http://localhost:4570
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: localstack
+      AWS_ACCESS_KEY: localstack
       AWS_SECRET_ACCESS_KEY: localstack
       ENCODER_ADDRESS: 0.0.0.0:34000
       USE_GRAPH: true
