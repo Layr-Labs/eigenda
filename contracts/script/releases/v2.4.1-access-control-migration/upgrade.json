@@ -1,6 +1,6 @@
 {
-    "name": "access-control-migration-v2.4.1",
-    "from": "unknown",
+    "name": "v2.4.1-access-control-migration",
+    "from": "0.0.0",
     "to": "2.4.1",
     "phases": [
         {
