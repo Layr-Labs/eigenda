@@ -3,7 +3,6 @@ pragma solidity ^0.8.9;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {Vm} from "forge-std/Vm.sol";
 import {StdStyle} from "forge-std/StdStyle.sol";
 
 interface IEigenDADirectory {

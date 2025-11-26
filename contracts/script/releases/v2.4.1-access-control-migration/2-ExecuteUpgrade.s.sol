@@ -4,20 +4,11 @@ pragma solidity ^0.8.12;
 import "../Env.sol";
 import "./1-DeployImplementations.s.sol";
 import {Encode} from "zeus-templates/utils/Encode.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {
-    IPauserRegistry
-} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
-import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-import {IEigenDAAddressDirectory} from "src/core/interfaces/IEigenDADirectory.sol";
 
 // TODO: Sort out whatever is wrong with the EjectionManager. (ignoring for now spoke with team)
-// TODO: Add ProxyAdmin to zeus.
-// TODO: Upgrade AccessControl.
 
 /// NOTE: Inconsistent use of EigenDARegistry
 /// forgefmt: disable-next-item
@@ -26,30 +17,27 @@ contract ExecuteUpgrade is DeployImplementations {
     using Encode for *;
 
     function _runAsEOA() internal override {        
-        // Get proxy admin.
-        ProxyAdmin proxyAdmin = ProxyAdmin(address(0xaFe14D2c59526C7f47EDa9c9BA83574363Db899a)); // TODO: fixme
-
         /// -----------------------------------------------------------------------
         /// WARNING: NETWORK BROADCAST BEGINS HERE!
         /// -----------------------------------------------------------------------
 
+        IProxyAdmin proxyAdmin = Env.proxyAdmin();
+
         vm.startBroadcast();
 
-        // TODO: Upgrade AccessControl.
-        
         // Upgrade BlsApkRegistry (no reinitialization needed).
         proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.blsApkRegistry()))),
+            address(Env.proxy.blsApkRegistry()),
             address(Env.impl.blsApkRegistry())
         );
 
         // Upgrade CertVerifierRouter.
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.certVerifierRouter()))),
+            address(Env.proxy.certVerifierRouter()),
             address(Env.impl.certVerifierRouter()),
             abi.encodeWithSelector(
                 EigenDACertVerifierRouter.initialize.selector,
-                Env.impl.owner(), // newOwner
+                Env.owner(), // newOwner
                 new uint32[](0),
                 new address[](0)
             )
@@ -59,7 +47,7 @@ contract ExecuteUpgrade is DeployImplementations {
 
         // Upgrade Directory.
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.directory()))),
+            address(Env.proxy.directory()),
             address(Env.impl.directory()),
             abi.encodeWithSelector(
                 EigenDADirectory.initialize.selector,
@@ -69,24 +57,24 @@ contract ExecuteUpgrade is DeployImplementations {
 
         // Upgrade DisperserRegistry.
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.disperserRegistry()))),
+            address(Env.proxy.disperserRegistry()),
             address(Env.impl.disperserRegistry()),
             abi.encodeWithSelector(
                 EigenDADisperserRegistry.initialize.selector, 
-                Env.impl.owner() // newOwner
+                Env.owner() // newOwner
             )
         );
 
-        // // TODO: This doesn't seam right, I think our zeus environment is using the old EjectionManager (at least on hoodi-preprod).
+        // NOTE: Spoke with team, EjectionManager is not being upgraded in this release.
         // // Upgrade EjectionManager (no reinitialization needed).
-        // proxyAdmin.upgrade(
-        //     TransparentUpgradeableProxy(payable(address(Env.proxy.ejectionManager()))),
+        // Env.proxyAdmin.upgrade(
+        //     address(Env.proxy.ejectionManager()),
         //     address(Env.impl.ejectionManager())
         // );
 
         // Upgrade IndexRegistry (no reinitialization needed).
         proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.indexRegistry()))), 
+            address(Env.proxy.indexRegistry()), 
             address(Env.impl.indexRegistry())
         );
 
@@ -96,11 +84,11 @@ contract ExecuteUpgrade is DeployImplementations {
 
         // Upgrade PaymentVault.
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.paymentVault()))),
+            address(Env.proxy.paymentVault()),
             address(Env.impl.paymentVault()),
             abi.encodeWithSelector(
                 PaymentVault.initialize.selector,
-                Env.impl.owner(), // newOwner
+                Env.owner(), // newOwner
                 Env.proxy.paymentVault().minNumSymbols(),
                 Env.proxy.paymentVault().pricePerSymbol(),
                 Env.proxy.paymentVault().priceUpdateCooldown(),
@@ -112,11 +100,11 @@ contract ExecuteUpgrade is DeployImplementations {
 
         // Upgrade RegistryCoordinator.
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.registryCoordinator()))),
+            address(Env.proxy.registryCoordinator()),
             address(Env.impl.registryCoordinator()),
             abi.encodeWithSelector(
                 EigenDARegistryCoordinator.initialize.selector,
-                Env.impl.owner(), // newOwner
+                Env.owner(), // newOwner
                 Env.proxy.registryCoordinator().ejector(),
                 Env.impl.pauserRegistry(), // not a proxy.
                 0, // initial paused status (nothing paused)
@@ -128,20 +116,20 @@ contract ExecuteUpgrade is DeployImplementations {
 
         // Upgrade RelayRegistry.
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.relayRegistry()))),
+            address(Env.proxy.relayRegistry()),
             address(Env.impl.relayRegistry()),
-            abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, Env.impl.owner()) // newOwner
+            abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, Env.owner()) // newOwner
         );
 
         // Upgrade ServiceManager.
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.serviceManager()))),
+            address(Env.proxy.serviceManager()),
             address(Env.impl.serviceManager()),
             abi.encodeWithSelector(
                 EigenDAServiceManager.initialize.selector,
                 Env.impl.pauserRegistry(), // not a proxy.
                 0, // initial paused status (nothing paused)
-                Env.impl.owner(), // newOwner
+                Env.owner(), // newOwner
                 new address[](0),
                 Env.proxy.serviceManager().rewardsInitiator()
             )
@@ -149,22 +137,22 @@ contract ExecuteUpgrade is DeployImplementations {
 
         // Upgrade SocketRegistry (no reinitialization needed).
         proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.socketRegistry()))),
+            address(Env.proxy.socketRegistry()),
             address(Env.impl.socketRegistry())
         );
 
         // Upgrade StakeRegistry (no reinitialization needed).
         proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.stakeRegistry()))), address(Env.impl.stakeRegistry())
+            address(Env.proxy.stakeRegistry()), address(Env.impl.stakeRegistry())
         );
 
         // Upgrade ThresholdRegistry.
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.thresholdRegistry()))),
+            address(Env.proxy.thresholdRegistry()),
             address(Env.impl.thresholdRegistry()),
             abi.encodeWithSelector(
                 EigenDAThresholdRegistry.initialize.selector,
-                Env.impl.owner(), // newOwner
+                Env.owner(), // newOwner
                 Env.proxy.thresholdRegistry().quorumAdversaryThresholdPercentages(),
                 Env.proxy.thresholdRegistry().quorumConfirmationThresholdPercentages(),
                 Env.proxy.thresholdRegistry().quorumNumbersRequired(),
@@ -215,47 +203,46 @@ contract ExecuteUpgrade is DeployImplementations {
 
     /// @notice Verify ownership has been transferred to the new owner
     function _testOwnership() internal view {
-        assertEq(Env.proxy.certVerifierRouter().owner(), Env.impl.owner(), "CertVerifierRouter: incorrect owner");
-        // assertEq(Env.proxy.directory().owner(), Env.impl.owner()); // Not ownable compliant.
-        assertEq(Env.proxy.disperserRegistry().owner(), Env.impl.owner(), "DisperserRegistry: incorrect owner");
-        // assertEq(Env.proxy.ejectionManager().owner(), Env.impl.owner()); // Not ownable compliant.
-        assertEq(Env.proxy.paymentVault().owner(), Env.impl.owner(), "PaymentVault: incorrect owner");
-        assertEq(Env.proxy.registryCoordinator().owner(), Env.impl.owner(), "RegistryCoordinator: incorrect owner");
-        assertEq(Env.proxy.relayRegistry().owner(), Env.impl.owner(), "RelayRegistry: incorrect owner");
-        // assertEq(Env.proxy.serviceManager().owner(), Env.impl.owner(), "ServiceManager: incorrect owner");
-        assertEq(Env.proxy.thresholdRegistry().owner(), Env.impl.owner(), "ThresholdRegistry: incorrect owner");
+        assertEq(Env.proxy.certVerifierRouter().owner(), Env.owner(), "CertVerifierRouter: incorrect owner");
+        // assertEq(Env.proxy.directory().owner(), Env.owner()); // Not ownable compliant.
+        assertEq(Env.proxy.disperserRegistry().owner(), Env.owner(), "DisperserRegistry: incorrect owner");
+        // assertEq(Env.proxy.ejectionManager().owner(), Env.owner()); // Not ownable compliant.
+        assertEq(Env.proxy.paymentVault().owner(), Env.owner(), "PaymentVault: incorrect owner");
+        assertEq(Env.proxy.registryCoordinator().owner(), Env.owner(), "RegistryCoordinator: incorrect owner");
+        assertEq(Env.proxy.relayRegistry().owner(), Env.owner(), "RelayRegistry: incorrect owner");
+        // assertEq(Env.proxy.serviceManager().owner(), Env.owner(), "ServiceManager: incorrect owner");
+        assertEq(Env.proxy.thresholdRegistry().owner(), Env.owner(), "ThresholdRegistry: incorrect owner");
     }
 
     /// @notice Verify all proxy implementations were upgraded
-    function _testUpgradedImplementations() internal view {
-        // ProxyAdmin proxyAdmin = ProxyAdmin(Env.proxyAdmin()); // TODO: Add proxy admin to zeus.
-        
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.blsApkRegistry())))), 
-        //     address(Env.impl.blsApkRegistry()), "BLSApkRegistry: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.certVerifierRouter())))), 
-        //     address(Env.impl.certVerifierRouter()), "CertVerifierRouter: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.directory())))), 
-        //     address(Env.impl.directory()), "Directory: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.disperserRegistry())))), 
-        //     address(Env.impl.disperserRegistry()), "DisperserRegistry: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.ejectionManager())))), 
-        //     address(Env.impl.ejectionManager()), "EjectionManager: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.indexRegistry())))), 
-        //     address(Env.impl.indexRegistry()), "IndexRegistry: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.paymentVault())))), 
-        //     address(Env.impl.paymentVault()), "PaymentVault: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.registryCoordinator())))), 
-        //     address(Env.impl.registryCoordinator()), "RegistryCoordinator: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.relayRegistry())))), 
-        //     address(Env.impl.relayRegistry()), "RelayRegistry: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.serviceManager())))), 
-        //     address(Env.impl.serviceManager()), "ServiceManager: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.socketRegistry())))), 
-        //     address(Env.impl.socketRegistry()), "SocketRegistry: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.stakeRegistry())))), 
-        //     address(Env.impl.stakeRegistry()), "StakeRegistry: implementation not upgraded");
-        // assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.thresholdRegistry())))), 
-        //     address(Env.impl.thresholdRegistry()), "ThresholdRegistry: implementation not upgraded");
+    function _testUpgradedImplementations() internal view {      
+        IProxyAdmin proxyAdmin = Env.proxyAdmin();  
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.blsApkRegistry())), 
+            address(Env.impl.blsApkRegistry()), "BLSApkRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.certVerifierRouter())), 
+            address(Env.impl.certVerifierRouter()), "CertVerifierRouter: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.directory())), 
+            address(Env.impl.directory()), "Directory: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.disperserRegistry())), 
+            address(Env.impl.disperserRegistry()), "DisperserRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.ejectionManager())), 
+            address(Env.impl.ejectionManager()), "EjectionManager: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.indexRegistry())), 
+            address(Env.impl.indexRegistry()), "IndexRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.paymentVault())), 
+            address(Env.impl.paymentVault()), "PaymentVault: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.registryCoordinator())), 
+            address(Env.impl.registryCoordinator()), "RegistryCoordinator: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.relayRegistry())), 
+            address(Env.impl.relayRegistry()), "RelayRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.serviceManager())), 
+            address(Env.impl.serviceManager()), "ServiceManager: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.socketRegistry())), 
+            address(Env.impl.socketRegistry()), "SocketRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.stakeRegistry())), 
+            address(Env.impl.stakeRegistry()), "StakeRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.thresholdRegistry())), 
+            address(Env.impl.thresholdRegistry()), "ThresholdRegistry: implementation not upgraded");
     }
 
     /// @notice Verify contracts are not paused after upgrade

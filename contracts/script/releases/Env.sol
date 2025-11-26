@@ -109,7 +109,7 @@ library Env {
     }
 
     function proxyAdmin() internal view returns (IProxyAdmin) {
-        return IProxyAdmin(_deployedImpl("proxyAdmin"));
+        return IProxyAdmin(_deployedImpl("ProxyAdmin"));
     }
 
     function timelockController() internal view returns (TimelockController) {

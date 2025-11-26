@@ -24,36 +24,20 @@ import {
     PauserRegistry
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 
-// Import periphery contracts
-import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
+// // Import periphery contracts
+// import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
 
 // Import certificate verification
-import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
+// import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
-import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 // Import interfaces
-import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
-import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
-import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
-import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
-import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
-import {
-    IAVSDirectory
-} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
-import {
-    IRewardsCoordinator
-} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 import {
     IDelegationManager
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
 // TODO: Fetch CertVerifier and EjectionManager constructor parameters.
 // TODO: Add DelegationManager to zeus.
-// TODO: Figure out what initEigenDASignatureVerifier should be.
-// TODO: Vender Pausable.
 // TODO: Directory updates.
 
 contract DeployImplementations is EOADeployer {
@@ -69,32 +53,20 @@ contract DeployImplementations is EOADeployer {
         /// Constructor parameters
         /// -----------------------------------------------------------------------
 
-        // CertVerifier.
-        EigenDATypesV1.SecurityThresholds memory initSecurityThresholds = EigenDATypesV1.SecurityThresholds({
-            confirmationThreshold: 100, // 100% confirmation
-            adversaryThreshold: 33 // 33% adversary
-        });
-        bytes memory initQuorumNumbersRequired = hex"00";
-        
-        // // EjectionManager.
-        // uint256 depositBaseFeeMultiplier;
-        // uint256 estimatedGasUsedWithoutSig;
-        // uint256 estimatedGasUsedWithSig;
-
         // PauserRegistry.
         address[] memory initPausers = new address[](1);
-        initPausers[0] = Env.impl.owner();
+        initPausers[0] = Env.owner();
 
         /// -----------------------------------------------------------------------
         /// WARNING: NETWORK BROADCAST BEGINS HERE!
         /// -----------------------------------------------------------------------
 
         vm.startBroadcast();
-        
+
         // Deploy new AccessControl implementation.
         deployImpl({
             name: "AccessControl", 
-            deployedTo: address(new EigenDAAccessControl(Env.impl.owner()))
+            deployedTo: address(new EigenDAAccessControl(Env.owner()))
         });
         // Deploy new BLSApkRegistry implementation.
         deployImpl({
@@ -106,18 +78,19 @@ contract DeployImplementations is EOADeployer {
             name: "CertVerifierRouter", 
             deployedTo: address(new EigenDACertVerifierRouter())
         });
-        // Deploy new CertVerifier implementation.
-        deployImpl({ // TODO: Likely needs removed + from Directory too.
-            name: "CertVerifier",
-            deployedTo: address(
-                new EigenDACertVerifier({
-                    initEigenDAThresholdRegistry: IEigenDAThresholdRegistry(address(Env.proxy.thresholdRegistry())),
-                    initEigenDASignatureVerifier: IEigenDASignatureVerifier(address(0)), // TODO
-                    initSecurityThresholds: initSecurityThresholds,
-                    initQuorumNumbersRequired: initQuorumNumbersRequired
-                })
-            )
-        });
+        // NOTE: Spoke with team, CertVerifier is getting deprecated, no need to deploy.
+        // // Deploy new CertVerifier implementation.
+        // deployImpl({ // TODO: Remove from Directory too.
+        //     name: "CertVerifier",
+        //     deployedTo: address(
+        //         new EigenDACertVerifier({
+        //             initEigenDAThresholdRegistry: IEigenDAThresholdRegistry(address(Env.proxy.thresholdRegistry())),
+        //             initEigenDASignatureVerifier: IEigenDASignatureVerifier(address(0)), // TODO
+        //             initSecurityThresholds: initSecurityThresholds,
+        //             initQuorumNumbersRequired: initQuorumNumbersRequired
+        //         })
+        //     )
+        // });
         // Deploy new Directory implementation.
         deployImpl({
             name: "Directory", 
@@ -128,6 +101,7 @@ contract DeployImplementations is EOADeployer {
             name: "DisperserRegistry", 
             deployedTo: address(new EigenDADisperserRegistry())
         });
+        // NOTE: Spoke with team, EjectionManager is not being upgraded in this release.
         // // Deploy new EjectionManager implementation.
         // deployImpl({
         //     name: "EjectionManager",
@@ -154,7 +128,7 @@ contract DeployImplementations is EOADeployer {
         // Deploy new PauserRegistry implementation.
         deployImpl({
             name: type(PauserRegistry).name, 
-            deployedTo: address(new PauserRegistry({_pausers: initPausers, _unpauser: Env.impl.owner()}))
+            deployedTo: address(new PauserRegistry({_pausers: initPausers, _unpauser: Env.owner()}))
         });
         // Deploy new PaymentVault implementation.
         deployImpl({
@@ -362,8 +336,8 @@ contract DeployImplementations is EOADeployer {
         );
 
         // PauserRegistry
-        assertEq(Env.impl.pauserRegistry().unpauser(), Env.impl.owner(), "PauserRegistry: incorrect unpauser");
-        assertTrue(Env.impl.pauserRegistry().isPauser(Env.impl.owner()), "PauserRegistry: owner not set as pauser");
+        assertEq(Env.impl.pauserRegistry().unpauser(), Env.owner(), "PauserRegistry: incorrect unpauser");
+        assertTrue(Env.impl.pauserRegistry().isPauser(Env.owner()), "PauserRegistry: owner not set as pauser");
 
         // // EjectionManager
         // assertEq(
