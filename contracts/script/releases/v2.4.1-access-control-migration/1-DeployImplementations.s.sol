@@ -53,7 +53,8 @@ import {
 // TODO: Fetch CertVerifier and EjectionManager constructor parameters.
 // TODO: Add DelegationManager to zeus.
 // TODO: Figure out what initEigenDASignatureVerifier should be.
-// TODO: Add post deployment assertions.
+// TODO: Vender Pausable.
+// TODO: Directory updates.
 
 contract DeployImplementations is EOADeployer {
     using Env for *;
@@ -106,12 +107,12 @@ contract DeployImplementations is EOADeployer {
             deployedTo: address(new EigenDACertVerifierRouter())
         });
         // Deploy new CertVerifier implementation.
-        deployImpl({
+        deployImpl({ // TODO: Likely needs removed + from Directory too.
             name: "CertVerifier",
             deployedTo: address(
                 new EigenDACertVerifier({
                     initEigenDAThresholdRegistry: IEigenDAThresholdRegistry(address(Env.proxy.thresholdRegistry())),
-                    initEigenDASignatureVerifier: IEigenDASignatureVerifier(address(0)), // TODO: Figure out what contract this should be.
+                    initEigenDASignatureVerifier: IEigenDASignatureVerifier(address(0)), // TODO
                     initSecurityThresholds: initSecurityThresholds,
                     initQuorumNumbersRequired: initQuorumNumbersRequired
                 })
@@ -197,7 +198,7 @@ contract DeployImplementations is EOADeployer {
             deployedTo: address(
                 new StakeRegistry({
                     _registryCoordinator: Env.proxy.registryCoordinator(),
-                    _delegationManager: IDelegationManager(Env.proxy.stakeRegistry().delegation()) // TODO: Add DM to zeus.
+                    _delegationManager: IDelegationManager(Env.proxy.stakeRegistry().delegation())
                 })
             )
         });

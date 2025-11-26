@@ -15,9 +15,9 @@ import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/c
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {IEigenDAAddressDirectory} from "src/core/interfaces/IEigenDADirectory.sol";
 
-// TODO: Sort out whatever is wrong with the EjectionManager.
+// TODO: Sort out whatever is wrong with the EjectionManager. (ignoring for now spoke with team)
 // TODO: Add ProxyAdmin to zeus.
-// TODO: Add post deployment assertions.
+// TODO: Upgrade AccessControl.
 
 /// NOTE: Inconsistent use of EigenDARegistry
 /// forgefmt: disable-next-item
@@ -110,21 +110,21 @@ contract ExecuteUpgrade is DeployImplementations {
             )
         );
 
-        // // Upgrade RegistryCoordinator.
-        // proxyAdmin.upgradeAndCall(
-        //     TransparentUpgradeableProxy(payable(address(Env.proxy.registryCoordinator()))),
-        //     address(Env.impl.registryCoordinator()),
-        //     abi.encodeWithSelector(
-        //         EigenDARegistryCoordinator.initialize.selector,
-        //         Env.impl.owner(), // newOwner
-        //         Env.proxy.registryCoordinator().ejector(),
-        //         Env.impl.pauserRegistry(),
-        //         0, // initial paused status (nothing paused)
-        //         new IRegistryCoordinator.OperatorSetParam[](0),
-        //         new uint96[](0),
-        //         new IStakeRegistry.StrategyParams[][](0)
-        //     )
-        // );
+        // Upgrade RegistryCoordinator.
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.registryCoordinator()))),
+            address(Env.impl.registryCoordinator()),
+            abi.encodeWithSelector(
+                EigenDARegistryCoordinator.initialize.selector,
+                Env.impl.owner(), // newOwner
+                Env.proxy.registryCoordinator().ejector(),
+                Env.impl.pauserRegistry(), // not a proxy.
+                0, // initial paused status (nothing paused)
+                new IRegistryCoordinator.OperatorSetParam[](0),
+                new uint96[](0),
+                new IStakeRegistry.StrategyParams[][](0)
+            )
+        );
 
         // Upgrade RelayRegistry.
         proxyAdmin.upgradeAndCall(
@@ -133,19 +133,19 @@ contract ExecuteUpgrade is DeployImplementations {
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, Env.impl.owner()) // newOwner
         );
 
-        // // Upgrade ServiceManager.
-        // proxyAdmin.upgradeAndCall(
-        //     TransparentUpgradeableProxy(payable(address(Env.proxy.serviceManager()))),
-        //     address(Env.impl.serviceManager()),
-        //     abi.encodeWithSelector(
-        //         EigenDAServiceManager.initialize.selector,
-        //         Env.impl.pauserRegistry(),
-        //         0, // initial paused status (nothing paused)
-        //         Env.impl.owner(), // newOwner
-        //         new address[](0),
-        //         Env.proxy.serviceManager().rewardsInitiator()
-        //     )
-        // );
+        // Upgrade ServiceManager.
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.serviceManager()))),
+            address(Env.impl.serviceManager()),
+            abi.encodeWithSelector(
+                EigenDAServiceManager.initialize.selector,
+                Env.impl.pauserRegistry(), // not a proxy.
+                0, // initial paused status (nothing paused)
+                Env.impl.owner(), // newOwner
+                new address[](0),
+                Env.proxy.serviceManager().rewardsInitiator()
+            )
+        );
 
         // Upgrade SocketRegistry (no reinitialization needed).
         proxyAdmin.upgrade(
