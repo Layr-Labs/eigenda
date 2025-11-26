@@ -2,8 +2,8 @@
 pragma solidity ^0.8.12;
 
 import "../Env.sol";
-import {DeployImplementations} from "./1-DeployImplementations.s.sol";
-import {MultisigBuilder} from "zeus-templates/templates/MultisigBuilder.sol";
+import "./1-DeployImplementations.s.sol";
+import {EOADeployer} from "zeus-templates/templates/EOADeployer.sol";
 import {Encode} from "zeus-templates/utils/Encode.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -17,16 +17,13 @@ import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.
 
 /// @title ExecuteUpgrade
 /// @notice Execute upgrade of EigenDA implementations via timelock controller
-contract ExecuteUpgrade is MultisigBuilder, DeployImplementations {
+contract ExecuteUpgrade is EOADeployer {
     using Env for *;
     using Encode for *;
 
-    function _runAsMultisig() internal override prank(Env.executorMultisig()) {
+    function _runAsEOA() internal override {
         // Get proxy admin
         ProxyAdmin proxyAdmin = ProxyAdmin(Env.proxyAdmin());
-
-        // Get the new owner address (this should be set to the target owner for the migration)
-        address newOwner = Env.executorMultisig(); // or use a specific owner from env
 
         // Upgrade ServiceManager with reinitialization
         {
@@ -37,11 +34,11 @@ contract ExecuteUpgrade is MultisigBuilder, DeployImplementations {
             proxyAdmin.upgradeAndCall(
                 TransparentUpgradeableProxy(payable(address(Env.proxy.serviceManager()))),
                 address(Env.impl.serviceManager()),
-                abi.encodeWithSignature(
-                    "initialize(address,uint256,address,address[],address)",
+                abi.encodeWithSelector(
+                    EigenDAServiceManager.initialize.selector,
                     Env.proxy.serviceManager().pauserRegistry(),
                     Pausable(address(Env.proxy.serviceManager())).paused(),
-                    newOwner,
+                    Env.impl.owner(), // newOwner
                     batchConfirmers,
                     Env.proxy.serviceManager().rewardsInitiator()
                 )
@@ -75,9 +72,9 @@ contract ExecuteUpgrade is MultisigBuilder, DeployImplementations {
             proxyAdmin.upgradeAndCall(
                 TransparentUpgradeableProxy(payable(address(Env.proxy.registryCoordinator()))),
                 address(Env.impl.registryCoordinator()),
-                abi.encodeWithSignature(
-                    "initialize(address,address,address,uint256,(uint32,uint16,uint16)[],uint96[],(address,uint96)[][])",
-                    newOwner,
+                abi.encodeWithSelector(
+                    EigenDARegistryCoordinator.initialize.selector,
+                    Env.impl.owner(), // newOwner
                     Env.proxy.registryCoordinator().ejector(),
                     Env.proxy.registryCoordinator().pauserRegistry(),
                     Pausable(address(Env.proxy.registryCoordinator())).paused(),
@@ -108,9 +105,9 @@ contract ExecuteUpgrade is MultisigBuilder, DeployImplementations {
             proxyAdmin.upgradeAndCall(
                 TransparentUpgradeableProxy(payable(address(Env.proxy.thresholdRegistry()))),
                 address(Env.impl.thresholdRegistry()),
-                abi.encodeWithSignature(
-                    "initialize(address,bytes,bytes,bytes,(uint32,uint32,uint8)[])",
-                    newOwner,
+                abi.encodeWithSelector(
+                    EigenDAThresholdRegistry.initialize.selector,
+                    Env.impl.owner(), // newOwner
                     quorumAdversaryThresholdPercentages,
                     quorumConfirmationThresholdPercentages,
                     quorumNumbersRequired,
@@ -123,23 +120,23 @@ contract ExecuteUpgrade is MultisigBuilder, DeployImplementations {
         proxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(Env.proxy.relayRegistry()))),
             address(Env.impl.relayRegistry()),
-            abi.encodeWithSignature("initialize(address)", newOwner)
+            abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, Env.impl.owner()) // newOwner
         );
 
         // Upgrade DisperserRegistry with reinitialization
         proxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(Env.proxy.disperserRegistry()))),
             address(Env.impl.disperserRegistry()),
-            abi.encodeWithSignature("initialize(address)", newOwner)
+            abi.encodeWithSelector(EigenDADisperserRegistry.initialize.selector, Env.impl.owner()) // newOwner
         );
 
         // Upgrade PaymentVault with reinitialization
         proxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(Env.proxy.paymentVault()))),
             address(Env.impl.paymentVault()),
-            abi.encodeWithSignature(
-                "initialize(address,uint64,uint64,uint64,uint64,uint64,uint64)",
-                newOwner,
+            abi.encodeWithSelector(
+                PaymentVault.initialize.selector,
+                Env.impl.owner(), // newOwner
                 Env.proxy.paymentVault().minNumSymbols(),
                 Env.proxy.paymentVault().pricePerSymbol(),
                 Env.proxy.paymentVault().priceUpdateCooldown(),
@@ -150,86 +147,24 @@ contract ExecuteUpgrade is MultisigBuilder, DeployImplementations {
         );
     }
 
-    function testScript() public virtual override {
-        // 1 - Deploy new implementations
+    /// -----------------------------------------------------------------------
+    /// 2) Post-upgrade assertions
+    /// -----------------------------------------------------------------------
+
+    function testScript() public virtual {
+        // Hook for pre-test setup.
+        _beforeTestScript();
+        // Execute upgrade.
         runAsEOA();
-
-        // 2 - Execute upgrades via multisig
-        execute();
-
-        // 3 - Validate all upgrades were successful
-        _validateUpgrades();
+        // Hook for post-upgrade assertions.
+        _afterTestScript();
     }
 
-    /// @dev Validate that all upgrades were successful
-    function _validateUpgrades() internal view {
-        address newOwner = Env.executorMultisig();
+    /// -----------------------------------------------------------------------
+    /// Test hooks
+    /// -----------------------------------------------------------------------
 
-        // Validate ServiceManager upgrade
-        address serviceManagerImpl = Env._getProxyImpl(address(Env.proxy.serviceManager()));
-        assertTrue(
-            serviceManagerImpl == address(Env.impl.serviceManager()),
-            "ServiceManager proxy should point to new implementation"
-        );
-        assertTrue(Env.proxy.serviceManager().owner() == newOwner, "ServiceManager owner should be updated");
+    function _beforeTestScript() internal view {}
 
-        // Validate RegistryCoordinator upgrade
-        address registryCoordinatorImpl = Env._getProxyImpl(address(Env.proxy.registryCoordinator()));
-        assertTrue(
-            registryCoordinatorImpl == address(Env.impl.registryCoordinator()),
-            "RegistryCoordinator proxy should point to new implementation"
-        );
-        assertTrue(Env.proxy.registryCoordinator().owner() == newOwner, "RegistryCoordinator owner should be updated");
-
-        // Validate ThresholdRegistry upgrade
-        address thresholdRegistryImpl = Env._getProxyImpl(address(Env.proxy.thresholdRegistry()));
-        assertTrue(
-            thresholdRegistryImpl == address(Env.impl.thresholdRegistry()),
-            "ThresholdRegistry proxy should point to new implementation"
-        );
-        assertTrue(Env.proxy.thresholdRegistry().owner() == newOwner, "ThresholdRegistry owner should be updated");
-
-        // Validate RelayRegistry upgrade
-        address relayRegistryImpl = Env._getProxyImpl(address(Env.proxy.relayRegistry()));
-        assertTrue(
-            relayRegistryImpl == address(Env.impl.relayRegistry()),
-            "RelayRegistry proxy should point to new implementation"
-        );
-        assertTrue(Env.proxy.relayRegistry().owner() == newOwner, "RelayRegistry owner should be updated");
-
-        // Validate DisperserRegistry upgrade
-        address disperserRegistryImpl = Env._getProxyImpl(address(Env.proxy.disperserRegistry()));
-        assertTrue(
-            disperserRegistryImpl == address(Env.impl.disperserRegistry()),
-            "DisperserRegistry proxy should point to new implementation"
-        );
-        assertTrue(Env.proxy.disperserRegistry().owner() == newOwner, "DisperserRegistry owner should be updated");
-
-        // Validate PaymentVault upgrade
-        address paymentVaultImpl = Env._getProxyImpl(address(Env.proxy.paymentVault()));
-        assertTrue(
-            paymentVaultImpl == address(Env.impl.paymentVault()),
-            "PaymentVault proxy should point to new implementation"
-        );
-        assertTrue(Env.proxy.paymentVault().owner() == newOwner, "PaymentVault owner should be updated");
-
-        // Validate ProxyAdmin ownership
-        address proxyAdmin = Env._getProxyAdmin(address(Env.proxy.serviceManager()));
-        assertTrue(proxyAdmin == Env.proxyAdmin(), "ServiceManager proxy admin should be correct");
-
-        proxyAdmin = Env._getProxyAdmin(address(Env.proxy.registryCoordinator()));
-        assertTrue(proxyAdmin == Env.proxyAdmin(), "RegistryCoordinator proxy admin should be correct");
-
-        proxyAdmin = Env._getProxyAdmin(address(Env.proxy.thresholdRegistry()));
-        assertTrue(proxyAdmin == Env.proxyAdmin(), "ThresholdRegistry proxy admin should be correct");
-
-        proxyAdmin = Env._getProxyAdmin(address(Env.proxy.relayRegistry()));
-        assertTrue(proxyAdmin == Env.proxyAdmin(), "RelayRegistry proxy admin should be correct");
-
-        proxyAdmin = Env._getProxyAdmin(address(Env.proxy.disperserRegistry()));
-        assertTrue(proxyAdmin == Env.proxyAdmin(), "DisperserRegistry proxy admin should be correct");
-
-        proxyAdmin = Env._getProxyAdmin(address(Env.proxy.paymentVault()));
-        assertTrue(proxyAdmin == Env.proxyAdmin(), "PaymentVault proxy admin should be correct");
-    }
+    function _afterTestScript() internal view {}
 }

@@ -8,7 +8,7 @@
             "filename": "1-DeployImplementations.s.sol"
         },
         {
-            "type": "multisig",
+            "type": "eoa",
             "filename": "2-ExecuteUpgrade.s.sol"
         }
     ]

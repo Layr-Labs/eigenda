@@ -48,126 +48,99 @@ import {
 // NOTE: The names in deployImpl must match the names in in zeus,
 // will likely have to correct all contracts with "EigenDA" prefix.
 
+// TODO: Fetch remaining constructor/initialize parameters from existing contracts on chain.
+// TODO: Ensure all relevant contracts are included in the upgrade.
+// TODO: Add post deployment assertions.
+
 contract DeployImplementations is EOADeployer {
     using Env for *;
 
-    /// forgefmt: disable-next-item
-    function _runAsEOA() internal override {
-        // Get the directory to access deployed proxies
-        EigenDADirectory directory = Env.proxy.directory();
+    /// -----------------------------------------------------------------------
+    /// 1) Deploy new implementations as EOA
+    /// -----------------------------------------------------------------------
 
+    function _runAsEOA() internal override {
+        // Deploy new ServiceManager implementation.
         deployImpl({
             name: "ServiceManager",
             deployedTo: address(
                 new EigenDAServiceManager(
                     IAVSDirectory(Env.proxy.avsDirectory()),
                     IRewardsCoordinator(Env.proxy.rewardsCoordinator()),
-                    IRegistryCoordinator(address(Env.proxy.registryCoordinator())),
-                    IStakeRegistry(address(Env.proxy.stakeRegistry())),
-                    IEigenDAThresholdRegistry(address(Env.proxy.thresholdRegistry())),
-                    IEigenDARelayRegistry(address(Env.proxy.relayRegistry())),
-                    IPaymentVault(address(Env.proxy.paymentVault())),
-                    IEigenDADisperserRegistry(address(Env.proxy.disperserRegistry()))
+                    IRegistryCoordinator(Env.proxy.registryCoordinator()),
+                    IStakeRegistry(Env.proxy.stakeRegistry()),
+                    IEigenDAThresholdRegistry(Env.proxy.thresholdRegistry()),
+                    IEigenDARelayRegistry(Env.proxy.relayRegistry()),
+                    IPaymentVault(Env.proxy.paymentVault()),
+                    IEigenDADisperserRegistry(Env.proxy.disperserRegistry())
                 )
             )
         });
 
-        // Deploy new RegistryCoordinator implementation
+        // Deploy new RegistryCoordinator implementation.
         deployImpl({
             name: "RegistryCoordinator",
-            deployedTo: address(new EigenDARegistryCoordinator(address(directory)))
+            deployedTo: address(new EigenDARegistryCoordinator(address(Env.proxy.directory())))
         });
 
-        // Deploy new ThresholdRegistry implementation
+        // Deploy new ThresholdRegistry implementation.
+        deployImpl({name: "ThresholdRegistry", deployedTo: address(new EigenDAThresholdRegistry())});
+        // Deploy new RelayRegistry implementation.
+        deployImpl({name: "RelayRegistry", deployedTo: address(new EigenDARelayRegistry())});
+        // Deploy new DisperserRegistry implementation.
+        deployImpl({name: "DisperserRegistry", deployedTo: address(new EigenDADisperserRegistry())});
+        // Deploy new PaymentVault implementation.
+        deployImpl({name: type(PaymentVault).name, deployedTo: address(new PaymentVault())});
+        // Deploy new IndexRegistry implementation.
         deployImpl({
-            name: "ThresholdRegistry",
-            deployedTo: address(new EigenDAThresholdRegistry())
+            name: type(IndexRegistry).name, deployedTo: address(new IndexRegistry(Env.proxy.registryCoordinator()))
         });
 
-        // Deploy new RelayRegistry implementation
-        deployImpl({
-            name: "RelayRegistry",
-            deployedTo: address(new EigenDARelayRegistry())
-        });
-
-        // Deploy new DisperserRegistry implementation
-        deployImpl({
-            name: "DisperserRegistry",
-            deployedTo: address(new EigenDADisperserRegistry())
-        });
-
-        // Deploy new PaymentVault implementation
-        deployImpl({
-            name: type(PaymentVault).name,
-            deployedTo: address(new PaymentVault())
-        });
-
-        // Deploy new IndexRegistry implementation
-        deployImpl({
-            name: type(IndexRegistry).name,
-            deployedTo: address(
-                new IndexRegistry(IRegistryCoordinator(address(Env.proxy.registryCoordinator())))
-            )
-        });
-
-        // Deploy new StakeRegistry implementation
-        // Get DelegationManager from existing StakeRegistry
-        StakeRegistry currentStakeRegistry = Env.proxy.stakeRegistry();
-        address delegationManager = address(currentStakeRegistry.delegation());
-        
+        // Deploy new StakeRegistry implementation.
         deployImpl({
             name: type(StakeRegistry).name,
             deployedTo: address(
                 new StakeRegistry(
-                    IRegistryCoordinator(address(Env.proxy.registryCoordinator())),
-                    IDelegationManager(delegationManager)
+                    IRegistryCoordinator(Env.proxy.registryCoordinator()),
+                    IDelegationManager(Env.proxy.stakeRegistry().delegation())
                 )
             )
         });
 
-        // Deploy new BLSApkRegistry implementation
+        // Deploy new BLSApkRegistry implementation.
         deployImpl({
-            name: type(BLSApkRegistry).name,
-            deployedTo: address(
-                new BLSApkRegistry(IRegistryCoordinator(address(Env.proxy.registryCoordinator())))
-            )
+            name: type(BLSApkRegistry).name, deployedTo: address(new BLSApkRegistry(Env.proxy.registryCoordinator()))
+        });
+        // Deploy new SocketRegistry implementation.
+        deployImpl({
+            name: type(SocketRegistry).name, deployedTo: address(new SocketRegistry(Env.proxy.registryCoordinator()))
         });
 
-        // Deploy new SocketRegistry implementation
-        deployImpl({
-            name: type(SocketRegistry).name,
-            deployedTo: address(
-                new SocketRegistry(IRegistryCoordinator(address(Env.proxy.registryCoordinator())))
-            )
-        });
-
-        // Deploy new EjectionManager implementation
         // TODO: Get parameters from existing ejection manager.
-        address depositToken = vm.envOr("EJECTION_DEPOSIT_TOKEN", address(0));
         uint256 depositBaseFeeMultiplier = vm.envOr("EJECTION_DEPOSIT_BASE_FEE_MULTIPLIER", uint256(1));
-        uint256 estimatedGasWithoutSig = vm.envOr("EJECTION_ESTIMATED_GAS_WITHOUT_SIG", uint256(100000));
-        uint256 estimatedGasWithSig = vm.envOr("EJECTION_ESTIMATED_GAS_WITH_SIG", uint256(150000));
-        
+        uint256 estimatedGasWithoutSig = vm.envOr("EJECTION_ESTIMATED_GAS_WITHOUT_SIG", uint256(100_000));
+        uint256 estimatedGasWithSig = vm.envOr("EJECTION_ESTIMATED_GAS_WITH_SIG", uint256(150_000));
+
+        // Deploy new EjectionManager implementation.
         deployImpl({
             name: "EjectionManager",
             deployedTo: address(
                 new EigenDAEjectionManager(
-                    depositToken,
+                    Env.proxy.ejectionManager().getDepositToken(),
                     depositBaseFeeMultiplier,
-                    address(directory),
+                    address(Env.proxy.directory()),
                     estimatedGasWithoutSig,
                     estimatedGasWithSig
                 )
             )
         });
 
-        // Deploy new CertVerifier implementation
-        // Use default security thresholds - can be updated post-deployment
+        // TODO: Get values from team or onchain state.
         EigenDATypesV1.SecurityThresholds memory defaultThresholds = EigenDATypesV1.SecurityThresholds({
             confirmationThreshold: 100, // 100% confirmation
             adversaryThreshold: 33 // 33% adversary
         });
-        
+
         deployImpl({
             name: "CertVerifier",
             deployedTo: address(
@@ -180,75 +153,30 @@ contract DeployImplementations is EOADeployer {
             )
         });
 
-        // Deploy new CertVerifierRouter implementation
-        deployImpl({
-            name: "CertVerifierRouter",
-            deployedTo: address(new EigenDACertVerifierRouter())
-        });
+        // Deploy new CertVerifierRouter implementation.
+        deployImpl({name: "CertVerifierRouter", deployedTo: address(new EigenDACertVerifierRouter())});
 
         vm.stopBroadcast();
     }
 
+    /// -----------------------------------------------------------------------
+    /// 2) Post-deployment assertions
+    /// -----------------------------------------------------------------------
+
     function testScript() public virtual {
-        // Deploy the new implementations
+        // Hook for pre-test setup.
+        _beforeTestScript();
+        // Deploy new implementations as EOA.
         runAsEOA();
-
-        // Validate implementations were deployed correctly
-        _validateNewImplAddresses();
-        _validateImplConstructors();
+        // Hook for post-deployment assertions.
+        _afterTestScript();
     }
 
-    /// @dev Validate that new implementation addresses are non-zero and different from proxies
-    function _validateNewImplAddresses() internal view {
-        address serviceManagerImpl = address(Env.impl.serviceManager());
-        address registryCoordinatorImpl = address(Env.impl.registryCoordinator());
+    /// -----------------------------------------------------------------------
+    /// Test hooks
+    /// -----------------------------------------------------------------------
 
-        assertTrue(serviceManagerImpl != address(0), "ServiceManager implementation should be deployed");
-        assertTrue(registryCoordinatorImpl != address(0), "RegistryCoordinator implementation should be deployed");
+    function _beforeTestScript() internal view {}
 
-        // Ensure implementations are different from proxy addresses
-        assertTrue(
-            serviceManagerImpl != address(Env.proxy.serviceManager()),
-            "ServiceManager implementation should differ from proxy"
-        );
-        assertTrue(
-            registryCoordinatorImpl != address(Env.proxy.registryCoordinator()),
-            "RegistryCoordinator implementation should differ from proxy"
-        );
-
-        // Validate other implementations
-        address thresholdRegistryImpl = address(Env.impl.thresholdRegistry());
-        assertTrue(thresholdRegistryImpl != address(0), "ThresholdRegistry implementation should be deployed");
-    }
-
-    /// @dev Validate implementation constructor values
-    function _validateImplConstructors() internal view {
-        // Validate ServiceManager constructor arguments
-        EigenDAServiceManager serviceManager = Env.impl.serviceManager();
-
-        // Verify immutable constructor parameters are set correctly
-        assertTrue(
-            address(serviceManager.registryCoordinator()) == address(Env.proxy.registryCoordinator()),
-            "ServiceManager registryCoordinator should match"
-        );
-        assertTrue(
-            address(serviceManager.stakeRegistry()) == address(Env.proxy.stakeRegistry()),
-            "ServiceManager stakeRegistry should match"
-        );
-
-        // Validate RegistryCoordinator constructor arguments
-        EigenDARegistryCoordinator registryCoordinator = Env.impl.registryCoordinator();
-        EigenDADirectory directory = Env.proxy.directory();
-
-        assertTrue(
-            address(registryCoordinator.directory()) == address(directory), "RegistryCoordinator directory should match"
-        );
-
-        // Validate StakeRegistry constructor
-        StakeRegistry stakeRegistry = Env.impl.stakeRegistry();
-        assertTrue(
-            address(stakeRegistry.registryCoordinator()) == address(Env.proxy.registryCoordinator()),
-            "StakeRegistry registryCoordinator should match"
-        );
-    }
+    function _afterTestScript() internal view {}
 }

@@ -47,6 +47,32 @@ import {
 library Env {
     using stdJson for string;
 
+    /// -----------------------------------------------------------------------
+    /// Constants
+    /// -----------------------------------------------------------------------
+
+    Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+    /// @dev Storage slot with the address of the current implementation.
+    /// This is the keccak-256 hash of "eip1967.proxy.implementation" subtracted by 1, and is
+    /// validated in the constructor.
+    bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+    /// @dev Storage slot with the admin of the contract.
+    /// This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
+    /// validated in the constructor.
+    bytes32 internal constant _ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    /// @dev The storage slot of the UpgradeableBeacon contract which defines the implementation for this proxy.
+    /// This is bytes32(uint256(keccak256('eip1967.proxy.beacon')) - 1)) and is validated in the constructor.
+    bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+
+    /// -----------------------------------------------------------------------
+    /// Enums
+    /// -----------------------------------------------------------------------
+
+    // TODO: Use user defined types instead of enums, like 4 lines instead of 20.
+
     /// Dummy types and variables to facilitate syntax, e.g: `Env.proxy.serviceManager()`
     enum DeployedProxy {
         A
@@ -66,7 +92,10 @@ library Env {
     DeployedImpl internal constant impl = DeployedImpl.A;
     DeployedInstance internal constant instance = DeployedInstance.A;
 
-    /// env
+    /// -----------------------------------------------------------------------
+    /// Environment Variables
+    /// -----------------------------------------------------------------------
+
     function env() internal view returns (string memory) {
         return _string("ZEUS_ENV");
     }
@@ -79,22 +108,6 @@ library Env {
         return _string("ZEUS_DEPLOY_TO_VERSION");
     }
 
-    function executorMultisig() internal view returns (address) {
-        return _envAddress("executorMultisig");
-    }
-
-    function opsMultisig() internal view returns (address) {
-        return _envAddress("operationsMultisig");
-    }
-
-    function communityMultisig() internal view returns (address) {
-        return _envAddress("communityMultisig");
-    }
-
-    function pauserMultisig() internal view returns (address) {
-        return _envAddress("pauserMultisig");
-    }
-
     function proxyAdmin() internal view returns (address) {
         return _envAddress("proxyAdmin");
     }
@@ -103,162 +116,190 @@ library Env {
         return TimelockController(payable(_envAddress("timelockController")));
     }
 
-    /// Core EigenDA Contracts
+    /// @dev Usage: `Env.impl.owner()`
+    function owner(DeployedImpl) internal view returns (address) {
+        return _deployedImpl("Owner");
+    }
 
-    /// Directory
+    /// -----------------------------------------------------------------------
+    /// Core EigenDA Contracts
+    /// -----------------------------------------------------------------------
+
+    /// @dev Usage: `Env.proxy.directory()`
     function directory(DeployedProxy) internal view returns (EigenDADirectory) {
         return EigenDADirectory(_deployedProxy("Directory"));
     }
 
+    /// @dev Usage: `Env.impl.directory()`
     function directory(DeployedImpl) internal view returns (EigenDADirectory) {
         return EigenDADirectory(_deployedImpl("Directory"));
     }
 
-    /// Service Manager
+    /// @dev Usage: `Env.proxy.serviceManager()`
     function serviceManager(DeployedProxy) internal view returns (EigenDAServiceManager) {
         return EigenDAServiceManager(_deployedProxy("ServiceManager"));
     }
 
+    /// @dev Usage: `Env.impl.serviceManager()`
     function serviceManager(DeployedImpl) internal view returns (EigenDAServiceManager) {
         return EigenDAServiceManager(_deployedImpl("ServiceManager"));
     }
 
-    /// Registry Coordinator
+    /// @dev Usage: `Env.proxy.registryCoordinator()`
     function registryCoordinator(DeployedProxy) internal view returns (EigenDARegistryCoordinator) {
         return EigenDARegistryCoordinator(_deployedProxy("RegistryCoordinator"));
     }
 
+    /// @dev Usage: `Env.impl.registryCoordinator()`
     function registryCoordinator(DeployedImpl) internal view returns (EigenDARegistryCoordinator) {
         return EigenDARegistryCoordinator(_deployedImpl("RegistryCoordinator"));
     }
 
-    /// BLS APK Registry
+    /// @dev Usage: `Env.proxy.blsApkRegistry()`
     function blsApkRegistry(DeployedProxy) internal view returns (BLSApkRegistry) {
         return BLSApkRegistry(_deployedProxy(type(BLSApkRegistry).name));
     }
 
+    /// @dev Usage: `Env.impl.blsApkRegistry()`
     function blsApkRegistry(DeployedImpl) internal view returns (BLSApkRegistry) {
         return BLSApkRegistry(_deployedImpl(type(BLSApkRegistry).name));
     }
 
-    /// Index Registry
+    /// @dev Usage: `Env.proxy.indexRegistry()`
     function indexRegistry(DeployedProxy) internal view returns (IndexRegistry) {
         return IndexRegistry(_deployedProxy(type(IndexRegistry).name));
     }
 
+    /// @dev Usage: `Env.impl.indexRegistry()`
     function indexRegistry(DeployedImpl) internal view returns (IndexRegistry) {
         return IndexRegistry(_deployedImpl(type(IndexRegistry).name));
     }
 
-    /// Stake Registry
+    /// @dev Usage: `Env.proxy.stakeRegistry()`
     function stakeRegistry(DeployedProxy) internal view returns (StakeRegistry) {
         return StakeRegistry(_deployedProxy(type(StakeRegistry).name));
     }
 
+    /// @dev Usage: `Env.impl.stakeRegistry()`
     function stakeRegistry(DeployedImpl) internal view returns (StakeRegistry) {
         return StakeRegistry(_deployedImpl(type(StakeRegistry).name));
     }
 
-    /// Socket Registry
+    /// @dev Usage: `Env.proxy.socketRegistry()`
     function socketRegistry(DeployedProxy) internal view returns (SocketRegistry) {
         return SocketRegistry(_deployedProxy(type(SocketRegistry).name));
     }
 
+    /// @dev Usage: `Env.impl.socketRegistry()`
     function socketRegistry(DeployedImpl) internal view returns (SocketRegistry) {
         return SocketRegistry(_deployedImpl(type(SocketRegistry).name));
     }
 
-    /// Threshold Registry
+    /// @dev Usage: `Env.proxy.thresholdRegistry()`
     function thresholdRegistry(DeployedProxy) internal view returns (EigenDAThresholdRegistry) {
         return EigenDAThresholdRegistry(_deployedProxy("ThresholdRegistry"));
     }
 
+    /// @dev Usage: `Env.impl.thresholdRegistry()`
     function thresholdRegistry(DeployedImpl) internal view returns (EigenDAThresholdRegistry) {
         return EigenDAThresholdRegistry(_deployedImpl("ThresholdRegistry"));
     }
 
-    /// Relay Registry
+    /// @dev Usage: `Env.proxy.relayRegistry()`
     function relayRegistry(DeployedProxy) internal view returns (EigenDARelayRegistry) {
         return EigenDARelayRegistry(_deployedProxy("RelayRegistry"));
     }
 
+    /// @dev Usage: `Env.impl.relayRegistry()`
     function relayRegistry(DeployedImpl) internal view returns (EigenDARelayRegistry) {
         return EigenDARelayRegistry(_deployedImpl("RelayRegistry"));
     }
 
-    /// Disperser Registry
+    /// @dev Usage: `Env.proxy.disperserRegistry()`
     function disperserRegistry(DeployedProxy) internal view returns (EigenDADisperserRegistry) {
         return EigenDADisperserRegistry(_deployedProxy("DisperserRegistry"));
     }
 
+    /// @dev Usage: `Env.impl.disperserRegistry()`
     function disperserRegistry(DeployedImpl) internal view returns (EigenDADisperserRegistry) {
         return EigenDADisperserRegistry(_deployedImpl("DisperserRegistry"));
     }
 
-    /// Payment Vault
+    /// @dev Usage: `Env.proxy.paymentVault()`
     function paymentVault(DeployedProxy) internal view returns (PaymentVault) {
         return PaymentVault(payable(_deployedProxy(type(PaymentVault).name)));
     }
 
+    /// @dev Usage: `Env.impl.paymentVault()`
     function paymentVault(DeployedImpl) internal view returns (PaymentVault) {
         return PaymentVault(payable(_deployedImpl(type(PaymentVault).name)));
     }
 
-    /// Access Control
+    /// @dev Usage: `Env.impl.accessControl()`
     function accessControl(DeployedImpl) internal view returns (EigenDAAccessControl) {
         return EigenDAAccessControl(_deployedImpl("AccessControl"));
     }
 
-    /// Operator State Retriever
+    /// @dev Usage: `Env.impl.operatorStateRetriever()`
     function operatorStateRetriever(DeployedImpl) internal view returns (OperatorStateRetriever) {
         return OperatorStateRetriever(_deployedImpl(type(OperatorStateRetriever).name));
     }
 
-    /// Pauser Registry
+    /// @dev Usage: `Env.impl.pauserRegistry()`
     function pauserRegistry(DeployedImpl) internal view returns (IPauserRegistry) {
         return IPauserRegistry(_deployedImpl("PauserRegistry"));
     }
 
+    /// -----------------------------------------------------------------------
     /// Periphery Contracts
+    /// -----------------------------------------------------------------------
 
-    /// Ejection Manager
+    /// @dev Usage: `Env.proxy.ejectionManager()`
     function ejectionManager(DeployedProxy) internal view returns (EigenDAEjectionManager) {
         return EigenDAEjectionManager(_deployedProxy("EjectionManager"));
     }
 
+    /// @dev Usage: `Env.impl.ejectionManager()`
     function ejectionManager(DeployedImpl) internal view returns (EigenDAEjectionManager) {
         return EigenDAEjectionManager(_deployedImpl("EjectionManager"));
     }
 
-    /// Certificate Verification Contracts
+    /// -----------------------------------------------------------------------
+    /// Cert Verification Contracts
+    /// -----------------------------------------------------------------------
 
-    /// Certificate Verifier
+    /// @dev Usage: `Env.impl.certVerifier()`
     function certVerifier(DeployedImpl) internal view returns (EigenDACertVerifier) {
         return EigenDACertVerifier(_deployedImpl("CertVerifier"));
     }
 
-    /// Certificate Verifier Router
+    /// @dev Usage: `Env.proxy.certVerifierRouter()`
     function certVerifierRouter(DeployedProxy) internal view returns (EigenDACertVerifierRouter) {
         return EigenDACertVerifierRouter(_deployedProxy("CertVerifierRouter"));
     }
 
+    /// @dev Usage: `Env.impl.certVerifierRouter()`
     function certVerifierRouter(DeployedImpl) internal view returns (EigenDACertVerifierRouter) {
         return EigenDACertVerifierRouter(_deployedImpl("CertVerifierRouter"));
     }
 
+    /// -----------------------------------------------------------------------
     /// EigenLayer Contracts
+    /// -----------------------------------------------------------------------
+
+    /// @dev Usage: `Env.proxy.avsDirectory()`
     function avsDirectory(DeployedProxy) internal view returns (IAVSDirectory) {
         return IAVSDirectory(_deployedProxy("AVSDirectory"));
     }
 
+    /// @dev Usage: `Env.proxy.rewardsCoordinator()`
     function rewardsCoordinator(DeployedProxy) internal view returns (IRewardsCoordinator) {
         return IRewardsCoordinator(_deployedProxy("RewardsCoordinator"));
     }
 
-    /// Helpers
-
-    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
-    Vm internal constant vm = Vm(VM_ADDRESS);
+    /// -----------------------------------------------------------------------
+    /// Private Zeus Helpers
+    /// -----------------------------------------------------------------------
 
     /// @dev Returns the path to the deployment state file based on ZEUS_ENV and ZEUS_ENV_VERSION
     function _getStatePath() private view returns (string memory) {
@@ -303,40 +344,39 @@ library Env {
         return 0;
     }
 
-    function _deployedProxy(string memory name) private view returns (address) {
+    function _parseJsonAddress(string memory json, string memory key) private pure returns (address) {
+        try vm.parseJsonAddress(json, key) returns (address addr) {
+            return addr;
+        } catch {
+            return address(0);
+        }
+    }
+
+    function _deployedProxy(string memory name) private view returns (address _proxy) {
         string memory json = _getDeploymentState();
         if (bytes(json).length == 0) return address(0);
-
         string memory key = string.concat(".proxies.", name);
-        try vm.parseJsonAddress(json, key) returns (address addr) {
-            return addr;
-        } catch {
-            return address(0);
-        }
+        _proxy = _parseJsonAddress(json, key);
+        vm.assertNotEq(_proxy, address(0), string.concat("Proxy ", name, " not found")); // added sanity check
+        return _proxy;
     }
 
-    function _deployedBeacon(string memory name) private view returns (address) {
+    function _deployedBeacon(string memory name) private view returns (address _beacon) {
         string memory json = _getDeploymentState();
         if (bytes(json).length == 0) return address(0);
-
         string memory key = string.concat(".beacons.", name);
-        try vm.parseJsonAddress(json, key) returns (address addr) {
-            return addr;
-        } catch {
-            return address(0);
-        }
+        _beacon = _parseJsonAddress(json, key);
+        vm.assertNotEq(_beacon, address(0), string.concat("Beacon ", name, " not found")); // added sanity check
+        return _beacon;
     }
 
-    function _deployedImpl(string memory name) private view returns (address) {
+    function _deployedImpl(string memory name) private view returns (address _impl) {
         string memory json = _getDeploymentState();
         if (bytes(json).length == 0) return address(0);
-
         string memory key = string.concat(".implementations.", name);
-        try vm.parseJsonAddress(json, key) returns (address addr) {
-            return addr;
-        } catch {
-            return address(0);
-        }
+        _impl = _parseJsonAddress(json, key);
+        vm.assertNotEq(_impl, address(0), string.concat("Implementation ", name, " not found")); // added sanity check
+        return _impl;
     }
 
     function _envAddress(string memory key) private view returns (address) {
@@ -395,21 +435,9 @@ library Env {
         }
     }
 
-    /// Test Helpers
-
-    /// @dev Storage slot with the address of the current implementation.
-    /// This is the keccak-256 hash of "eip1967.proxy.implementation" subtracted by 1, and is
-    /// validated in the constructor.
-    bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
-
-    /// @dev Storage slot with the admin of the contract.
-    /// This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
-    /// validated in the constructor.
-    bytes32 internal constant _ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
-    /// @dev The storage slot of the UpgradeableBeacon contract which defines the implementation for this proxy.
-    /// This is bytes32(uint256(keccak256('eip1967.proxy.beacon')) - 1)) and is validated in the constructor.
-    bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+    /// -----------------------------------------------------------------------
+    /// ERC-1967 Storage Accessors
+    /// -----------------------------------------------------------------------
 
     /// @dev Query and return the implementation address of the proxy.
     function _getProxyImpl(address _proxy) internal view returns (address) {
@@ -425,9 +453,4 @@ library Env {
     function _getBeacon(address _proxy) internal view returns (address) {
         return address(uint160(uint256(vm.load(_proxy, _BEACON_SLOT))));
     }
-
-    function _strEq(string memory a, string memory b) internal pure returns (bool) {
-        return keccak256(bytes(a)) == keccak256(bytes(b));
-    }
 }
-
