@@ -288,7 +288,7 @@ func StartProxyServer(
 	}
 
 	if appConfig.EnabledServersConfig.ArbCustomDA {
-		arbHandlers := arbitrum_altda.NewHandlers(certMgr, logger, compatibilityCfg)
+		arbHandlers := arbitrum_altda.NewHandlers(certMgr, logger, false, compatibilityCfg)
 		arbServer, err = arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
 		if err != nil {
 			return nil, nil, fmt.Errorf("create arbitrum server: %v", err.Error())
