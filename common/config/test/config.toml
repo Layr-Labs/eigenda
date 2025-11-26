@@ -12,6 +12,7 @@ Float64 = 11.11
 Float32 = 12.12
 Duration = "5s"
 Bool = false
+ThisIsASecretField = "you're no stranger to love, you know the rules and so do I (so do I)"
 
 [Bar]
 A = "bar A"
