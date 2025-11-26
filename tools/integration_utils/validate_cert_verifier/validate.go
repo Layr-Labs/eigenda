@@ -44,7 +44,7 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 	}
 
 	// Get network configuration
-	disperserHostname := network.GetDisperserAddress()
+	disperserGrpcUri := network.GetDisperserGrpcUri()
 	eigenDADirectoryAddr := gethcommon.HexToAddress(network.GetEigenDADirectory())
 
 	// Parse cert verifier address override if provided
@@ -57,7 +57,7 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 
 	logger.Info("Starting validate-cert-verifier tool",
 		"network", network,
-		"disperserHostname", disperserHostname,
+		"disperserGrpcUri", disperserGrpcUri,
 		"eigenDADirectoryAddr", eigenDADirectoryAddr.Hex(),
 		"jsonRPCURL", jsonRPCURL)
 
@@ -65,7 +65,7 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 	payloadDisperser, ethClient, certVerifierAddr, err := initializePayloadDisperser(
 		ctx,
 		logger,
-		disperserHostname,
+		disperserGrpcUri,
 		eigenDADirectoryAddr,
 		jsonRPCURL,
 		signerAuthKey,
@@ -156,7 +156,7 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 func initializePayloadDisperser(
 	ctx context.Context,
 	logger logging.Logger,
-	disperserHostname string,
+	disperserGrpcUri string,
 	eigenDADirectoryAddr gethcommon.Address,
 	jsonRPCURL string,
 	signerAuthKey string,
@@ -273,7 +273,7 @@ func initializePayloadDisperser(
 
 func createDisperserClientMultiplexer(
 	logger logging.Logger,
-	networkAddressString string,
+	grpcUri string,
 	privateKey string,
 	kzgCommitter *committer.Committer,
 ) (*dispersal.DisperserClientMultiplexer, error) {
@@ -283,7 +283,7 @@ func createDisperserClientMultiplexer(
 	}
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
-	disperserRegistry := disperser.NewLegacyDisperserRegistry(networkAddressString)
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(grpcUri)
 
 	return dispersal.NewDisperserClientMultiplexer(
 		logger,

@@ -330,7 +330,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		MemstoreEnabled: useMemory,
 		ClientConfigV2: common.ClientConfigV2{
 			DisperserClientCfg: dispersal.DisperserClientConfig{
-				GrpcUri:           disperserHostname + ":" + disperserPort,
+				GrpcUri:           fmt.Sprintf("%s:%s", disperserHostname, disperserPort),
 				UseSecureGrpcFlag: true,
 				DisperserID:       0,
 			},

@@ -70,7 +70,7 @@ func NewDisperserClient(
 		return nil, fmt.Errorf("config must be provided")
 	}
 	if strings.TrimSpace(config.GrpcUri) == "" {
-		return nil, fmt.Errorf("grpc URI must be provided")
+		return nil, fmt.Errorf("gRPC URI must be provided")
 	}
 	if signer == nil {
 		return nil, fmt.Errorf("signer must be provided")
@@ -82,11 +82,11 @@ func NewDisperserClient(
 		return nil, fmt.Errorf("metrics must be provided")
 	}
 
-	var connectionCount uint
-	if config.DisperserConnectionCount == 0 {
+	connectionCount := config.DisperserConnectionCount
+	if connectionCount == 0 {
 		connectionCount = 1
 	}
-	if config.DisperserConnectionCount > maxNumberOfConnections {
+	if connectionCount > maxNumberOfConnections {
 		connectionCount = maxNumberOfConnections
 	}
 
