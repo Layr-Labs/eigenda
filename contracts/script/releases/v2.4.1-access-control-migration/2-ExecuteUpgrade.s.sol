@@ -70,7 +70,7 @@ contract ExecuteUpgrade is EOADeployer {
             )
         );
 
-        // TODO: This doesn't seam right, I think our zeus environment is using the old EjectionManager.
+        // TODO: This doesn't seam right, I think our zeus environment is using the old EjectionManager (at least on hoodi-preprod).
         // Upgrade EjectionManager (no reinitialization needed).
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(Env.proxy.ejectionManager()))),
@@ -112,7 +112,7 @@ contract ExecuteUpgrade is EOADeployer {
                 Env.impl.owner(), // newOwner
                 Env.proxy.registryCoordinator().ejector(),
                 Env.proxy.registryCoordinator().pauserRegistry(),
-                0,
+                0, // initial paused status (nothing paused)
                 new IRegistryCoordinator.OperatorSetParam[](0),
                 new uint96[](0),
                 new IStakeRegistry.StrategyParams[][](0)
@@ -133,7 +133,7 @@ contract ExecuteUpgrade is EOADeployer {
             abi.encodeWithSelector(
                 EigenDAServiceManager.initialize.selector,
                 Env.proxy.serviceManager().pauserRegistry(),
-                0, // initial paused status
+                0, // initial paused status (nothing paused)
                 Env.impl.owner(), // newOwner
                 new address[](0),
                 Env.proxy.serviceManager().rewardsInitiator()
@@ -164,6 +164,8 @@ contract ExecuteUpgrade is EOADeployer {
                 new DATypesV1.VersionedBlobParams[](0) // no additional blobs needed
             )
         );
+
+        vm.stopBroadcast();
     }
 
     /// -----------------------------------------------------------------------
@@ -171,8 +173,11 @@ contract ExecuteUpgrade is EOADeployer {
     /// -----------------------------------------------------------------------
 
     function testScript() public virtual {
+        DeployImplementations deployImplementations = new DeployImplementations();
         // Hook for pre-test setup.
         _beforeTestScript();
+        // Deploy implementations.
+        deployImplementations.runAsEOA();
         // Execute upgrade.
         runAsEOA();
         // Hook for post-upgrade assertions.
@@ -185,5 +190,16 @@ contract ExecuteUpgrade is EOADeployer {
 
     function _beforeTestScript() internal view {}
 
-    function _afterTestScript() internal view {}
+    function _afterTestScript() internal view {
+        // Assert ownership has been transferred to the new owner.
+        assertEq(Env.proxy.certVerifierRouter().owner(), Env.impl.owner());
+        // assertEq(Env.proxy.directory().owner(), Env.impl.owner()); // Not ownable compliant.
+        assertEq(Env.proxy.disperserRegistry().owner(), Env.impl.owner());
+        // assertEq(Env.proxy.ejectionManager().owner(), Env.impl.owner()); // Not ownable compliant.
+        assertEq(Env.proxy.paymentVault().owner(), Env.impl.owner());
+        assertEq(Env.proxy.registryCoordinator().owner(), Env.impl.owner());
+        assertEq(Env.proxy.relayRegistry().owner(), Env.impl.owner());
+        assertEq(Env.proxy.serviceManager().owner(), Env.impl.owner());
+        assertEq(Env.proxy.thresholdRegistry().owner(), Env.impl.owner());
+    }
 }

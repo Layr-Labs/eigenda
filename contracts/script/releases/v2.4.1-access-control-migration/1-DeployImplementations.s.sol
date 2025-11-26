@@ -224,5 +224,7 @@ contract DeployImplementations is EOADeployer {
 
     function _beforeTestScript() internal view {}
 
-    function _afterTestScript() internal view {}
+    function _afterTestScript() internal view {
+        assertEq(Env.impl.pauserRegistry().unpauser(), Env.impl.owner());
+    }
 }
