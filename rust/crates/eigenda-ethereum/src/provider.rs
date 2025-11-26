@@ -21,7 +21,8 @@ use tracing::instrument;
 
 use crate::address::EthereumAddress;
 use crate::contracts::{
-    EIGENDA_DIRECTORY_HOODI, EIGENDA_DIRECTORY_MAINNET, EIGENDA_DIRECTORY_SEPOLIA, EigenDaContracts,
+    EIGENDA_DIRECTORY_HOODI, EIGENDA_DIRECTORY_INABOX, EIGENDA_DIRECTORY_MAINNET,
+    EIGENDA_DIRECTORY_SEPOLIA, EigenDaContracts,
 };
 
 sol! {
