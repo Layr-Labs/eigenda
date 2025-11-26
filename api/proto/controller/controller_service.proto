@@ -63,27 +63,23 @@ message AuthorizePaymentResponse {}
 message GetValidatorSigningRateRequest {
   // The unique identifier of the validator (i.e. the operator ID).
   bytes validator_id = 1;
+  // The quorum to fetch signing rate data for.
+  uint32 quorum = 2;
   // The start of the time range to query the signing rate for, in seconds since Unix epoch. If there is a bucket that
   // starts before but ends after this timestamp, that bucket will be included in the response, even though
   // some of its data is before the requested start time.
-  uint64 start_timestamp = 2;
+  uint64 start_timestamp = 3;
   // The end time of the range, in seconds since Unix epoch (exclusive). If a bucket's start time is greater than
   // or equal to this timestamp, it will not be included in the response. If a bucket's start time is before this 
   // timestamp and its end time is after or equal to this timestamp, it will be included in the response, even though
   // some of its data is after the requested end time.
-  uint64 end_timestamp = 3;
+  uint64 end_timestamp = 4;
 }
 
 // A reply containing the signing rate of a validator during a time range.
 message GetValidatorSigningRateReply {
-  // The start time of the range, in seconds since Unix epoch, inclusive. May be different from the requested start time
-  // (in order to align with bucket boundaries).
-  uint64 start_timestamp = 1;
-  // The end time of the range, in seconds since Unix epoch, exclusive. May be different from the requested end time
-  // (in order to align with bucket boundaries).
-  uint64 end_timestamp = 2;
   // The signing rate of the validator during the time range.
-  validator.ValidatorSigningRate validator_signing_rate = 3;
+  validator.ValidatorSigningRate validator_signing_rate = 1;
 }
 
 // A request to get a dump of signing rate data for all validators after a specified start time.
