@@ -22,10 +22,10 @@ The smart contracts can be found in our [repo](https://github.com/Layr-Labs/eige
 
 ## Contracts Overview
 
-| Contract Name                                                         | Project Category     | Deployed Behind ERC1967 Proxy? | isUsedByOffchainProtocol? |
+| Contract Name                                                         | Project Category     | Deployed Behind ERC1967 Proxy? | Used by Offchain Protocol? |
 |-----------------------------------------------------------------------|-----------------------|---------------------------------|----------------------------|
 | [EigenDA Directory](#eigendadirectory)                                | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
-| [Service Manager](#eigendaservicemanager)                             | [eigenda](#eigenda-specific-contracts)              | No                              | Yes                        |
+| [Service Manager](#eigendaservicemanager)                             | [eigenda](#eigenda-specific-contracts)              | Yes                              | Yes                        |
 | [Threshold Registry](#eigendathresholdregistry)                       | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
 | [Relay Registry](#eigendarelayregistry)                               | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
 | [Disperser Registry](#eigendadisperserregistry)                       | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
