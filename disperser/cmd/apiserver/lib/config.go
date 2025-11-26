@@ -111,8 +111,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		LoggerConfig: *loggerConfig,
 		MetricsConfig: disperser.MetricsConfig{
-			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
-			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
+			HTTPPort:                 ctx.GlobalString(flags.MetricsHTTPPort.Name),
+			EnableMetrics:            ctx.GlobalBool(flags.EnableMetrics.Name),
+			DisablePerAccountMetrics: ctx.GlobalBool(flags.DisablePerAccountMetricsFlag.Name),
 		},
 		RatelimiterConfig:             ratelimiterConfig,
 		RateConfig:                    rateConfig,

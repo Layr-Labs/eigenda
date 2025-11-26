@@ -35,6 +35,8 @@ type metricsV2 struct {
 	dispersalTimestampConfigMaxAge    prometheus.Gauge
 	dispersalTimestampConfigMaxFuture prometheus.Gauge
 
+	enablePerAccountMetrics bool
+
 	registry *prometheus.Registry
 	httpPort string
 	logger   logging.Logger
@@ -176,6 +178,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 		dispersalTimestampDrift:           dispersalTimestampDrift,
 		dispersalTimestampConfigMaxAge:    dispersalTimestampConfigMaxAge,
 		dispersalTimestampConfigMaxFuture: dispersalTimestampConfigMaxFuture,
+		enablePerAccountMetrics:           !metricsConfig.DisablePerAccountMetrics,
 		registry:                          registry,
 		httpPort:                          metricsConfig.HTTPPort,
 		logger:                            logger.With("component", "DisperserV2Metrics"),
@@ -236,7 +239,12 @@ func (m *metricsV2) reportDispersalTimestampRejected(reason string) {
 }
 
 func (m *metricsV2) reportDispersalTimestampDrift(driftSeconds float64, status string, accountID string) {
-	m.dispersalTimestampDrift.WithLabelValues(status, accountID).Observe(driftSeconds)
+	// If per-account metrics are disabled, aggregate under "0x0"
+	labelValue := accountID
+	if !m.enablePerAccountMetrics {
+		labelValue = "0x0"
+	}
+	m.dispersalTimestampDrift.WithLabelValues(status, labelValue).Observe(driftSeconds)
 }
 
 func (m *metricsV2) setDispersalTimestampConfig(maxAgeSeconds, maxFutureSeconds float64) {
