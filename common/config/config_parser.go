@@ -195,8 +195,7 @@ func bindEnvs(
 			if field.Type.Elem().Kind() == reflect.Struct {
 				// Check if this is a Secret type - if so, treat it as a leaf value
 				elemType := field.Type.Elem()
-				isSecretType := elemType.PkgPath() == "github.com/Layr-Labs/eigenda/common/config/secret" &&
-					elemType.Name() == "Secret"
+				isSecretType := elemType == reflect.TypeOf((*secret.Secret)(nil)).Elem()
 				if isSecretType {
 					// Secret types should be bound as leaf values, not recursed into
 					env := buildEnvVarName(prefix, keyPath...)

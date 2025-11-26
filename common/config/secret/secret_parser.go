@@ -30,7 +30,7 @@ var DecodeHook mapstructure.DecodeHookFunc = func(from reflect.Type, to reflect.
 
 	elem := to.Elem()
 	// Check if this is a Secret type
-	if elem.PkgPath() != "github.com/Layr-Labs/eigenda/common/config/secret" || elem.Name() != "Secret" {
+	if elem != reflect.TypeOf((*Secret)(nil)).Elem() {
 		return data, nil
 	}
 
