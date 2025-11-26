@@ -20,9 +20,9 @@ use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
 use crate::contracts::{
-    EIGENDA_DIRECTORY_HOODI, EIGENDA_DIRECTORY_MAINNET, EIGENDA_DIRECTORY_SEPOLIA,
-    EigenDaContracts, STATIC_CERT_VERIFIER_HOODI, STATIC_CERT_VERIFIER_MAINNET,
-    STATIC_CERT_VERIFIER_SEPOLIA,
+    EIGENDA_DIRECTORY_HOODI, EIGENDA_DIRECTORY_INABOX, EIGENDA_DIRECTORY_MAINNET,
+    EIGENDA_DIRECTORY_SEPOLIA, EigenDaContracts, STATIC_CERT_VERIFIER_HOODI,
+    STATIC_CERT_VERIFIER_INABOX, STATIC_CERT_VERIFIER_MAINNET, STATIC_CERT_VERIFIER_SEPOLIA,
 };
 use crate::provider::IEigenDADirectory::getAddressCall;
 
@@ -42,7 +42,7 @@ const DEFAULT_INITIAL_BACKOFF: u64 = 1000;
 const DEFAULT_COMPUTE_UNITS: u64 = u64::MAX;
 
 /// Network the adapter is running against.
-#[derive(Debug, Clone, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, JsonSchema, PartialEq, Serialize, Deserialize)]
 pub enum Network {
     /// Ethereum mainnet.
     Mainnet,
@@ -50,6 +50,8 @@ pub enum Network {
     Hoodi,
     /// Sepolia testnet.
     Sepolia,
+    /// Inabox local devnet.
+    Inabox,
 }
 
 /// Configuration for the EigenDA Ethereum provider
@@ -117,12 +119,14 @@ impl EigenDaProvider {
             Network::Mainnet => EIGENDA_DIRECTORY_MAINNET,
             Network::Hoodi => EIGENDA_DIRECTORY_HOODI,
             Network::Sepolia => EIGENDA_DIRECTORY_SEPOLIA,
+            Network::Inabox => EIGENDA_DIRECTORY_INABOX,
         };
 
         let cert_verifier_address = match config.network {
             Network::Mainnet => STATIC_CERT_VERIFIER_MAINNET,
             Network::Hoodi => STATIC_CERT_VERIFIER_HOODI,
             Network::Sepolia => STATIC_CERT_VERIFIER_SEPOLIA,
+            Network::Inabox => STATIC_CERT_VERIFIER_INABOX,
         };
 
         let contracts =
