@@ -22,8 +22,7 @@ import (
 const maxNumberOfConnections = 32
 
 type DisperserClientConfig struct {
-	Hostname          string
-	Port              string
+	NetworkAddress    string
 	UseSecureGrpcFlag bool
 	// The number of grpc connections to the disperser server. A value of 0 is treated as 1.
 	DisperserConnectionCount uint
@@ -69,11 +68,8 @@ func NewDisperserClient(
 	if config == nil {
 		return nil, fmt.Errorf("config must be provided")
 	}
-	if strings.TrimSpace(config.Hostname) == "" {
-		return nil, fmt.Errorf("hostname must be provided")
-	}
-	if strings.TrimSpace(config.Port) == "" {
-		return nil, fmt.Errorf("port must be provided")
+	if strings.TrimSpace(config.NetworkAddress) == "" {
+		return nil, fmt.Errorf("network address must be provided")
 	}
 	if signer == nil {
 		return nil, fmt.Errorf("signer must be provided")
@@ -93,13 +89,12 @@ func NewDisperserClient(
 		connectionCount = maxNumberOfConnections
 	}
 
-	addr := fmt.Sprintf("%v:%v", config.Hostname, config.Port)
 	dialOptions := clients.GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB)
 	clientPool, err := common.NewGRPCClientPool(
 		logger,
 		disperser_rpc.NewDisperserClient,
 		connectionCount,
-		addr,
+		config.NetworkAddress,
 		dialOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("new grpc client pool: %w", err)
