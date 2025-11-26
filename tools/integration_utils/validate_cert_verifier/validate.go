@@ -248,7 +248,7 @@ func initializePayloadDisperser(
 	}
 
 	disperserClientMultiplexer, err := createDisperserClientMultiplexer(
-		logger, disperserHostname, signerAuthKey, kzgCommitter)
+		logger, disperserGrpcUri, signerAuthKey, kzgCommitter)
 	if err != nil {
 		return nil, nil, gethcommon.Address{}, fmt.Errorf("create disperser client multiplexer: %w", err)
 	}

@@ -220,7 +220,7 @@ func (dcm *DisperserClientMultiplexer) getEligibleDispersers(
 
 	// start by assuming that all default dispersers are eligible
 	eligibleDispersers := make(map[uint32]*reputation.Reputation)
-	for id := range defaultDispersers {
+	for _, id := range defaultDispersers {
 		if _, exists := dcm.reputations[id]; !exists {
 			dcm.reputations[id] = reputation.NewReputation(dcm.config.ReputationConfig, now)
 		}
@@ -249,7 +249,7 @@ func (dcm *DisperserClientMultiplexer) getEligibleDispersers(
 
 		// Rebuild eligibleDispersers with only on-demand dispersers
 		filtered := make(map[uint32]*reputation.Reputation, len(onDemandDispersers))
-		for id := range onDemandDispersers {
+		for _, id := range onDemandDispersers {
 			if reputation, exists := eligibleDispersers[id]; exists {
 				filtered[id] = reputation
 			}
