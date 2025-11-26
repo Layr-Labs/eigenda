@@ -101,6 +101,7 @@ func (env *Config) deployEigenDAContracts() error {
 		CertVerifierLegacy:     result.EigenDA.CertVerifierLegacy,
 		CertVerifier:           result.EigenDA.CertVerifier,
 		CertVerifierRouter:     result.EigenDA.CertVerifierRouter,
+		ArbitrumProofValidator: result.EigenDA.ArbProofValidator,
 	}
 	env.EigenDAV1CertVerifier = result.EigenDAV1CertVerifier
 
