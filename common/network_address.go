@@ -22,8 +22,8 @@ func NewNetworkAddress[T constraints.Integer](hostname string, genericPort T) (*
 		return nil, fmt.Errorf("hostname must not be empty")
 	}
 	port := uint64(genericPort)
-	if genericPort == 0 || port > 65535 {
-		return nil, fmt.Errorf("port must be in range 1-65535, got %d", port)
+	if port == 0 || port > 65535 {
+		return nil, fmt.Errorf("port must be in range 1-65535, got %d", genericPort)
 	}
 	return &NetworkAddress{
 		hostname: hostname,
