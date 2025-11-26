@@ -69,10 +69,12 @@ pub struct CertStateData {
     pub bls_apk_registry: AccountProof,
     /// Proof for stake registry contract state.
     pub stake_registry: AccountProof,
-    /// Proof for certificate verifier contract state.
-    pub cert_verifier: AccountProof,
     /// Proof for delegation manager contract state.
     pub delegation_manager: AccountProof,
+    /// Proof for cert verifier router contract state.
+    pub cert_verifier_router: AccountProof,
+    /// Proof for certificate verifier contract state.
+    pub cert_verifier: AccountProof,
 }
 
 impl CertStateData {
@@ -84,9 +86,11 @@ impl CertStateData {
         self.service_manager.verify(state_root)?;
         self.bls_apk_registry.verify(state_root)?;
         self.stake_registry.verify(state_root)?;
-        self.cert_verifier.verify(state_root)?;
         self.delegation_manager.verify(state_root)?;
 
+        self.cert_verifier_router.verify(state_root)?;
+        self.cert_verifier.verify(state_root)?;
+        // TODO(samlaf): verify that the cert_verifier matches the expected ABN from the router
         Ok(())
     }
 

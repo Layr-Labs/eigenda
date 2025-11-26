@@ -85,11 +85,11 @@ func NewDisperserClient(
 		return nil, fmt.Errorf("metrics must be provided")
 	}
 
-	var connectionCount uint
-	if config.DisperserConnectionCount == 0 {
+	connectionCount := config.DisperserConnectionCount
+	if connectionCount == 0 {
 		connectionCount = 1
 	}
-	if config.DisperserConnectionCount > maxNumberOfConnections {
+	if connectionCount > maxNumberOfConnections {
 		connectionCount = maxNumberOfConnections
 	}
 
