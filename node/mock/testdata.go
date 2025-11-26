@@ -7,21 +7,32 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 )
 
 func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.Bundle) {
+	// Generate ECDSA keys for signing blob certificates
+	// Each blob will be signed by its corresponding account's private key
+	rand := random.NewTestRandom()
+	account0Addr, account0Key, err := rand.EthAccount()
+	require.NoError(t, err)
+	account1Addr, account1Key, err := rand.EthAccount()
+	require.NoError(t, err)
+	account2Addr, account2Key, err := rand.EthAccount()
+	require.NoError(t, err)
+
 	commitments := MockCommitment(t)
 	bh0 := &v2.BlobHeader{
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         gethcommon.Address{0},
+			AccountID:         account0Addr,
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
@@ -31,7 +42,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         gethcommon.Address{1},
+			AccountID:         account1Addr,
 			Timestamp:         6,
 			CumulativePayment: big.NewInt(200),
 		},
@@ -41,7 +52,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{1, 2},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         gethcommon.Address{2},
+			AccountID:         account2Addr,
 			Timestamp:         7,
 			CumulativePayment: big.NewInt(300),
 		},
@@ -53,21 +64,29 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 	blobKey2, err := bh2.BlobKey()
 	require.NoError(t, err)
 
+	// Sign each blob header with its corresponding account's private key
+	sig0, err := crypto.Sign(blobKey0[:], account0Key)
+	require.NoError(t, err)
+	sig1, err := crypto.Sign(blobKey1[:], account1Key)
+	require.NoError(t, err)
+	sig2, err := crypto.Sign(blobKey2[:], account2Key)
+	require.NoError(t, err)
+
 	// blobCert 0 and blobCert 2 will be downloaded from relay 0
 	// blobCert 1 will be downloaded from relay 1
 	blobCert0 := &v2.BlobCertificate{
 		BlobHeader: bh0,
-		Signature:  []byte{1, 2, 3},
+		Signature:  sig0,
 		RelayKeys:  []v2.RelayKey{0},
 	}
 	blobCert1 := &v2.BlobCertificate{
 		BlobHeader: bh1,
-		Signature:  []byte{1, 2, 3},
+		Signature:  sig1,
 		RelayKeys:  []v2.RelayKey{1},
 	}
 	blobCert2 := &v2.BlobCertificate{
 		BlobHeader: bh2,
-		Signature:  []byte{1, 2, 3},
+		Signature:  sig2,
 		RelayKeys:  []v2.RelayKey{0},
 	}
 

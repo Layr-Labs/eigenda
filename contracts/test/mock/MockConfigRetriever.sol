@@ -12,40 +12,66 @@ contract MockConfigRetriever {
         directory = _directory;
     }
 
-    function getNumCheckpointsBytes32(bytes32 key) external view returns (uint256) {
-        return directory.getNumCheckpointsBytes32(key);
+    /// @notice Gets the number of checkpoints for a block number-based configuration
+    /// @param key The hash of the configuration name
+    /// @return The number of checkpoints stored
+    function getNumCheckpointsBlockNumber(bytes32 key) external view returns (uint256) {
+        return directory.getNumCheckpointsBlockNumber(key);
     }
 
-    function getNumCheckpointsBytes(bytes32 key) external view returns (uint256) {
-        return directory.getNumCheckpointsBytes(key);
+    /// @notice Gets the number of checkpoints for a timestamp-based configuration
+    /// @param key The hash of the configuration name
+    /// @return The number of checkpoints stored
+    function getNumCheckpointsTimeStamp(bytes32 key) external view returns (uint256) {
+        return directory.getNumCheckpointsTimeStamp(key);
     }
 
-    function getConfigBytes32(bytes32 key, uint256 index) external view returns (bytes32) {
-        return directory.getConfigBytes32(key, index);
+    /// @notice Gets the configuration value at a specific index for a block number-based configuration
+    /// @param key The hash of the configuration name
+    /// @param index The index of the checkpoint to retrieve
+    /// @return The bytes configuration value at the specified index
+    function getConfigBytesBlockNumber(bytes32 key, uint256 index) external view returns (bytes memory) {
+        return directory.getConfigBlockNumber(key, index);
     }
 
-    function getConfigBytes(bytes32 key, uint256 index) external view returns (bytes memory) {
-        return directory.getConfigBytes(key, index);
+    /// @notice Gets the configuration value at a specific index for a timestamp-based configuration
+    /// @param key The hash of the configuration name
+    /// @param index The index of the checkpoint to retrieve
+    /// @return The bytes configuration value at the specified index
+    function getConfigTimeStamp(bytes32 key, uint256 index) external view returns (bytes memory) {
+        return directory.getConfigTimeStamp(key, index);
     }
 
-    function getActivationKey(bytes32 key, uint256 index) external view returns (uint256) {
-        return directory.getActivationKeyBytes32(key, index);
+    /// @notice Gets the activation block number at a specific index for a block number-based configuration
+    /// @param key The hash of the configuration name
+    /// @param index The index of the checkpoint to retrieve
+    /// @return The activation block number at the specified index
+    function getActivationBlockNumber(bytes32 key, uint256 index) external view returns (uint256) {
+        return directory.getActivationBlockNumber(key, index);
     }
 
-    function getActivationKeyBytes(bytes32 key, uint256 index) external view returns (uint256) {
-        return directory.getActivationKeyBytes(key, index);
+    /// @notice Gets the activation timestamp at a specific index for a timestamp-based configuration
+    /// @param key The hash of the configuration name
+    /// @param index The index of the checkpoint to retrieve
+    /// @return The activation timestamp at the specified index
+    function getActivationTimeStamp(bytes32 key, uint256 index) external view returns (uint256) {
+        return directory.getActivationTimeStamp(key, index);
     }
 
-    /// @notice Retrieves all configs with activation keys greater than or equal to the specified activation key.
-    function getAllConfigsGeActivationKeyBytes32(bytes32 key, uint256 activationKey)
+    /// @notice Retrieves all block number-based configs with activation blocks greater than or equal to the specified block number
+    /// @param key The hash of the configuration name
+    /// @param activationBlock The minimum activation block number to filter by
+    /// @return activationKeys Array of activation block numbers for matching checkpoints
+    /// @return configs Array of bytes32 configuration values for matching checkpoints (converted from bytes)
+    function getAllConfigsGeActivationKeyBlockNumber(bytes32 key, uint256 activationBlock)
         external
         view
         returns (uint256[] memory, bytes32[] memory)
     {
-        uint256 numCheckpoints = directory.getNumCheckpointsBytes32(key);
+        uint256 numCheckpoints = directory.getNumCheckpointsBlockNumber(key);
         uint256 count = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            if (directory.getActivationKeyBytes32(key, i) >= activationKey) {
+            if (directory.getActivationBlockNumber(key, i) >= activationBlock) {
                 count++;
             }
         }
@@ -54,10 +80,11 @@ contract MockConfigRetriever {
         bytes32[] memory configs = new bytes32[](count);
         uint256 index = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            uint256 activationKeyAtIdx = directory.getActivationKeyBytes32(key, i);
-            if (activationKeyAtIdx >= activationKey) {
+            uint256 activationKeyAtIdx = directory.getActivationBlockNumber(key, i);
+            if (activationKeyAtIdx >= activationBlock) {
                 activationKeys[index] = activationKeyAtIdx;
-                configs[index] = directory.getConfigBytes32(key, i);
+                bytes memory config = directory.getConfigBlockNumber(key, i);
+                configs[index] = bytes32(config);
                 index++;
             }
         }
@@ -65,16 +92,20 @@ contract MockConfigRetriever {
         return (activationKeys, configs);
     }
 
-    /// @notice Retrieves all configs with activation keys greater than or equal to the specified activation key.
-    function getAllConfigsGeActivationKeyBytes(bytes32 key, uint256 activationKey)
+    /// @notice Retrieves all timestamp-based configs with activation timestamps greater than or equal to the specified timestamp
+    /// @param key The hash of the configuration name
+    /// @param activationKey The minimum activation timestamp to filter by
+    /// @return activationKeys Array of activation timestamps for matching checkpoints
+    /// @return configs Array of bytes configuration values for matching checkpoints
+    function getAllConfigsGeActivationKeyTimeStamp(bytes32 key, uint256 activationKey)
         external
         view
         returns (uint256[] memory, bytes[] memory)
     {
-        uint256 numCheckpoints = directory.getNumCheckpointsBytes(key);
+        uint256 numCheckpoints = directory.getNumCheckpointsTimeStamp(key);
         uint256 count = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            if (directory.getActivationKeyBytes(key, i) >= activationKey) {
+            if (directory.getActivationTimeStamp(key, i) >= activationKey) {
                 count++;
             }
         }
@@ -83,10 +114,10 @@ contract MockConfigRetriever {
         bytes[] memory configs = new bytes[](count);
         uint256 index = 0;
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            uint256 activationKeyAtIdx = directory.getActivationKeyBytes(key, i);
+            uint256 activationKeyAtIdx = directory.getActivationTimeStamp(key, i);
             if (activationKeyAtIdx >= activationKey) {
                 activationKeys[index] = activationKeyAtIdx;
-                configs[index] = directory.getConfigBytes(key, i);
+                configs[index] = directory.getConfigTimeStamp(key, i);
                 index++;
             }
         }
