@@ -326,6 +326,7 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 		ENCODER_CONFIG_SERVER_REQUEST_POOL_SIZE:                 "32",
 		ENCODER_CONFIG_ENCODER_VERSION:                          "2",
 		ENCODER_CONFIG_BLOB_STORE_BUCKET_NAME:                   "test-eigenda-blobstore",
+		ENCODER_CONFIG_CHUNK_STORE_BUCKET_NAME:                  "test-eigenda-blobstore",
 		ENCODER_CONFIG_SERVER_REQUEST_QUEUE_SIZE:                "32",
 	}
 

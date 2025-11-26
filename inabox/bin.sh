@@ -286,7 +286,7 @@ function start_detached_for_tests {
         pid="$!"
         pids="$pids $pid"
 
-        ./wait-for 0.0.0.0:${DISPERSER_ENCODER_GRPC_PORT} -- echo "Encoder up" &
+        ./wait-for 0.0.0.0:${ENCODER_CONFIG_GRPC_PORT} -- echo "Encoder up" &
         waiters="$waiters $!"
     done
 
