@@ -51,7 +51,6 @@ import {
 
 // TODO: Fetch CertVerifier and EjectionManager constructor parameters.
 // TODO: Add DelegationManager to zeus.
-// TODO: Add ProxyAdmin to zeus.
 // TODO: Figure out what initEigenDASignatureVerifier should be.
 // TODO: Add post deployment assertions.
 

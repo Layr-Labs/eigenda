@@ -16,6 +16,9 @@ import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/c
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 // TODO: Double check encoded arguements (could be out of order).
+// TODO: Sort out whatever is wrong with the EjectionManager.
+// TODO: Add ProxyAdmin to zeus.
+// TODO: Add post deployment assertions.
 
 /// NOTE: Inconsistent use of EigenDARegistry
 contract ExecuteUpgrade is EOADeployer {
@@ -67,7 +70,7 @@ contract ExecuteUpgrade is EOADeployer {
             )
         );
 
-        // TODO: This doesn't seam right.
+        // TODO: This doesn't seam right, I think our zeus environment is using the old EjectionManager.
         // Upgrade EjectionManager (no reinitialization needed).
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(Env.proxy.ejectionManager()))),
