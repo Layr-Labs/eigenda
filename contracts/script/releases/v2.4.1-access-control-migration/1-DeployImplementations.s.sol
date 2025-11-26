@@ -12,6 +12,7 @@ import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {EigenDADirectory} from "src/core/EigenDADirectory.sol";
+import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
 
 // Import middleware contracts
 import {BLSApkRegistry} from "lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
@@ -62,7 +63,7 @@ contract DeployImplementations is EOADeployer {
     /// -----------------------------------------------------------------------
 
     /// forgefmt: disable-next-item
-    function _runAsEOA() internal override {
+    function _runAsEOA() internal virtual override {
         /// -----------------------------------------------------------------------
         /// Constructor parameters
         /// -----------------------------------------------------------------------
@@ -74,10 +75,10 @@ contract DeployImplementations is EOADeployer {
         });
         bytes memory initQuorumNumbersRequired = hex"00";
         
-        // EjectionManager.
-        uint256 depositBaseFeeMultiplier;
-        uint256 estimatedGasUsedWithoutSig;
-        uint256 estimatedGasUsedWithSig;
+        // // EjectionManager.
+        // uint256 depositBaseFeeMultiplier;
+        // uint256 estimatedGasUsedWithoutSig;
+        // uint256 estimatedGasUsedWithSig;
 
         // PauserRegistry.
         address[] memory initPausers = new address[](1);
@@ -88,10 +89,15 @@ contract DeployImplementations is EOADeployer {
         /// -----------------------------------------------------------------------
 
         vm.startBroadcast();
-
+        
+        // Deploy new AccessControl implementation.
+        deployImpl({
+            name: "AccessControl", 
+            deployedTo: address(new EigenDAAccessControl(Env.impl.owner()))
+        });
         // Deploy new BLSApkRegistry implementation.
         deployImpl({
-            name: type(BLSApkRegistry).name, 
+            name: "BlsApkRegistry", 
             deployedTo: address(new BLSApkRegistry(Env.proxy.registryCoordinator()))
         });
         // Deploy new CertVerifierRouter implementation.
@@ -121,20 +127,19 @@ contract DeployImplementations is EOADeployer {
             name: "DisperserRegistry", 
             deployedTo: address(new EigenDADisperserRegistry())
         });
-
-        // Deploy new EjectionManager implementation.
-        deployImpl({
-            name: "EjectionManager",
-            deployedTo: address(
-                new EigenDAEjectionManager({
-                    depositToken_: Env.proxy.ejectionManager().getDepositToken(),
-                    depositBaseFeeMultiplier_: depositBaseFeeMultiplier,
-                    addressDirectory_: address(Env.proxy.directory()),
-                    estimatedGasUsedWithoutSig_: estimatedGasUsedWithoutSig,
-                    estimatedGasUsedWithSig_: estimatedGasUsedWithSig
-                })
-            )
-        });
+        // // Deploy new EjectionManager implementation.
+        // deployImpl({
+        //     name: "EjectionManager",
+        //     deployedTo: address(
+        //         new EigenDAEjectionManager({
+        //             depositToken_: Env.proxy.ejectionManager().getDepositToken(),
+        //             depositBaseFeeMultiplier_: depositBaseFeeMultiplier,
+        //             addressDirectory_: address(Env.proxy.directory()),
+        //             estimatedGasUsedWithoutSig_: estimatedGasUsedWithoutSig,
+        //             estimatedGasUsedWithSig_: estimatedGasUsedWithSig
+        //         })
+        //     )
+        // });
         // Deploy new IndexRegistry implementation.
         deployImpl({
             name: type(IndexRegistry).name, 
@@ -210,8 +215,6 @@ contract DeployImplementations is EOADeployer {
     /// -----------------------------------------------------------------------
 
     function testScript() public virtual {
-        // Hook for pre-test setup.
-        _beforeTestScript();
         // Deploy new implementations as EOA.
         runAsEOA();
         // Hook for post-deployment assertions.
@@ -221,8 +224,6 @@ contract DeployImplementations is EOADeployer {
     /// -----------------------------------------------------------------------
     /// Test hooks
     /// -----------------------------------------------------------------------
-
-    function _beforeTestScript() internal view {}
 
     function _afterTestScript() internal view {
         _testDeploymentAddresses();
@@ -363,11 +364,11 @@ contract DeployImplementations is EOADeployer {
         assertEq(Env.impl.pauserRegistry().unpauser(), Env.impl.owner(), "PauserRegistry: incorrect unpauser");
         assertTrue(Env.impl.pauserRegistry().isPauser(Env.impl.owner()), "PauserRegistry: owner not set as pauser");
 
-        // EjectionManager
-        assertEq(
-            Env.impl.ejectionManager().getDepositToken(),
-            Env.proxy.ejectionManager().getDepositToken(),
-            "EjectionManager: incorrect depositToken"
-        );
+        // // EjectionManager
+        // assertEq(
+        //     Env.impl.ejectionManager().getDepositToken(),
+        //     Env.proxy.ejectionManager().getDepositToken(),
+        //     "EjectionManager: incorrect depositToken"
+        // );
     }
 }
