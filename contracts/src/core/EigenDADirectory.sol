@@ -19,8 +19,8 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     using AddressDirectoryLib for string;
     using AddressDirectoryLib for bytes32;
 
-    modifier initializer() {
-        InitializableLib.initialize();
+    modifier reinitializer(uint8 version) {
+        InitializableLib.reinitialize(version);
         _;
     }
 
@@ -34,7 +34,7 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     }
 
     /// @dev If doing a fresh deployment, this contract should be deployed AFTER an access control contract has been deployed.
-    function initialize(address accessControl) external initializer {
+    function initialize(address accessControl) external reinitializer(2) {
         require(accessControl != address(0), "Access control address cannot be zero");
         bytes32 key = AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey();
         AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey().setAddress(accessControl);
