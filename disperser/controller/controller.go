@@ -5,22 +5,20 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"slices"
 	"strings"
 	"time"
 
 	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -29,139 +27,8 @@ var errNoBlobsToDispatch = errors.New("no blobs to dispatch")
 
 type BlobCallback func(blobKey corev2.BlobKey) error
 
-// DispatcherConfig contains configuration parameters for the Dispatcher.
-// The Dispatcher is responsible for batching encoded blobs, dispersing them to DA nodes,
-// collecting signatures, and creating attestations.
-type DispatcherConfig struct {
-	// PullInterval is how frequently the Dispatcher polls for new encoded blobs to batch and dispatch.
-	// Must be positive.
-	PullInterval time.Duration
-
-	// DisperserID is the unique identifier for this disperser instance.
-	DisperserID uint32
-
-	// FinalizationBlockDelay is the number of blocks to wait before using operator state.
-	// This provides a hedge against chain reorganizations.
-	FinalizationBlockDelay uint64
-
-	// BatchMetadataUpdatePeriod is the interval between attempts to refresh batch metadata
-	// (reference block number and operator state).
-	// Since this changes at most once per eth block, values shorter than 10 seconds are not useful.
-	// In practice, checking every several minutes is sufficient.
-	// Must be positive.
-	BatchMetadataUpdatePeriod time.Duration
-
-	// AttestationTimeout is the maximum time to wait for a single node to provide a signature.
-	// Must be positive.
-	AttestationTimeout time.Duration
-
-	// BatchAttestationTimeout is the maximum time to wait for all nodes to provide signatures for a batch.
-	// Must be positive and must be longer or equal to the AttestationTimeout.
-	BatchAttestationTimeout time.Duration
-
-	// SignatureTickInterval is how frequently attestations are updated in the blob metadata store
-	// as signature gathering progresses.
-	// Must be positive.
-	SignatureTickInterval time.Duration
-
-	// NumRequestRetries is the number of times to retry dispersing to a node after the initial attempt fails.
-	// The current implementation has performance issues, so this should typically be 0 (no retries).
-	// Must be non-negative.
-	NumRequestRetries int
-
-	// MaxBatchSize is the maximum number of blobs to include in a single batch for dispersal.
-	// Must be at least 1.
-	MaxBatchSize int32
-
-	// SignificantSigningThresholdFraction is a configurable "important" signing threshold fraction.
-	// Used to track signing metrics and understand system performance.
-	// If the value is 0, special handling for this threshold is disabled.
-	// Must be between 0.0 and 1.0.
-	SignificantSigningThresholdFraction float64
-
-	// Whether or not to collect detailed validator signing metrics.
-	CollectDetailedValidatorSigningMetrics bool
-
-	// NumConcurrentRequests is the size of the worker pool for processing dispersal requests concurrently.
-	// Must be at least 1.
-	NumConcurrentRequests int
-
-	// NodeClientCacheSize is the maximum number of node clients to cache for reuse.
-	// Must be at least 1.
-	NodeClientCacheSize int
-
-	// MaxDispersalAge is the maximum age a dispersal request can be before it is discarded.
-	// Dispersals older than this duration are marked as Failed and not processed.
-	//
-	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
-	// client at dispersal request creation time (in nanoseconds since Unix epoch).
-	MaxDispersalAge time.Duration
-}
-
-var _ config.VerifiableConfig = &DispatcherConfig{}
-
-func (c *DispatcherConfig) Verify() error {
-	if c.PullInterval <= 0 {
-		return fmt.Errorf("PullInterval must be positive, got %v", c.PullInterval)
-	}
-	if c.BatchMetadataUpdatePeriod <= 0 {
-		return fmt.Errorf("BatchMetadataUpdatePeriod must be positive, got %v", c.BatchMetadataUpdatePeriod)
-	}
-	if c.AttestationTimeout <= 0 {
-		return fmt.Errorf("AttestationTimeout must be positive, got %v", c.AttestationTimeout)
-	}
-	if c.BatchAttestationTimeout <= 0 {
-		return fmt.Errorf("BatchAttestationTimeout must be positive, got %v", c.BatchAttestationTimeout)
-	}
-	if c.BatchAttestationTimeout < c.AttestationTimeout {
-		return fmt.Errorf("BatchAttestationTimeout must be longer than AttestationTimeout, got %v < %v",
-			c.BatchAttestationTimeout, c.AttestationTimeout)
-	}
-	if c.SignatureTickInterval <= 0 {
-		return fmt.Errorf("SignatureTickInterval must be positive, got %v", c.SignatureTickInterval)
-	}
-	if c.NumRequestRetries < 0 {
-		return fmt.Errorf("NumRequestRetries must be non-negative, got %d", c.NumRequestRetries)
-	}
-	if c.MaxBatchSize < 1 {
-		return fmt.Errorf("MaxBatchSize must be at least 1, got %d", c.MaxBatchSize)
-	}
-	if c.SignificantSigningThresholdFraction > 1.0 || c.SignificantSigningThresholdFraction < 0.0 {
-		return fmt.Errorf(
-			"SignificantSigningThresholdFraction must be between 0.0 and 1.0, got %f",
-			c.SignificantSigningThresholdFraction)
-	}
-	if c.NumConcurrentRequests < 1 {
-		return fmt.Errorf("NumConcurrentRequests must be at least 1, got %d", c.NumConcurrentRequests)
-	}
-	if c.NodeClientCacheSize < 1 {
-		return fmt.Errorf("NodeClientCacheSize must be at least 1, got %d", c.NodeClientCacheSize)
-	}
-	if c.MaxDispersalAge <= 0 {
-		return fmt.Errorf("MaxDispersalAge must be positive, got %v", c.MaxDispersalAge)
-	}
-	return nil
-}
-
-func DefaultDispatcherConfig() *DispatcherConfig {
-	return &DispatcherConfig{
-		PullInterval:                        1 * time.Second,
-		FinalizationBlockDelay:              75,
-		AttestationTimeout:                  45 * time.Second,
-		BatchMetadataUpdatePeriod:           time.Minute,
-		BatchAttestationTimeout:             55 * time.Second,
-		SignatureTickInterval:               50 * time.Millisecond,
-		NumRequestRetries:                   0,
-		MaxBatchSize:                        32,
-		SignificantSigningThresholdFraction: 0.55,
-		NumConcurrentRequests:               600,
-		NodeClientCacheSize:                 400,
-		MaxDispersalAge:                     45 * time.Second,
-	}
-}
-
 type Dispatcher struct {
-	*DispatcherConfig
+	*ControllerConfig
 
 	blobMetadataStore blobstore.MetadataStore
 	pool              common.WorkerPool
@@ -186,6 +53,9 @@ type Dispatcher struct {
 
 	// A utility responsible for fetching batch metadata (i.e. reference block number and operator state).
 	batchMetadataManager metadata.BatchMetadataManager
+
+	// Tracks signing rates for validators and serves queries about signing rates.
+	signingRateTracker signingrate.SigningRateTracker
 }
 
 type batchData struct {
@@ -197,8 +67,8 @@ type batchData struct {
 	BatchSizeBytes  uint64
 }
 
-func NewDispatcher(
-	config *DispatcherConfig,
+func NewController(
+	config *ControllerConfig,
 	getNow func() time.Time,
 	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
@@ -211,6 +81,7 @@ func NewDispatcher(
 	beforeDispatch func(blobKey corev2.BlobKey) error,
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
+	signingRateTracker signingrate.SigningRateTracker,
 ) (*Dispatcher, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -229,22 +100,21 @@ func NewDispatcher(
 	}
 
 	return &Dispatcher{
-		DispatcherConfig: config,
-
-		blobMetadataStore: blobMetadataStore,
-		pool:              pool,
-		chainState:        chainState,
-		aggregator:        aggregator,
-		nodeClientManager: nodeClientManager,
-		logger:            logger.With("component", "Dispatcher"),
-		metrics:           metrics,
-		getNow:            getNow,
-
+		ControllerConfig:       config,
+		blobMetadataStore:      blobMetadataStore,
+		pool:                   pool,
+		chainState:             chainState,
+		aggregator:             aggregator,
+		nodeClientManager:      nodeClientManager,
+		logger:                 logger.With("component", "Dispatcher"),
+		metrics:                metrics,
+		getNow:                 getNow,
 		cursor:                 nil,
 		beforeDispatch:         beforeDispatch,
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 		batchMetadataManager:   batchMetadataManager,
+		signingRateTracker:     signingRateTracker,
 	}, nil
 }
 
@@ -293,6 +163,8 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 
 }
 
+// For each blob in a batch, send a StoreChunks request to each validator, collecting responses and putting those
+// responses in the returned channel.
 func (d *Dispatcher) HandleBatch(
 	ctx context.Context,
 	batchProbe *common.SequenceProbe,
@@ -309,144 +181,110 @@ func (d *Dispatcher) HandleBatch(
 
 	batchProbe.SetStage("send_requests")
 
-	batch := batchData.Batch
-	state := batchData.OperatorState
-	sigChan := make(chan core.SigningMessage, len(state.IndexedOperators))
-	for opID, op := range state.IndexedOperators {
-		opID := opID
-		op := op
+	signingResponseChan := make(chan core.SigningMessage, len(batchData.OperatorState.IndexedOperators))
+	for validatorId, validatorInfo := range batchData.OperatorState.IndexedOperators {
 
 		validatorProbe := d.metrics.newSendToValidatorProbe()
 		validatorProbe.SetStage("pool_submission")
 
 		d.pool.Submit(func() {
-			defer validatorProbe.End()
+			signature, latency, err := d.sendChunksToValidator(
+				ctx,
+				batchData,
+				validatorId,
+				validatorInfo,
+				validatorProbe)
 
-			validatorProbe.SetStage("get_client")
-
-			host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
 			if err != nil {
-				d.logger.Warn("failed to parse operator socket, check if the socket format is correct",
-					"operator", opID.Hex(),
-					"socket", op.Socket,
+				d.logger.Warn("error sending chunks to validator",
+					"validator", validatorId.Hex(),
+					"batchHeaderHash", hex.EncodeToString(batchData.BatchHeaderHash[:]),
 					"err", err)
-				sigChan <- core.SigningMessage{
-					Signature:       nil,
-					Operator:        opID,
-					BatchHeaderHash: batchData.BatchHeaderHash,
-					TimeReceived:    time.Now(),
-					Err:             fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err),
-				}
-				return
 			}
 
-			client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
-			if err != nil {
-				d.logger.Warn("failed to get node client; node may not be reachable",
-					"operator", opID.Hex(),
-					"host", host,
-					"v2DispersalPort", v2DispersalPort,
-					"err", err)
-				sigChan <- core.SigningMessage{
-					Signature:       nil,
-					Operator:        opID,
-					BatchHeaderHash: batchData.BatchHeaderHash,
-					TimeReceived:    time.Now(),
-					Err:             err,
-				}
-				return
-			}
-
-			validatorProbe.SetStage("put_dispersal_request")
-
-			req := &corev2.DispersalRequest{
-				OperatorID: opID,
-				// TODO: get OperatorAddress
-				OperatorAddress: gethcommon.Address{},
-				Socket:          op.Socket,
-				DispersedAt:     uint64(time.Now().UnixNano()),
-				BatchHeader:     *batch.BatchHeader,
-			}
-			err = d.blobMetadataStore.PutDispersalRequest(ctx, req)
-			if err != nil {
-				d.logger.Error("failed to put dispersal request", "err", err)
-				sigChan <- core.SigningMessage{
-					Signature:       nil,
-					Operator:        opID,
-					BatchHeaderHash: batchData.BatchHeaderHash,
-					TimeReceived:    time.Now(),
-					Err:             err,
-				}
-				return
-			}
-
-			var i int
-			var lastErr error
-			for i = 0; i < d.NumRequestRetries+1; i++ {
-				validatorProbe.SetStage("send_chunks")
-
-				sig, err := d.sendChunks(ctx, client, batch)
-				lastErr = err
-				if err == nil {
-					validatorProbe.SetStage("put_dispersal_response")
-					storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
-						DispersalRequest: req,
-						RespondedAt:      uint64(time.Now().UnixNano()),
-						Signature:        sig.Bytes(),
-						Error:            "",
-					})
-					if storeErr != nil {
-						d.logger.Error("failed to store a succeeded dispersal response", "err", storeErr)
-					}
-
-					sigChan <- core.SigningMessage{
-						Signature:       sig,
-						Operator:        opID,
-						BatchHeaderHash: batchData.BatchHeaderHash,
-						TimeReceived:    time.Now(),
-						Err:             nil,
-					}
-					break
-				}
-
-				d.logger.Warn("failed to send chunks",
-					"operator", opID.Hex(),
-					"NumAttempts", i,
-					"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
-					"err", err)
-				time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Second) // Wait before retrying
-			}
-
-			if lastErr != nil {
-				d.logger.Warn("failed to send chunks",
-					"operator", opID.Hex(),
-					"NumAttempts", i,
-					"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
-					"err", lastErr)
-				storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
-					DispersalRequest: req,
-					RespondedAt:      uint64(time.Now().UnixNano()),
-					Signature:        [32]byte{}, // all zero sig for failed dispersal
-					Error:            lastErr.Error(),
-				})
-				if storeErr != nil {
-					d.logger.Error("failed to store a failed dispersal response", "err", storeErr)
-				}
-
-				sigChan <- core.SigningMessage{
-					Signature:       nil,
-					Operator:        opID,
-					BatchHeaderHash: batchData.BatchHeaderHash,
-					TimeReceived:    time.Now(),
-					Err:             lastErr,
-				}
+			signingResponseChan <- core.SigningMessage{
+				ValidatorId:     validatorId,
+				Signature:       signature,
+				BatchHeaderHash: batchData.BatchHeaderHash,
+				Latency:         latency,
+				Err:             err,
 			}
 		})
 	}
 
 	batchProbe.SetStage("await_responses")
 
-	return sigChan, batchData, nil
+	return signingResponseChan, batchData, nil
+}
+
+// Send a StoreChunks request for a batch to a specific validator, returning the result.
+func (d *Dispatcher) sendChunksToValidator(
+	ctx context.Context,
+	batchData *batchData,
+	validatorId core.OperatorID,
+	validatorInfo *core.IndexedOperatorInfo,
+	validatorProbe *common.SequenceProbe,
+) (signature *core.Signature, latency time.Duration, err error) {
+
+	defer validatorProbe.End()
+
+	validatorProbe.SetStage("get_client")
+
+	host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(validatorInfo.Socket)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse operator socket %s: %w", validatorInfo.Socket, err)
+	}
+
+	client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get node client for validator at host %s port %s: %w",
+			host, v2DispersalPort, err)
+	}
+
+	validatorProbe.SetStage("put_dispersal_request")
+
+	req := &corev2.DispersalRequest{
+		OperatorID:  validatorId,
+		Socket:      validatorInfo.Socket,
+		DispersedAt: uint64(time.Now().UnixNano()),
+		BatchHeader: *batchData.Batch.BatchHeader,
+	}
+	err = d.blobMetadataStore.PutDispersalRequest(ctx, req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to put dispersal request for validator: %w", err)
+	}
+
+	validatorProbe.SetStage("send_chunks")
+
+	start := time.Now()
+
+	sig, err := d.sendChunks(ctx, client, batchData.Batch)
+	if err != nil {
+		storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
+			DispersalRequest: req,
+			RespondedAt:      uint64(time.Now().UnixNano()),
+			Signature:        [32]byte{}, // all zero sig for failed dispersal
+			Error:            err.Error(),
+		})
+		if storeErr != nil {
+			d.logger.Error("failed to store a failed dispersal response", "err", storeErr)
+		}
+		return nil, 0, fmt.Errorf("failed to send chunks to validator: %w", err)
+	}
+
+	latency = time.Since(start)
+
+	validatorProbe.SetStage("put_dispersal_response")
+	storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
+		DispersalRequest: req,
+		RespondedAt:      uint64(time.Now().UnixNano()),
+		Signature:        sig.Bytes(),
+	})
+	if storeErr != nil {
+		d.logger.Error("failed to store a succeeded dispersal response", "err", storeErr)
+	}
+
+	return sig, latency, nil
 }
 
 // HandleSignatures receives SigningMessages from operators for a given batch through the input sigChan. The signatures
@@ -503,11 +341,12 @@ func (d *Dispatcher) HandleSignatures(
 		attestationCtx,
 		d.logger,
 		d.metrics,
+		d.signingRateTracker,
 		batchData.OperatorState,
 		batchData.BatchHeaderHash,
 		sigChan,
-		d.DispatcherConfig.SignatureTickInterval,
-		d.DispatcherConfig.SignificantSigningThresholdFraction,
+		d.ControllerConfig.SignatureTickInterval,
+		d.ControllerConfig.SignificantSigningThresholdFraction,
 		batchData.BatchSizeBytes)
 	if err != nil {
 		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)

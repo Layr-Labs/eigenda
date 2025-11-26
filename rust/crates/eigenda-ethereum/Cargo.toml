@@ -9,31 +9,28 @@ alloy-consensus = { workspace = true, features = [
   "serde-bincode-compat",
   "k256",
 ] }
+alloy-contract = { workspace = true }
 alloy-primitives = { workspace = true, features = ["serde"] }
-alloy-provider = { workspace = true }
+alloy-provider = { workspace = true, features = ["anvil-api", "default", "ws"] }
 alloy-rpc-client = { workspace = true }
 alloy-rpc-types-eth = { workspace = true }
 alloy-signer-local = { workspace = true }
 alloy-sol-types = { workspace = true }
 alloy-transport = { workspace = true }
+derive_more.workspace = true
 eigenda-verification = { path = "../eigenda-verification" }
 futures = { workspace = true }
-reth-trie-common = { workspace = true, features = ["serde"] }
-rustls = { workspace = true, features = ["aws-lc-rs"], optional = true }
+reth-trie-common = { workspace = true, features = ["serde", "eip1186"] }
+rustls = { workspace = true, features = ["aws-lc-rs"] }
 schemars = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["alloc", "derive"] }
+serde_json.workspace = true
+tracing = { workspace = true }
 
 [dev-dependencies]
-alloy-rpc-types = { workspace = true }
+alloy-rpc-types = { workspace = true, features = ["anvil"] }
 anyhow = { workspace = true }
 testcontainers = { workspace = true }
 
 [features]
 default = []
-native = [
-  "alloy-provider/anvil-api",
-  "alloy-provider/default",
-  "alloy-provider/ws",
-  "dep:rustls",
-  "reth-trie-common/eip1186",
-]

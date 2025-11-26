@@ -385,7 +385,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             defaultSecurityThresholds,
             hex"0001"
         );
-        eigenDADirectory.addAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME, address(eigenDACertVerifier));
 
         eigenDACertVerifierRouterImplementation = new EigenDACertVerifierRouter();
 

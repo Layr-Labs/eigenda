@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -787,19 +788,20 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 	metadataManager := metadata.NewMockBatchMetadataManager(
 		metadata.NewBatchMetadata(referenceBlockNumber, operatorState))
 
-	d, err := controller.NewDispatcher(
-		&controller.DispatcherConfig{
-			PullInterval:              1 * time.Second,
-			FinalizationBlockDelay:    finalizationBlockDelay,
-			AttestationTimeout:        1 * time.Second,
-			BatchMetadataUpdatePeriod: 1 * time.Minute,
-			BatchAttestationTimeout:   2 * time.Second,
-			SignatureTickInterval:     1 * time.Second,
-			NumRequestRetries:         3,
-			MaxBatchSize:              maxBatchSize,
-			NumConcurrentRequests:     10,
-			NodeClientCacheSize:       10,
-			MaxDispersalAge:           45 * time.Second,
+	d, err := controller.NewController(
+		&controller.ControllerConfig{
+			PullInterval:               1 * time.Second,
+			FinalizationBlockDelay:     finalizationBlockDelay,
+			AttestationTimeout:         1 * time.Second,
+			BatchMetadataUpdatePeriod:  1 * time.Minute,
+			BatchAttestationTimeout:    2 * time.Second,
+			SignatureTickInterval:      1 * time.Second,
+			MaxBatchSize:               maxBatchSize,
+			NumConcurrentRequests:      10,
+			NodeClientCacheSize:        10,
+			MaxDispersalAge:            45 * time.Second,
+			SigningRateRetentionPeriod: 1 * time.Minute,
+			SigningRateBucketSpan:      30 * time.Second,
 		},
 		time.Now,
 		blobMetadataStore,
@@ -812,7 +814,8 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		prometheus.NewRegistry(),
 		beforeDispatch,
 		blobSet,
-		livenessChan)
+		livenessChan,
+		signingrate.NewNoOpSigningRateTracker())
 	require.NoError(t, err)
 	return &dispatcherComponents{
 		Dispatcher:           d,

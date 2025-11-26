@@ -1,0 +1,4 @@
+testsFolder: tests
+libsFolder: node_modules
+manifestPath: subgraph.yaml
+matchstick_version: 0.6.0

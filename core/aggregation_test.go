@@ -55,15 +55,15 @@ func simulateOperators(state mock.PrivateOperatorState, message [32]byte, update
 		sig := op.KeyPair.SignMessage(message)
 		if count < len(state.IndexedOperators)-int(advCount) {
 			update <- core.SigningMessage{
-				Signature: sig,
-				Operator:  id,
-				Err:       nil,
+				Signature:   sig,
+				ValidatorId: id,
+				Err:         nil,
 			}
 		} else {
 			update <- core.SigningMessage{
-				Signature: nil,
-				Operator:  id,
-				Err:       errors.New("adversary"),
+				Signature:   nil,
+				ValidatorId: id,
+				Err:         errors.New("adversary"),
 			}
 		}
 
@@ -276,9 +276,9 @@ func TestNilPubkeyG1Handling(t *testing.T) {
 			op := state.PrivateOperators[id]
 			sig := op.KeyPair.SignMessage(message)
 			update <- core.SigningMessage{
-				Signature: sig,
-				Operator:  id,
-				Err:       nil,
+				Signature:   sig,
+				ValidatorId: id,
+				Err:         nil,
 			}
 		}
 		// Operators 2,3,4,5 don't sign (operator 2 has nil PubkeyG1)

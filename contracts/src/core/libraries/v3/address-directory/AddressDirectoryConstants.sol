@@ -30,7 +30,6 @@ library AddressDirectoryConstants {
     /// @dev This name is prefixed with EIGEN_DA to differentiate it from the previous ejection manager which was vendored from eigenlayer-middleware.
     string internal constant EIGEN_DA_EJECTION_MANAGER_NAME = "EIGEN_DA_EJECTION_MANAGER";
 
-    string internal constant CERT_VERIFIER_NAME = "CERT_VERIFIER";
     string internal constant CERT_VERIFIER_ROUTER_NAME = "CERT_VERIFIER_ROUTER";
 
     /// LEGACY

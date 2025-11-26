@@ -147,15 +147,9 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKe
 
 	// Check if the blob has already been encoded
 	if s.config.PreventReencoding && s.chunkWriter.ProofExists(ctx, blobKey) {
-		coefExist, fragmentInfo := s.chunkWriter.CoefficientsExists(ctx, blobKey)
+		coefExist := s.chunkWriter.CoefficientsExists(ctx, blobKey)
 		if coefExist {
-			s.logger.Info("blob already encoded", "blobKey", blobKey.Hex())
-			return &pb.EncodeBlobReply{
-				FragmentInfo: &pb.FragmentInfo{
-					TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-					FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
-				},
-			}, nil
+			return nil, fmt.Errorf("blob %s has already been encoded", blobKey.Hex())
 		}
 	}
 
@@ -321,8 +315,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 
 	return &pb.EncodeBlobReply{
 		FragmentInfo: &pb.FragmentInfo{
-			TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-			FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+			SymbolsPerFrame: fragmentInfo.SymbolsPerFrame,
 		},
 	}, nil
 }

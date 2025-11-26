@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/test"
 	testrandom "github.com/Layr-Labs/eigenda/test/random"
@@ -39,12 +40,10 @@ func createSigningMessage(
 	}
 
 	return core.SigningMessage{
-		Signature:            keypair.SignMessage(headerHash),
-		Operator:             operatorID,
-		BatchHeaderHash:      headerHash,
-		AttestationLatencyMs: 10.0,
-		TimeReceived:         time.Now(),
-		Err:                  err,
+		Signature:       keypair.SignMessage(headerHash),
+		ValidatorId:     operatorID,
+		BatchHeaderHash: headerHash,
+		Err:             err,
 	}
 }
 
@@ -193,6 +192,7 @@ func TestReceiveSignatures_Basic(t *testing.T) {
 		ctx,
 		logger,
 		nil,
+		signingrate.NewNoOpSigningRateTracker(),
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
@@ -232,6 +232,7 @@ func TestReceiveSignatures_WithError(t *testing.T) {
 		ctx,
 		logger,
 		nil,
+		signingrate.NewNoOpSigningRateTracker(),
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
@@ -274,6 +275,7 @@ func TestReceiveSignatures_DuplicateMessage(t *testing.T) {
 		ctx,
 		logger,
 		nil,
+		signingrate.NewNoOpSigningRateTracker(),
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
@@ -320,6 +322,7 @@ func TestReceiveSignatures_ContextCancellation(t *testing.T) {
 		ctx,
 		logger,
 		nil,
+		signingrate.NewNoOpSigningRateTracker(),
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
@@ -362,6 +365,7 @@ func TestReceiveSignatures_Concurrency(t *testing.T) {
 		ctx,
 		logger,
 		nil,
+		signingrate.NewNoOpSigningRateTracker(),
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
