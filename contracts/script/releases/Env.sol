@@ -3,6 +3,7 @@ pragma solidity ^0.8.12;
 
 import "forge-std/Vm.sol";
 import "forge-std/StdJson.sol";
+import "zeus-templates/utils/ZEnvHelpers.sol";
 
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -46,6 +47,7 @@ import {
 
 library Env {
     using stdJson for string;
+    using ZEnvHelpers for *;
 
     /// -----------------------------------------------------------------------
     /// Constants
@@ -157,12 +159,12 @@ library Env {
 
     /// @dev Usage: `Env.proxy.blsApkRegistry()`
     function blsApkRegistry(DeployedProxy) internal view returns (BLSApkRegistry) {
-        return BLSApkRegistry(_deployedProxy(type(BLSApkRegistry).name));
+        return BLSApkRegistry(_deployedProxy("BlsApkRegistry"));
     }
 
     /// @dev Usage: `Env.impl.blsApkRegistry()`
     function blsApkRegistry(DeployedImpl) internal view returns (BLSApkRegistry) {
-        return BLSApkRegistry(_deployedImpl(type(BLSApkRegistry).name));
+        return BLSApkRegistry(_deployedImpl("BlsApkRegistry"));
     }
 
     /// @dev Usage: `Env.proxy.indexRegistry()`
@@ -301,138 +303,52 @@ library Env {
     /// Private Zeus Helpers
     /// -----------------------------------------------------------------------
 
-    /// @dev Returns the path to the deployment state file based on ZEUS_ENV and ZEUS_ENV_VERSION
-    function _getStatePath() private view returns (string memory) {
-        string memory envName = _string("ZEUS_ENV");
-        string memory version = _string("ZEUS_ENV_VERSION");
-        return string.concat("script/releases/state/", envName, "/", version, "/deployed.json");
-    }
-
-    /// @dev Load and parse the deployment state JSON
-    function _getDeploymentState() private view returns (string memory) {
-        try vm.readFile(_getStatePath()) returns (string memory json) {
-            return json;
-        } catch {
-            return "";
-        }
-    }
-
     function _deployedInstance(string memory name, uint256 idx) private view returns (address) {
-        string memory json = _getDeploymentState();
-        if (bytes(json).length == 0) return address(0);
-
-        string memory key = string.concat(".instances.", name, "[", vm.toString(idx), "]");
-        try vm.parseJsonAddress(json, key) returns (address addr) {
-            return addr;
-        } catch {
-            return address(0);
-        }
+        return ZEnvHelpers.state().deployedInstance(name, idx);
     }
 
-    function _deployedInstanceCount(
-        string memory /*name*/
-    )
-        private
-        view
-        returns (uint256)
-    {
-        string memory json = _getDeploymentState();
-        if (bytes(json).length == 0) return 0;
-
-        // Try to parse the array and get its length
-        // This is a simplified approach - you may need to adjust based on your JSON structure
-        return 0;
+    function _deployedInstanceCount(string memory name) private view returns (uint256) {
+        return ZEnvHelpers.state().deployedInstanceCount(name);
     }
 
-    function _parseJsonAddress(string memory json, string memory key) private pure returns (address) {
-        try vm.parseJsonAddress(json, key) returns (address addr) {
-            return addr;
-        } catch {
-            return address(0);
-        }
+    function _deployedProxy(string memory name) private view returns (address) {
+        return ZEnvHelpers.state().deployedProxy(name);
     }
 
-    function _deployedProxy(string memory name) private view returns (address _proxy) {
-        string memory json = _getDeploymentState();
-        if (bytes(json).length == 0) return address(0);
-        string memory key = string.concat(".proxies.", name);
-        _proxy = _parseJsonAddress(json, key);
-        vm.assertNotEq(_proxy, address(0), string.concat("Proxy ", name, " not found")); // added sanity check
-        return _proxy;
+    function _deployedBeacon(string memory name) private view returns (address) {
+        return ZEnvHelpers.state().deployedBeacon(name);
     }
 
-    function _deployedBeacon(string memory name) private view returns (address _beacon) {
-        string memory json = _getDeploymentState();
-        if (bytes(json).length == 0) return address(0);
-        string memory key = string.concat(".beacons.", name);
-        _beacon = _parseJsonAddress(json, key);
-        vm.assertNotEq(_beacon, address(0), string.concat("Beacon ", name, " not found")); // added sanity check
-        return _beacon;
-    }
-
-    function _deployedImpl(string memory name) private view returns (address _impl) {
-        string memory json = _getDeploymentState();
-        if (bytes(json).length == 0) return address(0);
-        string memory key = string.concat(".implementations.", name);
-        _impl = _parseJsonAddress(json, key);
-        vm.assertNotEq(_impl, address(0), string.concat("Implementation ", name, " not found")); // added sanity check
-        return _impl;
+    function _deployedImpl(string memory name) private view returns (address) {
+        return ZEnvHelpers.state().deployedImpl(name);
     }
 
     function _envAddress(string memory key) private view returns (address) {
-        try vm.envAddress(key) returns (address addr) {
-            return addr;
-        } catch {
-            return address(0);
-        }
+        return ZEnvHelpers.state().envAddress(key);
     }
 
     function _envU256(string memory key) private view returns (uint256) {
-        try vm.envUint(key) returns (uint256 value) {
-            return value;
-        } catch {
-            return 0;
-        }
+        return ZEnvHelpers.state().envU256(key);
     }
 
     function _envU64(string memory key) private view returns (uint64) {
-        try vm.envUint(key) returns (uint256 value) {
-            return uint64(value);
-        } catch {
-            return 0;
-        }
+        return ZEnvHelpers.state().envU64(key);
     }
 
     function _envU32(string memory key) private view returns (uint32) {
-        try vm.envUint(key) returns (uint256 value) {
-            return uint32(value);
-        } catch {
-            return 0;
-        }
+        return ZEnvHelpers.state().envU32(key);
     }
 
     function _envU16(string memory key) private view returns (uint16) {
-        try vm.envUint(key) returns (uint256 value) {
-            return uint16(value);
-        } catch {
-            return 0;
-        }
+        return ZEnvHelpers.state().envU16(key);
     }
 
     function _envBool(string memory key) private view returns (bool) {
-        try vm.envBool(key) returns (bool value) {
-            return value;
-        } catch {
-            return false;
-        }
+        return ZEnvHelpers.state().envBool(key);
     }
 
     function _string(string memory key) private view returns (string memory) {
-        try vm.envString(key) returns (string memory value) {
-            return value;
-        } catch {
-            return "";
-        }
+        return ZEnvHelpers.state().envString(key);
     }
 
     /// -----------------------------------------------------------------------
@@ -453,4 +369,5 @@ library Env {
     function _getBeacon(address _proxy) internal view returns (address) {
         return address(uint160(uint256(vm.load(_proxy, _BEACON_SLOT))));
     }
+
 }
