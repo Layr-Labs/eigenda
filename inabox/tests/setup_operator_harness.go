@@ -257,7 +257,8 @@ func (oh *OperatorHarness) startOperator(
 		NumBatchValidators:             1,
 		QuorumIDList:                   []core.QuorumID{0, 1},
 		EigenDADirectory:               oh.testConfig.EigenDA.EigenDADirectory,
-		DisableDispersalAuthentication: true, // TODO: set to false
+		StoreChunksRequestMaxPastAge:   5 * time.Minute,
+		StoreChunksRequestMaxFutureAge: 5 * time.Minute,
 		EthClientConfig: geth.EthClientConfig{
 			RPCURLs:          []string{oh.chainHarness.GetAnvilRPCUrl()},
 			PrivateKeyString: strings.TrimPrefix(operatorKey.PrivateKey, "0x"),

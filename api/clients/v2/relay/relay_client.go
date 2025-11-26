@@ -258,7 +258,12 @@ func (c *relayClient) getClient(ctx context.Context, key corev2.RelayKey) (relay
 	if !ok {
 		return nil, fmt.Errorf("invalid grpc client for relay key: %v", key)
 	}
-	return clientPool.GetClient(), nil
+
+	client, err := clientPool.GetClient()
+	if err != nil {
+		return nil, fmt.Errorf("get client: %w", err)
+	}
+	return client, nil
 }
 
 // initOnceGrpcConnection initializes the GRPC connection for a given relay, and is guaranteed to only be completed
