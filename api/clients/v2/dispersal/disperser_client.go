@@ -3,6 +3,7 @@ package dispersal
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -21,7 +22,7 @@ import (
 const maxNumberOfConnections = 32
 
 type DisperserClientConfig struct {
-	NetworkAddress    *common.NetworkAddress
+	GrpcUri           string
 	UseSecureGrpcFlag bool
 	// The number of grpc connections to the disperser server. A value of 0 is treated as 1.
 	DisperserConnectionCount uint
@@ -68,6 +69,9 @@ func NewDisperserClient(
 	if config == nil {
 		return nil, fmt.Errorf("config must be provided")
 	}
+	if strings.TrimSpace(config.GrpcUri) == "" {
+		return nil, fmt.Errorf("grpc URI must be provided")
+	}
 	if signer == nil {
 		return nil, fmt.Errorf("signer must be provided")
 	}
@@ -91,7 +95,7 @@ func NewDisperserClient(
 		logger,
 		disperser_rpc.NewDisperserClient,
 		connectionCount,
-		config.NetworkAddress.String(),
+		config.GrpcUri,
 		dialOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("new grpc client pool: %w", err)

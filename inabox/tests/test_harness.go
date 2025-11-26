@@ -281,11 +281,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 	}
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
-	networkAddress, err := common.NewNetworkAddressFromString(tc.APIServerAddress)
-	if err != nil {
-		return nil, fmt.Errorf("create disperser network address: %w", err)
-	}
-	disperserRegistry := disperser.NewLegacyDisperserRegistry(networkAddress)
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(tc.APIServerAddress)
 
 	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
 		logger,

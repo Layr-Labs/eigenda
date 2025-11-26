@@ -592,7 +592,8 @@ func buildPayloadDisperser(
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
-	disperserRegistry := disperser.NewLegacyDisperserRegistry(clientConfigV2.DisperserClientCfg.NetworkAddress)
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(
+		clientConfigV2.DisperserClientCfg.GrpcUri)
 
 	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
 		log,

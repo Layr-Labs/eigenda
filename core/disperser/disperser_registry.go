@@ -1,10 +1,6 @@
 package disperser
 
-import (
-	"context"
-
-	"github.com/Layr-Labs/eigenda/common"
-)
+import "context"
 
 // DisperserRegistry provides access to disperser information from the DisperserRegistry contract.
 type DisperserRegistry interface {
@@ -12,6 +8,6 @@ type DisperserRegistry interface {
 	GetDefaultDispersers(ctx context.Context) (map[uint32]struct{}, error)
 	// Returns the set of dispersers that support on-demand payments
 	GetOnDemandDispersers(ctx context.Context) (map[uint32]struct{}, error)
-	// Returns the network address for a specific disperser
-	GetDisperserNetworkAddress(ctx context.Context, disperserID uint32) (*common.NetworkAddress, error)
+	// Returns the gRPC URI for a specific disperser in "hostname:port" format
+	GetDisperserGrpcUri(ctx context.Context, disperserID uint32) (string, error)
 }

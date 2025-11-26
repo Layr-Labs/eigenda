@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/reputation"
 	"github.com/Layr-Labs/eigenda/core/disperser"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -107,18 +106,18 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 		return nil, fmt.Errorf("choose disperser: %w", err)
 	}
 
-	networkAddress, err := dcm.disperserRegistry.GetDisperserNetworkAddress(ctx, chosenDisperser)
+	grpcUri, err := dcm.disperserRegistry.GetDisperserGrpcUri(ctx, chosenDisperser)
 	if err != nil {
-		return nil, fmt.Errorf("get disperser network address for ID %d: %w", chosenDisperser, err)
+		return nil, fmt.Errorf("get disperser gRPC URI for ID %d: %w", chosenDisperser, err)
 	}
 
-	dcm.cleanupOutdatedClient(chosenDisperser, networkAddress)
+	dcm.cleanupOutdatedClient(chosenDisperser, grpcUri)
 
 	client, exists := dcm.clients[chosenDisperser]
 	if !exists {
 		// create a new client for the chosen disperser
 		clientConfig := &DisperserClientConfig{
-			NetworkAddress:           networkAddress,
+			GrpcUri:                  grpcUri,
 			UseSecureGrpcFlag:        true,
 			DisperserConnectionCount: dcm.disperserConnectionCount,
 			DisperserID:              chosenDisperser,
@@ -178,13 +177,13 @@ func (dcm *DisperserClientMultiplexer) ReportDispersalOutcome(
 // to fail.
 //
 // This is an acceptable trade-off because:
-//  1. Network address changes for dispersers are rare in practice
+//  1. gRPC URI changes for dispersers are rare in practice
 //  2. When they do occur, the affected dispersals will fail gracefully with errors
-//  3. Failed dispersals during a disperser's network address transition are tolerable
+//  3. Failed dispersals during a disperser's gRPC URI transition are tolerable
 //  4. The alternative (reference counting) adds significant complexity for a rare edge case
 func (dcm *DisperserClientMultiplexer) cleanupOutdatedClient(
 	disperserID uint32,
-	latestNetworkAddress *common.NetworkAddress,
+	latestGrpcUri string,
 ) {
 	client, exists := dcm.clients[disperserID]
 	if !exists {
@@ -192,15 +191,15 @@ func (dcm *DisperserClientMultiplexer) cleanupOutdatedClient(
 		return
 	}
 
-	// check if the latest network address matches the existing client's config
+	// check if the latest gRPC URI matches the existing client's config
 	// if not, the existing client is outdated and should be closed and removed
 	oldConfig := client.GetConfig()
-	if !oldConfig.NetworkAddress.Equals(latestNetworkAddress) {
+	if oldConfig.GrpcUri != latestGrpcUri {
 		if err := client.Close(); err != nil {
 			dcm.logger.Errorf("failed to close outdated disperser client for disperserID %d: %v", disperserID, err)
 		}
 		// remove the outdated client from the map, but don't delete the reputation. reputation is presumed to remain
-		// relevant for a given disperser ID, even if the network address changes
+		// relevant for a given disperser ID, even if the gRPC URI changes
 		delete(dcm.clients, disperserID)
 	}
 }

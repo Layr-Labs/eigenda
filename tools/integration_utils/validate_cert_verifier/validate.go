@@ -283,11 +283,7 @@ func createDisperserClientMultiplexer(
 	}
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
-	networkAddress, err := common.NewNetworkAddressFromString(networkAddressString)
-	if err != nil {
-		return nil, fmt.Errorf("parse disperser address: %w", err)
-	}
-	disperserRegistry := disperser.NewLegacyDisperserRegistry(networkAddress)
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(networkAddressString)
 
 	return dispersal.NewDisperserClientMultiplexer(
 		logger,

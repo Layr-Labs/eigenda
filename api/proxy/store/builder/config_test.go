@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
-	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/stretchr/testify/require"
@@ -19,11 +18,6 @@ import (
 
 func validCfg() Config {
 	maxBlobLengthBytes, err := common.ParseBytesAmount("2MiB")
-	if err != nil {
-		panic(err)
-	}
-
-	disperserAddr, err := common_eigenda.NewNetworkAddress("localhost", 9999)
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +63,7 @@ func validCfg() Config {
 		MemstoreEnabled: false,
 		ClientConfigV2: common.ClientConfigV2{
 			DisperserClientCfg: dispersal.DisperserClientConfig{
-				NetworkAddress:    disperserAddr,
+				GrpcUri:           "localhost:9999",
 				UseSecureGrpcFlag: true,
 				DisperserID:       0,
 			},
@@ -170,7 +164,7 @@ func TestConfigVerification(t *testing.T) {
 			t.Run(
 				"FailWhenRequiredEigenDAV2FieldsAreUnset", func(t *testing.T) {
 					cfg := validCfg()
-					cfg.ClientConfigV2.DisperserClientCfg.NetworkAddress = nil
+					cfg.ClientConfigV2.DisperserClientCfg.GrpcUri = ""
 					require.Error(t, cfg.Check())
 				})
 		})

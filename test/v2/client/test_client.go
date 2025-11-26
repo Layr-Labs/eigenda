@@ -150,11 +150,8 @@ func NewTestClient(
 	dispersalMetrics := metricsv2.NewDispersalMetrics(registry)
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
-	networkAddress, err := common_eigenda.NewNetworkAddress(config.DisperserHostname, config.DisperserPort)
-	if err != nil {
-		return nil, fmt.Errorf("create disperser network address: %w", err)
-	}
-	disperserRegistry := disperser.NewLegacyDisperserRegistry(networkAddress)
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(
+		fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort))
 
 	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
 		logger,
@@ -439,7 +436,7 @@ func NewTestClient(
 				},
 				ClientConfigV2: proxycommon.ClientConfigV2{
 					DisperserClientCfg: dispersal.DisperserClientConfig{
-						NetworkAddress:    networkAddress,
+						GrpcUri:           fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
 						UseSecureGrpcFlag: true,
 						DisperserID:       0,
 					},

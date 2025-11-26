@@ -63,8 +63,8 @@ type ClientConfigV2 struct {
 
 // Check checks config invariants, and returns an error if there is a problem with the config struct
 func (cfg *ClientConfigV2) Check() error {
-	if err := cfg.DisperserClientCfg.NetworkAddress.Check(); err != nil {
-		return fmt.Errorf("check disperser network address: %w", err)
+	if cfg.DisperserClientCfg.GrpcUri == "" {
+		return fmt.Errorf("EigenDA disperser gRPC URI is required for using EigenDA V2 backend")
 	}
 
 	if cfg.EigenDACertVerifierOrRouterAddress == "" {
