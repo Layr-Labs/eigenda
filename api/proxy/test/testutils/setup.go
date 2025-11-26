@@ -299,7 +299,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		},
 		ClientConfigV1: common.ClientConfigV1{
 			EdaClientCfg: clients.EigenDAClientConfig{
-				RPC:                      disperserHostname + ":" + disperserPort,
+				RPC:                      disperserNetworkAddress.String(),
 				StatusQueryTimeout:       time.Minute * 45,
 				StatusQueryRetryInterval: pollInterval,
 				DisableTLS:               false,
