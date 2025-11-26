@@ -7,20 +7,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/proxy/clients/memconfig_client"
 	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
 	integration "github.com/Layr-Labs/eigenda/inabox/tests"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -303,21 +307,20 @@ func TestProxyReadFallback(t *testing.T) {
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
-// TODO(iquidus): create s3 bucket in localstack for this test ?
-/*
 func TestProxyWriteCacheOnMiss(t *testing.T) {
+	t.Skip("TODO(iquidus): create s3 bucket in localstack for this test")
 	testHarness, err := integration.NewTestHarnessWithSetup(globalInfra)
 	require.NoError(t, err)
 	defer testHarness.Cleanup()
 
-	testCfg := NewTestConfig()
+	testCfg := integration.NewProxyTestConfig(globalInfra)
 	testCfg.UseS3Caching = true
 	testCfg.WriteOnCacheMiss = true
 
-	proxyConfig, err := createProxyConfig(testCfg)
+	proxyConfig, err := integration.CreateProxyConfig(testCfg)
 	require.NoError(t, err)
 
-	ts, cleanup, err := startProxyServer(context.Background(), globalInfra.Logger, proxyConfig)
+	ts, cleanup, err := integration.StartProxyServer(context.Background(), globalInfra.Logger, proxyConfig)
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -354,7 +357,6 @@ func TestProxyWriteCacheOnMiss(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, exists)
 }
-*/
 
 func TestErrorOnSecondaryInsertFailureFlagOn(t *testing.T) {
 	t.Parallel()
@@ -605,17 +607,16 @@ func TestReservationPayments(t *testing.T) {
 	t.Log("Successfully dispersed and retrieved blob using reservation-only payments")
 }
 
-// TODO(iquidus): Insufficent on-demand balance currently causes test to fail
-/*
 func TestOnDemandPayments(t *testing.T) {
+	t.Skip("TODO(iquidus): Insufficent on-demand balance currently causes test to fail")
 	t.Parallel()
 
-	testCfg := NewTestConfig()
+	testCfg := integration.NewProxyTestConfig(globalInfra)
 	testCfg.ClientLedgerMode = clientledger.ClientLedgerModeOnDemandOnly
-	proxyConfig, err := createProxyConfig(testCfg)
+	proxyConfig, err := integration.CreateProxyConfig(testCfg)
 	require.NoError(t, err)
 
-	ts, cleanup, err := startProxyServer(context.Background(), globalInfra.Logger, proxyConfig)
+	ts, cleanup, err := integration.StartProxyServer(context.Background(), globalInfra.Logger, proxyConfig)
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -628,7 +629,218 @@ func TestOnDemandPayments(t *testing.T) {
 
 	t.Log("Successfully dispersed and retrieved blob using on-demand-only payments")
 }
-*/
+
+// OP contract tests
+// Contract Test here refers to https://pactflow.io/blog/what-is-contract-testing/, not evm contracts.
+func TestOPContractTestRBNRecentyCheck(t *testing.T) {
+	t.Skip("TODO(iquidus): RBN recency check failed, fails")
+	t.Parallel()
+
+	var testTable = []struct {
+		name                 string
+		RBNRecencyWindowSize uint64
+		certRBN              uint32
+		certL1IBN            uint64
+		requireErrorFn       func(t *testing.T, err error)
+	}{
+		{
+			name:                 "RBN recency check failed",
+			RBNRecencyWindowSize: 100,
+			certRBN:              100,
+			certL1IBN:            201,
+			requireErrorFn: func(t *testing.T, err error) {
+				// expect proxy to return a 418 error which the client converts to this structured error
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t,
+					int(coretypes.ErrRecencyCheckFailedDerivationError.StatusCode),
+					dropEigenDACommitmentErr.StatusCode)
+			},
+		},
+		{
+			name:                 "RBN recency check passed",
+			RBNRecencyWindowSize: 100,
+			certRBN:              100,
+			certL1IBN:            199,
+			requireErrorFn: func(t *testing.T, err error) {
+				// After RBN check succeeds, CertVerifier.checkDACert contract call is made,
+				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
+				// invalid). This gets converted to a [eigendav2store.ErrInvalidCertDerivationError] which gets marshalled
+				// and returned as the body of a 418 response by the proxy.
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
+			},
+		},
+		{
+			name:                 "RBN recency check skipped - Proxy set window size 0",
+			RBNRecencyWindowSize: 0,
+			certRBN:              100,
+			certL1IBN:            201,
+			requireErrorFn: func(t *testing.T, err error) {
+				// After RBN check succeeds, CertVerifier.checkDACert contract call is made,
+				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
+				// invalid). This gets converted to a [eigendav2store.ErrInvalidCertDerivationError] which gets marshalled
+				// and returned as the body of a 418 response by the proxy.
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
+			},
+		},
+		{
+			name:                 "RBN recency check skipped - client set IBN to 0",
+			RBNRecencyWindowSize: 100,
+			certRBN:              100,
+			certL1IBN:            0,
+			requireErrorFn: func(t *testing.T, err error) {
+				// After RBN check succeeds, CertVerifier.checkDACert contract call is made,
+				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
+				// invalid). This gets converted to a [eigendav2store.ErrInvalidCertDerivationError] which gets marshalled
+				// and returned as the body of a 418 response by the proxy.
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
+			},
+		},
+	}
+
+	for _, tt := range testTable {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			t.Log("Running test: ", tt.name)
+			testHarness, err := integration.NewTestHarnessWithSetup(globalInfra)
+			require.NoError(t, err)
+			defer testHarness.Cleanup()
+
+			testCfg := integration.NewProxyTestConfig(globalInfra)
+			proxyConfig, err := integration.CreateProxyConfig(testCfg)
+			require.NoError(t, err)
+
+			ts, cleanup, err := integration.StartProxyServer(context.Background(), globalInfra.Logger, proxyConfig)
+			require.NoError(t, err)
+			defer cleanup()
+
+			// Build + Serialize (empty) cert with the given RBN
+			certV3 := coretypes.EigenDACertV3{
+				BatchHeader: bindings.EigenDATypesV2BatchHeaderV2{
+					ReferenceBlockNumber: tt.certRBN,
+				},
+			}
+			serializedCertV3, err := rlp.EncodeToBytes(certV3)
+			require.NoError(t, err)
+			// altdaCommitment is what is returned by the proxy
+			altdaCommitment, err := commitments.EncodeCommitment(
+				certs.NewVersionedCert(serializedCertV3, certs.V2VersionByte),
+				commitments.OptimismGenericCommitmentMode)
+			require.NoError(t, err)
+			// the op client expects a typed commitment, so we have to decode the altdaCommitment
+			commitmentData, err := altda.DecodeCommitmentData(altdaCommitment)
+			require.NoError(t, err)
+
+			daClient := altda.NewDAClient(ts.RestAddress(), false, false)
+			_, err = daClient.GetInput(ts.Ctx, commitmentData, tt.certL1IBN)
+			tt.requireErrorFn(t, err)
+		})
+	}
+}
+
+// Test that proxy DerivationErrors are correctly parsed as DropCommitmentErrors on op side,
+// for parsing and cert validation errors.
+func TestOPContractTestValidAndInvalidCertErrors(t *testing.T) {
+	t.Skip("TODO(iquidus): connection refused error")
+	t.Parallel()
+
+	var testTable = []struct {
+		name           string
+		certCreationFn func() ([]byte, error)
+		requireErrorFn func(t *testing.T, err error)
+	}{
+		{
+			// TODO: need to figure out why this is happening, since ErrNotFound is supposed to be a keccak only error.
+			// Seems like op-client allows submitting an empty cert, and because its not a valid cert request, it gets
+			// matched by proxy's keccak commitment handler, which returns ErrNotFound (there is no such key in the store).
+			// I think this is ok behavior... since it would be a bug to submit an empty cert....?
+			// But need to think about this more.
+			name: "empty cert returns ErrNotFound",
+			certCreationFn: func() ([]byte, error) {
+				return []byte{}, nil
+			},
+			requireErrorFn: func(t *testing.T, err error) {
+				require.ErrorIs(t, err, altda.ErrNotFound)
+			},
+		},
+		{
+			name: "cert parsing error",
+			certCreationFn: func() ([]byte, error) {
+				cert := make([]byte, 10)
+				return cert, nil
+			},
+			requireErrorFn: func(t *testing.T, err error) {
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t, int(coretypes.ErrCertParsingFailedDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
+			},
+		},
+		{
+			name: "invalid (default) cert",
+			certCreationFn: func() ([]byte, error) {
+				// Build + Serialize invalid default cert
+				certV3 := coretypes.EigenDACertV3{}
+				serializedCertV3, err := rlp.EncodeToBytes(certV3)
+				if err != nil {
+					return nil, err
+				}
+				return serializedCertV3, nil
+			},
+			requireErrorFn: func(t *testing.T, err error) {
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
+			},
+		},
+	}
+
+	testHarness, err := integration.NewTestHarnessWithSetup(globalInfra)
+	require.NoError(t, err)
+	defer testHarness.Cleanup()
+
+	testCfg := integration.NewProxyTestConfig(globalInfra)
+	proxyConfig, err := integration.CreateProxyConfig(testCfg)
+	require.NoError(t, err)
+
+	ts, cleanup, err := integration.StartProxyServer(context.Background(), globalInfra.Logger, proxyConfig)
+	require.NoError(t, err)
+	defer cleanup()
+
+	for _, tt := range testTable {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			t.Log("Running test: ", tt.name)
+			serializedCert, err := tt.certCreationFn()
+			require.NoError(t, err)
+
+			altdaCommitment, err := commitments.EncodeCommitment(
+				certs.NewVersionedCert(serializedCert, certs.V2VersionByte),
+				commitments.OptimismGenericCommitmentMode)
+			require.NoError(t, err)
+			// the op client expects a typed commitment, so we have to decode the altdaCommitment
+			commitmentData, err := altda.DecodeCommitmentData(altdaCommitment)
+			require.NoError(t, err)
+
+			daClient := altda.NewDAClient(ts.RestAddress(), false, false)
+			_, err = daClient.GetInput(ts.Ctx, commitmentData, 0)
+
+			tt.requireErrorFn(t, err)
+		})
+	}
+}
+
+func TestOPContractTestBlobDecodingErrors(t *testing.T) {
+	// Writing this test is a lot more involved... because we need to populate mock relay backends
+	// that would return a blob that doesn't decode properly.
+	// Probably will require adding this after we've created a better test suite framework for the eigenda clients.
+	t.Skip("TODO: implement blob decoding errors test")
+}
 
 // requireStandardClientSetGet ... ensures that std proxy client can disperse and read a blob
 func requireStandardClientSetGet(t *testing.T, ctx context.Context, restEndpoint string, blob []byte) {
