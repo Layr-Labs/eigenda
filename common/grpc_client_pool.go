@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -22,6 +23,10 @@ type GRPCClientPool[T any] struct {
 
 	// Incremented once per call to GetClient().
 	callCount atomic.Uint64
+
+	// Indicates whether the pool has been closed
+	closed bool
+	lock   sync.Mutex
 }
 
 // Creates a new GRPCClientPool with the specified client builder and size.
@@ -63,8 +68,15 @@ func NewGRPCClientPool[T any](
 
 // GetClient returns a gRPC client of type T. If this client manager maintains a pool of clients, then it will choose
 // one from the pool to return.
-func (m *GRPCClientPool[T]) GetClient() T {
+func (m *GRPCClientPool[T]) GetClient() (T, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	var client T
+	if m.closed {
+		return client, fmt.Errorf("client pool is closed")
+	}
+
 	if len(m.clients) == 1 {
 		client = m.clients[0]
 	} else {
@@ -72,11 +84,19 @@ func (m *GRPCClientPool[T]) GetClient() T {
 		client = m.clients[index%uint64(len(m.clients))]
 	}
 
-	return client
+	return client, nil
 }
 
 // Close closes all gRPC client connections in the pool and releases resources.
 func (m *GRPCClientPool[T]) Close() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if m.closed {
+		return nil
+	}
+	m.closed = true
+
 	var err error
 	for _, conn := range m.connections {
 		if closeErr := conn.Close(); closeErr != nil {

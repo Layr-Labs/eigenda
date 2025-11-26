@@ -1,34 +1,30 @@
 use std::borrow::Cow;
 use std::time::Duration;
 
+use eigenda_ethereum::provider::Network;
 use testcontainers::core::{ContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, Image, ImageExt};
 
 const NAME: &str = "ghcr.io/layr-labs/eigenda-proxy";
 const TAG: &str = "2.4.1";
-const PORT: ContainerPort = ContainerPort::Tcp(3100);
+// We use 3101 since inabox starts a proxy on 3100 already.
+const PORT: ContainerPort = ContainerPort::Tcp(3101);
 const READY_MSG: &str = "Started EigenDA Proxy REST ALT DA server";
-
-// TODO(samlaf): add support for inabox
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum ProxyNetwork {
-    /// Run the proxy against the Sepolia network
-    Sepolia,
-}
 
 /// Start the proxy server.
 pub async fn start_proxy(
-    mode: ProxyNetwork,
+    network: Network,
+    // In order to disperse payloads, signer_sk_hex must have a reservation and/or on-demand deposit in the PaymentVault contract.
     signer_sk_hex: &str,
 ) -> Result<(String, ContainerAsync<EigenDaProxy>), anyhow::Error> {
-    let container = EigenDaProxy::new(mode, signer_sk_hex)
+    let container = EigenDaProxy::new(network, signer_sk_hex)
         .with_startup_timeout(Duration::from_secs(30))
+        // relay URLs are registered with localhost hostname, so we need to be on host network to access them.
+        .with_network("host")
         .start()
         .await?;
-    let host_port = container.get_host_port_ipv4(PORT).await?;
-    let url = format!("http://127.0.0.1:{host_port}");
+    let url = format!("http://127.0.0.1:{}", PORT.as_u16());
 
     Ok((url, container))
 }
@@ -40,7 +36,7 @@ pub struct EigenDaProxy {
 }
 
 impl EigenDaProxy {
-    pub fn new(mode: ProxyNetwork, signer_sk_hex: &str) -> Self {
+    pub fn new(network: Network, signer_sk_hex: &str) -> Self {
         let mut cmd_args = vec![
             "--port".to_string(),
             PORT.as_u16().to_string(),
@@ -54,8 +50,8 @@ impl EigenDaProxy {
             signer_sk_hex.to_string(),
         ];
 
-        match mode {
-            ProxyNetwork::Sepolia => {
+        match network {
+            Network::Sepolia => {
                 cmd_args.push("--eigenda.v2.network".to_string());
                 cmd_args.push("sepolia_testnet".to_string());
                 cmd_args.push(
@@ -66,6 +62,26 @@ impl EigenDaProxy {
                 cmd_args.push("0x19a469Ddb7199c7EB9E40455978b39894BB90974".to_string());
                 cmd_args.push("--eigenda.v2.eth-rpc".to_string());
                 cmd_args.push("wss://ethereum-sepolia-rpc.publicnode.com".to_string());
+            }
+            Network::Inabox => {
+                cmd_args.push("--eigenda.v2.eigenda-directory".to_string());
+                cmd_args.push("0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8".to_string());
+                cmd_args.push("--eigenda.v2.disperser-rpc".to_string());
+                cmd_args.push("localhost:32005".to_string());
+                cmd_args.push("--eigenda.v2.disable-tls".to_string());
+                cmd_args.push(
+                    "--eigenda.v2.cert-verifier-router-or-immutable-verifier-addr".to_string(),
+                );
+                // Local Inabox CertVerifier address
+                cmd_args.push("0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf".to_string());
+                cmd_args.push("--eigenda.v2.eth-rpc".to_string());
+                cmd_args.push("http://localhost:8545".to_string());
+            }
+            Network::Mainnet => {
+                panic!("Mainnet network support not implemented");
+            }
+            Network::Hoodi => {
+                panic!("Hoodi network support not implemented");
             }
         };
 
