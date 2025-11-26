@@ -49,10 +49,10 @@ import {
     IDelegationManager
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
-// NOTE: The names in deployImpl must match the names in in zeus,
-// will likely have to correct all contracts with "EigenDA" prefix.
-
 // TODO: Fetch CertVerifier and EjectionManager constructor parameters.
+// TODO: Add DelegationManager to zeus.
+// TODO: Add ProxyAdmin to zeus.
+// TODO: Figure out what initEigenDASignatureVerifier should be.
 // TODO: Add post deployment assertions.
 
 contract DeployImplementations is EOADeployer {
@@ -64,21 +64,29 @@ contract DeployImplementations is EOADeployer {
 
     /// forgefmt: disable-next-item
     function _runAsEOA() internal override {
-        // CertVerifier constructor parameters.
+        /// -----------------------------------------------------------------------
+        /// Constructor parameters
+        /// -----------------------------------------------------------------------
+
+        // CertVerifier.
         EigenDATypesV1.SecurityThresholds memory initSecurityThresholds = EigenDATypesV1.SecurityThresholds({
             confirmationThreshold: 100, // 100% confirmation
             adversaryThreshold: 33 // 33% adversary
         });
         bytes memory initQuorumNumbersRequired = hex"00";
         
-        // EjectionManager constructor parameters.
+        // EjectionManager.
         uint256 depositBaseFeeMultiplier;
         uint256 estimatedGasUsedWithoutSig;
         uint256 estimatedGasUsedWithSig;
 
-        // PauserRegistry constructor parameters.
+        // PauserRegistry.
         address[] memory initPausers = new address[](1);
         initPausers[0] = Env.impl.owner();
+
+        /// -----------------------------------------------------------------------
+        /// WARNING: NETWORK BROADCAST BEGINS HERE!
+        /// -----------------------------------------------------------------------
 
         vm.startBroadcast();
 

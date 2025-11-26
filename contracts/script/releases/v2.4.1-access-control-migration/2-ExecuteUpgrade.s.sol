@@ -15,122 +15,76 @@ import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeReg
 import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-/// @title ExecuteUpgrade
-/// @notice Execute upgrade of EigenDA implementations via timelock controller
+// TODO: Double check encoded arguements (could be out of order).
+
+/// NOTE: Inconsistent use of EigenDARegistry
 contract ExecuteUpgrade is EOADeployer {
     using Env for *;
     using Encode for *;
 
+    /// forgefmt: disable-next-item
     function _runAsEOA() internal override {
-        // Get proxy admin
+        // Get proxy admin.
         ProxyAdmin proxyAdmin = ProxyAdmin(Env.proxyAdmin());
 
-        // Upgrade ServiceManager with reinitialization
-        {
-            // Get current batch confirmers - we need to reconstruct this from events or state
-            // For now, using empty array as we'll need to set them post-upgrade
-            address[] memory batchConfirmers = new address[](0);
+        /// -----------------------------------------------------------------------
+        /// WARNING: NETWORK BROADCAST BEGINS HERE!
+        /// -----------------------------------------------------------------------
 
-            proxyAdmin.upgradeAndCall(
-                TransparentUpgradeableProxy(payable(address(Env.proxy.serviceManager()))),
-                address(Env.impl.serviceManager()),
-                abi.encodeWithSelector(
-                    EigenDAServiceManager.initialize.selector,
-                    Env.proxy.serviceManager().pauserRegistry(),
-                    Pausable(address(Env.proxy.serviceManager())).paused(),
-                    Env.impl.owner(), // newOwner
-                    batchConfirmers,
-                    Env.proxy.serviceManager().rewardsInitiator()
-                )
-            );
-        }
+        vm.startBroadcast();
 
-        // Upgrade RegistryCoordinator with reinitialization
-        {
-            // Get quorum count to read operator set params
-            uint8 quorumCount = Env.proxy.registryCoordinator().quorumCount();
-            IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams =
-                new IRegistryCoordinator.OperatorSetParam[](quorumCount);
-            uint96[] memory minimumStakes = new uint96[](quorumCount);
-            IStakeRegistry.StrategyParams[][] memory strategyParams = new IStakeRegistry.StrategyParams[][](quorumCount);
-
-            StakeRegistry stakeRegistry = Env.proxy.stakeRegistry();
-
-            // Read current configuration for each quorum
-            for (uint8 i = 0; i < quorumCount; i++) {
-                operatorSetParams[i] = Env.proxy.registryCoordinator().getOperatorSetParams(i);
-                minimumStakes[i] = stakeRegistry.minimumStakeForQuorum(i);
-
-                // Read strategy params for this quorum
-                uint256 strategyParamsLength = stakeRegistry.strategyParamsLength(i);
-                strategyParams[i] = new IStakeRegistry.StrategyParams[](strategyParamsLength);
-                for (uint256 j = 0; j < strategyParamsLength; j++) {
-                    strategyParams[i][j] = stakeRegistry.strategyParamsByIndex(i, j);
-                }
-            }
-
-            proxyAdmin.upgradeAndCall(
-                TransparentUpgradeableProxy(payable(address(Env.proxy.registryCoordinator()))),
-                address(Env.impl.registryCoordinator()),
-                abi.encodeWithSelector(
-                    EigenDARegistryCoordinator.initialize.selector,
-                    Env.impl.owner(), // newOwner
-                    Env.proxy.registryCoordinator().ejector(),
-                    Env.proxy.registryCoordinator().pauserRegistry(),
-                    Pausable(address(Env.proxy.registryCoordinator())).paused(),
-                    operatorSetParams,
-                    minimumStakes,
-                    strategyParams
-                )
-            );
-        }
-
-        // Upgrade ThresholdRegistry with reinitialization
-        {
-            // Read current threshold parameters
-            bytes memory quorumAdversaryThresholdPercentages =
-                Env.proxy.thresholdRegistry().quorumAdversaryThresholdPercentages();
-            bytes memory quorumConfirmationThresholdPercentages =
-                Env.proxy.thresholdRegistry().quorumConfirmationThresholdPercentages();
-            bytes memory quorumNumbersRequired = Env.proxy.thresholdRegistry().quorumNumbersRequired();
-
-            // Read versioned blob params
-            uint16 nextBlobVersion = Env.proxy.thresholdRegistry().nextBlobVersion();
-            DATypesV1.VersionedBlobParams[] memory versionedBlobParams =
-                new DATypesV1.VersionedBlobParams[](nextBlobVersion);
-            for (uint16 i = 0; i < nextBlobVersion; i++) {
-                versionedBlobParams[i] = Env.proxy.thresholdRegistry().getBlobParams(i);
-            }
-
-            proxyAdmin.upgradeAndCall(
-                TransparentUpgradeableProxy(payable(address(Env.proxy.thresholdRegistry()))),
-                address(Env.impl.thresholdRegistry()),
-                abi.encodeWithSelector(
-                    EigenDAThresholdRegistry.initialize.selector,
-                    Env.impl.owner(), // newOwner
-                    quorumAdversaryThresholdPercentages,
-                    quorumConfirmationThresholdPercentages,
-                    quorumNumbersRequired,
-                    versionedBlobParams
-                )
-            );
-        }
-
-        // Upgrade RelayRegistry with reinitialization
-        proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(Env.proxy.relayRegistry()))),
-            address(Env.impl.relayRegistry()),
-            abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, Env.impl.owner()) // newOwner
+        // Upgrade BlsApkRegistry (no reinitialization needed).
+        proxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.blsApkRegistry()))),
+            address(Env.impl.blsApkRegistry())
         );
 
-        // Upgrade DisperserRegistry with reinitialization
+        // Upgrade CertVerifierRouter.
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.certVerifierRouter()))),
+            address(Env.impl.certVerifierRouter()),
+            abi.encodeWithSelector(
+                EigenDACertVerifierRouter.initialize.selector,
+                Env.impl.owner() // newOwner
+            )
+        );
+
+        // NOTE: CertVerifier (Not a proxy no upgrade or initialization needed).
+
+        // Upgrade Directory.
+        proxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.directory()))),
+            address(Env.impl.directory())
+        );
+
+        // Upgrade DisperserRegistry.
         proxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(Env.proxy.disperserRegistry()))),
             address(Env.impl.disperserRegistry()),
-            abi.encodeWithSelector(EigenDADisperserRegistry.initialize.selector, Env.impl.owner()) // newOwner
+            abi.encodeWithSelector(
+                EigenDADisperserRegistry.initialize.selector, 
+                Env.impl.owner() // newOwner
+            )
         );
 
-        // Upgrade PaymentVault with reinitialization
+        // TODO: This doesn't seam right.
+        // Upgrade EjectionManager (no reinitialization needed).
+        proxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.ejectionManager()))),
+            address(Env.impl.ejectionManager())
+        );
+
+        // Upgrade IndexRegistry (no reinitialization needed).
+        proxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.indexRegistry()))), 
+            address(Env.impl.indexRegistry())
+        );
+
+        // NOTE: OperatorStateRetriever (not a proxy no upgrade or initialization needed).
+
+        // NOTE: PauserRegistry (not a proxy no upgrade or initialization needed).
+
+        // Upgrade PaymentVault.
         proxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(Env.proxy.paymentVault()))),
             address(Env.impl.paymentVault()),
@@ -143,6 +97,68 @@ contract ExecuteUpgrade is EOADeployer {
                 Env.proxy.paymentVault().globalSymbolsPerPeriod(),
                 Env.proxy.paymentVault().reservationPeriodInterval(),
                 Env.proxy.paymentVault().globalRatePeriodInterval()
+            )
+        );
+
+        // Upgrade RegistryCoordinator.
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.registryCoordinator()))),
+            address(Env.impl.registryCoordinator()),
+            abi.encodeWithSelector(
+                EigenDARegistryCoordinator.initialize.selector,
+                Env.impl.owner(), // newOwner
+                Env.proxy.registryCoordinator().ejector(),
+                Env.proxy.registryCoordinator().pauserRegistry(),
+                0,
+                new IRegistryCoordinator.OperatorSetParam[](0),
+                new uint96[](0),
+                new IStakeRegistry.StrategyParams[][](0)
+            )
+        );
+
+        // Upgrade RelayRegistry.
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.relayRegistry()))),
+            address(Env.impl.relayRegistry()),
+            abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, Env.impl.owner()) // newOwner
+        );
+
+        // Upgrade ServiceManager.
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.serviceManager()))),
+            address(Env.impl.serviceManager()),
+            abi.encodeWithSelector(
+                EigenDAServiceManager.initialize.selector,
+                Env.proxy.serviceManager().pauserRegistry(),
+                0, // initial paused status
+                Env.impl.owner(), // newOwner
+                new address[](0),
+                Env.proxy.serviceManager().rewardsInitiator()
+            )
+        );
+
+        // Upgrade SocketRegistry (no reinitialization needed).
+        proxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.socketRegistry()))),
+            address(Env.impl.socketRegistry())
+        );
+
+        // Upgrade StakeRegistry (no reinitialization needed).
+        proxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.stakeRegistry()))), address(Env.impl.stakeRegistry())
+        );
+
+        // Upgrade ThresholdRegistry.
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(Env.proxy.thresholdRegistry()))),
+            address(Env.impl.thresholdRegistry()),
+            abi.encodeWithSelector(
+                EigenDAThresholdRegistry.initialize.selector,
+                Env.impl.owner(), // newOwner
+                Env.proxy.thresholdRegistry().quorumAdversaryThresholdPercentages(),
+                Env.proxy.thresholdRegistry().quorumConfirmationThresholdPercentages(),
+                Env.proxy.thresholdRegistry().quorumNumbersRequired(),
+                new DATypesV1.VersionedBlobParams[](0) // no additional blobs needed
             )
         );
     }
