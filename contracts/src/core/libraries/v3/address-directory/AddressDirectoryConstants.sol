@@ -32,6 +32,9 @@ library AddressDirectoryConstants {
 
     string internal constant CERT_VERIFIER_ROUTER_NAME = "CERT_VERIFIER_ROUTER";
 
+    /// @dev This is an optional contract that EigenDA may deploy to provide more complex getters for configurations.
+    string internal constant EIGEN_DA_CONFIG_RETRIEVER_NAME = "EIGEN_DA_CONFIG_RETRIEVER";
+
     /// LEGACY
 
     string internal constant CERT_VERIFIER_LEGACY_V1_NAME = "CERT_VERIFIER_LEGACY_V1";
