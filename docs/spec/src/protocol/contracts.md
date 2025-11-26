@@ -31,7 +31,7 @@ The smart contracts can be found in our [repo](https://github.com/Layr-Labs/eige
 | [Disperser Registry](#eigendadisperserregistry)                       | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
 | [Payment Vault](#paymentvault)                                        | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
 | [Pauser Registry](#pauserregistry)                                    | [middleware](#middleware-contracts)           | No                              | No                         |
-| [BLS APK Registry](#blsapkblsapkregistry)                             | [middleware](#middleware-contracts)           | Yes                             | Yes                        |
+| [BLS APK Registry](#blsapkregistry)                             | [middleware](#middleware-contracts)           | Yes                             | Yes                        |
 | [Index Registry](#indexregistry)                                      | [middleware](#middleware-contracts)           | Yes                             | Yes                        |
 | [Stake Registry](#stakeregistry)                                      | [middleware](#middleware-contracts)           | Yes                             | Yes                        |
 | [Socket Registry](#socketregistry)                                    | [middleware](#middleware-contracts)           | Yes                             | Yes                        |
@@ -205,7 +205,7 @@ TODO
 ### [`IndexRegistry`](https://github.com/Layr-Labs/eigenlayer-middleware/blob/2f7c93e38f56f292f247981a52bd3619a16b9918/src/IndexRegistry.sol)
 
 **Description**
-Maintains an ordered, historically versioned list of operators for each quorum, allowing the RegistryCoordinator to register or deregister operators while preserving full block-by-block history of operator counts and index assignments. It provides efficient read functions to reconstruct the operator set at any block
+Maintains an ordered, historically versioned list of operators for each quorum, allowing the RegistryCoordinator to register or deregister operators while preserving full block-by-block history of operator counts and index assignments. It provides efficient read functions to reconstruct the operator set at any block.
 
 **Access Mgmt**
 - `RegistryCoordinator` role that makes stateful updates when registering / deregistering quorum operators
