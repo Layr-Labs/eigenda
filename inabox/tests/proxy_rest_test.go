@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -608,7 +609,7 @@ func TestReservationPayments(t *testing.T) {
 }
 
 func TestOnDemandPayments(t *testing.T) {
-	t.Skip("TODO(iquidus): Insufficent on-demand balance currently causes test to fail")
+	t.Skip("TODO(iquidus): Insufficient on-demand balance currently causes test to fail")
 	t.Parallel()
 
 	testCfg := integration.NewProxyTestConfig(globalInfra)
@@ -788,7 +789,7 @@ func TestOPContractTestValidAndInvalidCertErrors(t *testing.T) {
 				certV3 := coretypes.EigenDACertV3{}
 				serializedCertV3, err := rlp.EncodeToBytes(certV3)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to encode cert: %w", err)
 				}
 				return serializedCertV3, nil
 			},

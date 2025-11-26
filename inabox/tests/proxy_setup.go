@@ -94,7 +94,7 @@ func CreateProxyConfig(
 	}
 
 	// Get SRS paths using the utility function
-	g1Path, g2Path, g2TrailingPath, err := GetSRSPaths()
+	g1Path, g2Path, g2TrailingPath, err := getSRSPaths()
 	if err != nil {
 		return config.AppConfig{}, fmt.Errorf("failed to determine SRS file paths: %w", err)
 	}
