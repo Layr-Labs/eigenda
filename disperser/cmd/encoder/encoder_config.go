@@ -112,7 +112,7 @@ func DefaultEncoderConfig() *EncoderConfig {
 			Backend: blobstore.S3Backend,
 		},
 		ChunkStore: chunkstore.Config{
-			Backend: "s3",
+			Backend: string(blobstore.S3Backend),
 		},
 		Kzg: kzg.KzgConfig{
 			SRSOrder:        10000,
