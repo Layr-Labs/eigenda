@@ -23,6 +23,11 @@ pub const EIGENDA_DIRECTORY_HOODI: Address = address!("0x5a44e56e88abcf610c68340
 /// EigenDA directory address on the Sepolia test network.
 pub const EIGENDA_DIRECTORY_SEPOLIA: Address =
     address!("0x9620dC4B3564198554e4D2b06dEFB7A369D90257");
+/// EigenDA directory address on the Inabox local devnet.
+/// This address could get outdated if contract deployment script changes...
+/// run `make start-inabox` and get the EIGENDA_DIRECTORY_ADDR printed to stdout.
+pub const EIGENDA_DIRECTORY_INABOX: Address =
+    address!("0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8");
 
 /// EigenDA relevant contracts. Addresses are retrieved from the the EigenDADirectory contract for
 /// the respective network (i.e. Mainnet, Hoodi)
