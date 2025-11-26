@@ -43,6 +43,14 @@ import {
 import {
     IRewardsCoordinator
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+import {
+    IDelegationManager
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+
+type DeployedProxy is bytes32;
+type DeployedBeacon is bytes32;
+type DeployedImpl is bytes32;
+type DeployedInstance is bytes32;
 
 library Env {
     using ZEnvHelpers for *;
@@ -67,58 +75,58 @@ library Env {
     /// This is bytes32(uint256(keccak256('eip1967.proxy.beacon')) - 1)) and is validated in the constructor.
     bytes32 internal constant _BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
 
-    /// -----------------------------------------------------------------------
-    /// Enums
-    /// -----------------------------------------------------------------------
-
-    // TODO: Use user defined types instead of enums, like 4 lines instead of 20.
-
-    /// Dummy types and variables to facilitate syntax, e.g: `Env.proxy.serviceManager()`
-    enum DeployedProxy {
-        A
-    }
-    enum DeployedBeacon {
-        A
-    }
-    enum DeployedImpl {
-        A
-    }
-    enum DeployedInstance {
-        A
-    }
-
-    DeployedProxy internal constant proxy = DeployedProxy.A;
-    DeployedBeacon internal constant beacon = DeployedBeacon.A;
-    DeployedImpl internal constant impl = DeployedImpl.A;
-    DeployedInstance internal constant instance = DeployedInstance.A;
+    /// @dev Needed to allow handy syntax, e.g: `Env.proxy.serviceManager()`
+    DeployedProxy constant proxy = DeployedProxy.wrap(bytes32(0));
+    DeployedBeacon constant beacon = DeployedBeacon.wrap(bytes32(0));
+    DeployedImpl constant impl = DeployedImpl.wrap(bytes32(0));
+    DeployedInstance constant instance = DeployedInstance.wrap(bytes32(0));
 
     /// -----------------------------------------------------------------------
     /// Environment Variables
     /// -----------------------------------------------------------------------
 
+    /// @dev Usage: `Env.env()`
     function env() internal view returns (string memory) {
         return _string("ZEUS_ENV");
     }
 
+    /// @dev Usage: `Env.envVersion()`
     function envVersion() internal view returns (string memory) {
         return _string("ZEUS_ENV_VERSION");
     }
 
+    /// @dev Usage: `Env.deployVersion()`
     function deployVersion() internal view returns (string memory) {
         return _string("ZEUS_DEPLOY_TO_VERSION");
     }
 
+    /// @dev Usage: `Env.proxyAdmin()`
     function proxyAdmin() internal view returns (IProxyAdmin) {
         return IProxyAdmin(_deployedImpl("ProxyAdmin"));
-    }
-
-    function timelockController() internal view returns (TimelockController) {
-        return TimelockController(payable(_envAddress("timelockController")));
     }
 
     /// @dev Usage: `Env.owner()`
     function owner() internal view returns (address) {
         return _deployedImpl("Owner");
+    }
+
+    /// -----------------------------------------------------------------------
+    /// EigenLayer Contracts
+    /// -----------------------------------------------------------------------
+
+    /// @dev Usage: `Env.avsDirectory()`
+    function avsDirectory() internal view returns (IAVSDirectory) {
+        return IAVSDirectory(_deployedProxy("AVSDirectory"));
+    }
+
+    /// @dev Usage: `Env.rewardsCoordinator()`
+    function rewardsCoordinator() internal view returns (IRewardsCoordinator) {
+        return IRewardsCoordinator(_deployedProxy("RewardsCoordinator"));
+    }
+
+    /// @dev Usage: `Env.delegationManager()`
+    function delegationManager() internal view returns (IDelegationManager) {
+        return IDelegationManager(_deployedProxy("DelegationManager"));
     }
 
     /// -----------------------------------------------------------------------
@@ -281,20 +289,6 @@ library Env {
     /// @dev Usage: `Env.impl.certVerifierRouter()`
     function certVerifierRouter(DeployedImpl) internal view returns (EigenDACertVerifierRouter) {
         return EigenDACertVerifierRouter(_deployedImpl("CertVerifierRouter"));
-    }
-
-    /// -----------------------------------------------------------------------
-    /// EigenLayer Contracts
-    /// -----------------------------------------------------------------------
-
-    /// @dev Usage: `Env.proxy.avsDirectory()`
-    function avsDirectory(DeployedProxy) internal view returns (IAVSDirectory) {
-        return IAVSDirectory(_deployedProxy("AVSDirectory"));
-    }
-
-    /// @dev Usage: `Env.proxy.rewardsCoordinator()`
-    function rewardsCoordinator(DeployedProxy) internal view returns (IRewardsCoordinator) {
-        return IRewardsCoordinator(_deployedProxy("RewardsCoordinator"));
     }
 
     /// -----------------------------------------------------------------------

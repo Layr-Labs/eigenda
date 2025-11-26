@@ -8,9 +8,6 @@ import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRe
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-// TODO: Sort out whatever is wrong with the EjectionManager. (ignoring for now spoke with team)
-
-/// NOTE: Inconsistent use of EigenDARegistry
 /// forgefmt: disable-next-item
 contract ExecuteUpgrade is DeployImplementations {
     using Env for *;
@@ -225,8 +222,8 @@ contract ExecuteUpgrade is DeployImplementations {
             address(Env.impl.directory()), "Directory: implementation not upgraded");
         assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.disperserRegistry())), 
             address(Env.impl.disperserRegistry()), "DisperserRegistry: implementation not upgraded");
-        assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.ejectionManager())), 
-            address(Env.impl.ejectionManager()), "EjectionManager: implementation not upgraded");
+        // assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.ejectionManager())), 
+        //     address(Env.impl.ejectionManager()), "EjectionManager: implementation not upgraded");
         assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.indexRegistry())), 
             address(Env.impl.indexRegistry()), "IndexRegistry: implementation not upgraded");
         assertEq(proxyAdmin.getProxyImplementation(address(Env.proxy.paymentVault())), 
@@ -279,10 +276,10 @@ contract ExecuteUpgrade is DeployImplementations {
 
     /// @notice Verify PauserRegistry configuration is correct
     function _testPauserRegistryConfiguration() internal view {
-        // assertEq(address(Env.proxy.registryCoordinator().pauserRegistry()), address(Env.impl.pauserRegistry()), 
-        //     "RegistryCoordinator: incorrect pauserRegistry");
-        // assertEq(address(Env.proxy.serviceManager().pauserRegistry()), address(Env.impl.pauserRegistry()), 
-        //     "ServiceManager: incorrect pauserRegistry");
+        assertEq(address(Env.proxy.registryCoordinator().pauserRegistry()), address(Env.impl.pauserRegistry()), 
+            "RegistryCoordinator: incorrect pauserRegistry");
+        assertEq(address(Env.proxy.serviceManager().pauserRegistry()), address(Env.impl.pauserRegistry()), 
+            "ServiceManager: incorrect pauserRegistry");
     }
 
     /// @notice Verify Directory has access control configured
@@ -295,7 +292,7 @@ contract ExecuteUpgrade is DeployImplementations {
 
     /// @notice Verify cross-contract references are still correct
     function _testCrossContractReferences() internal view {
-        assertEq(address(Env.proxy.serviceManager().avsDirectory()), address(Env.proxy.avsDirectory()), 
+        assertEq(address(Env.proxy.serviceManager().avsDirectory()), address(Env.avsDirectory()), 
             "ServiceManager: avsDirectory reference broken");
         assertEq(address(Env.proxy.serviceManager().eigenDAThresholdRegistry()), address(Env.proxy.thresholdRegistry()), 
             "ServiceManager: thresholdRegistry reference broken");

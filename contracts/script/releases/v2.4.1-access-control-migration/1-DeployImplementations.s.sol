@@ -24,19 +24,19 @@ import {
     PauserRegistry
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 
-// // Import periphery contracts
+import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
+
+// Import periphery contracts
 // import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
 
 // Import certificate verification
 // import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
-import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
 
 // Import interfaces
 import {
     IDelegationManager
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
-// TODO: Fetch CertVerifier and EjectionManager constructor parameters.
 // TODO: Add DelegationManager to zeus.
 // TODO: Directory updates.
 
@@ -80,7 +80,7 @@ contract DeployImplementations is EOADeployer {
         });
         // NOTE: Spoke with team, CertVerifier is getting deprecated, no need to deploy.
         // // Deploy new CertVerifier implementation.
-        // deployImpl({ // TODO: Remove from Directory too.
+        // deployImpl({ // TODO: Remove from Directory.
         //     name: "CertVerifier",
         //     deployedTo: address(
         //         new EigenDACertVerifier({
@@ -150,8 +150,8 @@ contract DeployImplementations is EOADeployer {
             name: "ServiceManager",
             deployedTo: address(
                 new EigenDAServiceManager({
-                    __avsDirectory: Env.proxy.avsDirectory(),
-                    __rewardsCoordinator: Env.proxy.rewardsCoordinator(),
+                    __avsDirectory: Env.avsDirectory(),
+                    __rewardsCoordinator: Env.rewardsCoordinator(),
                     __registryCoordinator: Env.proxy.registryCoordinator(),
                     __stakeRegistry: Env.proxy.stakeRegistry(),
                     __eigenDAThresholdRegistry: Env.proxy.thresholdRegistry(),
@@ -301,7 +301,7 @@ contract DeployImplementations is EOADeployer {
     function _testServiceManagerImmutables() internal view {
         assertEq(
             address(Env.impl.serviceManager().avsDirectory()),
-            address(Env.proxy.avsDirectory()),
+            address(Env.avsDirectory()),
             "ServiceManager: incorrect avsDirectory"
         );
         assertEq(
