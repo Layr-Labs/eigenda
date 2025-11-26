@@ -24,7 +24,7 @@ pub async fn start_proxy(
         .with_network("host")
         .start()
         .await?;
-    let url = format!("http://127.0.0.1:{PORT}");
+    let url = format!("http://127.0.0.1:{}", PORT.as_u16());
 
     Ok((url, container))
 }
