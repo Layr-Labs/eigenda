@@ -17,7 +17,7 @@ type LegacyDisperserRegistry struct {
 }
 
 // Creates a new legacy disperser registry.
-// The grpcUri parameter specifies how to connect to disperser ID 0
+// The grpcUri parameter specifies how to connect to disperser ID 0 in "hostname:port" format.
 func NewLegacyDisperserRegistry(grpcUri string) *LegacyDisperserRegistry {
 	return &LegacyDisperserRegistry{
 		grpcUri: grpcUri,
@@ -27,15 +27,15 @@ func NewLegacyDisperserRegistry(grpcUri string) *LegacyDisperserRegistry {
 // GetDefaultDispersers implements [DisperserRegistry].
 //
 // Return a single default disperser with ID 0, which is the only disperser currently deployed on the network.
-func (r *LegacyDisperserRegistry) GetDefaultDispersers(ctx context.Context) (map[uint32]struct{}, error) {
-	return map[uint32]struct{}{0: {}}, nil
+func (r *LegacyDisperserRegistry) GetDefaultDispersers(ctx context.Context) ([]uint32, error) {
+	return []uint32{0}, nil
 }
 
 // GetOnDemandDispersers implements [DisperserRegistry].
 //
 // Return a single on-demand disperser with ID 0, which is the only disperser currently deployed on the network.
-func (r *LegacyDisperserRegistry) GetOnDemandDispersers(ctx context.Context) (map[uint32]struct{}, error) {
-	return map[uint32]struct{}{0: {}}, nil
+func (r *LegacyDisperserRegistry) GetOnDemandDispersers(ctx context.Context) ([]uint32, error) {
+	return []uint32{0}, nil
 }
 
 // Implements [DisperserRegistry].
