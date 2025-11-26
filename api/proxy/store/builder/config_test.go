@@ -62,7 +62,7 @@ func validCfg() Config {
 		MemstoreEnabled: false,
 		ClientConfigV2: common.ClientConfigV2{
 			DisperserClientCfg: dispersal.DisperserClientConfig{
-				NetworkAddress:    "http://localhost:9999",
+				GrpcUri:           "localhost:9999",
 				UseSecureGrpcFlag: true,
 			},
 			EigenDACertVerifierOrRouterAddress: "0x0000000000032443134",
@@ -162,7 +162,7 @@ func TestConfigVerification(t *testing.T) {
 			t.Run(
 				"FailWhenRequiredEigenDAV2FieldsAreUnset", func(t *testing.T) {
 					cfg := validCfg()
-					cfg.ClientConfigV2.DisperserClientCfg.NetworkAddress = ""
+					cfg.ClientConfigV2.DisperserClientCfg.GrpcUri = ""
 					require.Error(t, cfg.Check())
 				})
 		})

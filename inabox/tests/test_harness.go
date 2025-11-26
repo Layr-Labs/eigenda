@@ -251,7 +251,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 	}
 
 	disperserClientConfig := &dispersal.DisperserClientConfig{
-		NetworkAddress: tc.APIServerAddress,
+		GrpcUri: tc.APIServerAddress,
 	}
 
 	accountId, err := signer.GetAccountID()

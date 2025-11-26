@@ -13,7 +13,7 @@ import (
 func validClientConfigV2() common.ClientConfigV2 {
 	return common.ClientConfigV2{
 		DisperserClientCfg: dispersal.DisperserClientConfig{
-			NetworkAddress: "localhost:8080",
+			GrpcUri: "localhost:8080",
 		},
 		PayloadDisperserCfg:                dispersal.PayloadDisperserConfig{},
 		RelayPayloadRetrieverCfg:           payloadretrieval.RelayPayloadRetrieverConfig{},

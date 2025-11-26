@@ -141,7 +141,7 @@ func NewTestClient(
 	}
 
 	disperserConfig := &dispersal.DisperserClientConfig{
-		NetworkAddress:           fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
+		GrpcUri:                  fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
 		UseSecureGrpcFlag:        true,
 		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
@@ -436,7 +436,7 @@ func NewTestClient(
 				},
 				ClientConfigV2: proxycommon.ClientConfigV2{
 					DisperserClientCfg: dispersal.DisperserClientConfig{
-						NetworkAddress:    fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
+						GrpcUri:           fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
 						UseSecureGrpcFlag: true,
 					},
 					PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
