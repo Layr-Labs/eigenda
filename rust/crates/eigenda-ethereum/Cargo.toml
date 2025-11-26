@@ -25,6 +25,7 @@ rustls = { workspace = true, features = ["aws-lc-rs"] }
 schemars = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["alloc", "derive"] }
 serde_json.workspace = true
+tracing = { workspace = true }
 
 [dev-dependencies]
 alloy-rpc-types = { workspace = true, features = ["anvil"] }

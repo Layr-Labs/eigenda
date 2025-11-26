@@ -17,6 +17,7 @@ use reth_trie_common::AccountProof;
 use rustls::crypto::{CryptoProvider, aws_lc_rs};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 use crate::address::EthereumAddress;
 use crate::contracts::{
@@ -225,6 +226,7 @@ impl EigenDaProvider {
     }
 
     /// Fetches the relevant state used to validate the EigenDA certificate.
+    #[instrument(skip_all)]
     pub async fn fetch_cert_state(
         &self,
         block_height: u64,
