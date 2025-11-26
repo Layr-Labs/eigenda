@@ -69,7 +69,7 @@ func ParseConfig[T VerifiableConfig](
 		TagName:          "mapstructure",
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(), // Support time.Duration parsing from strings
-			secret.DecodeHook,                           // Support Secret parsing
+			secret.DecodeHook, // Support Secret parsing
 		),
 	}
 	decoder, err := mapstructure.NewDecoder(decoderConfig)
