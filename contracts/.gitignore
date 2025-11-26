@@ -29,3 +29,6 @@ artifacts/
 # Ignore inabox deployment artifacts
 inabox/
 inabox_*.json
+
+# Useful for references
+temp/
