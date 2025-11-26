@@ -369,5 +369,4 @@ library Env {
     function _getBeacon(address _proxy) internal view returns (address) {
         return address(uint160(uint256(vm.load(_proxy, _BEACON_SLOT))));
     }
-
 }
