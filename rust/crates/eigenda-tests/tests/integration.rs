@@ -36,6 +36,9 @@ async fn post_payload_and_verify_returned_cert_inabox() {
     common::tracing::init_tracing();
 
     dotenv().ok();
+    // Inabox local dev signer private key, which matches the public key registered in:
+    // https://github.com/Layr-Labs/eigenda/blob/bff1f8ab9c1841e6d05bc61225f66cfff508b751/contracts/script/SetUpEigenDA.s.sol#L168
+    // It is safe to use for local development and testing only. Do not use this key in production or any other context.
     let signer_sk_hex =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded".to_string();
     let rpc_url = "http://localhost:8545".to_string();
