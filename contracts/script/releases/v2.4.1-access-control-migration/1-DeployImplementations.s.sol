@@ -225,6 +225,149 @@ contract DeployImplementations is EOADeployer {
     function _beforeTestScript() internal view {}
 
     function _afterTestScript() internal view {
-        assertEq(Env.impl.pauserRegistry().unpauser(), Env.impl.owner());
+        _testDeploymentAddresses();
+        _testImplementationCode();
+        _testRegistryImmutables();
+        _testServiceManagerImmutables();
+        _testOtherImmutables();
+    }
+
+    /// -----------------------------------------------------------------------
+    /// Tests
+    /// -----------------------------------------------------------------------
+
+    /// @notice Verify all implementations deployed to non-zero addresses
+    function _testDeploymentAddresses() internal view {
+        assertTrue(address(Env.impl.blsApkRegistry()) != address(0), "BLSApkRegistry not deployed");
+        assertTrue(address(Env.impl.certVerifierRouter()) != address(0), "CertVerifierRouter not deployed");
+        assertTrue(address(Env.impl.certVerifier()) != address(0), "CertVerifier not deployed");
+        assertTrue(address(Env.impl.directory()) != address(0), "Directory not deployed");
+        assertTrue(address(Env.impl.disperserRegistry()) != address(0), "DisperserRegistry not deployed");
+        assertTrue(address(Env.impl.ejectionManager()) != address(0), "EjectionManager not deployed");
+        assertTrue(address(Env.impl.indexRegistry()) != address(0), "IndexRegistry not deployed");
+        assertTrue(address(Env.impl.operatorStateRetriever()) != address(0), "OperatorStateRetriever not deployed");
+        assertTrue(address(Env.impl.paymentVault()) != address(0), "PaymentVault not deployed");
+        assertTrue(address(Env.impl.registryCoordinator()) != address(0), "RegistryCoordinator not deployed");
+        assertTrue(address(Env.impl.relayRegistry()) != address(0), "RelayRegistry not deployed");
+        assertTrue(address(Env.impl.serviceManager()) != address(0), "ServiceManager not deployed");
+        assertTrue(address(Env.impl.socketRegistry()) != address(0), "SocketRegistry not deployed");
+        assertTrue(address(Env.impl.stakeRegistry()) != address(0), "StakeRegistry not deployed");
+        assertTrue(address(Env.impl.thresholdRegistry()) != address(0), "ThresholdRegistry not deployed");
+    }
+
+    /// @notice Verify implementations have bytecode deployed
+    function _testImplementationCode() internal view {
+        assertTrue(address(Env.impl.registryCoordinator()).code.length > 0, "RegistryCoordinator has no code");
+        assertTrue(address(Env.impl.serviceManager()).code.length > 0, "ServiceManager has no code");
+        assertTrue(address(Env.impl.paymentVault()).code.length > 0, "PaymentVault has no code");
+        assertTrue(address(Env.impl.thresholdRegistry()).code.length > 0, "ThresholdRegistry has no code");
+        assertTrue(address(Env.impl.directory()).code.length > 0, "Directory has no code");
+    }
+
+    /// @notice Verify immutable constructor parameters for registry implementations
+    function _testRegistryImmutables() internal view {
+        // Verify individual registry immutables
+        assertEq(
+            address(Env.impl.blsApkRegistry().registryCoordinator()),
+            address(Env.proxy.registryCoordinator()),
+            "BLSApkRegistry: incorrect registryCoordinator"
+        );
+        assertEq(
+            address(Env.impl.indexRegistry().registryCoordinator()),
+            address(Env.proxy.registryCoordinator()),
+            "IndexRegistry: incorrect registryCoordinator"
+        );
+        assertEq(
+            address(Env.impl.socketRegistry().registryCoordinator()),
+            address(Env.proxy.registryCoordinator()),
+            "SocketRegistry: incorrect registryCoordinator"
+        );
+        assertEq(
+            address(Env.impl.stakeRegistry().registryCoordinator()),
+            address(Env.proxy.registryCoordinator()),
+            "StakeRegistry: incorrect registryCoordinator"
+        );
+        assertEq(
+            address(Env.impl.stakeRegistry().delegation()),
+            address(Env.proxy.stakeRegistry().delegation()),
+            "StakeRegistry: incorrect delegation"
+        );
+
+        // Verify RegistryCoordinator references to other registries
+        assertEq(
+            address(Env.impl.registryCoordinator().stakeRegistry()),
+            address(Env.proxy.stakeRegistry()),
+            "RegistryCoordinator: incorrect stakeRegistry"
+        );
+        assertEq(
+            address(Env.impl.registryCoordinator().blsApkRegistry()),
+            address(Env.proxy.blsApkRegistry()),
+            "RegistryCoordinator: incorrect blsApkRegistry"
+        );
+        assertEq(
+            address(Env.impl.registryCoordinator().indexRegistry()),
+            address(Env.proxy.indexRegistry()),
+            "RegistryCoordinator: incorrect indexRegistry"
+        );
+        assertEq(
+            address(Env.impl.registryCoordinator().socketRegistry()),
+            address(Env.proxy.socketRegistry()),
+            "RegistryCoordinator: incorrect socketRegistry"
+        );
+        assertEq(
+            address(Env.impl.registryCoordinator().directory()),
+            address(Env.proxy.directory()),
+            "RegistryCoordinator: incorrect directory"
+        );
+    }
+
+    /// @notice Verify ServiceManager immutable parameters
+    function _testServiceManagerImmutables() internal view {
+        assertEq(
+            address(Env.impl.serviceManager().avsDirectory()),
+            address(Env.proxy.avsDirectory()),
+            "ServiceManager: incorrect avsDirectory"
+        );
+        assertEq(
+            address(Env.impl.serviceManager().eigenDAThresholdRegistry()),
+            address(Env.proxy.thresholdRegistry()),
+            "ServiceManager: incorrect eigenDAThresholdRegistry"
+        );
+        assertEq(
+            address(Env.impl.serviceManager().eigenDARelayRegistry()),
+            address(Env.proxy.relayRegistry()),
+            "ServiceManager: incorrect eigenDARelayRegistry"
+        );
+        assertEq(
+            address(Env.impl.serviceManager().paymentVault()),
+            address(Env.proxy.paymentVault()),
+            "ServiceManager: incorrect paymentVault"
+        );
+        assertEq(
+            address(Env.impl.serviceManager().eigenDADisperserRegistry()),
+            address(Env.proxy.disperserRegistry()),
+            "ServiceManager: incorrect eigenDADisperserRegistry"
+        );
+    }
+
+    /// @notice Verify other contract immutables
+    function _testOtherImmutables() internal view {
+        // CertVerifier
+        assertEq(
+            address(Env.impl.certVerifier().eigenDAThresholdRegistry()),
+            address(Env.proxy.thresholdRegistry()),
+            "CertVerifier: incorrect thresholdRegistry"
+        );
+
+        // PauserRegistry
+        assertEq(Env.impl.pauserRegistry().unpauser(), Env.impl.owner(), "PauserRegistry: incorrect unpauser");
+        assertTrue(Env.impl.pauserRegistry().isPauser(Env.impl.owner()), "PauserRegistry: owner not set as pauser");
+
+        // EjectionManager
+        assertEq(
+            Env.impl.ejectionManager().getDepositToken(),
+            Env.proxy.ejectionManager().getDepositToken(),
+            "EjectionManager: incorrect depositToken"
+        );
     }
 }

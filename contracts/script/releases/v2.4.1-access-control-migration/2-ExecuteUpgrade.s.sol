@@ -14,17 +14,18 @@ import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRe
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {IEigenDAAddressDirectory} from "src/core/interfaces/IEigenDADirectory.sol";
 
 // TODO: Sort out whatever is wrong with the EjectionManager.
 // TODO: Add ProxyAdmin to zeus.
 // TODO: Add post deployment assertions.
 
 /// NOTE: Inconsistent use of EigenDARegistry
+/// forgefmt: disable-next-item
 contract ExecuteUpgrade is EOADeployer {
     using Env for *;
     using Encode for *;
 
-    /// forgefmt: disable-next-item
     function _runAsEOA() internal override {
         // Get proxy admin.
         ProxyAdmin proxyAdmin = ProxyAdmin(Env.proxyAdmin());
@@ -194,15 +195,125 @@ contract ExecuteUpgrade is EOADeployer {
     function _beforeTestScript() internal view {}
 
     function _afterTestScript() internal view {
-        // Assert ownership has been transferred to the new owner.
-        assertEq(Env.proxy.certVerifierRouter().owner(), Env.impl.owner());
+        _testOwnership();
+        _testUpgradedImplementations();
+        _testPauseStates();
+        _testPaymentVaultStatePreservation();
+        _testThresholdRegistryStatePreservation();
+        _testCriticalReferencesPreserved();
+        _testPauserRegistryConfiguration();
+        _testDirectoryAccessControl();
+        _testCrossContractReferences();
+    }
+
+    /// -----------------------------------------------------------------------
+    /// Tests
+    /// -----------------------------------------------------------------------
+
+    /// @notice Verify ownership has been transferred to the new owner
+    function _testOwnership() internal view {
+        assertEq(Env.proxy.certVerifierRouter().owner(), Env.impl.owner(), "CertVerifierRouter: incorrect owner");
         // assertEq(Env.proxy.directory().owner(), Env.impl.owner()); // Not ownable compliant.
-        assertEq(Env.proxy.disperserRegistry().owner(), Env.impl.owner());
+        assertEq(Env.proxy.disperserRegistry().owner(), Env.impl.owner(), "DisperserRegistry: incorrect owner");
         // assertEq(Env.proxy.ejectionManager().owner(), Env.impl.owner()); // Not ownable compliant.
-        assertEq(Env.proxy.paymentVault().owner(), Env.impl.owner());
-        assertEq(Env.proxy.registryCoordinator().owner(), Env.impl.owner());
-        assertEq(Env.proxy.relayRegistry().owner(), Env.impl.owner());
-        assertEq(Env.proxy.serviceManager().owner(), Env.impl.owner());
-        assertEq(Env.proxy.thresholdRegistry().owner(), Env.impl.owner());
+        assertEq(Env.proxy.paymentVault().owner(), Env.impl.owner(), "PaymentVault: incorrect owner");
+        assertEq(Env.proxy.registryCoordinator().owner(), Env.impl.owner(), "RegistryCoordinator: incorrect owner");
+        assertEq(Env.proxy.relayRegistry().owner(), Env.impl.owner(), "RelayRegistry: incorrect owner");
+        assertEq(Env.proxy.serviceManager().owner(), Env.impl.owner(), "ServiceManager: incorrect owner");
+        assertEq(Env.proxy.thresholdRegistry().owner(), Env.impl.owner(), "ThresholdRegistry: incorrect owner");
+    }
+
+    /// @notice Verify all proxy implementations were upgraded
+    function _testUpgradedImplementations() internal view {
+        ProxyAdmin proxyAdmin = ProxyAdmin(Env.proxyAdmin());
+        
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.blsApkRegistry())))), 
+            address(Env.impl.blsApkRegistry()), "BLSApkRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.certVerifierRouter())))), 
+            address(Env.impl.certVerifierRouter()), "CertVerifierRouter: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.directory())))), 
+            address(Env.impl.directory()), "Directory: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.disperserRegistry())))), 
+            address(Env.impl.disperserRegistry()), "DisperserRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.ejectionManager())))), 
+            address(Env.impl.ejectionManager()), "EjectionManager: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.indexRegistry())))), 
+            address(Env.impl.indexRegistry()), "IndexRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.paymentVault())))), 
+            address(Env.impl.paymentVault()), "PaymentVault: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.registryCoordinator())))), 
+            address(Env.impl.registryCoordinator()), "RegistryCoordinator: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.relayRegistry())))), 
+            address(Env.impl.relayRegistry()), "RelayRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.serviceManager())))), 
+            address(Env.impl.serviceManager()), "ServiceManager: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.socketRegistry())))), 
+            address(Env.impl.socketRegistry()), "SocketRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.stakeRegistry())))), 
+            address(Env.impl.stakeRegistry()), "StakeRegistry: implementation not upgraded");
+        assertEq(proxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(Env.proxy.thresholdRegistry())))), 
+            address(Env.impl.thresholdRegistry()), "ThresholdRegistry: implementation not upgraded");
+    }
+
+    /// @notice Verify contracts are not paused after upgrade
+    function _testPauseStates() internal view {
+        assertEq(Env.proxy.registryCoordinator().paused(), 0, "RegistryCoordinator: should not be paused");
+        assertEq(Env.proxy.serviceManager().paused(), 0, "ServiceManager: should not be paused");
+    }
+
+    /// @notice Verify PaymentVault state was preserved during upgrade
+    function _testPaymentVaultStatePreservation() internal view {
+        assertTrue(Env.proxy.paymentVault().minNumSymbols() > 0, "PaymentVault: minNumSymbols not preserved");
+        assertTrue(Env.proxy.paymentVault().pricePerSymbol() > 0, "PaymentVault: pricePerSymbol not preserved");
+        assertTrue(Env.proxy.paymentVault().priceUpdateCooldown() > 0, "PaymentVault: priceUpdateCooldown not preserved");
+        assertTrue(Env.proxy.paymentVault().globalSymbolsPerPeriod() > 0, "PaymentVault: globalSymbolsPerPeriod not preserved");
+        assertTrue(Env.proxy.paymentVault().reservationPeriodInterval() > 0, "PaymentVault: reservationPeriodInterval not preserved");
+        assertTrue(Env.proxy.paymentVault().globalRatePeriodInterval() > 0, "PaymentVault: globalRatePeriodInterval not preserved");
+    }
+
+    /// @notice Verify ThresholdRegistry state was preserved during upgrade
+    function _testThresholdRegistryStatePreservation() internal view {
+        assertTrue(Env.proxy.thresholdRegistry().quorumAdversaryThresholdPercentages().length > 0, 
+            "ThresholdRegistry: quorumAdversaryThresholdPercentages not preserved");
+        assertTrue(Env.proxy.thresholdRegistry().quorumConfirmationThresholdPercentages().length > 0, 
+            "ThresholdRegistry: quorumConfirmationThresholdPercentages not preserved");
+        assertTrue(Env.proxy.thresholdRegistry().quorumNumbersRequired().length > 0, 
+            "ThresholdRegistry: quorumNumbersRequired not preserved");
+    }
+
+    /// @notice Verify critical references were preserved during upgrade
+    function _testCriticalReferencesPreserved() internal view {
+        assertTrue(Env.proxy.registryCoordinator().ejector() != address(0), "RegistryCoordinator: ejector not preserved");
+        assertTrue(Env.proxy.serviceManager().rewardsInitiator() != address(0), "ServiceManager: rewardsInitiator not preserved");
+    }
+
+    /// @notice Verify PauserRegistry configuration is correct
+    function _testPauserRegistryConfiguration() internal view {
+        assertEq(address(Env.proxy.registryCoordinator().pauserRegistry()), address(Env.impl.pauserRegistry()), 
+            "RegistryCoordinator: incorrect pauserRegistry");
+        assertEq(address(Env.proxy.serviceManager().pauserRegistry()), address(Env.impl.pauserRegistry()), 
+            "ServiceManager: incorrect pauserRegistry");
+    }
+
+    /// @notice Verify Directory has access control configured
+    function _testDirectoryAccessControl() internal view {
+        address accessControlAddr = Env.proxy.directory().getAddress(keccak256("ACCESS_CONTROL"));
+        assertTrue(accessControlAddr != address(0), "Directory: accessControl not set");
+        assertEq(accessControlAddr, address(Env.impl.accessControl()), 
+            "Directory: incorrect accessControl address");
+    }
+
+    /// @notice Verify cross-contract references are still correct
+    function _testCrossContractReferences() internal view {
+        assertEq(address(Env.proxy.serviceManager().avsDirectory()), address(Env.proxy.avsDirectory()), 
+            "ServiceManager: avsDirectory reference broken");
+        assertEq(address(Env.proxy.serviceManager().eigenDAThresholdRegistry()), address(Env.proxy.thresholdRegistry()), 
+            "ServiceManager: thresholdRegistry reference broken");
+        assertEq(address(Env.proxy.serviceManager().eigenDARelayRegistry()), address(Env.proxy.relayRegistry()), 
+            "ServiceManager: relayRegistry reference broken");
+        assertEq(address(Env.proxy.serviceManager().paymentVault()), address(Env.proxy.paymentVault()), 
+            "ServiceManager: paymentVault reference broken");
+        assertEq(address(Env.proxy.serviceManager().eigenDADisperserRegistry()), address(Env.proxy.disperserRegistry()), 
+            "ServiceManager: disperserRegistry reference broken");
     }
 }
