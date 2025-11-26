@@ -18,3 +18,10 @@ fmt-check:
 
 deps:
 	yarn
+
+# brew install typos-cli
+typos:
+	typos . --exclude 'lib/**' --write-changes
+
+diff-typos:
+	typos . --exclude 'lib/**' --diff
