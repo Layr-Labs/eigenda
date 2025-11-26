@@ -1,33 +1,36 @@
 use alloy_consensus::Header;
-use alloy_primitives::Address;
+use alloy_primitives::{Address, U256};
 use alloy_provider::network::Ethereum;
 use alloy_provider::{DynProvider, PendingTransactionBuilder, Provider, ProviderBuilder};
 use alloy_rpc_client::RpcClient;
-use alloy_rpc_types_eth::{
-    Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, TransactionRequest,
-};
+use alloy_rpc_types_eth::{Block, BlockId, BlockNumberOrTag, TransactionRequest};
 use alloy_signer_local::PrivateKeySigner;
-use alloy_sol_types::{SolCall, sol};
+use alloy_sol_types::sol;
 use alloy_transport::layers::RetryBackoffLayer;
 use alloy_transport::{RpcError, TransportErrorKind};
 use eigenda_verification::cert::StandardCommitment;
+use eigenda_verification::extraction::extractor::CERT_VERIFIER_ABNS_ARRAY_SLOT;
 use eigenda_verification::extraction::{CertStateData, contract};
 use futures::future::try_join_all;
+use futures::{TryFutureExt, try_join};
 use reth_trie_common::AccountProof;
 use rustls::crypto::{CryptoProvider, aws_lc_rs};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
+use crate::address::EthereumAddress;
 use crate::contracts::{
-    EIGENDA_DIRECTORY_HOODI, EIGENDA_DIRECTORY_MAINNET, EIGENDA_DIRECTORY_SEPOLIA,
-    EigenDaContracts, STATIC_CERT_VERIFIER_HOODI, STATIC_CERT_VERIFIER_MAINNET,
-    STATIC_CERT_VERIFIER_SEPOLIA,
+    EIGENDA_DIRECTORY_HOODI, EIGENDA_DIRECTORY_INABOX, EIGENDA_DIRECTORY_MAINNET,
+    EIGENDA_DIRECTORY_SEPOLIA, EigenDaContracts,
 };
-use crate::provider::IEigenDADirectory::getAddressCall;
 
 sol! {
-    interface IEigenDADirectory {
-        function getAddress(string memory name) external view returns (address);
+
+    #[sol(rpc)]
+    contract EigenDACertVerifierRouter {
+        function getCertVerifierAt(uint32 referenceBlockNumber) external view returns (address);
+        function certVerifierABNs(uint256 index) external view returns (uint32);
     }
 }
 
@@ -41,7 +44,7 @@ const DEFAULT_INITIAL_BACKOFF: u64 = 1000;
 const DEFAULT_COMPUTE_UNITS: u64 = u64::MAX;
 
 /// Network the adapter is running against.
-#[derive(Debug, Clone, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, JsonSchema, PartialEq, Serialize, Deserialize)]
 pub enum Network {
     /// Ethereum mainnet.
     Mainnet,
@@ -49,9 +52,17 @@ pub enum Network {
     Hoodi,
     /// Sepolia testnet.
     Sepolia,
+    /// Inabox local devnet.
+    Inabox,
 }
 
 /// Configuration for the EigenDA Ethereum provider
+///
+/// # Required Traits
+///
+/// This type **must** implement [`JsonSchema`](schemars::JsonSchema) because it's used
+/// in the Sovereign SDK's DA service configuration:
+/// <https://github.com/Sovereign-Labs/sovereign-sdk/blob/e099285e0bae55812f35af3446240daca4470bf9/crates/rollup-interface/src/node/da.rs#L118>
 #[derive(Debug, Clone, JsonSchema, PartialEq, Serialize, Deserialize)]
 pub struct EigenDaProviderConfig {
     /// Network the adapter is running against.
@@ -59,6 +70,14 @@ pub struct EigenDaProviderConfig {
 
     /// URL of the Ethereum RPC node.
     pub rpc_url: String,
+
+    /// Optional address of an EigenDACertVerifierRouter contract. See
+    /// https://layr-labs.github.io/eigenda/integration/spec/4-contracts.html#eigendacertverifierrouter
+    /// If None, the default EigenDA maintained Router for the selected network will be used.
+    /// For a trustless integration, we strongly recommend that teams deploy and use their own Router contract. See
+    /// https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#upgradable-quorums-and-thresholds-for-optimistic-verification
+    /// for more details.
+    pub cert_verifier_router_address: Option<EthereumAddress>,
 
     /// The number of compute units per second for the provider. Used in cases
     /// when the Ethereum node is hosted at providers like Alchemy that track
@@ -116,16 +135,15 @@ impl EigenDaProvider {
             Network::Mainnet => EIGENDA_DIRECTORY_MAINNET,
             Network::Hoodi => EIGENDA_DIRECTORY_HOODI,
             Network::Sepolia => EIGENDA_DIRECTORY_SEPOLIA,
+            Network::Inabox => EIGENDA_DIRECTORY_INABOX,
         };
 
-        let cert_verifier_address = match config.network {
-            Network::Mainnet => STATIC_CERT_VERIFIER_MAINNET,
-            Network::Hoodi => STATIC_CERT_VERIFIER_HOODI,
-            Network::Sepolia => STATIC_CERT_VERIFIER_SEPOLIA,
-        };
-
-        let contracts =
-            EigenDaContracts::new(&ethereum, directory_address, cert_verifier_address).await?;
+        let contracts = EigenDaContracts::new(
+            &ethereum,
+            directory_address,
+            config.cert_verifier_router_address.map(|a| a.into()),
+        )
+        .await?;
 
         Ok(Self {
             ethereum,
@@ -171,85 +189,144 @@ impl EigenDaProvider {
         self.ethereum.get_block(block).await
     }
 
+    /// Fetches all ABNs registered in the cert verifier router stored in self.contracts.
+    // TODO(samlaf): we should add a function in the Router contract to fetch all abns at once.
+    async fn get_router_abns(&self) -> Result<Vec<u32>, alloy_contract::Error> {
+        let router =
+            EigenDACertVerifierRouter::new(self.contracts.cert_verifier_router, &self.ethereum);
+
+        let num_abns = self
+            .ethereum
+            .get_storage_at(
+                self.contracts.cert_verifier_router,
+                U256::from(CERT_VERIFIER_ABNS_ARRAY_SLOT),
+            )
+            .await?;
+
+        let abn_futs = (0..num_abns.to::<u64>()).map(|i| {
+            let router = router.clone();
+            async move { router.certVerifierABNs(U256::from(i)).call().await }
+        });
+
+        let abns: Vec<u32> = try_join_all(abn_futs).await?;
+        Ok(abns)
+    }
+
+    /// Fetches the address of the cert verifier active at a given reference block number
+    /// according to the cert verifier router stored in self.contracts.
+    async fn get_cert_verifier_at_rbn(
+        &self,
+        reference_block_number: u32,
+    ) -> Result<Address, alloy_contract::Error> {
+        let router =
+            EigenDACertVerifierRouter::new(self.contracts.cert_verifier_router, &self.ethereum);
+
+        let addr: Address = router
+            .getCertVerifierAt(reference_block_number)
+            .call()
+            .await?;
+
+        Ok(addr)
+    }
+
     /// Fetches the relevant state used to validate the EigenDA certificate.
+    #[instrument(skip_all)]
     pub async fn fetch_cert_state(
         &self,
         block_height: u64,
         cert: &StandardCommitment,
-    ) -> Result<CertStateData, RpcError<TransportErrorKind>> {
+    ) -> Result<CertStateData, alloy_contract::Error> {
         let keys = contract::EigenDaThresholdRegistry::storage_keys(cert);
         let threshold_registry_fut = self
             .ethereum
             .get_proof(self.contracts.threshold_registry, keys)
             .number(block_height)
-            .into_future();
+            .into_future()
+            .map_err(alloy_contract::Error::TransportError);
 
         let keys = contract::RegistryCoordinator::storage_keys(cert);
         let registry_coordinator_fut = self
             .ethereum
             .get_proof(self.contracts.registry_coordinator, keys)
             .number(block_height)
-            .into_future();
+            .into_future()
+            .map_err(alloy_contract::Error::TransportError);
 
-        let service_manager_fut = {
-            let keys = contract::ServiceManager::storage_keys(cert);
-            self.ethereum
-                .get_proof(self.contracts.service_manager, keys)
-                .number(block_height)
-                .into_future()
-        };
+        let keys = contract::ServiceManager::storage_keys(cert);
+        let service_manager_fut = self
+            .ethereum
+            .get_proof(self.contracts.service_manager, keys)
+            .number(block_height)
+            .into_future()
+            .map_err(alloy_contract::Error::TransportError);
 
         let keys = contract::BlsApkRegistry::storage_keys(cert);
         let bls_apk_registry_fut = self
             .ethereum
             .get_proof(self.contracts.bls_apk_registry, keys)
             .number(block_height)
-            .into_future();
+            .into_future()
+            .map_err(alloy_contract::Error::TransportError);
 
         let keys = contract::StakeRegistry::storage_keys(cert);
         let stake_registry_fut = self
             .ethereum
             .get_proof(self.contracts.stake_registry, keys)
             .number(block_height)
-            .into_future();
+            .into_future()
+            .map_err(alloy_contract::Error::TransportError);
 
-        let keys = contract::EigenDaCertVerifier::storage_keys(cert);
-        let cert_verifier_fut = self
+        let keys = contract::DelegationManager::storage_keys(cert);
+        let delegation_manager_fut = self
             .ethereum
-            .get_proof(self.contracts.cert_verifier, keys)
+            .get_proof(self.contracts.delegation_manager, keys)
             .number(block_height)
-            .into_future();
+            .into_future()
+            .map_err(alloy_contract::Error::TransportError);
 
-        let delegation_manager_fut = {
-            let keys = contract::DelegationManager::storage_keys(cert);
+        let cert_verifier_router_fut = async {
+            let abns = self.get_router_abns().await?;
+            let keys = contract::EigenDaCertVerifierRouter::storage_keys(&abns);
             self.ethereum
-                .get_proof(self.contracts.delegation_manager, keys)
+                .get_proof(self.contracts.cert_verifier_router, keys)
                 .number(block_height)
-                .into_future()
+                .await
+                .map_err(alloy_contract::Error::TransportError)
         };
 
-        let responses = try_join_all([
-            threshold_registry_fut,
-            registry_coordinator_fut,
-            service_manager_fut,
-            bls_apk_registry_fut,
-            stake_registry_fut,
-            cert_verifier_fut,
-            delegation_manager_fut,
-        ])
-        .await?;
+        let cert_verifier_fut = async {
+            let cert_verifier_addr = self
+                // rbn is u32 but reference_block casts it to u64, so its safe to cast it back to u32 here.
+                .get_cert_verifier_at_rbn(cert.reference_block() as u32)
+                .await?;
 
-        let [
+            let keys = contract::EigenDaCertVerifier::storage_keys(cert);
+            self.ethereum
+                .get_proof(cert_verifier_addr, keys)
+                .number(block_height)
+                .await
+                .map_err(alloy_contract::Error::TransportError)
+        };
+
+        let (
             threshold_registry,
             registry_coordinator,
             service_manager,
             bls_apk_registry,
             stake_registry,
-            cert_verifier,
             delegation_manager,
-        ]: [EIP1186AccountProofResponse; 7] = responses
-            .try_into()
-            .expect("Expected correct number of elements");
+            cert_verifier_router,
+            cert_verifier,
+        ) = try_join!(
+            threshold_registry_fut,
+            registry_coordinator_fut,
+            service_manager_fut,
+            bls_apk_registry_fut,
+            stake_registry_fut,
+            delegation_manager_fut,
+            cert_verifier_router_fut,
+            cert_verifier_fut,
+        )?;
 
         Ok(CertStateData {
             threshold_registry: AccountProof::from(threshold_registry),
@@ -257,55 +334,11 @@ impl EigenDaProvider {
             service_manager: AccountProof::from(service_manager),
             bls_apk_registry: AccountProof::from(bls_apk_registry),
             stake_registry: AccountProof::from(stake_registry),
-            cert_verifier: AccountProof::from(cert_verifier),
             delegation_manager: AccountProof::from(delegation_manager),
+            cert_verifier_router: AccountProof::from(cert_verifier_router),
+            cert_verifier: AccountProof::from(cert_verifier),
         })
     }
-}
-
-impl EigenDaContracts {
-    /// Query the EigenDADirectory contract to fetch all required contract addresses
-    pub async fn new(
-        ethereum: &DynProvider,
-        directory_address: Address,
-        cert_verifier_address: Address,
-    ) -> Result<EigenDaContracts, RpcError<TransportErrorKind>> {
-        let eigen_da_contracts = EigenDaContracts {
-            threshold_registry: get_address(ethereum, "THRESHOLD_REGISTRY", directory_address)
-                .await?,
-            registry_coordinator: get_address(ethereum, "REGISTRY_COORDINATOR", directory_address)
-                .await?,
-            service_manager: get_address(ethereum, "SERVICE_MANAGER", directory_address).await?,
-            bls_apk_registry: get_address(ethereum, "BLS_APK_REGISTRY", directory_address).await?,
-            stake_registry: get_address(ethereum, "STAKE_REGISTRY", directory_address).await?,
-            cert_verifier: cert_verifier_address,
-            delegation_manager: get_address(ethereum, "DELEGATION_MANAGER", directory_address)
-                .await?,
-        };
-
-        Ok(eigen_da_contracts)
-    }
-}
-
-/// The function performs a contract call to the EigenDA contract directory
-/// to look up an address associated with a given contract name. It uses the
-/// `getAddress` function from the directory contract.
-async fn get_address(
-    ethereum: &DynProvider,
-    name: &'static str,
-    directory_address: Address,
-) -> Result<Address, RpcError<TransportErrorKind>> {
-    let input = getAddressCall {
-        name: name.to_string(),
-    };
-
-    let tx = TransactionRequest::default()
-        .to(directory_address)
-        .input(input.abi_encode().into());
-
-    let src = ethereum.call(tx).await?;
-
-    Ok(Address::from_slice(&src[12..32]))
 }
 
 #[cfg(test)]

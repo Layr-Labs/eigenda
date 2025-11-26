@@ -18,7 +18,7 @@
 
 | Name | Type<br>Default | Description |
 |------|--------------|-------------|
-| $${\color{red}\texttt{Environment.ClientLedgerPaymentMode}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_CLIENT_LEDGER_PAYMENT_MODE` | `string`<br>`"legacy"` | Client ledger mode used for payments. |
+| $${\color{red}\texttt{Environment.ClientLedgerPaymentMode}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_CLIENT_LEDGER_PAYMENT_MODE` | `string`<br>`"reservation-only"` | Client ledger mode used for payments. |
 | $${\color{red}\texttt{Environment.DisableMetrics}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISABLE_METRICS` | `bool`<br>`false` | If true, do not start the metrics server. |
 | $${\color{red}\texttt{Environment.DisperserConnectionCount}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_DISPERSER_CONNECTION_COUNT` | `uint`<br>`8` | The number of connections to open for each disperser. |
 | $${\color{red}\texttt{Environment.MaxBlobSize}}$$<br>`TRAFFIC_GENERATOR_ENVIRONMENT_MAX_BLOB_SIZE` | `uint64`<br>`16777216` | The maximum blob size supported by the EigenDA network |
@@ -41,7 +41,7 @@
 | $${\color{red}\texttt{Load.RelayReadParallelism}}$$<br>`TRAFFIC_GENERATOR_LOAD_RELAY_READ_PARALLELISM` | `uint64`<br>`300` | The maximum number of parallel blob relay read operations in flight. |
 | $${\color{red}\texttt{Load.RelayReadTimeout}}$$<br>`TRAFFIC_GENERATOR_LOAD_RELAY_READ_TIMEOUT` | `uint32`<br>`600` | The timeout for reading a blob from a relay, in seconds. This is the timeout per individual read. |
 | $${\color{red}\texttt{Load.SubmissionParallelism}}$$<br>`TRAFFIC_GENERATOR_LOAD_SUBMISSION_PARALLELISM` | `uint64`<br>`300` | The maximum number of parallel blobs submissions in flight. |
-| $${\color{red}\texttt{Load.UseProxy}}$$<br>`TRAFFIC_GENERATOR_LOAD_USE_PROXY` | `bool`<br>`false` | If true, then route traffic through the proxy instead of directly using the GRPC clients. |
+| $${\color{red}\texttt{Load.UseProxy}}$$<br>`TRAFFIC_GENERATOR_LOAD_USE_PROXY` | `bool`<br>`false` | If true, then route traffic through the proxy instead of directly using the GRPC clients.} |
 | $${\color{red}\texttt{Load.ValidatorReadAmplification}}$$<br>`TRAFFIC_GENERATOR_LOAD_VALIDATOR_READ_AMPLIFICATION` | `float64`<br>`1` | By default, this utility reads chunks once. The number of chunk reads is multiplied by this factor. If this is set to 3, then chunks are read back 3 times. If less than 1, then this value is treated as a probability. For example, if this is set to 0.5, then each chunk is read back from validators with a 50% chance. Ignored if the load generator is configured to use the proxy. |
 | $${\color{red}\texttt{Load.ValidatorReadParallelism}}$$<br>`TRAFFIC_GENERATOR_LOAD_VALIDATOR_READ_PARALLELISM` | `uint64`<br>`300` | The maximum number of parallel blob validator read operations in flight. |
 | $${\color{red}\texttt{Load.ValidatorReadTimeout}}$$<br>`TRAFFIC_GENERATOR_LOAD_VALIDATOR_READ_TIMEOUT` | `uint32`<br>`600` | The timeout for reading a blob from the validators, in seconds. This is the timeout per individual read. |

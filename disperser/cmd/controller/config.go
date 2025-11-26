@@ -23,9 +23,10 @@ import (
 
 const MaxUint16 = ^uint16(0)
 
+// TODO(cody.littley): combine this config struct with controller_config.go.
 type Config struct {
 	EncodingManagerConfig controller.EncodingManagerConfig
-	DispatcherConfig      controller.DispatcherConfig
+	DispatcherConfig      controller.ControllerConfig
 
 	DynamoDBTableName string
 	DisperserID       uint32
@@ -158,7 +159,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
 			MaxDispersalAge:             ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 		},
-		DispatcherConfig: controller.DispatcherConfig{
+		DispatcherConfig: controller.ControllerConfig{
 			PullInterval:                           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
 			DisperserID:                            disperserID,
 			FinalizationBlockDelay:                 ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
@@ -172,6 +173,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			NodeClientCacheSize:                    ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 			CollectDetailedValidatorSigningMetrics: ctx.GlobalBool(flags.DetailedValidatorMetricsFlag.Name),
 			MaxDispersalAge:                        ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
+			SigningRateRetentionPeriod:             ctx.GlobalDuration(flags.SigningRateRetentionPeriodFlag.Name),
+			SigningRateBucketSpan:                  ctx.GlobalDuration(flags.SigningRateBucketSpanFlag.Name),
 		},
 		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),

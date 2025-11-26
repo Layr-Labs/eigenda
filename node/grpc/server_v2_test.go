@@ -2,17 +2,20 @@ package grpc_test
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"net"
 	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common/version"
-	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
+	"github.com/Layr-Labs/eigenda/test/random"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gammazero/workerpool"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
@@ -26,6 +29,7 @@ import (
 	coremockv2 "github.com/Layr-Labs/eigenda/core/mock/v2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/Layr-Labs/eigenda/node/grpc"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
@@ -48,25 +52,16 @@ var (
 	blobParamsMap = map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,
 	}
-	ecdsaSig = []byte{
-		0x2a, 0x3b, 0x4c, 0x5d, 0x6e, 0x7f, 0x8a, 0x9b,
-		0x0c, 0x1d, 0x2e, 0x3f, 0x4a, 0x5b, 0x6c, 0x7d,
-		0x8e, 0x9f, 0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f,
-		0x6a, 0x7b, 0x8c, 0x9d, 0x0e, 0x1f, 0x2a, 0x3b,
-		0x4c, 0x5d, 0x6e, 0x7f, 0x8a, 0x9b, 0x0c, 0x1d,
-		0x2e, 0x3f, 0x4a, 0x5b, 0x6c, 0x7d, 0x8e, 0x9f,
-		0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f, 0x6a, 0x7b,
-		0x8c, 0x9d, 0x0e, 0x1f, 0x2a, 0x3b, 0x4c, 0x5d,
-		0x66,
-	}
 )
 
 type testComponents struct {
-	server      *grpc.ServerV2
-	node        *node.Node
-	store       *nodemock.MockStoreV2
-	validator   *coremockv2.MockShardValidator
-	relayClient *clientsmock.MockRelayClient
+	server        *grpc.ServerV2
+	node          *node.Node
+	store         *nodemock.MockStoreV2
+	validator     *coremockv2.MockShardValidator
+	relayClient   *clientsmock.MockRelayClient
+	disperserKey  *ecdsa.PrivateKey
+	disperserAddr gethcommon.Address
 }
 
 func newTestComponents(t *testing.T, config *node.Config) *testComponents {
@@ -87,6 +82,15 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	noopMetrics := metrics.NewNoopMetrics()
 	reg := prometheus.NewRegistry()
 	tx := &coremock.MockWriter{}
+
+	rand := random.NewTestRandom()
+	disperserAddr, disperserKey, err := rand.EthAccount()
+	require.NoError(t, err)
+
+	// Set up mock for disperser address lookup (used by authentication)
+	tx.On("GetDisperserAddress", mock.Anything, mock.Anything).Return(disperserAddr, nil)
+	// Set up mock for quorum count (used by blob validation)
+	tx.On("GetQuorumCount", mock.Anything, mock.Anything).Return(uint8(3), nil)
 
 	ratelimiter := &commonmock.NoopRatelimiter{}
 
@@ -117,9 +121,8 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		OperatorStateCache: operatorStateCache,
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
-
-	// The eth client is only utilized for StoreChunks validation, which is disabled in these tests
-	var reader *coreeth.Reader
+	// Set quorum count for validation
+	node.QuorumCount.Store(3)
 
 	// Create listeners with OS-allocated ports for testing
 	v2DispersalListener, err := net.Listen("tcp", "0.0.0.0:0")
@@ -134,19 +137,29 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		logger,
 		ratelimiter,
 		prometheus.NewRegistry(),
-		reader,
+		tx,
 		version.DefaultVersion(),
 		v2DispersalListener,
 		v2RetrievalListener)
 
 	require.NoError(t, err)
 	return &testComponents{
-		server:      server,
-		node:        node,
-		store:       s,
-		validator:   val,
-		relayClient: relay,
+		server:        server,
+		node:          node,
+		store:         s,
+		validator:     val,
+		relayClient:   relay,
+		disperserKey:  disperserKey,
+		disperserAddr: disperserAddr,
 	}
+}
+
+// Signs a StoreChunksRequest with the test disperser key and sets the timestamp
+func (c *testComponents) signRequest(t *testing.T, request *validator.StoreChunksRequest) {
+	request.Timestamp = uint32(time.Now().Unix())
+	signature, err := auth.SignStoreChunksRequest(c.disperserKey, request)
+	require.NoError(t, err)
+	request.Signature = signature
 }
 
 func TestV2NodeInfoRequest(t *testing.T) {
@@ -183,31 +196,31 @@ func TestV2StoreChunksInputValidation(t *testing.T) {
 
 	req = &validator.StoreChunksRequest{
 		DisperserID: 0,
-		Signature:   ecdsaSig,
 		Batch:       &pbcommon.Batch{},
 	}
+	c.signRequest(t, req)
 	_, err = c.server.StoreChunks(context.Background(), req)
 	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "failed to deserialize batch")
 
 	req = &validator.StoreChunksRequest{
 		DisperserID: 0,
-		Signature:   ecdsaSig,
 		Batch: &pbcommon.Batch{
 			Header:           &pbcommon.BatchHeader{},
 			BlobCertificates: batchProto.GetBlobCertificates(),
 		},
 	}
+	c.signRequest(t, req)
 	_, err = c.server.StoreChunks(context.Background(), req)
 	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "failed to deserialize batch")
 
 	req = &validator.StoreChunksRequest{
 		DisperserID: 0,
-		Signature:   ecdsaSig,
 		Batch: &pbcommon.Batch{
 			Header:           batchProto.GetHeader(),
 			BlobCertificates: []*pbcommon.BlobCertificate{},
 		},
 	}
+	c.signRequest(t, req)
 	_, err = c.server.StoreChunks(context.Background(), req)
 	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "failed to deserialize batch")
 }
@@ -251,11 +264,12 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
 	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, nil)
-	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
+	request := &validator.StoreChunksRequest{
 		DisperserID: 0,
-		Signature:   ecdsaSig,
 		Batch:       batchProto,
-	})
+	}
+	c.signRequest(t, request)
+	reply, err := c.server.StoreChunks(t.Context(), request)
 	require.NoError(t, err)
 	require.NotNil(t, reply.GetSignature())
 	sigBytes := reply.GetSignature()
@@ -280,11 +294,12 @@ func TestV2StoreChunksDownloadFailure(t *testing.T) {
 	relayErr := errors.New("error")
 	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{}, relayErr)
 	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{}, relayErr)
-	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
+	request := &validator.StoreChunksRequest{
 		DisperserID: 0,
-		Signature:   ecdsaSig,
 		Batch:       batchProto,
-	})
+	}
+	c.signRequest(t, request)
+	reply, err := c.server.StoreChunks(t.Context(), request)
 	require.Nil(t, reply.GetSignature())
 	requireErrorStatus(t, err, codes.Internal)
 }
@@ -328,11 +343,12 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
 	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, errors.New("error"))
-	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
+	request := &validator.StoreChunksRequest{
 		DisperserID: 0,
-		Signature:   ecdsaSig,
 		Batch:       batchProto,
-	})
+	}
+	c.signRequest(t, request)
+	reply, err := c.server.StoreChunks(t.Context(), request)
 	require.Nil(t, reply.GetSignature())
 	requireErrorStatusAndMsg(t, err, codes.Internal, "failed to store batch")
 }
@@ -371,11 +387,12 @@ func TestV2StoreChunksLevelDBValidationFailure(t *testing.T) {
 	})
 	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return([]kvstore.Key{mockKey{}}, nil)
 	c.store.On("DeleteKeys", mock.Anything, mock.Anything).Return(nil)
-	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
+	request := &validator.StoreChunksRequest{
 		DisperserID: 0,
-		Signature:   ecdsaSig,
 		Batch:       batchProto,
-	})
+	}
+	c.signRequest(t, request)
+	reply, err := c.server.StoreChunks(context.Background(), request)
 	require.Nil(t, reply.GetSignature())
 	requireErrorStatus(t, err, codes.Internal)
 }
