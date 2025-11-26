@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -282,14 +281,13 @@ func createDisperserClient(
 		return nil, fmt.Errorf("create blob request signer: %w", err)
 	}
 
-	hostname, port, err := net.SplitHostPort(disperserHostName)
+	networkAddress, err := common.NewNetworkAddressFromString(disperserHostName)
 	if err != nil {
-		return nil, fmt.Errorf("parse EigenDA RPC: %w", err)
+		return nil, fmt.Errorf("create disperser network address: %w", err)
 	}
 
 	disperserClientConfig := &dispersal.DisperserClientConfig{
-		Hostname:          hostname,
-		Port:              port,
+		NetworkAddress:    networkAddress,
 		UseSecureGrpcFlag: true,
 	}
 
