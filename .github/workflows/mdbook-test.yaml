@@ -1,3 +1,5 @@
+name: Test Spec MdBook
+
 on:
   pull_request:
   merge_group:
