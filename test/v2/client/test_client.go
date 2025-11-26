@@ -30,6 +30,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/disperser"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/payments"
@@ -153,7 +154,7 @@ func NewTestClient(
 	if err != nil {
 		return nil, fmt.Errorf("create disperser network address: %w", err)
 	}
-	disperserRegistry := clientsv2.NewLegacyDisperserRegistry(connectionInfo)
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(networkAddress)
 
 	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
 		logger,

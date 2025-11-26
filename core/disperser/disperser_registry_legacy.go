@@ -1,8 +1,10 @@
-package clients
+package disperser
 
 import (
 	"context"
 	"fmt"
+
+	"github.com/Layr-Labs/eigenda/common"
 )
 
 var _ DisperserRegistry = (*LegacyDisperserRegistry)(nil)
@@ -13,14 +15,14 @@ var _ DisperserRegistry = (*LegacyDisperserRegistry)(nil)
 // but it's not ready yet. For now, we have a legacy implementation that uses hardcoded values that match the current
 // state of the network, before having deployed any additional dispersers.
 type LegacyDisperserRegistry struct {
-	connectionInfo *DisperserConnectionInfo
+	networkAddress *common.NetworkAddress
 }
 
-// NewLegacyDisperserRegistry creates a new legacy disperser registry.
-// The connectionInfo parameter specifies how to connect to disperser ID 0.
-func NewLegacyDisperserRegistry(connectionInfo *DisperserConnectionInfo) *LegacyDisperserRegistry {
+// Creates a new legacy disperser registry.
+// The networkAddress parameter specifies how to connect to disperser ID 0.
+func NewLegacyDisperserRegistry(networkAddress *common.NetworkAddress) *LegacyDisperserRegistry {
 	return &LegacyDisperserRegistry{
-		connectionInfo: connectionInfo,
+		networkAddress: networkAddress,
 	}
 }
 
@@ -38,15 +40,15 @@ func (r *LegacyDisperserRegistry) GetOnDemandDispersers(ctx context.Context) (ma
 	return map[uint32]struct{}{0: {}}, nil
 }
 
-// GetDisperserConnectionInfo implements [DisperserRegistry].
+// Implements [DisperserRegistry].
 //
-// Returns the connection info for disperser ID 0. All other IDs return an error.
-func (r *LegacyDisperserRegistry) GetDisperserConnectionInfo(
+// Returns the network address for disperser ID 0. All other IDs return an error.
+func (r *LegacyDisperserRegistry) GetDisperserNetworkAddress(
 	ctx context.Context,
 	disperserID uint32,
-) (*DisperserConnectionInfo, error) {
+) (*common.NetworkAddress, error) {
 	if disperserID != 0 {
 		return nil, fmt.Errorf("legacy registry only supports disperser ID 0, got %d", disperserID)
 	}
-	return r.connectionInfo, nil
+	return r.networkAddress, nil
 }

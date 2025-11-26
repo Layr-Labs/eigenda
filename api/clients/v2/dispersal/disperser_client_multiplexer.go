@@ -7,9 +7,10 @@ import (
 	"sync"
 	"time"
 
-	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/reputation"
+	"github.com/Layr-Labs/eigenda/core/disperser"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -21,7 +22,7 @@ import (
 type DisperserClientMultiplexer struct {
 	logger            logging.Logger
 	config            *DisperserClientMultiplexerConfig
-	disperserRegistry clients.DisperserRegistry
+	disperserRegistry disperser.DisperserRegistry
 	signer            corev2.BlobRequestSigner
 	committer         *committer.Committer
 	dispersalMetrics  metrics.DispersalMetricer
@@ -39,7 +40,7 @@ type DisperserClientMultiplexer struct {
 func NewDisperserClientMultiplexer(
 	logger logging.Logger,
 	config *DisperserClientMultiplexerConfig,
-	disperserRegistry clients.DisperserRegistry,
+	disperserRegistry disperser.DisperserRegistry,
 	signer corev2.BlobRequestSigner,
 	committer *committer.Committer,
 	dispersalMetrics metrics.DispersalMetricer,
@@ -106,19 +107,18 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 		return nil, fmt.Errorf("choose disperser: %w", err)
 	}
 
-	connectionInfo, err := dcm.disperserRegistry.GetDisperserConnectionInfo(ctx, chosenDisperser)
+	networkAddress, err := dcm.disperserRegistry.GetDisperserNetworkAddress(ctx, chosenDisperser)
 	if err != nil {
-		return nil, fmt.Errorf("get disperser connection info for ID %d: %w", chosenDisperser, err)
+		return nil, fmt.Errorf("get disperser network address for ID %d: %w", chosenDisperser, err)
 	}
 
-	dcm.cleanupOutdatedClient(chosenDisperser, connectionInfo)
+	dcm.cleanupOutdatedClient(chosenDisperser, networkAddress)
 
 	client, exists := dcm.clients[chosenDisperser]
 	if !exists {
 		// create a new client for the chosen disperser
 		clientConfig := &DisperserClientConfig{
-			Hostname:                 connectionInfo.Hostname,
-			Port:                     fmt.Sprintf("%d", connectionInfo.Port),
+			NetworkAddress:           networkAddress,
 			UseSecureGrpcFlag:        true,
 			DisperserConnectionCount: dcm.disperserConnectionCount,
 			DisperserID:              chosenDisperser,
@@ -170,7 +170,7 @@ func (dcm *DisperserClientMultiplexer) ReportDispersalOutcome(
 	return nil
 }
 
-// Checks if the existing client for the given disperser ID is outdated based on the current connection info.
+// Checks if the existing client for the given disperser ID is outdated based on the current network address.
 // If it is outdated, closes the existing client and removes it from the map.
 //
 // NOTE: This method has an edge case where clients that have already been returned to callers
@@ -178,13 +178,13 @@ func (dcm *DisperserClientMultiplexer) ReportDispersalOutcome(
 // to fail.
 //
 // This is an acceptable trade-off because:
-//  1. Connection info changes for dispersers are rare in practice
+//  1. Network address changes for dispersers are rare in practice
 //  2. When they do occur, the affected dispersals will fail gracefully with errors
-//  3. Failed dispersals during a disperser's endpoint transition are tolerable
+//  3. Failed dispersals during a disperser's network address transition are tolerable
 //  4. The alternative (reference counting) adds significant complexity for a rare edge case
 func (dcm *DisperserClientMultiplexer) cleanupOutdatedClient(
 	disperserID uint32,
-	latestConnectionInfo *clients.DisperserConnectionInfo,
+	latestNetworkAddress *common.NetworkAddress,
 ) {
 	client, exists := dcm.clients[disperserID]
 	if !exists {
@@ -192,16 +192,15 @@ func (dcm *DisperserClientMultiplexer) cleanupOutdatedClient(
 		return
 	}
 
-	// check if the latest connection info matches the existing client's config
+	// check if the latest network address matches the existing client's config
 	// if not, the existing client is outdated and should be closed and removed
 	oldConfig := client.GetConfig()
-	if oldConfig.Hostname != latestConnectionInfo.Hostname ||
-		oldConfig.Port != fmt.Sprintf("%d", latestConnectionInfo.Port) {
+	if !oldConfig.NetworkAddress.Equals(latestNetworkAddress) {
 		if err := client.Close(); err != nil {
 			dcm.logger.Errorf("failed to close outdated disperser client for disperserID %d: %v", disperserID, err)
 		}
 		// remove the outdated client from the map, but don't delete the reputation. reputation is presumed to remain
-		// relevant for a given disperser ID, even if the connection info changes
+		// relevant for a given disperser ID, even if the network address changes
 		delete(dcm.clients, disperserID)
 	}
 }

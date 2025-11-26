@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"regexp"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -36,6 +35,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/disperser"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/payments"
@@ -592,17 +592,7 @@ func buildPayloadDisperser(
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
-
-	portUint64, err := strconv.ParseUint(clientConfigV2.DisperserClientCfg.Port, 10, 16)
-	if err != nil {
-		return nil, fmt.Errorf("parse disperser port: %w", err)
-	}
-
-	connectionInfo := &clients_v2.DisperserConnectionInfo{
-		Hostname: clientConfigV2.DisperserClientCfg.Hostname,
-		Port:     uint16(portUint64),
-	}
-	disperserRegistry := clients_v2.NewLegacyDisperserRegistry(connectionInfo)
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(clientConfigV2.DisperserClientCfg.NetworkAddress)
 
 	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
 		log,

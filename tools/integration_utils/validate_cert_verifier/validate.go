@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -17,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/disperser"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -274,7 +273,7 @@ func initializePayloadDisperser(
 
 func createDisperserClientMultiplexer(
 	logger logging.Logger,
-	disperserHostName string,
+	networkAddressString string,
 	privateKey string,
 	kzgCommitter *committer.Committer,
 ) (*dispersal.DisperserClientMultiplexer, error) {
@@ -283,22 +282,12 @@ func createDisperserClientMultiplexer(
 		return nil, fmt.Errorf("create blob request signer: %w", err)
 	}
 
-	hostname, portStr, err := net.SplitHostPort(disperserHostName)
-	if err != nil {
-		return nil, fmt.Errorf("parse disperser host: %w", err)
-	}
-
-	portUint64, err := strconv.ParseUint(portStr, 10, 16)
-	if err != nil {
-		return nil, fmt.Errorf("parse disperser port: %w", err)
-	}
-
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
-	connectionInfo := &clients.DisperserConnectionInfo{
-		Hostname: hostname,
-		Port:     uint16(portUint64),
+	networkAddress, err := common.NewNetworkAddressFromString(networkAddressString)
+	if err != nil {
+		return nil, fmt.Errorf("parse disperser address: %w", err)
 	}
-	disperserRegistry := clients.NewLegacyDisperserRegistry(connectionInfo)
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(networkAddress)
 
 	return dispersal.NewDisperserClientMultiplexer(
 		logger,
