@@ -7,8 +7,7 @@ import (
 
 var _ DisperserRegistry = (*LegacyDisperserRegistry)(nil)
 
-// LegacyDisperserRegistry implements [DisperserRegistry] without interacting with the on-chain registry.
-// This is a temporary implementation until the new DisperserRegistry contract is ready.
+// LegacyDisperserRegistry implements [DisperserRegistry] without actually interacting with the on-chain registry.
 //
 // TODO(litt3): We are currently working on a new DisperserRegistry contract which will support multiplexed dispersal,
 // but it's not ready yet. For now, we have a legacy implementation that uses hardcoded values that match the current
