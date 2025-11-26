@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.12;
 
-import "forge-std/Vm.sol";
-import "forge-std/StdJson.sol";
 import "zeus-templates/utils/ZEnvHelpers.sol";
 
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
@@ -10,6 +8,7 @@ import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {IProxyAdmin} from "src/core/interfaces/IProxyAdmin.sol";
 /// Core contracts from eigenlayer-middleware
 import {
     IPauserRegistry
@@ -46,7 +45,6 @@ import {
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 library Env {
-    using stdJson for string;
     using ZEnvHelpers for *;
 
     /// -----------------------------------------------------------------------
@@ -110,16 +108,16 @@ library Env {
         return _string("ZEUS_DEPLOY_TO_VERSION");
     }
 
-    function proxyAdmin() internal view returns (address) {
-        return _envAddress("proxyAdmin");
+    function proxyAdmin() internal view returns (IProxyAdmin) {
+        return IProxyAdmin(_deployedImpl("proxyAdmin"));
     }
 
     function timelockController() internal view returns (TimelockController) {
         return TimelockController(payable(_envAddress("timelockController")));
     }
 
-    /// @dev Usage: `Env.impl.owner()`
-    function owner(DeployedImpl) internal view returns (address) {
+    /// @dev Usage: `Env.owner()`
+    function owner() internal view returns (address) {
         return _deployedImpl("Owner");
     }
 
