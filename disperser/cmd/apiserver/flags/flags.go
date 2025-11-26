@@ -267,6 +267,8 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISABLE_GET_BLOB_COMMITMENT"),
 	}
+
+	// TODO Claude: wire up two new flags (see new entries in server_config.go). Default values should be 2 weeks and 1 minute, respectively.
 )
 
 // Flags needed for computing kzg commitments.

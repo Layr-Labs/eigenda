@@ -475,6 +475,16 @@ func (s *DispersalServerV2) getPaymentState(
 	return reply, status.New(codes.OK, "")
 }
 
+func (s *DispersalServerV2) GetValidatorSigningRate(
+	ctx context.Context,
+	req *pb.GetValidatorSigningRateRequest,
+) (*pb.GetValidatorSigningRateReply, error) {
+
+	// TODO
+
+	return nil, status.Error(codes.Unimplemented, "GetValidatorSigningRate is not yet implemented")
+}
+
 // Gracefully shuts down the server and closes any open connections
 func (s *DispersalServerV2) Stop() error {
 	if s.grpcServer != nil {

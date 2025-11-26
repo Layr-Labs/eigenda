@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser"
 	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -56,6 +57,10 @@ type DispersalServer struct {
 	grpcMetrics *grpcprom.ServerMetrics
 
 	maxBlobSize int
+
+	// Tracks signing rates for validators. This data is mirrored from the controller's signing rate tracker,
+	// so that external requests can be serviced without involving the controller.
+	signingRateTracker signingrate.SigningRateTracker
 
 	logger logging.Logger
 }
