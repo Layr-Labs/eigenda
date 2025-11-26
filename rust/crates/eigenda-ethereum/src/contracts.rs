@@ -28,7 +28,7 @@ pub const STATIC_CERT_VERIFIER_SEPOLIA: Address =
     address!("0x19a469Ddb7199c7EB9E40455978b39894BB90974");
 /// EigenDA CertVerifier v3.1.0 address on the Inabox local devnet.
 /// To fetch this address, run `make start-inabox` and run
-/// ```
+/// ```bash
 /// export EIGENDA_CERT_VERIFIER_ROUTER_ADDR=$(cast call $EIGENDA_DIRECTORY_ADDR "getAddress(string)(address)" "CERT_VERIFIER_ROUTER")
 /// cast call $EIGENDA_CERT_VERIFIER_ROUTER_ADDR "getCertVerifierAt(uint32)(address)" 0
 /// ```
