@@ -15,7 +15,6 @@ import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeReg
 import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-// TODO: Double check encoded arguements (could be out of order).
 // TODO: Sort out whatever is wrong with the EjectionManager.
 // TODO: Add ProxyAdmin to zeus.
 // TODO: Add post deployment assertions.
@@ -55,9 +54,13 @@ contract ExecuteUpgrade is EOADeployer {
         // NOTE: CertVerifier (Not a proxy no upgrade or initialization needed).
 
         // Upgrade Directory.
-        proxyAdmin.upgrade(
+        proxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(Env.proxy.directory()))),
-            address(Env.impl.directory())
+            address(Env.impl.directory()),
+            abi.encodeWithSelector(
+                EigenDADirectory.initialize.selector,
+                Env.impl.accessControl()
+            )
         );
 
         // Upgrade DisperserRegistry.
@@ -111,7 +114,7 @@ contract ExecuteUpgrade is EOADeployer {
                 EigenDARegistryCoordinator.initialize.selector,
                 Env.impl.owner(), // newOwner
                 Env.proxy.registryCoordinator().ejector(),
-                Env.proxy.registryCoordinator().pauserRegistry(),
+                Env.impl.pauserRegistry(),
                 0, // initial paused status (nothing paused)
                 new IRegistryCoordinator.OperatorSetParam[](0),
                 new uint96[](0),
@@ -132,7 +135,7 @@ contract ExecuteUpgrade is EOADeployer {
             address(Env.impl.serviceManager()),
             abi.encodeWithSelector(
                 EigenDAServiceManager.initialize.selector,
-                Env.proxy.serviceManager().pauserRegistry(),
+                Env.impl.pauserRegistry(),
                 0, // initial paused status (nothing paused)
                 Env.impl.owner(), // newOwner
                 new address[](0),
