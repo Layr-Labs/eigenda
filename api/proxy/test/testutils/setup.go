@@ -257,7 +257,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	var eigenDADirectory string
 	switch testCfg.Backend {
 	case MemstoreBackend:
-		break // no need to set these fields for local tests
+		disperserHostname = "localhost" // placeholder for local tests, not actually used
 	case SepoliaBackend:
 		disperserHostname = disperserSepoliaHostname
 		certVerifierAddress = sepoliaCertVerifierAddress
