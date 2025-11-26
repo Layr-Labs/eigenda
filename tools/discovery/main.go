@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -162,17 +163,12 @@ func printCSV(addressMap map[string]gethcommon.Address) {
 }
 
 func printJSON(addressMap map[string]gethcommon.Address) {
-	fmt.Println("[")
-	i := 0
-	for name, addr := range addressMap {
-		comma := ","
-		if i == len(addressMap)-1 {
-			comma = ""
-		}
-		fmt.Printf("  {\"contract_name\": \"%s\", \"address\": \"%s\"}%s\n", name, addr.Hex(), comma)
-		i++
+	jsonBytes, err := json.MarshalIndent(addressMap, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling JSON: %v\n", err)
+		return
 	}
-	fmt.Println("]")
+	fmt.Println(string(jsonBytes))
 }
 
 func validateNetworkAndEthRpcChainIDMatch(ctx context.Context, network proxycmn.EigenDANetwork, client *ethclient.Client) {

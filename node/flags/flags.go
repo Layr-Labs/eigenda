@@ -271,12 +271,6 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GRPC_MSG_SIZE_LIMIT_V2"),
 		Value:    units.MiB,
 	}
-	DisableDispersalAuthenticationFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "disable-dispersal-authentication"),
-		Usage:    "Disable authentication for StoreChunks() calls from the disperser",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISABLE_DISPERSAL_AUTHENTICATION"),
-	}
 	DispersalAuthenticationKeyCacheSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "dispersal-authentication-key-cache-size"),
 		Usage:    "The size of the dispersal authentication key cache",
@@ -715,7 +709,6 @@ var optionalFlags = []cli.Flag{
 	GRPCMsgSizeLimitV2Flag,
 	PprofHttpPort,
 	EnablePprof,
-	DisableDispersalAuthenticationFlag,
 	DispersalAuthenticationKeyCacheSizeFlag,
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,

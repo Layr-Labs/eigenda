@@ -11,6 +11,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// TODO(cody.littley): we should migrate this from urfave to cobra, since we already use cobra for the config
+// framework. This would let us drop the urfave dependency.
+
 var (
 	pprofFlag = &cli.BoolFlag{
 		Name:    "pprof",
@@ -43,6 +46,11 @@ var (
 		Aliases: []string{"c"},
 		Usage:   "Path to a configuration file. Can be specified multiple times to load multiple files.",
 	}
+	onlyVerifyConfigFlag = &cli.BoolFlag{
+		Name:    "only-verify-config",
+		Aliases: []string{"v"},
+		Usage:   "If set, verifies configuration then exits.",
+	}
 )
 
 // Reads command line arguments, loads configuration from files and environment variables as specified.
@@ -71,6 +79,7 @@ func Bootstrap[T DocumentedConfig](
 			disableEnvVarsFlag,
 			overrideEnvPrefixFlag,
 			configFileFlag,
+			onlyVerifyConfigFlag,
 		},
 		Action: action,
 	}
@@ -108,6 +117,7 @@ func buildHandler[T DocumentedConfig](
 		disableEnvVars := cliCTX.Bool(disableEnvVarsFlag.Name)
 		overrideEnvPrefix := cliCTX.String(overrideEnvPrefixFlag.Name)
 		configFiles := cliCTX.StringSlice(configFileFlag.Name)
+		onlyVerifyConfig := cliCTX.Bool(onlyVerifyConfigFlag.Name)
 
 		if debug {
 			waitForDebugger(logger)
@@ -129,6 +139,11 @@ func buildHandler[T DocumentedConfig](
 		cfg, err := ParseConfig(logger, defaultConfig, prefix, ignoredEnvVars, configFiles...)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		if onlyVerifyConfig {
+			logger.Info("Configuration is valid. Exiting.")
+			os.Exit(0)
 		}
 
 		cfgChan <- cfg

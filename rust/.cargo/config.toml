@@ -1,0 +1,6 @@
+[env]
+# RUST_LOG = "info,eigenda_proxy=debug"
+RUST_LOG = "info"
+
+# Uncomment when debugging integration test to keep proxy container around after tests.
+# TESTCONTAINERS_COMMAND = "keep"
