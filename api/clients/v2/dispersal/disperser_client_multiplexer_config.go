@@ -20,6 +20,8 @@ type DisperserClientMultiplexerConfig struct {
 	DisperserBlacklist []uint32
 	// Configuration for the reputation system used to select dispersers
 	ReputationConfig reputation.ReputationConfig
+	// Whether to use secure gRPC connections (TLS) when connecting to dispersers
+	UseSecureGrpcFlag bool
 }
 
 func DefaultDisperserClientMultiplexerConfig() *DisperserClientMultiplexerConfig {
@@ -27,6 +29,7 @@ func DefaultDisperserClientMultiplexerConfig() *DisperserClientMultiplexerConfig
 		AdditionalDispersers: nil,
 		DisperserBlacklist:   nil,
 		ReputationConfig:     reputation.DefaultConfig(),
+		UseSecureGrpcFlag:    true,
 	}
 }
 

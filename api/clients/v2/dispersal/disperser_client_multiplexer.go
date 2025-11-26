@@ -118,7 +118,7 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 		// create a new client for the chosen disperser
 		clientConfig := &DisperserClientConfig{
 			GrpcUri:                  grpcUri,
-			UseSecureGrpcFlag:        true,
+			UseSecureGrpcFlag:        dcm.config.UseSecureGrpcFlag,
 			DisperserConnectionCount: dcm.disperserConnectionCount,
 			DisperserID:              chosenDisperser,
 		}
