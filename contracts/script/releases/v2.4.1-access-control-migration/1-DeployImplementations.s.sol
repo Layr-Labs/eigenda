@@ -32,12 +32,6 @@ import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACer
 // Import certificate verification
 // import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 
-// Import interfaces
-import {
-    IDelegationManager
-} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
-
-// TODO: Add DelegationManager to zeus.
 // TODO: Directory updates.
 
 contract DeployImplementations is EOADeployer {
@@ -172,7 +166,7 @@ contract DeployImplementations is EOADeployer {
             deployedTo: address(
                 new StakeRegistry({
                     _registryCoordinator: Env.proxy.registryCoordinator(),
-                    _delegationManager: IDelegationManager(Env.proxy.stakeRegistry().delegation())
+                    _delegationManager: Env.delegationManager()
                 })
             )
         });
