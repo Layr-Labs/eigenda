@@ -444,6 +444,11 @@ func TestAliasedEnvironmentVariables(t *testing.T) {
 
 	configFile := "test/config.toml"
 
+	// unset the alias variables in case they were set in previous tests
+	require.NoError(t, os.Unsetenv("PREFIX_BAR_BAZ_X"))
+	require.NoError(t, os.Unsetenv("PREFIX_BAR_BAZ_Z"))
+
+
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
 	require.NoError(t, os.Setenv("PREFIX_INT", "-999"))
