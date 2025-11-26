@@ -9,8 +9,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/common"
@@ -162,7 +162,7 @@ func initializePayloadDisperser(
 	signerAuthKey string,
 	srsPath string,
 	certVerifierAddrOverride *gethcommon.Address,
-) (*payloaddispersal.PayloadDisperser, *geth.EthClient, gethcommon.Address, error) {
+) (*dispersal.PayloadDisperser, *geth.EthClient, gethcommon.Address, error) {
 
 	// Create KZG committer
 	kzgCommitter, err := createKzgCommitter(srsPath)
@@ -245,7 +245,7 @@ func initializePayloadDisperser(
 	}
 
 	// Configure payload disperser
-	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
+	payloadDisperserConfig := dispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    *clients.GetDefaultPayloadClientConfig(),
 		DisperseBlobTimeout:    60 * time.Second,
 		BlobCompleteTimeout:    120 * time.Second,
@@ -254,7 +254,7 @@ func initializePayloadDisperser(
 	}
 
 	// Create payload disperser (without client ledger for simplicity - legacy payment mode)
-	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
+	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
@@ -276,7 +276,7 @@ func createDisperserClient(
 	disperserHostName string,
 	privateKey string,
 	kzgCommitter *committer.Committer,
-) (*clients.DisperserClient, error) {
+) (*dispersal.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create blob request signer: %w", err)
@@ -287,13 +287,13 @@ func createDisperserClient(
 		return nil, fmt.Errorf("parse EigenDA RPC: %w", err)
 	}
 
-	disperserClientConfig := &clients.DisperserClientConfig{
+	disperserClientConfig := &dispersal.DisperserClientConfig{
 		Hostname:          hostname,
 		Port:              port,
 		UseSecureGrpcFlag: true,
 	}
 
-	client, err := clients.NewDisperserClient(
+	client, err := dispersal.NewDisperserClient(
 		logger,
 		disperserClientConfig,
 		signer,

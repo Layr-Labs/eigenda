@@ -60,6 +60,7 @@ use rust_kzg_bn254_prover::kzg::KZG;
 use crate::cert::{BlobCommitment, G1Point};
 use crate::verification::blob::codec::BYTES_PER_SYMBOL;
 use crate::verification::blob::error::BlobVerificationError;
+use crate::verification::blob::error::EncodedPayloadDecodingError;
 
 /// Verifies that `blob` passes all the checks defined in
 /// [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!

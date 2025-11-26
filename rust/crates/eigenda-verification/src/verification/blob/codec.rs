@@ -1,7 +1,7 @@
 //! # EigenDA Payload Encoding/Decoding
 //!
 //! This module implements the EigenDA payload encoding and decoding functionality according to the
-//! [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation).
+//! [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#decoding-an-encoded-payload).
 //!
 //! ## Overview
 //!
@@ -18,7 +18,7 @@
 //! |                   | Symbol 2 (32 bytes) |
 //! |                   | ... |
 //! |                   | Symbol N (32 bytes) |
-//! |                   | Padding |
+//! |                   | 0-Padding |
 //!
 //! ### Header Format (32 bytes)
 //!
@@ -32,7 +32,7 @@
 //! | Byte | 0 | 1-31 |
 //! |------|---|------|
 //! | Field | Guard Byte | Payload Data (31 bytes max) |
-//! | Value | 0 | raw payload chunk + padding |
+//! | Value | 0 | raw payload chunk + 0-padding |
 //!
 //! ## Notes
 //!
@@ -41,7 +41,8 @@
 //! - **Endianness**: Big-endian encoding
 //! - **Field**: BN254 elliptic curve field (order ≈ 2^254)
 
-use crate::verification::blob::BlobVerificationError::{self, *};
+use crate::verification::blob::{BlobVerificationError, EncodedPayloadDecodingError};
+use tracing::instrument;
 
 /// Size of each symbol in bytes.
 ///
@@ -66,19 +67,16 @@ pub const HEADER_SYMBOLS_LEN: usize = 1;
 /// payload length, and zero padding.
 pub const HEADER_BYTES_LEN: usize = HEADER_SYMBOLS_LEN * BYTES_PER_SYMBOL;
 
+/// The PAYLOAD_ENCODING_VERSION_0 requires payload to be encoded as follows
+/// - begin with 32 byte header = [0x00, version byte 0, uint32 len of data, 0x00, 0x00,..., 0x00]
+/// - followed by the encoded data [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
+pub const PAYLOAD_ENCODING_VERSION_0: u8 = 0x0;
+
 /// Extracts the raw payload from an EigenDA encoded payload.
 ///
 /// This function reverses the encoding process performed by [`encode_raw_payload`], parsing
 /// the encoded payload to recover the raw payload data. It performs strict validation
 /// of the encoded payload format according to the EigenDA specification.
-///
-/// # Process
-///
-/// 1. **Header Validation**: Verifies the encoded payload is large enough to contain a 32-byte header
-/// 2. **Length Extraction**: Reads the payload length from bytes 2-5 of the header
-/// 3. **Size Validation**: Ensures the encoded payload contains enough data for the claimed payload
-/// 4. **Symbol Decoding**: Extracts 31-byte chunks from each 32-byte symbol (skipping guard bytes)
-/// 5. **Payload Reconstruction**: Concatenates chunks and truncates to the exact payload length
 ///
 /// # Arguments
 ///
@@ -87,50 +85,146 @@ pub const HEADER_BYTES_LEN: usize = HEADER_SYMBOLS_LEN * BYTES_PER_SYMBOL;
 /// # Returns
 ///
 /// * `Ok(Vec<u8>)` - The raw payload data
-/// * `Err(BlobVerificationError)` - Various error conditions:
-///   - [`BlobTooSmallForHeader`](BlobVerificationError::BlobTooSmallForHeader) if blob < 32 bytes
-///   - [`BlobTooSmallForHeaderAndPayload`](BlobVerificationError::BlobTooSmallForHeaderAndPayload) if blob doesn't contain enough data for the claimed payload
+/// * Err([EncodedPayloadDecodingError]) - if some encoding invariants are violated
+#[instrument(skip_all)]
 pub fn decode_encoded_payload(encoded_payload: &[u8]) -> Result<Vec<u8>, BlobVerificationError> {
-    let encoded_payload_bytes_len = encoded_payload.len();
+    // Check length invariant
+    check_len_invariant(encoded_payload)?;
 
-    let header = encoded_payload
-        .get(..HEADER_BYTES_LEN)
-        .ok_or(BlobTooSmallForHeader(encoded_payload_bytes_len))?;
+    // Decode header to get claimed payload length
+    let payload_len_in_header = decode_header(encoded_payload)?;
 
-    // safety: indexing bounds have been asserted above
-    let raw_payload_len = u32::from_be_bytes(header[2..6].try_into().unwrap()) as usize;
+    // Decode payload using the helper method
+    decode_payload(encoded_payload, payload_len_in_header)
+}
 
-    let raw_payload_chunks_len = raw_payload_len.div_ceil(BYTES_PER_CHUNK);
-
-    let raw_payload_bytes_len = raw_payload_chunks_len
-        .checked_mul(BYTES_PER_CHUNK)
-        .ok_or(Overflow)?;
-
-    let padded_payload_bytes_len = raw_payload_chunks_len
-        .checked_mul(BYTES_PER_SYMBOL)
-        .ok_or(Overflow)?;
-
-    let claimed_encoded_payload_bytes_len = HEADER_BYTES_LEN
-        .checked_add(padded_payload_bytes_len)
-        .ok_or(Overflow)?;
-
-    let padded_payload = &encoded_payload
-        .get(HEADER_BYTES_LEN..claimed_encoded_payload_bytes_len)
-        .ok_or(BlobTooSmallForHeaderAndPayload {
-            encoded_payload_bytes_len,
-            claimed_encoded_payload_bytes_len,
-        })?;
-
-    let mut raw_payload = Vec::with_capacity(raw_payload_bytes_len);
-
-    for symbol in padded_payload.chunks_exact(BYTES_PER_SYMBOL) {
-        raw_payload.extend_from_slice(&symbol[1..]);
+/// Checks whether the encoded payload satisfies its length invariant.
+/// EncodedPayloads must contain a power of 2 number of Field Elements, each of length 32.
+/// This means the only valid encoded payloads have byte lengths of 32, 64, 128, 256, etc.
+///
+/// Note that this function only checks the length invariant, meaning that it doesn't check that
+/// the 32 byte chunks are valid bn254 elements.
+#[instrument(skip_all)]
+fn check_len_invariant(encoded_payload: &[u8]) -> Result<(), BlobVerificationError> {
+    // this check is redundant since 0 is not a valid power of 32, but we keep it for clarity.
+    if encoded_payload.len() < HEADER_BYTES_LEN {
+        return Err(
+            EncodedPayloadDecodingError::EncodedPayloadTooShortForHeader(encoded_payload.len())
+                .into(),
+        );
     }
 
-    // remove padding of the last chunk if any
-    raw_payload.truncate(raw_payload_len);
+    if encoded_payload.len() % BYTES_PER_SYMBOL != 0 {
+        return Err(EncodedPayloadDecodingError::InvalidLengthEncodedPayload(
+            encoded_payload.len() as u64,
+        )
+        .into());
+    }
 
-    Ok(raw_payload)
+    // Check encoded payload has a power of two number of field elements
+    let num_field_elements = encoded_payload.len() / BYTES_PER_SYMBOL;
+    if !num_field_elements.is_power_of_two() {
+        return Err(
+            EncodedPayloadDecodingError::InvalidPowerOfTwoLength(num_field_elements).into(),
+        );
+    }
+    Ok(())
+}
+
+/// Validates the header (first field element = 32 bytes) of the encoded payload,
+/// and returns the claimed length of the payload if the header is valid.
+#[instrument(skip_all)]
+fn decode_header(encoded_payload: &[u8]) -> Result<u32, BlobVerificationError> {
+    if encoded_payload.len() < HEADER_BYTES_LEN {
+        return Err(
+            EncodedPayloadDecodingError::EncodedPayloadTooShortForHeader(encoded_payload.len())
+                .into(),
+        );
+    }
+    // this ensures the header 32 bytes is a valid field element
+    if encoded_payload[0] != 0x00 {
+        return Err(EncodedPayloadDecodingError::InvalidHeaderFirstByte(encoded_payload[0]).into());
+    }
+    let payload_length = match encoded_payload[1] {
+        version if version == PAYLOAD_ENCODING_VERSION_0 => u32::from_be_bytes([
+            encoded_payload[2],
+            encoded_payload[3],
+            encoded_payload[4],
+            encoded_payload[5],
+        ]),
+        version => {
+            return Err(EncodedPayloadDecodingError::UnknownEncodingVersion(version).into());
+        }
+    };
+
+    // all the remaining bytes in the payload header must be zero
+    for b in &encoded_payload[6..HEADER_BYTES_LEN] {
+        if *b != 0x00 {
+            return Err(EncodedPayloadDecodingError::InvalidEncodedPayloadHeaderPadding(*b).into());
+        }
+    }
+
+    Ok(payload_length)
+}
+
+/// Decodes the payload from the encoded payload bytes.
+/// Removes internal padding and extracts the payload data based on the claimed length.
+#[instrument(skip_all)]
+fn decode_payload(
+    encoded_payload: &[u8],
+    payload_len: u32,
+) -> Result<Vec<u8>, BlobVerificationError> {
+    let body = &encoded_payload[HEADER_BYTES_LEN..];
+
+    // Decode the body by removing internal 0 byte padding (0x00 initial byte for every 32 byte chunk)
+    // this ensures every 32 bytes is a valid field element
+    let mut decoded_body = check_and_remove_zero_padding_for_field_elements(body)?;
+
+    // data length is checked when constructing an encoded payload. If this error is encountered, that means there
+    // must be a flaw in the logic at construction time (or someone was bad and didn't use the proper construction methods)
+    if decoded_body.len() < payload_len as usize {
+        return Err(EncodedPayloadDecodingError::DecodedPayloadBodyTooShort {
+            actual: decoded_body.len(),
+            claimed: payload_len,
+        }
+        .into());
+    }
+
+    for b in &decoded_body[payload_len as usize..] {
+        if *b != 0x00 {
+            return Err(EncodedPayloadDecodingError::InvalidEncodedPayloadBodyPadding(*b).into());
+        }
+    }
+
+    decoded_body.truncate(payload_len as usize);
+    Ok(decoded_body)
+}
+
+/// check_and_remove_zero_padding_for_field_elements checks if the first byte of every mulitple of 32 bytes is 0x00,
+/// it enforces the spec in <https://layr-labs.github.io/eigenda/integration/spec/3-data-structs.html#encoding-payload-version-0x0>
+/// then the function returns bytes with the zero-padding bytes removed.
+/// this ensures every multiple of 32 bytes is a valid field element
+fn check_and_remove_zero_padding_for_field_elements(
+    encoded_body: &[u8],
+) -> Result<Vec<u8>, BlobVerificationError> {
+    if encoded_body.len() % BYTES_PER_SYMBOL != 0 {
+        return Err(EncodedPayloadDecodingError::InvalidLengthEncodedPayload(
+            encoded_body.len() as u64
+        )
+        .into());
+    }
+
+    let num_field_elements = encoded_body.len() / BYTES_PER_SYMBOL;
+    let mut decoded_body = Vec::with_capacity(num_field_elements * 31);
+    for chunk in encoded_body.chunks_exact(BYTES_PER_SYMBOL) {
+        if chunk[0] != 0x00 {
+            return Err(
+                EncodedPayloadDecodingError::InvalidFirstByteFieldElementPadding(chunk[0]).into(),
+            );
+        }
+        decoded_body.extend_from_slice(&chunk[1..32]);
+    }
+    Ok(decoded_body)
 }
 
 #[cfg(any(test, feature = "test-utils"))]
@@ -141,7 +235,9 @@ pub fn decode_encoded_payload(encoded_payload: &[u8]) -> Result<Vec<u8>, BlobVer
 /// only available when the `test-utils` feature is enabled or during testing.
 pub mod tests_utils {
     use crate::verification::blob::BlobVerificationError::{self, *};
-    use crate::verification::blob::codec::{BYTES_PER_CHUNK, BYTES_PER_SYMBOL, HEADER_BYTES_LEN};
+    use crate::verification::blob::codec::{
+        BYTES_PER_CHUNK, BYTES_PER_SYMBOL, HEADER_BYTES_LEN, PAYLOAD_ENCODING_VERSION_0,
+    };
 
     /// Guard byte value used to prefix field elements in the EigenDA encoding.
     ///
@@ -150,11 +246,6 @@ pub mod tests_utils {
     /// operations. The value 0 ensures that the resulting 32-byte value is always
     /// less than the BN254 field modulus.
     pub const FIELD_ELEMENT_GUARD_BYTE: u8 = 0;
-
-    /// Version byte used in the encoded payload header.
-    ///
-    /// This indicates the encoding format version. Currently, only version 0 is defined.
-    pub const VERSION: u8 = 0;
 
     /// Encodes a raw payload into an EigenDA-compatible encoded payload format.
     ///
@@ -262,7 +353,7 @@ pub mod tests_utils {
     ) -> Result<[u8; HEADER_BYTES_LEN], BlobVerificationError> {
         let mut header = [0; HEADER_BYTES_LEN];
         header[0] = FIELD_ELEMENT_GUARD_BYTE;
-        header[1] = VERSION;
+        header[1] = PAYLOAD_ENCODING_VERSION_0;
         let raw_payload_len: u32 = raw_payload.len().try_into()?;
         header[2..6].copy_from_slice(&raw_payload_len.to_be_bytes());
         Ok(header)
@@ -331,33 +422,26 @@ pub mod tests_utils {
 
         Ok(dst)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::verification::blob::codec::tests_utils::{
-        FIELD_ELEMENT_GUARD_BYTE, VERSION, construct_header, encode_raw_payload, pad_raw_payload,
-    };
-    use crate::verification::blob::codec::{
-        BYTES_PER_CHUNK, BYTES_PER_SYMBOL, HEADER_BYTES_LEN, decode_encoded_payload,
-    };
-    use crate::verification::blob::error::BlobVerificationError::{
-        BlobTooSmallForHeader, BlobTooSmallForHeaderAndPayload,
-    };
 
     #[test]
-    fn roundtrip_boundary_cases() {
-        // Test critical boundary cases around chunk/symbol boundaries
-        for size in [0, 1, 30, 31, 32, 61, 62, 63, 100, 512, 1000, 2048] {
-            let raw_payload: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
+    fn construct_header_format() {
+        for (payload, expected_len) in [
+            (vec![], 0u32),
+            (vec![1, 2, 3, 4, 5], 5u32),
+            (vec![0u8; 1000], 1000u32),
+        ] {
+            let header = construct_header(&payload).unwrap();
 
-            let encoded_payload = encode_raw_payload(&raw_payload).unwrap();
-            let recovered_payload = decode_encoded_payload(&encoded_payload).unwrap();
-
+            assert_eq!(header[0], FIELD_ELEMENT_GUARD_BYTE);
+            assert_eq!(header[1], PAYLOAD_ENCODING_VERSION_0);
             assert_eq!(
-                raw_payload, recovered_payload,
-                "Failed roundtrip for size {size}",
+                u32::from_be_bytes([header[2], header[3], header[4], header[5]]),
+                expected_len
             );
+
+            for &byte in &header[6..] {
+                assert_eq!(byte, 0);
+            }
         }
     }
 
@@ -371,7 +455,7 @@ mod tests {
         assert!(encoded_payload.len() >= HEADER_BYTES_LEN + BYTES_PER_SYMBOL);
 
         assert_eq!(encoded_payload[0], FIELD_ELEMENT_GUARD_BYTE);
-        assert_eq!(encoded_payload[1], VERSION);
+        assert_eq!(encoded_payload[1], PAYLOAD_ENCODING_VERSION_0);
 
         let claimed_len = u32::from_be_bytes([
             encoded_payload[2],
@@ -383,62 +467,6 @@ mod tests {
 
         for &byte in &encoded_payload[6..HEADER_BYTES_LEN] {
             assert_eq!(byte, 0);
-        }
-    }
-
-    #[test]
-    fn encoded_payload_too_small_for_header() {
-        for size in 0..HEADER_BYTES_LEN {
-            let small_encoded_payload = vec![0u8; size];
-            assert!(matches!(
-                decode_encoded_payload(&small_encoded_payload),
-                Err(BlobTooSmallForHeader(len)) if len == size
-            ));
-        }
-    }
-
-    #[test]
-    fn claimed_encoded_payload_len_too_small_for_actual_payload() {
-        let mut encoded_payload = vec![0u8; HEADER_BYTES_LEN];
-        encoded_payload[0] = FIELD_ELEMENT_GUARD_BYTE;
-        encoded_payload[1] = VERSION;
-        let payload_len: u32 = 100;
-        encoded_payload[2..6].copy_from_slice(&payload_len.to_be_bytes());
-
-        encoded_payload.resize(HEADER_BYTES_LEN + 50, 0);
-
-        assert!(matches!(
-            decode_encoded_payload(&encoded_payload),
-            Err(BlobTooSmallForHeaderAndPayload { .. })
-        ));
-    }
-
-    #[test]
-    fn empty_payload_roundtrip() {
-        let encoded_payload = encode_raw_payload(&[]).unwrap();
-        let recovered = decode_encoded_payload(&encoded_payload).unwrap();
-        assert!(recovered.is_empty());
-    }
-
-    #[test]
-    fn construct_header_format() {
-        for (payload, expected_len) in [
-            (vec![], 0u32),
-            (vec![1, 2, 3, 4, 5], 5u32),
-            (vec![0u8; 1000], 1000u32),
-        ] {
-            let header = construct_header(&payload).unwrap();
-
-            assert_eq!(header[0], FIELD_ELEMENT_GUARD_BYTE);
-            assert_eq!(header[1], VERSION);
-            assert_eq!(
-                u32::from_be_bytes([header[2], header[3], header[4], header[5]]),
-                expected_len
-            );
-
-            for &byte in &header[6..] {
-                assert_eq!(byte, 0);
-            }
         }
     }
 
@@ -512,6 +540,329 @@ mod tests {
         let last_symbol_start = 2 * BYTES_PER_SYMBOL;
         for i in 6..BYTES_PER_CHUNK {
             assert_eq!(result[last_symbol_start + i + 1], 0);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::verification::blob::codec::tests_utils::encode_raw_payload;
+    use crate::verification::blob::codec::{
+        BYTES_PER_SYMBOL, check_and_remove_zero_padding_for_field_elements, check_len_invariant,
+        decode_encoded_payload, decode_header, decode_payload,
+    };
+    use crate::verification::blob::error::{BlobVerificationError, EncodedPayloadDecodingError};
+
+    // VALID ENCODED_PAYLOAD CASES
+    #[test]
+    fn accept_valid_encoded_payload_with_various_padding() {
+        // Test that valid encoded payloads with different amounts of padding work correctly
+        for payload_size in [1, 5, 31, 32, 62, 100] {
+            let payload = vec![0xFFu8; payload_size];
+            let encoded_payload = encode_raw_payload(&payload).unwrap();
+            let decoded = decode_encoded_payload(&encoded_payload).unwrap();
+            assert_eq!(payload, decoded, "Failed for payload size {payload_size}");
+        }
+    }
+
+    #[test]
+    fn roundtrip_empty_payload() {
+        let encoded_payload = encode_raw_payload(&[]).unwrap();
+        let recovered = decode_encoded_payload(&encoded_payload).unwrap();
+        assert!(recovered.is_empty());
+    }
+
+    #[test]
+    fn roundtrip_boundary_cases() {
+        // Test critical boundary cases around chunk/symbol boundaries
+        for size in [0, 1, 30, 31, 32, 61, 62, 63, 100, 512, 1000, 2048] {
+            let raw_payload: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
+
+            let encoded_payload = encode_raw_payload(&raw_payload).unwrap();
+            let recovered_payload = decode_encoded_payload(&encoded_payload).unwrap();
+
+            assert_eq!(
+                raw_payload, recovered_payload,
+                "Failed roundtrip for size {size}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_check_len_invariant() {
+        struct Case {
+            input: Vec<u8>,
+            result: Result<(), BlobVerificationError>,
+        }
+        let cases = [
+            // not long enough
+            Case {
+                input: vec![1, 2, 3, 4],
+                result: Err(EncodedPayloadDecodingError::EncodedPayloadTooShortForHeader(4).into()),
+            },
+            // not power of 2
+            Case {
+                input: vec![0; 96],
+                result: Err(EncodedPayloadDecodingError::InvalidPowerOfTwoLength(
+                    96 / BYTES_PER_SYMBOL,
+                )
+                .into()),
+            },
+            // not divide 32
+            Case {
+                input: vec![0; 34],
+                result: Err(EncodedPayloadDecodingError::InvalidLengthEncodedPayload(34).into()),
+            },
+            Case {
+                input: vec![0; 64],
+                result: Ok(()),
+            },
+        ];
+
+        for case in cases {
+            if let Err(e) = check_len_invariant(&case.input) {
+                assert_eq!(Err(e), case.result)
+            }
+        }
+    }
+
+    #[test]
+    fn test_decode_header() {
+        struct Case {
+            input: Vec<u8>,
+            result: Result<u32, BlobVerificationError>,
+        }
+        let cases = [
+            // insufficient length
+            Case {
+                input: vec![1, 2, 3, 4],
+                result: Err(EncodedPayloadDecodingError::EncodedPayloadTooShortForHeader(4).into()),
+            },
+            // First byte is not 0
+            Case {
+                input: vec![1; 32],
+                result: Err(EncodedPayloadDecodingError::InvalidHeaderFirstByte(1).into()),
+            },
+            // unknown encoding version
+            Case {
+                input: vec![
+                    0, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ],
+                result: Err(EncodedPayloadDecodingError::UnknownEncodingVersion(2).into()),
+            },
+            // invalid header padding
+            Case {
+                input: vec![
+                    0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 3,
+                ],
+                result: Err(
+                    EncodedPayloadDecodingError::InvalidEncodedPayloadHeaderPadding(3).into(),
+                ),
+            },
+            // working case
+            Case {
+                input: vec![
+                    0, 0, 0, 0, 0, 129, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ],
+                result: Ok(129),
+            },
+        ];
+
+        for case in cases {
+            match decode_header(&case.input) {
+                Ok(length) => assert_eq!(length, case.result.unwrap()),
+                Err(err) => assert_eq!(Err(err), case.result),
+            }
+        }
+    }
+
+    #[test]
+    fn test_check_and_remove_zero_padding_for_field_elements() {
+        struct Case {
+            input: Vec<u8>,
+            result: Result<Vec<u8>, BlobVerificationError>,
+        }
+        let cases = [
+            // invalid length not divide 32 byte, which is size of field element
+            Case {
+                // 33 bytes
+                input: vec![
+                    0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 2,
+                ],
+                result: Err(EncodedPayloadDecodingError::InvalidLengthEncodedPayload(33).into()),
+            },
+            Case {
+                // 64 bytes first byte violation
+                input: vec![
+                    3, 0, 0, 0, 0, 128, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                ],
+                result: Err(
+                    EncodedPayloadDecodingError::InvalidFirstByteFieldElementPadding(3).into(),
+                ),
+            },
+            Case {
+                // 64 bytes 32-th byte violation
+                input: vec![
+                    0, 0, 0, 0, 0, 128, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 111, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                ],
+                result: Err(
+                    EncodedPayloadDecodingError::InvalidFirstByteFieldElementPadding(111).into(),
+                ),
+            },
+            Case {
+                // 32 bytes
+                input: vec![
+                    0, 0, 0, 0, 0, 31, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2,
+                ],
+                result: Ok(vec![
+                    0, 0, 0, 0, 31, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2,
+                ]),
+            },
+            Case {
+                // 64 bytes
+                input: vec![
+                    0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                ],
+                result: Ok(vec![
+                    0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                ]),
+            },
+        ];
+
+        for case in cases {
+            match check_and_remove_zero_padding_for_field_elements(&case.input) {
+                Ok(decoded_body) => assert_eq!(Ok(decoded_body), case.result),
+                Err(e) => assert_eq!(Err(e), case.result),
+            }
+        }
+    }
+
+    #[test]
+    fn test_decode_payload() {
+        struct Case {
+            input: Vec<u8>,
+            result: Result<Vec<u8>, BlobVerificationError>,
+        }
+        let cases = [
+            // invalid length not divide 32 byte, which is size of field element
+            Case {
+                // 33 bytes -> 1 byte payload body
+                input: vec![
+                    0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 128,
+                ],
+                result: Err(EncodedPayloadDecodingError::InvalidLengthEncodedPayload(1).into()),
+            },
+            Case {
+                // 64 bytes -> claimed length 128
+                input: vec![
+                    0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                ],
+                result: Err(
+                    EncodedPayloadDecodingError::InvalidFirstByteFieldElementPadding(3).into(),
+                ),
+            },
+            Case {
+                // 64 bytes -> claimed length 128
+                input: vec![
+                    0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                ],
+                result: Err(EncodedPayloadDecodingError::DecodedPayloadBodyTooShort {
+                    actual: 31,
+                    claimed: 128,
+                }
+                .into()),
+            },
+            Case {
+                // 64 bytes in total, but payload_len is 1 (number is represented in big endian),
+                // so the remaining padding bytes need to be 0
+                input: vec![
+                    0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                ],
+                result: Err(
+                    EncodedPayloadDecodingError::InvalidEncodedPayloadBodyPadding(2).into(),
+                ),
+            },
+            Case {
+                // 64 bytes
+                input: vec![
+                    0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                ],
+                result: Ok(vec![1; 31]),
+            },
+            Case {
+                // 64 bytes with special case when length is 1, with many 0 padding
+                input: vec![
+                    0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                result: Ok(vec![128]),
+            },
+            Case {
+                // 64 bytes with special case when length is 0, and all padding are 0
+                input: vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ],
+                result: Ok(vec![]),
+            },
+            Case {
+                // 32 bytes with special case when length is 0
+                input: vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ],
+                result: Ok(vec![]),
+            },
+            Case {
+                // 32 bytes with special case but claimed length is 3
+                input: vec![
+                    0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ],
+                // expect 64
+                result: Err(EncodedPayloadDecodingError::DecodedPayloadBodyTooShort {
+                    actual: 0,
+                    claimed: 3,
+                }
+                .into()),
+            },
+        ];
+
+        for case in cases {
+            let length_in_byte =
+                decode_header(&case.input).expect("should have decoded header successfully");
+
+            match decode_payload(&case.input, length_in_byte) {
+                Ok(payload) => assert_eq!(Ok(payload), case.result),
+                Err(e) => {
+                    assert_eq!(Err(e), case.result);
+                }
+            }
         }
     }
 }

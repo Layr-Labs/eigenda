@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/peer"
@@ -47,8 +48,11 @@ type Server struct {
 	// blobProvider encapsulates logic for fetching blobs.
 	blobProvider *blobProvider
 
-	// chunkProvider encapsulates logic for fetching chunks.
-	chunkProvider *chunkProvider
+	// legacyChunkProvider encapsulates logic for fetching chunks using the old-style get by index pattern.
+	legacyChunkProvider *chunkProvider
+
+	// Provides direct access to the chunk reader client.
+	chunkReader chunkstore.ChunkReader
 
 	// blobRateLimiter enforces rate limits on GetBlob and operations.
 	blobRateLimiter *limiter.BlobRateLimiter
@@ -156,18 +160,19 @@ func NewServer(
 		config.GetChunksRequestMaxPastAge)
 
 	server := &Server{
-		config:           config,
-		logger:           logger.With("component", "RelayServer"),
-		metadataProvider: mp,
-		blobProvider:     bp,
-		chunkProvider:    cp,
-		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits, relayMetrics),
-		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits, relayMetrics),
-		authenticator:    authenticator,
-		replayGuardian:   replayGuardian,
-		metrics:          relayMetrics,
-		chainReader:      chainReader,
-		listener:         listener,
+		config:              config,
+		logger:              logger.With("component", "RelayServer"),
+		metadataProvider:    mp,
+		blobProvider:        bp,
+		legacyChunkProvider: cp,
+		chunkReader:         chunkReader,
+		blobRateLimiter:     limiter.NewBlobRateLimiter(&config.RateLimits, relayMetrics),
+		chunkRateLimiter:    limiter.NewChunkRateLimiter(&config.RateLimits, relayMetrics),
+		authenticator:       authenticator,
+		replayGuardian:      replayGuardian,
+		metrics:             relayMetrics,
+		chainReader:         chainReader,
+		listener:            listener,
 	}
 
 	// Setup gRPC server
@@ -365,14 +370,41 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 	s.metrics.ReportGetChunksBandwidthUsage(requiredBandwidth)
 
-	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
-	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching frames: %v", err))
+	// Determine whether to use legacy chunk provider or new chunk provider. We have to use the legacy chunk
+	// provider if there are any requests that use the "by index" query pattern.
+	useLegacyChunkProvider := false
+	for _, chunkRequest := range request.GetChunkRequests() {
+		if chunkRequest.GetByIndex() != nil {
+			useLegacyChunkProvider = true
+			break
+		}
 	}
 
-	bytesToSend, err := gatherChunkDataToSend(frames, request)
-	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err))
+	var bytesToSend [][]byte
+
+	if useLegacyChunkProvider {
+		frames, err := s.legacyChunkProvider.GetFrames(ctx, mMap)
+		if err != nil {
+			// nolint:wrapcheck
+			return nil, api.NewErrorInternal(fmt.Sprintf("error fetching frames: %v", err))
+		}
+
+		bytesToSend, err = gatherChunkDataToSendLegacy(frames, request)
+		if err != nil {
+			// nolint:wrapcheck
+			return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err))
+		}
+	} else {
+		var found bool
+		bytesToSend, found, err = s.gatherChunkDataToSend(ctx, mMap, request)
+		if err != nil {
+			// nolint:wrapcheck
+			return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err))
+		}
+		if !found {
+			// nolint:wrapcheck
+			return nil, api.NewErrorNotFound("requested chunks not found")
+		}
 	}
 
 	s.metrics.ReportChunkDataLatency(time.Since(finishedFetchingMetadata))
@@ -408,8 +440,193 @@ func getKeysFromChunkRequest(request *pb.GetChunksRequest) ([]v2.BlobKey, error)
 	return keys, nil
 }
 
-// gatherChunkDataToSend takes the chunk data and narrows it down to the data requested in the GetChunks request.
-func gatherChunkDataToSend(
+// Used to pass status of downloads from goroutines up to controlling function.
+type downloadResult struct {
+	key   v2.BlobKey
+	found bool
+}
+
+// Download and compile the chunk data to send back to the client.
+func (s *Server) gatherChunkDataToSend(
+	ctx context.Context,
+	metadataMap map[v2.BlobKey]*blobMetadata,
+	request *pb.GetChunksRequest,
+) ([][]byte, bool, error) {
+
+	coefficients, proofs, found, err := s.downloadDataFromRelays(ctx, metadataMap, request)
+	if err != nil {
+		return nil, false, fmt.Errorf("error downloading chunk data from relays: %w", err)
+	}
+	if !found {
+		return nil, false, nil
+	}
+
+	chunkDataObjects, err := combineProofsAndCoefficients(
+		proofs,
+		coefficients,
+		request,
+		metadataMap)
+	if err != nil {
+		return nil, false, fmt.Errorf("error building chunk data: %w", err)
+	}
+
+	bytesToSend, err := buildBinaryChunkData(chunkDataObjects, request)
+	if err != nil {
+		return nil, false, fmt.Errorf("error building binary chunk data: %w", err)
+	}
+
+	return bytesToSend, true, nil
+}
+
+// Download all data from relays needed to fulfill a GetChunks request.
+func (s *Server) downloadDataFromRelays(
+	ctx context.Context,
+	metadataMap map[v2.BlobKey]*blobMetadata,
+	request *pb.GetChunksRequest,
+) (coefficients [][][]byte, proofs [][][]byte, allDataFound bool, err error) {
+	requestCount := len(request.GetChunkRequests())
+
+	coefficients = make([][][]byte, requestCount)
+	proofs = make([][][]byte, requestCount)
+
+	results := make(chan downloadResult, requestCount*2)
+
+	runner, ctx := errgroup.WithContext(ctx)
+
+	// Fan out and make requests in parallel
+	for i, chunkRequest := range request.GetChunkRequests() {
+		blobKey := v2.BlobKey(chunkRequest.GetByRange().GetBlobKey())
+		metadata := metadataMap[blobKey]
+
+		// Download proofs
+		runner.Go(func() error {
+			data, found, err := s.chunkReader.GetBinaryChunkProofsRange(
+				ctx,
+				blobKey,
+				chunkRequest.GetByRange().GetStartIndex(),
+				chunkRequest.GetByRange().GetEndIndex(),
+			)
+
+			proofs[i] = data
+			if err != nil {
+				return fmt.Errorf("failed to download proofs: %w", err)
+			}
+			results <- downloadResult{key: blobKey, found: found}
+
+			return nil
+		})
+		// Download coefficients
+		runner.Go(func() error {
+			data, found, err := s.chunkReader.GetBinaryChunkCoefficientRange(
+				ctx,
+				blobKey,
+				chunkRequest.GetByRange().GetStartIndex(),
+				chunkRequest.GetByRange().GetEndIndex(),
+				metadata.symbolsPerFrame,
+			)
+
+			coefficients[i] = data
+			if err != nil {
+				return fmt.Errorf("failed to download coefficients: %w", err)
+			}
+			results <- downloadResult{key: blobKey, found: found}
+
+			return nil
+		})
+	}
+
+	// Await results
+	if err := runner.Wait(); err != nil {
+		return nil, nil, false, fmt.Errorf("error downloading chunk data: %w", err)
+	}
+
+	// Handle the situation where some data couldn't be found
+	for i := 0; i < requestCount*2; i++ {
+		result := <-results
+		if !result.found {
+			return nil, nil, false, nil
+		}
+	}
+
+	return coefficients, proofs, true, nil
+}
+
+// Convert the disparate proofs and coefficients into unified "ChunkData" objects
+// (or "chunks" or "frames" or other names, depending on what part of the code you are looking at)
+func combineProofsAndCoefficients(
+	proofs [][][]byte,
+	coefficients [][][]byte,
+	request *pb.GetChunksRequest,
+	metadataMap map[v2.BlobKey]*blobMetadata,
+) ([]*core.ChunksData, error) {
+
+	requestCount := len(request.GetChunkRequests())
+
+	chunkDataObjects := make([]*core.ChunksData, requestCount)
+	for i := 0; i < requestCount; i++ {
+		blobKey := v2.BlobKey(request.GetChunkRequests()[i].GetByRange().GetBlobKey())
+		metadata := metadataMap[blobKey]
+		chunkData, err := buildChunksData(proofs[i], int(metadata.symbolsPerFrame), coefficients[i])
+		if err != nil {
+			return nil, fmt.Errorf("error building chunk data: %w", err)
+		}
+		chunkDataObjects[i] = chunkData
+	}
+
+	return chunkDataObjects, nil
+}
+
+// Take the chunk data objects and build the final byte arrays to send back to the client.
+func buildBinaryChunkData(
+	chunkDataObjects []*core.ChunksData,
+	request *pb.GetChunksRequest,
+) ([][]byte, error) {
+
+	bytesToSend := make([][]byte, 0, len(request.GetChunkRequests()))
+	for requestIndex := 0; requestIndex < len(request.GetChunkRequests()); requestIndex++ {
+		nextRequest := request.GetChunkRequests()[requestIndex]
+		targetKey := nextRequest.GetByRange().GetBlobKey()
+
+		chunkDataToSend := chunkDataObjects[requestIndex]
+
+		// Validator verification logic expects all chunks for the same blob to be grouped together.
+		// This is easy to do with an index request, since an index request allows non-contiguous chunks
+		// to be fetched via a single request. But range queries require contiguous chunks, so we may receive
+		// multiple range requests for the same blob. In order to avoid breaking tricky validation logic,
+		// it is simpler to just group all range requests for the same blob together into a single "bundle"
+		// (aka a binary object that encodes a list of chunks).
+
+		// If there are multiple requests for the same blob, combine them.
+		for i := requestIndex + 1; i < len(request.GetChunkRequests()); i++ {
+			followingRequest := request.GetChunkRequests()[i].GetByRange()
+
+			nextKey := followingRequest.GetBlobKey()
+			if !bytes.Equal(targetKey, nextKey) {
+				// Next request is for a different blob, don't combine.
+				break
+			}
+
+			followingChunkData := chunkDataObjects[i]
+			chunkDataToSend.Chunks = append(chunkDataToSend.Chunks, followingChunkData.Chunks...)
+
+			// Bump the counter for the outer loop since this iteration handles it
+			requestIndex++
+		}
+
+		bundleBytes, err := chunkDataToSend.FlattenToBundle()
+		if err != nil {
+			return nil, fmt.Errorf("error serializing chunk subset: %w", err)
+		}
+
+		bytesToSend = append(bytesToSend, bundleBytes)
+	}
+
+	return bytesToSend, nil
+}
+
+// gatherChunkDataToSendLegacy takes the chunk data and narrows it down to the data requested in the GetChunks request.
+// Required for requests that use the old "by index" query pattern.
+func gatherChunkDataToSendLegacy(
 	frames map[v2.BlobKey]*core.ChunksData,
 	request *pb.GetChunksRequest) ([][]byte, error) {
 
@@ -556,7 +773,10 @@ func selectFrameSubsetByIndex(
 }
 
 // computeChunkRequestRequiredBandwidth computes the bandwidth required to fulfill a GetChunks request.
-func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap metadataMap) (uint32, error) {
+func computeChunkRequestRequiredBandwidth(
+	request *pb.GetChunksRequest,
+	mMap map[v2.BlobKey]*blobMetadata,
+) (uint32, error) {
 	requiredBandwidth := uint32(0)
 	for _, req := range request.GetChunkRequests() {
 		var metadata *blobMetadata

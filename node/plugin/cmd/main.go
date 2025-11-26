@@ -130,7 +130,7 @@ func pluginOps(ctx *cli.Context) {
 		log.Printf("Error: failed to create eth client: %v", err)
 		return
 	}
-	log.Printf("Info: ethclient created for url: %s", config.ChainRpcUrl)
+	log.Printf("Info: ethclient created for url: %s", geth.SanitizeRpcUrl(config.ChainRpcUrl))
 
 	contractDirectory, err := directory.NewContractDirectory(context.Background(), logger, client,
 		gethcommon.HexToAddress(config.EigenDADirectory))

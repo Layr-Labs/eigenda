@@ -15,6 +15,13 @@ var (
 	// ErrFallbackRequested is returned by a CustomDA provider to explicitly signal that
 	// the batch poster should fall back to the next available DA writer (e.g, AnyTrust).
 	ErrFallbackRequested = errors.New("DA provider requests fallback to next writer")
+
+	// Vendored from:
+	// https://github.com/OffchainLabs/nitro/blob/2b3cf2138b17af6411e7e391eac346267fec121a/daprovider/reader.go#L19-L31
+	//
+	// ErrCertValidationError is returned by a CustomDA provider to signal an "invalid DA Cert"
+	// condition to the Arbitrum derivation pipeline.
+	ErrCertValidationError = errors.New("certificate validation failed")
 )
 
 const (

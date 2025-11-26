@@ -31,7 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	ethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
 // NewTestHarnessWithSetup creates a fully initialized TestHarness with all components set up.
@@ -65,10 +64,11 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		return nil, fmt.Errorf("failed to create eth client: %w", err)
 	}
 
-	testCtx.RPCClient, err = ethrpc.Dial(infra.TestConfig.Deployers[0].RPC)
+	ethClient, err := geth.SafeDial(ctx, infra.TestConfig.Deployers[0].RPC)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rpc client: %w", err)
 	}
+	testCtx.RPCClient = ethClient.Client()
 
 	// Force foundry to mine a block since it isn't auto-mining
 	err = testCtx.RPCClient.CallContext(ctx, nil, "evm_mine")

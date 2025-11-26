@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/consts"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	v1_verifier_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	edsm_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertVerifierLegacy"
@@ -63,9 +64,9 @@ func NewCertVerifier(cfg *Config, log logging.Logger) (*CertVerifier, error) {
 		)
 	}
 
-	client, err := ethclient.Dial(cfg.RPCURL)
+	client, err := geth.SafeDial(context.Background(), cfg.RPCURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial ETH RPC node: %s", err.Error())
+		return nil, fmt.Errorf("dial ETH RPC node: %w", err)
 	}
 
 	// construct caller bindings

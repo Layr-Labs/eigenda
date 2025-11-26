@@ -77,7 +77,7 @@ func RunRelay(cliCtx *cli.Context) error {
 
 	// Create blob store and chunk reader
 	blobStore := blobstore.NewBlobStore(config.BucketName, objectStorageClient, logger)
-	chunkReader := chunkstore.NewChunkReader(logger, objectStorageClient, config.BucketName)
+	chunkReader := chunkstore.NewChunkReader(objectStorageClient, config.BucketName)
 
 	// Create eth writer
 	tx, err := eth.NewWriter(logger, ethClient, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)

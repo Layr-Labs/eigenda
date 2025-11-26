@@ -4,6 +4,13 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
+    "prepare:inabox": "mustache templates/inabox.json templates/subgraph.template.yaml > subgraph.yaml",
+    "prepare:devnet": "mustache templates/devnet.json templates/subgraph.template.yaml > subgraph.yaml",
+    "prepare:anvil": "mustache templates/anvil.json templates/subgraph.template.yaml > subgraph.yaml",
+    "prepare:preprod-hoodi": "mustache templates/preprod-hoodi.json templates/subgraph.template.yaml > subgraph.yaml",
+    "prepare:hoodi": "mustache templates/hoodi.json templates/subgraph.template.yaml > subgraph.yaml",
+    "prepare:sepolia": "mustache templates/sepolia.json templates/subgraph.template.yaml > subgraph.yaml",
+    "prepare:mainnet": "mustache templates/mainnet.json templates/subgraph.template.yaml > subgraph.yaml",
     "deploy": "graph deploy --node https://api.thegraph.com/deploy/ Layr-Labs/eigenda-operator-state",
     "create-local": "graph create --node http://localhost:8020/ Layr-Labs/eigenda-operator-state",
     "remove-local": "graph remove --node http://localhost:8020/ Layr-Labs/eigenda-operator-state",
@@ -11,8 +18,10 @@
     "test": "graph test"
   },
   "devDependencies": {
-    "@graphprotocol/graph-cli": "^0.97.0",
+    "@graphprotocol/graph-cli": "^0.98.0",
     "@graphprotocol/graph-ts": "^0.38.0",
-    "matchstick-as": "^0.6.0"
+    "matchstick-as": "^0.6.0",
+    "mustache": "^4.0.1",
+    "assemblyscript": "^0.19.0"
   }
 }

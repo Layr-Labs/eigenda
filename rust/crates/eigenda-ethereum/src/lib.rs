@@ -18,9 +18,10 @@
 //! - Cryptographic verification
 
 /// Smart contract interfaces and data structures for EigenDA contracts.
-#[cfg(feature = "native")]
 pub mod contracts;
 
 /// Ethereum provider utilities and helper functions.
-#[cfg(feature = "native")]
 pub mod provider;
+
+/// Ethereum address wrapper to implement jsonSchema trait.
+pub mod address;

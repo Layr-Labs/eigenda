@@ -37,7 +37,8 @@ The deployment will output the address of the deployed contract to a json file i
 }
 ```
 
-## EigenDA V1 Cert Verifier Deployer
+
+## EigenDA V1 Cert Verifier Deployer (SOON TO BE DEPRECATED)
 
 This script deploys both an immutable EigenDAThresholdRegistryImmutableV1 contract and an EigenDACertVerifierV1 contract for EigenDA V1 with custom security thresholds and quorum numbers.
 

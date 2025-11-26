@@ -8,9 +8,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,8 +28,9 @@ func TestArbCustomDAGetSupportedHeaderBytesMethod(t *testing.T) {
 	testSuite, teardown := testutils.CreateTestSuite(appCfg)
 	defer teardown()
 
-	rpcClient, err := rpc.Dial(testSuite.ArbAddress())
+	ethClient, err := geth.SafeDial(t.Context(), testSuite.ArbAddress())
 	require.NoError(t, err)
+	rpcClient := ethClient.Client()
 
 	var supportedHeaderBytesResult *arbitrum_altda.SupportedHeaderBytesResult
 	err = rpcClient.Call(&supportedHeaderBytesResult,
@@ -53,8 +54,9 @@ func TestArbCustomDAStoreAndRecoverMethods(t *testing.T) {
 	testSuite, teardown := testutils.CreateTestSuite(appCfg)
 	defer teardown()
 
-	rpcClient, err := rpc.Dial(testSuite.ArbAddress())
+	ethClient, err := geth.SafeDial(t.Context(), testSuite.ArbAddress())
 	require.NoError(t, err)
+	rpcClient := ethClient.Client()
 
 	var storeResult *arbitrum_altda.StoreResult
 	seqMessageArg := "0xDEADBEEF"
