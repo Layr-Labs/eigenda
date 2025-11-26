@@ -47,7 +47,7 @@ The smart contracts can be found in our [repo](https://github.com/Layr-Labs/eige
 ### [`EigenDADirectory`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/EigenDADirectory.sol)
 **Description**
 
-This contract serves as the central discovery and reference point for all contracts composing the EigenDA system. It implements a lightweight namespace resolution protocol in which human-readable string keys are deterministically mapped to fixed storage slots containing `20-byte` contract address references.
+This contract serves as the central discovery and reference point for all contracts composing the EigenDA system. It implements a lightweight namespace resolution protocol in which human-readable string keys are mapped to EigenDA contract addresses.
 
 **Access Mgmt**
 
