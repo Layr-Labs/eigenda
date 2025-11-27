@@ -113,7 +113,7 @@ pub fn extract_certificate(
 /// 1. Decoded payload as [`Bytes`] if verification succeeds
 /// 2. `None` to mean that this cert/encoded-payload should be discarded, since
 ///   one of the verification steps failed in a way that means "cert is invalid"
-/// 3. `Some(Err(_))` if some unexpected error occured that most likely means a bug in the
+/// 3. `Some(Err(_))` if some unexpected error occurred that most likely means a bug in the
 ///  state extraction or proof extraction logic. If this error occurs, the rollup's derivation
 ///  pipeline is NOT safe to continue, as the cert's validity could not be determined.
 ///
