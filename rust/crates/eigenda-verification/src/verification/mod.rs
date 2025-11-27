@@ -45,7 +45,7 @@
 //! - [Certificate Verification Reference](https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol)
 //! - [EigenDA Integration Specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html)
 
-use alloy_consensus::{EthereumTxEnvelope, Header, Transaction, TxEip4844};
+use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
 use alloy_primitives::B256;
 use bytes::Bytes;
 use tracing::instrument;
@@ -85,28 +85,37 @@ pub fn extract_certificate(
     Ok(cert)
 }
 
-/// Verifies an EigenDA certificate and extracts the blob data.
+/// Verifies an EigenDA certificate and extracts the payload.
 ///
-/// This is a high-level convenience function that performs the complete verification workflow:
+/// This function implements the "EigenDA Derivation process":
 /// 1. Validates certificate recency
 /// 2. Verifies contract state proofs against the state root
 /// 3. Extracts verification inputs from proven state
 /// 4. Verifies certificate cryptographically (BLS signatures, quorum stakes, thresholds)
 /// 5. Verifies blob data matches the certificate commitment (KZG proof)
 /// 6. Decodes and returns the blob payload
+/// See the EigenDA Integration Specification for full details:
+/// <https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#derivation-process>
 ///
 /// # Arguments
 /// * `tx` - Transaction hash (for error reporting)
 /// * `cert` - The certificate to verify
 /// * `cert_state` - Optional contract state data with proofs
-/// * `cert_state_header` - Block header containing the state root for verification
+/// * `state_root` - State root against which the cert_state proofs are verified
 /// * `inclusion_height` - Block height where certificate is included
 /// * `referenced_height` - Block height referenced by the certificate
 /// * `cert_recency_window` - Maximum allowed certificate age in blocks
-/// * `encoded_payload` - Optional encoded blob payload to verify
+/// * `encoded_payload` - Optional encoded payload to verify
+/// Note that the cert_state and encoded_payload are only optional in case where the input
+/// can be safely rejected before needing them (e.g. recency check fails).
 ///
 /// # Returns
-/// Decoded blob data as [`Bytes`]
+/// 1. Decoded payload as [`Bytes`] if verification succeeds
+/// 2. `None` to mean that this cert/encoded-payload should be discarded, since
+///   one of the verification steps failed in a way that means "cert is invalid"
+/// 3. `Some(Err(_))` if some unexpected error occured that most likely means a bug in the
+///  state extraction or proof extraction logic. If this error occurs, the rollup's derivation
+///  pipeline is NOT safe to continue, as the cert's validity could not be determined.
 ///
 /// # Errors
 /// - [`EigenDaVerificationError::MissingCertState`] if cert_state is None
@@ -118,24 +127,24 @@ pub fn extract_certificate(
 pub fn verify_and_extract_payload(
     tx: B256,
     cert: &StandardCommitment,
-    cert_state: &Option<CertStateData>,
-    cert_state_header: &Header,
+    cert_state: Option<&CertStateData>,
+    state_root: B256,
     inclusion_height: u64,
     referenced_height: u64,
     cert_recency_window: u64,
-    encoded_payload: &Option<Bytes>,
+    encoded_payload: Option<&[u8]>,
 ) -> Option<Result<Bytes, EigenDaVerificationError>> {
     use EigenDaVerificationError::*;
 
-    // if certificate recency verification fails: ignore
+    // if certificate recency verification fails: safe to discard
     verify_cert_recency(inclusion_height, referenced_height, cert_recency_window).ok()?;
 
-    let cert_state = match cert_state.as_ref() {
+    let cert_state = match cert_state {
         Some(cert_state) => cert_state,
         None => return Some(Err(MissingCertState(tx))),
     };
 
-    if let Err(err) = cert_state.verify(cert_state_header.state_root) {
+    if let Err(err) = cert_state.verify(state_root) {
         return Some(Err(ProofVerificationError(err)));
     }
 
@@ -145,10 +154,10 @@ pub fn verify_and_extract_payload(
         Err(err) => return Some(Err(CertExtractionError(err))),
     };
 
-    // if certificate verification fails: ignore
+    // if certificate verification fails: safe to discard
     cert::verify(inputs).ok()?;
 
-    let encoded_payload = match encoded_payload.as_ref() {
+    let encoded_payload = match encoded_payload {
         Some(encoded_payload) => encoded_payload,
         None => return Some(Err(MissingBlob(tx))),
     };
@@ -157,7 +166,7 @@ pub fn verify_and_extract_payload(
         return Some(Err(BlobVerificationError(err)));
     }
 
-    // if encoded_payload decode fails: ignore
+    // if encoded_payload decode fails: safe to discard
     let payload = decode_encoded_payload(encoded_payload).ok()?;
 
     Some(Ok(Bytes::from(payload)))
