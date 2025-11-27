@@ -15,8 +15,11 @@ func main() {
 
 	cfg, err := config.Bootstrap(
 		load.DefaultTrafficGeneratorConfig,
-		"TRAFFIC_GENERATOR_SIGNER_PRIVATE_KEY_HEX",
-		"TRAFFIC_GENERATOR_RPC_URLS",
+		nil,
+		[]string{
+			"TRAFFIC_GENERATOR_SIGNER_PRIVATE_KEY_HEX",
+			"TRAFFIC_GENERATOR_RPC_URLS",
+		},
 	)
 	if err != nil {
 		panic(fmt.Errorf("failed to bootstrap config: %w", err))
