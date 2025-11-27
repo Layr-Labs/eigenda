@@ -26,6 +26,7 @@ type DisperserClientConfig struct {
 	UseSecureGrpcFlag bool
 	// The number of grpc connections to the disperser server. A value of 0 is treated as 1.
 	DisperserConnectionCount uint
+	DisperserID              uint32
 }
 
 // DisperserClient manages communication with the disperser server.
@@ -108,6 +109,15 @@ func NewDisperserClient(
 		committer:  committer,
 		metrics:    metrics,
 	}, nil
+}
+
+func (c *DisperserClient) GetConfig() *DisperserClientConfig {
+	return c.config
+}
+
+// Returns the disperser ID for this client.
+func (c *DisperserClient) GetDisperserID() uint32 {
+	return c.config.DisperserID
 }
 
 // Close closes the grpc connection to the disperser server.
