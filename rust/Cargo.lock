@@ -2255,6 +2255,7 @@ dependencies = [
 name = "eigenda-tests"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
  "alloy-signer-local",
  "anyhow",
  "bytes",

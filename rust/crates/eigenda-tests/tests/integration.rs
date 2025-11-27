@@ -9,12 +9,11 @@ use std::str::FromStr;
 use tracing::info;
 
 use crate::common::proxy::start_proxy;
+use alloy_primitives::B256;
 use alloy_signer_local::LocalSigner;
 use eigenda_ethereum::provider::{EigenDaProvider, EigenDaProviderConfig, Network};
 use eigenda_proxy::{EigenDaProxyConfig, ProxyClient};
-use eigenda_verification::verification::{
-    blob::codec::decode_encoded_payload, cert, verify_blob, verify_cert_recency,
-};
+use eigenda_verification::verification::verify_and_extract_payload;
 
 #[tokio::test]
 #[ignore = "Test that runs against sepolia network"]
@@ -87,15 +86,22 @@ async fn post_payload_and_verify_returned_cert(
         .await
         .unwrap();
 
+    let rbn = std_commitment.reference_block();
+    // we pretend the std commitment was posted to a rollup's inbox 100 blocks after the reference block.
+    let inclusion_block_num = rbn + 100;
+    let recency_window = 1_000;
+
     let cert_state = provider
         .fetch_cert_state(std_commitment.reference_block(), &std_commitment)
         .await
         .unwrap();
-
-    let rbn_u32: u32 = std_commitment.reference_block().try_into().unwrap();
-    let cur_block_num = rbn_u32 + 1;
-
-    let inputs = cert_state.extract(&std_commitment, cur_block_num).unwrap();
+    let rbn_state_root = provider
+        .get_block_by_number(rbn.into())
+        .await
+        .unwrap()
+        .unwrap()
+        .header
+        .state_root;
 
     // TODO(samlaf): should just encode it locally rather than needing to go through the proxy
     let encoded_payload = proxy_client
@@ -103,9 +109,16 @@ async fn post_payload_and_verify_returned_cert(
         .await
         .unwrap();
 
-    // or call verify_and_extract_payload() to do all of these together.
-    verify_cert_recency(cur_block_num as u64, rbn_u32 as u64, 1_000_000).unwrap();
-    cert::verify(inputs).unwrap();
-    verify_blob(&std_commitment, &encoded_payload).unwrap();
-    let _payload = decode_encoded_payload(&encoded_payload).unwrap();
+    let _payload = verify_and_extract_payload(
+        B256::ZERO,
+        &std_commitment,
+        Some(&cert_state),
+        rbn_state_root,
+        inclusion_block_num,
+        rbn,
+        recency_window,
+        Some(&encoded_payload),
+    )
+    .unwrap()
+    .unwrap();
 }
