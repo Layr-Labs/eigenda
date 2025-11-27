@@ -1,7 +1,6 @@
 [book]
 authors = ["Samuel Laferriere", "Bowen Xue", "Ethen Pociask"]
 language = "en"
-multilingual = false
 src = "src"
 title = "EigenDA Spec"
 
