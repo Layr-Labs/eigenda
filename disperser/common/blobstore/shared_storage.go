@@ -62,9 +62,9 @@ type Config struct {
 	// Backend is the backend to use for object storage (s3 or oci).
 	Backend ObjectStorageBackend
 	// OCI-specific configuration
-	OCINamespace     string `docs:"required"`
-	OCIRegion        string `docs:"required"`
-	OCICompartmentID string `docs:"required"`
+	OCINamespace     string
+	OCIRegion        string
+	OCICompartmentID string
 }
 
 // This represents the s3 fetch result for a blob.
