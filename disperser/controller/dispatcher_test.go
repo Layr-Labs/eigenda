@@ -802,6 +802,8 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 			MaxDispersalAge:            45 * time.Second,
 			SigningRateRetentionPeriod: 1 * time.Minute,
 			SigningRateBucketSpan:      30 * time.Second,
+			SigningRateFlushPeriod:     1 * time.Minute,
+			SigningRateDynamoDbTableName: "validator-signing-rates",
 		},
 		time.Now,
 		blobMetadataStore,

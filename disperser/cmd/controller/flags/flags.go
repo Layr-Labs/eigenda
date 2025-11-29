@@ -346,6 +346,20 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_BUCKET_SPAN"),
 		Value:    10 * time.Minute,
 	}
+	SigningRateFlushPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-flush-period"),
+		Usage:    "The period at which signing rate data is flushed to persistent storage",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_FLUSH_PERIOD"),
+		Value:    1 * time.Minute,
+	}
+	SigningRateDynamoDbTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-dynamodb-table-name"),
+		Usage:    "The name of the DynamoDB table used to store signing rate data",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_DYNAMODB_TABLE_NAME"),
+		Value:    "validator-signing-rates",
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -401,6 +415,8 @@ var optionalFlags = []cli.Flag{
 	DetailedValidatorMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRateBucketSpanFlag,
+	SigningRateFlushPeriodFlag,
+	SigningRateDynamoDbTableNameFlag,
 }
 
 var Flags []cli.Flag
