@@ -136,11 +136,12 @@ func DefaultEncoderConfig() *EncoderConfig {
 			EnablePprof:                    false,
 		},
 		Metrics: MetricsConfig{
-			HTTPPort:      "9100",
-			EnableMetrics: false,
+			HTTPPort: "9100",
+			Enable:   false,
 		},
 		LogFormat: string(common.JSONLogFormat),
 		LogColor:  false,
+		LogLevel:  "info",
 		Aws: aws.ClientConfig{
 			Region: "us-east-1",
 		},

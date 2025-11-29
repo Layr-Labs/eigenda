@@ -55,13 +55,16 @@ const (
 )
 
 type Config struct {
-	BucketName string
-	TableName  string
-	Backend    ObjectStorageBackend
+	// BucketName is the name of the bucket that stores blobs (S3 or OCI).
+	BucketName string `docs:"required"`
+	// TableName is the name of the DynamoDB table that stores blob metadata.
+	TableName string `docs:"required"`
+	// Backend is the backend to use for object storage (s3 or oci).
+	Backend ObjectStorageBackend
 	// OCI-specific configuration
-	OCINamespace     string
-	OCIRegion        string
-	OCICompartmentID string
+	OCINamespace     string `docs:"required"`
+	OCIRegion        string `docs:"required"`
+	OCICompartmentID string `docs:"required"`
 }
 
 // This represents the s3 fetch result for a blob.

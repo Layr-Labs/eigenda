@@ -14,8 +14,8 @@ import (
 )
 
 type MetricsConfig struct {
-	HTTPPort      string
-	EnableMetrics bool
+	HTTPPort string
+	Enable   bool
 }
 
 type Metrics struct {

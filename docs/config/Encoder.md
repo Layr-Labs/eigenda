@@ -6,8 +6,14 @@
 
 | Name | Type | Description |
 |------|------|-------------|
+| $${\color{red}\texttt{Config.Aws.AccessKey}}$$<br>`ENCODER_CONFIG_AWS_ACCESS_KEY` | `string` | AccessKey to use when interacting with S3. |
 | $${\color{red}\texttt{Config.Aws.EndpointURL}}$$<br>`ENCODER_CONFIG_AWS_ENDPOINT_URL` | `string` | EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used. |
 | $${\color{red}\texttt{Config.Aws.SecretAccessKey}}$$<br>`ENCODER_CONFIG_AWS_SECRET_ACCESS_KEY` | `string` | SecretAccessKey to use when interacting with S3. |
+| $${\color{red}\texttt{Config.BlobStore.BucketName}}$$<br>`ENCODER_CONFIG_BLOB_STORE_BUCKET_NAME` | `string` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
+| $${\color{red}\texttt{Config.BlobStore.OCICompartmentID}}$$<br>`ENCODER_CONFIG_BLOB_STORE_OCI_COMPARTMENT_ID` | `string` |  |
+| $${\color{red}\texttt{Config.BlobStore.OCINamespace}}$$<br>`ENCODER_CONFIG_BLOB_STORE_OCI_NAMESPACE` | `string` | OCI-specific configuration |
+| $${\color{red}\texttt{Config.BlobStore.OCIRegion}}$$<br>`ENCODER_CONFIG_BLOB_STORE_OCI_REGION` | `string` |  |
+| $${\color{red}\texttt{Config.BlobStore.TableName}}$$<br>`ENCODER_CONFIG_BLOB_STORE_TABLE_NAME` | `string` | TableName is the name of the DynamoDB table that stores blob metadata. |
 | $${\color{red}\texttt{Config.EncoderVersion}}$$<br>`ENCODER_CONFIG_ENCODER_VERSION` | `uint` | Encoder version (1 or 2) |
 | $${\color{red}\texttt{Config.GrpcPort}}$$<br>`ENCODER_CONFIG_GRPC_PORT` | `string` | Port at which encoder listens for gRPC calls |
 
@@ -15,16 +21,10 @@
 
 | Name | Type<br>Default | Description |
 |------|--------------|-------------|
-| $${\color{red}\texttt{Config.Aws.AccessKey}}$$<br>`ENCODER_CONFIG_AWS_ACCESS_KEY` | `string`<br>`""` | AccessKey to use when interacting with S3. |
 | $${\color{red}\texttt{Config.Aws.FragmentParallelismConstant}}$$<br>`ENCODER_CONFIG_AWS_FRAGMENT_PARALLELISM_CONSTANT` | `int`<br>`0` | FragmentParallelismConstant helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a constant number of workers. Default is 0. |
 | $${\color{red}\texttt{Config.Aws.FragmentParallelismFactor}}$$<br>`ENCODER_CONFIG_AWS_FRAGMENT_PARALLELISM_FACTOR` | `int`<br>`0` | FragmentParallelismFactor helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a number of workers equal to the number of cores times this value. Default is 8. In general, the number of workers here can be a lot larger than the number of cores because the workers will be blocked on I/O most of the time. |
 | $${\color{red}\texttt{Config.Aws.Region}}$$<br>`ENCODER_CONFIG_AWS_REGION` | `string`<br>`"us-east-1"` | Region is the region to use when interacting with S3. Default is "us-east-2". |
-| $${\color{red}\texttt{Config.BlobStore.Backend}}$$<br>`ENCODER_CONFIG_BLOB_STORE_BACKEND` | `blobstore.ObjectStorageBackend`<br>`s3` |  |
-| $${\color{red}\texttt{Config.BlobStore.BucketName}}$$<br>`ENCODER_CONFIG_BLOB_STORE_BUCKET_NAME` | `string`<br>`""` |  |
-| $${\color{red}\texttt{Config.BlobStore.OCICompartmentID}}$$<br>`ENCODER_CONFIG_BLOB_STORE_OCI_COMPARTMENT_ID` | `string`<br>`""` |  |
-| $${\color{red}\texttt{Config.BlobStore.OCINamespace}}$$<br>`ENCODER_CONFIG_BLOB_STORE_OCI_NAMESPACE` | `string`<br>`""` | OCI-specific configuration |
-| $${\color{red}\texttt{Config.BlobStore.OCIRegion}}$$<br>`ENCODER_CONFIG_BLOB_STORE_OCI_REGION` | `string`<br>`""` |  |
-| $${\color{red}\texttt{Config.BlobStore.TableName}}$$<br>`ENCODER_CONFIG_BLOB_STORE_TABLE_NAME` | `string`<br>`""` |  |
+| $${\color{red}\texttt{Config.BlobStore.Backend}}$$<br>`ENCODER_CONFIG_BLOB_STORE_BACKEND` | `blobstore.ObjectStorageBackend`<br>`s3` | Backend is the backend to use for object storage (s3 or oci). |
 | $${\color{red}\texttt{Config.ChunkStore.Backend}}$$<br>`ENCODER_CONFIG_CHUNK_STORE_BACKEND` | `string`<br>`"s3"` |  |
 | $${\color{red}\texttt{Config.ChunkStore.BucketName}}$$<br>`ENCODER_CONFIG_CHUNK_STORE_BUCKET_NAME` | `string`<br>`""` |  |
 | $${\color{red}\texttt{Config.Kzg.CacheDir}}$$<br>`ENCODER_CONFIG_KZG_CACHE_DIR` | `string`<br>`""` | Path to SRS Table directory. Always required even if PreloadEncoder is false, because the prover will write the SRS tables to this directory if they are not already present. |
@@ -39,8 +39,8 @@
 | $${\color{red}\texttt{Config.Kzg.Verbose}}$$<br>`ENCODER_CONFIG_KZG_VERBOSE` | `bool`<br>`false` |  |
 | $${\color{red}\texttt{Config.LogColor}}$$<br>`ENCODER_CONFIG_LOG_COLOR` | `bool`<br>`false` |  |
 | $${\color{red}\texttt{Config.LogFormat}}$$<br>`ENCODER_CONFIG_LOG_FORMAT` | `string`<br>`"json"` | Logger configuration |
-| $${\color{red}\texttt{Config.LogLevel}}$$<br>`ENCODER_CONFIG_LOG_LEVEL` | `string`<br>`""` |  |
-| $${\color{red}\texttt{Config.Metrics.EnableMetrics}}$$<br>`ENCODER_CONFIG_METRICS_ENABLE_METRICS` | `bool`<br>`false` |  |
+| $${\color{red}\texttt{Config.LogLevel}}$$<br>`ENCODER_CONFIG_LOG_LEVEL` | `string`<br>`"info"` |  |
+| $${\color{red}\texttt{Config.Metrics.Enable}}$$<br>`ENCODER_CONFIG_METRICS_ENABLE` | `bool`<br>`false` |  |
 | $${\color{red}\texttt{Config.Metrics.HTTPPort}}$$<br>`ENCODER_CONFIG_METRICS_HTTP_PORT` | `string`<br>`"9100"` |  |
 | $${\color{red}\texttt{Config.Server.Backend}}$$<br>`ENCODER_CONFIG_SERVER_BACKEND` | `string`<br>`"gnark"` |  |
 | $${\color{red}\texttt{Config.Server.EnableGnarkChunkEncoding}}$$<br>`ENCODER_CONFIG_SERVER_ENABLE_GNARK_CHUNK_ENCODING` | `bool`<br>`false` |  |
