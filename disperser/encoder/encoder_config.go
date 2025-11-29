@@ -1,4 +1,4 @@
-package main
+package encoder
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
@@ -41,10 +40,10 @@ type EncoderConfig struct {
 	Kzg kzg.KzgConfig
 
 	// Server configuration
-	Server encoder.ServerConfig
+	Server ServerConfig
 
 	// Metrics configuration
-	Metrics encoder.MetricsConfig
+	Metrics MetricsConfig
 
 	// Logger configuration
 	LogFormat string
@@ -73,7 +72,11 @@ func (e *RootEncoderConfig) GetName() string {
 
 func (e *RootEncoderConfig) GetPackagePaths() []string {
 	return []string{
-		"github.com/Layr-Labs/eigenda/disperser/cmd/encoder",
+		"github.com/Layr-Labs/eigenda/disperser/encoder",
+		"github.com/Layr-Labs/eigenda/disperser/common/blobstore",
+		"github.com/Layr-Labs/eigenda/relay/chunkstore",
+		"github.com/Layr-Labs/eigenda/encoding/v1/kzg",
+		"github.com/Layr-Labs/eigenda/common/aws",
 	}
 }
 
@@ -121,7 +124,7 @@ func DefaultEncoderConfig() *EncoderConfig {
 			PreloadEncoder:  false,
 			Verbose:         false,
 		},
-		Server: encoder.ServerConfig{
+		Server: ServerConfig{
 			MaxConcurrentRequestsDangerous: 16,
 			RequestPoolSize:                32,
 			RequestQueueSize:               32,
@@ -132,7 +135,7 @@ func DefaultEncoderConfig() *EncoderConfig {
 			PprofHttpPort:                  "6060",
 			EnablePprof:                    false,
 		},
-		Metrics: encoder.MetricsConfig{
+		Metrics: MetricsConfig{
 			HTTPPort:      "9100",
 			EnableMetrics: false,
 		},
