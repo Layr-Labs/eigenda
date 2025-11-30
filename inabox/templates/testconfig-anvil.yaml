@@ -57,7 +57,7 @@ services:
       KZG_G1_PATH: ../resources/srs/g1.point
       KZG_G2_PATH: ../resources/srs/g2.point
       KZG_G2_POWER_OF_2_PATH: ../resources/srs/g2.point.powerOf2
-      KZG_CACHE_PATH: ../resources/srs/SRSTables
+      KZG_CACHE_DIR: ../resources/srs/SRSTables
       KZG_SRS_ORDER: 10000
       KZG_SRS_NUMBER_TO_LOAD: 10000
       CHALLENGE_ORDER: 10000
@@ -71,3 +71,4 @@ services:
       AWS_SECRET_ACCESS_KEY: localstack
       ENCODER_ADDRESS: 0.0.0.0:34000
       USE_GRAPH: true
+      METRICS_ENABLE: false
