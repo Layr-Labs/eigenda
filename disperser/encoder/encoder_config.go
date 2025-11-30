@@ -45,10 +45,12 @@ type EncoderConfig struct {
 	// Metrics configuration
 	Metrics MetricsConfig
 
-	// Logger configuration
+	// LogFormat is the format of the logs: json or text
 	LogFormat string
-	LogColor  bool
-	LogLevel  string
+	// LogColor is a flag to enable color in the logs
+	LogColor bool
+	// LogLevel is the level of the logs: debug, info, warn, error
+	LogLevel string
 
 	// AWS client configuration
 	Aws aws.ClientConfig
@@ -137,7 +139,6 @@ func DefaultEncoderConfig() *EncoderConfig {
 		},
 		Metrics: MetricsConfig{
 			HTTPPort: "9100",
-			Enable:   false,
 		},
 		LogFormat: string(common.JSONLogFormat),
 		LogColor:  false,

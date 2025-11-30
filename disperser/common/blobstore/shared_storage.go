@@ -61,9 +61,12 @@ type Config struct {
 	TableName string `docs:"required"`
 	// Backend is the backend to use for object storage (s3 or oci).
 	Backend ObjectStorageBackend
-	// OCI-specific configuration
-	OCINamespace     string
-	OCIRegion        string
+	// OCI namespace (only used when object-storage-backend is oci).
+	// If not provided, will be retrieved dynamically.
+	OCINamespace string
+	// OCI region (only used when object-storage-backend is oci)
+	OCIRegion string
+	// OCI compartment ID (only used when object-storage-backend is oci)
 	OCICompartmentID string
 }
 
