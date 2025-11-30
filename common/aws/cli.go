@@ -23,11 +23,11 @@ type ClientConfig struct {
 	// Region is the region to use when interacting with S3. Default is "us-east-2".
 	Region string
 	// AccessKey to use when interacting with S3.
-	AccessKey string
+	AccessKey string `docs:"required"`
 	// SecretAccessKey to use when interacting with S3.
-	SecretAccessKey string
+	SecretAccessKey string `docs:"required"`
 	// EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used.
-	EndpointURL string
+	EndpointURL string `docs:"required"`
 
 	// FragmentParallelismFactor helps determine the size of the pool of workers to help upload/download files.
 	// A non-zero value for this parameter adds a number of workers equal to the number of cores times this value.
