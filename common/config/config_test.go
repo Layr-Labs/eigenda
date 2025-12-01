@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/config/secret"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,6 +30,7 @@ type Foo struct {
 	Bar                          Bar
 	Baz                          *Baz
 	ThisIsAFieldWithAComplexName string
+	ThisIsASecretField           *secret.Secret
 }
 
 func DefaultFoo() *Foo {
@@ -89,6 +91,9 @@ func TestTOMLParsing(t *testing.T) {
 	require.Equal(t, float32(12.12), foo.Float32)
 	require.Equal(t, 5*time.Second, foo.Duration)
 	require.Equal(t, false, foo.Bool)
+	require.Equal(t,
+		"you're no stranger to love, you know the rules and so do I (so do I)",
+		foo.ThisIsASecretField.Get())
 
 	// Bar field
 	require.Equal(t, "bar A", foo.Bar.A)
@@ -130,6 +135,9 @@ func TestJSONParsing(t *testing.T) {
 	require.Equal(t, float32(112.12), foo.Float32)
 	require.Equal(t, 1*time.Hour, foo.Duration)
 	require.Equal(t, true, foo.Bool)
+	require.Equal(t,
+		"A full commitment's what I'm thinking of. You wouldn't get this from any other guy.",
+		foo.ThisIsASecretField.Get())
 
 	// Bar field
 	require.Equal(t, "json bar A", foo.Bar.A)
@@ -172,6 +180,9 @@ func TestYAMLParsing(t *testing.T) {
 	require.Equal(t, float32(212.12), foo.Float32)
 	require.Equal(t, 33*time.Minute, foo.Duration)
 	require.Equal(t, false, foo.Bool)
+	require.Equal(t,
+		"Iiiiiii, just wanna tell you how I'm feeling. Gotta make you... understand.",
+		foo.ThisIsASecretField.Get())
 
 	// Bar field
 	require.Equal(t, "yaml bar A", foo.Bar.A)
@@ -398,6 +409,8 @@ func TestEnvironmentVariables(t *testing.T) {
 	require.NoError(t, os.Setenv("PREFIX_BAR_BAZ_Z", "false"))
 	require.NoError(t, os.Setenv("PREFIX_INT64", "0")) // zero value
 	require.NoError(t, os.Setenv("PREFIX_INT32", "0")) // zero value
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SECRET_FIELD",
+		"Never gonna give you up, never gonna let you down, never gonna run around and desert you."))
 
 	require.NoError(t, os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored"))
 
@@ -420,6 +433,9 @@ func TestEnvironmentVariables(t *testing.T) {
 	require.Equal(t, float32(12.12), foo.Float32)      // from config
 	require.Equal(t, 5*time.Second, foo.Duration)      // from config
 	require.Equal(t, false, foo.Bool)                  // from config
+	require.Equal(t,
+		"Never gonna give you up, never gonna let you down, never gonna run around and desert you.",
+		foo.ThisIsASecretField.Get())
 
 	// Bar field
 	require.Equal(t, "bar A", foo.Bar.A) // from config
