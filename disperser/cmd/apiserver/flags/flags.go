@@ -273,9 +273,20 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISABLE_PER_ACCOUNT_METRICS"),
 	}
-
-	// TODO Claude: wire up two new flags (see new entries in server_config.go). Default values should be 2 weeks and 1 minute, respectively.
-
+	SigningRateRetentionPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-retention-period"),
+		Usage:    "The amount of time to retain signing rate data",
+		Required: false,
+		Value:    14 * 24 * time.Hour, // 2 weeks
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_RETENTION_PERIOD"),
+	}
+	SigningRatePollIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-poll-interval"),
+		Usage:    "The interval at which to poll for signing rate data from the controller",
+		Required: false,
+		Value:    time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_POLL_INTERVAL"),
+	}
 )
 
 // Flags needed for computing kzg commitments.
@@ -346,6 +357,8 @@ var optionalFlags = []cli.Flag{
 	UseControllerMediatedPayments,
 	DisableGetBlobCommitment,
 	DisablePerAccountMetricsFlag,
+	SigningRateRetentionPeriodFlag,
+	SigningRatePollIntervalFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,
