@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {EigenDAEjectionTypes} from "src/periphery/ejection/libraries/EigenDAEjectionTypes.sol";
+import {EigenDAEjectionTypes} from "./EigenDAEjectionTypes.sol";
 
 library EigenDAEjectionStorage {
     string internal constant STORAGE_ID = "eigen.da.ejection";

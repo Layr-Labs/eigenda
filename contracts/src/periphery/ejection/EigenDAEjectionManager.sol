@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAEjectionManager} from "src/periphery/ejection/IEigenDAEjectionManager.sol";
-import {EigenDAEjectionLib} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
+import {IEigenDAEjectionManager} from "./IEigenDAEjectionManager.sol";
+import {EigenDAEjectionLib} from "./libraries/EigenDAEjectionLib.sol";
 import {SafeERC20, IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {IEigenDADirectory} from "src/core/interfaces/IEigenDADirectory.sol";
+import {IEigenDADirectory} from "../../core/interfaces/IEigenDADirectory.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {BLSSignatureChecker} from "lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
-import {AddressDirectoryLib} from "src/core/libraries/v3/address-directory/AddressDirectoryLib.sol";
-import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
+import {AddressDirectoryLib} from "../../core/libraries/v3/address-directory/AddressDirectoryLib.sol";
+import {AddressDirectoryConstants} from "../../core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
 
-import {AccessControlConstants} from "src/core/libraries/v3/access-control/AccessControlConstants.sol";
+import {AccessControlConstants} from "../../core/libraries/v3/access-control/AccessControlConstants.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
+import {IEigenDASemVer} from "../../core/interfaces/IEigenDASemVer.sol";
 
 contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     using AddressDirectoryLib for string;
