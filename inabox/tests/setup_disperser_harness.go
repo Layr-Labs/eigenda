@@ -1287,6 +1287,7 @@ func startAPIServer(
 		controllerConnection,
 		controllerClient,
 		listener,
+		signingrate.NewNoOpSigningRateTracker(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API server: %w", err)
