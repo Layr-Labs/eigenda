@@ -68,6 +68,8 @@ func MirrorSigningRate(
 			logger.Info("Stopping signing rate mirroring")
 			return
 		case <-ticker.C:
+			currentTime := time.Now()
+
 			buckets, err := scraper(ctx, previousScrapeTime)
 			if err != nil {
 				logger.Error("Failed to scrape signing rate data", "err", err)
@@ -77,6 +79,8 @@ func MirrorSigningRate(
 			for _, bucket := range buckets {
 				tracker.UpdateLastBucket(bucket)
 			}
+
+			previousScrapeTime = currentTime
 		}
 	}
 }
