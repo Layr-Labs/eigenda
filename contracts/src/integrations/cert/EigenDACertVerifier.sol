@@ -41,8 +41,8 @@ contract EigenDACertVerifier is
     bytes internal _quorumNumbersRequired;
     uint8 internal _offchainDerivationVersion;
 
-    uint8 internal constant MAJOR_VERSION = 3; // TODO(iquidus): bump version
-    uint8 internal constant MINOR_VERSION = 1;
+    uint8 internal constant MAJOR_VERSION = 3;
+    uint8 internal constant MINOR_VERSION = 2;
     uint8 internal constant PATCH_VERSION = 0;
 
     /// @notice Status codes for certificate verification results
