@@ -1,11 +1,11 @@
 # EigenDA Protocol Contracts
 
-This page describes EigenDA contracts that are managed by EigenDA related actors (see the exact [roles](#governance-roles)). For EigenDA-related contracts that are managed by rollups, see the [rollup managed contracts](../integration/spec/4-contracts.md) page.
+This page describes EigenDA contracts that are managed by EigenDA related actors (see the exact [roles](#governance-roles)).
 
 > Warning: This page is incomplete and a work in progress as we are undergoing refactors of our contracts as well as some protocol upgrades. The details will change, but the information contained here should at least help to understand the important concepts.
 
 ## Overview
-![image](../../assets/contracts-overview.png)
+![image](../assets/contracts-overview.png)
 
 ### Middleware Contracts
 
@@ -20,9 +20,15 @@ Some of the middleware contracts (e.g, `EjectionsManager`, `RegistryCoordinator`
 The smart contracts can be found in our [repo](https://github.com/Layr-Labs/eigenda/tree/master/contracts/src/core), and the deployment addresses on different chains can be found in the [Networks](https://docs.eigenda.xyz/networks/mainnet#contract-addresses) section of our docs.
 
 
+### Integration Contracts
+For EigenDA-related contracts that are managed by rollups, see the [rollup managed contracts](../integration/spec/4-contracts.md) page.
+
+The EigenDA team maintains one customer-facing contract, `EigenDACertVerifier`. However, using this contract directly is not recommended. The `EigenDACertVerifier` includes a `certVersion` parameter that, if upgraded without corresponding updates to a rollup’s offchain code, can lead to liveness outages. Relying on this contract places a rollup’s safety and liveness on EigenDA governance, which is generally discouraged.
+
+
 ## Contracts Overview
 
-| Contract Name                                                         | Project Category     | Deployed Behind ERC1967 Proxy? | Used by Offchain Protocol? |
+| Contract Name                                                         | Project Category     | Deployed Behind ERC1967 Proxy? | Used by Offchain EigenDA Protocol? |
 |-----------------------------------------------------------------------|-----------------------|---------------------------------|----------------------------|
 | [EigenDA Directory](#eigendadirectory)                                | [eigenda](#eigenda-specific-contracts)              | Yes                             | Yes                        |
 | [Service Manager](#eigendaservicemanager)                             | [eigenda](#eigenda-specific-contracts)              | Yes                              | Yes                        |
@@ -38,6 +44,7 @@ The smart contracts can be found in our [repo](https://github.com/Layr-Labs/eige
 | [Operator State Retriever](#operatorstateretriever)                   | [middleware](#middleware-contracts)           | No                              | Yes                        |
 | [Registry Coordinator](#eigendaregistrycoordinator)                   | [vendored middleware](#middleware-vendored-contracts)  | Yes                             | Yes                        |
 | [Ejections Manager](#eigendaejectionsmanager)                         | [vendored middleware](#middleware-vendored-contracts)  | Yes                             | No                         |
+| [Cert Verifier Router](#eigendaejectionsmanager)                         | [integrations](#integration-contracts)  | Yes                             | No                         |
 
 
 <br />
@@ -81,7 +88,7 @@ TODO
 ### [`EigenDAThresholdRegistry`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/core/EigenDAThresholdRegistry.sol)
 **Description**
 <!-- TODO: Cleanup this description and better coalesce wrt other contract doc entries -->
-![image.png](../../assets/integration/contracts-eigenda.png)
+![image.png](../assets/integration/contracts-eigenda.png)
 
 The [EigenDAThresholdRegistry](https://github.com/Layr-Labs/eigenda/blob/c4567f90e835678fae4749f184857dea10ff330c/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L22) contains two sets of protocol parameters:
 
@@ -299,6 +306,19 @@ Coordinates the lifecycle of ejecting non-responsive operators from EigenDA. It 
 
 TODO
 
+### [`CertVerifierRouter`](https://github.com/Layr-Labs/eigenda/blob/98a17e884de40a18ed9744e709ccc109adf273d3/contracts/src/integrations/cert/router/EigenDACertVerifierRouter.sol)
+
+**Description**
+
+See [here](../integration/spec/4-contracts.md#eigendacertverifierrouter).
+
+**Access Mgmt**
+
+- `Ownable` role that can add new `EigenDACertVerifier` entries at new activation block number
+
+**Offchain Usage**
+
+This dynamic naming pattern requires off-chain management of canonical contract keys, allowing clients and services to retrieve on-chain system context from a single directory contract reference rather than requiring every contract address to be hard-coded or passed through environment configuration.
 
 ## Governance Roles
 
