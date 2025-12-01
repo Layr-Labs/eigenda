@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "../../../core/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDASignatureVerifier} from "../../../core/interfaces/IEigenDASignatureVerifier.sol";
+import {IEigenDAThresholdRegistry} from "../../../../core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDASignatureVerifier} from "../../../../core/interfaces/IEigenDASignatureVerifier.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {Merkle} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {EigenDATypesV2 as DATypesV2} from "../../../core/libraries/v2/EigenDATypesV2.sol";
-import {EigenDATypesV1 as DATypesV1} from "../../../core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "../../../../core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV1 as DATypesV1} from "../../../../core/libraries/v1/EigenDATypesV1.sol";
 
 /// @title EigenDACertVerificationV2Lib - EigenDA V2 certificate verification library
 /// @author Layr Labs, Inc.
