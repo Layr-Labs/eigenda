@@ -6,49 +6,49 @@
 
 | Name | Type | Description |
 |------|------|-------------|
-| $${\color{red}\texttt{Config.Aws.AccessKey}}$$<br>`ENCODER_CONFIG_AWS_ACCESS_KEY` | `string` | AccessKey to use when interacting with S3. |
-| $${\color{red}\texttt{Config.Aws.EndpointURL}}$$<br>`ENCODER_CONFIG_AWS_ENDPOINT_URL` | `string` | EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used. |
-| $${\color{red}\texttt{Config.Aws.SecretAccessKey}}$$<br>`ENCODER_CONFIG_AWS_SECRET_ACCESS_KEY` | `string` | SecretAccessKey to use when interacting with S3. |
-| $${\color{red}\texttt{Config.BlobStore.BucketName}}$$<br>`ENCODER_CONFIG_BLOB_STORE_BUCKET_NAME` | `string` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
-| $${\color{red}\texttt{Config.BlobStore.TableName}}$$<br>`ENCODER_CONFIG_BLOB_STORE_TABLE_NAME` | `string` | TableName is the name of the DynamoDB table that stores blob metadata. |
-| $${\color{red}\texttt{Config.EncoderVersion}}$$<br>`ENCODER_CONFIG_ENCODER_VERSION` | `uint` | Encoder version (1 or 2) |
-| $${\color{red}\texttt{Config.GrpcPort}}$$<br>`ENCODER_CONFIG_GRPC_PORT` | `string` | Port at which encoder listens for gRPC calls |
-| $${\color{red}\texttt{Config.Metrics.Enable}}$$<br>`ENCODER_CONFIG_METRICS_ENABLE` | `bool` | Enable is a flag to enable the metrics server. |
+| $${\color{red}\texttt{Aws.AccessKey}}$$<br>`ENCODER_AWS_ACCESS_KEY` | `string` | AccessKey to use when interacting with S3. |
+| $${\color{red}\texttt{Aws.EndpointURL}}$$<br>`ENCODER_AWS_ENDPOINT_URL` | `string` | EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used. |
+| $${\color{red}\texttt{Aws.SecretAccessKey}}$$<br>`ENCODER_AWS_SECRET_ACCESS_KEY` | `string` | SecretAccessKey to use when interacting with S3. |
+| $${\color{red}\texttt{BlobStore.BucketName}}$$<br>`ENCODER_BLOB_STORE_BUCKET_NAME` | `string` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
+| $${\color{red}\texttt{BlobStore.TableName}}$$<br>`ENCODER_BLOB_STORE_TABLE_NAME` | `string` | TableName is the name of the DynamoDB table that stores blob metadata. |
+| $${\color{red}\texttt{EncoderVersion}}$$<br>`ENCODER_ENCODER_VERSION` | `uint` | Encoder version (1 or 2) |
+| $${\color{red}\texttt{GrpcPort}}$$<br>`ENCODER_GRPC_PORT` | `string` | Port at which encoder listens for gRPC calls |
+| $${\color{red}\texttt{Metrics.Enable}}$$<br>`ENCODER_METRICS_ENABLE` | `bool` | Enable is a flag to enable the metrics server. |
 
 ## Optional Fields
 
 | Name | Type<br>Default | Description |
 |------|--------------|-------------|
-| $${\color{red}\texttt{Config.Aws.FragmentParallelismConstant}}$$<br>`ENCODER_CONFIG_AWS_FRAGMENT_PARALLELISM_CONSTANT` | `int`<br>`0` | FragmentParallelismConstant helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a constant number of workers. Default is 0. |
-| $${\color{red}\texttt{Config.Aws.FragmentParallelismFactor}}$$<br>`ENCODER_CONFIG_AWS_FRAGMENT_PARALLELISM_FACTOR` | `int`<br>`0` | FragmentParallelismFactor helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a number of workers equal to the number of cores times this value. Default is 8. In general, the number of workers here can be a lot larger than the number of cores because the workers will be blocked on I/O most of the time. |
-| $${\color{red}\texttt{Config.Aws.Region}}$$<br>`ENCODER_CONFIG_AWS_REGION` | `string`<br>`"us-east-1"` | Region is the region to use when interacting with S3. Default is "us-east-2". |
-| $${\color{red}\texttt{Config.BlobStore.Backend}}$$<br>`ENCODER_CONFIG_BLOB_STORE_BACKEND` | `blobstore.ObjectStorageBackend`<br>`s3` | Backend is the backend to use for object storage (s3 or oci). |
-| $${\color{red}\texttt{Config.BlobStore.OCICompartmentID}}$$<br>`ENCODER_CONFIG_BLOB_STORE_OCI_COMPARTMENT_ID` | `string`<br>`""` | OCI compartment ID (only used when object-storage-backend is oci) |
-| $${\color{red}\texttt{Config.BlobStore.OCINamespace}}$$<br>`ENCODER_CONFIG_BLOB_STORE_OCI_NAMESPACE` | `string`<br>`""` | OCI namespace (only used when object-storage-backend is oci). If not provided, will be retrieved dynamically. |
-| $${\color{red}\texttt{Config.BlobStore.OCIRegion}}$$<br>`ENCODER_CONFIG_BLOB_STORE_OCI_REGION` | `string`<br>`""` | OCI region (only used when object-storage-backend is oci) |
-| $${\color{red}\texttt{Config.ChunkStore.Backend}}$$<br>`ENCODER_CONFIG_CHUNK_STORE_BACKEND` | `string`<br>`"s3"` |  |
-| $${\color{red}\texttt{Config.ChunkStore.BucketName}}$$<br>`ENCODER_CONFIG_CHUNK_STORE_BUCKET_NAME` | `string`<br>`""` |  |
-| $${\color{red}\texttt{Config.Kzg.CacheDir}}$$<br>`ENCODER_CONFIG_KZG_CACHE_DIR` | `string`<br>`""` | Path to SRS Table directory. Always required even if PreloadEncoder is false, because the prover will write the SRS tables to this directory if they are not already present. |
-| $${\color{red}\texttt{Config.Kzg.G1Path}}$$<br>`ENCODER_CONFIG_KZG_G1_PATH` | `string`<br>`""` | G1 points are needed by both the prover and verifier, so G1Path is always needed. |
-| $${\color{red}\texttt{Config.Kzg.G2Path}}$$<br>`ENCODER_CONFIG_KZG_G2_PATH` | `string`<br>`""` | G2Path and G2TrailingPath are only needed if LoadG2Points is true. G2 points are used to generate the blob length proof.<br><br>There are 2 ways to configure G2 points: 1. Entire G2 SRS file (16GiB) is provided via G2Path 2. G2Path and G2TrailingPath both contain at least SRSNumberToLoad points, where G2Path contains the first part of the G2 SRS file, and G2TrailingPath contains the trailing end of the G2 SRS file. TODO(samlaf): to prevent misconfigurations and simplify the code, we should probably not multiplex G2Path like this, and instead use a G2PrefixPath config. Then EITHER G2Path is used, OR both G2PrefixPath and G2TrailingPath are used. |
-| $${\color{red}\texttt{Config.Kzg.G2TrailingPath}}$$<br>`ENCODER_CONFIG_KZG_G2_TRAILING_PATH` | `string`<br>`""` |  |
-| $${\color{red}\texttt{Config.Kzg.LoadG2Points}}$$<br>`ENCODER_CONFIG_KZG_LOAD_G2_POINTS` | `bool`<br>`false` | G2 SRS points are only needed by the prover, since the verifier uses hardcoded G2 powers of 2. See [srs.G2PowerOf2SRS] for details. |
-| $${\color{red}\texttt{Config.Kzg.NumWorker}}$$<br>`ENCODER_CONFIG_KZG_NUM_WORKER` | `uint64`<br>`12` | NumWorker is used in a few places: 1. Num goroutines used to parse the SRS points read from the SRS files. 2. Num goroutines used by the prover and verifier. TODO(samlaf): split into separate configs only specified for prover or verifier, where needed. |
-| $${\color{red}\texttt{Config.Kzg.PreloadEncoder}}$$<br>`ENCODER_CONFIG_KZG_PRELOAD_ENCODER` | `bool`<br>`false` | PreloadEncoder is only used by the prover to generate kzg multiproofs. It is not needed by the clients/proxy, which only need to generate kzg commitments, not proofs.<br><br>If true, SRS tables are read from CacheDir during initialization. Generating these on startup would take hours otherwise. |
-| $${\color{red}\texttt{Config.Kzg.SRSNumberToLoad}}$$<br>`ENCODER_CONFIG_KZG_SRS_NUMBER_TO_LOAD` | `uint64`<br>`10000` | Number of G1 (and optionally G2) points to be loaded from the SRS files: G1Path, and optionally G2Path and G2TrailingPath. This number times 32 bytes will be loaded from G1Path, and if LoadG2Points is true, this number times 64 bytes will be loaded from G2Path and optionally G2TrailingPath. |
-| $${\color{red}\texttt{Config.Kzg.SRSOrder}}$$<br>`ENCODER_CONFIG_KZG_SRS_ORDER` | `uint64`<br>`10000` | SRSOrder is the total size of SRS. TODO(samlaf): this should always be 2^28. Get rid of this field and replace with hardcoded constant. |
-| $${\color{red}\texttt{Config.Kzg.Verbose}}$$<br>`ENCODER_CONFIG_KZG_VERBOSE` | `bool`<br>`false` |  |
-| $${\color{red}\texttt{Config.LogColor}}$$<br>`ENCODER_CONFIG_LOG_COLOR` | `bool`<br>`false` | LogColor is a flag to enable color in the logs |
-| $${\color{red}\texttt{Config.LogFormat}}$$<br>`ENCODER_CONFIG_LOG_FORMAT` | `string`<br>`"json"` | LogFormat is the format of the logs: json or text |
-| $${\color{red}\texttt{Config.LogLevel}}$$<br>`ENCODER_CONFIG_LOG_LEVEL` | `string`<br>`"info"` | LogLevel is the level of the logs: debug, info, warn, error |
-| $${\color{red}\texttt{Config.Metrics.HTTPPort}}$$<br>`ENCODER_CONFIG_METRICS_HTTP_PORT` | `string`<br>`"9100"` | HTTPPort is the port at which the metrics server is listening. |
-| $${\color{red}\texttt{Config.Server.Backend}}$$<br>`ENCODER_CONFIG_SERVER_BACKEND` | `string`<br>`"gnark"` | Backend to use for encoding. Supported values are "gnark" and "icicle". |
-| $${\color{red}\texttt{Config.Server.EnableGnarkChunkEncoding}}$$<br>`ENCODER_CONFIG_SERVER_ENABLE_GNARK_CHUNK_ENCODING` | `bool`<br>`false` | EnableGnarkChunkEncoding if true, will produce chunks in Gnark, instead of Gob |
-| $${\color{red}\texttt{Config.Server.EnablePprof}}$$<br>`ENCODER_CONFIG_SERVER_ENABLE_PPROF` | `bool`<br>`false` | EnablePprof starts the pprof server |
-| $${\color{red}\texttt{Config.Server.GPUEnable}}$$<br>`ENCODER_CONFIG_SERVER_GPU_ENABLE` | `bool`<br>`false` | GPUEnable enables GPU, falls back to CPU if not available |
-| $${\color{red}\texttt{Config.Server.MaxConcurrentRequestsDangerous}}$$<br>`ENCODER_CONFIG_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS` | `int`<br>`16` | MaxConcurrentRequestsDangerous limits the number of concurrent encoding requests the server will handle, which also limits the number of concurrent GPU encodings if GPUEnable is true. This is a dangerous setting because setting it too high may lead to out-of-memory panics on the GPU. |
-| $${\color{red}\texttt{Config.Server.PprofHttpPort}}$$<br>`ENCODER_CONFIG_SERVER_PPROF_HTTP_PORT` | `string`<br>`"6060"` | PprofHttpPort is the http port which the pprof server is listening |
-| $${\color{red}\texttt{Config.Server.PreventReencoding}}$$<br>`ENCODER_CONFIG_SERVER_PREVENT_REENCODING` | `bool`<br>`true` | PreventReencoding if true, will prevent reencoding of chunks by checking if the chunk already exists in the chunk store |
-| $${\color{red}\texttt{Config.Server.RequestPoolSize}}$$<br>`ENCODER_CONFIG_SERVER_REQUEST_POOL_SIZE` | `int`<br>`32` | RequestPoolSize is the maximum number of requests in the request pool. |
-| $${\color{red}\texttt{Config.Server.RequestQueueSize}}$$<br>`ENCODER_CONFIG_SERVER_REQUEST_QUEUE_SIZE` | `int`<br>`32` | RequestQueueSize is the maximum number of requests in the request queue. |
+| $${\color{red}\texttt{Aws.FragmentParallelismConstant}}$$<br>`ENCODER_AWS_FRAGMENT_PARALLELISM_CONSTANT` | `int`<br>`0` | FragmentParallelismConstant helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a constant number of workers. Default is 0. |
+| $${\color{red}\texttt{Aws.FragmentParallelismFactor}}$$<br>`ENCODER_AWS_FRAGMENT_PARALLELISM_FACTOR` | `int`<br>`0` | FragmentParallelismFactor helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a number of workers equal to the number of cores times this value. Default is 8. In general, the number of workers here can be a lot larger than the number of cores because the workers will be blocked on I/O most of the time. |
+| $${\color{red}\texttt{Aws.Region}}$$<br>`ENCODER_AWS_REGION` | `string`<br>`"us-east-1"` | Region is the region to use when interacting with S3. Default is "us-east-2". |
+| $${\color{red}\texttt{BlobStore.Backend}}$$<br>`ENCODER_BLOB_STORE_BACKEND` | `blobstore.ObjectStorageBackend`<br>`s3` | Backend is the backend to use for object storage (s3 or oci). |
+| $${\color{red}\texttt{BlobStore.OCICompartmentID}}$$<br>`ENCODER_BLOB_STORE_OCI_COMPARTMENT_ID` | `string`<br>`""` | OCI compartment ID (only used when object-storage-backend is oci) |
+| $${\color{red}\texttt{BlobStore.OCINamespace}}$$<br>`ENCODER_BLOB_STORE_OCI_NAMESPACE` | `string`<br>`""` | OCI namespace (only used when object-storage-backend is oci). If not provided, will be retrieved dynamically. |
+| $${\color{red}\texttt{BlobStore.OCIRegion}}$$<br>`ENCODER_BLOB_STORE_OCI_REGION` | `string`<br>`""` | OCI region (only used when object-storage-backend is oci) |
+| $${\color{red}\texttt{ChunkStore.Backend}}$$<br>`ENCODER_CHUNK_STORE_BACKEND` | `string`<br>`"s3"` |  |
+| $${\color{red}\texttt{ChunkStore.BucketName}}$$<br>`ENCODER_CHUNK_STORE_BUCKET_NAME` | `string`<br>`""` |  |
+| $${\color{red}\texttt{Kzg.CacheDir}}$$<br>`ENCODER_KZG_CACHE_DIR` | `string`<br>`""` | Path to SRS Table directory. Always required even if PreloadEncoder is false, because the prover will write the SRS tables to this directory if they are not already present. |
+| $${\color{red}\texttt{Kzg.G1Path}}$$<br>`ENCODER_KZG_G1_PATH` | `string`<br>`""` | G1 points are needed by both the prover and verifier, so G1Path is always needed. |
+| $${\color{red}\texttt{Kzg.G2Path}}$$<br>`ENCODER_KZG_G2_PATH` | `string`<br>`""` | G2Path and G2TrailingPath are only needed if LoadG2Points is true. G2 points are used to generate the blob length proof.<br><br>There are 2 ways to configure G2 points: 1. Entire G2 SRS file (16GiB) is provided via G2Path 2. G2Path and G2TrailingPath both contain at least SRSNumberToLoad points, where G2Path contains the first part of the G2 SRS file, and G2TrailingPath contains the trailing end of the G2 SRS file. TODO(samlaf): to prevent misconfigurations and simplify the code, we should probably not multiplex G2Path like this, and instead use a G2PrefixPath config. Then EITHER G2Path is used, OR both G2PrefixPath and G2TrailingPath are used. |
+| $${\color{red}\texttt{Kzg.G2TrailingPath}}$$<br>`ENCODER_KZG_G2_TRAILING_PATH` | `string`<br>`""` |  |
+| $${\color{red}\texttt{Kzg.LoadG2Points}}$$<br>`ENCODER_KZG_LOAD_G2_POINTS` | `bool`<br>`false` | G2 SRS points are only needed by the prover, since the verifier uses hardcoded G2 powers of 2. See [srs.G2PowerOf2SRS] for details. |
+| $${\color{red}\texttt{Kzg.NumWorker}}$$<br>`ENCODER_KZG_NUM_WORKER` | `uint64`<br>`12` | NumWorker is used in a few places: 1. Num goroutines used to parse the SRS points read from the SRS files. 2. Num goroutines used by the prover and verifier. TODO(samlaf): split into separate configs only specified for prover or verifier, where needed. |
+| $${\color{red}\texttt{Kzg.PreloadEncoder}}$$<br>`ENCODER_KZG_PRELOAD_ENCODER` | `bool`<br>`false` | PreloadEncoder is only used by the prover to generate kzg multiproofs. It is not needed by the clients/proxy, which only need to generate kzg commitments, not proofs.<br><br>If true, SRS tables are read from CacheDir during initialization. Generating these on startup would take hours otherwise. |
+| $${\color{red}\texttt{Kzg.SRSNumberToLoad}}$$<br>`ENCODER_KZG_SRS_NUMBER_TO_LOAD` | `uint64`<br>`10000` | Number of G1 (and optionally G2) points to be loaded from the SRS files: G1Path, and optionally G2Path and G2TrailingPath. This number times 32 bytes will be loaded from G1Path, and if LoadG2Points is true, this number times 64 bytes will be loaded from G2Path and optionally G2TrailingPath. |
+| $${\color{red}\texttt{Kzg.SRSOrder}}$$<br>`ENCODER_KZG_SRS_ORDER` | `uint64`<br>`10000` | SRSOrder is the total size of SRS. TODO(samlaf): this should always be 2^28. Get rid of this field and replace with hardcoded constant. |
+| $${\color{red}\texttt{Kzg.Verbose}}$$<br>`ENCODER_KZG_VERBOSE` | `bool`<br>`false` |  |
+| $${\color{red}\texttt{LogColor}}$$<br>`ENCODER_LOG_COLOR` | `bool`<br>`false` | LogColor is a flag to enable color in the logs |
+| $${\color{red}\texttt{LogFormat}}$$<br>`ENCODER_LOG_FORMAT` | `string`<br>`"json"` | LogFormat is the format of the logs: json or text |
+| $${\color{red}\texttt{LogLevel}}$$<br>`ENCODER_LOG_LEVEL` | `string`<br>`"info"` | LogLevel is the level of the logs: debug, info, warn, error |
+| $${\color{red}\texttt{Metrics.HTTPPort}}$$<br>`ENCODER_METRICS_HTTP_PORT` | `string`<br>`"9100"` | HTTPPort is the port at which the metrics server is listening. |
+| $${\color{red}\texttt{Server.Backend}}$$<br>`ENCODER_SERVER_BACKEND` | `string`<br>`"gnark"` | Backend to use for encoding. Supported values are "gnark" and "icicle". |
+| $${\color{red}\texttt{Server.EnableGnarkChunkEncoding}}$$<br>`ENCODER_SERVER_ENABLE_GNARK_CHUNK_ENCODING` | `bool`<br>`false` | EnableGnarkChunkEncoding if true, will produce chunks in Gnark, instead of Gob |
+| $${\color{red}\texttt{Server.EnablePprof}}$$<br>`ENCODER_SERVER_ENABLE_PPROF` | `bool`<br>`false` | EnablePprof starts the pprof server |
+| $${\color{red}\texttt{Server.GPUEnable}}$$<br>`ENCODER_SERVER_GPU_ENABLE` | `bool`<br>`false` | GPUEnable enables GPU, falls back to CPU if not available |
+| $${\color{red}\texttt{Server.MaxConcurrentRequestsDangerous}}$$<br>`ENCODER_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS` | `int`<br>`16` | MaxConcurrentRequestsDangerous limits the number of concurrent encoding requests the server will handle, which also limits the number of concurrent GPU encodings if GPUEnable is true. This is a dangerous setting because setting it too high may lead to out-of-memory panics on the GPU. |
+| $${\color{red}\texttt{Server.PprofHttpPort}}$$<br>`ENCODER_SERVER_PPROF_HTTP_PORT` | `string`<br>`"6060"` | PprofHttpPort is the http port which the pprof server is listening |
+| $${\color{red}\texttt{Server.PreventReencoding}}$$<br>`ENCODER_SERVER_PREVENT_REENCODING` | `bool`<br>`true` | PreventReencoding if true, will prevent reencoding of chunks by checking if the chunk already exists in the chunk store |
+| $${\color{red}\texttt{Server.RequestPoolSize}}$$<br>`ENCODER_SERVER_REQUEST_POOL_SIZE` | `int`<br>`32` | RequestPoolSize is the maximum number of requests in the request pool. |
+| $${\color{red}\texttt{Server.RequestQueueSize}}$$<br>`ENCODER_SERVER_REQUEST_QUEUE_SIZE` | `int`<br>`32` | RequestQueueSize is the maximum number of requests in the request queue. |
 
