@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/common"
@@ -44,7 +43,7 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 	}
 
 	// Get network configuration
-	disperserHostname := network.GetDisperserAddress()
+	disperserGrpcUri := network.GetDisperserGrpcUri()
 	eigenDADirectoryAddr := gethcommon.HexToAddress(network.GetEigenDADirectory())
 
 	// Parse cert verifier address override if provided
@@ -57,7 +56,7 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 
 	logger.Info("Starting validate-cert-verifier tool",
 		"network", network,
-		"disperserHostname", disperserHostname,
+		"disperserGrpcUri", disperserGrpcUri,
 		"eigenDADirectoryAddr", eigenDADirectoryAddr.Hex(),
 		"jsonRPCURL", jsonRPCURL)
 
@@ -65,7 +64,7 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 	payloadDisperser, ethClient, certVerifierAddr, err := initializePayloadDisperser(
 		ctx,
 		logger,
-		disperserHostname,
+		disperserGrpcUri,
 		eigenDADirectoryAddr,
 		jsonRPCURL,
 		signerAuthKey,
@@ -156,13 +155,13 @@ func RunCreateAndValidateCertValidation(c *cli.Context) error {
 func initializePayloadDisperser(
 	ctx context.Context,
 	logger logging.Logger,
-	disperserHostname string,
+	disperserGrpcUri string,
 	eigenDADirectoryAddr gethcommon.Address,
 	jsonRPCURL string,
 	signerAuthKey string,
 	srsPath string,
 	certVerifierAddrOverride *gethcommon.Address,
-) (*payloaddispersal.PayloadDisperser, *geth.EthClient, gethcommon.Address, error) {
+) (*dispersal.PayloadDisperser, *geth.EthClient, gethcommon.Address, error) {
 
 	// Create KZG committer
 	kzgCommitter, err := createKzgCommitter(srsPath)
@@ -171,7 +170,7 @@ func initializePayloadDisperser(
 	}
 
 	// Create disperser client
-	disperserClient, err := createDisperserClient(logger, disperserHostname, signerAuthKey, kzgCommitter)
+	disperserClient, err := createDisperserClient(logger, disperserGrpcUri, signerAuthKey, kzgCommitter)
 	if err != nil {
 		return nil, nil, gethcommon.Address{}, fmt.Errorf("create disperser client: %w", err)
 	}
@@ -245,7 +244,7 @@ func initializePayloadDisperser(
 	}
 
 	// Configure payload disperser
-	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
+	payloadDisperserConfig := dispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    *clients.GetDefaultPayloadClientConfig(),
 		DisperseBlobTimeout:    60 * time.Second,
 		BlobCompleteTimeout:    120 * time.Second,
@@ -254,7 +253,7 @@ func initializePayloadDisperser(
 	}
 
 	// Create payload disperser (without client ledger for simplicity - legacy payment mode)
-	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
+	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
@@ -273,41 +272,25 @@ func initializePayloadDisperser(
 
 func createDisperserClient(
 	logger logging.Logger,
-	disperserHostName string,
+	grpcUri string,
 	privateKey string,
 	kzgCommitter *committer.Committer,
-) (*clients.DisperserClient, error) {
+) (*dispersal.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create blob request signer: %w", err)
 	}
 
-	// Get account ID from the signer's public key
-	accountID, err := signer.GetAccountID()
-	if err != nil {
-		return nil, fmt.Errorf("get account ID: %w", err)
-	}
-
-	// Create an unpopulated accountant for legacy payment mode
-	accountant := clients.NewUnpopulatedAccountant(accountID, metrics.NoopAccountantMetrics)
-
-	hostname, port, err := net.SplitHostPort(disperserHostName)
-	if err != nil {
-		return nil, fmt.Errorf("parse EigenDA RPC: %w", err)
-	}
-
-	disperserClientConfig := &clients.DisperserClientConfig{
-		Hostname:          hostname,
-		Port:              port,
+	disperserClientConfig := &dispersal.DisperserClientConfig{
+		GrpcUri:           grpcUri,
 		UseSecureGrpcFlag: true,
 	}
 
-	client, err := clients.NewDisperserClient(
+	client, err := dispersal.NewDisperserClient(
 		logger,
 		disperserClientConfig,
 		signer,
 		kzgCommitter,
-		accountant,
 		metrics.NoopDispersalMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)

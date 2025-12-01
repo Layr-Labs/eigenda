@@ -10,8 +10,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
@@ -27,6 +27,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -86,7 +87,7 @@ type TestHarness struct {
 	ValidatorRetrievalClientV2 *payloadretrieval.ValidatorPayloadRetriever
 	// Tests can use this default payload disperser directly, or create custom payload dispersers via
 	// CreatePayloadDisperser().
-	PayloadDisperser *payloaddispersal.PayloadDisperser
+	PayloadDisperser *dispersal.PayloadDisperser
 
 	// Core components
 	ChainReader       core.Reader
@@ -230,7 +231,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 	ctx context.Context,
 	logger logging.Logger,
 	config TestPayloadDisperserConfig,
-) (*payloaddispersal.PayloadDisperser, error) {
+) (*dispersal.PayloadDisperser, error) {
 	blockMonitor, err := verification.NewBlockNumberMonitor(logger, tc.EthClient, time.Second*1)
 	if err != nil {
 		return nil, fmt.Errorf("create block number monitor: %w", err)
@@ -249,22 +250,8 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("APIServerAddress not set in test harness")
 	}
 
-	// Parse hostname:port from the address
-	var hostname, port string
-	for i := len(tc.APIServerAddress) - 1; i >= 0; i-- {
-		if tc.APIServerAddress[i] == ':' {
-			hostname = tc.APIServerAddress[:i]
-			port = tc.APIServerAddress[i+1:]
-			break
-		}
-	}
-	if hostname == "" || port == "" {
-		return nil, fmt.Errorf("invalid APIServerAddress format (expected hostname:port): %s", tc.APIServerAddress)
-	}
-
-	disperserClientConfig := &clientsv2.DisperserClientConfig{
-		Hostname: hostname,
-		Port:     port,
+	disperserClientConfig := &dispersal.DisperserClientConfig{
+		GrpcUri: tc.APIServerAddress,
 	}
 
 	accountId, err := signer.GetAccountID()
@@ -272,30 +259,33 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("error getting account ID: %w", err)
 	}
 
-	accountant := clientsv2.NewAccountant(
-		accountId,
-		nil,
-		nil,
-		0,
-		0,
-		0,
-		0,
-		metrics.NoopAccountantMetrics,
-	)
+	g1Path, g2Path, g2TrailingPath, err := getSRSPaths()
+	if err != nil {
+		return nil, fmt.Errorf("get SRS paths: %w", err)
+	}
 
-	disperserClient, err := clientsv2.NewDisperserClient(
+	kzgCommitter, err := committer.NewFromConfig(committer.Config{
+		SRSNumberToLoad:   10000,
+		G1SRSPath:         g1Path,
+		G2SRSPath:         g2Path,
+		G2TrailingSRSPath: g2TrailingPath,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create kzg committer: %w", err)
+	}
+
+	disperserClient, err := dispersal.NewDisperserClient(
 		logger,
 		disperserClientConfig,
 		signer,
-		nil, // no prover so will query disperser for generating commitments
-		accountant,
+		kzgCommitter,
 		metrics.NoopDispersalMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create disperser client: %w", err)
 	}
 
-	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
+	payloadDisperserConfig := dispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    *clientsv2.GetDefaultPayloadClientConfig(),
 		DisperseBlobTimeout:    2 * time.Minute,
 		BlobCompleteTimeout:    2 * time.Minute,
@@ -303,29 +293,25 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		ContractCallTimeout:    5 * time.Second,
 	}
 
-	// Create ClientLedger based on configured mode
-	var clientLedger *clientledger.ClientLedger
-	if config.ClientLedgerMode != clientledger.ClientLedgerModeLegacy {
-		paymentVaultAddr, err := tc.ContractDirectory.GetContractAddress(ctx, directory.PaymentVault)
-		if err != nil {
-			return nil, fmt.Errorf("get PaymentVault address: %w", err)
-		}
-
-		clientLedger, err = buildClientLedger(
-			ctx,
-			logger,
-			tc.EthClient,
-			paymentVaultAddr,
-			accountId,
-			config.ClientLedgerMode,
-			disperserClient,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("build client ledger: %w", err)
-		}
+	paymentVaultAddr, err := tc.ContractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
 	}
 
-	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
+	clientLedger, err := buildClientLedger(
+		ctx,
+		logger,
+		tc.EthClient,
+		paymentVaultAddr,
+		accountId,
+		config.ClientLedgerMode,
+		disperserClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build client ledger: %w", err)
+	}
+
+	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
@@ -349,7 +335,7 @@ func buildClientLedger(
 	paymentVaultAddr gethcommon.Address,
 	accountID gethcommon.Address,
 	mode clientledger.ClientLedgerMode,
-	disperserClient *clientsv2.DisperserClient,
+	disperserClient *dispersal.DisperserClient,
 ) (*clientledger.ClientLedger, error) {
 	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddr)
 	if err != nil {
@@ -448,7 +434,7 @@ func buildOnDemandLedger(
 	paymentVault payments.PaymentVault,
 	accountID gethcommon.Address,
 	minNumSymbols uint32,
-	disperserClient *clientsv2.DisperserClient,
+	disperserClient *dispersal.DisperserClient,
 ) (*ondemand.OnDemandLedger, error) {
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
 	if err != nil {

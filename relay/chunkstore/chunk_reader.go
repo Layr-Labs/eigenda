@@ -8,7 +8,6 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // ChunkReader reads chunks written by ChunkWriter.
@@ -21,17 +20,38 @@ type ChunkReader interface {
 
 	// GetBinaryChunkCoefficients reads a slice of frames from the chunk store, similar to GetChunkCoefficients.
 	// Unlike GetChunkCoefficients, this method returns the raw serialized bytes of the frames, as opposed to
-	// deserializing them into rs.FrameCoeffs structs. The returned uint32 is the number of elements in each frame.
+	// deserializing them into rs.FrameCoeffs structs. The returned uint32 is the number of symbols per frame.
 	GetBinaryChunkCoefficients(
 		ctx context.Context,
 		blobKey corev2.BlobKey,
-		fragmentInfo *encoding.FragmentInfo) (uint32, [][]byte, error)
+	) (uint32, [][]byte, error)
+
+	// GetBinaryChunkProofsRange reads a range of proofs from the chunk store.
+	GetBinaryChunkProofsRange(
+		ctx context.Context,
+		blobKey corev2.BlobKey,
+		// The index of the first proof to fetch (inclusive).
+		startIndex uint32,
+		// The index of the last proof to fetch (exclusive).
+		endIndex uint32,
+	) ([][]byte, bool, error)
+
+	// GetBinaryChunkCoefficientRange reads a range of chunks from the chunk store.
+	GetBinaryChunkCoefficientRange(
+		ctx context.Context,
+		blobKey corev2.BlobKey,
+		// The index of the first chunk to fetch (inclusive).
+		startIndex uint32,
+		// The index of the last chunk to fetch (exclusive).
+		endIndex uint32,
+		// The number of symbols per frame. Required to determine the exact byte range to fetch.
+		symbolsPerFrame uint32,
+	) ([][]byte, bool, error)
 }
 
 var _ ChunkReader = (*chunkReader)(nil)
 
 type chunkReader struct {
-	logger logging.Logger
 	client s3.S3Client
 	bucket string
 }
@@ -41,27 +61,27 @@ type chunkReader struct {
 // This chunk reader will only return data for the shards specified in the shards parameter.
 // If empty, it will return data for all shards. (Note: shard feature is not yet implemented.)
 func NewChunkReader(
-	logger logging.Logger,
 	s3Client s3.S3Client,
 	bucketName string) ChunkReader {
 
 	return &chunkReader{
-		logger: logger,
 		client: s3Client,
 		bucket: bucketName,
 	}
 }
 
 func (r *chunkReader) GetBinaryChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([][]byte, error) {
-	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedProofKey(blobKey))
+	bytes, found, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedProofKey(blobKey))
 	if err != nil {
-		r.logger.Error("failed to download proofs from S3", "blob", blobKey.Hex(), "error", err)
 		return nil, fmt.Errorf("failed to download proofs from S3 for blob %s: %w", blobKey.Hex(), err)
+	}
+
+	if !found {
+		return nil, fmt.Errorf("proofs not found for blob %s", blobKey.Hex())
 	}
 
 	proofs, err := encoding.SplitSerializedFrameProofs(bytes)
 	if err != nil {
-		r.logger.Error("failed to split proofs", "blob", blobKey.Hex(), "error", err)
 		return nil, fmt.Errorf("failed to split proofs for blob %s: %w", blobKey.Hex(), err)
 	}
 
@@ -71,30 +91,107 @@ func (r *chunkReader) GetBinaryChunkProofs(ctx context.Context, blobKey corev2.B
 func (r *chunkReader) GetBinaryChunkCoefficients(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
-	fragmentInfo *encoding.FragmentInfo) (uint32, [][]byte, error) {
+) (uint32, [][]byte, error) {
 
-	bytes, err := r.client.FragmentedDownloadObject(
-		ctx,
-		r.bucket,
-		s3.ScopedChunkKey(blobKey),
-		int(fragmentInfo.TotalChunkSizeBytes),
-		int(fragmentInfo.FragmentSizeBytes))
-
+	bytes, found, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedChunkKey(blobKey))
 	if err != nil {
-		r.logger.Error("failed to download coefficients from S3",
-			"blob", blobKey.Hex(),
-			"totalSize", fragmentInfo.TotalChunkSizeBytes,
-			"fragmentSize", fragmentInfo.FragmentSizeBytes,
-			"error", err)
-		return 0, nil, fmt.Errorf("failed to download coefficients from S3 for blob %s (total size: %d, fragment size: %d): %w",
-			blobKey.Hex(), fragmentInfo.TotalChunkSizeBytes, fragmentInfo.FragmentSizeBytes, err)
+		return 0, nil, fmt.Errorf("failed to download coefficients from S3 for blob %s: %w", blobKey.Hex(), err)
+	}
+
+	if !found {
+		return 0, nil, fmt.Errorf("coefficients not found for blob %s", blobKey.Hex())
 	}
 
 	elementCount, frames, err := rs.SplitSerializedFrameCoeffs(bytes)
 	if err != nil {
-		r.logger.Error("failed to split coefficient frames", "blob", blobKey.Hex(), "error", err)
 		return 0, nil, fmt.Errorf("failed to split coefficient frames for blob %s: %w", blobKey.Hex(), err)
 	}
 
 	return elementCount, frames, nil
+}
+
+func (r *chunkReader) GetBinaryChunkProofsRange(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	firstChunkIndex uint32,
+	endChunkIndex uint32,
+) ([][]byte, bool, error) {
+
+	if firstChunkIndex >= endChunkIndex {
+		return nil, false, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", firstChunkIndex, endChunkIndex)
+	}
+
+	firstByteIndex := firstChunkIndex * encoding.SerializedProofLength
+	count := endChunkIndex - firstChunkIndex
+	size := count * encoding.SerializedProofLength
+
+	s3Key := s3.ScopedProofKey(blobKey)
+
+	data, found, err := r.client.DownloadPartialObject(
+		ctx,
+		r.bucket,
+		s3Key,
+		int64(firstByteIndex),
+		int64(firstByteIndex+size))
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to download proofs from S3 for blob %s: %w", blobKey.Hex(), err)
+	}
+
+	if !found {
+		return nil, false, nil
+	}
+
+	proofs, err := encoding.SplitSerializedFrameProofs(data)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to split proofs for blob %s: %w", blobKey.Hex(), err)
+	}
+
+	return proofs, true, nil
+}
+
+func (r *chunkReader) GetBinaryChunkCoefficientRange(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	startIndex uint32,
+	endIndex uint32,
+	symbolsPerFrame uint32,
+) ([][]byte, bool, error) {
+
+	if startIndex >= endIndex {
+		return nil, false, fmt.Errorf("invalid startIndex (%d) or endIndex (%d)", startIndex, endIndex)
+	}
+
+	if symbolsPerFrame == 0 {
+		return nil, false, fmt.Errorf("symbolsPerFrame must be greater than 0")
+	}
+
+	bytesPerFrame := encoding.BYTES_PER_SYMBOL * symbolsPerFrame
+	firstByteIndex := 4 + startIndex*bytesPerFrame
+	size := (endIndex - startIndex) * bytesPerFrame
+
+	s3Key := s3.ScopedChunkKey(blobKey)
+
+	data, found, err := r.client.DownloadPartialObject(
+		ctx,
+		r.bucket,
+		s3Key,
+		int64(firstByteIndex),
+		int64(firstByteIndex+size))
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to download coefficients from S3 for blob %s: %w", blobKey.Hex(), err)
+	}
+
+	if !found {
+		return nil, false, nil
+	}
+
+	// Deserialize the frames
+	frames, err := rs.SplitSerializedFrameCoeffsWithElementCount(data, symbolsPerFrame)
+	if err != nil {
+		return nil, false, fmt.Errorf(
+			"failed to split coefficient frames for blob %s, symbols per frame %d: %w",
+			blobKey.Hex(), symbolsPerFrame, err)
+	}
+
+	return frames, true, nil
 }

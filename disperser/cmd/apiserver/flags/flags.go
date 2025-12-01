@@ -261,6 +261,18 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_CONTROLLER_MEDIATED_PAYMENTS"),
 	}
+	DisableGetBlobCommitment = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disable-get-blob-commitment"),
+		Usage:    "If true, the GetBlobCommitment gRPC endpoint will return a deprecation error. This endpoint is deprecated and will be removed in a future release.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISABLE_GET_BLOB_COMMITMENT"),
+	}
+	DisablePerAccountMetricsFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disable-per-account-metrics"),
+		Usage:    "Disables account level metrics collection (default: false)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISABLE_PER_ACCOUNT_METRICS"),
+	}
 )
 
 // Flags needed for computing kzg commitments.
@@ -329,6 +341,8 @@ var optionalFlags = []cli.Flag{
 	ReservedOnly,
 	ControllerAddressFlag,
 	UseControllerMediatedPayments,
+	DisableGetBlobCommitment,
+	DisablePerAccountMetricsFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -23,8 +24,9 @@ type signatureReceiver struct {
 	// indexedOperatorState contains operator information including pubkeys, stakes, and quorum membership
 	indexedOperatorState *core.IndexedOperatorState
 
-	// validSignerMap tracks which operators have already submitted valid signatures
-	validSignerMap map[core.OperatorID]struct{}
+	// validSignerMap tracks which operators have already submitted valid signatures. The key is the operator ID,
+	// and the value is the latency of the signature submission.
+	validSignerMap map[core.OperatorID]time.Duration
 	// signatureMessageReceived tracks which operators have submitted signature messages, whether valid or invalid.
 	// this is tracked separately from signerMap, since signerMap only includes valid signatures
 	signatureMessageReceived map[core.OperatorID]bool
@@ -78,6 +80,10 @@ type signatureReceiver struct {
 
 	// The most recently yielded attestation.
 	latestAttestation *core.QuorumAttestation
+
+	// Used to track signing rates. Data passed to this object will be used for making ejection decisions and is
+	// exposed to end users via an API Server endpoint.
+	signingRateTracker signingrate.SigningRateTracker
 }
 
 // ReceiveSignatures receives SigningMessages over the signingMessageChan, and yields QuorumAttestations produced
@@ -96,6 +102,7 @@ func ReceiveSignatures(
 	ctx context.Context,
 	logger logging.Logger,
 	metrics *controllerMetrics,
+	signingRateTracker signingrate.SigningRateTracker,
 	indexedOperatorState *core.IndexedOperatorState,
 	batchHeaderHash [32]byte,
 	signingMessageChan chan core.SigningMessage,
@@ -108,7 +115,7 @@ func ReceiveSignatures(
 		return nil, fmt.Errorf("get sorted quorum ids: %w", err)
 	}
 
-	validSignerMap := make(map[core.OperatorID]struct{})
+	validSignerMap := make(map[core.OperatorID]time.Duration)
 	signatureMessageReceived := make(map[core.OperatorID]bool)
 	aggregateSignatures := make(map[core.QuorumID]*core.Signature, len(sortedQuorumIDs))
 	aggregateSignersG2PubKeys := make(map[core.QuorumID]*core.G2Point, len(sortedQuorumIDs))
@@ -124,6 +131,7 @@ func ReceiveSignatures(
 	receiver := &signatureReceiver{
 		logger:                                 logger,
 		metrics:                                metrics,
+		signingRateTracker:                     signingRateTracker,
 		indexedOperatorState:                   indexedOperatorState,
 		aggregateSignatures:                    aggregateSignatures,
 		validSignerMap:                         validSignerMap,
@@ -203,47 +211,35 @@ func (sr *signatureReceiver) handleNextSignature(
 	attestationChan chan *core.QuorumAttestation,
 ) {
 
-	if signingMessage.TimeReceived.IsZero() {
-		sr.logger.Errorf("signing message from %s time received is zero in batch %s. "+
-			"This shouldn't be possible.",
-			signingMessage.Operator.Hex(),
-			hex.EncodeToString(sr.batchHeaderHash[:]))
-	} else if sr.metrics != nil {
-		sr.metrics.reportSigningMessageChannelLatency(time.Since(signingMessage.TimeReceived))
-	}
-
-	indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
+	indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.ValidatorId]
 	if !found {
 		sr.logger.Error("operator not found in state",
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-			"operatorID", signingMessage.Operator.Hex(),
-			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
+			"validatorID", signingMessage.ValidatorId.Hex())
 		return
 	}
 
-	if seen := sr.signatureMessageReceived[signingMessage.Operator]; seen {
+	if seen := sr.signatureMessageReceived[signingMessage.ValidatorId]; seen {
 		sr.logger.Error("duplicate message from operator",
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-			"operatorID", signingMessage.Operator.Hex(),
-			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
+			"validatorID", signingMessage.ValidatorId.Hex())
 		return
 	}
 
 	// this map records messages received, whether the messages are valid or not
-	sr.signatureMessageReceived[signingMessage.Operator] = true
+	sr.signatureMessageReceived[signingMessage.ValidatorId] = true
 
 	thresholdCrossed, err := sr.processSigningMessage(signingMessage, indexedOperatorInfo)
 	if err != nil {
 		sr.errorCount++
 		sr.logger.Warn("error processing signing message",
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-			"operatorID", signingMessage.Operator.Hex(),
-			"attestationLatencyMs", signingMessage.AttestationLatencyMs,
+			"validatorID", signingMessage.ValidatorId.Hex(),
 			"error", err)
 		return
 	}
 
-	sr.validSignerMap[signingMessage.Operator] = struct{}{}
+	sr.validSignerMap[signingMessage.ValidatorId] = signingMessage.Latency
 	sr.newSignaturesGathered = true
 
 	if thresholdCrossed {
@@ -294,7 +290,7 @@ func (sr *signatureReceiver) processSigningMessage(
 	thresholdCrossed := false
 	for _, quorumID := range sr.quorumIDs {
 		quorumOperators := sr.indexedOperatorState.Operators[quorumID]
-		quorumOperatorInfo, isOperatorInQuorum := quorumOperators[signingMessage.Operator]
+		quorumOperatorInfo, isOperatorInQuorum := quorumOperators[signingMessage.ValidatorId]
 		if !isOperatorInQuorum {
 			// if the operator which sent the signing message isn't in a given quorum, then we shouldn't make any
 			// changes to the aggregates that are tracked on a per-quorum basis
@@ -630,7 +626,6 @@ func (sr *signatureReceiver) reportBatchMetrics() {
 
 	// Update per-validator metrics
 	for quorumID, validatorsInQuorum := range sr.indexedOperatorState.Operators {
-
 		quorumTotals, ok := sr.indexedOperatorState.Totals[quorumID]
 		if !ok {
 			sr.logger.Errorf("missing quorum totals for quorum %d in final attestation for batch %s",
@@ -661,6 +656,11 @@ func (sr *signatureReceiver) reportBatchMetrics() {
 		}
 	}
 
+	// Update validator latency metrics.
+	for validatorId, latency := range sr.validSignerMap {
+		sr.metrics.ReportValidatorSigningLatency(validatorId, latency)
+	}
+
 	// Track legacy attestation metrics. This can be removed once we modify alerts to use other metrics.
 	validatorCount := make(map[core.QuorumID]int)
 	signerCount := make(map[core.QuorumID]int)
@@ -676,4 +676,16 @@ func (sr *signatureReceiver) reportBatchMetrics() {
 		}
 	}
 	sr.metrics.reportLegacyAttestation(validatorCount, signerCount, sr.latestAttestation.QuorumResults)
+
+	// Pass data to the signing rate tracker. Kind of like metrics, but not passed to grafana.
+	for quorumId, quorumInfo := range sr.indexedOperatorState.Operators {
+		for validatorId := range quorumInfo {
+			latency, signed := sr.validSignerMap[validatorId]
+			if signed {
+				sr.signingRateTracker.ReportSuccess(quorumId, validatorId, sr.batchSizeBytes, latency)
+			} else {
+				sr.signingRateTracker.ReportFailure(quorumId, validatorId, sr.batchSizeBytes)
+			}
+		}
+	}
 }

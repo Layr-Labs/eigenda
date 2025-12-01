@@ -1,0 +1,9 @@
+{
+  "network": "sepolia",
+  "RegistryCoordinator_address": "0xAF21d3811B5d23D5466AC83BA7a9c34c261A8D81",
+  "RegistryCoordinator_startBlock": 8153008,
+  "BLSApkRegistry_address": "0xA8fF891E5b8cA255A0e884129bc14977F7A742BC",
+  "BLSApkRegistry_startBlock": 8153008,
+  "EjectionManager_address": "0xc9d4541C409f15C0408c022D7e8C3F37Ac960f66",
+  "EjectionManager_startBlock": 8153008
+}

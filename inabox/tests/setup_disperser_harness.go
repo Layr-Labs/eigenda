@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -496,7 +497,7 @@ func startRelayWithListener(
 
 	// Create blob store and chunk reader
 	blobStore := blobstore.NewBlobStore(config.S3BucketName, s3Client, logger)
-	chunkReader := chunkstore.NewChunkReader(logger, s3Client, config.S3BucketName)
+	chunkReader := chunkstore.NewChunkReader(s3Client, config.S3BucketName)
 
 	// Create eth writer
 	tx, err := eth.NewWriter(
@@ -665,8 +666,7 @@ func startEncoder(
 	blobStore := blobstore.NewBlobStore(config.S3BucketName, s3Client, encoderLogger)
 
 	// Create chunk writer
-	const DefaultFragmentSizeBytes = 4 * 1024 * 1024
-	chunkWriter := chunkstore.NewChunkWriter(encoderLogger, s3Client, config.S3BucketName, DefaultFragmentSizeBytes)
+	chunkWriter := chunkstore.NewChunkWriter(s3Client, config.S3BucketName)
 
 	// Create encoder server config
 	serverConfig := encoder.ServerConfig{
@@ -902,8 +902,8 @@ func startController(
 	}
 	dispatcherBlobSet := controller.NewBlobSet()
 
-	// Create dispatcher
-	dispatcher, err := controller.NewDispatcher(
+	// Create controller
+	dispatcher, err := controller.NewController(
 		dispatcherConfig,
 		time.Now,
 		metadataStore,
@@ -917,6 +917,7 @@ func startController(
 		beforeDispatch,
 		dispatcherBlobSet,
 		controllerLivenessChan,
+		signingrate.NewNoOpSigningRateTracker(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dispatcher: %w", err)
@@ -1018,6 +1019,7 @@ func startController(
 			metricsRegistry,
 			paymentAuthorizationHandler,
 			listener,
+			signingrate.NewNoOpSigningRateTracker(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gRPC server: %w", err)

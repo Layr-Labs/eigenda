@@ -12,8 +12,8 @@ import (
 
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	metricsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
@@ -63,8 +63,8 @@ type TestClient struct {
 	payloadClientConfig         *clientsv2.PayloadClientConfig
 	logger                      logging.Logger
 	certVerifierAddressProvider clientsv2.CertVerifierAddressProvider
-	disperserClient             *clientsv2.DisperserClient
-	payloadDisperser            *payloaddispersal.PayloadDisperser
+	disperserClient             *dispersal.DisperserClient
+	payloadDisperser            *dispersal.PayloadDisperser
 	relayClient                 relay.RelayClient
 	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
 	indexedChainState           core.IndexedChainState
@@ -140,9 +140,8 @@ func NewTestClient(
 		return nil, fmt.Errorf("new committer: %w", err)
 	}
 
-	disperserConfig := &clientsv2.DisperserClientConfig{
-		Hostname:                 config.DisperserHostname,
-		Port:                     fmt.Sprintf("%d", config.DisperserPort),
+	disperserConfig := &dispersal.DisperserClientConfig{
+		GrpcUri:                  fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
 		UseSecureGrpcFlag:        true,
 		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
@@ -153,21 +152,15 @@ func NewTestClient(
 	}
 
 	accountantMetrics := metricsv2.NewAccountantMetrics(registry)
-	accountant := clientsv2.NewUnpopulatedAccountant(accountId, accountantMetrics)
-	disperserClient, err := clientsv2.NewDisperserClient(
+	disperserClient, err := dispersal.NewDisperserClient(
 		logger,
 		disperserConfig,
 		signer,
 		kzgCommitter,
-		accountant,
 		metricsv2.NoopDispersalMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
-	}
-	err = disperserClient.PopulateAccountant(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to populate accountant: %w", err)
 	}
 
 	ethClientConfig := geth.EthClientConfig{
@@ -226,7 +219,7 @@ func NewTestClient(
 	//  options.
 	payloadClientConfig := clientsv2.GetDefaultPayloadClientConfig()
 
-	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
+	payloadDisperserConfig := dispersal.PayloadDisperserConfig{
 		PayloadClientConfig: *payloadClientConfig,
 		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 		BlobCompleteTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
@@ -269,7 +262,7 @@ func NewTestClient(
 		return nil, fmt.Errorf("build client ledger: %w", err)
 	}
 
-	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
+	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
@@ -442,12 +435,11 @@ func NewTestClient(
 					AsyncPutWorkers:  32,
 				},
 				ClientConfigV2: proxycommon.ClientConfigV2{
-					DisperserClientCfg: clientsv2.DisperserClientConfig{
-						Hostname:          config.DisperserHostname,
-						Port:              fmt.Sprintf("%d", config.DisperserPort),
+					DisperserClientCfg: dispersal.DisperserClientConfig{
+						GrpcUri:           fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
 						UseSecureGrpcFlag: true,
 					},
-					PayloadDisperserCfg: payloaddispersal.PayloadDisperserConfig{
+					PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 						PayloadClientConfig:    *payloadClientConfig,
 						DisperseBlobTimeout:    5 * time.Minute,
 						BlobCompleteTimeout:    5 * time.Minute,
@@ -516,12 +508,12 @@ func (c *TestClient) GetLogger() logging.Logger {
 }
 
 // GetDisperserClient returns the test client's disperser client.
-func (c *TestClient) GetDisperserClient() *clientsv2.DisperserClient {
+func (c *TestClient) GetDisperserClient() *dispersal.DisperserClient {
 	return c.disperserClient
 }
 
 // GetPayloadDisperser returns the test client's payload disperser.
-func (c *TestClient) GetPayloadDisperser() *payloaddispersal.PayloadDisperser {
+func (c *TestClient) GetPayloadDisperser() *dispersal.PayloadDisperser {
 	return c.payloadDisperser
 }
 
@@ -955,13 +947,9 @@ func buildClientLedger(
 	paymentVaultAddr gethcommon.Address,
 	accountID gethcommon.Address,
 	mode clientledger.ClientLedgerMode,
-	disperserClient *clientsv2.DisperserClient,
+	disperserClient *dispersal.DisperserClient,
 	accountantMetrics metricsv2.AccountantMetricer,
 ) (*clientledger.ClientLedger, error) {
-	if mode == clientledger.ClientLedgerModeLegacy {
-		return nil, nil
-	}
-
 	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddr)
 	if err != nil {
 		return nil, fmt.Errorf("new payment vault: %w", err)
@@ -975,8 +963,6 @@ func buildClientLedger(
 	var reservationLedger *reservation.ReservationLedger
 	var onDemandLedger *ondemand.OnDemandLedger
 	switch mode {
-	case clientledger.ClientLedgerModeLegacy:
-		panic("impossible case- this is checked at the start of the method")
 	case clientledger.ClientLedgerModeReservationOnly:
 		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
 		if err != nil {
@@ -1069,7 +1055,7 @@ func buildOnDemandLedger(
 	paymentVault payments.PaymentVault,
 	accountID gethcommon.Address,
 	minNumSymbols uint32,
-	disperserClient *clientsv2.DisperserClient,
+	disperserClient *dispersal.DisperserClient,
 ) (*ondemand.OnDemandLedger, error) {
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
 	if err != nil {

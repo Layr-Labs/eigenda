@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
-	v2_clients "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
@@ -61,9 +61,8 @@ func validCfg() Config {
 			}),
 		MemstoreEnabled: false,
 		ClientConfigV2: common.ClientConfigV2{
-			DisperserClientCfg: v2_clients.DisperserClientConfig{
-				Hostname:          "http://localhost",
-				Port:              "9999",
+			DisperserClientCfg: dispersal.DisperserClientConfig{
+				GrpcUri:           "localhost:9999",
 				UseSecureGrpcFlag: true,
 			},
 			EigenDACertVerifierOrRouterAddress: "0x0000000000032443134",
@@ -163,7 +162,7 @@ func TestConfigVerification(t *testing.T) {
 			t.Run(
 				"FailWhenRequiredEigenDAV2FieldsAreUnset", func(t *testing.T) {
 					cfg := validCfg()
-					cfg.ClientConfigV2.DisperserClientCfg.Hostname = ""
+					cfg.ClientConfigV2.DisperserClientCfg.GrpcUri = ""
 					require.Error(t, cfg.Check())
 				})
 		})

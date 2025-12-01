@@ -12,6 +12,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/replay"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -32,6 +34,7 @@ type Server struct {
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
 	metrics                     *metrics.ServerMetrics
 	replayGuardian              replay.ReplayGuardian
+	signingRateTracker          signingrate.SigningRateTracker
 }
 
 func NewServer(
@@ -41,6 +44,7 @@ func NewServer(
 	metricsRegistry *prometheus.Registry,
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler,
 	listener net.Listener,
+	signingRateTracker signingrate.SigningRateTracker,
 ) (*Server, error) {
 	if listener == nil {
 		return nil, fmt.Errorf("listener is required")
@@ -55,6 +59,7 @@ func NewServer(
 		metrics:                     metrics.NewServerMetrics(metricsRegistry, logger),
 		paymentAuthorizationHandler: paymentAuthorizationHandler,
 		replayGuardian:              replayGuardian,
+		signingRateTracker:          signingRateTracker,
 	}, nil
 }
 
@@ -148,4 +153,43 @@ func (s *Server) AuthorizePayment(
 
 	success = true
 	return response, nil
+}
+
+// GetValidatorSigningRate returns the signing rate of a validator during a time range
+func (s *Server) GetValidatorSigningRate(
+	ctx context.Context,
+	request *controller.GetValidatorSigningRateRequest,
+) (*controller.GetValidatorSigningRateReply, error) {
+
+	validatorId := core.OperatorID(request.GetValidatorId())
+
+	signingRate, err := s.signingRateTracker.GetValidatorSigningRate(
+		core.QuorumID(request.GetQuorum()),
+		validatorId,
+		time.Unix(int64(request.GetStartTimestamp()), 0),
+		time.Unix(int64(request.GetEndTimestamp()), 0))
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing rate for validator %s: %w", validatorId.Hex(), err)
+	}
+
+	return &controller.GetValidatorSigningRateReply{
+		ValidatorSigningRate: signingRate,
+	}, nil
+}
+
+// GetValidatorSigningRateDump returns a dump of signing rate data for all validators after a specified start time
+func (s *Server) GetValidatorSigningRateDump(
+	ctx context.Context,
+	request *controller.GetValidatorSigningRateDumpRequest,
+) (*controller.GetValidatorSigningRateDumpReply, error) {
+
+	dump, err := s.signingRateTracker.GetSigningRateDump(time.Unix(int64(request.GetStartTimestamp()), 0))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing rate dump: %w", err)
+	}
+
+	return &controller.GetValidatorSigningRateDumpReply{
+		SigningRateBuckets: dump,
+	}, nil
 }

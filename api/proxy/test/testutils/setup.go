@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
@@ -328,12 +328,11 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			}),
 		MemstoreEnabled: useMemory,
 		ClientConfigV2: common.ClientConfigV2{
-			DisperserClientCfg: clientsv2.DisperserClientConfig{
-				Hostname:          disperserHostname,
-				Port:              disperserPort,
+			DisperserClientCfg: dispersal.DisperserClientConfig{
+				GrpcUri:           fmt.Sprintf("%s:%s", disperserHostname, disperserPort),
 				UseSecureGrpcFlag: true,
 			},
-			PayloadDisperserCfg: payloaddispersal.PayloadDisperserConfig{
+			PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 				PayloadClientConfig:    payloadClientConfig,
 				DisperseBlobTimeout:    5 * time.Minute,
 				BlobCompleteTimeout:    5 * time.Minute,

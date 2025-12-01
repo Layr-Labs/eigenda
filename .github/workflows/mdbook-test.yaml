@@ -1,0 +1,16 @@
+name: Test Spec MdBook
+
+on:
+  pull_request:
+  merge_group:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+        with:
+          fetch-depth: 0
+      - name: Build MD Book
+        run: make build # also installs deps
+        working-directory: docs/spec

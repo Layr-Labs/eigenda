@@ -4,10 +4,12 @@ members = [
   "crates/eigenda-verification",
   "crates/eigenda-srs-data",
   "crates/eigenda-proxy",
+  "crates/eigenda-tests",
 ]
 resolver = "2"
 
 [workspace.dependencies]
+alloy-contract = { version = "1.1.1", default-features = false }
 alloy-consensus = { version = "1.0.32", default-features = false }
 alloy-eips = { version = "1.0.32", default-features = false }
 alloy-network = { version = "1.0.32", default-features = false }
@@ -54,7 +56,7 @@ serde = { version = "1.0.219", default-features = false }
 serde_json = { version = "1.0.141" }
 serde_with = { version = "3.14.0" }
 test-strategy = { version = "0.4.3" }
-testcontainers = "0.25.0"
+testcontainers = "0.25.2"
 thiserror = { version = "2.0.12", default-features = false }
 tokio = { version = "1.47.1" }
 tracing = { version = "0.1.41" }

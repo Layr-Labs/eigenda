@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {EmptyContract} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 import {ProxyAdmin, TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -15,12 +15,14 @@ import {IStakeRegistry, StakeRegistry} from "lib/eigenlayer-middleware/src/Stake
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {BLSApkRegistry} from "lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
 import {EigenDARegistryCoordinator, IRegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
-import {IEigenDAThresholdRegistry, EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
+import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry, EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {IEigenDADisperserRegistry, EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
-import {EigenDAServiceManager, IServiceManager} from "src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
+import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
 import {
     IAVSDirectory
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
@@ -300,22 +302,19 @@ contract DeployEigenDA is Script {
             AddressDirectoryConstants.OPERATOR_STATE_RETRIEVER_NAME, address(new OperatorStateRetriever())
         );
 
-        directory.addAddress(
-            AddressDirectoryConstants.CERT_VERIFIER_NAME,
-            address(
-                new EigenDACertVerifier(
-                    IEigenDAThresholdRegistry(directory.getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME)),
-                    IEigenDASignatureVerifier(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
-                    cfg.certVerifierSecurityThresholds(),
-                    cfg.certVerifierQuorumNumbersRequired()
-                )
+        address certVerifier = address(
+            new EigenDACertVerifier(
+                IEigenDAThresholdRegistry(directory.getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME)),
+                IEigenDASignatureVerifier(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
+                cfg.certVerifierSecurityThresholds(),
+                cfg.certVerifierQuorumNumbersRequired()
             )
         );
 
         address routerImpl = address(new EigenDACertVerifierRouter());
         address[] memory certVerifiers = new address[](1);
 
-        certVerifiers[0] = directory.getAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME);
+        certVerifiers[0] = certVerifier;
 
         directory.addAddress(
             AddressDirectoryConstants.CERT_VERIFIER_ROUTER_NAME,

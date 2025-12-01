@@ -99,6 +99,10 @@ type DispersalServerV2 struct {
 	// Pre-created listener for the gRPC server
 	listener   net.Listener
 	grpcServer *grpc.Server
+
+	// DisableGetBlobCommitment, if true, causes the GetBlobCommitment gRPC endpoint to return
+	// a deprecation error. This endpoint is deprecated and will be removed in a future release.
+	disableGetBlobCommitment bool
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -197,6 +201,7 @@ func NewDispersalServerV2(
 		controllerConnection:          controllerConnection,
 		controllerClient:              controllerClient,
 		listener:                      listener,
+		disableGetBlobCommitment:      serverConfig.DisableGetBlobCommitment,
 	}, nil
 }
 
@@ -204,6 +209,11 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	// Start the metrics server
 	if s.metricsConfig.EnableMetrics {
 		s.metrics.Start(context.Background())
+		// Set configuration gauges
+		s.metrics.setDispersalTimestampConfig(
+			s.MaxDispersalAge.Seconds(),
+			s.MaxFutureDispersalTime.Seconds(),
+		)
 	}
 
 	// Serve grpc requests
@@ -277,6 +287,10 @@ func (s *DispersalServerV2) getBlobCommitment(
 	defer func() {
 		s.metrics.reportGetBlobCommitmentLatency(time.Since(start))
 	}()
+
+	if s.disableGetBlobCommitment {
+		return nil, status.New(codes.Unimplemented, "GetBlobCommitment is deprecated and has been disabled. This service will be removed in a future release. Please compute blob commitments locally.")
+	}
 
 	if s.committer == nil {
 		return nil, status.New(codes.Internal, "committer is not configured")

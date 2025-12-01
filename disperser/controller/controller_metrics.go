@@ -18,7 +18,6 @@ const controllerNamespace = "eigenda_dispatcher"
 // controllerMetrics is a struct that holds the metrics for the controller.
 type controllerMetrics struct {
 	processSigningMessageLatency *prometheus.SummaryVec
-	signingMessageChannelLatency *prometheus.SummaryVec
 	attestationUpdateLatency     *prometheus.SummaryVec
 	attestationBuildingLatency   *prometheus.SummaryVec
 	thresholdSignedToDoneLatency *prometheus.SummaryVec
@@ -40,6 +39,7 @@ type controllerMetrics struct {
 	validatorSignedByteCount    *prometheus.CounterVec
 	validatorUnsignedBatchCount *prometheus.CounterVec
 	validatorUnsignedByteCount  *prometheus.CounterVec
+	validatorSigningLatency     *prometheus.SummaryVec
 
 	globalSignedBatchCount   *prometheus.CounterVec
 	globalUnsignedBatchCount *prometheus.CounterVec
@@ -88,17 +88,6 @@ func newControllerMetrics(
 			Namespace:  controllerNamespace,
 			Name:       "process_signing_message_latency_ms",
 			Help:       "The time required to process a single signing message (part of HandleSignatures()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	signingMessageChannelLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace: controllerNamespace,
-			Name:      "signing_message_channel_latency_ms",
-			Help: "The time a signing message sits in the channel " +
-				"waiting to be processed (part of HandleSignatures()).",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -260,6 +249,16 @@ func newControllerMetrics(
 		signingRateLabels,
 	)
 
+	validatorSigningLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  controllerNamespace,
+			Name:       "validator_signing_latency_ms",
+			Help:       "The latency of signing messages for each validator.",
+			Objectives: objectives,
+		},
+		[]string{"id"},
+	)
+
 	globalSignedBatchCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
@@ -308,7 +307,6 @@ func newControllerMetrics(
 
 	return &controllerMetrics{
 		processSigningMessageLatency:    processSigningMessageLatency,
-		signingMessageChannelLatency:    signingMessageChannelLatency,
 		attestationUpdateLatency:        attestationUpdateLatency,
 		attestationBuildingLatency:      attestationBuildingLatency,
 		thresholdSignedToDoneLatency:    thresholdSignedToDoneLatency,
@@ -328,6 +326,7 @@ func newControllerMetrics(
 		validatorSignedByteCount:        validatorSignedByteCount,
 		validatorUnsignedBatchCount:     validatorUnsignedBatchCount,
 		validatorUnsignedByteCount:      validatorUnsignedByteCount,
+		validatorSigningLatency:         validatorSigningLatency,
 		collectDetailedValidatorMetrics: collectDetailedValidatorMetrics,
 		globalSignedBatchCount:          globalSignedBatchCount,
 		globalUnsignedBatchCount:        globalUnsignedBatchCount,
@@ -342,13 +341,6 @@ func (m *controllerMetrics) reportProcessSigningMessageLatency(duration time.Dur
 		return
 	}
 	m.processSigningMessageLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *controllerMetrics) reportSigningMessageChannelLatency(duration time.Duration) {
-	if m == nil {
-		return
-	}
-	m.signingMessageChannelLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *controllerMetrics) reportAttestationUpdateLatency(duration time.Duration) {
@@ -531,6 +523,13 @@ func (m *controllerMetrics) ReportValidatorSigningResult(
 		m.validatorUnsignedBatchCount.With(label).Add(1)
 		m.validatorUnsignedByteCount.With(label).Add(float64(batchSize) * stakeFraction)
 	}
+}
 
-	// TODO(cody.littley): consider measuring per-validator latency
+// Report the signing latency for a validator. Should only be used for validators that successfully signed a batch.
+func (m *controllerMetrics) ReportValidatorSigningLatency(id core.OperatorID, latency time.Duration) {
+	if m == nil || !m.collectDetailedValidatorMetrics {
+		return
+	}
+
+	m.validatorSigningLatency.WithLabelValues(id.Hex()).Observe(common.ToMilliseconds(latency))
 }

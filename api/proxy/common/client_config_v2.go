@@ -5,16 +5,15 @@ import (
 	"slices"
 	"time"
 
-	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 )
 
 // ClientConfigV2 contains all non-sensitive configuration to construct V2 clients
 type ClientConfigV2 struct {
-	DisperserClientCfg           clients_v2.DisperserClientConfig
-	PayloadDisperserCfg          payloaddispersal.PayloadDisperserConfig
+	DisperserClientCfg           dispersal.DisperserClientConfig
+	PayloadDisperserCfg          dispersal.PayloadDisperserConfig
 	RelayPayloadRetrieverCfg     payloadretrieval.RelayPayloadRetrieverConfig
 	ValidatorPayloadRetrieverCfg payloadretrieval.ValidatorPayloadRetrieverConfig
 
@@ -64,12 +63,8 @@ type ClientConfigV2 struct {
 
 // Check checks config invariants, and returns an error if there is a problem with the config struct
 func (cfg *ClientConfigV2) Check() error {
-	if cfg.DisperserClientCfg.Hostname == "" {
-		return fmt.Errorf("EigenDA disperser hostname is required for using EigenDA V2 backend")
-	}
-
-	if cfg.DisperserClientCfg.Port == "" {
-		return fmt.Errorf("EigenDA disperser port is required for using EigenDA V2 backend")
+	if cfg.DisperserClientCfg.GrpcUri == "" {
+		return fmt.Errorf("EigenDA disperser gRPC URI is required for using EigenDA V2 backend")
 	}
 
 	if cfg.EigenDACertVerifierOrRouterAddress == "" {
@@ -84,6 +79,13 @@ func (cfg *ClientConfigV2) Check() error {
 	// Check if at least one retriever is enabled
 	if len(cfg.RetrieversToEnable) == 0 {
 		return fmt.Errorf("at least one retriever type must be enabled for using EigenDA V2 backend")
+	}
+
+	// Check that relay retriever is not the only retriever enabled
+	if slices.Contains(cfg.RetrieversToEnable, RelayRetrieverType) {
+		if !slices.Contains(cfg.RetrieversToEnable, ValidatorRetrieverType) {
+			return fmt.Errorf("relay retriever cannot be the only retriever enabled in EigenDA V2 backend")
+		}
 	}
 
 	if slices.Contains(cfg.RetrieversToEnable, ValidatorRetrieverType) {

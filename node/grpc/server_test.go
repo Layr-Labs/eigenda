@@ -85,15 +85,17 @@ func makeTestComponents() (*prover.Prover, *verifier.Verifier, error) {
 
 func makeConfig(t *testing.T) *node.Config {
 	return &node.Config{
-		Timeout:                        10 * time.Second,
-		ExpirationPollIntervalSec:      1,
-		QuorumIDList:                   []core.QuorumID{0},
-		DbPath:                         t.TempDir(),
-		ID:                             opID,
-		NumBatchValidators:             runtime.GOMAXPROCS(0),
-		EnableV2:                       false,
-		DisableDispersalAuthentication: true,
-		RelayMaxMessageSize:            units.GiB,
+		Timeout:                             10 * time.Second,
+		ExpirationPollIntervalSec:           1,
+		QuorumIDList:                        []core.QuorumID{0},
+		DbPath:                              t.TempDir(),
+		ID:                                  opID,
+		NumBatchValidators:                  runtime.GOMAXPROCS(0),
+		EnableV2:                            false,
+		RelayMaxMessageSize:                 units.GiB,
+		DispersalAuthenticationKeyCacheSize: 1024,
+		StoreChunksRequestMaxPastAge:        5 * time.Minute,
+		StoreChunksRequestMaxFutureAge:      5 * time.Minute,
 	}
 }
 
