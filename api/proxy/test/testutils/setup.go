@@ -245,6 +245,8 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 
 		// use inabox default private key
 		pk = integration.GetDefaultTestPayloadDisperserConfig().PrivateKey
+
+		// TODO(iquidus): initialize on-demand balance for on-demand test
 	} else {
 		ethRPC = os.Getenv(EthRPCEnvVar)
 		if ethRPC == "" && !useMemory {
@@ -293,7 +295,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		svcManagerAddress = hoodiPreprodSvcManagerAddress
 		eigenDADirectory = hoodiPreprodEigenDADirectory
 	case InaboxBackend:
-		// TODO(iquidus): set these values when inabox backend is ready
+		// TODO(iquidus): set these values dynamically when inabox backend is ready
 		disperserHostname = "localhost"
 		disperserPort = "32005"
 		certVerifierAddress = "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
@@ -356,7 +358,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		ClientConfigV2: common.ClientConfigV2{
 			DisperserClientCfg: dispersal.DisperserClientConfig{
 				GrpcUri:           fmt.Sprintf("%s:%s", disperserHostname, disperserPort),
-				UseSecureGrpcFlag: true,
+				UseSecureGrpcFlag: !useInabox,
 				DisperserID:       0,
 				ChainID:           nil, // Will be populated after eth client is created
 			},
