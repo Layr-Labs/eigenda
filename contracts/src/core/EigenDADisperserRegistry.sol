@@ -3,8 +3,8 @@ pragma solidity ^0.8.9;
 
 import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 import {EigenDADisperserRegistryStorage} from "./EigenDADisperserRegistryStorage.sol";
-import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
-import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {IEigenDADisperserRegistry} from "./interfaces/IEigenDADisperserRegistry.sol";
+import {EigenDATypesV2} from "./libraries/v2/EigenDATypesV2.sol";
 
 /// @title Registry for EigenDA disperser info
 /// @author Layr Labs, Inc.

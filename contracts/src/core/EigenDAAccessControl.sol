@@ -2,7 +2,7 @@
 pragma solidity ^0.8.9;
 
 import {AccessControlEnumerable} from "lib/openzeppelin-contracts/contracts/access/AccessControlEnumerable.sol";
-import {AccessControlConstants} from "../../libraries/v3/access-control/AccessControlConstants.sol";
+import {AccessControlConstants} from "./libraries/v3/access-control/AccessControlConstants.sol";
 
 /// @title EigenDAAccessControl
 /// @notice This contract is to serve as the centralized source of truth for access control in all EigenDA contracts.

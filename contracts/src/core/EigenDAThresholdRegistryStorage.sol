@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {IEigenDAThresholdRegistry} from "./interfaces/IEigenDAThresholdRegistry.sol";
+import {EigenDATypesV1 as DATypesV1} from "./libraries/v1/EigenDATypesV1.sol";
 
 /// @title Storage variables for the `EigenDAThresholdRegistry` contract.
 /// @author Layr Labs, Inc.

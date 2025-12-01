@@ -11,11 +11,11 @@ import {ServiceManagerBase, IAVSDirectory, IRewardsCoordinator} from
 import {BLSSignatureChecker} from "lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
-import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
-import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
-import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry.sol";
-import {EigenDATypesV1 as DATypesV1} from "../libraries/v1/EigenDATypesV1.sol";
+import {IEigenDAThresholdRegistry} from "./interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDARelayRegistry} from "./interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "./interfaces/IPaymentVault.sol";
+import {IEigenDADisperserRegistry} from "./interfaces/IEigenDADisperserRegistry.sol";
+import {EigenDATypesV1 as DATypesV1} from "./libraries/v1/EigenDATypesV1.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 
 /// @title Primary entrypoint for procuring services from EigenDA.
