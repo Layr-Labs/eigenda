@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV1} from "../libraries/v1/EigenDATypesV1.sol";
 
 interface IEigenDASignatureVerifier {
     function checkSignatures(

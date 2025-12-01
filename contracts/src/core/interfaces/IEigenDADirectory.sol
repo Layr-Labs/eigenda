@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {ConfigRegistryTypes} from "src/core/libraries/v3/config-registry/ConfigRegistryTypes.sol";
+import {ConfigRegistryTypes} from "../libraries/v3/config-registry/ConfigRegistryTypes.sol";
 
 interface IEigenDAAddressDirectory {
     error AddressAlreadyExists(string name);

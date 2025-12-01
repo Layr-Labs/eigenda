@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {AddressDirectoryStorage} from "src/core/libraries/v3/address-directory/AddressDirectoryStorage.sol";
+import {AddressDirectoryStorage} from "./AddressDirectoryStorage.sol";
 
 library AddressDirectoryLib {
     event AddressSet(bytes32 key, address indexed value);

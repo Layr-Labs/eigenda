@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IPaymentVault} from "./IPaymentVault.sol";
-
 interface IPaymentVault {
     struct Reservation {
         uint64 symbolsPerSecond; // Number of symbols reserved per second

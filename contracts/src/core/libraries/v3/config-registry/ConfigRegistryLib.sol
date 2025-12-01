@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {ConfigRegistryStorage as S} from "src/core/libraries/v3/config-registry/ConfigRegistryStorage.sol";
-import {ConfigRegistryTypes as T} from "src/core/libraries/v3/config-registry/ConfigRegistryTypes.sol";
+import {ConfigRegistryStorage as S} from "./ConfigRegistryStorage.sol";
+import {ConfigRegistryTypes as T} from "./ConfigRegistryTypes.sol";
 
 library ConfigRegistryLib {
     event TimestampConfigBytesSet(bytes32 nameDigest, uint256 activationTS, bytes value);

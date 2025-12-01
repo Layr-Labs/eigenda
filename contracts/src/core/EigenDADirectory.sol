@@ -2,11 +2,7 @@
 pragma solidity ^0.8.9;
 
 import {AddressDirectoryLib} from "./libraries/v3/address-directory/AddressDirectoryLib.sol";
-import {
-    IEigenDADirectory,
-    IEigenDAAddressDirectory,
-    IEigenDAConfigRegistry
-} from "src/core/interfaces/IEigenDADirectory.sol";
+import {IEigenDADirectory, IEigenDAAddressDirectory, IEigenDAConfigRegistry} from "./interfaces/IEigenDADirectory.sol";
 import {AccessControlConstants} from "./libraries/v3/access-control/AccessControlConstants.sol";
 import {AddressDirectoryConstants} from "./libraries/v3/address-directory/AddressDirectoryConstants.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
