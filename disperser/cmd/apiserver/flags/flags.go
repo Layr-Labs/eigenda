@@ -267,6 +267,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISABLE_GET_BLOB_COMMITMENT"),
 	}
+	DisablePerAccountMetricsFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disable-per-account-metrics"),
+		Usage:    "Disables account level metrics collection (default: false)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISABLE_PER_ACCOUNT_METRICS"),
+	}
 )
 
 // Flags needed for computing kzg commitments.
@@ -336,6 +342,7 @@ var optionalFlags = []cli.Flag{
 	ControllerAddressFlag,
 	UseControllerMediatedPayments,
 	DisableGetBlobCommitment,
+	DisablePerAccountMetricsFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,
