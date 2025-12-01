@@ -112,7 +112,8 @@ contract CertVerifierDeployerV2 is Script, Test {
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
                 defaultSecurityThresholds,
-                quorumNumbersRequired
+                quorumNumbersRequired,
+                offchainDerivationVersion
             )
         );
 
