@@ -52,13 +52,13 @@ func ParseConfig[T VerifiableConfig](
 		}
 	}
 
-	err := aliasEnvVars(logger, aliasedEnvVars)
-	if err != nil {
-		var zero T
-		return zero, fmt.Errorf("failed to alias environment variables: %w", err)
-	}
-
 	if envPrefix != "" {
+		err := aliasEnvVars(logger, aliasedEnvVars)
+		if err != nil {
+			var zero T
+			return zero, fmt.Errorf("failed to alias environment variables: %w", err)
+		}
+
 		viperInstance.SetEnvPrefix(envPrefix)
 		viperInstance.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 		viperInstance.AutomaticEnv()
@@ -288,6 +288,9 @@ func checkForInvalidEnvVars(
 	for _, v := range ignoredEnvVars {
 		ignoredSet[v] = struct{}{}
 	}
+	// The config parser will return an error if it discovers an environment variable that doesn't map to a struct
+	// value. Since the aliased environment variables indirectly map to struct values, we need to instruct the config
+	// parser to ignore them when it's checking for un-mapped environment variables.
 	for k := range aliasedEnvVars {
 		ignoredSet[k] = struct{}{}
 	}

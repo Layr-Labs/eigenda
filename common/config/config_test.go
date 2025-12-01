@@ -448,7 +448,6 @@ func TestAliasedEnvironmentVariables(t *testing.T) {
 	require.NoError(t, os.Unsetenv("PREFIX_BAR_BAZ_X"))
 	require.NoError(t, os.Unsetenv("PREFIX_BAR_BAZ_Z"))
 
-
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
 	require.NoError(t, os.Setenv("PREFIX_INT", "-999"))
@@ -600,4 +599,22 @@ func TestScreamingSnakeCaseFlag(t *testing.T) {
 	require.NoError(t, os.Unsetenv("TEST_THIS_IS_A_FIELD_WITH_A_COMPLEX_NAME"))
 	require.NoError(t, os.Unsetenv("TEST_BAR_THIS_IS_A_NESTED_FIELD_WITH_A_COMPLEX_NAME"))
 	require.NoError(t, os.Unsetenv("TEST_BAR_BAZ_THIS_FIELD_IS_NESTED_EVEN_DEEPER"))
+}
+
+// If env var A is aliased to env var B, then both must not be set at the same time. This test verifies that if both
+// are set then an error is returned.
+func TestAliasAndTargetSet(t *testing.T) {
+	configFile := "test/config.toml"
+
+	aliases := map[string]string{
+		"LEGACY_PREFIX_BAR_BAZ_X": "PREFIX_BAR_BAZ_X",
+	}
+
+	// set both the alias and the target env vars
+	require.NoError(t, os.Setenv("LEGACY_PREFIX_BAR_BAZ_X", "env var bar baz X"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_BAZ_X", "this conflicts with the alias"))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", aliases, nil, configFile)
+	require.Error(t, err)
+	require.Nil(t, foo)
 }
