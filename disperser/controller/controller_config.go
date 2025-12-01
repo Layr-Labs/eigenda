@@ -79,7 +79,7 @@ type ControllerConfig struct {
 	SigningRateFlushPeriod time.Duration
 
 	// The name of the DynamoDB table used to store signing rate data.
-	SigningRateDynamoDbTableName string
+	SigningRateDynamoDbTableName string `docs:"required"`
 }
 
 var _ config.VerifiableConfig = &ControllerConfig{}
@@ -100,7 +100,6 @@ func DefaultDispatcherConfig() *ControllerConfig {
 		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
 		SigningRateBucketSpan:               10 * time.Minute,
 		SigningRateFlushPeriod:              1 * time.Minute,
-		SigningRateDynamoDbTableName:        "validator-signing-rates",
 	}
 }
 
