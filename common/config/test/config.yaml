@@ -13,6 +13,7 @@ Float64: 211.11
 Float32: 212.12
 Duration: "33m"
 Bool: false
+ThisIsASecretField: "Iiiiiii, just wanna tell you how I'm feeling. Gotta make you... understand."
 
 Bar:
   A: "yaml bar A"

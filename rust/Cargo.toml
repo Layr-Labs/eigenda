@@ -9,6 +9,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
+alloy-contract = { version = "1.1.1", default-features = false }
 alloy-consensus = { version = "1.0.32", default-features = false }
 alloy-eips = { version = "1.0.32", default-features = false }
 alloy-network = { version = "1.0.32", default-features = false }

@@ -209,6 +209,11 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	// Start the metrics server
 	if s.metricsConfig.EnableMetrics {
 		s.metrics.Start(context.Background())
+		// Set configuration gauges
+		s.metrics.setDispersalTimestampConfig(
+			s.MaxDispersalAge.Seconds(),
+			s.MaxFutureDispersalTime.Seconds(),
+		)
 	}
 
 	// Serve grpc requests
