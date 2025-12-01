@@ -2,7 +2,6 @@ package eigendaflags
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -332,8 +331,8 @@ func readPayloadDisperserCfg(ctx *cli.Context) dispersal.PayloadDisperserConfig 
 }
 
 func readDisperserCfg(ctx *cli.Context) (dispersal.DisperserClientConfig, error) {
-	disperserAddressString := ctx.String(DisperserFlagName)
-	if disperserAddressString == "" {
+	grpcUri := ctx.String(DisperserFlagName)
+	if grpcUri == "" {
 		networkString := ctx.String(NetworkFlagName)
 		if networkString == "" {
 			return dispersal.DisperserClientConfig{},
@@ -345,18 +344,11 @@ func readDisperserCfg(ctx *cli.Context) (dispersal.DisperserClientConfig, error)
 			return dispersal.DisperserClientConfig{}, fmt.Errorf("parse eigenDANetwork: %w", err)
 		}
 
-		disperserAddressString = eigenDANetwork.GetDisperserAddress()
-	}
-
-	hostStr, portStr, err := net.SplitHostPort(disperserAddressString)
-	if err != nil {
-		return dispersal.DisperserClientConfig{},
-			fmt.Errorf("split host port '%s': %w", disperserAddressString, err)
+		grpcUri = eigenDANetwork.GetDisperserGrpcUri()
 	}
 
 	return dispersal.DisperserClientConfig{
-		Hostname:          hostStr,
-		Port:              portStr,
+		GrpcUri:           grpcUri,
 		UseSecureGrpcFlag: !ctx.Bool(DisableTLSFlagName),
 	}, nil
 }
