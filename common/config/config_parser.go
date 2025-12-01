@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Layr-Labs/eigenda/common/config/secret"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/go-viper/mapstructure/v2"
@@ -68,6 +69,7 @@ func ParseConfig[T VerifiableConfig](
 		TagName:          "mapstructure",
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(), // Support time.Duration parsing from strings
+			secret.DecodeHook, // Support Secret parsing
 		),
 	}
 	decoder, err := mapstructure.NewDecoder(decoderConfig)
@@ -168,7 +170,13 @@ func bindEnvs(
 			continue
 		}
 
-		keyPath := append(path, field.Name)
+		// Get the mapstructure tag, or use field name if tag is not present
+		fieldKey := field.Name
+		if tag := field.Tag.Get("mapstructure"); tag != "" {
+			fieldKey = tag
+		}
+
+		keyPath := append(path, fieldKey)
 
 		switch field.Type.Kind() { //nolint:exhaustive // only handling struct and pointer types
 
@@ -185,13 +193,26 @@ func bindEnvs(
 		case reflect.Ptr:
 			// Handle pointer to struct
 			if field.Type.Elem().Kind() == reflect.Struct {
-				tmp := reflect.New(field.Type.Elem()).Interface()
-				nestedBoundVars, err := bindEnvs(v, prefix, tmp, keyPath...)
-				if err != nil {
-					return nil, fmt.Errorf("failed to bind envs for field %s: %w", field.Name, err)
-				}
-				for k := range nestedBoundVars {
-					boundVars[k] = struct{}{}
+				// Check if this is a Secret type - if so, treat it as a leaf value
+				elemType := field.Type.Elem()
+				isSecretType := elemType == reflect.TypeOf((*secret.Secret)(nil)).Elem()
+				if isSecretType {
+					// Secret types should be bound as leaf values, not recursed into
+					env := buildEnvVarName(prefix, keyPath...)
+					boundVars[env] = struct{}{}
+					if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
+						return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
+					}
+				} else {
+					// Regular struct, recurse into it
+					tmp := reflect.New(field.Type.Elem()).Interface()
+					nestedBoundVars, err := bindEnvs(v, prefix, tmp, keyPath...)
+					if err != nil {
+						return nil, fmt.Errorf("failed to bind envs for field %s: %w", field.Name, err)
+					}
+					for k := range nestedBoundVars {
+						boundVars[k] = struct{}{}
+					}
 				}
 			} else {
 				// Pointer to non-struct type, bind as regular field

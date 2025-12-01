@@ -43,10 +43,10 @@ func (n EigenDANetwork) GetEigenDADirectory() string {
 	}
 }
 
-// GetDisperserAddress gets a string representing the address of the disperser for the network.
+// GetDisperserGrpcUri gets a string representing the address of the disperser for the network.
 // The format of the returned address is "<hostname>:<port>"
 // For more information about networks and disperser endpoints, see https://docs.eigenlayer.xyz/eigenda/networks/
-func (n EigenDANetwork) GetDisperserAddress() string {
+func (n EigenDANetwork) GetDisperserGrpcUri() string {
 	// TODO: These hardcoded addresses should eventually be fetched from the EigenDADirectory contract
 	// to reduce duplication and ensure consistency across the codebase
 	switch n {

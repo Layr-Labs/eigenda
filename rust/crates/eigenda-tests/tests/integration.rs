@@ -78,6 +78,7 @@ async fn post_payload_and_verify_returned_cert(
     let provider_config = EigenDaProviderConfig {
         network,
         rpc_url,
+        cert_verifier_router_address: None,
         compute_units: None,
         max_retry_times: None,
         initial_backoff: None,
