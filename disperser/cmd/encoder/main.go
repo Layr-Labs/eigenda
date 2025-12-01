@@ -41,18 +41,15 @@ func main() {
 
 // Run the encoder. This method is split from main() so we only have to use log.Fatalf() once.
 func run(_ context.Context) error {
-	rootCfg, err := config.Bootstrap(encoder.DefaultRootEncoderConfig)
+	cfg, err := config.Bootstrap(encoder.DefaultEncoderConfig)
 	if err != nil {
 		return fmt.Errorf("failed to bootstrap config: %w", err)
 	}
-	encoderConfig := rootCfg.Config
-	// Ensure we don't accidentally use rootCfg after this point.
-	rootCfg = nil
 
 	loggerConfig := common.DefaultLoggerConfig()
-	loggerConfig.Format = common.LogFormat(encoderConfig.LogFormat)
-	loggerConfig.HandlerOpts.NoColor = !encoderConfig.LogColor
-	level, err := common.StringToLogLevel(encoderConfig.LogLevel)
+	loggerConfig.Format = common.LogFormat(cfg.LogFormat)
+	loggerConfig.HandlerOpts.NoColor = !cfg.LogColor
+	level, err := common.StringToLogLevel(cfg.LogLevel)
 	if err != nil {
 		return fmt.Errorf("failed to parse log level: %w", err)
 	}
@@ -64,10 +61,10 @@ func run(_ context.Context) error {
 	}
 
 	reg := prometheus.NewRegistry()
-	metrics := encoder.NewMetrics(reg, encoderConfig.Metrics.HTTPPort, logger)
+	metrics := encoder.NewMetrics(reg, cfg.Metrics.HTTPPort, logger)
 	grpcMetrics := grpcprom.NewServerMetrics()
-	if encoderConfig.Metrics.Enable {
-		httpSocket := fmt.Sprintf(":%s", encoderConfig.Metrics.HTTPPort)
+	if cfg.Metrics.Enable {
+		httpSocket := fmt.Sprintf(":%s", cfg.Metrics.HTTPPort)
 		metrics.Start(context.Background())
 		logger.Info("Enabled metrics for Encoder", "socket", httpSocket)
 
@@ -75,13 +72,13 @@ func run(_ context.Context) error {
 	}
 
 	// Start pprof server if enabled (works for both v1 and v2)
-	pprofProfiler := commonpprof.NewPprofProfiler(encoderConfig.Server.PprofHttpPort, logger)
-	if encoderConfig.Server.EnablePprof {
+	pprofProfiler := commonpprof.NewPprofProfiler(cfg.Server.PprofHttpPort, logger)
+	if cfg.Server.EnablePprof {
 		go pprofProfiler.Start()
-		logger.Info("Enabled pprof for encoder server", "port", encoderConfig.Server.PprofHttpPort)
+		logger.Info("Enabled pprof for encoder server", "port", cfg.Server.PprofHttpPort)
 	}
 
-	backendType, err := encoding.ParseBackendType(encoderConfig.Server.Backend)
+	backendType, err := encoding.ParseBackendType(cfg.Server.Backend)
 	if err != nil {
 		return err
 	}
@@ -89,13 +86,13 @@ func run(_ context.Context) error {
 	// Set the encoding config
 	encodingConfig := &encoding.Config{
 		BackendType:                           backendType,
-		GPUEnable:                             encoderConfig.Server.GPUEnable,
-		GPUConcurrentFrameGenerationDangerous: int64(encoderConfig.Server.MaxConcurrentRequestsDangerous),
-		NumWorker:                             encoderConfig.Kzg.NumWorker,
+		GPUEnable:                             cfg.Server.GPUEnable,
+		GPUConcurrentFrameGenerationDangerous: int64(cfg.Server.MaxConcurrentRequestsDangerous),
+		NumWorker:                             cfg.Kzg.NumWorker,
 	}
 
 	// Create listener
-	addr := fmt.Sprintf("0.0.0.0:%s", encoderConfig.GrpcPort)
+	addr := fmt.Sprintf("0.0.0.0:%s", cfg.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("failed to create listener on %s: %w", addr, err)
@@ -106,38 +103,38 @@ func run(_ context.Context) error {
 		}
 	}()
 
-	if encoderConfig.EncoderVersion == 2 {
+	if cfg.EncoderVersion == 2 {
 		// We no longer load the G2 points in V2 because the KZG commitments are computed
 		// on the API server side.
-		encoderConfig.Kzg.LoadG2Points = false
-		prover, err := proverv2.NewProver(logger, proverv2.KzgConfigFromV1Config(&encoderConfig.Kzg), encodingConfig)
+		cfg.Kzg.LoadG2Points = false
+		prover, err := proverv2.NewProver(logger, proverv2.KzgConfigFromV1Config(&cfg.Kzg), encodingConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
 
 		// Create object storage client (supports both S3 and OCI)
 		objectStorageClient, err := blobstore.CreateObjectStorageClient(
-			context.Background(), encoderConfig.BlobStore, encoderConfig.Aws, logger)
+			context.Background(), cfg.BlobStore, cfg.Aws, logger)
 		if err != nil {
 			return err
 		}
 
-		blobStoreBucketName := encoderConfig.BlobStore.BucketName
+		blobStoreBucketName := cfg.BlobStore.BucketName
 		if blobStoreBucketName == "" {
 			return fmt.Errorf("blob store bucket name is required")
 		}
 
 		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, objectStorageClient, logger)
-		logger.Info("Blob store", "bucket", blobStoreBucketName, "backend", encoderConfig.BlobStore.Backend)
+		logger.Info("Blob store", "bucket", blobStoreBucketName, "backend", cfg.BlobStore.Backend)
 
-		chunkStoreBucketName := encoderConfig.ChunkStore.BucketName
+		chunkStoreBucketName := cfg.ChunkStore.BucketName
 		chunkWriter := chunkstore.NewChunkWriter(
 			objectStorageClient,
 			chunkStoreBucketName)
-		logger.Info("Chunk store writer", "bucket", chunkStoreBucketName, "backend", encoderConfig.ChunkStore.Backend)
+		logger.Info("Chunk store writer", "bucket", chunkStoreBucketName, "backend", cfg.ChunkStore.Backend)
 
 		server := encoder.NewEncoderServerV2(
-			encoderConfig.Server,
+			cfg.Server,
 			blobStore,
 			chunkWriter,
 			logger,
@@ -152,13 +149,13 @@ func run(_ context.Context) error {
 		return server.StartWithListener(listener)
 	}
 
-	encoderConfig.Kzg.LoadG2Points = true
-	prover, err := prover.NewProver(&encoderConfig.Kzg, encodingConfig)
+	cfg.Kzg.LoadG2Points = true
+	prover, err := prover.NewProver(&cfg.Kzg, encodingConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder: %w", err)
 	}
 
-	server := encoder.NewEncoderServer(encoderConfig.Server, logger, prover, metrics, grpcMetrics)
+	server := encoder.NewEncoderServer(cfg.Server, logger, prover, metrics, grpcMetrics)
 
 	logger.Info("Starting encoder v1 server", "address", listener.Addr().String())
 

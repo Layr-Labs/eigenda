@@ -12,15 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 )
 
-var _ config.DocumentedConfig = (*RootEncoderConfig)(nil)
-
-// The root configuration for the encoder service. This config should be discarded after parsing
-// and only the sub-configs should be used. This is a safety mechanism to make it harder to
-// accidentally print/log the secret config.
-type RootEncoderConfig struct {
-	Config *EncoderConfig
-	Secret *EncoderSecretConfig
-}
+var _ config.DocumentedConfig = (*EncoderConfig)(nil)
 
 var _ config.VerifiableConfig = (*EncoderConfig)(nil)
 
@@ -56,23 +48,15 @@ type EncoderConfig struct {
 	Aws aws.ClientConfig
 }
 
-// Create a new root encoder config with default values.
-func DefaultRootEncoderConfig() *RootEncoderConfig {
-	return &RootEncoderConfig{
-		Config: DefaultEncoderConfig(),
-		Secret: &EncoderSecretConfig{},
-	}
-}
-
-func (e *RootEncoderConfig) GetEnvVarPrefix() string {
+func (e *EncoderConfig) GetEnvVarPrefix() string {
 	return "ENCODER"
 }
 
-func (e *RootEncoderConfig) GetName() string {
+func (e *EncoderConfig) GetName() string {
 	return "Encoder"
 }
 
-func (e *RootEncoderConfig) GetPackagePaths() []string {
+func (e *EncoderConfig) GetPackagePaths() []string {
 	return []string{
 		"github.com/Layr-Labs/eigenda/disperser/encoder",
 		"github.com/Layr-Labs/eigenda/disperser/common/blobstore",
@@ -80,32 +64,6 @@ func (e *RootEncoderConfig) GetPackagePaths() []string {
 		"github.com/Layr-Labs/eigenda/encoding/v1/kzg",
 		"github.com/Layr-Labs/eigenda/common/aws",
 	}
-}
-
-func (e *RootEncoderConfig) Verify() error {
-	err := e.Config.Verify()
-	if err != nil {
-		return fmt.Errorf("invalid encoder config: %w", err)
-	}
-	err = e.Secret.Verify()
-	if err != nil {
-		return fmt.Errorf("invalid encoder secret config: %w", err)
-	}
-	return nil
-}
-
-var _ config.VerifiableConfig = (*EncoderSecretConfig)(nil)
-
-// Configuration for secrets used by the encoder.
-// Currently empty as AWS credentials are handled through aws.ClientConfig,
-// but this structure is kept for consistency with the ejector pattern
-// and potential future secret fields.
-type EncoderSecretConfig struct {
-}
-
-func (c *EncoderSecretConfig) Verify() error {
-	// No secrets to verify currently
-	return nil
 }
 
 // DefaultEncoderConfig returns a default configuration for the encoder.

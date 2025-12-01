@@ -282,55 +282,55 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 
 func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
-		ENCODER_CONFIG_LOG_FORMAT:                               "text",
-		ENCODER_CONFIG_AWS_REGION:                               "",
-		ENCODER_CONFIG_AWS_ACCESS_KEY:                           "",
-		ENCODER_CONFIG_AWS_SECRET_ACCESS_KEY:                    "",
-		ENCODER_CONFIG_AWS_ENDPOINT_URL:                         "",
-		ENCODER_CONFIG_GRPC_PORT:                                grpcPort,
-		ENCODER_CONFIG_METRICS_ENABLE:                           "true",
-		ENCODER_CONFIG_KZG_G1_PATH:                              "",
-		ENCODER_CONFIG_KZG_G2_PATH:                              "",
-		ENCODER_CONFIG_KZG_SRS_ORDER:                            "",
-		ENCODER_CONFIG_KZG_SRS_NUMBER_TO_LOAD:                   "",
-		ENCODER_CONFIG_KZG_CACHE_DIR:                            "",
-		ENCODER_CONFIG_KZG_VERBOSE:                              "",
-		ENCODER_CONFIG_KZG_NUM_WORKER:                           fmt.Sprint(runtime.GOMAXPROCS(0)),
-		ENCODER_CONFIG_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS: "16",
-		ENCODER_CONFIG_SERVER_REQUEST_POOL_SIZE:                 "32",
-		ENCODER_CONFIG_SERVER_REQUEST_QUEUE_SIZE:                "32",
+		ENCODER_LOG_FORMAT:                               "text",
+		ENCODER_AWS_REGION:                               "",
+		ENCODER_AWS_ACCESS_KEY:                           "",
+		ENCODER_AWS_SECRET_ACCESS_KEY:                    "",
+		ENCODER_AWS_ENDPOINT_URL:                         "",
+		ENCODER_GRPC_PORT:                                grpcPort,
+		ENCODER_METRICS_ENABLE:                           "true",
+		ENCODER_KZG_G1_PATH:                              "",
+		ENCODER_KZG_G2_PATH:                              "",
+		ENCODER_KZG_SRS_ORDER:                            "",
+		ENCODER_KZG_SRS_NUMBER_TO_LOAD:                   "",
+		ENCODER_KZG_CACHE_DIR:                            "",
+		ENCODER_KZG_VERBOSE:                              "",
+		ENCODER_KZG_NUM_WORKER:                           fmt.Sprint(runtime.GOMAXPROCS(0)),
+		ENCODER_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS: "16",
+		ENCODER_SERVER_REQUEST_POOL_SIZE:                 "32",
+		ENCODER_SERVER_REQUEST_QUEUE_SIZE:                "32",
 	}
 
-	env.applyDefaults(&v, "ENCODER_CONFIG", "enc", ind)
+	env.applyDefaults(&v, "ENCODER", "enc", ind)
 
 	return v
 }
 
 func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
-		ENCODER_CONFIG_LOG_FORMAT:                               "text",
-		ENCODER_CONFIG_AWS_REGION:                               "",
-		ENCODER_CONFIG_AWS_ACCESS_KEY:                           "",
-		ENCODER_CONFIG_AWS_SECRET_ACCESS_KEY:                    "",
-		ENCODER_CONFIG_AWS_ENDPOINT_URL:                         "",
-		ENCODER_CONFIG_GRPC_PORT:                                grpcPort,
-		ENCODER_CONFIG_METRICS_ENABLE:                           "true",
-		ENCODER_CONFIG_KZG_G1_PATH:                              "",
-		ENCODER_CONFIG_KZG_G2_PATH:                              "",
-		ENCODER_CONFIG_KZG_SRS_ORDER:                            "",
-		ENCODER_CONFIG_KZG_SRS_NUMBER_TO_LOAD:                   "",
-		ENCODER_CONFIG_KZG_CACHE_DIR:                            "",
-		ENCODER_CONFIG_KZG_VERBOSE:                              "",
-		ENCODER_CONFIG_KZG_NUM_WORKER:                           fmt.Sprint(runtime.GOMAXPROCS(0)),
-		ENCODER_CONFIG_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS: "16",
-		ENCODER_CONFIG_SERVER_REQUEST_POOL_SIZE:                 "32",
-		ENCODER_CONFIG_ENCODER_VERSION:                          "2",
-		ENCODER_CONFIG_BLOB_STORE_BUCKET_NAME:                   "test-eigenda-blobstore",
-		ENCODER_CONFIG_CHUNK_STORE_BUCKET_NAME:                  "test-eigenda-blobstore",
-		ENCODER_CONFIG_SERVER_REQUEST_QUEUE_SIZE:                "32",
+		ENCODER_LOG_FORMAT:                               "text",
+		ENCODER_AWS_REGION:                               "",
+		ENCODER_AWS_ACCESS_KEY:                           "",
+		ENCODER_AWS_SECRET_ACCESS_KEY:                    "",
+		ENCODER_AWS_ENDPOINT_URL:                         "",
+		ENCODER_GRPC_PORT:                                grpcPort,
+		ENCODER_METRICS_ENABLE:                           "true",
+		ENCODER_KZG_G1_PATH:                              "",
+		ENCODER_KZG_G2_PATH:                              "",
+		ENCODER_KZG_SRS_ORDER:                            "",
+		ENCODER_KZG_SRS_NUMBER_TO_LOAD:                   "",
+		ENCODER_KZG_CACHE_DIR:                            "",
+		ENCODER_KZG_VERBOSE:                              "",
+		ENCODER_KZG_NUM_WORKER:                           fmt.Sprint(runtime.GOMAXPROCS(0)),
+		ENCODER_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS: "16",
+		ENCODER_SERVER_REQUEST_POOL_SIZE:                 "32",
+		ENCODER_ENCODER_VERSION:                          "2",
+		ENCODER_BLOB_STORE_BUCKET_NAME:                   "test-eigenda-blobstore",
+		ENCODER_CHUNK_STORE_BUCKET_NAME:                  "test-eigenda-blobstore",
+		ENCODER_SERVER_REQUEST_QUEUE_SIZE:                "32",
 	}
 
-	env.applyDefaults(&v, "ENCODER_CONFIG", "enc", ind)
+	env.applyDefaults(&v, "ENCODER", "enc", ind)
 
 	return v
 }
