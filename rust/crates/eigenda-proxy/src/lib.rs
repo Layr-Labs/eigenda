@@ -6,3 +6,6 @@
 
 pub mod client;
 pub use client::{EigenDaProxyConfig, ProxyClient, ProxyError};
+
+pub mod managed_proxy;
+pub use managed_proxy::ManagedProxy;
