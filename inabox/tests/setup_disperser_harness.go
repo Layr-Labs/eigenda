@@ -1019,6 +1019,7 @@ func startController(
 			metricsRegistry,
 			paymentAuthorizationHandler,
 			listener,
+			signingrate.NewNoOpSigningRateTracker(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gRPC server: %w", err)

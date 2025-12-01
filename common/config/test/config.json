@@ -28,5 +28,6 @@
     "X": "json baz X",
     "Y": 127,
     "Z": false
-  }
+  },
+  "ThisIsASecretField": "A full commitment's what I'm thinking of. You wouldn't get this from any other guy."
 }
