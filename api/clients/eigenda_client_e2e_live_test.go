@@ -13,11 +13,11 @@ import (
 
 const (
 	// Test configuration constants
-	testRPC = "disperser-holesky.eigenda.xyz:443"
+	testRPC = "disperser-testnet-sepolia.eigenda.xyz:443"
 	// TODO: we should use a more reliable RPC provider, injected via secrets
-	testEthRpcUrl                = "https://ethereum-holesky-rpc.publicnode.com"
+	testEthRpcUrl                = "https://ethereum-sepolia-rpc.publicnode.com"
 	testSignerPrivateKeyHex      = "2d23e142a9e86a9175b9dfa213f20ea01f6c1731e09fa6edf895f70fe279cbb1"
-	testSvcManagerAddr           = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
+	testSvcManagerAddr           = "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764"
 	testStatusQueryTimeout       = 20 * time.Minute
 	testStatusQueryRetryInterval = 5 * time.Second
 )
