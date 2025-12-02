@@ -178,7 +178,7 @@ func bindEnvs(
 
 		keyPath := append(path, fieldKey)
 
-		switch field.Type.Kind() { //nolint:exhaustive // only handling struct and pointer types
+		switch field.Type.Kind() { //nolint:exhaustive // only handling struct, pointer, and slice types
 
 		case reflect.Struct:
 			// Recurse for nested structs
@@ -190,6 +190,21 @@ func bindEnvs(
 			for k := range nestedBoundVars {
 				boundVars[k] = struct{}{}
 			}
+		case reflect.Slice:
+			// Handle slices - currently only []*secret.Secret is supported
+			// Check if this is a slice of pointers to Secret
+			if field.Type.Elem().Kind() == reflect.Ptr &&
+				field.Type.Elem().Elem().Kind() == reflect.Struct &&
+				field.Type.Elem().Elem() == reflect.TypeOf((*secret.Secret)(nil)).Elem() {
+				// Slice of *secret.Secret, bind as leaf value
+				env := buildEnvVarName(prefix, keyPath...)
+				boundVars[env] = struct{}{}
+				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
+					return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
+				}
+			}
+			// Other slice types are not currently supported for environment variable binding
+			// and are silently ignored. This could be extended in the future if needed.
 		case reflect.Ptr:
 			// Handle pointer to struct
 			if field.Type.Elem().Kind() == reflect.Struct {

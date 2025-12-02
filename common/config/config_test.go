@@ -31,6 +31,7 @@ type Foo struct {
 	Baz                          *Baz
 	ThisIsAFieldWithAComplexName string
 	ThisIsASecretField           *secret.Secret
+	ThisIsASliceOfSecrets        []*secret.Secret
 }
 
 func DefaultFoo() *Foo {
@@ -551,4 +552,35 @@ func TestScreamingSnakeCaseFlag(t *testing.T) {
 	require.NoError(t, os.Unsetenv("TEST_THIS_IS_A_FIELD_WITH_A_COMPLEX_NAME"))
 	require.NoError(t, os.Unsetenv("TEST_BAR_THIS_IS_A_NESTED_FIELD_WITH_A_COMPLEX_NAME"))
 	require.NoError(t, os.Unsetenv("TEST_BAR_BAZ_THIS_FIELD_IS_NESTED_EVEN_DEEPER"))
+}
+
+func TestSecretSlice(t *testing.T) {
+	expected := []string{
+		"Never gonna give you up",
+		"Never gonna let you down",
+		"Never gonna run around and desert you",
+		"Never gonna make you cry",
+		"Never gonna say goodbye",
+		"Never gonna tell a lie and hurt you",
+	}
+
+	fullString := ""
+	for i, s := range expected {
+		if i > 0 {
+			fullString += ","
+		}
+		fullString += s
+	}
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_SECRETS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfSecrets, len(expected))
+	for i, secretField := range foo.ThisIsASliceOfSecrets {
+		require.Equal(t, expected[i], secretField.Get())
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_SECRETS"))
 }
