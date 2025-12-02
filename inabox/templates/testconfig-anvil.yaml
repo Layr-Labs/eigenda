@@ -71,4 +71,4 @@ services:
       AWS_SECRET_ACCESS_KEY: localstack
       ENCODER_ADDRESS: 0.0.0.0:34000
       USE_GRAPH: true
-      METRICS_ENABLE: false
+      ENABLE_METRICS: false

@@ -36,7 +36,11 @@ type EncoderConfig struct {
 	ChunkStore chunkstore.Config
 	Kzg        kzg.KzgConfig
 	Server     ServerConfig
-	Metrics    MetricsConfig
+
+	// MetricsPort is the port that the encoder metrics server listens on.
+	MetricsPort string
+	// EnableMetrics enables the metrics HTTP server for prometheus metrics collection
+	EnableMetrics bool
 
 	// LogFormat is the format of the logs: json or text
 	LogFormat string
@@ -67,7 +71,7 @@ func (e *EncoderConfig) GetPackagePaths() []string {
 // DefaultEncoderConfig returns a default configuration for the encoder.
 func DefaultEncoderConfig() *EncoderConfig {
 	return &EncoderConfig{
-		EncoderVersion: 1,
+		EncoderVersion: V2,
 		GrpcPort:       "34000",
 		Aws: aws.ClientConfig{
 			Region: "us-east-1",
@@ -96,12 +100,11 @@ func DefaultEncoderConfig() *EncoderConfig {
 			PprofHttpPort:                  "6060",
 			EnablePprof:                    false,
 		},
-		Metrics: MetricsConfig{
-			HTTPPort: "9100",
-		},
-		LogFormat: string(common.JSONLogFormat),
-		LogColor:  false,
-		LogLevel:  "info",
+		MetricsPort:   "9100",
+		EnableMetrics: false,
+		LogFormat:     string(common.JSONLogFormat),
+		LogColor:      false,
+		LogLevel:      "info",
 	}
 }
 

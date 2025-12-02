@@ -11,7 +11,6 @@
 | $${\color{red}\texttt{Aws.SecretAccessKey}}$$<br>`ENCODER_AWS_SECRET_ACCESS_KEY` | `string` | SecretAccessKey to use when interacting with S3. |
 | $${\color{red}\texttt{BlobStore.BucketName}}$$<br>`ENCODER_BLOB_STORE_BUCKET_NAME` | `string` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
 | $${\color{red}\texttt{BlobStore.TableName}}$$<br>`ENCODER_BLOB_STORE_TABLE_NAME` | `string` | TableName is the name of the DynamoDB table that stores blob metadata. |
-| $${\color{red}\texttt{Metrics.Enable}}$$<br>`ENCODER_METRICS_ENABLE` | `bool` | Enable is a flag to enable the metrics server. |
 
 ## Optional Fields
 
@@ -26,7 +25,8 @@
 | $${\color{red}\texttt{BlobStore.OCIRegion}}$$<br>`ENCODER_BLOB_STORE_OCI_REGION` | `string`<br>`""` | OCI region (only used when object-storage-backend is oci) |
 | $${\color{red}\texttt{ChunkStore.Backend}}$$<br>`ENCODER_CHUNK_STORE_BACKEND` | `string`<br>`"s3"` | Backend is the backend to use for object storage (s3 or oci). |
 | $${\color{red}\texttt{ChunkStore.BucketName}}$$<br>`ENCODER_CHUNK_STORE_BUCKET_NAME` | `string`<br>`""` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
-| $${\color{red}\texttt{EncoderVersion}}$$<br>`ENCODER_ENCODER_VERSION` | `encoder.EncoderVersion`<br>`1` | Encoder version (1 or 2) |
+| $${\color{red}\texttt{EnableMetrics}}$$<br>`ENCODER_ENABLE_METRICS` | `bool`<br>`false` | EnableMetrics enables the metrics HTTP server for prometheus metrics collection |
+| $${\color{red}\texttt{EncoderVersion}}$$<br>`ENCODER_ENCODER_VERSION` | `encoder.EncoderVersion`<br>`2` | Encoder version (1 or 2) |
 | $${\color{red}\texttt{GrpcPort}}$$<br>`ENCODER_GRPC_PORT` | `string`<br>`"34000"` | Port at which encoder listens for gRPC calls (default: 34000) |
 | $${\color{red}\texttt{Kzg.CacheDir}}$$<br>`ENCODER_KZG_CACHE_DIR` | `string`<br>`""` | Path to SRS Table directory. Always required even if PreloadEncoder is false, because the prover will write the SRS tables to this directory if they are not already present. |
 | $${\color{red}\texttt{Kzg.G1Path}}$$<br>`ENCODER_KZG_G1_PATH` | `string`<br>`""` | G1 points are needed by both the prover and verifier, so G1Path is always needed. |
@@ -41,7 +41,7 @@
 | $${\color{red}\texttt{LogColor}}$$<br>`ENCODER_LOG_COLOR` | `bool`<br>`false` | LogColor is a flag to enable color in the logs |
 | $${\color{red}\texttt{LogFormat}}$$<br>`ENCODER_LOG_FORMAT` | `string`<br>`"json"` | LogFormat is the format of the logs: json or text |
 | $${\color{red}\texttt{LogLevel}}$$<br>`ENCODER_LOG_LEVEL` | `string`<br>`"info"` | LogLevel is the level of the logs: debug, info, warn, error |
-| $${\color{red}\texttt{Metrics.HTTPPort}}$$<br>`ENCODER_METRICS_HTTP_PORT` | `string`<br>`"9100"` | HTTPPort is the port at which the metrics server is listening. |
+| $${\color{red}\texttt{MetricsPort}}$$<br>`ENCODER_METRICS_PORT` | `string`<br>`"9100"` | MetricsPort is the port that the encoder metrics server listens on. |
 | $${\color{red}\texttt{Server.Backend}}$$<br>`ENCODER_SERVER_BACKEND` | `string`<br>`"gnark"` | Backend to use for encoding. Supported values are "gnark" and "icicle". |
 | $${\color{red}\texttt{Server.EnableGnarkChunkEncoding}}$$<br>`ENCODER_SERVER_ENABLE_GNARK_CHUNK_ENCODING` | `bool`<br>`false` | EnableGnarkChunkEncoding if true, will produce chunks in Gnark, instead of Gob |
 | $${\color{red}\texttt{Server.EnablePprof}}$$<br>`ENCODER_SERVER_ENABLE_PPROF` | `bool`<br>`false` | EnablePprof starts the pprof server |

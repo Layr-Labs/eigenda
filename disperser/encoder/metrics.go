@@ -13,13 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-type MetricsConfig struct {
-	// HTTPPort is the port at which the metrics server is listening.
-	HTTPPort string
-	// Enable is a flag to enable the metrics server.
-	Enable bool `docs:"required"`
-}
-
 type Metrics struct {
 	logger   logging.Logger
 	registry *prometheus.Registry

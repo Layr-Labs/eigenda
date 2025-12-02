@@ -61,10 +61,10 @@ func run(_ context.Context) error {
 	}
 
 	reg := prometheus.NewRegistry()
-	metrics := encoder.NewMetrics(reg, cfg.Metrics.HTTPPort, logger)
+	metrics := encoder.NewMetrics(reg, cfg.MetricsPort, logger)
 	grpcMetrics := grpcprom.NewServerMetrics()
-	if cfg.Metrics.Enable {
-		httpSocket := fmt.Sprintf(":%s", cfg.Metrics.HTTPPort)
+	if cfg.EnableMetrics {
+		httpSocket := fmt.Sprintf(":%s", cfg.MetricsPort)
 		metrics.Start(context.Background())
 		logger.Info("Enabled metrics for Encoder", "socket", httpSocket)
 
