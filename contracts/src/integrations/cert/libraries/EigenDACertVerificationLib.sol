@@ -54,6 +54,11 @@ library EigenDACertVerificationLib {
     /// @param nextBlobVersion The next blob version (valid versions need to be less than this number)
     error InvalidBlobVersion(uint16 blobVersion, uint16 nextBlobVersion);
 
+    /// @notice Thrown when the offchain derivation version is invalid
+    /// @param actualVersion The actual offchain derivation version from the certificate
+    /// @param expectedVersion The expected offchain derivation version
+    error InvalidOffchainDerivationVersion(uint16 actualVersion, uint16 expectedVersion);
+
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
     /// @dev Uses the same verification logic as verifyDACertV2. The only difference is that the certificate is ABI encoded bytes.
     /// @param eigenDAThresholdRegistry The threshold registry contract
@@ -65,9 +70,10 @@ library EigenDACertVerificationLib {
     function checkDACert(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier eigenDASignatureVerifier,
-        CT.EigenDACertV3 memory daCert,
+        CT.EigenDACertV4 memory daCert,
         DATypesV1.SecurityThresholds memory securityThresholds,
-        bytes memory requiredQuorumNumbers
+        bytes memory requiredQuorumNumbers,
+        uint16 offchainDerivationVersion
     ) internal view {
         checkDACertV2(
             eigenDAThresholdRegistry,
@@ -77,7 +83,9 @@ library EigenDACertVerificationLib {
             daCert.nonSignerStakesAndSignature,
             securityThresholds,
             requiredQuorumNumbers,
-            daCert.signedQuorumNumbers
+            daCert.signedQuorumNumbers,
+            offchainDerivationVersion,
+            daCert.offchainDerivationVersion
         );
     }
 
@@ -98,7 +106,9 @@ library EigenDACertVerificationLib {
         DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers,
-        bytes memory signedQuorumNumbers
+        bytes memory signedQuorumNumbers,
+        uint16 expectedOffchainDerivationVersion,
+        uint16 actualOffchainDerivationVersion
     ) internal view {
         checkBlobInclusion(batchHeader, blobInclusionInfo);
 
@@ -121,6 +131,9 @@ library EigenDACertVerificationLib {
         checkQuorumSubsets(
             requiredQuorumNumbers, blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap
         );
+
+        // Check offchain derivation version
+        checkOffchainDerivationVersion(expectedOffchainDerivationVersion, actualOffchainDerivationVersion);
     }
 
     /// @notice Checks blob inclusion in the batch using Merkle proof
@@ -322,5 +335,17 @@ library EigenDACertVerificationLib {
                 hashBlobHeaderV2(blobCertificate.blobHeader), blobCertificate.signature, blobCertificate.relayKeys
             )
         );
+    }
+
+    /// @notice Checks that the offchain derivation version matches the expected version
+    /// @param expectedOffchainDerivationVersion The expected offchain derivation version
+    /// @param actualOffchainDerivationVersion The actual offchain derivation version from the certificate
+    function checkOffchainDerivationVersion(
+        uint16 expectedOffchainDerivationVersion,
+        uint16 actualOffchainDerivationVersion
+    ) internal pure {
+        if (expectedOffchainDerivationVersion != actualOffchainDerivationVersion) {
+            revert InvalidOffchainDerivationVersion(actualOffchainDerivationVersion, expectedOffchainDerivationVersion);
+        }
     }
 }

@@ -14,4 +14,11 @@ library EigenDACertTypes {
         DATypesV1.NonSignerStakesAndSignature nonSignerStakesAndSignature;
         bytes signedQuorumNumbers;
     }
+    struct EigenDACertV4 {
+        DATypesV2.BatchHeaderV2 batchHeader;
+        DATypesV2.BlobInclusionInfo blobInclusionInfo;
+        DATypesV1.NonSignerStakesAndSignature nonSignerStakesAndSignature;
+        bytes signedQuorumNumbers;
+        uint16 offchainDerivationVersion;
+    }
 }

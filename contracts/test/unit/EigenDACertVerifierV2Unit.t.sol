@@ -35,26 +35,26 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         certLibHarness = new CertLibTestHarness();
     }
 
-    function _getDACert(uint256 seed) internal returns (EigenDACertTypes.EigenDACertV3 memory) {
+    function _getDACert(uint256 seed) internal returns (EigenDACertTypes.EigenDACertV4 memory) {
         (EigenDATypesV2.SignedBatch memory signedBatch, EigenDATypesV2.BlobInclusionInfo memory blobInclusionInfo,) =
             _getSignedBatchAndBlobVerificationProof(seed, 0);
 
         (DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertLib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
 
-        return EigenDACertTypes.EigenDACertV3(
-            signedBatch.batchHeader, blobInclusionInfo, nonSignerStakesAndSignature, signedQuorumNumbers
+        return EigenDACertTypes.EigenDACertV4(
+            signedBatch.batchHeader, blobInclusionInfo, nonSignerStakesAndSignature, signedQuorumNumbers, offchainDerivationVersion
         );
     }
 
     function test_verifyDACert(uint256 pseudoRandomNumber) public {
-        EigenDACertTypes.EigenDACertV3 memory cert = _getDACert(pseudoRandomNumber);
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
         uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
         assertEq(res, 1);
     }
 
     function test_verifyDACert_revert_InclusionProofInvalid(uint256 pseudoRandomNumber) public {
-        EigenDACertTypes.EigenDACertV3 memory cert = _getDACert(pseudoRandomNumber);
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
 
         cert.blobInclusionInfo.inclusionProof =
             abi.encodePacked(keccak256(abi.encode(pseudoRandomNumber, "inclusion proof")));
