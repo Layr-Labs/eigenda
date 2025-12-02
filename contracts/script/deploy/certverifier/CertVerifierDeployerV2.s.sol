@@ -32,7 +32,7 @@ contract CertVerifierDeployerV2 is Script, Test {
 
     DATypesV1.SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
-    uint8 offchainDerivationVersion;
+    uint16 offchainDerivationVersion;
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
         // 1 - ingest JSON config file as string and extract dependency fields used for
@@ -51,7 +51,7 @@ contract CertVerifierDeployerV2 is Script, Test {
         quorumNumbersRequired = abi.decode(raw, (bytes));
 
         raw = stdJson.parseRaw(data, ".offchainDerivationVersion");
-        offchainDerivationVersion = abi.decode(raw, (uint8));
+        offchainDerivationVersion = abi.decode(raw, (uint16));
 
         // 2 - read dependency contract addresses from EigenDA Directory namespaced resolution
         //     contract and ensure that addresses are correct w.r.t their intended interfaces

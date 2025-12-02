@@ -25,5 +25,5 @@ interface IEigenDACertVerifier {
     function quorumNumbersRequired() external view returns (bytes memory);
 
     /// @notice Returns the offchain derivation version used in certificate verification.
-    function offchainDerivationVersion() external view returns (uint8);
+    function offchainDerivationVersion() external view returns (uint16);
 }

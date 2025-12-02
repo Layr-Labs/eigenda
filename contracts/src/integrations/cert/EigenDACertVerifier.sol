@@ -39,7 +39,7 @@ contract EigenDACertVerifier is
     DATypesV1.SecurityThresholds internal _securityThresholds;
 
     bytes internal _quorumNumbersRequired;
-    uint8 internal _offchainDerivationVersion;
+    uint16 internal _offchainDerivationVersion;
 
     uint8 internal constant MAJOR_VERSION = 3;
     uint8 internal constant MINOR_VERSION = 2;
@@ -67,7 +67,7 @@ contract EigenDACertVerifier is
         IEigenDASignatureVerifier initEigenDASignatureVerifier,
         DATypesV1.SecurityThresholds memory initSecurityThresholds,
         bytes memory initQuorumNumbersRequired,
-        uint8 initOffchainDerivationVersion
+        uint16 initOffchainDerivationVersion
     ) {
         if (initSecurityThresholds.confirmationThreshold <= initSecurityThresholds.adversaryThreshold) {
             revert InvalidSecurityThresholds();
@@ -173,7 +173,7 @@ contract EigenDACertVerifier is
     }
 
     /// @inheritdoc IEigenDACertVerifier
-    function offchainDerivationVersion() external view returns (uint8) {
+    function offchainDerivationVersion() external view returns (uint16) {
         return _offchainDerivationVersion;
     }
 

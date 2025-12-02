@@ -87,8 +87,8 @@ library InitParamsLib {
         return stdToml.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumNumbersRequired");
     }
 
-    function offchainDerivationVersion(string memory configData) internal pure returns (uint8) {
-        return uint8(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.offchainDerivationVersion"));
+    function offchainDerivationVersion(string memory configData) internal pure returns (uint16) {
+        return uint16(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.offchainDerivationVersion"));
     }
 
     function versionedBlobParams(string memory configData)
