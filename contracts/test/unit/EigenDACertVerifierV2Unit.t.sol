@@ -64,6 +64,13 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
     }
 
+    function test_verifyDACert_revert_OffchainDerivationVersionInvalid(uint256 pseudoRandomNumber) public {
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
+        cert.offchainDerivationVersion = cert.offchainDerivationVersion + 1;
+        uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
+    }
+
     function test_checkSecurityParams_ValidParams() public view {
         // Uses the default blob params from MockEigenDADeployer:
         // maxNumOperators: 3537, numChunks: 8192, codingRate: 8
