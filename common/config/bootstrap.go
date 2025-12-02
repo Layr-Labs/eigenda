@@ -99,6 +99,7 @@ func Bootstrap[T DocumentedConfig](
 		// Help was shown, return zero value
 		os.Exit(0)
 	}
+	// This is a workaround to make the compiler happy.
 	var zero T
 	return zero, nil
 }

@@ -18,7 +18,6 @@ func main() {
 	err = config.DocumentConfig(ejector.DefaultRootEjectorConfig, configDocsDir, true)
 	enforce.NilError(err, "failed to generate docs for the ejector config")
 
-	// requireDocs is false because nested configs (blobstore, chunkstore, etc.) may not have complete GoDoc comments
-	err = config.DocumentConfig(encoder.DefaultEncoderConfig, configDocsDir, false)
+	err = config.DocumentConfig(encoder.DefaultEncoderConfig, configDocsDir, true)
 	enforce.NilError(err, "failed to generate docs for the encoder config")
 }

@@ -12,6 +12,13 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 )
 
+type EncoderVersion uint
+
+const (
+	V1 EncoderVersion = 1
+	V2 EncoderVersion = 2
+)
+
 var _ config.DocumentedConfig = (*EncoderConfig)(nil)
 
 var _ config.VerifiableConfig = (*EncoderConfig)(nil)
@@ -19,23 +26,17 @@ var _ config.VerifiableConfig = (*EncoderConfig)(nil)
 // Configuration for the encoder.
 type EncoderConfig struct {
 	// Encoder version (1 or 2)
-	EncoderVersion uint `docs:"required"`
+	EncoderVersion EncoderVersion
 
-	// Port at which encoder listens for gRPC calls
-	GrpcPort string `docs:"required"`
+	// Port at which encoder listens for gRPC calls (default: 34000)
+	GrpcPort string
 
-	// Object storage configuration
+	Aws        aws.ClientConfig
 	BlobStore  blobstore.Config
 	ChunkStore chunkstore.Config
-
-	// KZG configuration
-	Kzg kzg.KzgConfig
-
-	// Server configuration
-	Server ServerConfig
-
-	// Metrics configuration
-	Metrics MetricsConfig
+	Kzg        kzg.KzgConfig
+	Server     ServerConfig
+	Metrics    MetricsConfig
 
 	// LogFormat is the format of the logs: json or text
 	LogFormat string
@@ -43,9 +44,6 @@ type EncoderConfig struct {
 	LogColor bool
 	// LogLevel is the level of the logs: debug, info, warn, error
 	LogLevel string
-
-	// AWS client configuration
-	Aws aws.ClientConfig
 }
 
 func (e *EncoderConfig) GetEnvVarPrefix() string {
@@ -71,6 +69,9 @@ func DefaultEncoderConfig() *EncoderConfig {
 	return &EncoderConfig{
 		EncoderVersion: 1,
 		GrpcPort:       "34000",
+		Aws: aws.ClientConfig{
+			Region: "us-east-1",
+		},
 		BlobStore: blobstore.Config{
 			Backend: blobstore.S3Backend,
 		},
@@ -101,14 +102,11 @@ func DefaultEncoderConfig() *EncoderConfig {
 		LogFormat: string(common.JSONLogFormat),
 		LogColor:  false,
 		LogLevel:  "info",
-		Aws: aws.ClientConfig{
-			Region: "us-east-1",
-		},
 	}
 }
 
 func (c *EncoderConfig) Verify() error {
-	if c.EncoderVersion != 1 && c.EncoderVersion != 2 {
+	if c.EncoderVersion != V1 && c.EncoderVersion != V2 {
 		return fmt.Errorf("invalid encoder version: %d (must be 1 or 2)", c.EncoderVersion)
 	}
 
@@ -117,7 +115,7 @@ func (c *EncoderConfig) Verify() error {
 	}
 
 	// For V2, bucket name is required
-	if c.EncoderVersion == 2 {
+	if c.EncoderVersion == V2 {
 		if c.BlobStore.BucketName == "" {
 			return fmt.Errorf("blob store bucket name is required for encoder v2")
 		}

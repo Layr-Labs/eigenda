@@ -11,8 +11,6 @@
 | $${\color{red}\texttt{Aws.SecretAccessKey}}$$<br>`ENCODER_AWS_SECRET_ACCESS_KEY` | `string` | SecretAccessKey to use when interacting with S3. |
 | $${\color{red}\texttt{BlobStore.BucketName}}$$<br>`ENCODER_BLOB_STORE_BUCKET_NAME` | `string` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
 | $${\color{red}\texttt{BlobStore.TableName}}$$<br>`ENCODER_BLOB_STORE_TABLE_NAME` | `string` | TableName is the name of the DynamoDB table that stores blob metadata. |
-| $${\color{red}\texttt{EncoderVersion}}$$<br>`ENCODER_ENCODER_VERSION` | `uint` | Encoder version (1 or 2) |
-| $${\color{red}\texttt{GrpcPort}}$$<br>`ENCODER_GRPC_PORT` | `string` | Port at which encoder listens for gRPC calls |
 | $${\color{red}\texttt{Metrics.Enable}}$$<br>`ENCODER_METRICS_ENABLE` | `bool` | Enable is a flag to enable the metrics server. |
 
 ## Optional Fields
@@ -26,18 +24,20 @@
 | $${\color{red}\texttt{BlobStore.OCICompartmentID}}$$<br>`ENCODER_BLOB_STORE_OCI_COMPARTMENT_ID` | `string`<br>`""` | OCI compartment ID (only used when object-storage-backend is oci) |
 | $${\color{red}\texttt{BlobStore.OCINamespace}}$$<br>`ENCODER_BLOB_STORE_OCI_NAMESPACE` | `string`<br>`""` | OCI namespace (only used when object-storage-backend is oci). If not provided, will be retrieved dynamically. |
 | $${\color{red}\texttt{BlobStore.OCIRegion}}$$<br>`ENCODER_BLOB_STORE_OCI_REGION` | `string`<br>`""` | OCI region (only used when object-storage-backend is oci) |
-| $${\color{red}\texttt{ChunkStore.Backend}}$$<br>`ENCODER_CHUNK_STORE_BACKEND` | `string`<br>`"s3"` |  |
-| $${\color{red}\texttt{ChunkStore.BucketName}}$$<br>`ENCODER_CHUNK_STORE_BUCKET_NAME` | `string`<br>`""` |  |
+| $${\color{red}\texttt{ChunkStore.Backend}}$$<br>`ENCODER_CHUNK_STORE_BACKEND` | `string`<br>`"s3"` | Backend is the backend to use for object storage (s3 or oci). |
+| $${\color{red}\texttt{ChunkStore.BucketName}}$$<br>`ENCODER_CHUNK_STORE_BUCKET_NAME` | `string`<br>`""` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
+| $${\color{red}\texttt{EncoderVersion}}$$<br>`ENCODER_ENCODER_VERSION` | `encoder.EncoderVersion`<br>`1` | Encoder version (1 or 2) |
+| $${\color{red}\texttt{GrpcPort}}$$<br>`ENCODER_GRPC_PORT` | `string`<br>`"34000"` | Port at which encoder listens for gRPC calls (default: 34000) |
 | $${\color{red}\texttt{Kzg.CacheDir}}$$<br>`ENCODER_KZG_CACHE_DIR` | `string`<br>`""` | Path to SRS Table directory. Always required even if PreloadEncoder is false, because the prover will write the SRS tables to this directory if they are not already present. |
 | $${\color{red}\texttt{Kzg.G1Path}}$$<br>`ENCODER_KZG_G1_PATH` | `string`<br>`""` | G1 points are needed by both the prover and verifier, so G1Path is always needed. |
 | $${\color{red}\texttt{Kzg.G2Path}}$$<br>`ENCODER_KZG_G2_PATH` | `string`<br>`""` | G2Path and G2TrailingPath are only needed if LoadG2Points is true. G2 points are used to generate the blob length proof.<br><br>There are 2 ways to configure G2 points: 1. Entire G2 SRS file (16GiB) is provided via G2Path 2. G2Path and G2TrailingPath both contain at least SRSNumberToLoad points, where G2Path contains the first part of the G2 SRS file, and G2TrailingPath contains the trailing end of the G2 SRS file. TODO(samlaf): to prevent misconfigurations and simplify the code, we should probably not multiplex G2Path like this, and instead use a G2PrefixPath config. Then EITHER G2Path is used, OR both G2PrefixPath and G2TrailingPath are used. |
-| $${\color{red}\texttt{Kzg.G2TrailingPath}}$$<br>`ENCODER_KZG_G2_TRAILING_PATH` | `string`<br>`""` |  |
+| $${\color{red}\texttt{Kzg.G2TrailingPath}}$$<br>`ENCODER_KZG_G2_TRAILING_PATH` | `string`<br>`""` | G2TrailingPath is the path to trailing G2 SRS file. Its intended purpose is to allow local generation the blob length proof. If you already downloaded the entire G2 SRS file which contains 268435456 G2 points with total size 16GiB, this setting is not needed. With this G2TrailingPath, user can use a smaller file that contains only the trailing end of the whole G2 SRS file. Ignoring this setting, the program assumes the entire G2 SRS file is provided. With this setting, the size of the provided file must be at least SRSNumberToLoad * 64 Bytes. |
 | $${\color{red}\texttt{Kzg.LoadG2Points}}$$<br>`ENCODER_KZG_LOAD_G2_POINTS` | `bool`<br>`false` | G2 SRS points are only needed by the prover, since the verifier uses hardcoded G2 powers of 2. See [srs.G2PowerOf2SRS] for details. |
 | $${\color{red}\texttt{Kzg.NumWorker}}$$<br>`ENCODER_KZG_NUM_WORKER` | `uint64`<br>`12` | NumWorker is used in a few places: 1. Num goroutines used to parse the SRS points read from the SRS files. 2. Num goroutines used by the prover and verifier. TODO(samlaf): split into separate configs only specified for prover or verifier, where needed. |
 | $${\color{red}\texttt{Kzg.PreloadEncoder}}$$<br>`ENCODER_KZG_PRELOAD_ENCODER` | `bool`<br>`false` | PreloadEncoder is only used by the prover to generate kzg multiproofs. It is not needed by the clients/proxy, which only need to generate kzg commitments, not proofs.<br><br>If true, SRS tables are read from CacheDir during initialization. Generating these on startup would take hours otherwise. |
 | $${\color{red}\texttt{Kzg.SRSNumberToLoad}}$$<br>`ENCODER_KZG_SRS_NUMBER_TO_LOAD` | `uint64`<br>`10000` | Number of G1 (and optionally G2) points to be loaded from the SRS files: G1Path, and optionally G2Path and G2TrailingPath. This number times 32 bytes will be loaded from G1Path, and if LoadG2Points is true, this number times 64 bytes will be loaded from G2Path and optionally G2TrailingPath. |
 | $${\color{red}\texttt{Kzg.SRSOrder}}$$<br>`ENCODER_KZG_SRS_ORDER` | `uint64`<br>`10000` | SRSOrder is the total size of SRS. TODO(samlaf): this should always be 2^28. Get rid of this field and replace with hardcoded constant. |
-| $${\color{red}\texttt{Kzg.Verbose}}$$<br>`ENCODER_KZG_VERBOSE` | `bool`<br>`false` |  |
+| $${\color{red}\texttt{Kzg.Verbose}}$$<br>`ENCODER_KZG_VERBOSE` | `bool`<br>`false` | Verbose is a flag to enable verbose output for encoding/decoding. |
 | $${\color{red}\texttt{LogColor}}$$<br>`ENCODER_LOG_COLOR` | `bool`<br>`false` | LogColor is a flag to enable color in the logs |
 | $${\color{red}\texttt{LogFormat}}$$<br>`ENCODER_LOG_FORMAT` | `string`<br>`"json"` | LogFormat is the format of the logs: json or text |
 | $${\color{red}\texttt{LogLevel}}$$<br>`ENCODER_LOG_LEVEL` | `string`<br>`"info"` | LogLevel is the level of the logs: debug, info, warn, error |
