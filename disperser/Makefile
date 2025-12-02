@@ -42,16 +42,20 @@ run_server: build
 	--aws.endpoint-url http://0.0.0.0:4566
 
 run_encoder: build
-	./bin/encoder \
-	--disperser-encoder.grpc-port 34000 \
-  --disperser-encoder.metrics-http-port 9109 \
-  --kzg.g1-path ../resources/srs/g1.point \
-  --kzg.g2-path ../resources/srs/g2.point \
-  --kzg.cache-path ../resources/srs/SRSTables \
-  --kzg.srs-order 3000 \
-  --kzg.num-workers 12 \
-  --disperser-encoder.log.level-std debug \
-  --disperser-encoder.log.level-file debug
+	export ENCODER_ENCODER_VERSION=1 && \
+	export ENCODER_ENABLE_METRICS=true && \
+	export ENCODER_METRICS_PORT=9109 && \
+	export ENCODER_LOG_LEVEL=debug && \
+	export ENCODER_LOG_FORMAT=json && \
+	export ENCODER_LOG_COLOR=false && \
+	export ENCODER_GRPC_PORT=34000 && \
+	export ENCODER_KZG_G1_PATH=../resources/srs/g1.point && \
+	export ENCODER_KZG_G2_PATH=../resources/srs/g2.point && \
+	export ENCODER_KZG_CACHE_DIR=../resources/srs/SRSTables && \
+	export ENCODER_KZG_SRS_ORDER=3000 && \
+	export ENCODER_KZG_SRS_NUMBER_TO_LOAD=3000 && \
+	export ENCODER_KZG_NUM_WORKER=12 && \
+	./bin/encoder
 
 # You can override these defaults via CLI or environment variables
 run_blobapi: build
