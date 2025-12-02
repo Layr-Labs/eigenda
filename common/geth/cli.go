@@ -1,6 +1,8 @@
 package geth
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
 )
@@ -18,6 +20,7 @@ type EthClientConfig struct {
 	PrivateKeyString string
 	NumConfirmations int
 	NumRetries       int
+	RetryDelay       time.Duration
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {
