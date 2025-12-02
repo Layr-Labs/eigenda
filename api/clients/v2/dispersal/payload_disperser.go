@@ -126,7 +126,7 @@ func (pd *PayloadDisperser) SendPayload(
 		return nil, fmt.Errorf("get disperser client: %w", err)
 	}
 
-	disperserID := disperserClient.GetDisperserID()
+	disperserID := disperserClient.GetConfig().DisperserID
 	dispersalSuccess := false
 	defer func() {
 		err := pd.disperserClientMultiplexer.ReportDispersalOutcome(disperserID, dispersalSuccess, time.Now())

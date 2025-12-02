@@ -115,10 +115,6 @@ func (c *DisperserClient) GetConfig() *DisperserClientConfig {
 	return c.config
 }
 
-// Returns the disperser ID for this client.
-func (c *DisperserClient) GetDisperserID() uint32 {
-	return c.config.DisperserID
-}
 
 // Close closes the grpc connection to the disperser server.
 // It is thread safe and can be called multiple times.
