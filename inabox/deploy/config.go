@@ -299,6 +299,7 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 		ENCODER_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS: "16",
 		ENCODER_SERVER_REQUEST_POOL_SIZE:                 "32",
 		ENCODER_SERVER_REQUEST_QUEUE_SIZE:                "32",
+		ENCODER_ENCODER_VERSION:                          "1",
 	}
 
 	env.applyDefaults(&v, "ENCODER", "enc", ind)
