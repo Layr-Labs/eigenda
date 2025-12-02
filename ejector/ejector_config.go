@@ -29,6 +29,16 @@ type EjectorConfig struct {
 	// The URL of the Eigenda Data API to use for looking up signing rates.
 	DataApiUrl string `docs:"required"`
 
+	// The AWS KMS Key ID to use for signing transactions. Only required if the private key is not provided via
+	// the Secret.PrivateKey field.
+	KmsKeyId string `docs:"required"`
+
+	// The AWS region where the KMS key is located. Only required if KmsKeyId is provided.
+	KmsRegion string `docs:"required"`
+
+	// The AWS KMS endpoint to use. Only required if using a custom endpoint (e.g., LocalStack).
+	KmsEndpoint string
+
 	// The number of times to retry a failed Ethereum RPC call.
 	EthRpcRetryCount int
 
@@ -92,6 +102,18 @@ type EjectorConfig struct {
 	MaxGasOverride uint64
 }
 
+var _ config.VerifiableConfig = (*EjectorSecretConfig)(nil)
+
+// Configuration for secrets used by the ejector.
+type EjectorSecretConfig struct {
+	// The Ethereum RPC URL(s) to use for connecting to the blockchain.
+	EthRpcUrls []string `docs:"required"`
+
+	// The private key to use for signing ejection transactions, in hex.
+	// Do not include the '0x' prefix. This is required if KMS is not configured.
+	PrivateKey string `docs:"required"`
+}
+
 // Create a new root ejector config with default values.
 func DefaultRootEjectorConfig() *RootEjectorConfig {
 	return &RootEjectorConfig{
@@ -119,31 +141,24 @@ func (e *RootEjectorConfig) Verify() error {
 	if err != nil {
 		return fmt.Errorf("invalid ejector config: %w", err)
 	}
+
 	err = e.Secret.Verify()
 	if err != nil {
 		return fmt.Errorf("invalid ejector secret config: %w", err)
 	}
+
+	if e.Secret.PrivateKey == "" {
+		if e.Config.KmsKeyId == "" || e.Config.KmsRegion == "" {
+			return fmt.Errorf("either private key or KMS configuration must be provided")
+		}
+	}
+
 	return nil
-}
-
-var _ config.VerifiableConfig = (*EjectorSecretConfig)(nil)
-
-// Configuration for secrets used by the ejector.
-type EjectorSecretConfig struct {
-	// The Ethereum RPC URL(s) to use for connecting to the blockchain.
-	EthRpcUrls []string `docs:"required"`
-
-	// The private key to use for signing ejection transactions, in hex.
-	// Do not include the '0x' prefix.
-	PrivateKey string `docs:"required"`
 }
 
 func (c *EjectorSecretConfig) Verify() error {
 	if len(c.EthRpcUrls) == 0 {
 		return fmt.Errorf("invalid Ethereum RPC URLs: must provide at least one URL")
-	}
-	if c.PrivateKey == "" {
-		return fmt.Errorf("invalid private key")
 	}
 	return nil
 }

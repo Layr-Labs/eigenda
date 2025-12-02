@@ -5,14 +5,16 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"time"
 
+	"github.com/Layr-Labs/eigenda/common/aws"
 	contractEigenDAEjectionManager "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDAEjectionManager"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/aws/aws-sdk-go-v2/config"
+	awskms "github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 // EjectionTransactor executes transactions related to ejections. This layer of abstraction allows for easier
@@ -75,18 +77,15 @@ func NewEjectionTransactor(
 	selfAddress gethcommon.Address,
 	privateKey *ecdsa.PrivateKey,
 	chainID *big.Int,
-	referenceBlockNumberOffset uint64,
-	referenceBlockNumberPollInterval time.Duration,
-	ethCacheSize int,
-	maxGasOverride uint64,
+	cfg *EjectorConfig,
 ) (EjectionTransactor, error) {
 
 	var zeroAddress gethcommon.Address
 	if selfAddress == zeroAddress {
 		return nil, fmt.Errorf("selfAddress must be non-zero")
 	}
-	if privateKey == nil {
-		return nil, fmt.Errorf("privateKey must be non-nil")
+	if privateKey == nil && (cfg.KmsKeyId == "" || cfg.KmsRegion == "") {
+		return nil, fmt.Errorf("either privateKey or KMS configuration (keyId and region) must be provided")
 	}
 	if ejectionContractAddress == zeroAddress {
 		return nil, fmt.Errorf("ejectionContractAddress must be non-zero")
@@ -110,15 +109,10 @@ func NewEjectionTransactor(
 		return nil, fmt.Errorf("failed to create ejection manager transactor: %w", err)
 	}
 
-	transactOpts, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transact opts: %w", err)
-	}
-
-	referenceBlockProvider := eth.NewReferenceBlockProvider(logger, client, referenceBlockNumberOffset)
+	referenceBlockProvider := eth.NewReferenceBlockProvider(logger, client, cfg.ReferenceBlockNumberOffset)
 	referenceBlockProvider, err = eth.NewPeriodicReferenceBlockProvider(
 		referenceBlockProvider,
-		referenceBlockNumberPollInterval)
+		cfg.ReferenceBlockNumberPollInterval)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create periodic reference block provider: %w", err)
 	}
@@ -127,7 +121,7 @@ func NewEjectionTransactor(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create validator quorum lookup: %w", err)
 	}
-	validatorQuorumLookup, err = eth.NewCachedValidatorQuorumLookup(validatorQuorumLookup, ethCacheSize)
+	validatorQuorumLookup, err = eth.NewCachedValidatorQuorumLookup(validatorQuorumLookup, int(cfg.ChainDataCacheSize))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cached validator quorum lookup: %w", err)
 	}
@@ -138,9 +132,14 @@ func NewEjectionTransactor(
 	}
 	validatorIDToAddressConverter, err = eth.NewCachedValidatorIDToAddressConverter(
 		validatorIDToAddressConverter,
-		ethCacheSize)
+		int(cfg.ChainDataCacheSize))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cached validator ID to address converter: %w", err)
+	}
+
+	signer, err := buildSigner(privateKey, chainID, cfg.KmsKeyId, cfg.KmsRegion, cfg.KmsEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build signer: %w", err)
 	}
 
 	return &ejectionTransactor{
@@ -148,12 +147,79 @@ func NewEjectionTransactor(
 		selfAddress:                   selfAddress,
 		caller:                        caller,
 		transactor:                    transactor,
-		signer:                        transactOpts.Signer,
+		signer:                        signer,
 		referenceBlockProvider:        referenceBlockProvider,
 		validatorQuorumLookup:         validatorQuorumLookup,
 		validatorIDToAddressConverter: validatorIDToAddressConverter,
-		maxGasOverride:                maxGasOverride,
+		maxGasOverride:                cfg.MaxGasOverride,
 	}, nil
+}
+
+// Build a signer function.
+func buildSigner(
+	privateKey *ecdsa.PrivateKey,
+	chainID *big.Int,
+	kmsKeyId string,
+	kmsRegion string,
+	kmsEndpoint string,
+) (bind.SignerFn, error) {
+
+	if privateKey != nil {
+		signer, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create transact opts: %w", err)
+		}
+		return signer.Signer, nil
+	}
+
+	if kmsKeyId == "" || kmsRegion == "" {
+		return nil, fmt.Errorf("KMS key ID and region must be provided for KMS signing if private key is not provided")
+	}
+
+	// Load AWS config for the specified region
+	ctx := context.Background()
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(kmsRegion))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	// Create KMS client with optional custom endpoint
+	kmsClient := awskms.NewFromConfig(awsCfg, func(o *awskms.Options) {
+		if kmsEndpoint != "" {
+			o.BaseEndpoint = &kmsEndpoint
+		}
+	})
+
+	// Load the public key from KMS
+	publicKey, err := aws.LoadPublicKeyKMS(ctx, kmsClient, kmsKeyId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load public key from KMS: %w", err)
+	}
+
+	// Create the EIP-155 signer for the chain
+	signer := types.LatestSignerForChainID(chainID)
+
+	// Create and return a SignerFn that uses KMS
+	var signerFn bind.SignerFn = func(address gethcommon.Address, tx *types.Transaction) (*types.Transaction, error) {
+		// Hash the transaction using the signer
+		txHash := signer.Hash(tx)
+
+		// Sign the hash using KMS
+		signature, err := aws.SignKMS(context.Background(), kmsClient, kmsKeyId, publicKey, txHash.Bytes())
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign transaction with KMS: %w", err)
+		}
+
+		// Apply the signature to the transaction
+		signedTx, err := tx.WithSignature(signer, signature)
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply signature to transaction: %w", err)
+		}
+
+		return signedTx, nil
+	}
+
+	return signerFn, nil
 }
 
 func (e *ejectionTransactor) CompleteEjection(

@@ -7,11 +7,14 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/ejector"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	awskms "github.com/aws/aws-sdk-go-v2/service/kms"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -49,18 +52,34 @@ func run(ctx context.Context) error {
 	}
 
 	var privateKey *ecdsa.PrivateKey
-	privateKey, err = crypto.HexToECDSA(secretConfig.PrivateKey)
-	if err != nil {
-		return fmt.Errorf("failed to parse private key: %w", err)
-	}
+	var senderAddress gethcommon.Address
 
-	// Derive the public address from the private key
-	publicKey := privateKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		return fmt.Errorf("failed to get ECDSA public key")
+	if secretConfig.PrivateKey != "" {
+		// Use private key if provided
+		privateKey, err = crypto.HexToECDSA(secretConfig.PrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to parse private key: %w", err)
+		}
+
+		// Derive the public address from the private key
+		publicKey := privateKey.Public()
+		publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+		if !ok {
+			return fmt.Errorf("failed to get ECDSA public key")
+		}
+		senderAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
+	} else {
+		// Derive address from KMS public key
+		senderAddress, err = getAddressFromKMS(
+			ctx,
+			ejectorConfig.KmsKeyId,
+			ejectorConfig.KmsRegion,
+			ejectorConfig.KmsEndpoint,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to get address from KMS: %w", err)
+		}
 	}
-	senderAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
 
 	gethClient, err := geth.NewMultiHomingClient(
 		geth.EthClientConfig{
@@ -107,10 +126,7 @@ func run(ctx context.Context) error {
 		senderAddress,
 		privateKey,
 		chainID,
-		ejectorConfig.ReferenceBlockNumberOffset,
-		ejectorConfig.ReferenceBlockNumberPollInterval,
-		int(ejectorConfig.ChainDataCacheSize),
-		ejectorConfig.MaxGasOverride,
+		ejectorConfig,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create ejection transactor: %w", err)
@@ -192,4 +208,35 @@ func run(ctx context.Context) error {
 		validatorStakeLookup,
 	)
 	return nil
+}
+
+// getAddressFromKMS retrieves the Ethereum address associated with a KMS key.
+func getAddressFromKMS(
+	ctx context.Context,
+	kmsKeyId string,
+	kmsRegion string,
+	kmsEndpoint string,
+) (gethcommon.Address, error) {
+	// Load AWS config for the specified region
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(kmsRegion))
+	if err != nil {
+		return gethcommon.Address{}, fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	// Create KMS client with optional custom endpoint
+	kmsClient := awskms.NewFromConfig(awsCfg, func(o *awskms.Options) {
+		if kmsEndpoint != "" {
+			o.BaseEndpoint = &kmsEndpoint
+		}
+	})
+
+	// Load the public key from KMS
+	publicKey, err := aws.LoadPublicKeyKMS(ctx, kmsClient, kmsKeyId)
+	if err != nil {
+		return gethcommon.Address{}, fmt.Errorf("failed to load public key from KMS: %w", err)
+	}
+
+	// Derive the Ethereum address from the public key
+	address := crypto.PubkeyToAddress(*publicKey)
+	return address, nil
 }
