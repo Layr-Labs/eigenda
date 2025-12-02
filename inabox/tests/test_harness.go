@@ -281,6 +281,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 	}
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
+	multiplexerConfig.UseSecureGrpcFlag = false
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(tc.APIServerAddress)
 
 	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
