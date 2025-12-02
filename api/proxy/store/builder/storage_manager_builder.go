@@ -34,8 +34,8 @@ import (
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/Layr-Labs/eigenda/common/disperser"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
-	"github.com/Layr-Labs/eigenda/core/disperser"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/payments"

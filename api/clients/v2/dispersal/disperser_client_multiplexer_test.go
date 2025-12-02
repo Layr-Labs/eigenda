@@ -6,8 +6,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/disperser"
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
-	"github.com/Layr-Labs/eigenda/core/disperser"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/stretchr/testify/require"
 )
