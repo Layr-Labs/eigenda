@@ -40,11 +40,16 @@ var DecodeHook mapstructure.DecodeHookFunc = func(from reflect.Type, to reflect.
 				return data, nil
 			}
 
+			// If the source string is empty, return an empty slice
+			if len(sourceStr) == 0 {
+				return []*Secret{}, nil
+			}
+
 			// Split the string by commas and create a slice of secrets
 			parts := strings.Split(sourceStr, ",")
 			secrets := make([]*Secret, len(parts))
 			for i, part := range parts {
-				secrets[i] = NewSecret(part)
+				secrets[i] = NewSecret(strings.TrimSpace(part))
 			}
 			return secrets, nil
 		}

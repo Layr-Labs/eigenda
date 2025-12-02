@@ -95,6 +95,7 @@ func TestTOMLParsing(t *testing.T) {
 	require.Equal(t,
 		"you're no stranger to love, you know the rules and so do I (so do I)",
 		foo.ThisIsASecretField.Get())
+	require.Equal(t, 0, len(foo.ThisIsASliceOfSecrets))
 
 	// Bar field
 	require.Equal(t, "bar A", foo.Bar.A)
@@ -567,7 +568,7 @@ func TestSecretSlice(t *testing.T) {
 	fullString := ""
 	for i, s := range expected {
 		if i > 0 {
-			fullString += ","
+			fullString += ", "
 		}
 		fullString += s
 	}
