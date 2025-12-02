@@ -308,6 +308,7 @@ contract DeployEigenDA is Script {
                 IEigenDASignatureVerifier(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
                 cfg.certVerifierSecurityThresholds(),
                 cfg.certVerifierQuorumNumbersRequired(),
+                cfg.certVersion(),
                 cfg.offchainDerivationVersion()
             )
         );
