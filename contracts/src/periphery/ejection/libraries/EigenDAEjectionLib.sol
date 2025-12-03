@@ -104,6 +104,10 @@ library EigenDAEjectionLib {
         return s().ejectionParams[operator].params.ejector;
     }
 
+    function getEjectorBalance(address ejector) internal view returns (uint256) {
+        return s().ejectorBalance[ejector];
+    }
+
     function getDepositAmount(address operator) internal view returns (uint256 depositAmount) {
         return s().ejectionParams[operator].params.depositAmount;
     }

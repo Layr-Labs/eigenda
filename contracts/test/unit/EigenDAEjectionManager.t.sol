@@ -71,6 +71,7 @@ contract EigenDAEjectionManagerTest is Test {
 
         token.approve(address(ejectionManager), EXPECTED_DEPOSIT);
         ejectionManager.addEjectorBalance(EXPECTED_DEPOSIT);
+        assertEq(ejectionManager.getEjectorBalance(caller), EXPECTED_DEPOSIT);
 
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionStarted(
@@ -120,6 +121,8 @@ contract EigenDAEjectionManagerTest is Test {
         vm.stopPrank();
 
         // 5) Ensure the ejector has received the full amount of their deposited tokens back
+        //    and their book-kept balance in the ejection manager state is zero'd
+        assertEq(ejectionManager.getEjectorBalance(ejector), 0);
         assertEq(
             token.balanceOf(address(ejectionManager)),
             0,
@@ -157,14 +160,14 @@ contract EigenDAEjectionManagerTest is Test {
     }
 
     function testDelayEnforcementCausesAttemptedCompletionsToRevert(address caller, address ejectee) public {
-        // set an artificial delay for which the ejector has to wait
-        // until completing the ejection
+        // 1) set an artificial delay for which the ejector has to wait
+        //    until completing the ejection
         testStartEjection(caller, ejectee, 0, 6000);
 
         vm.startPrank(caller);
         vm.expectRevert("Proceeding not yet due");
-        // the EVM time context hasn't been advanced and there's an artificial
-        // delay where the block.timestamp >= start_ejection_block.timestamp + 1000
+        // 2) the EVM time context hasn't been advanced and there's an artificial
+        //    delay where the block.timestamp >= start_ejection_block.timestamp + 1000
         ejectionManager.completeEjection(ejectee, "0x");
         vm.stopPrank();
     }
@@ -174,7 +177,7 @@ contract EigenDAEjectionManagerTest is Test {
         //    by warping time forward past any potential cooldown from previous fuzz iterations
         vm.warp(block.timestamp + 7000);
 
-        // 2) set an artificial delay for which the ejector has to wait
+        // 2) set an artificial cooldown period for which the ejector has to wait
         //    until completing the ejection
         testStartEjection(caller, ejectee, 6000, 0);
 
