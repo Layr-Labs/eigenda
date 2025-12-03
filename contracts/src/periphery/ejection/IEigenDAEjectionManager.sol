@@ -52,7 +52,7 @@ interface IEigenDAEjectionManager {
 
     /// @notice Returns the address of the ejector for a given operator. If the returned address is zero, then there is no ejection in progress.
     function getEjector(address operator) external view returns (address);
-    
+
     /// @notice Returns the current book-kept balance for an existing ejector.
     function getEjectorBalance(address ejector) external view returns (uint256);
 

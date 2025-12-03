@@ -145,7 +145,7 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     function getEjectorBalance(address ejector) external view returns (uint256) {
         return ejector.getEjectorBalance();
     }
-    
+
     /// @inheritdoc IEigenDAEjectionManager
     function ejectionTime(address operator) external view returns (uint64) {
         return EigenDAEjectionLib.ejectionParams(operator).proceedingTime;

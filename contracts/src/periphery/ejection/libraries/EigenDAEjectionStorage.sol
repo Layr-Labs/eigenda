@@ -11,7 +11,7 @@ library EigenDAEjectionStorage {
     struct Layout {
         mapping(address => EigenDAEjectionTypes.Ejectee) ejectionParams;
         /// @dev ejectorBalance is a book-kept value of the ejector's balance
-        ///      wrt to active collateralized lockups 
+        ///      wrt to active collateralized lockups
         mapping(address => uint256) ejectorBalance;
         uint64 delay;
         uint64 cooldown;
