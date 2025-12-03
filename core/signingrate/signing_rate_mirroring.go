@@ -48,7 +48,7 @@ func MirrorSigningRate(
 	ctx context.Context,
 	logger logging.Logger,
 	// A function that can fetch signing rate data from some source.
-	scraper SigningRateScraper,
+	scrape SigningRateScraper,
 	// The signing rate tracker that will mirror the remote data.
 	tracker SigningRateTracker,
 	// How often to poll the remote source for new data.
@@ -70,7 +70,7 @@ func MirrorSigningRate(
 		case <-ticker.C:
 			currentTime := time.Now()
 
-			buckets, err := scraper(ctx, previousScrapeTime)
+			buckets, err := scrape(ctx, previousScrapeTime)
 			if err != nil {
 				logger.Error("Failed to scrape signing rate data", "err", err)
 				continue

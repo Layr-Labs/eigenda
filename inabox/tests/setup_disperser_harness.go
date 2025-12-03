@@ -902,6 +902,13 @@ func startController(
 	}
 	dispatcherBlobSet := controller.NewBlobSet()
 
+	signingRateTracker, err := signingrate.NewSigningRateTracker(
+		controllerLogger,
+		10*time.Minute,
+		1*time.Minute,
+		time.Now)
+	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
+
 	// Create controller
 	dispatcher, err := controller.NewController(
 		dispatcherConfig,
@@ -917,7 +924,7 @@ func startController(
 		beforeDispatch,
 		dispatcherBlobSet,
 		controllerLivenessChan,
-		signingrate.NewNoOpSigningRateTracker(),
+		signingRateTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dispatcher: %w", err)
@@ -1264,6 +1271,13 @@ func startAPIServer(
 		controllerClient = grpccontroller.NewControllerServiceClient(connection)
 	}
 
+	signingRateTracker, err := signingrate.NewSigningRateTracker(
+		apiServerLogger,
+		10*time.Minute,
+		1*time.Minute,
+		time.Now)
+	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
+
 	// Create API server
 	// Note: meterer is nil when using controller-mediated payments, otherwise it's the legacy meterer
 	apiServer, err := apiserver.NewDispersalServerV2(
@@ -1287,7 +1301,7 @@ func startAPIServer(
 		controllerConnection,
 		controllerClient,
 		listener,
-		signingrate.NewNoOpSigningRateTracker(),
+		signingRateTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API server: %w", err)

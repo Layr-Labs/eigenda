@@ -216,7 +216,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			signingRateTracker,
 			config.ServerConfig.SigningRateRetentionPeriod)
 		if err != nil {
-			return fmt.Errorf("failed to do initial scrape of signing rate data from controller: %w", err)
+			return fmt.Errorf("do initial scrape: %w", err)
 		}
 
 		// In the background, periodically refresh signing rate data from controller.
