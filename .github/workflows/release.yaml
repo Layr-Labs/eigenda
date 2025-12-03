@@ -19,6 +19,7 @@ env:
   REGISTRY: ghcr.io
   CACHE-FROM: /tmp/.buildx-cache
   CACHE-TO: /tmp/.buildx-cache-new
+  MISE_VERSION: 2024.12.14
 
 jobs:
   # Build the node, nodeplugin, and proxy docker images and push to ghcr.
