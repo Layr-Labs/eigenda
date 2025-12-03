@@ -279,7 +279,6 @@ func (v *Verifier) universalVerify(params encoding.EncodingParams, samples []Sam
 	// precheck
 	for i, s := range samples {
 		if s.RowIndex >= numBlobs {
-			fmt.Printf("sample %v has %v Row, but there are only %v blobs\n", i, s.RowIndex, numBlobs)
 			return errors.New("sample.RowIndex and numBlob are inconsistent")
 		}
 	}
@@ -296,7 +295,6 @@ func (v *Verifier) universalVerify(params encoding.EncodingParams, samples []Sam
 	}
 
 	n := len(samples)
-	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLength, numBlobs)
 	if n == 0 {
 		return errors.New("the number of samples (i.e. chunks) must not be empty")
 	}
