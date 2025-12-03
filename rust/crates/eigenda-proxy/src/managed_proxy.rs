@@ -43,7 +43,10 @@ impl ManagedProxy {
         // Spawn the process
         let child = Command::new(&binary_path)
             .args(args)
+            // Redirect stdout and stderr to null for now to not clutter output.
+            // If needed, we could allow user to specify log file paths or pipe to parent stdout/stderr.
             .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()?;
 
         Ok(ProxyHandle { child })
