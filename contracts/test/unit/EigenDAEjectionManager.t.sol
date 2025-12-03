@@ -48,18 +48,27 @@ contract EigenDAEjectionManagerTest is Test {
         directory.addAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME, address(this));
     }
 
+    function testStartEjection(address caller, address ejectee) public {
+        testStartEjection(caller, ejectee, 0, 0);
+    }
+
     /// 1. Takes a deposit from the caller.
     /// 2. Starts the ejection process for the operator.
     /// 2a. sets quorums
     /// 2b. sets proceeding time to timestamp + delay
     /// 2c. sets proceeding initiated time to current timestamp
     /// 3. Emits EjectionStarted event.
-    function testStartEjection(address caller, address ejectee) public {
+    function testStartEjection(address caller, address ejectee, uint64 cooldown, uint64 delay) private {
         accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, caller);
+        accessControl.grantRole(AccessControlConstants.OWNER_ROLE, caller);
+
         vm.assume(caller != address(0) && ejectee != address(0) && caller != ejectee);
         token.mint(caller, EXPECTED_DEPOSIT);
 
         vm.startPrank(caller);
+        ejectionManager.setCooldown(cooldown);
+        ejectionManager.setDelay(delay);
+
         token.approve(address(ejectionManager), EXPECTED_DEPOSIT);
         ejectionManager.addEjectorBalance(EXPECTED_DEPOSIT);
 
@@ -80,22 +89,51 @@ contract EigenDAEjectionManagerTest is Test {
         assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp);
     }
 
-    function testCancelEjectionByEjector(address caller, address ejectee) public {
-        testStartEjection(caller, ejectee);
-        vm.startPrank(caller);
-        vm.expectEmit(true, true, true, true);
-        emit EigenDAEjectionLib.EjectionCancelled(ejectee);
-        vm.startSnapshotGas("CANCEL EJECTION");
-        ejectionManager.cancelEjectionByEjector(ejectee);
-        vm.stopSnapshotGas("CANCEL EJECTION");
+    function testCancelEjectionByEjector(address ejector, address operator) public {
+        accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, ejector);
+        token.mint(ejector, EXPECTED_DEPOSIT);
+
+        // Ejector "deposits" by escrowing ERC20 tokens to the contract
+        // address and starting the ejection
+        vm.startPrank(ejector);
+        token.approve(address(ejectionManager), EXPECTED_DEPOSIT);
+        ejectionManager.addEjectorBalance(EXPECTED_DEPOSIT);
+        ejectionManager.startEjection(operator, "0x");
+
+        // Ensure that the deposited funds are actually escrowed into the contract
+        assertEq(
+            token.balanceOf(address(ejectionManager)),
+            EXPECTED_DEPOSIT,
+            "Deposit should result in funds escrowed to contract"
+        );
+
+        // Issue a cancellation from the Ejector role and withdraw the ERC20 funds
+        // (i.e, contract -> ejector)
+        ejectionManager.cancelEjectionByEjector(operator);
+
+        // Ensure the stateful params entry has been nullified
+        assertEq(ejectionManager.getEjector(operator), address(0));
+        assertEq(ejectionManager.ejectionTime(operator), 0);
+        assertEq(ejectionManager.lastEjectionInitiated(operator), block.timestamp); // should remain unchanged
+
+        ejectionManager.withdrawEjectorBalance(EXPECTED_DEPOSIT);
         vm.stopPrank();
-        assertEq(ejectionManager.getEjector(ejectee), address(0));
-        assertEq(ejectionManager.ejectionTime(ejectee), 0);
-        assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
+
+        // Ensure the ejector has received the full amount of their deposited tokens back
+        assertEq(
+            token.balanceOf(address(ejectionManager)),
+            0,
+            "Ejections manager should not have any escrowed collateral tokens after ejector withdraw"
+        );
+        assertEq(
+            token.balanceOf(address(ejector)),
+            EXPECTED_DEPOSIT,
+            "withdrawn tokens should be fully reissued to the ejector"
+        );
     }
 
     function testCancelEjectionByEjectee(address caller, address ejectee) public {
-        testStartEjection(caller, ejectee);
+        testStartEjection(caller, ejectee, 0, 0);
         vm.startPrank(ejectee);
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionCancelled(ejectee);
@@ -104,14 +142,54 @@ contract EigenDAEjectionManagerTest is Test {
         assertEq(ejectionManager.getEjector(ejectee), address(0));
         assertEq(ejectionManager.ejectionTime(ejectee), 0);
         assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
+
+        // ensure ERC20 gas refund lands onto the ejectee account
+        assertGt(token.balanceOf(ejectee), 0);
     }
 
     function testCompleteEjection(address caller, address ejectee) public {
-        testStartEjection(caller, ejectee);
+        testStartEjection(caller, ejectee, 0, 0);
         vm.startPrank(caller);
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionCompleted(ejectee, "0x");
         ejectionManager.completeEjection(ejectee, "0x");
+        vm.stopPrank();
+    }
+
+    function testDelayEnforcementCausesAttemptedCompletionsToRevert(address caller, address ejectee) public {
+        // set an artificial delay for which the ejector has to wait
+        // until completing the ejection
+        testStartEjection(caller, ejectee, 0, 6000);
+
+        vm.startPrank(caller);
+        vm.expectRevert("Proceeding not yet due");
+        // the EVM time context hasn't been advanced and there's an artificial
+        // delay where the block.timestamp >= start_ejection_block.timestamp + 1000
+        ejectionManager.completeEjection(ejectee, "0x");
+        vm.stopPrank();
+    }
+
+    function testCoolDownEnforcementCausesAttemptedCompletionsToRevert(address caller, address ejectee) public {
+        // 1) Ensure the test starts with a clean slate for the ejectee
+        //    by warping time forward past any potential cooldown from previous fuzz iterations
+        vm.warp(block.timestamp + 7000);
+
+        // 2) set an artificial delay for which the ejector has to wait
+        //    until completing the ejection
+        testStartEjection(caller, ejectee, 6000, 0);
+
+        // 3) have the ejectee successfully cancels the ejection
+        vm.startPrank(ejectee);
+        vm.expectEmit(true, true, true, true);
+        emit EigenDAEjectionLib.EjectionCancelled(ejectee);
+        ejectionManager.cancelEjection();
+        vm.stopPrank();
+
+        // 4) now the ejector attempts to eject the ejectee which reverts due
+        //    to cooldown enforcements since block time hasn't advanced
+        vm.startPrank(caller);
+        vm.expectRevert();
+        ejectionManager.startEjection(ejectee, "0x");
         vm.stopPrank();
     }
 }

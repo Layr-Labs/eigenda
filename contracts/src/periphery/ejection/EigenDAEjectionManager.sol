@@ -92,8 +92,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     /// @inheritdoc IEigenDAEjectionManager
     function cancelEjectionByEjector(address operator) external onlyEjector(msg.sender) {
         uint256 depositAmount = operator.getDepositAmount();
-        operator.cancelEjection();
         operator.getEjector().addEjectorBalance(depositAmount);
+        operator.cancelEjection();
     }
 
     /// @inheritdoc IEigenDAEjectionManager
@@ -125,8 +125,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
 
     /// @inheritdoc IEigenDAEjectionManager
     function cancelEjection() external {
-        msg.sender.cancelEjection();
         _refundGas(msg.sender, _estimatedGasUsedWithoutSig);
+        msg.sender.cancelEjection();
     }
 
     /// GETTERS
