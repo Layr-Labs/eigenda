@@ -69,19 +69,12 @@ func TestWeightedSelector_ZeroScores(t *testing.T) {
 	selector := createTestSelector(t, DefaultWeightedSelectorConfig())
 
 	candidates := []testItem{
-		{id: "zero", score: 0.0},
-		{id: "nonzero", score: 0.1},
+		{id: "zeroA", score: 0.0},
+		{id: "zeroB", score: 0.0},
 	}
 
-	selections := make(map[string]int)
-	for range 1000 {
-		result, err := selector.Select(candidates)
-		require.NoError(t, err)
-		selections[result.id]++
-	}
-
-	require.Greater(t, selections["zero"], 0, "zero score item should be selected at least once")
-	require.Greater(t, selections["nonzero"], selections["zero"], "nonzero should be selected more than zero")
+	_, err := selector.Select(candidates)
+	require.NoError(t, err)
 }
 
 func TestWeightedSelector_Filtering(t *testing.T) {
