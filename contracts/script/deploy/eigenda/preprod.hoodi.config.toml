@@ -52,6 +52,7 @@ quorumAdversaryThresholdPercentages = "0x2121"
 # Hex format to match current on-chain format
 quorumConfirmationThresholdPercentages = "0x3737"
 quorumNumbersRequired = "0x0001"
+offchainDerivationVersion = 0
 versionedBlobParams = [
     { 0_maxNumOperators = 3537, 1_numChunks = 8192, 2_codingRate = 8 }
 ]
