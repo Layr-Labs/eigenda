@@ -30,7 +30,9 @@ fn main() {
 
             // Download the binary
             let response = reqwest::blocking::get(download_url)
-                .expect("Failed to download eigenda-proxy binary");
+                .unwrap_or_else(|e| {
+                    panic!("Failed to download eigenda-proxy binary from '{download_url}': {e}. Please check your network connectivity and ensure the URL is accessible.");
+                });
 
             if !response.status().is_success() {
                 panic!(
