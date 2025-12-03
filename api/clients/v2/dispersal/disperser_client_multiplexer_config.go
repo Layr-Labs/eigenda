@@ -5,6 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/reputation"
+	"github.com/Layr-Labs/eigenda/common/selector"
 )
 
 var _ config.VerifiableConfig = (*DisperserClientMultiplexerConfig)(nil)
@@ -22,6 +23,8 @@ type DisperserClientMultiplexerConfig struct {
 	ReputationConfig reputation.ReputationConfig
 	// Whether to use secure gRPC connections (TLS) when connecting to dispersers
 	UseSecureGrpcFlag bool
+	// Configuration for the weighted selector used to choose dispersers
+	SelectorConfig selector.WeightedSelectorConfig
 }
 
 func DefaultDisperserClientMultiplexerConfig() *DisperserClientMultiplexerConfig {
@@ -30,6 +33,7 @@ func DefaultDisperserClientMultiplexerConfig() *DisperserClientMultiplexerConfig
 		DisperserBlacklist:   nil,
 		ReputationConfig:     reputation.DefaultConfig(),
 		UseSecureGrpcFlag:    true,
+		SelectorConfig:       selector.DefaultWeightedSelectorConfig(),
 	}
 }
 
@@ -38,6 +42,11 @@ func (c *DisperserClientMultiplexerConfig) Verify() error {
 	err := c.ReputationConfig.Verify()
 	if err != nil {
 		return fmt.Errorf("verify reputation config: %w", err)
+	}
+
+	err = c.SelectorConfig.Verify()
+	if err != nil {
+		return fmt.Errorf("verify selector config: %w", err)
 	}
 
 	return nil

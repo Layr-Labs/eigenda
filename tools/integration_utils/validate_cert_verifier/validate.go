@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -285,7 +286,7 @@ func createDisperserClientMultiplexer(
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(grpcUri)
 
-	return dispersal.NewDisperserClientMultiplexer(
+	multiplexer, err := dispersal.NewDisperserClientMultiplexer(
 		logger,
 		multiplexerConfig,
 		disperserRegistry,
@@ -293,7 +294,13 @@ func createDisperserClientMultiplexer(
 		kzgCommitter,
 		metrics.NoopDispersalMetrics,
 		8,
-	), nil
+		rand.New(rand.NewSource(time.Now().UnixNano())),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create disperser client multiplexer: %w", err)
+	}
+
+	return multiplexer, nil
 }
 
 func createEthClient(logger logging.Logger, rpcURL string) (*geth.EthClient, error) {

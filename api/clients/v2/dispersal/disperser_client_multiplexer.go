@@ -4,16 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/common/disperser"
 	"github.com/Layr-Labs/eigenda/common/reputation"
+	"github.com/Layr-Labs/eigenda/common/selector"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
+
+// Contains the information needed for disperser selection.
+type disperserInfo struct {
+	id              uint32
+	grpcUri         string
+	reputationScore float64
+}
 
 // Supplies DisperserClients based on a dynamic set of eligible dispersers and their reputations.
 //
@@ -31,6 +41,8 @@ type DisperserClientMultiplexer struct {
 	clients map[uint32]*DisperserClient
 	// map from disperser ID to its reputation tracker
 	reputations map[uint32]*reputation.Reputation
+	// chooses dispersers based on reputation
+	weightedSelector *selector.WeightedSelector[*disperserInfo]
 	// indicates whether Close() has been called
 	closed bool
 	lock   sync.Mutex
@@ -44,7 +56,18 @@ func NewDisperserClientMultiplexer(
 	committer *committer.Committer,
 	dispersalMetrics metrics.DispersalMetricer,
 	disperserConnectionCount uint,
-) *DisperserClientMultiplexer {
+	random *rand.Rand,
+) (*DisperserClientMultiplexer, error) {
+	weightedSelector, err := selector.NewWeightedSelector(
+		logger,
+		&config.SelectorConfig,
+		random,
+		func(d *disperserInfo) float64 { return d.reputationScore },
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create weighted selector: %w", err)
+	}
+
 	return &DisperserClientMultiplexer{
 		logger:                   logger,
 		config:                   config,
@@ -55,7 +78,8 @@ func NewDisperserClientMultiplexer(
 		disperserConnectionCount: disperserConnectionCount,
 		clients:                  make(map[uint32]*DisperserClient),
 		reputations:              make(map[uint32]*reputation.Reputation),
-	}
+		weightedSelector:         weightedSelector,
+	}, nil
 }
 
 // Closes all underlying [DisperserClient]s
@@ -101,26 +125,25 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 		return nil, fmt.Errorf("get eligible dispersers: %w", err)
 	}
 
-	chosenDisperser, err := dcm.chooseDisperser(now, eligibleDispersers)
-	if err != nil {
-		return nil, fmt.Errorf("choose disperser: %w", err)
+	if len(eligibleDispersers) == 0 {
+		return nil, fmt.Errorf("no eligible dispersers")
 	}
 
-	grpcUri, err := dcm.disperserRegistry.GetDisperserGrpcUri(ctx, chosenDisperser)
+	selectedDisperserInfo, err := dcm.weightedSelector.Select(eligibleDispersers)
 	if err != nil {
-		return nil, fmt.Errorf("get disperser gRPC URI for ID %d: %w", chosenDisperser, err)
+		return nil, fmt.Errorf("select disperser: %w", err)
 	}
 
-	dcm.cleanupOutdatedClient(chosenDisperser, grpcUri)
+	dcm.cleanupOutdatedClient(selectedDisperserInfo.id, selectedDisperserInfo.grpcUri)
 
-	client, exists := dcm.clients[chosenDisperser]
+	client, exists := dcm.clients[selectedDisperserInfo.id]
 	if !exists {
-		// create a new client for the chosen disperser
+		// create a new client for the selected disperser
 		clientConfig := &DisperserClientConfig{
-			GrpcUri:                  grpcUri,
+			GrpcUri:                  selectedDisperserInfo.grpcUri,
 			UseSecureGrpcFlag:        dcm.config.UseSecureGrpcFlag,
 			DisperserConnectionCount: dcm.disperserConnectionCount,
-			DisperserID:              chosenDisperser,
+			DisperserID:              selectedDisperserInfo.id,
 		}
 
 		client, err = NewDisperserClient(
@@ -131,10 +154,10 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 			dcm.dispersalMetrics,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("create disperser client for ID %d: %w", chosenDisperser, err)
+			return nil, fmt.Errorf("create disperser client for ID %d: %w", selectedDisperserInfo.id, err)
 		}
 
-		dcm.clients[chosenDisperser] = client
+		dcm.clients[selectedDisperserInfo.id] = client
 	}
 
 	return client, nil
@@ -204,7 +227,7 @@ func (dcm *DisperserClientMultiplexer) cleanupOutdatedClient(
 	}
 }
 
-// Returns the IDs of all eligible dispersers, along with their reputations.
+// Returns the list of all eligible dispersers, along with their reputations scores and URIs.
 //
 // All dispersers returned by this function will have corresponding entries in dcm.reputations, since new reputations
 // are created internally as needed.
@@ -212,75 +235,60 @@ func (dcm *DisperserClientMultiplexer) getEligibleDispersers(
 	ctx context.Context,
 	now time.Time,
 	onDemandPayment bool,
-) (map[uint32]*reputation.Reputation, error) {
+) ([]*disperserInfo, error) {
 	defaultDispersers, err := dcm.disperserRegistry.GetDefaultDispersers(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get default dispersers: %w", err)
 	}
 
-	// start by assuming that all default dispersers are eligible
-	eligibleDispersers := make(map[uint32]*reputation.Reputation)
-	for _, id := range defaultDispersers {
-		if _, exists := dcm.reputations[id]; !exists {
-			dcm.reputations[id] = reputation.NewReputation(dcm.config.ReputationConfig, now)
-		}
-		eligibleDispersers[id] = dcm.reputations[id]
-	}
+	// Combine default dispersers and additional dispersers
+	potentiallyEligibleDispersers := make([]uint32, 0, len(defaultDispersers)+len(dcm.config.AdditionalDispersers))
+	potentiallyEligibleDispersers = append(potentiallyEligibleDispersers, defaultDispersers...)
+	potentiallyEligibleDispersers = append(potentiallyEligibleDispersers, dcm.config.AdditionalDispersers...)
 
-	// add any additional dispersers specified in the config
-	for _, id := range dcm.config.AdditionalDispersers {
-		if _, exists := dcm.reputations[id]; !exists {
-			dcm.reputations[id] = reputation.NewReputation(dcm.config.ReputationConfig, now)
-		}
-		eligibleDispersers[id] = dcm.reputations[id]
-	}
-
-	// remove any dispersers that are blacklisted
-	for _, id := range dcm.config.DisperserBlacklist {
-		delete(eligibleDispersers, id)
-	}
-
-	// if on-demand payment support is required, filter out dispersers that don't support it
-	if onDemandPayment {
-		onDemandDispersers, err := dcm.disperserRegistry.GetOnDemandDispersers(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("get on-demand dispersers: %w", err)
+	eligibleDispersers := make([]*disperserInfo, 0, len(potentiallyEligibleDispersers))
+	for _, disperserId := range potentiallyEligibleDispersers {
+		if slices.Contains(dcm.config.DisperserBlacklist, disperserId) {
+			continue
 		}
 
-		// Rebuild eligibleDispersers with only on-demand dispersers
-		filtered := make(map[uint32]*reputation.Reputation, len(onDemandDispersers))
-		for _, id := range onDemandDispersers {
-			if reputation, exists := eligibleDispersers[id]; exists {
-				filtered[id] = reputation
+		// Skip if on-demand payment is required and disperser doesn't support it
+		if onDemandPayment {
+			supportsOnDemand, err := dcm.disperserRegistry.IsOnDemandDisperser(ctx, disperserId)
+			if err != nil {
+				dcm.logger.Errorf(
+					"failed to check if disperser ID %d supports on-demand, excluding: %v", disperserId, err)
+				continue
+			}
+			if !supportsOnDemand {
+				continue
 			}
 		}
-		eligibleDispersers = filtered
+
+		grpcUri, err := dcm.disperserRegistry.GetDisperserGrpcUri(ctx, disperserId)
+		if err != nil {
+			dcm.logger.Errorf("failed to get URI for disperser ID %d, excluding from eligible dispersers: %v",
+				disperserId, err)
+			continue
+		}
+
+		// Initialize reputation if it doesn't exist
+		if _, exists := dcm.reputations[disperserId]; !exists {
+			dcm.reputations[disperserId] = reputation.NewReputation(dcm.config.ReputationConfig, now)
+		}
+
+		score := dcm.reputations[disperserId].Score(now)
+		// The weighted selection algorithm doesn't handle zero values well, so we use a small positive value instead
+		if score == 0 {
+			score = 0.001
+		}
+
+		eligibleDispersers = append(eligibleDispersers, &disperserInfo{
+			id:              disperserId,
+			grpcUri:         grpcUri,
+			reputationScore: score,
+		})
 	}
 
 	return eligibleDispersers, nil
-}
-
-// Chooses the best disperser from the eligible set based on their reputations.
-func (dcm *DisperserClientMultiplexer) chooseDisperser(
-	now time.Time,
-	eligibleDispersers map[uint32]*reputation.Reputation,
-) (uint32, error) {
-	if len(eligibleDispersers) == 0 {
-		return 0, fmt.Errorf("no eligible dispersers")
-	}
-
-	// Choose the disperser with the highest reputation
-	//
-	// TODO(litt3): At some point, we might consider adding some randomness here
-	var bestID uint32
-	bestScore := -1.0
-	for disperserId, disperserReputation := range eligibleDispersers {
-		score := disperserReputation.Score(now)
-		if score > bestScore {
-			bestScore = score
-			bestID = disperserId
-		}
-	}
-
-	return bestID, nil
 }

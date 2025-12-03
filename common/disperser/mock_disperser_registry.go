@@ -3,6 +3,7 @@ package disperser
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 )
 
@@ -29,7 +30,7 @@ func (r *MockDisperserRegistry) SetDefaultDispersers(dispersers []uint32) {
 	r.defaultDispersers = dispersers
 }
 
-// Configures what GetOnDemandDispersers will return.
+// Configures what IsOnDemandDisperser will return.
 func (r *MockDisperserRegistry) SetOnDemandDispersers(dispersers []uint32) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -52,13 +53,11 @@ func (r *MockDisperserRegistry) GetDefaultDispersers(ctx context.Context) ([]uin
 	return result, nil
 }
 
-// Returns the list configured via SetOnDemandDispersers.
-func (r *MockDisperserRegistry) GetOnDemandDispersers(ctx context.Context) ([]uint32, error) {
+// Returns whether the specified disperser is configured as an on-demand disperser via SetOnDemandDispersers.
+func (r *MockDisperserRegistry) IsOnDemandDisperser(ctx context.Context, disperserID uint32) (bool, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	result := make([]uint32, len(r.onDemandDispersers))
-	copy(result, r.onDemandDispersers)
-	return result, nil
+	return slices.Contains(r.onDemandDispersers, disperserID), nil
 }
 
 // Returns the URI configured via SetDisperserGrpcUri for the specified disperser.

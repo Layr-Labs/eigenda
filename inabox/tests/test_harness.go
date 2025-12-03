@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -284,7 +285,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 	multiplexerConfig.UseSecureGrpcFlag = false
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(tc.APIServerAddress)
 
-	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
+	disperserClientMultiplexer, err := dispersal.NewDisperserClientMultiplexer(
 		logger,
 		multiplexerConfig,
 		disperserRegistry,
@@ -292,7 +293,11 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		kzgCommitter,
 		metrics.NoopDispersalMetrics,
 		8,
+		rand.New(rand.NewSource(time.Now().UnixNano())),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("create disperser client multiplexer: %w", err)
+	}
 
 	clientLedger, err := buildClientLedger(
 		ctx,

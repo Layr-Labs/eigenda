@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -153,7 +154,7 @@ func NewTestClient(
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(
 		fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort))
 
-	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
+	disperserClientMultiplexer, err := dispersal.NewDisperserClientMultiplexer(
 		logger,
 		multiplexerConfig,
 		disperserRegistry,
@@ -161,7 +162,11 @@ func NewTestClient(
 		kzgCommitter,
 		dispersalMetrics,
 		config.DisperserConnectionCount,
+		rand.New(rand.NewSource(time.Now().UnixNano())),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("create disperser client multiplexer: %w", err)
+	}
 
 	ethClientConfig := geth.EthClientConfig{
 		RPCURLs:          config.EthRpcUrls,

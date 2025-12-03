@@ -597,7 +597,7 @@ func buildPayloadDisperser(
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(
 		clientConfigV2.DisperserClientCfg.GrpcUri)
 
-	disperserClientMultiplexer := dispersal.NewDisperserClientMultiplexer(
+	disperserClientMultiplexer, err := dispersal.NewDisperserClientMultiplexer(
 		log,
 		multiplexerConfig,
 		disperserRegistry,
@@ -605,7 +605,11 @@ func buildPayloadDisperser(
 		kzgCommitter,
 		dispersalMetrics,
 		clientConfigV2.DisperserClientCfg.DisperserConnectionCount,
+		rand.New(rand.NewSource(time.Now().UnixNano())),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("create disperser client multiplexer: %w", err)
+	}
 
 	clientLedger, err := buildClientLedger(
 		ctx,
