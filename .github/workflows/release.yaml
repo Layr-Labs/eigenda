@@ -84,7 +84,7 @@ jobs:
   # The binaries are meant to be used by the rust client for teams that don't want to manage a sidecar proxy themselves.
   # The release notes should be updated according to our release process, and undrafted when ready.
   # See https://www.notion.so/eigen-labs/Monorepo-Release-Mgmt-21f13c11c3e0802b9d7fcf4173a49d12 for more info.
-  # Note: this doesn't wait for build-docker-andpush to complete successfully,
+  # Note: this doesn't wait for build-docker-and-push to complete successfully,
   # so the draft release may be created even if the docker build fails.
   build-proxy-and-publish-to-draft-release:
     if: github.ref_type == 'tag'
