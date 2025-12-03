@@ -23,8 +23,8 @@ func (c *WeightedSelectorConfig) Verify() error {
 	if c.LowPerformerFraction < 0 || c.LowPerformerFraction > 1 {
 		return fmt.Errorf("LowPerformerFraction must be between 0 and 1, got %f", c.LowPerformerFraction)
 	}
-	if c.ScoreThreshold < 0 || c.ScoreThreshold > 1 {
-		return fmt.Errorf("ScoreThreshold must be between 0 and 1, got %f", c.ScoreThreshold)
+	if c.ScoreThreshold < 0 {
+		return fmt.Errorf("ScoreThreshold must be >= 0, got %f", c.ScoreThreshold)
 	}
 	return nil
 }

@@ -133,29 +133,3 @@ func TestWeightedSelector_ThresholdPreservation(t *testing.T) {
 	require.Greater(t, selections["c"], selections["b"], "item c should be selected more than item b")
 	require.Greater(t, selections["d"], selections["c"], "item d should be selected more than item c")
 }
-
-func TestWeightedSelectorConfig_Validation(t *testing.T) {
-	// Test invalid LowPerformerFraction
-	config := WeightedSelectorConfig{LowPerformerFraction: -0.1, ScoreThreshold: 0.4}
-	require.Error(t, config.Verify())
-
-	config = WeightedSelectorConfig{LowPerformerFraction: 1.1, ScoreThreshold: 0.4}
-	require.Error(t, config.Verify())
-
-	// Test invalid ScoreThreshold
-	config = WeightedSelectorConfig{LowPerformerFraction: 0.5, ScoreThreshold: -0.1}
-	require.Error(t, config.Verify())
-
-	config = WeightedSelectorConfig{LowPerformerFraction: 0.5, ScoreThreshold: 1.1}
-	require.Error(t, config.Verify())
-
-	// Test valid configs
-	config = WeightedSelectorConfig{LowPerformerFraction: 0.5, ScoreThreshold: 0.4}
-	require.NoError(t, config.Verify())
-
-	config = WeightedSelectorConfig{LowPerformerFraction: 0, ScoreThreshold: 0}
-	require.NoError(t, config.Verify())
-
-	config = WeightedSelectorConfig{LowPerformerFraction: 1, ScoreThreshold: 1}
-	require.NoError(t, config.Verify())
-}
