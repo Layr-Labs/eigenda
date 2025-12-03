@@ -10,6 +10,8 @@ use tokio::process::Command;
 /// Path to the downloaded eigenda-proxy binary (set by build.rs when managed-proxy feature is enabled)
 const EIGENDA_PROXY_PATH: &str = env!("EIGENDA_PROXY_PATH");
 
+/// ManagedProxy struct that handles launching the proxy binary as a subprocess.
+/// It is currently kept very minimal and doesn't do any monitoring, health checks, piping proxy output, etc.
 pub struct ManagedProxy {
     binary_path: PathBuf,
 }
@@ -48,6 +50,8 @@ impl ManagedProxy {
     }
 }
 
+/// Handle to the running managed proxy process, which is currently simply
+/// a wrapper around the [tokio::process::Child].
 pub struct ProxyHandle {
     child: tokio::process::Child,
 }
@@ -58,6 +62,9 @@ impl ProxyHandle {
         self.child.kill().await
     }
 
+    /// Wait for the proxy process to exit. The proxy is a long-standing process which is not meant to exit normally,
+    /// but we recommend calling this inside a tokio::select! along with other tasks to monitor for unexpected exits
+    /// and crash the client.
     pub async fn wait(&mut self) -> Result<std::process::ExitStatus, std::io::Error> {
         self.child.wait().await
     }
