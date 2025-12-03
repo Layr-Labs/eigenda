@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 use std::process::Stdio;
-use tokio::process::Command;
+use tokio::process::{Child, Command};
 
 /// Path to the downloaded eigenda-proxy binary (set by build.rs when managed-proxy feature is enabled)
 const EIGENDA_PROXY_PATH: &str = env!("EIGENDA_PROXY_PATH");
@@ -35,9 +35,9 @@ impl ManagedProxy {
         Ok(Self { binary_path })
     }
 
-    /// Start the embedded proxy and monitor it in the background
-    /// This spawns the process and monitors it using tokio::select!
-    pub async fn start(&self, args: &[&str]) -> Result<ProxyHandle, std::io::Error> {
+    /// Start the embedded proxy and monitor it in the background.
+    /// This spawns the process and returns the Child handle for further management.
+    pub async fn start(&self, args: &[&str]) -> Result<Child, std::io::Error> {
         let binary_path = self.binary_path.clone();
 
         // Spawn the process
@@ -47,49 +47,21 @@ impl ManagedProxy {
             // If needed, we could allow user to specify log file paths or pipe to parent stdout/stderr.
             .stdout(Stdio::null())
             .stderr(Stdio::null())
+            .kill_on_drop(true)
             .spawn()?;
 
-        Ok(ProxyHandle { child })
-    }
-}
-
-/// Handle to the running managed proxy process, which is currently simply
-/// a wrapper around the [tokio::process::Child].
-pub struct ProxyHandle {
-    child: tokio::process::Child,
-}
-
-impl ProxyHandle {
-    /// Stop the running proxy
-    pub async fn stop(&mut self) -> Result<(), std::io::Error> {
-        self.child.kill().await
-    }
-
-    /// Wait for the proxy process to exit. The proxy is a long-standing process which is not meant to exit normally,
-    /// but we recommend calling this inside a tokio::select! along with other tasks to monitor for unexpected exits
-    /// and crash the client.
-    pub async fn wait(&mut self) -> Result<std::process::ExitStatus, std::io::Error> {
-        self.child.wait().await
-    }
-}
-
-impl Drop for ProxyHandle {
-    // Note: We can't await in Drop, so monitor task cleanup happens in background
-    // For proper cleanup, users should call stop() before dropping
-    fn drop(&mut self) {
-        // Attempt to kill the child process
-        if let Err(e) = self.child.start_kill() {
-            eprintln!("Warning: Failed to kill proxy process: {e}");
-        }
+        Ok(child)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::os::unix::process::ExitStatusExt;
+
     use super::*;
 
     #[tokio::test]
-    async fn test_basic_start_stop() {
+    async fn test_proxy_version() {
         let mut proxy = ManagedProxy::new()
             .unwrap()
             .start(&["--version"])
@@ -98,5 +70,29 @@ mod tests {
 
         let status = proxy.wait().await.unwrap();
         assert!(status.success());
+    }
+
+    #[tokio::test]
+    async fn test_start_and_kill_memstore_proxy() {
+        let mut proxy = ManagedProxy::new()
+            .unwrap()
+            .start(&[
+                "--memstore.enabled",
+                "--apis.enabled=standard",
+                "--eigenda.g1-path=../../../resources/srs/g1.point",
+            ])
+            .await
+            .unwrap();
+
+        // Give the proxy a moment to start up
+        tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
+
+        let status = proxy.try_wait().unwrap();
+        assert!(status.is_none(), "Proxy exited prematurely");
+
+        proxy.start_kill().unwrap();
+
+        let status = proxy.wait().await.unwrap();
+        assert!(status.signal() == Some(9), "Proxy was not killed properly");
     }
 }
