@@ -57,9 +57,20 @@ var (
 func Bootstrap[T DocumentedConfig](
 	// A function that returns a new instance of the config struct with default values set.
 	constructor func() T,
+	// A map of environment variable aliases. The keys are environment variables that should be aliased to something
+	// else, and the values are the environment variables they should be aliased to.
+	//
+	// Environment variables in this map should be fully qualified, including any prefixes.
+	//
+	// If nil, then no aliasing is performed.
+	aliasedEnvVars map[string]string,
 	// A list of environment variables that should be ignored when sanity checking environment variables.
 	// Useful for situations where external systems set environment variables that would otherwise cause problems.
-	ignoredEnvVars ...string,
+	//
+	// Environment variables in this list should be fully qualified, including any prefixes.
+	//
+	// If nil, then no environment variables are ignored during sanity checking.
+	ignoredEnvVars []string,
 ) (T, error) {
 
 	// We need a logger before we have a logger config. Once we parse config, we can initialize the real logger.
@@ -69,7 +80,7 @@ func Bootstrap[T DocumentedConfig](
 		return zero, fmt.Errorf("failed to create bootstrap logger: %w", err)
 	}
 
-	action, cfgChan := buildHandler(bootstrapLogger, constructor, ignoredEnvVars)
+	action, cfgChan := buildHandler(bootstrapLogger, constructor, aliasedEnvVars, ignoredEnvVars)
 
 	app := &cli.App{
 		Flags: []cli.Flag{
@@ -107,6 +118,7 @@ func Bootstrap[T DocumentedConfig](
 func buildHandler[T DocumentedConfig](
 	logger logging.Logger,
 	constructor func() T,
+	aliasedEnvVars map[string]string,
 	ignoredEnvVars []string,
 ) (cli.ActionFunc, chan T) {
 
@@ -137,7 +149,7 @@ func buildHandler[T DocumentedConfig](
 			prefix = overrideEnvPrefix
 		}
 
-		cfg, err := ParseConfig(logger, defaultConfig, prefix, ignoredEnvVars, configFiles...)
+		cfg, err := ParseConfig(logger, defaultConfig, prefix, aliasedEnvVars, ignoredEnvVars, configFiles...)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}
