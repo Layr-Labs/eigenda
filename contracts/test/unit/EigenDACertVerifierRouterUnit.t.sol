@@ -32,7 +32,11 @@ contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
             CertLib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
 
         return EigenDACertTypes.EigenDACertV4(
-            signedBatch.batchHeader, blobInclusionInfo, nonSignerStakesAndSignature, signedQuorumNumbers, offchainDerivationVersion
+            signedBatch.batchHeader,
+            blobInclusionInfo,
+            nonSignerStakesAndSignature,
+            signedQuorumNumbers,
+            offchainDerivationVersion
         );
     }
 
