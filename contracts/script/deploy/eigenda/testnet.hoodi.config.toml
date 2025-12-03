@@ -52,7 +52,6 @@ quorumAdversaryThresholdPercentages = "0x2121"
 # Hex format to match current on-chain format
 quorumConfirmationThresholdPercentages = "0x3737"
 quorumNumbersRequired = "0x0001"
-offchainDerivationVersion = 0
 versionedBlobParams = [
     { 0_maxNumOperators = 3537, 1_numChunks = 8192, 2_codingRate = 8 }
 ]
@@ -76,6 +75,7 @@ batchConfirmers = ["0x3aaabc5361fa6fcd4ac4623253a709a2e476577b"]
 confirmationThreshold = 55
 adversaryThreshold = 33
 quorumNumbersRequired = [0, 1]
+offchainDerivationVersion = 0
 
 [initParams.eigenDA.disperser]
 dispersers = ["0x34200f3326bfa13df47fdbe39e51a0df5512aa22"]
