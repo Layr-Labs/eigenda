@@ -3,6 +3,13 @@ edition = "2024"
 name = "eigenda-proxy"
 version = "0.1.0"
 
+[features]
+# Feature flag to enable the managed proxy functionality, which downloads
+# the eigenda-proxy binary during build and spins it up as a subprocess.
+# Teams that are willing to manage a proxy instance as part of their deployment,
+# which we recommend, can omit this feature and only use the proxy client functionality.
+managed-proxy = []
+
 [dependencies]
 backon = { workspace = true }
 bytes = { workspace = true }

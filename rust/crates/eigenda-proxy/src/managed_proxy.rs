@@ -1,8 +1,13 @@
+//! Managed Proxy
+//!
+//! This module provides the ManagedProxy type for managing an eigenda-proxy binary.
+//! It is only available when the `managed-proxy` feature is enabled.
+
 use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
 
-/// Path to the downloaded eigenda-proxy binary (set by build.rs)
+/// Path to the downloaded eigenda-proxy binary (set by build.rs when managed-proxy feature is enabled)
 const EIGENDA_PROXY_PATH: &str = env!("EIGENDA_PROXY_PATH");
 
 pub struct ManagedProxy {
@@ -64,7 +69,7 @@ impl Drop for ProxyHandle {
     fn drop(&mut self) {
         // Attempt to kill the child process
         if let Err(e) = self.child.start_kill() {
-            eprintln!("Warning: Failed to kill proxy process: {}", e);
+            eprintln!("Warning: Failed to kill proxy process: {e}");
         }
     }
 }
