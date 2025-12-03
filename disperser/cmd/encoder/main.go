@@ -41,7 +41,7 @@ func main() {
 
 // Run the encoder. This method is split from main() so we only have to use log.Fatalf() once.
 func run(_ context.Context) error {
-	config, err := config.Bootstrap(encoder.DefaultEncoderConfig)
+	config, err := config.Bootstrap(encoder.DefaultEncoderConfig, nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to bootstrap config: %w", err)
 	}
