@@ -16,6 +16,9 @@ tracing = { workspace = true }
 url = { version = "2.5.4" }
 schemars = { workspace = true, features = ["derive"] }
 
+[build-dependencies]
+reqwest = { version = "0.12.22", features = ["blocking"] }
+
 [dev-dependencies]
 alloy-consensus = { workspace = true, features = ["arbitrary"] }
 alloy-provider = { workspace = true, features = ["anvil-api"] }

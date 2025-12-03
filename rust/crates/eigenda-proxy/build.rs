@@ -1,59 +1,58 @@
 use std::env;
+use std::fs;
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
 
 fn main() {
-    // Get the workspace root directory (eigenda/)
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let workspace_root = Path::new(&manifest_dir)
-        .parent()
-        .and_then(|p| p.parent())
-        .and_then(|p| p.parent())
-        .expect("Failed to find workspace root");
+    let out_dir = env::var("OUT_DIR").expect("OUT_DIR not set");
+    let binary_path = Path::new(&out_dir).join("eigenda-proxy");
 
-    let api_proxy_dir = workspace_root.join("api/proxy");
-    let proxy_binary_path = api_proxy_dir.join("bin/eigenda-proxy");
+    // Download URL for the eigenda-proxy binary
+    // TODO(samlaf): once https://github.com/Layr-Labs/eigenda/pull/2379 is merged and the next release is cut,
+    // update this URL to point to the latest eigenda release packaged proxy binary instead of this test one.
+    let download_url = "https://github.com/samlaf/samlaf.github.io/releases/download/test/eigenda-proxy";
 
-    println!("cargo:rerun-if-changed={}", api_proxy_dir.display());
-    println!("cargo:rerun-if-changed={}", proxy_binary_path.display());
+    // Check if binary already exists to avoid re-downloading on every build
+    if !binary_path.exists() {
+        println!("cargo:warning=Downloading eigenda-proxy binary from {}", download_url);
 
-    // Check if the binary already exists
-    if !proxy_binary_path.exists() {
-        println!(
-            "cargo:warning=Proxy binary not found at {}, building it...",
-            proxy_binary_path.display()
-        );
+        // Download the binary
+        let response = reqwest::blocking::get(download_url)
+            .expect("Failed to download eigenda-proxy binary");
 
-        // Build the proxy using make
-        let status = Command::new("make")
-            .current_dir(&api_proxy_dir)
-            .status()
-            .expect("Failed to run 'make' in api/proxy directory");
-
-        if !status.success() {
-            panic!("Failed to build eigenda-proxy using make");
-        }
-
-        // Verify the binary was created
-        if !proxy_binary_path.exists() {
+        if !response.status().is_success() {
             panic!(
-                "Proxy binary was not created at expected path: {}",
-                proxy_binary_path.display()
+                "Failed to download eigenda-proxy: HTTP {}",
+                response.status()
             );
         }
+
+        let bytes = response.bytes().expect("Failed to read response bytes");
+
+        // Write binary to OUT_DIR
+        let mut file = fs::File::create(&binary_path)
+            .expect("Failed to create eigenda-proxy binary file");
+        file.write_all(&bytes)
+            .expect("Failed to write eigenda-proxy binary");
+
+        // Make the binary executable on Unix systems
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = file.metadata()
+                .expect("Failed to get file metadata")
+                .permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&binary_path, perms)
+                .expect("Failed to set executable permissions");
+        }
+
+        println!("cargo:warning=Downloaded eigenda-proxy binary to: {}", binary_path.display());
     }
 
-    // Set the environment variable that will be used by include_bytes!
-    let proxy_binary_absolute = proxy_binary_path
-        .canonicalize()
-        .expect("Failed to canonicalize proxy binary path");
+    // Set environment variable pointing to the binary location
+    println!("cargo:rustc-env=EIGENDA_PROXY_PATH={}", binary_path.display());
 
-    println!(
-        "cargo:rustc-env=EMBEDDED_PROXY_BINARY_PATH={}",
-        proxy_binary_absolute.display()
-    );
-    println!(
-        "cargo:warning=Embedding proxy binary from: {}",
-        proxy_binary_absolute.display()
-    );
+    // Rerun build script if the download URL changes (though it's hardcoded)
+    println!("cargo:rerun-if-changed=build.rs");
 }

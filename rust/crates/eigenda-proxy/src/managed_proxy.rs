@@ -1,45 +1,28 @@
-use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
 
-/// Embedded binary data
-const EMBEDDED_BINARY: &[u8] = include_bytes!("../../../../api/proxy/bin/eigenda-proxy");
+/// Path to the downloaded eigenda-proxy binary (set by build.rs)
+const EIGENDA_PROXY_PATH: &str = env!("EIGENDA_PROXY_PATH");
 
 pub struct ManagedProxy {
     binary_path: PathBuf,
 }
 
-pub struct ProxyHandle {
-    binary_path: PathBuf,
-    child: tokio::process::Child,
-}
-
 impl ManagedProxy {
-    /// Create a new ManagedProxy instance by extracting the embedded binary
+    /// Create a new ManagedProxy instance using the downloaded binary
     pub fn new() -> Result<Self, std::io::Error> {
-        // Create a temporary directory for the binary
-        let temp_dir = std::env::temp_dir();
+        let binary_path = PathBuf::from(EIGENDA_PROXY_PATH);
 
-        // Add .exe extension to make it executable on Windows
-        #[cfg(windows)]
-        let binary_path = temp_dir.join("eigenda-proxy-embedded.exe");
-        #[cfg(not(windows))]
-        let binary_path = temp_dir.join("eigenda-proxy-embedded");
-
-        // Write the embedded binary to the temporary location
-        let mut file = fs::File::create(&binary_path)?;
-        file.write_all(EMBEDDED_BINARY)?;
-
-        // Make the binary executable (Unix-like systems only)
-        // On Windows, the .exe extension handles executability
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = file.metadata()?.permissions();
-            perms.set_mode(0o755);
-            file.set_permissions(perms)?;
+        // Verify the binary exists
+        if !binary_path.exists() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!(
+                    "eigenda-proxy binary not found at {}. This should have been downloaded during build.",
+                    binary_path.display()
+                ),
+            ));
         }
 
         Ok(Self { binary_path })
@@ -56,8 +39,12 @@ impl ManagedProxy {
             .stdout(Stdio::null())
             .spawn()?;
 
-        Ok(ProxyHandle { binary_path, child })
+        Ok(ProxyHandle { child })
     }
+}
+
+pub struct ProxyHandle {
+    child: tokio::process::Child,
 }
 
 impl ProxyHandle {
@@ -79,15 +66,6 @@ impl Drop for ProxyHandle {
         if let Err(e) = self.child.start_kill() {
             eprintln!("Warning: Failed to kill proxy process: {}", e);
         }
-
-        // Clean up the temporary binary file
-        if let Err(e) = fs::remove_file(&self.binary_path) {
-            eprintln!(
-                "Warning: Failed to remove temporary proxy binary {}: {}",
-                self.binary_path.display(),
-                e
-            );
-        }
     }
 }
 
@@ -99,10 +77,11 @@ mod tests {
     async fn test_basic_start_stop() {
         let mut proxy = ManagedProxy::new()
             .unwrap()
-            .start(&["--help"])
+            .start(&["--version"])
             .await
             .unwrap();
 
-        proxy.wait().await.unwrap();
+        let status = proxy.wait().await.unwrap();
+        assert!(status.success());
     }
 }
