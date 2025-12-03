@@ -87,10 +87,6 @@ library InitParamsLib {
         return stdToml.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumNumbersRequired");
     }
 
-    function certVersion(string memory configData) internal pure returns (uint8) {
-        return uint8(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.certVersion"));
-    }
-
     function offchainDerivationVersion(string memory configData) internal pure returns (uint16) {
         return uint16(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.offchainDerivationVersion"));
     }

@@ -384,7 +384,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             defaultSecurityThresholds,
             hex"0001",
-            4, // cert version
             0 // offchain derivation version
         );
 

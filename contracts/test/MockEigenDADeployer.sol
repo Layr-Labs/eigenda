@@ -176,7 +176,6 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             defaultSecurityThresholds,
             quorumNumbersRequired,
-            certVersion,
             offchainDerivationVersion
         );
     }

@@ -117,7 +117,6 @@ contract CertVerifierDeployerV2 is Script, Test {
                 IEigenDASignatureVerifier(eigenDAServiceManager),
                 defaultSecurityThresholds,
                 quorumNumbersRequired,
-                certVersion,
                 offchainDerivationVersion
             )
         );
