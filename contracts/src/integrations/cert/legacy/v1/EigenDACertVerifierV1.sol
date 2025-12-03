@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
-import {
-    EigenDACertVerificationV1Lib as CertV1Lib
-} from "src/integrations/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
-import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {IEigenDAThresholdRegistry} from "../../../../core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDABatchMetadataStorage} from "../../../../core/interfaces/IEigenDABatchMetadataStorage.sol";
+import {EigenDACertVerificationV1Lib as CertV1Lib} from "./EigenDACertVerificationV1Lib.sol";
+import {EigenDATypesV1 as DATypesV1} from "../../../../core/libraries/v1/EigenDATypesV1.sol";
 
 /// @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
 ///         to change these values or verification behavior a new CertVerifier must be deployed

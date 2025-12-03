@@ -18,10 +18,10 @@ import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initia
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 
 import {Pausable} from "eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
-import {EigenDARegistryCoordinatorStorage} from "src/core/EigenDARegistryCoordinatorStorage.sol";
+import {EigenDARegistryCoordinatorStorage} from "./EigenDARegistryCoordinatorStorage.sol";
 
-import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
-import {AddressDirectoryLib} from "src/core/libraries/v3/address-directory/AddressDirectoryLib.sol";
+import {AddressDirectoryConstants} from "./libraries/v3/address-directory/AddressDirectoryConstants.sol";
+import {AddressDirectoryLib} from "./libraries/v3/address-directory/AddressDirectoryLib.sol";
 
 /// @title A `RegistryCoordinator` that has three registries:
 ///      1) a `StakeRegistry` that keeps track of operators' stakes

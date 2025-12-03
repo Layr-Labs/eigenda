@@ -1,19 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifier} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
-import {IEigenDACertVerifierBase} from "src/integrations/cert/interfaces/IEigenDACertVerifierBase.sol";
-import {IVersionedEigenDACertVerifier} from "src/integrations/cert/interfaces/IVersionedEigenDACertVerifier.sol";
+import {IEigenDACertVerifier} from "./interfaces/IEigenDACertVerifier.sol";
+import {IEigenDACertVerifierBase} from "./interfaces/IEigenDACertVerifierBase.sol";
+import {IVersionedEigenDACertVerifier} from "./interfaces/IVersionedEigenDACertVerifier.sol";
 
-import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
-
-import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-
-import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
-
-import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
-import {EigenDACertTypes as CT} from "src/integrations/cert/EigenDACertTypes.sol";
+import {IEigenDAThresholdRegistry} from "../../core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDASignatureVerifier} from "../../core/interfaces/IEigenDASignatureVerifier.sol";
+import {EigenDATypesV1 as DATypesV1} from "../../core/libraries/v1/EigenDATypesV1.sol";
+import {IEigenDASemVer} from "../../core/interfaces/IEigenDASemVer.sol";
+import {EigenDACertVerificationLib as CertLib} from "./libraries/EigenDACertVerificationLib.sol";
+import {EigenDACertTypes as CT} from "./EigenDACertTypes.sol";
 
 /// @title EigenDACertVerifier
 /// @notice Verifies EigenDA certificates

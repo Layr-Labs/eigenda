@@ -3,16 +3,16 @@ pragma solidity ^0.8.12;
 
 import {Test} from "forge-std/Test.sol";
 
-import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
-import {EigenDAEjectionLib} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
+import {EigenDAEjectionManager} from "../../src/periphery/ejection/EigenDAEjectionManager.sol";
+import {EigenDAEjectionLib} from "../../src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
 
-import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
-import {EigenDADirectory} from "src/core/EigenDADirectory.sol";
+import {EigenDAAccessControl} from "../../src/core/EigenDAAccessControl.sol";
+import {EigenDADirectory} from "../../src/core/EigenDADirectory.sol";
 
-import {AccessControlConstants} from "src/core/libraries/v3/access-control/AccessControlConstants.sol";
-import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
+import {AccessControlConstants} from "../../src/core/libraries/v3/access-control/AccessControlConstants.sol";
+import {AddressDirectoryConstants} from "../../src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
 
-import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract ERC20Mintable is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import {InitializableStorage} from "src/core/libraries/v3/initializable/InitializableStorage.sol";
+import {InitializableStorage} from "./InitializableStorage.sol";
 
 library InitializableLib {
     event Initialized(uint8 version);
