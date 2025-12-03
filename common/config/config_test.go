@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,6 +96,8 @@ func TestTOMLParsing(t *testing.T) {
 	require.Equal(t,
 		"you're no stranger to love, you know the rules and so do I (so do I)",
 		foo.ThisIsASecretField.Get())
+	// The slice of secrets is unset in this config, so we should expect an empty slice.
+	// There used to be a bug where it would instead return [""].
 	require.Equal(t, 0, len(foo.ThisIsASliceOfSecrets))
 
 	// Bar field
@@ -565,13 +568,7 @@ func TestSecretSlice(t *testing.T) {
 		"Never gonna tell a lie and hurt you",
 	}
 
-	fullString := ""
-	for i, s := range expected {
-		if i > 0 {
-			fullString += ", "
-		}
-		fullString += s
-	}
+	fullString := strings.Join(expected, ", ")
 
 	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_SECRETS", fullString))
 

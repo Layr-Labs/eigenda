@@ -1,6 +1,7 @@
 package secret
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -36,8 +37,8 @@ var DecodeHook mapstructure.DecodeHookFunc = func(from reflect.Type, to reflect.
 			case []byte:
 				sourceStr = string(v)
 			default:
-				// If it's not a string or []byte, let mapstructure handle it normally
-				return data, nil
+				// If it's not a string or []byte then we can't handle it here
+				return nil, fmt.Errorf("cannot convert %v to slice of Secrets", from)
 			}
 
 			// If the source string is empty, return an empty slice
