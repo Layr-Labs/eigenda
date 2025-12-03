@@ -172,7 +172,9 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 	// precheck
 	for _, s := range samples {
 		if s.RowIndex >= m {
-			return errors.New("sample.RowIndex and numBlob are inconsistent")
+			return fmt.Errorf(
+				"sample.RowIndex and numBlob are inconsistent: sample has %d rows, but there are only %d blobs",
+				s.RowIndex, m)
 		}
 	}
 
