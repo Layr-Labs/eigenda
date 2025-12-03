@@ -21,7 +21,7 @@ var (
 
 type ClientConfig struct {
 	// Region is the region to use when interacting with S3. Default is "us-east-2".
-	Region string
+	Region string `docs:"required"`
 	// AccessKey to use when interacting with S3.
 	AccessKey string `docs:"required"`
 	// SecretAccessKey to use when interacting with S3.

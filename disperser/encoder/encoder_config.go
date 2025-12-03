@@ -74,7 +74,7 @@ func DefaultEncoderConfig() *EncoderConfig {
 		Version:  V2,
 		GrpcPort: "34000",
 		Aws: aws.ClientConfig{
-			Region: "us-east-1",
+			Region: "",
 		},
 		BlobStore: blobstore.Config{
 			Backend: blobstore.S3Backend,
@@ -83,8 +83,8 @@ func DefaultEncoderConfig() *EncoderConfig {
 			Backend: string(blobstore.S3Backend),
 		},
 		Kzg: kzg.KzgConfig{
-			SRSOrder:        10000,
-			SRSNumberToLoad: 10000,
+			SRSOrder:        268435456,
+			SRSNumberToLoad: 2097152,
 			NumWorker:       12,
 			PreloadEncoder:  false,
 			Verbose:         false,
@@ -100,11 +100,11 @@ func DefaultEncoderConfig() *EncoderConfig {
 			PprofHttpPort:                  "6060",
 			EnablePprof:                    false,
 		},
-		MetricsPort:   "9100",
-		EnableMetrics: false,
+		MetricsPort:   "9094",
+		EnableMetrics: true,
 		LogFormat:     string(common.JSONLogFormat),
 		LogColor:      false,
-		LogLevel:      "info",
+		LogLevel:      "debug",
 	}
 }
 

@@ -42,7 +42,7 @@ run_server: build
 	--aws.endpoint-url http://0.0.0.0:4566
 
 run_encoder: build
-	export ENCODER_ENCODER_VERSION=1 && \
+	export ENCODER_VERSION=1 && \
 	export ENCODER_ENABLE_METRICS=true && \
 	export ENCODER_METRICS_PORT=9109 && \
 	export ENCODER_LOG_LEVEL=debug && \
