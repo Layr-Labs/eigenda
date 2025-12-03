@@ -277,7 +277,7 @@ func genRhsG1(
 // Each sample need not have unique row, it is possible that multiple chunks of the same blob are validated altogether
 func (v *Verifier) universalVerify(params encoding.EncodingParams, samples []Sample, numBlobs int) error {
 	// precheck
-	for i, s := range samples {
+	for _, s := range samples {
 		if s.RowIndex >= numBlobs {
 			return errors.New("sample.RowIndex and numBlob are inconsistent")
 		}
