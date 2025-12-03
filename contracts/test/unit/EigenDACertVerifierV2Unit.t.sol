@@ -68,7 +68,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
         cert.offchainDerivationVersion = cert.offchainDerivationVersion + 1;
         uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
-        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_OFFCHAIN_DERIVATION_VERSION));
     }
 
     function test_checkSecurityParams_ValidParams() public view {
