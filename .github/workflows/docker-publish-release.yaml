@@ -1,3 +1,5 @@
+# TODO: rename this file to release.yaml once we are confident the release job works.
+# The only way to test the release job is to push a v* tag, which I don't have permission to do.
 name: release
 
 on:
