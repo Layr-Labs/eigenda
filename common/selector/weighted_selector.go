@@ -9,9 +9,16 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// Performs weighted random selection with configurable filtering.
+// Performs weighted random selection with configurable filtering of low performers.
+//
+// Selection is a two-stage process:
+//  1. Filtering: Candidates that are in the bottom LowPerformerFraction AND have scores below ScoreThreshold
+//     are excluded.
+//  2. Weighted Selection: From remaining candidates, one is chosen randomly with probability proportional to score.
+//
+// The score function must return values >= 0. Higher scores increase selection probability.
+// Zero scores are treated as 0.001 to ensure all candidates that aren't filtered have non-zero selection probability.
 type WeightedSelector[T any] struct {
-	logger        logging.Logger
 	config        *WeightedSelectorConfig
 	random        *rand.Rand
 	scoreFunction func(T) float64
@@ -21,9 +28,14 @@ func NewWeightedSelector[T any](
 	logger logging.Logger,
 	config *WeightedSelectorConfig,
 	random *rand.Rand,
-	// Function to extract score from candidate. Score must be in range [0.0, 1.0), and is used for weighted selection.
+	// Function to extract score from candidate. Score must be >= 0, and is used for weighted selection.
 	scoreFunction func(T) float64,
 ) (*WeightedSelector[T], error) {
+	err := config.Verify()
+	if err != nil {
+		return nil, fmt.Errorf("invalid weighted selector config: %w", err)
+	}
+
 	if random == nil {
 		return nil, fmt.Errorf("random must not be nil")
 	}
@@ -31,7 +43,6 @@ func NewWeightedSelector[T any](
 		return nil, fmt.Errorf("scoreFunction must not be nil")
 	}
 	return &WeightedSelector[T]{
-		logger:        logger,
 		config:        config,
 		random:        random,
 		scoreFunction: scoreFunction,
@@ -81,8 +92,6 @@ func (ws *WeightedSelector[T]) filterLowPerformers(candidates []T) []T {
 	}
 
 	if len(filtered) == 0 {
-		ws.logger.Errorf("all %d candidates were filtered out, which means there is a bug in the filtering logic.",
-			len(candidates))
 		// fall back to using all candidates
 		filtered = candidates
 	}
@@ -96,7 +105,7 @@ func (ws *WeightedSelector[T]) weightedRandomSelect(candidates []T) (T, error) {
 	var totalWeight float64
 	for i, candidate := range candidates {
 		score := ws.scoreFunction(candidate)
-		// The weighted selection algorithm doesn't handle zero values well, so we use a small positive value instead
+		// Items with zero score would never be selected, so we use a small positive value instead
 		if score == 0 {
 			score = 0.001
 		}

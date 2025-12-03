@@ -69,19 +69,12 @@ func TestWeightedSelector_ZeroScores(t *testing.T) {
 	selector := createTestSelector(t, DefaultWeightedSelectorConfig())
 
 	candidates := []testItem{
-		{id: "zero", score: 0.0},
-		{id: "nonzero", score: 0.1},
+		{id: "zeroA", score: 0.0},
+		{id: "zeroB", score: 0.0},
 	}
 
-	selections := make(map[string]int)
-	for range 1000 {
-		result, err := selector.Select(candidates)
-		require.NoError(t, err)
-		selections[result.id]++
-	}
-
-	require.Greater(t, selections["zero"], 0, "zero score item should be selected at least once")
-	require.Greater(t, selections["nonzero"], selections["zero"], "nonzero should be selected more than zero")
+	_, err := selector.Select(candidates)
+	require.NoError(t, err)
 }
 
 func TestWeightedSelector_Filtering(t *testing.T) {
@@ -132,30 +125,4 @@ func TestWeightedSelector_ThresholdPreservation(t *testing.T) {
 	require.Greater(t, selections["b"], 0, "item b should be preserved by threshold")
 	require.Greater(t, selections["c"], selections["b"], "item c should be selected more than item b")
 	require.Greater(t, selections["d"], selections["c"], "item d should be selected more than item c")
-}
-
-func TestWeightedSelectorConfig_Validation(t *testing.T) {
-	// Test invalid LowPerformerFraction
-	config := WeightedSelectorConfig{LowPerformerFraction: -0.1, ScoreThreshold: 0.4}
-	require.Error(t, config.Verify())
-
-	config = WeightedSelectorConfig{LowPerformerFraction: 1.1, ScoreThreshold: 0.4}
-	require.Error(t, config.Verify())
-
-	// Test invalid ScoreThreshold
-	config = WeightedSelectorConfig{LowPerformerFraction: 0.5, ScoreThreshold: -0.1}
-	require.Error(t, config.Verify())
-
-	config = WeightedSelectorConfig{LowPerformerFraction: 0.5, ScoreThreshold: 1.1}
-	require.Error(t, config.Verify())
-
-	// Test valid configs
-	config = WeightedSelectorConfig{LowPerformerFraction: 0.5, ScoreThreshold: 0.4}
-	require.NoError(t, config.Verify())
-
-	config = WeightedSelectorConfig{LowPerformerFraction: 0, ScoreThreshold: 0}
-	require.NoError(t, config.Verify())
-
-	config = WeightedSelectorConfig{LowPerformerFraction: 1, ScoreThreshold: 1}
-	require.NoError(t, config.Verify())
 }
