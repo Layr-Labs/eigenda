@@ -32,7 +32,6 @@ contract CertVerifierDeployerV2 is Script, Test {
 
     DATypesV1.SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
-    uint8 certVersion;
     uint16 offchainDerivationVersion;
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
@@ -50,9 +49,6 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         raw = stdJson.parseRaw(data, ".quorumNumbersRequired");
         quorumNumbersRequired = abi.decode(raw, (bytes));
-
-        raw = stdJson.parseRaw(data, ".certVersion");
-        certVersion = abi.decode(raw, (uint8));
 
         raw = stdJson.parseRaw(data, ".offchainDerivationVersion");
         offchainDerivationVersion = abi.decode(raw, (uint16));
