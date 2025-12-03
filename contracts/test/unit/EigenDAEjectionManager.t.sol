@@ -93,25 +93,25 @@ contract EigenDAEjectionManagerTest is Test {
         accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, ejector);
         token.mint(ejector, EXPECTED_DEPOSIT);
 
-        // Ejector "deposits" by escrowing ERC20 tokens to the contract
-        // address and starting the ejection
+        // 1) Ejector "deposits" by escrowing ERC20 tokens to the contract
+        //    address and starting the ejection
         vm.startPrank(ejector);
         token.approve(address(ejectionManager), EXPECTED_DEPOSIT);
         ejectionManager.addEjectorBalance(EXPECTED_DEPOSIT);
         ejectionManager.startEjection(operator, "0x");
 
-        // Ensure that the deposited funds are actually escrowed into the contract
+        // 2) Ensure that the deposited funds are actually escrowed into the contract
         assertEq(
             token.balanceOf(address(ejectionManager)),
             EXPECTED_DEPOSIT,
             "Deposit should result in funds escrowed to contract"
         );
 
-        // Issue a cancellation from the Ejector role and withdraw the ERC20 funds
-        // (i.e, contract -> ejector)
+        // 3) Issue a cancellation from the Ejector role and withdraw the ERC20 funds
+        //    (i.e, contract -> ejector)
         ejectionManager.cancelEjectionByEjector(operator);
 
-        // Ensure the stateful params entry has been nullified
+        // 4) Ensure the stateful params entry has been nullified
         assertEq(ejectionManager.getEjector(operator), address(0));
         assertEq(ejectionManager.ejectionTime(operator), 0);
         assertEq(ejectionManager.lastEjectionInitiated(operator), block.timestamp); // should remain unchanged
@@ -119,7 +119,7 @@ contract EigenDAEjectionManagerTest is Test {
         ejectionManager.withdrawEjectorBalance(EXPECTED_DEPOSIT);
         vm.stopPrank();
 
-        // Ensure the ejector has received the full amount of their deposited tokens back
+        // 5) Ensure the ejector has received the full amount of their deposited tokens back
         assertEq(
             token.balanceOf(address(ejectionManager)),
             0,
@@ -178,7 +178,7 @@ contract EigenDAEjectionManagerTest is Test {
         //    until completing the ejection
         testStartEjection(caller, ejectee, 6000, 0);
 
-        // 3) have the ejectee successfully cancels the ejection
+        // 3) have the ejectee successfully cancel the ejection
         vm.startPrank(ejectee);
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionCancelled(ejectee);
