@@ -26,7 +26,7 @@ var _ config.VerifiableConfig = (*EncoderConfig)(nil)
 // Configuration for the encoder.
 type EncoderConfig struct {
 	// Encoder version (1 or 2)
-	EncoderVersion EncoderVersion
+	Version EncoderVersion
 
 	// Port at which encoder listens for gRPC calls (default: 34000)
 	GrpcPort string
@@ -71,8 +71,8 @@ func (e *EncoderConfig) GetPackagePaths() []string {
 // DefaultEncoderConfig returns a default configuration for the encoder.
 func DefaultEncoderConfig() *EncoderConfig {
 	return &EncoderConfig{
-		EncoderVersion: V2,
-		GrpcPort:       "34000",
+		Version:  V2,
+		GrpcPort: "34000",
 		Aws: aws.ClientConfig{
 			Region: "us-east-1",
 		},
@@ -109,8 +109,8 @@ func DefaultEncoderConfig() *EncoderConfig {
 }
 
 func (c *EncoderConfig) Verify() error {
-	if c.EncoderVersion != V1 && c.EncoderVersion != V2 {
-		return fmt.Errorf("invalid encoder version: %d (must be 1 or 2)", c.EncoderVersion)
+	if c.Version != V1 && c.Version != V2 {
+		return fmt.Errorf("invalid encoder version: %d (must be 1 or 2)", c.Version)
 	}
 
 	if c.GrpcPort == "" {
@@ -118,7 +118,7 @@ func (c *EncoderConfig) Verify() error {
 	}
 
 	// For V2, bucket name is required
-	if c.EncoderVersion == V2 {
+	if c.Version == V2 {
 		if c.BlobStore.BucketName == "" {
 			return fmt.Errorf("blob store bucket name is required for encoder v2")
 		}

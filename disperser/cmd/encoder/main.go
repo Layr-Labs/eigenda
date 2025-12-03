@@ -103,7 +103,7 @@ func run(_ context.Context) error {
 		}
 	}()
 
-	if config.EncoderVersion == encoder.V2 {
+	if config.Version == encoder.V2 {
 		// We no longer load the G2 points in V2 because the KZG commitments are computed
 		// on the API server side.
 		config.Kzg.LoadG2Points = false

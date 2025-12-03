@@ -282,6 +282,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 
 func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
+		ENCODER_VERSION:                                  "1",
 		ENCODER_LOG_FORMAT:                               "text",
 		ENCODER_AWS_REGION:                               "",
 		ENCODER_AWS_ACCESS_KEY:                           "",
@@ -299,7 +300,6 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 		ENCODER_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS: "16",
 		ENCODER_SERVER_REQUEST_POOL_SIZE:                 "32",
 		ENCODER_SERVER_REQUEST_QUEUE_SIZE:                "32",
-		ENCODER_ENCODER_VERSION:                          "1",
 	}
 
 	env.applyDefaults(&v, "ENCODER", "enc", ind)
@@ -309,6 +309,7 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 
 func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
+		ENCODER_VERSION:                                  "2",
 		ENCODER_LOG_FORMAT:                               "text",
 		ENCODER_AWS_REGION:                               "",
 		ENCODER_AWS_ACCESS_KEY:                           "",
@@ -325,7 +326,6 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 		ENCODER_KZG_NUM_WORKER:                           fmt.Sprint(runtime.GOMAXPROCS(0)),
 		ENCODER_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS: "16",
 		ENCODER_SERVER_REQUEST_POOL_SIZE:                 "32",
-		ENCODER_ENCODER_VERSION:                          "2",
 		ENCODER_BLOB_STORE_BUCKET_NAME:                   "test-eigenda-blobstore",
 		ENCODER_CHUNK_STORE_BUCKET_NAME:                  "test-eigenda-blobstore",
 		ENCODER_SERVER_REQUEST_QUEUE_SIZE:                "32",

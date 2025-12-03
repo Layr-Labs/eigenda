@@ -26,7 +26,6 @@
 | $${\color{red}\texttt{ChunkStore.Backend}}$$<br>`ENCODER_CHUNK_STORE_BACKEND` | `string`<br>`"s3"` | Backend is the backend to use for object storage (s3 or oci). |
 | $${\color{red}\texttt{ChunkStore.BucketName}}$$<br>`ENCODER_CHUNK_STORE_BUCKET_NAME` | `string`<br>`""` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
 | $${\color{red}\texttt{EnableMetrics}}$$<br>`ENCODER_ENABLE_METRICS` | `bool`<br>`false` | EnableMetrics enables the metrics HTTP server for prometheus metrics collection |
-| $${\color{red}\texttt{EncoderVersion}}$$<br>`ENCODER_ENCODER_VERSION` | `encoder.EncoderVersion`<br>`2` | Encoder version (1 or 2) |
 | $${\color{red}\texttt{GrpcPort}}$$<br>`ENCODER_GRPC_PORT` | `string`<br>`"34000"` | Port at which encoder listens for gRPC calls (default: 34000) |
 | $${\color{red}\texttt{Kzg.CacheDir}}$$<br>`ENCODER_KZG_CACHE_DIR` | `string`<br>`""` | Path to SRS Table directory. Always required even if PreloadEncoder is false, because the prover will write the SRS tables to this directory if they are not already present. |
 | $${\color{red}\texttt{Kzg.G1Path}}$$<br>`ENCODER_KZG_G1_PATH` | `string`<br>`""` | G1 points are needed by both the prover and verifier, so G1Path is always needed. |
@@ -51,4 +50,5 @@
 | $${\color{red}\texttt{Server.PreventReencoding}}$$<br>`ENCODER_SERVER_PREVENT_REENCODING` | `bool`<br>`true` | PreventReencoding if true, will prevent reencoding of chunks by checking if the chunk already exists in the chunk store |
 | $${\color{red}\texttt{Server.RequestPoolSize}}$$<br>`ENCODER_SERVER_REQUEST_POOL_SIZE` | `int`<br>`32` | RequestPoolSize is the maximum number of requests in the request pool. |
 | $${\color{red}\texttt{Server.RequestQueueSize}}$$<br>`ENCODER_SERVER_REQUEST_QUEUE_SIZE` | `int`<br>`32` | RequestQueueSize is the maximum number of requests in the request queue. |
+| $${\color{red}\texttt{Version}}$$<br>`ENCODER_VERSION` | `encoder.EncoderVersion`<br>`2` | Encoder version (1 or 2) |
 
