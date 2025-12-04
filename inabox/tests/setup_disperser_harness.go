@@ -904,8 +904,8 @@ func startController(
 
 	signingRateTracker, err := signingrate.NewSigningRateTracker(
 		controllerLogger,
-		10*time.Minute,
 		1*time.Minute,
+		1*time.Second,
 		time.Now)
 	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
 
@@ -1273,8 +1273,8 @@ func startAPIServer(
 
 	signingRateTracker, err := signingrate.NewSigningRateTracker(
 		apiServerLogger,
-		10*time.Minute,
 		1*time.Minute,
+		1*time.Second,
 		time.Now)
 	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
 
