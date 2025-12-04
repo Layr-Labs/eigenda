@@ -2,6 +2,7 @@ package encoder
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -85,7 +86,7 @@ func DefaultEncoderConfig() *EncoderConfig {
 		Kzg: kzg.KzgConfig{
 			SRSOrder:        268435456,
 			SRSNumberToLoad: 2097152,
-			NumWorker:       12,
+			NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 			PreloadEncoder:  false,
 			Verbose:         false,
 		},
