@@ -181,7 +181,7 @@ func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
 //	MYSTRUCT_BAR_BAZ -> Bar.Baz
 //
 // This function uses reflection to walk the struct tree, so it only works with exported fields. It also only works
-// with basic types (string, int, bool, etc.), slices of basic types, nested structs, secret.Secret, and slices of 
+// with basic types (string, int, bool, etc.), slices of basic types, nested structs, secret.Secret, and slices of
 // secret.Secret. It does not work with maps or other complex types.
 //
 // This function is recursive, so it will walk nested structs to any depth.
