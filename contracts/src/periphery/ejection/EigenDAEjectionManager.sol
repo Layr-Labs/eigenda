@@ -113,8 +113,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         BN254.G1Point memory sigma,
         address recipient
     ) external {
-        address blsApkRegistry = IEigenDADirectory(_addressDirectory)
-            .getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME.getKey());
+        address blsApkRegistry =
+            IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME.getKey());
 
         (BN254.G1Point memory apk,) = IBLSApkRegistry(blsApkRegistry).getRegisteredPubkey(operator);
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
@@ -148,7 +148,7 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
 
     /// @inheritdoc IEigenDAEjectionManager
     function ejectionTime(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionParams(operator).proceedingTime;
+        return EigenDAEjectionLib.getEjectionRecord(operator).proceedingTime;
     }
 
     /// @inheritdoc IEigenDAEjectionManager
@@ -158,7 +158,7 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
 
     /// @inheritdoc IEigenDAEjectionManager
     function ejectionQuorums(address operator) external view returns (bytes memory) {
-        return EigenDAEjectionLib.ejectionParams(operator).quorums;
+        return EigenDAEjectionLib.getEjectionRecord(operator).quorums;
     }
 
     /// @inheritdoc IEigenDAEjectionManager
@@ -177,38 +177,6 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     }
 
     /// INTERNAL FUNCTIONS
-
-    function _isOperatorWeightsGreater(address operator1, address operator2, bytes memory quorumNumbers)
-        internal
-        view
-        returns (bool)
-    {
-        uint96[] memory weights1 = _getOperatorWeights(operator1, quorumNumbers);
-        uint96[] memory weights2 = _getOperatorWeights(operator2, quorumNumbers);
-
-        for (uint256 i; i < weights1.length; i++) {
-            if (weights1[i] <= weights2[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    function _getOperatorWeights(address operator, bytes memory quorumNumbers)
-        internal
-        view
-        returns (uint96[] memory weights)
-    {
-        address stakeRegistry =
-            IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME.getKey());
-        weights = new uint96[](quorumNumbers.length);
-        for (uint256 i; i < quorumNumbers.length; i++) {
-            uint8 quorumNumber = uint8(quorumNumbers[i]);
-
-            weights[i] = IStakeRegistry(stakeRegistry).weightOfOperatorForQuorum(quorumNumber, operator);
-        }
-    }
-
     /// @notice Returns the required deposit for initiating an ejection based on a multiple of the base fee of the block.
     function _depositAmount() internal virtual returns (uint256) {
         return _estimatedGasUsedWithSig * block.basefee * _depositBaseFeeMultiplier;
@@ -216,14 +184,15 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
 
     function _refundGas(address receiver, uint256 estimatedGasUsed) internal virtual {
         uint256 estimatedRefund = estimatedGasUsed * block.basefee;
-        uint256 depositAmount = EigenDAEjectionLib.ejectionParams(receiver).depositAmount;
+        uint256 depositAmount = EigenDAEjectionLib.getEjectionRecord(receiver).depositAmount;
         IERC20(_depositToken).safeTransfer(receiver, estimatedRefund > depositAmount ? depositAmount : estimatedRefund);
     }
 
     /// @notice Attempts to eject an operator. If the ejection fails, it catches the error and does nothing.
     function _tryEjectOperator(address operator, bytes memory quorums) internal {
-        address registryCoordinator = IEigenDADirectory(_addressDirectory)
-            .getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME.getKey());
+        address registryCoordinator = IEigenDADirectory(_addressDirectory).getAddress(
+            AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME.getKey()
+        );
         try IRegistryCoordinator(registryCoordinator).ejectOperator(operator, quorums) {} catch {}
     }
 
@@ -234,7 +203,7 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
                 CANCEL_EJECTION_MESSAGE_IDENTIFIER,
                 block.chainid,
                 address(this),
-                EigenDAEjectionLib.ejectionParams(operator),
+                EigenDAEjectionLib.getEjectionRecord(operator),
                 recipient
             )
         );
@@ -246,8 +215,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         BN254.G2Point memory apkG2,
         BN254.G1Point memory sigma
     ) internal view {
-        address signatureVerifier = IEigenDADirectory(_addressDirectory)
-            .getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME.getKey());
+        address signatureVerifier =
+            IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME.getKey());
         (bool paired, bool valid) =
             BLSSignatureChecker(signatureVerifier).trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
         require(paired, "EigenDAEjectionManager: Pairing failed");
@@ -257,9 +226,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     function _onlyOwner(address sender) internal view virtual {
         require(
             IAccessControl(
-                    IEigenDADirectory(_addressDirectory)
-                        .getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
-                ).hasRole(AccessControlConstants.OWNER_ROLE, sender),
+                IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
+            ).hasRole(AccessControlConstants.OWNER_ROLE, sender),
             "EigenDAEjectionManager: Caller is not the owner"
         );
     }
@@ -267,9 +235,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     function _onlyEjector(address sender) internal view virtual {
         require(
             IAccessControl(
-                    IEigenDADirectory(_addressDirectory)
-                        .getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
-                ).hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
+                IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
+            ).hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
             "EigenDAEjectionManager: Caller is not an ejector"
         );
     }

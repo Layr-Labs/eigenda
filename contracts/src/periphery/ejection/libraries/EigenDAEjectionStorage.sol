@@ -9,10 +9,12 @@ library EigenDAEjectionStorage {
         keccak256(abi.encode(uint256(keccak256(abi.encodePacked(STORAGE_ID))) - 1)) & ~bytes32(uint256(0xff));
 
     struct Layout {
-        mapping(address => EigenDAEjectionTypes.Ejectee) ejectionParams;
-        /// @dev ejectorBalance is a book-kept value of the ejector's balance
-        ///      wrt to active collateralized lockups
-        mapping(address => uint256) ejectorBalance;
+        mapping(address => EigenDAEjectionTypes.EjecteeState) ejectees;
+        /// @dev ejectorBalanceRecord is a book-keeping value of the ejector's balance
+        ///      which reflects total_ejector_amount_added - ∑(ejector_ejection_deposit_i)
+        ///      where some ejector_ejection_deposit_i can either be reclaimed by the ejector OR lost
+        ///      in the event of an ejectee cancellation
+        mapping(address => uint256) ejectorBalanceRecord;
         uint64 delay;
         uint64 cooldown;
     }

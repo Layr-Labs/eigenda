@@ -91,6 +91,10 @@ contract EigenDAEjectionManagerTest is Test {
     }
 
     function testCancelEjectionByEjector(address ejector, address operator) public {
+        vm.assume(ejector != address(0));
+        vm.assume(ejector != address(ejectionManager));
+        vm.assume(ejector != operator);
+
         accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, ejector);
         token.mint(ejector, EXPECTED_DEPOSIT);
 
