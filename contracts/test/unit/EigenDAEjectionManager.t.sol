@@ -175,19 +175,19 @@ contract EigenDAEjectionManagerTest is Test {
     }
 
     function testCompleteEjection() public {
-        // 1) start an ejection via ejector
+        // 0) start an ejection via ejector
 
         testStartEjection(0, 0);
         assertEq(ejectionManager.getEjectorBalance(ejector), 0);
 
-        // 2) complete ejection via ejector
+        // 1) complete ejection via ejector
         vm.startPrank(ejector);
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionCompleted(ejectee, "0x");
         ejectionManager.completeEjection(ejectee, "0x");
         vm.stopPrank();
 
-        // 3) ensure that ejectee's record is nullified and the
+        // 2) ensure that ejectee's record is nullified and the
         //    ejector's book-kept balance reincorpates the initial deposit amount
         assertEq(ejectionManager.getEjector(ejectee), address(0));
         assertEq(ejectionManager.ejectionTime(ejectee), 0);
@@ -196,17 +196,17 @@ contract EigenDAEjectionManagerTest is Test {
     }
 
     function testDelayEnforcementCausesEjectorCompletionsToRevert() public {
-        // 1) set an artificial delay for which the ejector has to wait
+        // 0) set an artificial delay for which the ejector has to wait
         //    until completing the ejection
         testStartEjection(0, 6000);
 
         vm.startPrank(ejector);
         vm.expectRevert("Proceeding not yet due");
-        // 2) the EVM time context hasn't been advanced and there's an artificial
+        // 1) the EVM time context hasn't been advanced and there's an artificial
         //    delay where the block.timestamp >= start_ejection_block.timestamp + 6000s
         ejectionManager.completeEjection(ejectee, "0x");
 
-        // 3) now advance EVM and ensure that ejection can be successfully completed
+        // 2) now advance EVM and ensure that ejection can be successfully completed
         //    by ejector
         vm.warp(block.timestamp + 7000);
         ejectionManager.completeEjection(ejectee, "0x");
