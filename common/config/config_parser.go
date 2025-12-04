@@ -24,8 +24,19 @@ func ParseConfig[T VerifiableConfig](
 	cfg T,
 	// The prefix to use for environment variables. If empty, then environment variables are not read.
 	envPrefix string,
+	// A map of environment variable aliases. The keys are environment variables that should be aliased to something
+	// else, and the values are the environment variables they should be aliased to.
+	//
+	// Environment variables in this map should be fully qualified, including any prefixes.
+	//
+	// If nil, then no aliasing is performed.
+	aliasedEnvVars map[string]string,
 	// A list of environment variables that should be ignored when sanity checking environment variables.
 	// Useful for situations where external systems set environment variables that would otherwise cause problems.
+	//
+	// Environment variables in this list should be fully qualified, including any prefixes.
+	//
+	// If nil, then no environment variables are ignored during sanity checking.
 	ignoredEnvVars []string,
 	// A list of zero or more paths to configuration files. Later files override earlier ones.
 	// If environment variables are read, they override all configuration files.
@@ -43,6 +54,12 @@ func ParseConfig[T VerifiableConfig](
 	}
 
 	if envPrefix != "" {
+		err := aliasEnvVars(logger, aliasedEnvVars)
+		if err != nil {
+			var zero T
+			return zero, fmt.Errorf("failed to alias environment variables: %w", err)
+		}
+
 		viperInstance.SetEnvPrefix(envPrefix)
 		viperInstance.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 		viperInstance.AutomaticEnv()
@@ -55,7 +72,7 @@ func ParseConfig[T VerifiableConfig](
 		}
 
 		// Make sure there aren't any invalid environment variables set.
-		err = checkForInvalidEnvVars(logger, boundVars, envPrefix, ignoredEnvVars)
+		err = checkForInvalidEnvVars(logger, boundVars, envPrefix, aliasedEnvVars, ignoredEnvVars)
 		if err != nil {
 			var zero T
 			return zero, fmt.Errorf("invalid environment variables: %w", err)
@@ -90,6 +107,31 @@ func ParseConfig[T VerifiableConfig](
 	}
 
 	return cfg, nil
+}
+
+// Applies environment variable aliases by copying the value of each aliased variable to its target variable.
+// This function sets new environment variables using os.Setenv if old environment variables in need of
+// aliasing are set.
+func aliasEnvVars(logger logging.Logger, aliasedEnvVars map[string]string) error {
+	for oldVar, newVar := range aliasedEnvVars {
+		value, oldVarExists := os.LookupEnv(oldVar)
+
+		if oldVarExists {
+			_, newVarExists := os.LookupEnv(newVar)
+			if newVarExists {
+				return fmt.Errorf("cannot alias environment variable %q to %q: both are set", oldVar, newVar)
+			}
+
+			logger.Warnf("Deprecated environment variable %q is set; please use %q instead. "+
+				"Support for this environment variable may be removed in a future release.", oldVar, newVar)
+
+			err := os.Setenv(newVar, value)
+			if err != nil {
+				return fmt.Errorf("failed to set aliased environment variable %q: %w", newVar, err)
+			}
+		}
+	}
+	return nil
 }
 
 func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
@@ -178,7 +220,7 @@ func bindEnvs(
 
 		keyPath := append(path, fieldKey)
 
-		switch field.Type.Kind() { //nolint:exhaustive // only handling struct and pointer types
+		switch field.Type.Kind() { //nolint:exhaustive // only handling struct, pointer, and slice types
 
 		case reflect.Struct:
 			// Recurse for nested structs
@@ -190,6 +232,21 @@ func bindEnvs(
 			for k := range nestedBoundVars {
 				boundVars[k] = struct{}{}
 			}
+		case reflect.Slice:
+			// Handle slices - currently only []*secret.Secret is supported
+			// Check if this is a slice of pointers to Secret
+			if field.Type.Elem().Kind() == reflect.Ptr &&
+				field.Type.Elem().Elem().Kind() == reflect.Struct &&
+				field.Type.Elem().Elem() == reflect.TypeOf((*secret.Secret)(nil)).Elem() {
+				// Slice of *secret.Secret, bind as leaf value
+				env := buildEnvVarName(prefix, keyPath...)
+				boundVars[env] = struct{}{}
+				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
+					return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
+				}
+			}
+			// Other slice types are not currently supported for environment variable binding
+			// and are silently ignored. This could be extended in the future if needed.
 		case reflect.Ptr:
 			// Handle pointer to struct
 			if field.Type.Elem().Kind() == reflect.Struct {
@@ -255,6 +312,7 @@ func checkForInvalidEnvVars(
 	logger logging.Logger,
 	boundVars map[string]struct{},
 	envPrefix string,
+	aliasedEnvVars map[string]string,
 	ignoredEnvVars []string,
 ) error {
 	if envPrefix == "" {
@@ -265,6 +323,12 @@ func checkForInvalidEnvVars(
 	ignoredSet := make(map[string]struct{}, len(ignoredEnvVars))
 	for _, v := range ignoredEnvVars {
 		ignoredSet[v] = struct{}{}
+	}
+	// The config parser will return an error if it discovers an environment variable that doesn't map to a struct
+	// value. Since the aliased environment variables indirectly map to struct values, we need to instruct the config
+	// parser to ignore them when it's checking for un-mapped environment variables.
+	for k := range aliasedEnvVars {
+		ignoredSet[k] = struct{}{}
 	}
 
 	for _, env := range os.Environ() {

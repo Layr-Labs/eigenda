@@ -48,7 +48,7 @@ func NewReputationSelector[T any](
 
 // Chooses one item from the provided candidates using weighted random selection.
 // Returns an error if candidates is empty.
-func (ws *ReputationSelector[T]) Select(candidates []T) (T, error) {
+func (rs *ReputationSelector[T]) Select(candidates []T) (T, error) {
 	var zero T
 
 	if len(candidates) == 0 {
@@ -57,8 +57,8 @@ func (ws *ReputationSelector[T]) Select(candidates []T) (T, error) {
 
 	// Sort candidates by score (ascending)
 	slices.SortFunc(candidates, func(a, b T) int {
-		scoreA := ws.scoreFunction(a)
-		scoreB := ws.scoreFunction(b)
+		scoreA := rs.scoreFunction(a)
+		scoreB := rs.scoreFunction(b)
 		if scoreA < scoreB {
 			return -1
 		} else if scoreA > scoreB {
@@ -67,22 +67,22 @@ func (ws *ReputationSelector[T]) Select(candidates []T) (T, error) {
 		return 0
 	})
 
-	filteredCandidates := ws.filterLowPerformers(candidates)
-	return ws.weightedRandomSelect(filteredCandidates)
+	filteredCandidates := rs.filterLowPerformers(candidates)
+	return rs.weightedRandomSelect(filteredCandidates)
 }
 
 // Filters out low performers based on config.
-func (ws *ReputationSelector[T]) filterLowPerformers(candidates []T) []T {
+func (rs *ReputationSelector[T]) filterLowPerformers(candidates []T) []T {
 	// Calculate how many candidates are in the low performer fraction. Round down to ensure we don't exclude all
 	// candidates in cases where there are few eligible candidates.
-	lowPerformerCount := int(math.Floor(float64(len(candidates)) * ws.config.LowPerformerFraction))
+	lowPerformerCount := int(math.Floor(float64(len(candidates)) * rs.config.LowPerformerFraction))
 
 	// Filter out low performers
 	filtered := make([]T, 0, len(candidates))
 	for i, candidate := range candidates {
-		score := ws.scoreFunction(candidate)
+		score := rs.scoreFunction(candidate)
 		// Exclude if in bottom percentile AND below threshold
-		if i < lowPerformerCount && score < ws.config.ScoreThreshold {
+		if i < lowPerformerCount && score < rs.config.ScoreThreshold {
 			continue
 		}
 		filtered = append(filtered, candidate)
@@ -97,11 +97,11 @@ func (ws *ReputationSelector[T]) filterLowPerformers(candidates []T) []T {
 }
 
 // Performs weighted random selection based on scores.
-func (ws *ReputationSelector[T]) weightedRandomSelect(candidates []T) (T, error) {
+func (rs *ReputationSelector[T]) weightedRandomSelect(candidates []T) (T, error) {
 	scores := make([]float64, len(candidates))
 	var totalWeight float64
 	for i, candidate := range candidates {
-		score := ws.scoreFunction(candidate)
+		score := rs.scoreFunction(candidate)
 
 		scores[i] = score
 		totalWeight += score
@@ -109,11 +109,11 @@ func (ws *ReputationSelector[T]) weightedRandomSelect(candidates []T) (T, error)
 
 	// if all candidates have zero score, select uniformly at random
 	if totalWeight == 0 {
-		return candidates[ws.random.Intn(len(candidates))], nil
+		return candidates[rs.random.Intn(len(candidates))], nil
 	}
 
 	// Generate random number in [0, totalWeight)
-	target := ws.random.Float64() * totalWeight
+	target := rs.random.Float64() * totalWeight
 
 	// Walk through candidates, accumulating weight until we exceed target
 	var accumulated float64

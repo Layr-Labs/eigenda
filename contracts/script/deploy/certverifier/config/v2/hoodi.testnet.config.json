@@ -4,5 +4,6 @@
         "0_confirmationThreshold": 55,
         "1_adversaryThreshold": 33
     },
-    "quorumNumbersRequired": "0x0001"
+    "quorumNumbersRequired": "0x0001",
+    "offchainDerivationVersion": 0
 }
