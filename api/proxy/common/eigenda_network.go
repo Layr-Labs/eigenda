@@ -107,11 +107,8 @@ func EigenDANetworkFromString(inputString string) (EigenDANetwork, error) {
 
 // BuildEthClient creates an Ethereum client using the provided RPC URL and, if set, validates that the chain ID
 // matches the expected EigenDA network. It returns an ethClient, it's ChainID, and an error.
-func BuildEthClient(ctx context.Context, log logging.Logger, ethRpcUrl string,
+func BuildEthClient(ctx context.Context, log logging.Logger, gethCfg geth.EthClientConfig,
 	expectedNetwork EigenDANetwork) (common_eigenda.EthClient, string, error) {
-	gethCfg := geth.EthClientConfig{
-		RPCURLs: []string{ethRpcUrl},
-	}
 
 	ethClient, err := geth.NewClient(gethCfg, geth_common.Address{}, 0, log)
 	if err != nil {

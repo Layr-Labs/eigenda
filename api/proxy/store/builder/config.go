@@ -33,6 +33,9 @@ type Config struct {
 
 	// secondary storage cfgs
 	S3Config s3.Config
+
+	// eth rpc retry cfg
+	NumRetry int
 }
 
 // ReadConfig ... parses the Config from the provided flags or environment variables.

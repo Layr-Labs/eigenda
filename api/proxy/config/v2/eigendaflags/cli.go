@@ -33,6 +33,7 @@ var (
 	ContractCallTimeoutFlagName     = withFlagPrefix("contract-call-timeout")
 	BlobParamsVersionFlagName       = withFlagPrefix("blob-version")
 	EthRPCURLFlagName               = withFlagPrefix("eth-rpc")
+	EthRPCNumRetryFlagName          = withFlagPrefix("eth-rpc-num-retry")
 	MaxBlobLengthFlagName           = withFlagPrefix("max-blob-length")
 	NetworkFlagName                 = withFlagPrefix("network")
 	RBNRecencyWindowSizeFlagName    = withFlagPrefix("rbn-recency-window-size")
@@ -86,6 +87,14 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Name:     EthRPCURLFlagName,
 			Usage:    "URL of the Ethereum RPC endpoint.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC")},
+			Category: category,
+			Required: false,
+		},
+		&cli.IntFlag{
+			Name:     EthRPCNumRetryFlagName,
+			Usage:    "number of retry to call the Ethereum RPC endpoint.",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC_NUM_RETRY")},
+			Value:    2,
 			Category: category,
 			Required: false,
 		},
