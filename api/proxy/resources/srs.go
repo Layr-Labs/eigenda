@@ -84,7 +84,8 @@ func deserializePoints[T bn254.G1Affine | bn254.G2Affine](serializedPoints []byt
 			endPoint = n
 		}
 
-		go kzg.DeserializePointsInRange(serializedPoints, points, uint64(startPoint), uint64(endPoint), pointSizeBytes, results)
+		go kzg.DeserializePointsInRange(serializedPoints, points,
+			uint64(startPoint), uint64(endPoint), pointSizeBytes, results)
 	}
 
 	for w := 0; w < numWorkers; w++ {
