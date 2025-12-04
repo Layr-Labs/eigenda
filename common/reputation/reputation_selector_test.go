@@ -81,10 +81,10 @@ func TestReputationSelector_Filtering(t *testing.T) {
 	selector := createTestSelector(t, DefaultReputationSelectorConfig())
 
 	candidates := []testItem{
-		{id: "a", score: 0.1}, // Bottom 50% AND below threshold -> filtered
-		{id: "b", score: 0.2}, // Bottom 50% AND below threshold -> filtered
-		{id: "c", score: 0.3}, // Not in bottom 50%, but below threshold -> included
-		{id: "d", score: 0.9}, // Not in bottom 50%, and above threshold -> included
+		{id: "a", score: 0.1},  // Bottom 50% AND below threshold -> filtered
+		{id: "b", score: 0.11}, // Bottom 50% AND below threshold -> filtered
+		{id: "c", score: 0.12}, // Not in bottom 50%, but below threshold -> included
+		{id: "d", score: 1.0},  // Not in bottom 50%, and above threshold -> included
 	}
 
 	selections := make(map[string]int)
@@ -106,14 +106,14 @@ func TestReputationSelector_ThresholdPreservation(t *testing.T) {
 	selector := createTestSelector(t, DefaultReputationSelectorConfig())
 
 	candidates := []testItem{
-		{id: "a", score: 0.3}, // Bottom 50% AND below threshold -> filtered
-		{id: "b", score: 0.6}, // Bottom 50% BUT above threshold -> KEPT
-		{id: "c", score: 0.7}, // Not in bottom 50% -> included
-		{id: "d", score: 0.9}, // Not in bottom 50% -> included
+		{id: "a", score: 0.3},  // Bottom 50% AND below threshold -> filtered
+		{id: "b", score: 0.51}, // Bottom 50% BUT above threshold -> KEPT
+		{id: "c", score: 0.75}, // Not in bottom 50% -> included
+		{id: "d", score: 1.0},  // Not in bottom 50% -> included
 	}
 
 	selections := make(map[string]int)
-	for range 1000 {
+	for range 2000 {
 		result, err := selector.Select(candidates)
 		require.NoError(t, err)
 		selections[result.id]++
