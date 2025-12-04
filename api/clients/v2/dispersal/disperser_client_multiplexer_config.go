@@ -5,7 +5,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/reputation"
-	"github.com/Layr-Labs/eigenda/common/selector"
 )
 
 var _ config.VerifiableConfig = (*DisperserClientMultiplexerConfig)(nil)
@@ -23,8 +22,8 @@ type DisperserClientMultiplexerConfig struct {
 	ReputationConfig reputation.ReputationConfig
 	// Whether to use secure gRPC connections (TLS) when connecting to dispersers
 	UseSecureGrpcFlag bool
-	// Configuration for the weighted selector used to choose dispersers
-	SelectorConfig selector.WeightedSelectorConfig
+	// Configuration for the reputation selector used to choose dispersers
+	SelectorConfig reputation.ReputationSelectorConfig
 }
 
 func DefaultDisperserClientMultiplexerConfig() *DisperserClientMultiplexerConfig {
@@ -33,7 +32,7 @@ func DefaultDisperserClientMultiplexerConfig() *DisperserClientMultiplexerConfig
 		DisperserBlacklist:   nil,
 		ReputationConfig:     reputation.DefaultConfig(),
 		UseSecureGrpcFlag:    true,
-		SelectorConfig:       selector.DefaultWeightedSelectorConfig(),
+		SelectorConfig:       reputation.DefaultReputationSelectorConfig(),
 	}
 }
 

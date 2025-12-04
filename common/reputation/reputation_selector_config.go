@@ -1,9 +1,9 @@
-package selector
+package reputation
 
 import "fmt"
 
-// Configuration for the [WeightedSelector]
-type WeightedSelectorConfig struct {
+// Configuration for the [ReputationSelector]
+type ReputationSelectorConfig struct {
 	// The fraction of candidates (sorted by score) to consider as "low performers", which may potentially be
 	// excluded from selection.
 	LowPerformerFraction float64
@@ -12,14 +12,14 @@ type WeightedSelectorConfig struct {
 	ScoreThreshold float64
 }
 
-func DefaultWeightedSelectorConfig() WeightedSelectorConfig {
-	return WeightedSelectorConfig{
+func DefaultReputationSelectorConfig() ReputationSelectorConfig {
+	return ReputationSelectorConfig{
 		LowPerformerFraction: 0.5,
 		ScoreThreshold:       0.4,
 	}
 }
 
-func (c *WeightedSelectorConfig) Verify() error {
+func (c *ReputationSelectorConfig) Verify() error {
 	if c.LowPerformerFraction < 0 || c.LowPerformerFraction > 1 {
 		return fmt.Errorf("LowPerformerFraction must be between 0 and 1, got %f", c.LowPerformerFraction)
 	}

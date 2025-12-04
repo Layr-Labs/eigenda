@@ -1,4 +1,4 @@
-package selector
+package reputation
 
 import (
 	"fmt"
@@ -18,22 +18,22 @@ import (
 //
 // The score function must return values >= 0. Higher scores increase selection probability.
 // Zero scores are treated as 0.001 to ensure all candidates that aren't filtered have non-zero selection probability.
-type WeightedSelector[T any] struct {
-	config        *WeightedSelectorConfig
+type ReputationSelector[T any] struct {
+	config        *ReputationSelectorConfig
 	random        *rand.Rand
 	scoreFunction func(T) float64
 }
 
-func NewWeightedSelector[T any](
+func NewReputationSelector[T any](
 	logger logging.Logger,
-	config *WeightedSelectorConfig,
+	config *ReputationSelectorConfig,
 	random *rand.Rand,
 	// Function to extract score from candidate. Score must be >= 0, and is used for weighted selection.
 	scoreFunction func(T) float64,
-) (*WeightedSelector[T], error) {
+) (*ReputationSelector[T], error) {
 	err := config.Verify()
 	if err != nil {
-		return nil, fmt.Errorf("invalid weighted selector config: %w", err)
+		return nil, fmt.Errorf("invalid reputation selector config: %w", err)
 	}
 
 	if random == nil {
@@ -42,7 +42,7 @@ func NewWeightedSelector[T any](
 	if scoreFunction == nil {
 		return nil, fmt.Errorf("scoreFunction must not be nil")
 	}
-	return &WeightedSelector[T]{
+	return &ReputationSelector[T]{
 		config:        config,
 		random:        random,
 		scoreFunction: scoreFunction,
@@ -51,7 +51,7 @@ func NewWeightedSelector[T any](
 
 // Chooses one item from the provided candidates using weighted random selection.
 // Returns an error if candidates is empty.
-func (ws *WeightedSelector[T]) Select(candidates []T) (T, error) {
+func (ws *ReputationSelector[T]) Select(candidates []T) (T, error) {
 	var zero T
 
 	if len(candidates) == 0 {
@@ -75,7 +75,7 @@ func (ws *WeightedSelector[T]) Select(candidates []T) (T, error) {
 }
 
 // Filters out low performers based on config.
-func (ws *WeightedSelector[T]) filterLowPerformers(candidates []T) []T {
+func (ws *ReputationSelector[T]) filterLowPerformers(candidates []T) []T {
 	// Calculate how many candidates are in the low performer fraction. Round down to ensure we don't exclude all
 	// candidates in cases where there are few eligible candidates.
 	lowPerformerCount := int(math.Floor(float64(len(candidates)) * ws.config.LowPerformerFraction))
@@ -100,7 +100,7 @@ func (ws *WeightedSelector[T]) filterLowPerformers(candidates []T) []T {
 }
 
 // Performs weighted random selection based on scores.
-func (ws *WeightedSelector[T]) weightedRandomSelect(candidates []T) (T, error) {
+func (ws *ReputationSelector[T]) weightedRandomSelect(candidates []T) (T, error) {
 	scores := make([]float64, len(candidates))
 	var totalWeight float64
 	for i, candidate := range candidates {

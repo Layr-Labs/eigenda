@@ -1,4 +1,4 @@
-package selector
+package reputation
 
 import (
 	"testing"
@@ -13,8 +13,8 @@ type testItem struct {
 	score float64
 }
 
-func createTestSelector(t *testing.T, config WeightedSelectorConfig) *WeightedSelector[testItem] {
-	selector, err := NewWeightedSelector(
+func createTestSelector(t *testing.T, config ReputationSelectorConfig) *ReputationSelector[testItem] {
+	selector, err := NewReputationSelector(
 		common.TestLogger(t),
 		&config,
 		random.NewTestRandom().Rand,
@@ -24,15 +24,15 @@ func createTestSelector(t *testing.T, config WeightedSelectorConfig) *WeightedSe
 	return selector
 }
 
-func TestWeightedSelector_EmptyCandidates(t *testing.T) {
-	selector := createTestSelector(t, DefaultWeightedSelectorConfig())
+func TestReputationSelector_EmptyCandidates(t *testing.T) {
+	selector := createTestSelector(t, DefaultReputationSelectorConfig())
 
 	_, err := selector.Select([]testItem{})
 	require.Error(t, err)
 }
 
-func TestWeightedSelector_SingleCandidate(t *testing.T) {
-	selector := createTestSelector(t, DefaultWeightedSelectorConfig())
+func TestReputationSelector_SingleCandidate(t *testing.T) {
+	selector := createTestSelector(t, DefaultReputationSelectorConfig())
 
 	candidates := []testItem{{id: "a", score: 0.5}}
 	result, err := selector.Select(candidates)
@@ -40,8 +40,8 @@ func TestWeightedSelector_SingleCandidate(t *testing.T) {
 	require.Equal(t, "a", result.id)
 }
 
-func TestWeightedSelector_EqualWeights(t *testing.T) {
-	selector := createTestSelector(t, DefaultWeightedSelectorConfig())
+func TestReputationSelector_EqualWeights(t *testing.T) {
+	selector := createTestSelector(t, DefaultReputationSelectorConfig())
 
 	candidates := []testItem{
 		{id: "a", score: 0.5},
@@ -65,8 +65,8 @@ func TestWeightedSelector_EqualWeights(t *testing.T) {
 	}
 }
 
-func TestWeightedSelector_ZeroScores(t *testing.T) {
-	selector := createTestSelector(t, DefaultWeightedSelectorConfig())
+func TestReputationSelector_ZeroScores(t *testing.T) {
+	selector := createTestSelector(t, DefaultReputationSelectorConfig())
 
 	candidates := []testItem{
 		{id: "zeroA", score: 0.0},
@@ -77,8 +77,8 @@ func TestWeightedSelector_ZeroScores(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestWeightedSelector_Filtering(t *testing.T) {
-	selector := createTestSelector(t, DefaultWeightedSelectorConfig())
+func TestReputationSelector_Filtering(t *testing.T) {
+	selector := createTestSelector(t, DefaultReputationSelectorConfig())
 
 	candidates := []testItem{
 		{id: "a", score: 0.1}, // Bottom 50% AND below threshold -> filtered
@@ -102,8 +102,8 @@ func TestWeightedSelector_Filtering(t *testing.T) {
 	require.Greater(t, selections["d"], selections["c"], "item d should be selected more than item c")
 }
 
-func TestWeightedSelector_ThresholdPreservation(t *testing.T) {
-	selector := createTestSelector(t, DefaultWeightedSelectorConfig())
+func TestReputationSelector_ThresholdPreservation(t *testing.T) {
+	selector := createTestSelector(t, DefaultReputationSelectorConfig())
 
 	candidates := []testItem{
 		{id: "a", score: 0.3}, // Bottom 50% AND below threshold -> filtered

@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/common/disperser"
 	"github.com/Layr-Labs/eigenda/common/reputation"
-	"github.com/Layr-Labs/eigenda/common/selector"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -42,7 +41,7 @@ type DisperserClientMultiplexer struct {
 	// map from disperser ID to its reputation tracker
 	reputations map[uint32]*reputation.Reputation
 	// chooses dispersers based on reputation
-	weightedSelector *selector.WeightedSelector[*disperserInfo]
+	reputationSelector *reputation.ReputationSelector[*disperserInfo]
 	// indicates whether Close() has been called
 	closed bool
 	lock   sync.Mutex
@@ -58,14 +57,14 @@ func NewDisperserClientMultiplexer(
 	disperserConnectionCount uint,
 	random *rand.Rand,
 ) (*DisperserClientMultiplexer, error) {
-	weightedSelector, err := selector.NewWeightedSelector(
+	reputationSelector, err := reputation.NewReputationSelector(
 		logger,
 		&config.SelectorConfig,
 		random,
 		func(d *disperserInfo) float64 { return d.reputationScore },
 	)
 	if err != nil {
-		return nil, fmt.Errorf("create weighted selector: %w", err)
+		return nil, fmt.Errorf("create reputation selector: %w", err)
 	}
 
 	return &DisperserClientMultiplexer{
@@ -78,7 +77,7 @@ func NewDisperserClientMultiplexer(
 		disperserConnectionCount: disperserConnectionCount,
 		clients:                  make(map[uint32]*DisperserClient),
 		reputations:              make(map[uint32]*reputation.Reputation),
-		weightedSelector:         weightedSelector,
+		reputationSelector:       reputationSelector,
 	}, nil
 }
 
@@ -129,7 +128,7 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 		return nil, fmt.Errorf("no eligible dispersers")
 	}
 
-	selectedDisperserInfo, err := dcm.weightedSelector.Select(eligibleDispersers)
+	selectedDisperserInfo, err := dcm.reputationSelector.Select(eligibleDispersers)
 	if err != nil {
 		return nil, fmt.Errorf("select disperser: %w", err)
 	}
@@ -277,16 +276,10 @@ func (dcm *DisperserClientMultiplexer) getEligibleDispersers(
 			dcm.reputations[disperserId] = reputation.NewReputation(dcm.config.ReputationConfig, now)
 		}
 
-		score := dcm.reputations[disperserId].Score(now)
-		// The weighted selection algorithm doesn't handle zero values well, so we use a small positive value instead
-		if score == 0 {
-			score = 0.001
-		}
-
 		eligibleDispersers = append(eligibleDispersers, &disperserInfo{
 			id:              disperserId,
 			grpcUri:         grpcUri,
-			reputationScore: score,
+			reputationScore: dcm.reputations[disperserId].Score(now),
 		})
 	}
 
