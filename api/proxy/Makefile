@@ -8,7 +8,7 @@ LDFLAGSSTRING +=-X main.Version=$(GIT_TAG)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
 build:
-	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
+	env GOOS=$(GOOS) GOARCH=$(GOARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
 
 clean:
 	rm -rf bin/eigenda-proxy
