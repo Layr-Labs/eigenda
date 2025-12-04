@@ -2234,6 +2234,7 @@ dependencies = [
  "risc0-zkvm",
  "schemars 0.8.22",
  "serde",
+ "sha2",
  "test-strategy",
  "testcontainers",
  "thiserror 2.0.16",
