@@ -86,8 +86,8 @@ func ParseConfig[T VerifiableConfig](
 		TagName:          "mapstructure",
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(), // Support time.Duration parsing from strings
-			secret.DecodeHook,                           // Support Secret parsing
-			basicTypeSliceDecodeHook,                    // Support slices of basic types
+			secret.DecodeHook,        // Support Secret parsing
+			basicTypeSliceDecodeHook, // Support slices of basic types
 		),
 	}
 	decoder, err := mapstructure.NewDecoder(decoderConfig)
@@ -181,8 +181,8 @@ func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
 //	MYSTRUCT_BAR_BAZ -> Bar.Baz
 //
 // This function uses reflection to walk the struct tree, so it only works with exported fields. It also only works
-// with basic types (string, int, bool, etc.) and nested structs. It does not work with slices, maps, or other complex
-// types.
+// with basic types (string, int, bool, etc.), slices of basic types, nested structs, secret.Secret, and slices of 
+// secret.Secret. It does not work with maps or other complex types.
 //
 // This function is recursive, so it will walk nested structs to any depth.
 //
@@ -248,7 +248,7 @@ func bindEnvs(
 				}
 			} else if isBasicType(elemType) {
 				// Slice of basic types (int, string, bool, float, etc.)
-				// Bind as leaf value - mapstructure will handle comma/semicolon-separated conversion
+				// Bind as leaf value - mapstructure will handle comma-separated conversion
 				env := buildEnvVarName(prefix, keyPath...)
 				boundVars[env] = struct{}{}
 				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
@@ -376,29 +376,26 @@ var basicTypeSliceDecodeHook mapstructure.DecodeHookFunc = func(
 	for i, part := range parts {
 		trimmedPart := strings.TrimSpace(part)
 
+		// Create a pointer to a new instance of the target element type
+		elemPtr := reflect.New(to.Elem())
+
 		// Create a temporary decoder to convert the string to the target type
-		var elem any
 		decoderConfig := &mapstructure.DecoderConfig{
 			WeaklyTypedInput: true,
-			Result:           &elem,
+			Result:           elemPtr.Interface(),
 		}
 		decoder, err := mapstructure.NewDecoder(decoderConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create decoder for element %d: %w", i, err)
 		}
 
-		// Decode the trimmed part
+		// Decode the trimmed part into the properly typed variable
 		if err := decoder.Decode(trimmedPart); err != nil {
 			return nil, fmt.Errorf("failed to decode element %d (%q): %w", i, trimmedPart, err)
 		}
 
 		// Set the element in the result slice
-		elemValue := reflect.ValueOf(elem)
-		if elemValue.Type().ConvertibleTo(to.Elem()) {
-			result.Index(i).Set(elemValue.Convert(to.Elem()))
-		} else {
-			return nil, fmt.Errorf("cannot convert element %d from %v to %v", i, elemValue.Type(), to.Elem())
-		}
+		result.Index(i).Set(elemPtr.Elem())
 	}
 
 	return result.Interface(), nil
