@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Disperser_DisperseBlob_FullMethodName      = "/disperser.v2.Disperser/DisperseBlob"
-	Disperser_GetBlobStatus_FullMethodName     = "/disperser.v2.Disperser/GetBlobStatus"
-	Disperser_GetBlobCommitment_FullMethodName = "/disperser.v2.Disperser/GetBlobCommitment"
-	Disperser_GetPaymentState_FullMethodName   = "/disperser.v2.Disperser/GetPaymentState"
+	Disperser_DisperseBlob_FullMethodName            = "/disperser.v2.Disperser/DisperseBlob"
+	Disperser_GetBlobStatus_FullMethodName           = "/disperser.v2.Disperser/GetBlobStatus"
+	Disperser_GetBlobCommitment_FullMethodName       = "/disperser.v2.Disperser/GetBlobCommitment"
+	Disperser_GetPaymentState_FullMethodName         = "/disperser.v2.Disperser/GetPaymentState"
+	Disperser_GetValidatorSigningRate_FullMethodName = "/disperser.v2.Disperser/GetValidatorSigningRate"
 )
 
 // DisperserClient is the client API for Disperser service.
@@ -51,6 +52,8 @@ type DisperserClient interface {
 	// For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
 	GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error)
+	// GetValidatorSigningRate returns the signing rate of a validator during a time range.
+	GetValidatorSigningRate(ctx context.Context, in *GetValidatorSigningRateRequest, opts ...grpc.CallOption) (*GetValidatorSigningRateReply, error)
 }
 
 type disperserClient struct {
@@ -97,6 +100,15 @@ func (c *disperserClient) GetPaymentState(ctx context.Context, in *GetPaymentSta
 	return out, nil
 }
 
+func (c *disperserClient) GetValidatorSigningRate(ctx context.Context, in *GetValidatorSigningRateRequest, opts ...grpc.CallOption) (*GetValidatorSigningRateReply, error) {
+	out := new(GetValidatorSigningRateReply)
+	err := c.cc.Invoke(ctx, Disperser_GetValidatorSigningRate_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DisperserServer is the server API for Disperser service.
 // All implementations must embed UnimplementedDisperserServer
 // for forward compatibility
@@ -123,6 +135,8 @@ type DisperserServer interface {
 	// For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
 	GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error)
+	// GetValidatorSigningRate returns the signing rate of a validator during a time range.
+	GetValidatorSigningRate(context.Context, *GetValidatorSigningRateRequest) (*GetValidatorSigningRateReply, error)
 	mustEmbedUnimplementedDisperserServer()
 }
 
@@ -141,6 +155,9 @@ func (UnimplementedDisperserServer) GetBlobCommitment(context.Context, *BlobComm
 }
 func (UnimplementedDisperserServer) GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPaymentState not implemented")
+}
+func (UnimplementedDisperserServer) GetValidatorSigningRate(context.Context, *GetValidatorSigningRateRequest) (*GetValidatorSigningRateReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetValidatorSigningRate not implemented")
 }
 func (UnimplementedDisperserServer) mustEmbedUnimplementedDisperserServer() {}
 
@@ -227,6 +244,24 @@ func _Disperser_GetPaymentState_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Disperser_GetValidatorSigningRate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetValidatorSigningRateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DisperserServer).GetValidatorSigningRate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Disperser_GetValidatorSigningRate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DisperserServer).GetValidatorSigningRate(ctx, req.(*GetValidatorSigningRateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Disperser_ServiceDesc is the grpc.ServiceDesc for Disperser service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -249,6 +284,10 @@ var Disperser_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPaymentState",
 			Handler:    _Disperser_GetPaymentState_Handler,
+		},
+		{
+			MethodName: "GetValidatorSigningRate",
+			Handler:    _Disperser_GetValidatorSigningRate_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
