@@ -35,7 +35,7 @@ type encodingManagerMetrics struct {
 func newEncodingManagerMetrics(
 	registry *prometheus.Registry,
 	enablePerAccountMetrics bool,
-	nameRemapping map[string]string,
+	userAccountRemapping map[string]string,
 ) *encodingManagerMetrics {
 	batchSubmissionLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
@@ -174,7 +174,7 @@ func newEncodingManagerMetrics(
 		blobSetSize:             blobSetSize,
 		staleDispersalCount:     staleDispersalCount,
 		enablePerAccountMetrics: enablePerAccountMetrics,
-		userAccountRemapping:    nameRemapping,
+		userAccountRemapping:    userAccountRemapping,
 	}
 }
 
