@@ -272,10 +272,12 @@ func (dcm *DisperserClientMultiplexer) getEligibleDispersers(
 			dcm.reputations[disperserId] = reputation.NewReputation(dcm.config.ReputationConfig, now)
 		}
 
+		score := dcm.reputations[disperserId].Score(now)
+		dcm.dispersalMetrics.RecordDisperserReputationScore(disperserId, score)
 		eligibleDispersers = append(eligibleDispersers, &disperserInfo{
 			id:              disperserId,
 			grpcUri:         grpcUri,
-			reputationScore: dcm.reputations[disperserId].Score(now),
+			reputationScore: score,
 		})
 	}
 
