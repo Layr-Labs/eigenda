@@ -24,15 +24,18 @@ type DisperserClientMultiplexerConfig struct {
 	UseSecureGrpcFlag bool
 	// Configuration for the reputation selector used to choose dispersers
 	SelectorConfig reputation.ReputationSelectorConfig
+	// Number of grpc connections to each disperser
+	DisperserConnectionCount uint
 }
 
 func DefaultDisperserClientMultiplexerConfig() *DisperserClientMultiplexerConfig {
 	return &DisperserClientMultiplexerConfig{
-		AdditionalDispersers: nil,
-		DisperserBlacklist:   nil,
-		ReputationConfig:     reputation.DefaultConfig(),
-		UseSecureGrpcFlag:    true,
-		SelectorConfig:       reputation.DefaultReputationSelectorConfig(),
+		AdditionalDispersers:     nil,
+		DisperserBlacklist:       nil,
+		ReputationConfig:         reputation.DefaultConfig(),
+		UseSecureGrpcFlag:        true,
+		SelectorConfig:           reputation.DefaultReputationSelectorConfig(),
+		DisperserConnectionCount: 8,
 	}
 }
 

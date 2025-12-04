@@ -46,7 +46,6 @@ func createTestMultiplexer(
 		signer,
 		kzgCommitter,
 		metrics.NoopDispersalMetrics,
-		8,
 		random.NewTestRandom().Rand,
 	)
 	require.NoError(t, err)

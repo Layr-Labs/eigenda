@@ -34,8 +34,6 @@ type DisperserClientMultiplexer struct {
 	signer            corev2.BlobRequestSigner
 	committer         *committer.Committer
 	dispersalMetrics  metrics.DispersalMetricer
-	// number of grpc connections to each disperser
-	disperserConnectionCount uint
 	// map from disperser ID to corresponding client that can communicate with that disperser
 	clients map[uint32]*DisperserClient
 	// map from disperser ID to its reputation tracker
@@ -54,7 +52,6 @@ func NewDisperserClientMultiplexer(
 	signer corev2.BlobRequestSigner,
 	committer *committer.Committer,
 	dispersalMetrics metrics.DispersalMetricer,
-	disperserConnectionCount uint,
 	random *rand.Rand,
 ) (*DisperserClientMultiplexer, error) {
 	reputationSelector, err := reputation.NewReputationSelector(
@@ -68,16 +65,15 @@ func NewDisperserClientMultiplexer(
 	}
 
 	return &DisperserClientMultiplexer{
-		logger:                   logger,
-		config:                   config,
-		disperserRegistry:        disperserRegistry,
-		signer:                   signer,
-		committer:                committer,
-		dispersalMetrics:         dispersalMetrics,
-		disperserConnectionCount: disperserConnectionCount,
-		clients:                  make(map[uint32]*DisperserClient),
-		reputations:              make(map[uint32]*reputation.Reputation),
-		reputationSelector:       reputationSelector,
+		logger:             logger,
+		config:             config,
+		disperserRegistry:  disperserRegistry,
+		signer:             signer,
+		committer:          committer,
+		dispersalMetrics:   dispersalMetrics,
+		clients:            make(map[uint32]*DisperserClient),
+		reputations:        make(map[uint32]*reputation.Reputation),
+		reputationSelector: reputationSelector,
 	}, nil
 }
 
@@ -141,7 +137,7 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 		clientConfig := &DisperserClientConfig{
 			GrpcUri:                  selectedDisperserInfo.grpcUri,
 			UseSecureGrpcFlag:        dcm.config.UseSecureGrpcFlag,
-			DisperserConnectionCount: dcm.disperserConnectionCount,
+			DisperserConnectionCount: dcm.config.DisperserConnectionCount,
 			DisperserID:              selectedDisperserInfo.id,
 		}
 

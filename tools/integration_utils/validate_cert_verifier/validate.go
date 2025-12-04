@@ -293,7 +293,6 @@ func createDisperserClientMultiplexer(
 		signer,
 		kzgCommitter,
 		metrics.NoopDispersalMetrics,
-		8,
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 	)
 	if err != nil {

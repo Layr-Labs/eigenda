@@ -151,6 +151,7 @@ func NewTestClient(
 	dispersalMetrics := metricsv2.NewDispersalMetrics(registry)
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
+	multiplexerConfig.DisperserConnectionCount = config.DisperserConnectionCount
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(
 		fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort))
 
@@ -161,7 +162,6 @@ func NewTestClient(
 		signer,
 		kzgCommitter,
 		dispersalMetrics,
-		config.DisperserConnectionCount,
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 	)
 	if err != nil {
