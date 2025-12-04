@@ -15,9 +15,6 @@ import (
 //  1. Filtering: Candidates that are in the bottom LowPerformerFraction AND have scores below ScoreThreshold
 //     are excluded.
 //  2. Weighted Selection: From remaining candidates, one is chosen randomly with probability proportional to score.
-//
-// The score function must return values >= 0. Higher scores increase selection probability.
-// Zero scores are treated as 0.001 to ensure all candidates that aren't filtered have non-zero selection probability.
 type ReputationSelector[T any] struct {
 	config        *ReputationSelectorConfig
 	random        *rand.Rand
@@ -105,12 +102,14 @@ func (ws *ReputationSelector[T]) weightedRandomSelect(candidates []T) (T, error)
 	var totalWeight float64
 	for i, candidate := range candidates {
 		score := ws.scoreFunction(candidate)
-		// Items with zero score would never be selected, so we use a small positive value instead
-		if score == 0 {
-			score = 0.001
-		}
+
 		scores[i] = score
 		totalWeight += score
+	}
+
+	// if all candidates have zero score, select uniformly at random
+	if totalWeight == 0 {
+		return candidates[ws.random.Intn(len(candidates))], nil
 	}
 
 	// Generate random number in [0, totalWeight)
