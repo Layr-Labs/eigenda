@@ -169,21 +169,23 @@ func NewEncodingManager(
 	registry *prometheus.Registry,
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
+	userAccountRemapping map[string]string,
 ) (*EncodingManager, error) {
 	if err := config.Verify(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
 	return &EncodingManager{
-		EncodingManagerConfig:  config,
-		getNow:                 getNow,
-		blobMetadataStore:      blobMetadataStore,
-		pool:                   pool,
-		encodingClient:         encodingClient,
-		chainReader:            chainReader,
-		logger:                 logger.With("component", "EncodingManager"),
-		cursor:                 nil,
-		metrics:                newEncodingManagerMetrics(registry, config.EnablePerAccountBlobStatusMetrics),
+		EncodingManagerConfig: config,
+		getNow:                getNow,
+		blobMetadataStore:     blobMetadataStore,
+		pool:                  pool,
+		encodingClient:        encodingClient,
+		chainReader:           chainReader,
+		logger:                logger.With("component", "EncodingManager"),
+		cursor:                nil,
+		metrics: newEncodingManagerMetrics(
+			registry, config.EnablePerAccountBlobStatusMetrics, userAccountRemapping),
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 	}, nil

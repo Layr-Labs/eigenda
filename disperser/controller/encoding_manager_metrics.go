@@ -4,6 +4,7 @@ import (
 	"time"
 
 	common "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -27,10 +28,15 @@ type encodingManagerMetrics struct {
 	blobSetSize             *prometheus.GaugeVec
 	staleDispersalCount     prometheus.Counter
 	enablePerAccountMetrics bool
+	userAccountRemapping    map[string]string
 }
 
 // NewEncodingManagerMetrics sets up metrics for the encoding manager.
-func newEncodingManagerMetrics(registry *prometheus.Registry, enablePerAccountMetrics bool) *encodingManagerMetrics {
+func newEncodingManagerMetrics(
+	registry *prometheus.Registry,
+	enablePerAccountMetrics bool,
+	nameRemapping map[string]string,
+) *encodingManagerMetrics {
 	batchSubmissionLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  encodingManagerNamespace,
@@ -168,6 +174,7 @@ func newEncodingManagerMetrics(registry *prometheus.Registry, enablePerAccountMe
 		blobSetSize:             blobSetSize,
 		staleDispersalCount:     staleDispersalCount,
 		enablePerAccountMetrics: enablePerAccountMetrics,
+		userAccountRemapping:    nameRemapping,
 	}
 }
 
@@ -212,10 +219,26 @@ func (m *encodingManagerMetrics) reportFailedSubmission() {
 }
 
 func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus, accountID string) {
-	// If per-account metrics are disabled, aggregate under "0x0"
-	accountLabel := accountID
-	if !m.enablePerAccountMetrics {
-		accountLabel = "0x0"
+	var accountLabel string
+	if m.userAccountRemapping != nil {
+		if remappedName, found := m.userAccountRemapping[accountID]; found && remappedName != "" {
+			// Found in remapping - always use the formatted label
+			accountLabel = nameremapping.FormatNameWithAccountPrefix(remappedName, accountID)
+		} else {
+			// Not found in remapping - use raw value only if per-account metrics enabled
+			if m.enablePerAccountMetrics {
+				accountLabel = accountID
+			} else {
+				accountLabel = "0x0"
+			}
+		}
+	} else {
+		// No remapping loaded - respect per-account metrics flag
+		if m.enablePerAccountMetrics {
+			accountLabel = accountID
+		} else {
+			accountLabel = "0x0"
+		}
 	}
 
 	switch status {

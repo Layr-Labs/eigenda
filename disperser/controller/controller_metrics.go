@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	"github.com/Layr-Labs/eigenda/core"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -50,6 +51,7 @@ type controllerMetrics struct {
 
 	collectDetailedValidatorMetrics bool
 	enablePerAccountMetrics         bool
+	userAccountRemapping            map[string]string
 }
 
 // Sets up metrics for the controller.
@@ -63,6 +65,8 @@ func newControllerMetrics(
 	collectDetailedValidatorMetrics bool,
 	// If false, per-account blob completion metrics will be aggregated under "0x0" to reduce cardinality.
 	enablePerAccountMetrics bool,
+	// Name remapping for metric labels. Maps account IDs to user-friendly names.
+	userAccountRemapping map[string]string,
 ) (*controllerMetrics, error) {
 	if registry == nil {
 		return nil, nil
@@ -332,6 +336,7 @@ func newControllerMetrics(
 		validatorSigningLatency:         validatorSigningLatency,
 		collectDetailedValidatorMetrics: collectDetailedValidatorMetrics,
 		enablePerAccountMetrics:         enablePerAccountMetrics,
+		userAccountRemapping:            userAccountRemapping,
 		globalSignedBatchCount:          globalSignedBatchCount,
 		globalUnsignedBatchCount:        globalUnsignedBatchCount,
 		globalSignedByteCount:           globalSignedByteCount,
@@ -409,10 +414,26 @@ func (m *controllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStat
 		return
 	}
 
-	// If per-account metrics are disabled, aggregate under "0x0"
-	accountLabel := accountID
-	if !m.enablePerAccountMetrics {
-		accountLabel = "0x0"
+	var accountLabel string
+	if m.userAccountRemapping != nil {
+		if remappedName, found := m.userAccountRemapping[accountID]; found && remappedName != "" {
+			// Found in remapping - always use the formatted label
+			accountLabel = nameremapping.FormatNameWithAccountPrefix(remappedName, accountID)
+		} else {
+			// Not found in remapping - use raw value only if per-account metrics enabled
+			if m.enablePerAccountMetrics {
+				accountLabel = accountID
+			} else {
+				accountLabel = "0x0"
+			}
+		}
+	} else {
+		// No remapping loaded - respect per-account metrics flag
+		if m.enablePerAccountMetrics {
+			accountLabel = accountID
+		} else {
+			accountLabel = "0x0"
+		}
 	}
 
 	switch status {

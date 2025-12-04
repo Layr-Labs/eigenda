@@ -43,6 +43,12 @@ var (
 		Required: false,
 		Value:    "./data/",
 	}
+	UserAccountRemappingFileFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "user-account-remapping-file"),
+		Usage:    "Path to YAML file for name remapping",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USER_ACCOUNT_REMAPPING_FILE"),
+		Required: false,
+	}
 	// EncodingManager Flags
 	EncodingPullIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "encoding-pull-interval"),
@@ -369,6 +375,7 @@ var requiredFlags = []cli.Flag{
 
 var optionalFlags = []cli.Flag{
 	IndexerDataDirFlag,
+	UserAccountRemappingFileFlag,
 	EncodingRequestTimeoutFlag,
 	EncodingStoreTimeoutFlag,
 	NumEncodingRetriesFlag,
