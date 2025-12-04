@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -103,6 +104,10 @@ type DispersalServerV2 struct {
 	// DisableGetBlobCommitment, if true, causes the GetBlobCommitment gRPC endpoint to return
 	// a deprecation error. This endpoint is deprecated and will be removed in a future release.
 	disableGetBlobCommitment bool
+
+	// Tracks signing rates for validators. This data is mirrored from the controller's signing rate tracker,
+	// so that external requests can be serviced without involving the controller.
+	signingRateTracker signingrate.SigningRateTracker
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -127,6 +132,7 @@ func NewDispersalServerV2(
 	controllerConnection *grpc.ClientConn,
 	controllerClient controller.ControllerServiceClient,
 	listener net.Listener,
+	signingRateTracker signingrate.SigningRateTracker,
 ) (*DispersalServerV2, error) {
 	if listener == nil {
 		return nil, errors.New("listener is required")
@@ -148,6 +154,9 @@ func NewDispersalServerV2(
 	}
 	if committer == nil {
 		return nil, errors.New("committer is required")
+	}
+	if signingRateTracker == nil {
+		return nil, errors.New("signingRateTracker is required")
 	}
 	if maxNumSymbolsPerBlob == 0 {
 		return nil, errors.New("maxNumSymbolsPerBlob is required")
@@ -202,6 +211,7 @@ func NewDispersalServerV2(
 		controllerClient:              controllerClient,
 		listener:                      listener,
 		disableGetBlobCommitment:      serverConfig.DisableGetBlobCommitment,
+		signingRateTracker:            signingRateTracker,
 	}, nil
 }
 
@@ -478,6 +488,28 @@ func (s *DispersalServerV2) getPaymentState(
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, status.New(codes.OK, "")
+}
+
+func (s *DispersalServerV2) GetValidatorSigningRate(
+	ctx context.Context,
+	request *pb.GetValidatorSigningRateRequest,
+) (*pb.GetValidatorSigningRateReply, error) {
+
+	validatorId := core.OperatorID(request.GetValidatorId())
+
+	signingRate, err := s.signingRateTracker.GetValidatorSigningRate(
+		core.QuorumID(request.GetQuorum()),
+		validatorId,
+		time.Unix(int64(request.GetStartTimestamp()), 0),
+		time.Unix(int64(request.GetEndTimestamp()), 0))
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing rate for validator %s: %w", validatorId.Hex(), err)
+	}
+
+	return &pb.GetValidatorSigningRateReply{
+		ValidatorSigningRate: signingRate,
+	}, nil
 }
 
 // Gracefully shuts down the server and closes any open connections

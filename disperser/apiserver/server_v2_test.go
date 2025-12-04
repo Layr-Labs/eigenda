@@ -21,6 +21,7 @@ import (
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
@@ -597,6 +598,7 @@ func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment b
 		nil,   // controllerConnection - not needed for unit tests
 		mockControllerClient,
 		listener,
+		signingrate.NewNoOpSigningRateTracker(),
 	)
 	require.NoError(t, err)
 
