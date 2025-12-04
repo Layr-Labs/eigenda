@@ -94,7 +94,8 @@ func NewController(
 	metrics, err := newControllerMetrics(
 		registry,
 		config.SignificantSigningThresholdFraction,
-		config.CollectDetailedValidatorSigningMetrics)
+		config.CollectDetailedValidatorSigningMetrics,
+		config.EnablePerAccountBlobStatusMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
 	}
@@ -797,7 +798,8 @@ func (c *Controller) updateBatchStatus(
 				c.blobSet.RemoveBlob(blobKey)
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
-				c.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
+				c.metrics.reportCompletedBlob(
+					int(metadata.BlobSize), v2.Failed, metadata.BlobHeader.PaymentMetadata.AccountID.Hex())
 			}
 			continue
 		}
@@ -820,7 +822,8 @@ func (c *Controller) updateBatchStatus(
 				c.blobSet.RemoveBlob(blobKey)
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
-				c.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
+				c.metrics.reportCompletedBlob(
+					int(metadata.BlobSize), v2.Failed, metadata.BlobHeader.PaymentMetadata.AccountID.Hex())
 			}
 			continue
 		}
@@ -835,7 +838,8 @@ func (c *Controller) updateBatchStatus(
 		if metadata, ok := batch.Metadata[blobKey]; ok {
 			requestedAt := time.Unix(0, int64(metadata.RequestedAt))
 			c.metrics.reportE2EDispersalLatency(time.Since(requestedAt))
-			c.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Complete)
+			c.metrics.reportCompletedBlob(
+				int(metadata.BlobSize), v2.Complete, metadata.BlobHeader.PaymentMetadata.AccountID.Hex())
 		}
 	}
 
@@ -851,7 +855,8 @@ func (c *Controller) failBatch(ctx context.Context, batch *batchData) error {
 				fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 		}
 		if metadata, ok := batch.Metadata[blobKey]; ok {
-			c.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
+			c.metrics.reportCompletedBlob(
+				int(metadata.BlobSize), v2.Failed, metadata.BlobHeader.PaymentMetadata.AccountID.Hex())
 		}
 		c.blobSet.RemoveBlob(blobKey)
 	}
