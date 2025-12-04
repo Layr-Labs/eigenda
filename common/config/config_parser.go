@@ -86,7 +86,8 @@ func ParseConfig[T VerifiableConfig](
 		TagName:          "mapstructure",
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(), // Support time.Duration parsing from strings
-			secret.DecodeHook, // Support Secret parsing
+			secret.DecodeHook,        // Support Secret parsing
+			basicTypeSliceDecodeHook, // Support slices of basic types
 		),
 	}
 	decoder, err := mapstructure.NewDecoder(decoderConfig)
@@ -180,8 +181,8 @@ func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
 //	MYSTRUCT_BAR_BAZ -> Bar.Baz
 //
 // This function uses reflection to walk the struct tree, so it only works with exported fields. It also only works
-// with basic types (string, int, bool, etc.) and nested structs. It does not work with slices, maps, or other complex
-// types.
+// with basic types (string, int, bool, etc.), slices of basic types, nested structs, secret.Secret, and slices of
+// secret.Secret. It does not work with maps or other complex types.
 //
 // This function is recursive, so it will walk nested structs to any depth.
 //
@@ -233,20 +234,29 @@ func bindEnvs(
 				boundVars[k] = struct{}{}
 			}
 		case reflect.Slice:
-			// Handle slices - currently only []*secret.Secret is supported
+			// Handle slices
+			elemType := field.Type.Elem()
 			// Check if this is a slice of pointers to Secret
-			if field.Type.Elem().Kind() == reflect.Ptr &&
-				field.Type.Elem().Elem().Kind() == reflect.Struct &&
-				field.Type.Elem().Elem() == reflect.TypeOf((*secret.Secret)(nil)).Elem() {
+			if elemType.Kind() == reflect.Ptr &&
+				elemType.Elem().Kind() == reflect.Struct &&
+				elemType.Elem() == reflect.TypeOf((*secret.Secret)(nil)).Elem() {
 				// Slice of *secret.Secret, bind as leaf value
 				env := buildEnvVarName(prefix, keyPath...)
 				boundVars[env] = struct{}{}
 				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
 					return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
 				}
+			} else if isBasicType(elemType) {
+				// Slice of basic types (int, string, bool, float, etc.)
+				// Bind as leaf value - mapstructure will handle comma-separated conversion
+				env := buildEnvVarName(prefix, keyPath...)
+				boundVars[env] = struct{}{}
+				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
+					return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
+				}
 			}
-			// Other slice types are not currently supported for environment variable binding
-			// and are silently ignored. This could be extended in the future if needed.
+			// Other slice types (e.g., slices of structs) are not currently supported
+			// for environment variable binding and are silently ignored.
 		case reflect.Ptr:
 			// Handle pointer to struct
 			if field.Type.Elem().Kind() == reflect.Struct {
@@ -301,6 +311,84 @@ func buildEnvVarName(prefix string, path ...string) string {
 		sb.WriteString(toScreamingSnakeCase(p))
 	}
 	return sb.String()
+}
+
+// isBasicType checks if a type is a basic type that can be parsed from environment variables.
+// This includes primitives (int, uint, float, bool), strings, and pointers to these types.
+func isBasicType(t reflect.Type) bool {
+	// Handle pointer to basic type
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	switch t.Kind() { //nolint:exhaustive // only handling basic types, default handles all others
+	case reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64,
+		reflect.String:
+		return true
+	default:
+		return false
+	}
+}
+
+// basicTypeSliceDecodeHook is a mapstructure decode hook that handles slices of basic types.
+// It converts string inputs from config files or environment variables into slices of basic types
+// by splitting on commas. This allows environment variables to represent slices using a
+// comma-separated format (e.g., "value1,value2,value3").
+var basicTypeSliceDecodeHook mapstructure.DecodeHookFunc = func(
+	from reflect.Type, to reflect.Type, data any) (any, error) {
+	// Only handle string sources
+	if from.Kind() != reflect.String {
+		return data, nil
+	}
+
+	// Only handle slice targets
+	if to.Kind() != reflect.Slice {
+		return data, nil
+	}
+
+	// Only handle slices of basic types
+	if !isBasicType(to.Elem()) {
+		return data, nil
+	}
+
+	// Get the source data as a string
+	sourceStr, ok := data.(string)
+	if !ok {
+		return data, nil
+	}
+
+	// If the source string is empty, return an empty slice
+	if len(sourceStr) == 0 {
+		return reflect.MakeSlice(to, 0, 0).Interface(), nil
+	}
+
+	// Split the string by commas
+	parts := strings.Split(sourceStr, ",")
+
+	// Create a slice of the target type
+	result := reflect.MakeSlice(to, len(parts), len(parts))
+
+	// Convert each part to the target element type using WeakDecode
+	// which handles type conversion automatically
+	for i, part := range parts {
+		trimmedPart := strings.TrimSpace(part)
+
+		// Create a pointer to a new instance of the target element type
+		elemPtr := reflect.New(to.Elem())
+
+		// Use WeakDecode directly - it's more efficient than creating a decoder each time
+		if err := mapstructure.WeakDecode(trimmedPart, elemPtr.Interface()); err != nil {
+			return nil, fmt.Errorf("failed to decode element %d (%q): %w", i, trimmedPart, err)
+		}
+
+		// Set the element in the result slice
+		result.Index(i).Set(elemPtr.Elem())
+	}
+
+	return result.Interface(), nil
 }
 
 // checkForInvalidEnvVars checks for any environment variables with the given prefix that were not bound to any
