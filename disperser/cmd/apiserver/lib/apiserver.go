@@ -264,12 +264,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		dynamoClient,
 		logger,
 		config.BlobstoreConfig.TableName,
-<<<<<<< HEAD
 		time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
-=======
-		time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second,
-	)
->>>>>>> ea9d5222 (parse num retry flag, update help_out.txt and fix usage description. Also fix lint issue)
 	blobStore := blobstore.NewSharedStorage(bucketName, objectStorageClient, blobMetadataStore, logger)
 
 	grpcMetrics := grpcprom.NewServerMetrics()
