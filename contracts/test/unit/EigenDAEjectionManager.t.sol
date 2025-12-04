@@ -54,7 +54,7 @@ contract EigenDAEjectionManagerTest is Test {
             new EigenDAEjectionManager(address(token), DEPOSIT_BASE_FEE_MULTIPLIER, address(directory), 39_128, 70_000);
         directory.addAddress(AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(ejectionManager));
 
-        /// TODO: figure out the proper way to wire this for testing E2E signature recovery 
+        /// TODO: figure out the proper way to wire this for testing E2E signature recovery
         //        and BLS pairing verification
         directory.addAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME, address(this));
     }
@@ -73,7 +73,7 @@ contract EigenDAEjectionManagerTest is Test {
         ejectionManager.setCooldown(cooldown);
         ejectionManager.setDelay(delay);
 
-        // 1) start an ejection against an arbitrary ejectee 
+        // 1) start an ejection against an arbitrary ejectee
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionStarted(
             ejectee,
@@ -156,7 +156,7 @@ contract EigenDAEjectionManagerTest is Test {
     }
 
     function testCancelEjectionByEjectee() public {
-        // 0) Start the ejection 
+        // 0) Start the ejection
         testStartEjection(0, 0);
 
         // 1) Cancel the ejection on behalf of the ejectee
@@ -179,7 +179,7 @@ contract EigenDAEjectionManagerTest is Test {
 
         testStartEjection(0, 0);
         assertEq(ejectionManager.getEjectorBalance(ejector), 0);
-        
+
         // 2) complete ejection via ejector
         vm.startPrank(ejector);
         vm.expectEmit(true, true, true, true);
@@ -215,7 +215,7 @@ contract EigenDAEjectionManagerTest is Test {
     }
 
     function testCoolDownEnforcementCausesAttemptedCompletionsToRevert() public {
-        // 0) warp the time context 
+        // 0) warp the time context
 
         vm.warp(block.timestamp + 7000);
         // 1) set an artificial cooldown period for which the ejector has to wait
