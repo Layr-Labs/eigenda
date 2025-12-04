@@ -99,9 +99,9 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     /// @inheritdoc IEigenDAEjectionManager
     function completeEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
         uint256 depositAmount = operator.getDepositAmount();
+        operator.getEjector().addEjectorBalance(depositAmount);
         operator.completeEjection(quorums);
         _tryEjectOperator(operator, quorums);
-        operator.getEjector().addEjectorBalance(depositAmount);
     }
 
     /// OPERATOR FUNCTIONS
