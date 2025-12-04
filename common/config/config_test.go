@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ type Foo struct {
 	Baz                          *Baz
 	ThisIsAFieldWithAComplexName string
 	ThisIsASecretField           *secret.Secret
+	ThisIsASliceOfSecrets        []*secret.Secret
 }
 
 func DefaultFoo() *Foo {
@@ -94,6 +96,9 @@ func TestTOMLParsing(t *testing.T) {
 	require.Equal(t,
 		"you're no stranger to love, you know the rules and so do I (so do I)",
 		foo.ThisIsASecretField.Get())
+	// The slice of secrets is unset in this config, so we should expect an empty slice.
+	// There used to be a bug where it would instead return [""].
+	require.Equal(t, 0, len(foo.ThisIsASliceOfSecrets))
 
 	// Bar field
 	require.Equal(t, "bar A", foo.Bar.A)
@@ -633,4 +638,29 @@ func TestAliasAndTargetSet(t *testing.T) {
 	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", aliases, nil, configFile)
 	require.Error(t, err)
 	require.Nil(t, foo)
+}
+
+func TestSecretSlice(t *testing.T) {
+	expected := []string{
+		"Never gonna give you up",
+		"Never gonna let you down",
+		"Never gonna run around and desert you",
+		"Never gonna make you cry",
+		"Never gonna say goodbye",
+		"Never gonna tell a lie and hurt you",
+	}
+
+	fullString := strings.Join(expected, ", ")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_SECRETS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfSecrets, len(expected))
+	for i, secretField := range foo.ThisIsASliceOfSecrets {
+		require.Equal(t, expected[i], secretField.Get())
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_SECRETS"))
 }
