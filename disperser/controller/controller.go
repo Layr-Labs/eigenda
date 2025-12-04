@@ -106,7 +106,7 @@ func NewController(
 		chainState:             chainState,
 		aggregator:             aggregator,
 		nodeClientManager:      nodeClientManager,
-		logger:                 logger.With("component", "Dispatcher"),
+		logger:                 logger.With("component", "controller"),
 		metrics:                metrics,
 		getNow:                 getNow,
 		cursor:                 nil,
@@ -748,7 +748,7 @@ func (c *Controller) GetOperatorState(
 	// GetIndexedOperatorState should return state for valid quorums only
 	indexedOperatorState, err := c.chainState.GetIndexedOperatorState(ctx, uint(blockNumber), quorumIds)
 	if err != nil {
-		return nil, fmt.Errorf("GetIndexedOperatorSTate: %w", err)
+		return nil, fmt.Errorf("GetIndexedOperatorState: %w", err)
 	}
 	return indexedOperatorState, nil
 }

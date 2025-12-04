@@ -29,6 +29,8 @@ import (
 	"github.com/wealdtech/go-merkletree/v2/keccak256"
 )
 
+// Note: do not add additional tests to this file. All new controller specific tests should go into controller_test.go.
+
 var (
 	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
 	opId1, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
@@ -48,8 +50,8 @@ var (
 	maxBatchSize           = int32(5)
 )
 
-type dispatcherComponents struct {
-	Dispatcher           *controller.Controller
+type controllerComponents struct {
+	Controller           *controller.Controller
 	BatchMetadataManager *metadata.MockBatchMetadataManager
 	BlobMetadataStore    *blobstore.BlobMetadataStore
 	Pool                 common.WorkerPool
@@ -64,8 +66,8 @@ type dispatcherComponents struct {
 	LivenessChan    chan healthcheck.HeartbeatMessage
 }
 
-func TestDispatcherHandleBatch(t *testing.T) {
-	components := newDispatcherComponents(t)
+func TestControllerHandleBatch(t *testing.T) {
+	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
@@ -113,7 +115,7 @@ func TestDispatcherHandleBatch(t *testing.T) {
 		}
 		close(done)
 	}()
-	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx, nil)
+	sigChan, batchData, err := components.Controller.HandleBatch(ctx, nil)
 	require.NoError(t, err)
 	for _, key := range objs.blobKeys {
 		components.CallbackBlobSet.AssertCalled(t, "RemoveBlob", key)
@@ -123,7 +125,7 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	components.CallbackBlobSet.AssertNumberOfCalls(t, "RemoveBlob", len(objs.blobKeys))
 	components.BlobSet.AssertNumberOfCalls(t, "AddBlob", len(objs.blobKeys))
 	components.BlobSet.AssertNumberOfCalls(t, "Contains", len(objs.blobKeys))
-	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
+	err = components.Controller.HandleSignatures(ctx, ctx, batchData, sigChan)
 	require.NoError(t, err)
 	for _, key := range objs.blobKeys {
 		components.BlobSet.AssertCalled(t, "RemoveBlob", key)
@@ -177,8 +179,8 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
 }
 
-func TestDispatcherInsufficientSignatures(t *testing.T) {
-	components := newDispatcherComponents(t)
+func TestControllerInsufficientSignatures(t *testing.T) {
+	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
@@ -229,9 +231,9 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 		}
 		close(done)
 	}()
-	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx, nil)
+	sigChan, batchData, err := components.Controller.HandleBatch(ctx, nil)
 	require.NoError(t, err)
-	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
+	err = components.Controller.HandleSignatures(ctx, ctx, batchData, sigChan)
 	require.NoError(t, err)
 
 	// Test that the blob metadata status are updated
@@ -288,8 +290,8 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	deleteBlobs(t, components.BlobMetadataStore, successfulObjs.blobKeys, [][32]byte{bhh})
 }
 
-func TestDispatcherInsufficientSignatures2(t *testing.T) {
-	components := newDispatcherComponents(t)
+func TestControllerInsufficientSignatures2(t *testing.T) {
+	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
@@ -333,10 +335,10 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 		}
 		close(done)
 	}()
-	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx, nil)
+	sigChan, batchData, err := components.Controller.HandleBatch(ctx, nil)
 	require.NoError(t, err)
 
-	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
+	err = components.Controller.HandleSignatures(ctx, ctx, batchData, sigChan)
 	require.NoError(t, err)
 
 	// Test that the blob metadata status are updated
@@ -389,8 +391,8 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	deleteBlobs(t, components.BlobMetadataStore, objsInQuorum1.blobKeys, [][32]byte{bhh})
 }
 
-func TestDispatcherMaxBatchSize(t *testing.T) {
-	components := newDispatcherComponents(t)
+func TestControllerMaxBatchSize(t *testing.T) {
+	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
@@ -402,7 +404,7 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 	ctx := context.Background()
 	expectedNumBatches := (numBlobs + int(maxBatchSize) - 1) / int(maxBatchSize)
 	for i := 0; i < expectedNumBatches; i++ {
-		batchData, err := components.Dispatcher.NewBatch(ctx, nil)
+		batchData, err := components.Controller.NewBatch(ctx, nil)
 		require.NoError(t, err)
 		if i < expectedNumBatches-1 {
 			require.Len(t, batchData.Batch.BlobCertificates, int(maxBatchSize))
@@ -416,14 +418,14 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	_, err := components.Dispatcher.NewBatch(ctx, nil)
+	_, err := components.Controller.NewBatch(ctx, nil)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
 }
 
-func TestDispatcherNewBatch(t *testing.T) {
-	components := newDispatcherComponents(t)
+func TestControllerNewBatch(t *testing.T) {
+	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
@@ -437,7 +439,7 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.Len(t, objs.blobCerts, 2)
 	ctx := context.Background()
 
-	batchData, err := components.Dispatcher.NewBatch(ctx, nil)
+	batchData, err := components.Controller.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	batch := batchData.Batch
 	bhh, keys, state := batchData.BatchHeaderHash, batchData.BlobKeys, batchData.OperatorState
@@ -485,14 +487,14 @@ func TestDispatcherNewBatch(t *testing.T) {
 	}
 
 	// Attempt to create a batch with the same blobs
-	_, err = components.Dispatcher.NewBatch(ctx, nil)
+	_, err = components.Controller.NewBatch(ctx, nil)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
 }
 
-func TestDispatcherNewBatchFailure(t *testing.T) {
-	components := newDispatcherComponents(t)
+func TestControllerNewBatchFailure(t *testing.T) {
+	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
 	numBlobs := int(maxBatchSize + 1)
@@ -508,7 +510,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	ctx := context.Background()
 
 	// process one batch to set cursor
-	_, err := components.Dispatcher.NewBatch(ctx, nil)
+	_, err := components.Controller.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	for i := 0; i < int(maxBatchSize); i++ {
 		err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[i], commonv2.GatheringSignatures)
@@ -534,7 +536,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	// process another batch (skips blob with old UpdatedAt due to cursor position)
-	batchData, err := components.Dispatcher.NewBatch(ctx, nil)
+	batchData, err := components.Controller.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	require.Len(t, batchData.Batch.BlobCertificates, 1)
 	require.Equal(t, objs.blobKeys[maxBatchSize], batchData.BlobKeys[0])
@@ -542,7 +544,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	// cursor resets to beginning and picks up blob with old UpdatedAt
-	newBatchData, err := components.Dispatcher.NewBatch(ctx, nil)
+	newBatchData, err := components.Controller.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	require.Len(t, batchData.Batch.BlobCertificates, 1)
 	require.Equal(t, oldTimestampKey, newBatchData.BlobKeys[0])
@@ -554,8 +556,8 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 		[][32]byte{newBatchData.BatchHeaderHash})
 }
 
-func TestDispatcherDedupBlobs(t *testing.T) {
-	components := newDispatcherComponents(t)
+func TestControllerDedupBlobs(t *testing.T) {
+	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
@@ -566,14 +568,14 @@ func TestDispatcherDedupBlobs(t *testing.T) {
 	components.BlobSet.On("Contains", objs.blobKeys[0]).Return(true)
 
 	ctx := context.Background()
-	batchData, err := components.Dispatcher.NewBatch(ctx, nil)
+	batchData, err := components.Controller.NewBatch(ctx, nil)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 	require.Nil(t, batchData)
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
 }
 
-func TestDispatcherBuildMerkleTree(t *testing.T) {
+func TestControllerBuildMerkleTree(t *testing.T) {
 	certs := []*corev2.BlobCertificate{
 		{
 			BlobHeader: &corev2.BlobHeader{
@@ -628,11 +630,11 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 	require.True(t, verified)
 }
 
-func TestDispatcherFilterStaleBlobs(t *testing.T) {
+func TestControllerFilterStaleBlobs(t *testing.T) {
 	ctx := t.Context()
 	now := time.Now()
 
-	components := newDispatcherComponents(t)
+	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
 	staleBlobKey, staleBlobHeader := newBlobWithDispersalTime(t, now.Add(-time.Minute).UnixNano(), []core.QuorumID{0, 1})
@@ -676,7 +678,7 @@ func TestDispatcherFilterStaleBlobs(t *testing.T) {
 	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 
-	batchData, err := components.Dispatcher.NewBatch(ctx, nil)
+	batchData, err := components.Controller.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	require.NotNil(t, batchData)
 	require.Len(t, batchData.Batch.BlobCertificates, 1)
@@ -756,7 +758,7 @@ func deleteBlobs(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore, k
 	}
 }
 
-func newDispatcherComponents(t *testing.T) *dispatcherComponents {
+func newControllerComponents(t *testing.T) *controllerComponents {
 	// logger := testutils.GetLogger()
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -817,8 +819,8 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		livenessChan,
 		signingrate.NewNoOpSigningRateTracker())
 	require.NoError(t, err)
-	return &dispatcherComponents{
-		Dispatcher:           d,
+	return &controllerComponents{
+		Controller:           d,
 		BatchMetadataManager: metadataManager,
 		BlobMetadataStore:    blobMetadataStore,
 		Pool:                 pool,
