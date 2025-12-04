@@ -89,6 +89,7 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		MemstoreConfig:   memstoreConfig,
 		MemstoreEnabled:  ctx.Bool(memstore.EnabledFlagName),
 		S3Config:         s3.ReadConfig(ctx),
+		NumRetry:         ctx.Int(eigendaflags_v2.EthRPCNumRetryFlagName),
 	}
 
 	return cfg, nil

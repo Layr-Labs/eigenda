@@ -172,6 +172,9 @@ GLOBAL OPTIONS:
     --eigenda.v2.eth-rpc value                                             ($EIGENDA_PROXY_EIGENDA_V2_ETH_RPC)
           URL of the Ethereum RPC endpoint.
    
+    --eigenda.v2.eth-rpc-num-retry value (default: 2)                       ($EIGENDA_PROXY_EIGENDA_V2_ETH_RPC_NUM_RETRY)
+          number of retry to call the Ethereum RPC endpoint.
+   
     --eigenda.v2.max-blob-length value  (default: "16MiB")                 ($EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH)
           Maximum blob length (base 2) to be written or read from EigenDA. Determines the
           number of SRS points

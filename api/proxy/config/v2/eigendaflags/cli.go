@@ -92,7 +92,7 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.IntFlag{
 			Name:     EthRPCNumRetryFlagName,
-			Usage:    "number of retry to call the Ethereum RPC endpoint.",
+			Usage:    "Number of retries for the Ethereum RPC request after the initial call fails.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC_NUM_RETRY")},
 			Value:    2,
 			Category: category,
