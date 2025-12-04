@@ -53,6 +53,10 @@ type ControllerConfig struct {
 	// Whether or not to collect detailed validator signing metrics.
 	CollectDetailedValidatorSigningMetrics bool
 
+	// Whether to enable per-account blob status metrics.
+	// If false, all per-account blob status metrics will be aggregated under "0x0" to reduce cardinality.
+	EnablePerAccountBlobStatusMetrics bool
+
 	// NumConcurrentRequests is the size of the worker pool for processing dispersal requests concurrently.
 	// Must be at least 1.
 	NumConcurrentRequests int
