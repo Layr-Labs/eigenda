@@ -137,65 +137,65 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -o ./bin/eigenda-proxy ./cmd/server
 
 # Final stages for each component
-FROM alpine:3.22 AS churner
+FROM alpine:3.23 AS churner
 COPY --from=churner-builder /app/operators/bin/churner /usr/local/bin
 ENTRYPOINT ["churner"]
 
-FROM alpine:3.22 AS encoder
+FROM alpine:3.23 AS encoder
 COPY --from=encoder-builder /app/disperser/bin/encoder /usr/local/bin
 ENTRYPOINT ["encoder"]
 
-FROM alpine:3.22 AS apiserver
+FROM alpine:3.23 AS apiserver
 COPY --from=apiserver-builder /app/disperser/bin/apiserver /usr/local/bin
 ENTRYPOINT ["apiserver"]
 
-FROM alpine:3.22 AS dataapi
+FROM alpine:3.23 AS dataapi
 COPY --from=dataapi-builder /app/disperser/bin/dataapi /usr/local/bin
 ENTRYPOINT ["dataapi"]
 
-FROM alpine:3.22 AS batcher
+FROM alpine:3.23 AS batcher
 COPY --from=batcher-builder /app/disperser/bin/batcher /usr/local/bin
 ENTRYPOINT ["batcher"]
 
-FROM alpine:3.22 AS retriever
+FROM alpine:3.23 AS retriever
 COPY --from=retriever-builder /app/retriever/bin/retriever /usr/local/bin
 ENTRYPOINT ["retriever"]
 
-FROM alpine:3.22 AS node
+FROM alpine:3.23 AS node
 COPY --from=node-builder /app/node/bin/node /usr/local/bin
 ENTRYPOINT ["node"]
 
-FROM alpine:3.22 AS nodeplugin
+FROM alpine:3.23 AS nodeplugin
 COPY --from=node-plugin-builder /app/node/bin/nodeplugin /usr/local/bin
 ENTRYPOINT ["nodeplugin"]
 
-FROM alpine:3.22 AS controller
+FROM alpine:3.23 AS controller
 COPY --from=controller-builder /app/disperser/bin/controller /usr/local/bin
 ENTRYPOINT ["controller"]
 
-FROM alpine:3.22 AS ejector
+FROM alpine:3.23 AS ejector
 COPY --from=ejector-builder /app/ejector/bin/ejector /usr/local/bin
 ENTRYPOINT ["ejector"]
 
-FROM alpine:3.22 AS relay
+FROM alpine:3.23 AS relay
 COPY --from=relay-builder /app/relay/bin/relay /usr/local/bin
 ENTRYPOINT ["relay"]
 
-FROM alpine:3.22 AS generator
+FROM alpine:3.23 AS generator
 COPY --from=generator-builder /app/tools/traffic/bin/generator /usr/local/bin
 ENTRYPOINT ["generator"]
 
-FROM alpine:3.22 AS generator2
+FROM alpine:3.23 AS generator2
 COPY --from=generator2-builder /app/test/v2/bin/load /usr/local/bin
 ENTRYPOINT ["load"]
 
-FROM alpine:3.22 AS blobapi
+FROM alpine:3.23 AS blobapi
 COPY --from=blobapi-builder /app/disperser/bin/blobapi /usr/local/bin
 ENTRYPOINT ["blobapi"]
 
 # proxy doesn't follow the same pattern as the others, because we keep it in the same
 # format as when it was a separate repo: https://github.com/Layr-Labs/eigenda-proxy/blob/main/Dockerfile
-FROM alpine:3.22 AS proxy
+FROM alpine:3.23 AS proxy
 WORKDIR /app
 COPY --from=proxy-builder /app/api/proxy/bin/eigenda-proxy .
 # All SRS points are now embedded into the binary, but we keep g1.point here
