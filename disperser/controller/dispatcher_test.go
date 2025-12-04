@@ -49,7 +49,7 @@ var (
 )
 
 type dispatcherComponents struct {
-	Dispatcher           *controller.Dispatcher
+	Dispatcher           *controller.Controller
 	BatchMetadataManager *metadata.MockBatchMetadataManager
 	BlobMetadataStore    *blobstore.BlobMetadataStore
 	Pool                 common.WorkerPool

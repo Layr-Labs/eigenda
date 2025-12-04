@@ -101,7 +101,7 @@ type DisperserHarness struct {
 	// Controller components
 	// TODO: Refactor into a single struct for controller components
 	EncodingManager  *controller.EncodingManager
-	Dispatcher       *controller.Dispatcher
+	Dispatcher       *controller.Controller
 	ControllerServer *server.Server
 }
 
@@ -124,7 +124,7 @@ type EncoderComponents struct {
 // ControllerComponents contains the components created by startController
 type ControllerComponents struct {
 	EncodingManager  *controller.EncodingManager
-	Dispatcher       *controller.Dispatcher
+	Dispatcher       *controller.Controller
 	ControllerServer *server.Server
 	Address          string
 }
