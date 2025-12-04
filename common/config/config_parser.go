@@ -379,18 +379,8 @@ var basicTypeSliceDecodeHook mapstructure.DecodeHookFunc = func(
 		// Create a pointer to a new instance of the target element type
 		elemPtr := reflect.New(to.Elem())
 
-		// Create a temporary decoder to convert the string to the target type
-		decoderConfig := &mapstructure.DecoderConfig{
-			WeaklyTypedInput: true,
-			Result:           elemPtr.Interface(),
-		}
-		decoder, err := mapstructure.NewDecoder(decoderConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create decoder for element %d: %w", i, err)
-		}
-
-		// Decode the trimmed part into the properly typed variable
-		if err := decoder.Decode(trimmedPart); err != nil {
+		// Use WeakDecode directly - it's more efficient than creating a decoder each time
+		if err := mapstructure.WeakDecode(trimmedPart, elemPtr.Interface()); err != nil {
 			return nil, fmt.Errorf("failed to decode element %d (%q): %w", i, trimmedPart, err)
 		}
 
