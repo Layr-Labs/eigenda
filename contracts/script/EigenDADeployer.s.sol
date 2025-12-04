@@ -383,7 +383,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             defaultSecurityThresholds,
-            hex"0001"
+            hex"0001",
+            0 // offchain derivation version
         );
 
         eigenDACertVerifierRouterImplementation = new EigenDACertVerifierRouter();
