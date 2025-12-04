@@ -33,6 +33,7 @@ type Foo struct {
 	ThisIsAFieldWithAComplexName string
 	ThisIsASecretField           *secret.Secret
 	ThisIsASliceOfSecrets        []*secret.Secret
+	ThisIsASliceOfStrings        []string
 }
 
 func DefaultFoo() *Foo {
@@ -663,4 +664,29 @@ func TestSecretSlice(t *testing.T) {
 	}
 
 	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_SECRETS"))
+}
+
+func TestStringSlice(t *testing.T) {
+	expected := []string{
+		"This",
+		"is",
+		"a",
+		"slice",
+		"of",
+		"strings",
+	}
+
+	fullString := strings.Join(expected, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_STRINGS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfStrings, len(expected))
+	for i, str := range foo.ThisIsASliceOfStrings {
+		require.Equal(t, expected[i], str)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_STRINGS"))
 }
