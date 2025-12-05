@@ -60,24 +60,48 @@ func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) error {
-	// TODO(iquidus): handle v4 cert
-	// 1 - Normalize cert to V3
-	certV3 := NormalizeCertV3(cert)
+	var (
+		certVerifierAddr gethcommon.Address
+		certBytes        []byte
+		err              error
+	)
+	// 1 - Determine cert version and serialize appropriately
+	// V2 certs are normalized to V3 for verification
+	if certV4, ok := cert.(*coretypes.EigenDACertV4); ok {
+		// V4 cert
+		certVerifierAddr, err = cv.addressProvider.GetCertVerifierAddress(
+			ctx,
+			certV4.ReferenceBlockNumber(),
+		)
+		if err != nil {
+			return &CertVerifierInternalError{Msg: "get verifier address", Err: err}
+		}
+
+		certBytes, err = certV4.Serialize(coretypes.CertSerializationABI)
+		if err != nil {
+			return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
+		}
+	} else {
+		// Normalize cert to V3
+		certV3 := NormalizeCertV3(cert)
+		certVerifierAddr, err = cv.addressProvider.GetCertVerifierAddress(
+			ctx,
+			certV3.ReferenceBlockNumber(),
+		)
+		if err != nil {
+			return &CertVerifierInternalError{Msg: "get verifier address", Err: err}
+		}
+
+		certBytes, err = certV3.Serialize(coretypes.CertSerializationABI)
+		if err != nil {
+			return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
+		}
+	}
 
 	// 2 - Call the contract method CheckDACert to verify the certificate
 	// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
 	//       with future reference timestamp change which deprecates the reference block number
 	//       used for quorum stake check-pointing.
-	certVerifierAddr, err := cv.addressProvider.GetCertVerifierAddress(ctx, certV3.ReferenceBlockNumber())
-	if err != nil {
-		return &CertVerifierInternalError{Msg: "get verifier address", Err: err}
-	}
-
-	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
-	if err != nil {
-		return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
-	}
-
 	// TODO(ethenotethan): determine if there's any merit in passing call context
 	// options (e.g, block number) to impose better determinism and safety on the simulation
 	// call
@@ -128,21 +152,41 @@ func (cv *CertVerifier) EstimateGasCheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) (uint64, error) {
-	// TODO(iquidus): handle v4 cert
-	// Normalize cert to V3
-	certV3 := NormalizeCertV3(cert)
-
-	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(
-		ctx,
-		certV3.ReferenceBlockNumber(),
+	var (
+		certVerifierAddress gethcommon.Address
+		certBytes           []byte
+		err                 error
 	)
-	if err != nil {
-		return 0, fmt.Errorf("get cert verifier address: %w", err)
-	}
 
-	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
-	if err != nil {
-		return 0, fmt.Errorf("serialize cert: %w", err)
+	if certV4, ok := cert.(*coretypes.EigenDACertV4); ok {
+		// V4 cert
+		certVerifierAddress, err = cv.addressProvider.GetCertVerifierAddress(
+			ctx,
+			certV4.ReferenceBlockNumber(),
+		)
+		if err != nil {
+			return 0, fmt.Errorf("get cert verifier address: %w", err)
+		}
+
+		certBytes, err = certV4.Serialize(coretypes.CertSerializationABI)
+		if err != nil {
+			return 0, fmt.Errorf("serialize cert: %w", err)
+		}
+	} else {
+		// Normalize cert to V3
+		certV3 := NormalizeCertV3(cert)
+		certVerifierAddress, err = cv.addressProvider.GetCertVerifierAddress(
+			ctx,
+			certV3.ReferenceBlockNumber(),
+		)
+		if err != nil {
+			return 0, fmt.Errorf("get cert verifier address: %w", err)
+		}
+
+		certBytes, err = certV3.Serialize(coretypes.CertSerializationABI)
+		if err != nil {
+			return 0, fmt.Errorf("serialize cert: %w", err)
+		}
 	}
 
 	// Pack the checkDACert method call data
