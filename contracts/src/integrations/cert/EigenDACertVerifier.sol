@@ -61,8 +61,7 @@ contract EigenDACertVerifier is
         UNUSED_HISTORICAL_BLOB_QUORUMS_NOT_SUBSET,
         UNUSED_HISTORICAL_REQUIRED_QUORUMS_NOT_SUBSET,
         INVALID_CERT, // 400: Certificate is invalid due to some revert from the verification library
-        INTERNAL_ERROR, // 500: Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
-        INVALID_OFFCHAIN_DERIVATION_VERSION // 400: Certificate has an invalid offchain derivation version
+        INTERNAL_ERROR // 500: Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
     }
 
     constructor(
@@ -112,11 +111,6 @@ contract EigenDACertVerifier is
             return uint8(StatusCode.INVALID_CERT);
         }
 
-        // Check offchain derivation version
-        if (daCert.offchainDerivationVersion != _offchainDerivationVersion) {
-            return uint8(StatusCode.INVALID_OFFCHAIN_DERIVATION_VERSION);
-        }
-
         // The try catch below is used to filter certs into 3 status codes:
         // 1. success
         // 2. invalid cert (any failing require statement; we assume all require statements return either a string or custom error)
@@ -156,7 +150,7 @@ contract EigenDACertVerifier is
     /// @dev This function will revert if the certificate is invalid.
     function checkDACertReverts(CT.EigenDACertV4 calldata daCert) external view {
         CertLib.checkDACert(
-            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, daCert, _securityThresholds, _quorumNumbersRequired
+            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, daCert, _securityThresholds, _quorumNumbersRequired, _offchainDerivationVersion
         );
     }
 

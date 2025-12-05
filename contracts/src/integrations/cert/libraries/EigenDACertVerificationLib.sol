@@ -54,6 +54,11 @@ library EigenDACertVerificationLib {
     /// @param nextBlobVersion The next blob version (valid versions need to be less than this number)
     error InvalidBlobVersion(uint16 blobVersion, uint16 nextBlobVersion);
 
+    /// @notice Thrown when the offchain derivation version is invalid
+    /// @param certVersion The offchain derivation version in the certificate
+    /// @param requiredVersion The required offchain derivation version
+    error InvalidOffchainDerivationVersion(uint16 certVersion, uint16 requiredVersion);
+
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
     /// @dev Uses the same verification logic as verifyDACertV2. The only difference is that the certificate is ABI encoded bytes.
     /// @param eigenDAThresholdRegistry The threshold registry contract
@@ -62,12 +67,14 @@ library EigenDACertVerificationLib {
     /// @param securityThresholds The security thresholds to verify against
     /// Callers should ensure that the requiredQuorumNumbers passed are non-empty if needed.
     /// @param requiredQuorumNumbers The required quorum numbers. Can be empty if not required.
+    /// @param offchainDerivationVersion The offchain derivation version to verify against
     function checkDACert(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier eigenDASignatureVerifier,
         CT.EigenDACertV4 memory daCert,
         DATypesV1.SecurityThresholds memory securityThresholds,
-        bytes memory requiredQuorumNumbers
+        bytes memory requiredQuorumNumbers,
+        uint16 offchainDerivationVersion
     ) internal view {
         checkBlobInclusion(daCert.batchHeader, daCert.blobInclusionInfo);
 
@@ -91,6 +98,11 @@ library EigenDACertVerificationLib {
             requiredQuorumNumbers,
             daCert.blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
             confirmedQuorumsBitmap
+        );
+
+        checkOffchainDerivationVersion(
+            daCert.offchainDerivationVersion,
+            offchainDerivationVersion
         );
     }
 
@@ -218,6 +230,15 @@ library EigenDACertVerificationLib {
         uint256 requiredQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers);
         if (!BitmapUtils.isSubsetOf(requiredQuorumsBitmap, blobQuorumsBitmap)) {
             revert RequiredQuorumsNotSubset(requiredQuorumsBitmap, blobQuorumsBitmap);
+        }
+    }
+
+    function checkOffchainDerivationVersion(
+        uint16 certOffchainDerivationVersion,
+        uint16 requiredOffchainDerivationVersion
+    ) internal pure {
+        if (certOffchainDerivationVersion != requiredOffchainDerivationVersion) {
+            revert InvalidOffchainDerivationVersion(certOffchainDerivationVersion, requiredOffchainDerivationVersion);
         }
     }
 
