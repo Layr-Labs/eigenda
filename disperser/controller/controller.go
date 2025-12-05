@@ -725,35 +725,6 @@ func (c *Controller) checkAndHandleStaleBlob(
 	return true
 }
 
-// GetOperatorState returns the operator state for the given quorums at the given block number
-func (c *Controller) GetOperatorState(
-	ctx context.Context,
-	metadatas []*v2.BlobMetadata,
-	blockNumber uint64,
-) (*core.IndexedOperatorState, error) {
-
-	quorums := make(map[core.QuorumID]struct{}, 0)
-	for _, m := range metadatas {
-		for _, quorum := range m.BlobHeader.QuorumNumbers {
-			quorums[quorum] = struct{}{}
-		}
-	}
-
-	quorumIds := make([]core.QuorumID, len(quorums))
-	i := 0
-	for id := range quorums {
-		quorumIds[i] = id
-		i++
-	}
-
-	// GetIndexedOperatorState should return state for valid quorums only
-	indexedOperatorState, err := c.chainState.GetIndexedOperatorState(ctx, uint(blockNumber), quorumIds)
-	if err != nil {
-		return nil, fmt.Errorf("GetIndexedOperatorState: %w", err)
-	}
-	return indexedOperatorState, nil
-}
-
 func (c *Controller) sendChunks(
 	ctx context.Context,
 	client clients.NodeClient,

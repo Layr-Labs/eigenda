@@ -112,7 +112,21 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 	infra.ChainHarness = *chainHarness
 
-	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
+	// Setup Operator Harness second (requires chain harness only).
+	// Operators must be registered before the disperser harness so that the subgraph
+	// has quorum APK data available when the controller starts.
+	operatorHarnessConfig := &OperatorHarnessConfig{
+		TestConfig: testConfig,
+		TestName:   testName,
+	}
+	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup operator harness: %w", err)
+	}
+	infra.OperatorHarness = *operatorHarness
+
+	// Setup Disperser Harness third (LocalStack, DynamoDB tables, S3 buckets, relays, controller).
+	// This must come after operator harness so the subgraph has APK data for the controller.
 	if !config.DisableDisperser {
 		disperserHarnessConfig := &DisperserHarnessConfig{
 			Network:             sharedDockerNetwork,
@@ -141,17 +155,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	} else {
 		logger.Info("Disperser deployment disabled, skipping disperser harness setup")
 	}
-
-	// Setup Operator Harness third (requires chain and disperser to be ready)
-	operatorHarnessConfig := &OperatorHarnessConfig{
-		TestConfig: testConfig,
-		TestName:   testName,
-	}
-	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup operator harness: %w", err)
-	}
-	infra.OperatorHarness = *operatorHarness
 
 	return infra, nil
 }
