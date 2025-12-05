@@ -69,57 +69,28 @@ library EigenDACertVerificationLib {
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
-        checkDACertV2(
-            eigenDAThresholdRegistry,
-            eigenDASignatureVerifier,
-            daCert.batchHeader,
-            daCert.blobInclusionInfo,
-            daCert.nonSignerStakesAndSignature,
-            securityThresholds,
-            requiredQuorumNumbers,
-            daCert.signedQuorumNumbers
-        );
-    }
-
-    /// @notice Checks a complete blob certificate for V2 in a single call
-    /// @param eigenDAThresholdRegistry The threshold registry contract
-    /// @param signatureVerifier The signature verifier contract
-    /// @param batchHeader The batch header
-    /// @param blobInclusionInfo The blob inclusion info
-    /// @param nonSignerStakesAndSignature The non-signer stakes and signature
-    /// @param securityThresholds The security thresholds to verify against
-    /// @param requiredQuorumNumbers The required quorum numbers
-    /// @param signedQuorumNumbers The signed quorum numbers
-    function checkDACertV2(
-        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
-        IEigenDASignatureVerifier signatureVerifier,
-        DATypesV2.BatchHeaderV2 memory batchHeader,
-        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
-        DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
-        DATypesV1.SecurityThresholds memory securityThresholds,
-        bytes memory requiredQuorumNumbers,
-        bytes memory signedQuorumNumbers
-    ) internal view {
-        checkBlobInclusion(batchHeader, blobInclusionInfo);
+        checkBlobInclusion(daCert.batchHeader, daCert.blobInclusionInfo);
 
         checkSecurityParams(
-            eigenDAThresholdRegistry, blobInclusionInfo.blobCertificate.blobHeader.version, securityThresholds
+            eigenDAThresholdRegistry, daCert.blobInclusionInfo.blobCertificate.blobHeader.version, securityThresholds
         );
 
         // Verify signatures and build confirmed quorums bitmap
         uint256 confirmedQuorumsBitmap = checkSignaturesAndBuildConfirmedQuorums(
-            signatureVerifier,
-            hashBatchHeaderV2(batchHeader),
-            signedQuorumNumbers,
-            batchHeader.referenceBlockNumber,
-            nonSignerStakesAndSignature,
+            eigenDASignatureVerifier,
+            hashBatchHeaderV2(daCert.batchHeader),
+            daCert.signedQuorumNumbers,
+            daCert.batchHeader.referenceBlockNumber,
+            daCert.nonSignerStakesAndSignature,
             securityThresholds
         );
 
         // The different quorums are related by: requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums ⊆ signedQuorums
         // checkSignaturesAndBuildConfirmedQuorums checked the last inequality. We now verify the other two.
         checkQuorumSubsets(
-            requiredQuorumNumbers, blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap
+            requiredQuorumNumbers,
+            daCert.blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
+            confirmedQuorumsBitmap
         );
     }
 
