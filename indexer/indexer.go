@@ -42,7 +42,8 @@ type indexer struct {
 	HeaderStore        HeaderStore
 	UpgradeForkWatcher UpgradeForkWatcher
 
-	PullInterval time.Duration
+	PullInterval            time.Duration
+	ContractDeploymentBlock uint64
 }
 
 var _ Indexer = (*indexer)(nil)
@@ -61,12 +62,13 @@ func New(
 	}
 
 	return &indexer{
-		Handlers:           handlers,
-		HeaderService:      headerSrvc,
-		HeaderStore:        headerStore,
-		UpgradeForkWatcher: upgradeForkWatcher,
-		PullInterval:       config.PullInterval,
-		Logger:             logger,
+		Handlers:                handlers,
+		HeaderService:           headerSrvc,
+		HeaderStore:             headerStore,
+		UpgradeForkWatcher:      upgradeForkWatcher,
+		PullInterval:            config.PullInterval,
+		ContractDeploymentBlock: config.ContractDeploymentBlock,
+		Logger:                  logger,
 	}
 }
 
@@ -137,9 +139,9 @@ func (i *indexer) Index(ctx context.Context) error {
 			default:
 				latestFinalizedHeader, err := i.HeaderStore.GetLatestHeader(true)
 				if errors.Is(err, ErrNoHeaders) {
-					// TODO: Set the latestFinalized to a config value reflecting the point at which the contract was deployed
+					// Use the configured contract deployment block as the starting point
 					latestFinalizedHeader = &Header{
-						Number: 0,
+						Number: i.ContractDeploymentBlock,
 					}
 				} else if err != nil {
 					i.Logger.Error("Error getting latest header", "err", err)
