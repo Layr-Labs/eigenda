@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	srs "github.com/Layr-Labs/eigenda/api/proxy/resources"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
@@ -109,11 +110,7 @@ func BuildManagers(
 		// kzgVerifier and encoder are only needed when validator retrieval is enabled
 		var kzgVerifier *kzgverifierv2.Verifier
 		if slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
-			kzgConfig := kzgverifierv2.ConfigFromV1KzgConfig(&config.KzgConfig)
-			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig)
-			if err != nil {
-				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
-			}
+			kzgVerifier = kzgverifierv2.NewVerifierWithSRS(srs.GetG1SRS())
 		}
 		encoder, err := rsv2.NewEncoder(log, nil)
 		if err != nil {
@@ -229,12 +226,7 @@ func buildEigenDAV2Backend(
 	registry *prometheus.Registry,
 	ethClient common_eigenda.EthClient,
 ) (common.EigenDAV2Store, error) {
-	kzgCommitter, err := committer.NewFromConfig(committer.Config{
-		G1SRSPath:         config.KzgConfig.G1Path,
-		G2SRSPath:         config.KzgConfig.G2Path,
-		G2TrailingSRSPath: config.KzgConfig.G2TrailingPath,
-		SRSNumberToLoad:   config.KzgConfig.SRSNumberToLoad,
-	})
+	kzgCommitter, err := committer.New(srs.GetG1SRS(), srs.GetG2SRS(), srs.GetG2TrailingSRS())
 	if err != nil {
 		return nil, fmt.Errorf("new kzg committer: %w", err)
 	}

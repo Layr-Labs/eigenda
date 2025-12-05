@@ -170,10 +170,11 @@ func (v *Verifier) UniversalVerifySubBatch(params encoding.EncodingParams, sampl
 // Each sample need not have unique row, it is possible that multiple chunks of the same blob are validated altogether
 func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sample, m int) error {
 	// precheck
-	for i, s := range samples {
+	for _, s := range samples {
 		if s.RowIndex >= m {
-			fmt.Printf("sample %v has %v Row, but there are only %v blobs\n", i, s.RowIndex, m)
-			return errors.New("sample.RowIndex and numBlob are inconsistent")
+			return fmt.Errorf(
+				"sample.RowIndex and numBlob are inconsistent: sample has %d rows, but there are only %d blobs",
+				s.RowIndex, m)
 		}
 	}
 
@@ -189,7 +190,6 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 	}
 
 	n := len(samples)
-	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLength, m)
 	if n == 0 {
 		return errors.New("the number of samples (i.e. chunks) must not be empty")
 	}
