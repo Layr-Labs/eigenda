@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,6 +32,21 @@ type Foo struct {
 	Baz                          *Baz
 	ThisIsAFieldWithAComplexName string
 	ThisIsASecretField           *secret.Secret
+	ThisIsASliceOfSecrets        []*secret.Secret
+	ThisIsASliceOfStrings        []string
+	ThisIsASliceOfInts           []int
+	ThisIsASliceOfInt64s         []int64
+	ThisIsASliceOfInt32s         []int32
+	ThisIsASliceOfInt16s         []int16
+	ThisIsASliceOfInt8s          []int8
+	ThisIsASliceOfUints          []uint
+	ThisIsASliceOfUint64s        []uint64
+	ThisIsASliceOfUint32s        []uint32
+	ThisIsASliceOfUint16s        []uint16
+	ThisIsASliceOfUint8s         []uint8
+	ThisIsASliceOfBools          []bool
+	ThisIsASliceOfFloat64s       []float64
+	ThisIsASliceOfFloat32s       []float32
 }
 
 func DefaultFoo() *Foo {
@@ -94,6 +110,9 @@ func TestTOMLParsing(t *testing.T) {
 	require.Equal(t,
 		"you're no stranger to love, you know the rules and so do I (so do I)",
 		foo.ThisIsASecretField.Get())
+	// The slice of secrets is unset in this config, so we should expect an empty slice.
+	// There used to be a bug where it would instead return [""].
+	require.Equal(t, 0, len(foo.ThisIsASliceOfSecrets))
 
 	// Bar field
 	require.Equal(t, "bar A", foo.Bar.A)
@@ -633,4 +652,353 @@ func TestAliasAndTargetSet(t *testing.T) {
 	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", aliases, nil, configFile)
 	require.Error(t, err)
 	require.Nil(t, foo)
+}
+
+func TestSecretSlice(t *testing.T) {
+	expected := []string{
+		"Never gonna give you up",
+		"Never gonna let you down",
+		"Never gonna run around and desert you",
+		"Never gonna make you cry",
+		"Never gonna say goodbye",
+		"Never gonna tell a lie and hurt you",
+	}
+
+	fullString := strings.Join(expected, ", ")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_SECRETS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfSecrets, len(expected))
+	for i, secretField := range foo.ThisIsASliceOfSecrets {
+		require.Equal(t, expected[i], secretField.Get())
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_SECRETS"))
+}
+
+func TestStringSlice(t *testing.T) {
+	expected := []string{
+		"This",
+		"is",
+		"a",
+		"slice",
+		"of",
+		"strings",
+	}
+
+	fullString := strings.Join(expected, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_STRINGS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfStrings, len(expected))
+	for i, str := range foo.ThisIsASliceOfStrings {
+		require.Equal(t, expected[i], str)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_STRINGS"))
+}
+
+func TestIntSlice(t *testing.T) {
+	expected := []int{1, 2, 3, -4, 5, 0, 42}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_INTS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfInts, len(expected))
+	for i, val := range foo.ThisIsASliceOfInts {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_INTS"))
+}
+
+func TestBoolSlice(t *testing.T) {
+	expected := []bool{true, false, true, true, false}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%t", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_BOOLS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfBools, len(expected))
+	for i, val := range foo.ThisIsASliceOfBools {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_BOOLS"))
+}
+
+func TestFloat64Slice(t *testing.T) {
+	expected := []float64{1.5, -2.3, 0.0, 42.42, 3.14159}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%f", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_FLOAT64S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfFloat64s, len(expected))
+	for i, val := range foo.ThisIsASliceOfFloat64s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_FLOAT64S"))
+}
+
+func TestInt64Slice(t *testing.T) {
+	expected := []int64{9223372036854775807, -9223372036854775808, 0, 42, -100}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_INT64S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfInt64s, len(expected))
+	for i, val := range foo.ThisIsASliceOfInt64s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_INT64S"))
+}
+
+func TestInt32Slice(t *testing.T) {
+	expected := []int32{2147483647, -2147483648, 0, 42, -100}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_INT32S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfInt32s, len(expected))
+	for i, val := range foo.ThisIsASliceOfInt32s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_INT32S"))
+}
+
+func TestInt16Slice(t *testing.T) {
+	expected := []int16{32767, -32768, 0, 42, -100}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_INT16S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfInt16s, len(expected))
+	for i, val := range foo.ThisIsASliceOfInt16s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_INT16S"))
+}
+
+func TestInt8Slice(t *testing.T) {
+	expected := []int8{127, -128, 0, 42, -100}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_INT8S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfInt8s, len(expected))
+	for i, val := range foo.ThisIsASliceOfInt8s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_INT8S"))
+}
+
+func TestUintSlice(t *testing.T) {
+	expected := []uint{0, 1, 42, 100, 4294967295}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_UINTS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfUints, len(expected))
+	for i, val := range foo.ThisIsASliceOfUints {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_UINTS"))
+}
+
+func TestUint64Slice(t *testing.T) {
+	expected := []uint64{0, 1, 42, 100, 18446744073709551615}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_UINT64S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfUint64s, len(expected))
+	for i, val := range foo.ThisIsASliceOfUint64s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_UINT64S"))
+}
+
+func TestUint32Slice(t *testing.T) {
+	expected := []uint32{0, 1, 42, 100, 4294967295}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_UINT32S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfUint32s, len(expected))
+	for i, val := range foo.ThisIsASliceOfUint32s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_UINT32S"))
+}
+
+func TestUint16Slice(t *testing.T) {
+	expected := []uint16{0, 1, 42, 100, 65535}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_UINT16S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfUint16s, len(expected))
+	for i, val := range foo.ThisIsASliceOfUint16s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_UINT16S"))
+}
+
+func TestUint8Slice(t *testing.T) {
+	expected := []uint8{0, 1, 42, 100, 255}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_UINT8S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfUint8s, len(expected))
+	for i, val := range foo.ThisIsASliceOfUint8s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_UINT8S"))
+}
+
+func TestFloat32Slice(t *testing.T) {
+	expected := []float32{1.5, -2.3, 0.0, 42.42, 3.14159}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%f", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_FLOAT32S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfFloat32s, len(expected))
+	for i, val := range foo.ThisIsASliceOfFloat32s {
+		require.InDelta(t, expected[i], val, 0.00001)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_FLOAT32S"))
 }

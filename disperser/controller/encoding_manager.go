@@ -68,6 +68,10 @@ type EncodingManagerConfig struct {
 	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
 	// client at dispersal request creation time (in nanoseconds since Unix epoch).
 	MaxDispersalAge time.Duration
+
+	// Whether to enable per-account blob status metrics.
+	// If false, all per-account blob status metrics will be aggregated under "0x0" to reduce cardinality.
+	EnablePerAccountBlobStatusMetrics bool
 }
 
 var _ config.VerifiableConfig = &EncodingManagerConfig{}
@@ -179,7 +183,7 @@ func NewEncodingManager(
 		chainReader:            chainReader,
 		logger:                 logger.With("component", "EncodingManager"),
 		cursor:                 nil,
-		metrics:                newEncodingManagerMetrics(registry),
+		metrics:                newEncodingManagerMetrics(registry, config.EnablePerAccountBlobStatusMetrics),
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 	}, nil
@@ -425,7 +429,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 				requestedAt := time.Unix(0, int64(blob.RequestedAt))
 				e.metrics.reportE2EEncodingLatency(time.Since(requestedAt))
-				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded)
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded, blob.BlobHeader.PaymentMetadata.AccountID.Hex())
 			} else {
 				e.metrics.reportFailedSubmission()
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
@@ -439,7 +443,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				// the Dispatcher removes the blobKey from the blobSet when batching, but blobs that are set to FAILED
 				// never are batched, and therefore must be removed manually
 				e.blobSet.RemoveBlob(blobKey)
-				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed)
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed, blob.BlobHeader.PaymentMetadata.AccountID.Hex())
 			}
 		})
 	}
