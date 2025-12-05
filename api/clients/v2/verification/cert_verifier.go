@@ -35,6 +35,8 @@ type CertVerifier struct {
 	confirmationThresholds sync.Map
 	// maps contract address to the cert version specified in the contract at that address
 	versions sync.Map
+	// maps contract address to the offchain derivation version specified in the contract at that address
+	offchainDerivationVersions sync.Map
 }
 
 // NewCertVerifier constructs a new CertVerifier instance
@@ -58,6 +60,7 @@ func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) error {
+	// TODO(iquidus): handle v4 cert
 	// 1 - Normalize cert to V3
 	certV3 := NormalizeCertV3(cert)
 
@@ -125,6 +128,7 @@ func (cv *CertVerifier) EstimateGasCheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) (uint64, error) {
+	// TODO(iquidus): handle v4 cert
 	// Normalize cert to V3
 	certV3 := NormalizeCertV3(cert)
 
@@ -296,7 +300,7 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 	if ok {
 		castVersion, ok := cachedVersion.(uint8)
 		if !ok {
-			return 0, fmt.Errorf("expected version to be uint64")
+			return 0, fmt.Errorf("expected version to be uint8")
 		}
 		return castVersion, nil
 	}
@@ -315,6 +319,44 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 	cv.versions.Store(certVerifierAddress, version)
 
 	return version, nil
+}
+
+// GetOffchainDerivationVersion returns the OffchainDerivationVersion that corresponds to the input RBN.
+//
+// This method will return the offchain derivation version from an internal cache if it is already known for the cert
+// verifier which corresponds to the input reference block number. Otherwise, this method will query the offchain
+// derivation version and cache the result for future use.
+func (cv *CertVerifier) GetOffchainDerivationVersion(ctx context.Context, referenceBlockNumber uint64) (uint16, error) {
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
+	if err != nil {
+		return 0, fmt.Errorf("get cert verifier address: %w", err)
+	}
+
+	// if the offchain derivation version for the active cert verifier address has already been cached, return it
+	// immediately
+	cachedVersion, ok := cv.offchainDerivationVersions.Load(certVerifierAddress)
+	if ok {
+		castVersion, ok := cachedVersion.(uint16)
+		if !ok {
+			return 0, fmt.Errorf("expected version to be uint16")
+		}
+		return castVersion, nil
+	}
+
+	// version wasn't cached, so proceed to fetch it
+	certVerifierCaller, err := cv.getVerifierCallerFromAddress(certVerifierAddress)
+	if err != nil {
+		return 0, fmt.Errorf("get verifier caller from address: %w", err)
+	}
+
+	offchainDerivationVersion, err := certVerifierCaller.OffchainDerivationVersion(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return 0, fmt.Errorf("get offchain derivation version via contract call: %w", err)
+	}
+
+	cv.offchainDerivationVersions.Store(certVerifierAddress, offchainDerivationVersion)
+
+	return offchainDerivationVersion, nil
 }
 
 // NormalizeCertV3 returns a EigenDACertV3 for a given EigenDACert
