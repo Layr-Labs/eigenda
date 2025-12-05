@@ -20,6 +20,7 @@ const (
 	// All future CertVersions will be against EigenDA V2 Blazar (https://docs.eigenda.xyz/releases/blazar)
 	V1VersionByte
 	V2VersionByte
+	V3VersionByte
 )
 
 // versionByteString returns a string representation of the version byte for display
@@ -31,6 +32,8 @@ func (v VersionByte) VersionByteString() string {
 		return "EigenDA V2 Legacy"
 	case V2VersionByte:
 		return "EigenDA V2 with V3 Cert"
+	case V3VersionByte:
+		return "EigenDA V2 with V4 Cert"
 	default:
 		return fmt.Sprintf("Unknown (0x%02x)", byte(v))
 	}
@@ -49,6 +52,8 @@ func (v VersionByte) IntoCertVersion() (coretypes.CertificateVersion, error) {
 		return coretypes.VersionTwoCert, nil
 	case V2VersionByte:
 		return coretypes.VersionThreeCert, nil
+	case V3VersionByte:
+		return coretypes.VersionFourCert, nil
 	default:
 		return 0, fmt.Errorf("unknown version byte (0x%02x)", byte(v))
 	}
@@ -64,6 +69,8 @@ func ByteToVersion(b byte) (VersionByte, error) {
 		return V1VersionByte, nil
 	case byte(V2VersionByte):
 		return V2VersionByte, nil
+	case byte(V3VersionByte):
+		return V3VersionByte, nil
 	default:
 		return 0, fmt.Errorf("unknown EigenDA cert version: %d", b)
 	}

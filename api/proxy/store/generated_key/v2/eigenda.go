@@ -210,6 +210,12 @@ func (e Store) Put(
 			return nil, fmt.Errorf("serialize cert: %w", err)
 		}
 		return certs.NewVersionedCert(serializedCert, certs.V2VersionByte), nil
+	case *coretypes.EigenDACertV4:
+		serializedCert, err := cert.Serialize(serializationType)
+		if err != nil {
+			return nil, fmt.Errorf("serialize cert: %w", err)
+		}
+		return certs.NewVersionedCert(serializedCert, certs.V3VersionByte), nil
 	default:
 		return nil, fmt.Errorf("unsupported cert version: %T", cert)
 	}

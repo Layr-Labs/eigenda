@@ -62,19 +62,19 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert2)
 	require.NoError(t, err)
 
-	eigenDAV3Cert1, ok := cert1.(*coretypes.EigenDACertV3)
+	eigenDAV4Cert1, ok := cert1.(*coretypes.EigenDACertV4)
 	require.True(t, ok)
 
-	eigenDAV3Cert2, ok := cert2.(*coretypes.EigenDACertV3)
+	eigenDAV4Cert2, ok := cert2.(*coretypes.EigenDACertV4)
 	require.True(t, ok)
 
 	// test retrieval from disperser relay subnet
-	actualPayload1, err := testHarness.RelayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert1)
+	actualPayload1, err := testHarness.RelayRetrievalClientV2.GetPayload(ctx, eigenDAV4Cert1)
 	require.NoError(t, err)
 	require.NotNil(t, actualPayload1)
 	require.Equal(t, payload1, actualPayload1)
 
-	actualPayload2, err := testHarness.RelayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert2)
+	actualPayload2, err := testHarness.RelayRetrievalClientV2.GetPayload(ctx, eigenDAV4Cert2)
 	require.NoError(t, err)
 	require.NotNil(t, actualPayload2)
 	require.Equal(t, payload2, actualPayload2)
@@ -82,7 +82,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	// test distributed retrieval from DA network validator nodes
 	actualPayload1, err = testHarness.ValidatorRetrievalClientV2.GetPayload(
 		ctx,
-		eigenDAV3Cert1,
+		eigenDAV4Cert1,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, actualPayload1)
@@ -90,7 +90,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 
 	actualPayload2, err = testHarness.ValidatorRetrievalClientV2.GetPayload(
 		ctx,
-		eigenDAV3Cert2,
+		eigenDAV4Cert2,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, actualPayload2)
@@ -183,22 +183,22 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.NoError(t, err)
 
 	// now force verification to fail by modifying the cert contents
-	eigenDAV3Cert4, ok := cert4.(*coretypes.EigenDACertV3)
+	eigenDAV4Cert4, ok := cert4.(*coretypes.EigenDACertV4)
 	require.True(t, ok)
 
 	// modify the merkle root of the batch header and ensure verification fails
 	// TODO: Test other cert verification failure cases as well
-	eigenDAV3Cert4.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
+	eigenDAV4Cert4.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
 
 	var certErr *verification.CertVerifierInvalidCertError
-	err = testHarness.RouterCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, eigenDAV4Cert4)
 	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
 	require.True(t, errors.As(err, &certErr))
 	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
 	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
 
-	err = testHarness.StaticCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+	err = testHarness.StaticCertVerifier.CheckDACert(ctx, eigenDAV4Cert4)
 	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
 	require.True(t, errors.As(err, &certErr))
 	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,

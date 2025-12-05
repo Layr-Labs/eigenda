@@ -67,8 +67,11 @@ func (cb *CertBuilder) BuildCert(
 	ctx context.Context,
 	certVersion coretypes.CertificateVersion,
 	blobStatusReply *disperser.BlobStatusReply,
+	offchainDerivationVersion uint16,
 ) (coretypes.EigenDACert, error) {
 	switch certVersion {
+	case coretypes.VersionFourCert:
+		return cb.buildEigenDAV4Cert(ctx, blobStatusReply, offchainDerivationVersion)
 	case coretypes.VersionThreeCert:
 		return cb.buildEigenDAV3Cert(ctx, blobStatusReply)
 	default:
@@ -90,6 +93,26 @@ func (cb *CertBuilder) buildEigenDAV3Cert(
 	eigenDACert, err := coretypes.NewEigenDACertV3(blobStatusReply, nonSignerStakesAndSignature)
 	if err != nil {
 		return nil, fmt.Errorf("build eigenda v3 cert: %w", err)
+	}
+
+	return eigenDACert, nil
+}
+
+// buildEigenDAV4Cert builds an EigenDA certificate of version 4 using the provided blob key and blob status reply.
+func (cb *CertBuilder) buildEigenDAV4Cert(
+	ctx context.Context,
+	blobStatusReply *disperser.BlobStatusReply,
+	offchainDerivationVersion uint16,
+) (*coretypes.EigenDACertV4, error) {
+	nonSignerStakesAndSignature, err := cb.getNonSignerStakesAndSignature(
+		ctx, blobStatusReply.GetSignedBatch())
+	if err != nil {
+		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
+	}
+
+	eigenDACert, err := coretypes.NewEigenDACertV4(blobStatusReply, nonSignerStakesAndSignature, offchainDerivationVersion)
+	if err != nil {
+		return nil, fmt.Errorf("build eigenda v4 cert: %w", err)
 	}
 
 	return eigenDACert, nil
