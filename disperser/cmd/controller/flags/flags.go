@@ -191,7 +191,7 @@ var (
 	}
 	EnablePerAccountBlobStatusMetricsFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-blob-status-metrics"),
-		Usage:    "Whether to report per-account blob status metrics. If false, all metrics will be aggregated under account 0x0. (default: true)",
+		Usage:    "Whether to report per-account blob status metrics for unmapped accounts. Accounts with valid name remappings will always use their remapped labels. If false, unmapped accounts will be aggregated under account 0x0. (default: true)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PER_ACCOUNT_BLOB_STATUS_METRICS"),
 	}

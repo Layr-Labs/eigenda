@@ -414,27 +414,7 @@ func (m *controllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStat
 		return
 	}
 
-	var accountLabel string
-	if m.userAccountRemapping != nil {
-		if remappedName, found := m.userAccountRemapping[accountID]; found && remappedName != "" {
-			// Found in remapping - always use the formatted label
-			accountLabel = nameremapping.FormatNameWithAccountPrefix(remappedName, accountID)
-		} else {
-			// Not found in remapping - use raw value only if per-account metrics enabled
-			if m.enablePerAccountMetrics {
-				accountLabel = accountID
-			} else {
-				accountLabel = "0x0"
-			}
-		}
-	} else {
-		// No remapping loaded - respect per-account metrics flag
-		if m.enablePerAccountMetrics {
-			accountLabel = accountID
-		} else {
-			accountLabel = "0x0"
-		}
-	}
+	accountLabel := m.getAccountLabel(accountID)
 
 	switch status {
 	case dispv2.Complete:
@@ -456,6 +436,32 @@ func (m *controllerMetrics) reportBlobSetSize(size int) {
 		return
 	}
 	m.blobSetSize.WithLabelValues().Set(float64(size))
+}
+
+// Gets the appropriate account label based on remapping and per-account settings.
+func (m *controllerMetrics) getAccountLabel(accountId string) string {
+	if m.userAccountRemapping == nil {
+		if m.enablePerAccountMetrics {
+			// if there aren't any remappings, and per-account metrics are enabled, just return the account ID
+			return accountId
+		} else {
+			// otherwise, return the catch-all label to keep cardinality low
+			return "0x0"
+		}
+	}
+
+	if remappedName, found := m.userAccountRemapping[accountId]; found && remappedName != "" {
+		// Found in remapping - always use the formatted label
+		return nameremapping.FormatNameWithAccountPrefix(remappedName, accountId)
+	} else {
+		// if no remapping is found, and per-account metrics are enabled, just return the account ID
+		if m.enablePerAccountMetrics {
+			return accountId
+		} else {
+			// otherwise, return the catch-all label to keep cardinality low
+			return "0x0"
+		}
+	}
 }
 
 func (m *controllerMetrics) reportStaleDispersal() {
