@@ -76,7 +76,7 @@ batchConfirmers = ["0xf7fd61910d1b5d705c25e4a55a67d577a650bf2e"]
 confirmationThreshold = 55
 adversaryThreshold = 33
 quorumNumbersRequired = [0, 1]
-
+offchainDerivationVersion = 0
 
 [initParams.eigenDA.disperser]
 dispersers = []
