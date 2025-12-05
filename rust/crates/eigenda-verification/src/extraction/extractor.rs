@@ -1,5 +1,5 @@
 use alloy_primitives::aliases::{U96, U192};
-use alloy_primitives::{B256, Bytes, StorageKey, U256};
+use alloy_primitives::{Address, B256, Bytes, StorageKey, U256};
 use hashbrown::HashMap;
 use reth_trie_common::StorageProof;
 pub use stale_stakes_forbidden::*;
@@ -102,7 +102,6 @@ impl QuorumCountExtractor {
 }
 
 impl StorageKeyProvider for QuorumCountExtractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         vec![storage_key_helpers::simple_slot_key(
             QUORUM_COUNT_VARIABLE_SLOT,
@@ -113,7 +112,7 @@ impl StorageKeyProvider for QuorumCountExtractor {
 impl DataDecoder for QuorumCountExtractor {
     type Output = u8;
 
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
@@ -147,7 +146,6 @@ impl VersionedBlobParamsExtractor {
 }
 
 impl StorageKeyProvider for VersionedBlobParamsExtractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         let version = U256::from(self.version);
         vec![storage_key_helpers::mapping_key(
@@ -160,7 +158,7 @@ impl StorageKeyProvider for VersionedBlobParamsExtractor {
 impl DataDecoder for VersionedBlobParamsExtractor {
     type Output = HashMap<Version, VersionedBlobParams>;
 
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
@@ -199,7 +197,6 @@ impl NextBlobVersionExtractor {
 }
 
 impl StorageKeyProvider for NextBlobVersionExtractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         vec![storage_key_helpers::simple_slot_key(NEXT_BLOB_VERSION_SLOT)]
     }
@@ -209,7 +206,7 @@ impl DataDecoder for NextBlobVersionExtractor {
     type Output = Version;
 
     /// Decode the next blob version from storage proofs
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
@@ -218,8 +215,6 @@ impl DataDecoder for NextBlobVersionExtractor {
         let proof =
             decode_helpers::find_required_proof(storage_proofs, storage_key, "nextBlobVersion")?;
         let next_blob_version = proof.value.to::<Self::Output>();
-
-        tracing::info!(?next_blob_version);
 
         Ok(next_blob_version)
     }
@@ -254,7 +249,6 @@ impl OperatorBitmapHistoryExtractor {
 }
 
 impl StorageKeyProvider for OperatorBitmapHistoryExtractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         self.non_signers_pk_hashes
             .iter()
@@ -274,7 +268,7 @@ impl StorageKeyProvider for OperatorBitmapHistoryExtractor {
 impl DataDecoder for OperatorBitmapHistoryExtractor {
     type Output = HashMap<B256, History<Bitmap>>;
 
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")))]
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
@@ -333,7 +327,6 @@ impl ApkHistoryExtractor {
 }
 
 impl StorageKeyProvider for ApkHistoryExtractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         self.signed_quorum_numbers
             .iter()
@@ -354,7 +347,7 @@ impl StorageKeyProvider for ApkHistoryExtractor {
 impl DataDecoder for ApkHistoryExtractor {
     type Output = HashMap<QuorumNumber, History<TruncHash>>;
 
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")))]
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
@@ -414,7 +407,6 @@ impl TotalStakeHistoryExtractor {
 }
 
 impl StorageKeyProvider for TotalStakeHistoryExtractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         self.signed_quorum_numbers
             .iter()
@@ -435,7 +427,7 @@ impl StorageKeyProvider for TotalStakeHistoryExtractor {
 impl DataDecoder for TotalStakeHistoryExtractor {
     type Output = HashMap<QuorumNumber, History<Stake>>;
 
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")))]
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
@@ -501,7 +493,6 @@ impl OperatorStakeHistoryExtractor {
 }
 
 impl StorageKeyProvider for OperatorStakeHistoryExtractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         let mut storage_keys = vec![];
 
@@ -535,7 +526,7 @@ impl StorageKeyProvider for OperatorStakeHistoryExtractor {
 impl DataDecoder for OperatorStakeHistoryExtractor {
     type Output = HashMap<B256, HashMap<QuorumNumber, History<Stake>>>;
 
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")))]
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
@@ -614,11 +605,28 @@ impl Default for CertVerifierABNsLenExtractor {
 }
 
 impl StorageKeyProvider for CertVerifierABNsLenExtractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         vec![storage_key_helpers::simple_slot_key(
             CERT_VERIFIER_ABNS_ARRAY_SLOT,
         )]
+    }
+}
+
+impl DataDecoder for CertVerifierABNsLenExtractor {
+    type Output = u32;
+
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
+    fn decode_data(
+        &self,
+        storage_proofs: &[StorageProof],
+    ) -> Result<Self::Output, CertExtractionError> {
+        let storage_key = &self.storage_keys()[0];
+        let proof = decode_helpers::find_required_proof(
+            storage_proofs,
+            storage_key,
+            "certVerifierABNs length",
+        )?;
+        Ok(proof.value.to::<u32>())
     }
 }
 
@@ -636,20 +644,64 @@ impl CertVerifierABNsExtractor {
     ///
     /// # Arguments
     /// * `num_abns` - Number of ABNs to extract from storage
+    ///
+    /// In the verification path, the num_abns passed should come from
+    /// the CertVerifierABNsLenExtractor::decode_data result.
     pub fn new(num_abns: usize) -> Self {
         Self { num_abns }
     }
 }
 
 impl StorageKeyProvider for CertVerifierABNsExtractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
-        let keys: Vec<_> = (0..self.num_abns)
+        // abns are u32s, so 8 abns are packed per storage slot (32 bytes)
+        let num_keys = self.num_abns.div_ceil(8);
+        let keys: Vec<_> = (0..num_keys)
             .map(|i| {
                 storage_key_helpers::dynamic_array_key(CERT_VERIFIER_ABNS_ARRAY_SLOT, i as u32)
             })
             .collect();
         keys
+    }
+}
+
+impl DataDecoder for CertVerifierABNsExtractor {
+    type Output = Vec<u32>;
+
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
+    fn decode_data(
+        &self,
+        storage_proofs: &[StorageProof],
+    ) -> Result<Self::Output, CertExtractionError> {
+        let mut out: Vec<u32> = Vec::with_capacity(self.num_abns);
+
+        for storage_key in self.storage_keys().iter() {
+            let proof = decode_helpers::find_required_proof(
+                storage_proofs,
+                storage_key,
+                "certVerifierABNs",
+            )?;
+            for i in 0..8 {
+                if out.len() >= self.num_abns {
+                    break;
+                }
+                let start = 32 - (i + 1) * 4;
+                let end = start + 4;
+                let abn_bytes: [u8; 4] = proof.value.to_be_bytes::<32>()[start..end]
+                    .try_into()
+                    .unwrap();
+                let abn = u32::from_be_bytes(abn_bytes);
+                out.push(abn);
+            }
+        }
+        out.windows(2)
+            .all(|w| w[0] < w[1])
+            .then(|| ())
+            .ok_or_else(|| {
+                CertExtractionError::CertVerifierABNsNotStrictlyIncreasing(out.clone())
+            })?;
+
+        Ok(out)
     }
 }
 
@@ -676,7 +728,6 @@ impl<'a> CertVerifiersExtractor<'a> {
 }
 
 impl<'a> StorageKeyProvider for CertVerifiersExtractor<'a> {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         let keys: Vec<_> = self
             .abns
@@ -689,6 +740,29 @@ impl<'a> StorageKeyProvider for CertVerifiersExtractor<'a> {
             })
             .collect();
         keys
+    }
+}
+
+impl DataDecoder for CertVerifiersExtractor<'_> {
+    type Output = HashMap<u32, Address>;
+
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
+    fn decode_data(
+        &self,
+        storage_proofs: &[StorageProof],
+    ) -> Result<Self::Output, CertExtractionError> {
+        let mut out: HashMap<u32, Address> = HashMap::new();
+
+        for (&abn, storage_key) in self.abns.iter().zip(self.storage_keys().iter()) {
+            let proof =
+                decode_helpers::find_required_proof(storage_proofs, storage_key, "certVerifiers")?;
+            let address_bytes = proof.value.to_be_bytes::<32>();
+            let address: Address = Address::from_slice(&address_bytes[12..32]);
+
+            out.insert(abn, address);
+        }
+
+        Ok(out)
     }
 }
 
@@ -710,7 +784,6 @@ impl SecurityThresholdsV2Extractor {
 }
 
 impl StorageKeyProvider for SecurityThresholdsV2Extractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         vec![storage_key_helpers::simple_slot_key(
             SECURITY_THRESHOLDS_V2_VARIABLE_SLOT,
@@ -723,7 +796,7 @@ impl StorageKeyProvider for SecurityThresholdsV2Extractor {
 impl DataDecoder for SecurityThresholdsV2Extractor {
     type Output = SecurityThresholds;
 
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
@@ -764,7 +837,6 @@ impl QuorumNumbersRequiredV2Extractor {
 }
 
 impl StorageKeyProvider for QuorumNumbersRequiredV2Extractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
         vec![storage_key_helpers::simple_slot_key(
             QUORUM_NUMBERS_REQUIRED_V2_VARIABLE_SLOT,
@@ -777,7 +849,7 @@ impl StorageKeyProvider for QuorumNumbersRequiredV2Extractor {
 impl DataDecoder for QuorumNumbersRequiredV2Extractor {
     type Output = Bytes;
 
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
@@ -1070,7 +1142,6 @@ mod stale_stakes_forbidden {
     }
 
     impl StorageKeyProvider for StaleStakesForbiddenExtractor {
-        #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
         fn storage_keys(&self) -> Vec<StorageKey> {
             vec![storage_key_helpers::simple_slot_key(
                 STALE_STAKES_FORBIDDEN_VARIABLE_SLOT,
@@ -1083,7 +1154,7 @@ mod stale_stakes_forbidden {
     impl DataDecoder for StaleStakesForbiddenExtractor {
         type Output = bool;
 
-        #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+        #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
         fn decode_data(
             &self,
             storage_proofs: &[StorageProof],
@@ -1116,7 +1187,6 @@ mod stale_stakes_forbidden {
     }
 
     impl StorageKeyProvider for MinWithdrawalDelayBlocksExtractor {
-        #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
         fn storage_keys(&self) -> Vec<StorageKey> {
             vec![storage_key_helpers::simple_slot_key(
                 MIN_WITHDRAWAL_DELAY_BLOCKS_VARIABLE_SLOT,
@@ -1129,7 +1199,7 @@ mod stale_stakes_forbidden {
     impl DataDecoder for MinWithdrawalDelayBlocksExtractor {
         type Output = u32;
 
-        #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+        #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
         fn decode_data(
             &self,
             storage_proofs: &[StorageProof],
@@ -1167,7 +1237,6 @@ mod stale_stakes_forbidden {
     }
 
     impl StorageKeyProvider for QuorumUpdateBlockNumberExtractor {
-        #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
         fn storage_keys(&self) -> Vec<StorageKey> {
             self.signed_quorum_numbers
                 .iter()
@@ -1186,7 +1255,7 @@ mod stale_stakes_forbidden {
     impl DataDecoder for QuorumUpdateBlockNumberExtractor {
         type Output = HashMap<QuorumNumber, BlockNumber>;
 
-        #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+        #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
         fn decode_data(
             &self,
             storage_proofs: &[StorageProof],
