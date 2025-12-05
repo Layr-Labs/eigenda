@@ -133,8 +133,7 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	aggKeys := make(map[uint8]*core.G1Point)
 	for _, apk := range aggregatePublicKeys {
 		if apk.Err != nil {
-			ics.logger.Error("Error getting aggregate public key", "err", apk.Err)
-			continue
+			return nil, fmt.Errorf("error getting aggregate public key for quorum %d: %w", apk.QuorumNumber, apk.Err)
 		}
 		if apk.Err == nil && apk.AggregatePubk != nil {
 			aggKeys[apk.QuorumNumber] = apk.AggregatePubk
