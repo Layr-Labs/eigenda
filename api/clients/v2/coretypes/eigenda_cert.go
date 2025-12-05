@@ -102,7 +102,7 @@ var _ EigenDACert = &EigenDACertV2{}
 var _ EigenDACert = &EigenDACertV3{}
 var _ EigenDACert = &EigenDACertV4{}
 
-// This struct represents the composition of a EigenDA V3 certificate, as it would exist in a rollup inbox.
+// This struct represents the composition of a EigenDA V4 certificate, as it would exist in a rollup inbox.
 type EigenDACertV4 certTypesBinding.EigenDACertTypesEigenDACertV4
 
 // NewEigenDACertV4 creates a new EigenDACertV4 from a BlobStatusReply, NonSignerStakesAndSignature and
@@ -112,12 +112,30 @@ func NewEigenDACertV4(
 	nonSignerStakesAndSignature *certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature,
 	offchainDerivationVersion uint16,
 ) (*EigenDACertV4, error) {
-	certv3, err := NewEigenDACertV3(blobStatusReply, nonSignerStakesAndSignature)
+	bindingInclusionInfo, err := InclusionInfoProtoToIEigenDATypesBinding(blobStatusReply.GetBlobInclusionInfo())
 	if err != nil {
-		return nil, fmt.Errorf("create EigenDACertV3: %w", err)
+		return nil, fmt.Errorf("convert inclusion info to binding: %w", err)
 	}
 
-	return certv3.ToV4(offchainDerivationVersion), nil
+	signedBatch := blobStatusReply.GetSignedBatch()
+
+	bindingBatchHeader, err := BatchHeaderProtoToIEigenDATypesBinding(signedBatch.GetHeader())
+	if err != nil {
+		return nil, fmt.Errorf("convert batch header to binding: %w", err)
+	}
+
+	quorumNumbers, err := QuorumNumbersUint32ToUint8(signedBatch.GetAttestation().GetQuorumNumbers())
+	if err != nil {
+		return nil, fmt.Errorf("convert quorum numbers to uint8: %w", err)
+	}
+
+	return &EigenDACertV4{
+		BlobInclusionInfo:           *bindingInclusionInfo,
+		BatchHeader:                 *bindingBatchHeader,
+		NonSignerStakesAndSignature: *nonSignerStakesAndSignature,
+		SignedQuorumNumbers:         quorumNumbers,
+		OffchainDerivationVersion:   offchainDerivationVersion,
+	}, nil
 }
 
 // RelayKeys returns the relay keys used for reading blob contents from disperser relays
@@ -237,7 +255,8 @@ func (c *EigenDACertV4) Commitments() (*encoding.BlobCommitments, error) {
 	return commitments(&c.BlobInclusionInfo)
 }
 
-// Version returns the version of the EigenDA certificate
+// isEigenDACert is an unexported method that restricts which types can implement this interface to only those
+// defined in this package
 func (c *EigenDACertV4) isEigenDACert() {}
 
 // This struct represents the composition of a EigenDA V3 certificate, as it would exist in a rollup inbox.
@@ -411,19 +430,9 @@ func (c *EigenDACertV3) Commitments() (*encoding.BlobCommitments, error) {
 	return commitments(&c.BlobInclusionInfo)
 }
 
-// Version returns the version of the EigenDA certificate
+// isEigenDACert is an unexported method that restricts which types can implement this interface to only those
+// defined in this package
 func (c *EigenDACertV3) isEigenDACert() {}
-
-// ToV4 converts an EigenDACertV3 to an EigenDACertV4
-func (c *EigenDACertV3) ToV4(offchainDerivationVersion uint16) *EigenDACertV4 {
-	return &EigenDACertV4{
-		BlobInclusionInfo:           c.BlobInclusionInfo,
-		BatchHeader:                 c.BatchHeader,
-		NonSignerStakesAndSignature: c.NonSignerStakesAndSignature,
-		SignedQuorumNumbers:         c.SignedQuorumNumbers,
-		OffchainDerivationVersion:   offchainDerivationVersion,
-	}
-}
 
 // This struct represents the composition of an EigenDA V2 certificate
 // NOTE: This type is hardforked from the V3 type and will no longer
@@ -543,7 +552,8 @@ func (c *EigenDACertV2) ComputeBlobKey() (coreV2.BlobKey, error) {
 	return blobKey, nil
 }
 
-// Version returns the version of the EigenDA certificate
+// isEigenDACert is an unexported method that restricts which types can implement this interface to only those
+// defined in this package
 func (c *EigenDACertV2) isEigenDACert() {}
 
 // ToV3 converts an EigenDACertV2 to an EigenDACertV3
