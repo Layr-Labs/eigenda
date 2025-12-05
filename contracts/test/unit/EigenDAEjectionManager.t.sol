@@ -101,10 +101,10 @@ contract EigenDAEjectionManagerTest is Test {
         ejectionManager.addEjectorBalance(amount);
         vm.stopPrank();
 
-        assertEq(ejectionManager.getEjectorBalance(ejector), EXPECTED_DEPOSIT);
+        assertEq(ejectionManager.getEjectorBalance(ejector), amount);
     }
 
-    function testCancelEjectionbyEjector() public {
+    function testCancelEjectionByEjector() public {
         testCancelEjectionByEjector(0, 0);
     }
 
@@ -188,7 +188,7 @@ contract EigenDAEjectionManagerTest is Test {
         vm.stopPrank();
 
         // 2) ensure that ejectee's record is nullified and the
-        //    ejector's book-kept balance reincorpates the initial deposit amount
+        //    ejector's book-kept balance reincorporates the initial deposit amount
         assertEq(ejectionManager.getEjector(ejectee), address(0));
         assertEq(ejectionManager.ejectionTime(ejectee), 0);
         assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
@@ -223,10 +223,15 @@ contract EigenDAEjectionManagerTest is Test {
         testCancelEjectionByEjector(6000, 0);
         depositEjectorFunds(EXPECTED_DEPOSIT);
 
-        // 2) after the cooldown period has successfuly elapsed, the ejector
-        //    should be able to successfully start a new ejection
-        vm.warp(block.timestamp + 7000);
+        // 2) ensure that a too-early attempted ejector completion reverts
+        vm.expectRevert("Ejection cooldown not met");
         vm.startPrank(ejector);
         ejectionManager.startEjection(ejectee, "0x");
+
+        // 3) after the cooldown period has successfully elapsed, the ejector
+        //    should be able to successfully start a new ejection
+        vm.warp(block.timestamp + 7000);
+        ejectionManager.startEjection(ejectee, "0x");
+        vm.stopPrank();
     }
 }

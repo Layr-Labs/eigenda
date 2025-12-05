@@ -13,7 +13,7 @@ library EigenDAEjectionTypes {
         bytes quorums;
     }
 
-    /// @dev stateful storage entry for an ejectee - first constructed when the ejectee being targetted for ejection
+    /// @dev stateful storage entry for an ejectee - first constructed when the ejectee being targeted for ejection
     ///      hasn't been challenged before and is preserved after a cancellation for cooldown enforcements to stop
     ///      a malicious ejector from spam attacks
     ///
