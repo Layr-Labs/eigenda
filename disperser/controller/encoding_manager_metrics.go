@@ -4,6 +4,7 @@ import (
 	"time"
 
 	common "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -27,10 +28,15 @@ type encodingManagerMetrics struct {
 	blobSetSize             *prometheus.GaugeVec
 	staleDispersalCount     prometheus.Counter
 	enablePerAccountMetrics bool
+	userAccountRemapping    map[string]string
 }
 
 // NewEncodingManagerMetrics sets up metrics for the encoding manager.
-func newEncodingManagerMetrics(registry *prometheus.Registry, enablePerAccountMetrics bool) *encodingManagerMetrics {
+func newEncodingManagerMetrics(
+	registry *prometheus.Registry,
+	enablePerAccountMetrics bool,
+	userAccountRemapping map[string]string,
+) *encodingManagerMetrics {
 	batchSubmissionLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  encodingManagerNamespace,
@@ -168,6 +174,7 @@ func newEncodingManagerMetrics(registry *prometheus.Registry, enablePerAccountMe
 		blobSetSize:             blobSetSize,
 		staleDispersalCount:     staleDispersalCount,
 		enablePerAccountMetrics: enablePerAccountMetrics,
+		userAccountRemapping:    userAccountRemapping,
 	}
 }
 
@@ -212,11 +219,7 @@ func (m *encodingManagerMetrics) reportFailedSubmission() {
 }
 
 func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus, accountID string) {
-	// If per-account metrics are disabled, aggregate under "0x0"
-	accountLabel := accountID
-	if !m.enablePerAccountMetrics {
-		accountLabel = "0x0"
-	}
+	accountLabel := m.getAccountLabel(accountID)
 
 	switch status {
 	case dispv2.Encoded:
@@ -239,4 +242,30 @@ func (m *encodingManagerMetrics) reportBlobSetSize(size int) {
 
 func (m *encodingManagerMetrics) reportStaleDispersal() {
 	m.staleDispersalCount.Inc()
+}
+
+// Gets the appropriate account label based on remapping and per-account settings.
+func (m *encodingManagerMetrics) getAccountLabel(accountId string) string {
+	if m.userAccountRemapping == nil {
+		if m.enablePerAccountMetrics {
+			// if there aren't any remappings, and per-account metrics are enabled, just return the account ID
+			return accountId
+		} else {
+			// otherwise, return the catch-all label to keep cardinality low
+			return "0x0"
+		}
+	}
+
+	if remappedName, found := m.userAccountRemapping[accountId]; found && remappedName != "" {
+		// Found in remapping - always use the formatted label
+		return nameremapping.FormatNameWithAccountPrefix(remappedName, accountId)
+	} else {
+		// if no remapping is found, and per-account metrics are enabled, just return the account ID
+		if m.enablePerAccountMetrics {
+			return accountId
+		} else {
+			// otherwise, return the catch-all label to keep cardinality low
+			return "0x0"
+		}
+	}
 }

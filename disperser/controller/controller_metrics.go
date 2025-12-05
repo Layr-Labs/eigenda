@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	"github.com/Layr-Labs/eigenda/core"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -50,6 +51,7 @@ type controllerMetrics struct {
 
 	collectDetailedValidatorMetrics bool
 	enablePerAccountMetrics         bool
+	userAccountRemapping            map[string]string
 }
 
 // Sets up metrics for the controller.
@@ -63,6 +65,8 @@ func newControllerMetrics(
 	collectDetailedValidatorMetrics bool,
 	// If false, per-account blob completion metrics will be aggregated under "0x0" to reduce cardinality.
 	enablePerAccountMetrics bool,
+	// Name remapping for metric labels. Maps account IDs to user-friendly names.
+	userAccountRemapping map[string]string,
 ) (*controllerMetrics, error) {
 	if registry == nil {
 		return nil, nil
@@ -332,6 +336,7 @@ func newControllerMetrics(
 		validatorSigningLatency:         validatorSigningLatency,
 		collectDetailedValidatorMetrics: collectDetailedValidatorMetrics,
 		enablePerAccountMetrics:         enablePerAccountMetrics,
+		userAccountRemapping:            userAccountRemapping,
 		globalSignedBatchCount:          globalSignedBatchCount,
 		globalUnsignedBatchCount:        globalUnsignedBatchCount,
 		globalSignedByteCount:           globalSignedByteCount,
@@ -409,11 +414,7 @@ func (m *controllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStat
 		return
 	}
 
-	// If per-account metrics are disabled, aggregate under "0x0"
-	accountLabel := accountID
-	if !m.enablePerAccountMetrics {
-		accountLabel = "0x0"
-	}
+	accountLabel := m.getAccountLabel(accountID)
 
 	switch status {
 	case dispv2.Complete:
@@ -435,6 +436,32 @@ func (m *controllerMetrics) reportBlobSetSize(size int) {
 		return
 	}
 	m.blobSetSize.WithLabelValues().Set(float64(size))
+}
+
+// Gets the appropriate account label based on remapping and per-account settings.
+func (m *controllerMetrics) getAccountLabel(accountId string) string {
+	if m.userAccountRemapping == nil {
+		if m.enablePerAccountMetrics {
+			// if there aren't any remappings, and per-account metrics are enabled, just return the account ID
+			return accountId
+		} else {
+			// otherwise, return the catch-all label to keep cardinality low
+			return "0x0"
+		}
+	}
+
+	if remappedName, found := m.userAccountRemapping[accountId]; found && remappedName != "" {
+		// Found in remapping - always use the formatted label
+		return nameremapping.FormatNameWithAccountPrefix(remappedName, accountId)
+	} else {
+		// if no remapping is found, and per-account metrics are enabled, just return the account ID
+		if m.enablePerAccountMetrics {
+			return accountId
+		} else {
+			// otherwise, return the catch-all label to keep cardinality low
+			return "0x0"
+		}
+	}
 }
 
 func (m *controllerMetrics) reportStaleDispersal() {
