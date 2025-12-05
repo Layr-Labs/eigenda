@@ -803,6 +803,7 @@ func startController(
 	dispatcherConfig := controller.DefaultDispatcherConfig()
 	dispatcherConfig.FinalizationBlockDelay = 5
 	dispatcherConfig.BatchMetadataUpdatePeriod = 100 * time.Millisecond
+	dispatcherConfig.SigningRateDynamoDbTableName = "signing-rate-tracker"
 
 	// Chain state config
 	chainStateConfig := thegraph.Config{
