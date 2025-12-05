@@ -150,7 +150,12 @@ contract EigenDACertVerifier is
     /// @dev This function will revert if the certificate is invalid.
     function checkDACertReverts(CT.EigenDACertV4 calldata daCert) external view {
         CertLib.checkDACert(
-            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, daCert, _securityThresholds, _quorumNumbersRequired, _offchainDerivationVersion
+            _eigenDAThresholdRegistry,
+            _eigenDASignatureVerifier,
+            daCert,
+            _securityThresholds,
+            _quorumNumbersRequired,
+            _offchainDerivationVersion
         );
     }
 

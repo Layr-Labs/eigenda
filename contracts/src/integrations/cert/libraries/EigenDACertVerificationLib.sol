@@ -100,10 +100,7 @@ library EigenDACertVerificationLib {
             confirmedQuorumsBitmap
         );
 
-        checkOffchainDerivationVersion(
-            daCert.offchainDerivationVersion,
-            offchainDerivationVersion
-        );
+        checkOffchainDerivationVersion(daCert.offchainDerivationVersion, offchainDerivationVersion);
     }
 
     /// @notice Checks blob inclusion in the batch using Merkle proof
