@@ -52,6 +52,9 @@ pub fn mapping_key(key: U256, slot: u64) -> StorageKey {
 ///
 /// Implements the Ethereum dynamic array storage rule:
 /// `storage_key = keccak256(slot) + index`
+/// 
+/// SAFETY CAVEAT: This function assumes that the values in the array have size >= 16 bytes.
+/// Smaller values get packed into 32 byte slots, and hence the indexing would be different.
 ///
 /// The base slot for the array data is `keccak256(slot)`, and each element is stored sequentially.
 ///
@@ -71,6 +74,9 @@ pub fn dynamic_array_key(slot: u64, index: u32) -> StorageKey {
 ///
 /// Implements the Ethereum dynamic array storage rule:
 /// `storage_key = keccak256(keccak256(abi.encode(key, slot))) + index`
+///
+/// SAFETY CAVEAT: This function assumes that the values in the array have size >= 16 bytes.
+/// Smaller values get packed into 32 byte slots, and hence the indexing would be different.
 ///
 /// The first keccak256 gives the array length location, the second gives
 /// the data start location, then we add the index.
@@ -93,6 +99,9 @@ pub fn mapping_to_dynamic_array_key(key: U256, slot: u64, index: u32) -> Storage
 ///
 /// Implements the storage rule for nested mappings containing arrays:
 /// `storage_key = keccak256(keccak256(abi.encode(second_key, keccak256(abi.encode(first_key, slot))))) + index`
+///
+/// SAFETY CAVEAT: This function assumes that the values in the array have size >= 16 bytes.
+/// Smaller values get packed into 32 byte slots, and hence the indexing would be different.
 ///
 /// This handles structures like `mapping(address => mapping(uint256 => SomeStruct[]))`
 ///

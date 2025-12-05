@@ -622,6 +622,24 @@ impl StorageKeyProvider for CertVerifierABNsLenExtractor {
     }
 }
 
+impl DataDecoder for CertVerifierABNsLenExtractor {
+    type Output = u32;
+
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
+    fn decode_data(
+        &self,
+        storage_proofs: &[StorageProof],
+    ) -> Result<Self::Output, CertExtractionError> {
+        let storage_key = &self.storage_keys()[0];
+        let proof = decode_helpers::find_required_proof(
+            storage_proofs,
+            storage_key,
+            "certVerifierABNs length",
+        )?;
+        Ok(proof.value.to::<u32>())
+    }
+}
+
 /// Extractor for the certificate verifiers ABNs array.
 /// This struct is used to extract a specified number of certificate verifier ABNs from storage.
 pub struct CertVerifierABNsExtractor {
@@ -636,6 +654,9 @@ impl CertVerifierABNsExtractor {
     ///
     /// # Arguments
     /// * `num_abns` - Number of ABNs to extract from storage
+    ///
+    /// In the verification path, the num_abns passed should come from
+    /// the CertVerifierABNsLenExtractor::decode_data result.
     pub fn new(num_abns: usize) -> Self {
         Self { num_abns }
     }
@@ -644,12 +665,54 @@ impl CertVerifierABNsExtractor {
 impl StorageKeyProvider for CertVerifierABNsExtractor {
     #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn storage_keys(&self) -> Vec<StorageKey> {
-        let keys: Vec<_> = (0..self.num_abns)
+        // abns are u32s, so 8 abns are packed per storage slot (32 bytes)
+        let num_keys = self.num_abns.div_ceil(8);
+        let keys: Vec<_> = (0..num_keys)
             .map(|i| {
                 storage_key_helpers::dynamic_array_key(CERT_VERIFIER_ABNS_ARRAY_SLOT, i as u32)
             })
             .collect();
         keys
+    }
+}
+
+impl DataDecoder for CertVerifierABNsExtractor {
+    type Output = Vec<u32>;
+
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
+    fn decode_data(
+        &self,
+        storage_proofs: &[StorageProof],
+    ) -> Result<Self::Output, CertExtractionError> {
+        let mut out: Vec<u32> = Vec::with_capacity(self.num_abns);
+
+        for storage_key in self.storage_keys().iter() {
+            let proof = decode_helpers::find_required_proof(
+                storage_proofs,
+                storage_key,
+                "certVerifierABNs",
+            )?;
+            for i in 0..8 {
+                if out.len() >= self.num_abns {
+                    break;
+                }
+                let start = 32 - (i + 1) * 4;
+                let end = start + 4;
+                let abn_bytes: [u8; 4] = proof.value.to_be_bytes::<32>()[start..end]
+                    .try_into()
+                    .unwrap();
+                let abn = u32::from_be_bytes(abn_bytes);
+                out.push(abn);
+            }
+        }
+        out.windows(2)
+            .all(|w| w[0] < w[1])
+            .then(|| ())
+            .ok_or_else(|| {
+                CertExtractionError::CertVerifierABNsNotStrictlyIncreasing(out.clone())
+            })?;
+
+        Ok(out)
     }
 }
 
@@ -689,6 +752,29 @@ impl<'a> StorageKeyProvider for CertVerifiersExtractor<'a> {
             })
             .collect();
         keys
+    }
+}
+
+impl DataDecoder for CertVerifiersExtractor<'_> {
+    type Output = HashMap<u32, Address>;
+
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
+    fn decode_data(
+        &self,
+        storage_proofs: &[StorageProof],
+    ) -> Result<Self::Output, CertExtractionError> {
+        let mut out: HashMap<u32, Address> = HashMap::new();
+
+        for (&abn, storage_key) in self.abns.iter().zip(self.storage_keys().iter()) {
+            let proof =
+                decode_helpers::find_required_proof(storage_proofs, storage_key, "certVerifiers")?;
+            let address_bytes = proof.value.to_be_bytes::<32>();
+            let address: Address = Address::from_slice(&address_bytes[12..32]);
+
+            out.insert(abn, address);
+        }
+
+        Ok(out)
     }
 }
 
