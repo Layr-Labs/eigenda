@@ -8,7 +8,7 @@ on:
         required: true
         type: string
 
-# Only allow this workflow to run on master branch
+# Only allow this workflow to run on master or release/* branches
 # This is enforced by checking the branch in the workflow
 
 permissions:
@@ -33,13 +33,14 @@ jobs:
         with:
           token: ${{ steps.generate_token.outputs.token }}
 
-      - name: Validate branch is master
+      - name: Validate branch is master or release branch
         run: |
-          if [[ "${{ github.ref_name }}" != "master" ]]; then
-            echo "Error: This workflow can only be run from the master branch"
+          branch="${{ github.ref_name }}"
+          if [[ "$branch" != "master" && ! "$branch" =~ ^release/ ]]; then
+            echo "Error: This workflow can only be run from the master branch or a release/* branch"
             exit 1
           fi
-          echo "Branch validation passed: running on master"
+          echo "Branch validation passed: running on $branch"
 
       - name: Validate version format
         run: |
