@@ -12,4 +12,5 @@
 | eigenda_accountant_reservation_remaining_capacity   | Remaining capacity in reservation bucket (symbols). This is part of the leaky-bucket payment system. |                                            | gauge     |
 | eigenda_accountant_reservation_bucket_size          | Total reservation bucket size (symbols). This is part of the leaky-bucket payment system.            |                                            | gauge     |
 | eigenda_dispersal_blob_size_bytes                   | Size of blobs created from payloads in bytes                                                         |                                            | histogram |
+| eigenda_dispersal_disperser_reputation_score        | Current reputation score for each disperser                                                          | disperser_id                               | gauge     |
 | eigenda_retrieval_payload_size_bytes                | Size of decoded payloads in bytes                                                                    |                                            | histogram |

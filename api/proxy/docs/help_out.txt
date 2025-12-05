@@ -248,20 +248,16 @@ GLOBAL OPTIONS:
           this.
    
     --eigenda.g1-path value             (default: "resources/g1.point")    ($EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH)
-          path to g1.point file.
+          Path to g1.point file. Only needed for V1 backend. Points are embedded into the
+          binary for V2 backend.
    
     --eigenda.g2-path value             (default: "resources/g2.point")    ($EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH)
-          Path to g2.point file, which is needed to generate and verify blob length
-          proofs. If this flag doesn't point to a complete 16GiB G2 SRS file, then the
-          --eigenda.g2-path-trailing flag must be used to specify a trailing segment of
-          that file, of equivalent length to the initial segment pointed to by this flag.
+          [Deprecated] SRS points are embedded in the binary, so this flag is no longer
+          needed.
    
     --eigenda.g2-path-trailing value    (default: "resources/g2.trailing.point") ($EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH)
-          Path to g2.trailing.point file, which is needed to generate and verify blob
-          length proofs. If --eigenda.g2-path is pointing to the entire 16GiB G2 SRS file
-          which contains 268435456 G2 points, this flag is not needed. Otherwise, users
-          can truncate the G2 file by taking an initial segment, and a trailing segment
-          (both of the same size).
+          [Deprecated] SRS points are embedded in the binary, so this flag is no longer
+          needed.
 
    Logging
 
