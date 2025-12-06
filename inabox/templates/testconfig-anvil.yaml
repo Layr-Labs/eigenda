@@ -48,6 +48,7 @@ services:
       TIMEOUT: 20s
       CHAIN_RPC: http://localhost:8545
       CHAIN_ID: 40525
+      # TODO(taras): G1_PATH, G2_PATH, CACHE_PATH, SRS_LOAD and AWS_ACCESS_KEY_ID should be removed once we migrate other services to use KZG_G1_PATH, KZG_G2_PATH, KZG_CACHE_DIR, KZG_SRS_NUMBER_TO_LOAD, KZG_SRS_ORDER
       G1_PATH: ../resources/srs/g1.point
       G2_PATH: ../resources/srs/g2.point
       G2_POWER_OF_2_PATH: ../resources/srs/g2.point.powerOf2
@@ -56,7 +57,6 @@ services:
       SRS_LOAD: 10000
       KZG_G1_PATH: ../resources/srs/g1.point
       KZG_G2_PATH: ../resources/srs/g2.point
-      KZG_G2_POWER_OF_2_PATH: ../resources/srs/g2.point.powerOf2
       KZG_CACHE_DIR: ../resources/srs/SRSTables
       KZG_SRS_ORDER: 10000
       KZG_SRS_NUMBER_TO_LOAD: 10000
