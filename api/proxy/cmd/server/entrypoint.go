@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli/v2"
@@ -58,6 +59,11 @@ func StartProxyService(cliCtx *cli.Context) error {
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
 
+	gethCfg := geth.EthClientConfig{
+		RPCURLs:    []string{cfg.SecretConfig.EthRPCURL},
+		NumRetries: cfg.StoreBuilderConfig.NumRetry,
+	}
+
 	var ethClient common_eigenda.EthClient
 	var chainID = ""
 	var readOnlyMode = false
@@ -65,7 +71,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 		ethClient, chainID, err = common.BuildEthClient(
 			ctx,
 			log,
-			cfg.SecretConfig.EthRPCURL,
+			gethCfg,
 			cfg.StoreBuilderConfig.ClientConfigV2.EigenDANetwork,
 		)
 		if err != nil {
