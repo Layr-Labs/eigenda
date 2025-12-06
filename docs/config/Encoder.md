@@ -41,7 +41,7 @@
 | $${\color{red}\texttt{LogFormat}}$$<br>`ENCODER_LOG_FORMAT` | `common.LogFormat`<br>`json` | LogFormat is the format of the logs: json or text |
 | $${\color{red}\texttt{LogLevel}}$$<br>`ENCODER_LOG_LEVEL` | `string`<br>`"debug"` | LogLevel is the level of the logs: debug, info, warn, error |
 | $${\color{red}\texttt{MetricsPort}}$$<br>`ENCODER_METRICS_PORT` | `string`<br>`"9094"` | MetricsPort is the port that the encoder metrics server listens on. |
-| $${\color{red}\texttt{Server.Backend}}$$<br>`ENCODER_SERVER_BACKEND` | `string`<br>`"gnark"` | Backend to use for encoding. Supported values are "gnark" and "icicle". |
+| $${\color{red}\texttt{Server.Backend}}$$<br>`ENCODER_SERVER_BACKEND` | `encoding.BackendType`<br>`gnark` | Backend to use for encoding. Supported values are "gnark" and "icicle". |
 | $${\color{red}\texttt{Server.EnableGnarkChunkEncoding}}$$<br>`ENCODER_SERVER_ENABLE_GNARK_CHUNK_ENCODING` | `bool`<br>`false` | EnableGnarkChunkEncoding if true, will produce chunks in Gnark, instead of Gob |
 | $${\color{red}\texttt{Server.EnablePprof}}$$<br>`ENCODER_SERVER_ENABLE_PPROF` | `bool`<br>`false` | EnablePprof starts the pprof server |
 | $${\color{red}\texttt{Server.GPUEnable}}$$<br>`ENCODER_SERVER_GPU_ENABLE` | `bool`<br>`false` | GPUEnable enables GPU, falls back to CPU if not available |
