@@ -10,7 +10,7 @@ import (
 
 const (
 	FlagPrefix   = "disperser-encoder"
-	envVarPrefix = "DISPERSER_ENCODER"
+	envVarPrefix = "ENCODER"
 )
 
 var (
