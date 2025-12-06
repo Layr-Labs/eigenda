@@ -94,7 +94,7 @@ func DefaultEncoderConfig() *EncoderConfig {
 			RequestQueueSize:               32,
 			EnableGnarkChunkEncoding:       false,
 			PreventReencoding:              true,
-			Backend:                        string(encoding.GnarkBackend),
+			Backend:                        encoding.GnarkBackend,
 			GPUEnable:                      false,
 			PprofHttpPort:                  "6060",
 			EnablePprof:                    false,
@@ -153,6 +153,10 @@ func (c *EncoderConfig) Verify() error {
 
 	if c.LogFormat != common.JSONLogFormat && c.LogFormat != common.TextLogFormat {
 		return fmt.Errorf("invalid log format: %s (must be json or text)", c.LogFormat)
+	}
+
+	if c.Server.Backend != encoding.GnarkBackend && c.Server.Backend != encoding.IcicleBackend {
+		return fmt.Errorf("invalid backend: %s (must be `gnark` or `icicle`)", c.Server.Backend)
 	}
 
 	return nil

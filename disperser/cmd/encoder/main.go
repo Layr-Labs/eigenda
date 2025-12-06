@@ -78,14 +78,9 @@ func run(_ context.Context) error {
 		logger.Info("Enabled pprof for encoder server", "port", config.Server.PprofHttpPort)
 	}
 
-	backendType, err := encoding.ParseBackendType(config.Server.Backend)
-	if err != nil {
-		return err
-	}
-
 	// Set the encoding config
 	encodingConfig := &encoding.Config{
-		BackendType:                           backendType,
+		BackendType:                           config.Server.Backend,
 		GPUEnable:                             config.Server.GPUEnable,
 		GPUConcurrentFrameGenerationDangerous: int64(config.Server.MaxConcurrentRequestsDangerous),
 		NumWorker:                             config.Kzg.NumWorker,

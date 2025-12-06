@@ -1,5 +1,7 @@
 package encoder
 
+import "github.com/Layr-Labs/eigenda/encoding"
+
 const (
 	Localhost = "0.0.0.0"
 )
@@ -19,7 +21,7 @@ type ServerConfig struct {
 	// if the chunk already exists in the chunk store
 	PreventReencoding bool
 	// Backend to use for encoding. Supported values are "gnark" and "icicle".
-	Backend string
+	Backend encoding.BackendType
 	// GPUEnable enables GPU, falls back to CPU if not available
 	GPUEnable bool
 	// PprofHttpPort is the http port which the pprof server is listening
