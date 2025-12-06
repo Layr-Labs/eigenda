@@ -867,7 +867,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "arbitrary"))]
+#[cfg(test)]
 mod proptests {
     use proptest::prelude::*;
 

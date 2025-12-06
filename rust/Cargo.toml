@@ -26,7 +26,6 @@ alloy-signer-local = { version = "1.0.32", default-features = false }
 alloy-sol-types = { version = "1.3.1", default-features = false }
 alloy-transport = { version = "1.0.32", default-features = false }
 anyhow = { version = "1.0.99", default-features = false }
-arbitrary = { version = "1.3" }
 ark-bn254 = { version = "0.5.0", default-features = false }
 ark-ec = { version = "0.5.0", default-features = false }
 ark-ff = { version = "0.5.0", default-features = false }
