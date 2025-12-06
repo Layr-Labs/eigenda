@@ -74,9 +74,7 @@ func DefaultEncoderConfig() *EncoderConfig {
 	return &EncoderConfig{
 		Version:  V2,
 		GrpcPort: "34000",
-		Aws: aws.ClientConfig{
-			Region: "",
-		},
+		Aws:      *aws.DefaultClientConfig(),
 		BlobStore: blobstore.Config{
 			Backend: blobstore.S3Backend,
 		},
