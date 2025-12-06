@@ -218,6 +218,13 @@ A `DACert` contains the four data structs needed to call [checkDACert](https://g
 
 ![image.png](../../assets/integration/v2-batch-hashing-structure.png)
 
+#### Cert Version
+
+After the Blazer EigenDA network upgrade, three DACert versions exist: V2, V3, and V4. Integrations are expected to use the latest version.
+- EigenDACertV2: The diagram displays all the members.
+- EigenDACertV3: Defined in the [contract](https://github.com/Layr-Labs/eigenda/blob/cf8e5b5402427048c49f3a1c1ded29c7302acd63/contracts/src/integrations/cert/EigenDACertTypes.sol#L11). It contains the same members as EigenDACertV2, but with a different ordering: `BatchHeaderV2` appears as the first member.
+- EigenDACertV4: Identical to EigenDACertV3 except for an additional uint16 field named offchainDerivationVersion, appended at the end. See [contract](https://github.com/Layr-Labs/eigenda/blob/d2101b3c12a92bcb3b0ba129dc9676434ab490bc/contracts/src/integrations/cert/EigenDACertTypes.sol#L18).
+
 ### AltDACommitment
 
 In order to be understood by each rollup stack’s derivation pipeline, the encoded `DACert` must be prepended with header bytes, to turn it into an [`altda-commitment`](https://github.com/Layr-Labs/eigenda/tree/master/api/proxy?tab=readme-ov-file#rollup-commitment-schemas) respective to each stack:

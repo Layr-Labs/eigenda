@@ -32,7 +32,7 @@ The diagram below shows the step-by-step transformation from input to final roll
 > An encoded payload is an intermediate artifact between the rollup payload and the EigenDA blob. See its [definition](./3-data-structs.md/#encodedpayload).
 
 
-![](../../assets/integration/eigenda-blob-derivation.png)
+![](../../assets/integration/eigenda-blob-derivation-2-preimage.png)
 
 ### Terminal States
 
@@ -56,7 +56,7 @@ When validation fails, the DA Cert is discarded and nothing is forwarded downstr
 - Host provides false recency window size that leads to failure
 
 #### Cert Validity Check Failed
-- Certificate doesn't satisfy [quorum-attestation constraint](../spec/6-secure-integration.md#2-cert-validation)
+- Certificate doesn't satisfy [quorum-attestation constraint](../spec/6-secure-integration.md#2-cert-validation) or the `offchain derivation version` from the DACert differ from the one stored within the certVerifier. More see [upgrade](./7-upgrade.md)
 - Host provides false validity information via preimage oracle
 
 #### Decode Blob Failed
@@ -113,7 +113,6 @@ The proxy combines:
 - **Retrieval clients** for preimage data
   - **Cert validity:** ETH RPC
   - **EigenDA blob:** gRPC connection to EigenDA network
-  - **Recency window:** Input parameter at binary startup 
 
 ![](../../assets/integration/proxy-preimage-derivation-impl.png)
 
@@ -149,6 +148,10 @@ In the diagram, the top row shows L1 blocks every 12 s; the smaller squares are 
 
 However, if the RecencyWindowSize is configured to be 0, the entire recency check is skipped. It is strongly not recommended to set it to 0, as it allows a malicious or misbehaving batcher to submit an AltDACommitment whose blob has been pruned by the DA network. An altda commitments is considered valid and can be processed by the next stage of the eigenda blob derivation.
 
+#### Protocol controlled recency window size
+
+The RecencyWindowSize is determined by `offchainDerivationVersion` if the integration uses `EigenDACertV4`. For `offchainDerivationVersion=0`, the RecencyWindowSize is 14400 measured in number of L1 blocks, which corresponds to 48 hours. `EigenDACertV2` and `EigenDACertV3` do not contain `offchainDerivationVersion` in the DACert, the corresponding RecencyWindowSize is `0`, effectively disabling the recency check.
+
 ### 2. Cert Validation
 
 Cert validation is done inside the `EigenDACertVerifier` contract, which EigenDA deploys as-is, but is also available for rollups to modify and deploy on their own. Specifically, [checkDACert](https://github.com/Layr-Labs/eigenda/blob/2414ed6f11bd28bc631eab4da3d6b576645801b0/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) is the entry point for validation. This could either be called during a normal eth transaction (either for pessimistic “bridging” like EigenDA V1 used to do, or when uploading a Blob Field Element to a one-step-proof’s [preimage contract](https://specs.optimism.io/fault-proof/index.html#pre-image-oracle)), or be zk proven using a library like [Steel](https://docs.beboundless.xyz/developers/steel/what-is-steel) and [Sp1CC](https://succinctlabs.github.io/sp1-contract-call/).
@@ -176,7 +179,7 @@ The `EigenDACertVerifier` contract maintains three status codes that define roll
   - Any Solidity compiler-injected runtime error.  
 
 - **`INVALID_CERT`**  
-  Indicates that the DA Certificate violates critical invariants.  
+  Indicates that the DA Certificate violates critical invariants.
   This implies an **invalid or insecure** certificate, and rollup posting must not proceed and derivation must treat the associated     Rollup Payload as an empty batch.
 
 
@@ -187,6 +190,8 @@ The [cert verification](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0
 2. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/libraries/EigenDACertVerificationLib.sol#L203-L240) `sigma` (operators’ bls signature) over `batchRoot` using the `NonSignerStakesAndSignature` struct
 3. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L198-L218) blob security params (blob_params + security thresholds)
 4. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L259-L279) each quorum part of the blob_header has met its threshold
+5. verify the submitted calldata can be abi decoded into the DACert struct from the certVerifier
+6. verify the equality between `offchainDerivationVersion` within the DAcert from the calldata and `offchainDerivationVersion` hardcoded in the certVerifier
 
 More information about upgrading the cert verification can be found in the [section](#upgradable-quorums-and-thresholds-for-optimistic-verification).
 

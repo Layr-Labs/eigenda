@@ -48,15 +48,13 @@ mapping(bytes32 => mapping(uint256 => bool)) public preimagePartOk;
 
 EigenDA blob derivation requires three pre‑images:
 
-1. **Recency window**  
-2. **Certificate validity**  
-3. **Point opening on blob**
+1. **Certificate validity**  
+2. **Point opening on blob**
 
 Keys of the preimages are `keccak256(address)` of the [reserved addresses](https://github.com/Layr-Labs/hokulea/tree/master/docs) (prefixed as *type 3* per the [OP spec](https://specs.optimism.io/fault-proof/index.html#type-3-global-generic-key)).
 
 The preimage and relation between (key-value) pair can be specified by a contract that:
 
-- stores the recency‑window parameter as the preimage;  
 - uses **certVerifier Router** to establish the validity of the DA certificate, the preimage is a boolean;  
 - verifies KZG point openings on a blob (using EigenDA’s `BN254` library), the preimage is 32 bytes from the EigenDA blob;
 
