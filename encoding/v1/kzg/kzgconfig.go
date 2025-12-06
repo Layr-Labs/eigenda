@@ -37,7 +37,7 @@ type KzgConfig struct {
 	//    contains the trailing end of the G2 SRS file.
 	// TODO(samlaf): to prevent misconfigurations and simplify the code, we should probably not multiplex G2Path like this,
 	// and instead use a G2PrefixPath config. Then EITHER G2Path is used, OR both G2PrefixPath and G2TrailingPath are used.
-	G2Path string `docs:"required"`
+	G2Path string
 	// G2TrailingPath is the path to trailing G2 SRS file. Its intended purpose is to allow local generation the blob
 	// length proof. If you already downloaded the entire G2 SRS file which contains 268435456 G2 points with total size
 	// 16GiB, this setting is not needed.
