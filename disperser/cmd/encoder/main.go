@@ -47,7 +47,7 @@ func run(_ context.Context) error {
 	}
 
 	loggerConfig := common.DefaultLoggerConfig()
-	loggerConfig.Format = common.LogFormat(config.LogFormat)
+	loggerConfig.Format = config.LogFormat
 	loggerConfig.HandlerOpts.NoColor = !config.LogColor
 	level, err := common.StringToLogLevel(config.LogLevel)
 	if err != nil {

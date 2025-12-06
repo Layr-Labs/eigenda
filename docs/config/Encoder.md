@@ -21,7 +21,7 @@
 | Name | Type<br>Default | Description |
 |------|--------------|-------------|
 | $${\color{red}\texttt{Aws.FragmentParallelismConstant}}$$<br>`ENCODER_AWS_FRAGMENT_PARALLELISM_CONSTANT` | `int`<br>`0` | FragmentParallelismConstant helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a constant number of workers. Default is 0. |
-| $${\color{red}\texttt{Aws.FragmentParallelismFactor}}$$<br>`ENCODER_AWS_FRAGMENT_PARALLELISM_FACTOR` | `int`<br>`0` | FragmentParallelismFactor helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a number of workers equal to the number of cores times this value. Default is 8. In general, the number of workers here can be a lot larger than the number of cores because the workers will be blocked on I/O most of the time. |
+| $${\color{red}\texttt{Aws.FragmentParallelismFactor}}$$<br>`ENCODER_AWS_FRAGMENT_PARALLELISM_FACTOR` | `int`<br>`8` | FragmentParallelismFactor helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a number of workers equal to the number of cores times this value. Default is 8. In general, the number of workers here can be a lot larger than the number of cores because the workers will be blocked on I/O most of the time. |
 | $${\color{red}\texttt{BlobStore.Backend}}$$<br>`ENCODER_BLOB_STORE_BACKEND` | `blobstore.ObjectStorageBackend`<br>`s3` | Backend is the backend to use for object storage (s3 or oci). |
 | $${\color{red}\texttt{BlobStore.OCICompartmentID}}$$<br>`ENCODER_BLOB_STORE_OCI_COMPARTMENT_ID` | `string`<br>`""` | OCI compartment ID (only used when object-storage-backend is oci) |
 | $${\color{red}\texttt{BlobStore.OCINamespace}}$$<br>`ENCODER_BLOB_STORE_OCI_NAMESPACE` | `string`<br>`""` | OCI namespace (only used when object-storage-backend is oci). If not provided, will be retrieved dynamically. |
@@ -38,7 +38,7 @@
 | $${\color{red}\texttt{Kzg.SRSOrder}}$$<br>`ENCODER_KZG_SRS_ORDER` | `uint64`<br>`268435456` | SRSOrder is the total size of SRS. TODO(samlaf): this should always be 2^28. Get rid of this field and replace with hardcoded constant. |
 | $${\color{red}\texttt{Kzg.Verbose}}$$<br>`ENCODER_KZG_VERBOSE` | `bool`<br>`false` | Verbose is a flag to enable verbose output for encoding/decoding. |
 | $${\color{red}\texttt{LogColor}}$$<br>`ENCODER_LOG_COLOR` | `bool`<br>`false` | LogColor is a flag to enable color in the logs |
-| $${\color{red}\texttt{LogFormat}}$$<br>`ENCODER_LOG_FORMAT` | `string`<br>`"json"` | LogFormat is the format of the logs: json or text |
+| $${\color{red}\texttt{LogFormat}}$$<br>`ENCODER_LOG_FORMAT` | `common.LogFormat`<br>`json` | LogFormat is the format of the logs: json or text |
 | $${\color{red}\texttt{LogLevel}}$$<br>`ENCODER_LOG_LEVEL` | `string`<br>`"debug"` | LogLevel is the level of the logs: debug, info, warn, error |
 | $${\color{red}\texttt{MetricsPort}}$$<br>`ENCODER_METRICS_PORT` | `string`<br>`"9094"` | MetricsPort is the port that the encoder metrics server listens on. |
 | $${\color{red}\texttt{Server.Backend}}$$<br>`ENCODER_SERVER_BACKEND` | `string`<br>`"gnark"` | Backend to use for encoding. Supported values are "gnark" and "icicle". |

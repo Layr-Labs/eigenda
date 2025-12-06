@@ -44,7 +44,7 @@ type EncoderConfig struct {
 	EnableMetrics bool
 
 	// LogFormat is the format of the logs: json or text
-	LogFormat string
+	LogFormat common.LogFormat
 	// LogColor is a flag to enable color in the logs
 	LogColor bool
 	// LogLevel is the level of the logs: debug, info, warn, error
@@ -101,7 +101,7 @@ func DefaultEncoderConfig() *EncoderConfig {
 		},
 		MetricsPort:   "9094",
 		EnableMetrics: true,
-		LogFormat:     string(common.JSONLogFormat),
+		LogFormat:     common.JSONLogFormat,
 		LogColor:      false,
 		LogLevel:      "debug",
 	}
@@ -149,6 +149,10 @@ func (c *EncoderConfig) Verify() error {
 
 	if c.Server.RequestQueueSize <= 0 {
 		return fmt.Errorf("request queue size must be greater than 0")
+	}
+
+	if c.LogFormat != common.JSONLogFormat && c.LogFormat != common.TextLogFormat {
+		return fmt.Errorf("invalid log format: %s (must be json or text)", c.LogFormat)
 	}
 
 	return nil
