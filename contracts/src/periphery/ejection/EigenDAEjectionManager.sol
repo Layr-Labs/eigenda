@@ -119,14 +119,16 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         (BN254.G1Point memory apk,) = IBLSApkRegistry(blsApkRegistry).getRegisteredPubkey(operator);
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
 
+        uint256 depositAmount = EigenDAEjectionLib.getEjectionRecord(operator).depositAmount;
         operator.cancelEjection();
-        _refundGas(recipient, _estimatedGasUsedWithSig);
+        _refundGas(recipient, _estimatedGasUsedWithSig, depositAmount);
     }
 
     /// @inheritdoc IEigenDAEjectionManager
     function cancelEjection() external {
-        _refundGas(msg.sender, _estimatedGasUsedWithoutSig);
+        uint256 depositAmount = EigenDAEjectionLib.getEjectionRecord(msg.sender).depositAmount;
         msg.sender.cancelEjection();
+        _refundGas(msg.sender, _estimatedGasUsedWithoutSig, depositAmount);
     }
 
     /// GETTERS
@@ -182,9 +184,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         return _estimatedGasUsedWithSig * block.basefee * _depositBaseFeeMultiplier;
     }
 
-    function _refundGas(address receiver, uint256 estimatedGasUsed) internal virtual {
+    function _refundGas(address receiver, uint256 estimatedGasUsed, uint256 depositAmount) internal virtual {
         uint256 estimatedRefund = estimatedGasUsed * block.basefee;
-        uint256 depositAmount = EigenDAEjectionLib.getEjectionRecord(receiver).depositAmount;
         IERC20(_depositToken).safeTransfer(receiver, estimatedRefund > depositAmount ? depositAmount : estimatedRefund);
     }
 
