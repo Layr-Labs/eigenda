@@ -4,10 +4,11 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/api/hashing"
+	"math/big"
 	"time"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common/replay"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common"
@@ -36,7 +37,13 @@ func NewPaymentStateAuthenticator(maxTimeInPast, maxTimeInFuture time.Duration) 
 
 var _ core.BlobRequestAuthenticator = &authenticator{}
 
-func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader, signature []byte) error {
+func (*authenticator) AuthenticateBlobRequest(
+	header *core.BlobHeader,
+	signature []byte,
+	useNewHashVersion bool,
+	disperserId uint32,
+	chainId *big.Int,
+) error {
 	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
 	if len(signature) != 65 {
 		return fmt.Errorf("signature length is unexpected: %d", len(signature))
@@ -44,13 +51,18 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader, signature
 
 	blobKey, err := header.BlobKey()
 	if err != nil {
-		return fmt.Errorf("failed to get blob key: %v", err)
+		return fmt.Errorf("get blob key: %w", err)
+	}
+
+	hash, err := hashing.HashDisperseBlobRequest(useNewHashVersion, blobKey, disperserId, chainId)
+	if err != nil {
+		return fmt.Errorf("compute request hash: %w", err)
 	}
 
 	// Recover public key from signature
-	sigPublicKeyECDSA, err := crypto.SigToPub(blobKey[:], signature)
+	sigPublicKeyECDSA, err := crypto.SigToPub(hash, signature)
 	if err != nil {
-		return fmt.Errorf("failed to recover public key from signature: %v", err)
+		return fmt.Errorf("recover public key from signature: %w", err)
 	}
 
 	accountAddr := header.PaymentMetadata.AccountID

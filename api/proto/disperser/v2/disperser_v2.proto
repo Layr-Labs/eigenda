@@ -64,6 +64,20 @@ message DisperseBlobRequest {
   common.v2.BlobHeader blob_header = 2;
   // signature over keccak hash of the blob_header that can be verified by blob_header.payment_header.account_id
   bytes signature = 3;
+
+  // Version of the request.
+  // Version 0 (or undefined): signature is over blobKey only (legacy)
+  // Version 1+: signature is over hash("disperser.DisperseBlobRequest" || chainID || disperserID || blobKey)
+  uint32 request_version = 4;
+
+  // The disperser ID that this request is intended for.
+  // For request_version >= 1, the disperser will reject requests where this doesn't match its configured ID.
+  uint32 disperser_id = 5;
+
+  // The chain ID that this request is valid for.
+  // Represented as bytes to accommodate uint256 values (32 bytes, big-endian).
+  // For version >= 1, this should match the Ethereum chain ID where the EigenDA contracts are deployed.
+  bytes chain_id = 6;
 }
 
 // A reply to a DisperseBlob request.

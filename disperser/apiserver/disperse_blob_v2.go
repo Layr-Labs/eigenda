@@ -10,6 +10,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -211,6 +213,39 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	if len(signature) != 65 {
 		return nil, fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(signature))
 	}
+
+	requestVersion := hashing.DisperseBlobRequestVersion(req.GetRequestVersion())
+
+	switch requestVersion {
+	case hashing.DisperseBlobRequestVersion0:
+		if !s.serverConfig.AcceptV0Requests {
+			return nil, errors.New("version 0 requests are no longer accepted by this disperser")
+		}
+	case hashing.DisperseBlobRequestVersion1:
+		if req.GetDisperserId() != s.serverConfig.DisperserId {
+			return nil, fmt.Errorf(
+				"disperser ID mismatch: request specifies %d but this disperser is %d",
+				req.GetDisperserId(),
+				s.serverConfig.DisperserId,
+			)
+		}
+
+		reqChainId, err := common.ChainIdFromBytes(req.GetChainId())
+		if err != nil {
+			return nil, fmt.Errorf("invalid chain ID: %w", err)
+		}
+		if s.serverConfig.ChainId.Cmp(reqChainId) != 0 {
+			return nil, fmt.Errorf(
+				"chain ID mismatch: request specifies %s but this disperser is on chain %s",
+				reqChainId.String(),
+				s.serverConfig.ChainId.String(),
+			)
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported request version: %d", requestVersion)
+	}
+
 	blob := req.GetBlob()
 	blobSize := uint32(len(blob))
 	if blobSize == 0 {
@@ -294,8 +329,17 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		)
 	}
 
-	if err = s.blobRequestAuthenticator.AuthenticateBlobRequest(blobHeader, signature); err != nil {
-		return nil, fmt.Errorf("authentication failed: %w", err)
+	// Determine which hashing version to use
+	useNewHashVersion := requestVersion >= hashing.DisperseBlobRequestVersion1
+
+	if err = s.blobRequestAuthenticator.AuthenticateBlobRequest(
+		blobHeader,
+		signature,
+		useNewHashVersion,
+		s.serverConfig.DisperserId,
+		s.serverConfig.ChainId,
+	); err != nil {
+		return nil, fmt.Errorf("authenticate blob request: %w", err)
 	}
 
 	commitments, err := s.committer.GetCommitmentsForPaddedLength(blob)

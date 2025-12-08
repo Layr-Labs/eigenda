@@ -81,6 +81,18 @@ message StoreChunksRequest {
   //
   // Note that this signature is not included in the hash for obvious reasons.
   bytes signature = 4;
+
+  // Version of the request.
+  // Version 0 (or undefined): blob signatures use legacy hashing (signature over blobKey only)
+  // Version 1+: blob signatures use versioned hashing (signature over hash(domain || chainID || disperserID || blobKey))
+  // This version must match the version used by clients when creating blob signatures.
+  uint32 request_version = 5;
+
+  // The chain ID that blobs in this batch were signed for.
+  // Represented as bytes to accommodate uint256 values (32 bytes, big-endian).
+  // Required for request_version >= 1 to verify blob signatures.
+  // Should match the Ethereum chain ID where EigenDA contracts are deployed.
+  bytes chain_id = 6;
 }
 
 // StoreChunksReply is the message type used to respond to a StoreChunks() RPC.

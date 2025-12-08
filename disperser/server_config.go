@@ -1,6 +1,9 @@
 package disperser
 
-import "time"
+import (
+	"math/big"
+	"time"
+)
 
 type ServerConfig struct {
 	GrpcPort string
@@ -32,4 +35,16 @@ type ServerConfig struct {
 
 	// The interval at which to poll for signing rate data from the controller.
 	SigningRatePollInterval time.Duration
+
+	// Whether to accept version 0 (legacy) DisperseBlobRequests.
+	//
+	// TODO (litt3): eventually this should be false, and then removed. But that will have to be after most/all clients
+	// and most/all validators have been updated to use version 1+ requests.
+	AcceptV0Requests bool
+
+	// Unique identifier for this disperser instance.
+	DisperserId uint32
+
+	// Ethereum chain ID for this disperser.
+	ChainId *big.Int
 }

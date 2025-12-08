@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/replay"
@@ -198,8 +199,22 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
 	}
 
+	requestVersion := hashing.StoreChunksRequestVersion(in.GetRequestVersion())
+
+	var chainId *big.Int
+	// nolint:exhaustive // we intentionally use default to cover current and all future versions
+	switch requestVersion {
+	case hashing.StoreChunksRequestVersion0:
+		chainId = nil
+	default:
+		chainId, err = common.ChainIdFromBytes(in.GetChainId())
+		if err != nil {
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid chain ID for version %d: %v", requestVersion, err))
+		}
+	}
+
 	for _, blobCert := range batch.BlobCertificates {
-		_, err = s.validateDispersalRequest(blobCert)
+		_, err = s.validateDispersalRequest(blobCert, requestVersion, in.GetDisperserID(), chainId)
 		if err != nil {
 			//nolint:wrapcheck
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
@@ -443,13 +458,25 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 // Node cannot make these checks because the checks require the blob data
 func (s *ServerV2) validateDispersalRequest(
 	blobCert *corev2.BlobCertificate,
+	requestVersion hashing.StoreChunksRequestVersion,
+	disperserId uint32,
+	chainId *big.Int,
 ) (*corev2.BlobHeader, error) {
 	if len(blobCert.Signature) != 65 {
 		return nil, fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(blobCert.Signature))
 	}
-	err := s.blobAuthenticator.AuthenticateBlobRequest(blobCert.BlobHeader, blobCert.Signature)
+
+	useNewHashVersion := requestVersion >= hashing.StoreChunksRequestVersion1
+
+	err := s.blobAuthenticator.AuthenticateBlobRequest(
+		blobCert.BlobHeader,
+		blobCert.Signature,
+		useNewHashVersion,
+		disperserId,
+		chainId,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to authenticate blob request: %v", err)
+		return nil, fmt.Errorf("authenticate blob request: %w", err)
 	}
 
 	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
