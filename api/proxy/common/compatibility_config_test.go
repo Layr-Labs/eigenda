@@ -5,6 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/stretchr/testify/require"
@@ -13,8 +14,10 @@ import (
 func validClientConfigV2() common.ClientConfigV2 {
 	return common.ClientConfigV2{
 		DisperserClientCfg: dispersal.DisperserClientConfig{
-			GrpcUri:     "localhost:8080",
-			DisperserID: 0,
+			GrpcUri:        "localhost:8080",
+			DisperserID:    0,
+			RequestVersion: hashing.DisperseBlobRequestVersion0,
+			ChainID:        nil,
 		},
 		PayloadDisperserCfg:                dispersal.PayloadDisperserConfig{},
 		RelayPayloadRetrieverCfg:           payloadretrieval.RelayPayloadRetrieverConfig{},

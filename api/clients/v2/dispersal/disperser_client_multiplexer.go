@@ -139,6 +139,8 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 			UseSecureGrpcFlag:        dcm.config.UseSecureGrpcFlag,
 			DisperserConnectionCount: dcm.config.DisperserConnectionCount,
 			DisperserID:              selectedDisperserInfo.id,
+			RequestVersion:           dcm.config.RequestVersion,
+			ChainID:                  dcm.config.ChainID,
 		}
 
 		client, err = NewDisperserClient(

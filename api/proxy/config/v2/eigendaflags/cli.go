@@ -8,6 +8,7 @@ import (
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
@@ -350,6 +351,9 @@ func readDisperserCfg(ctx *cli.Context) (dispersal.DisperserClientConfig, error)
 	return dispersal.DisperserClientConfig{
 		GrpcUri:           grpcUri,
 		UseSecureGrpcFlag: !ctx.Bool(DisableTLSFlagName),
+		DisperserID:       0,
+		RequestVersion:    hashing.DisperseBlobRequestVersion0,
+		ChainID:           nil,
 	}, nil
 }
 

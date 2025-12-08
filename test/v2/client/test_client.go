@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
@@ -177,6 +178,11 @@ func NewTestClient(
 	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, accountId, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ethereum client: %w", err)
+	}
+
+	chainId, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get chain ID: %w", err)
 	}
 
 	contractDirectoryAddress := gethcommon.HexToAddress(config.ContractDirectoryAddress)
@@ -444,6 +450,9 @@ func NewTestClient(
 						GrpcUri:           fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
 						UseSecureGrpcFlag: true,
 						DisperserID:       0,
+						// use v0 for now, until all dispersers support v1
+						RequestVersion: hashing.DisperseBlobRequestVersion0,
+						ChainID:        chainId,
 					},
 					PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 						PayloadClientConfig:    *payloadClientConfig,

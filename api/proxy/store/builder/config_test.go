@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
@@ -66,6 +67,8 @@ func validCfg() Config {
 				GrpcUri:           "localhost:9999",
 				UseSecureGrpcFlag: true,
 				DisperserID:       0,
+				RequestVersion:    hashing.DisperseBlobRequestVersion0,
+				ChainID:           nil,
 			},
 			EigenDACertVerifierOrRouterAddress: "0x0000000000032443134",
 			MaxBlobSizeBytes:                   maxBlobLengthBytes,

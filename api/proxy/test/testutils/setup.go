@@ -13,6 +13,7 @@ import (
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	enablement "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
@@ -333,6 +334,8 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 				GrpcUri:           fmt.Sprintf("%s:%s", disperserHostname, disperserPort),
 				UseSecureGrpcFlag: true,
 				DisperserID:       0,
+				RequestVersion:    hashing.DisperseBlobRequestVersion0,
+				ChainID:           nil,
 			},
 			PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 				PayloadClientConfig:    payloadClientConfig,
