@@ -232,10 +232,7 @@ library EigenDACertVerificationLib {
     /// @notice Checks that the offchain derivation version matches the required version
     /// @param certDerivationVer The offchain derivation version in the certificate
     /// @param requiredDerivationVer The required offchain derivation version
-    function checkOffchainDerivationVersion(
-        uint16 certDerivationVer,
-        uint16 requiredDerivationVer
-    ) internal pure {
+    function checkOffchainDerivationVersion(uint16 certDerivationVer, uint16 requiredDerivationVer) internal pure {
         if (certDerivationVer != requiredDerivationVer) {
             revert InvalidOffchainDerivationVersion(certDerivationVer, requiredDerivationVer);
         }
