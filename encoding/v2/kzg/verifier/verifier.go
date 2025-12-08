@@ -29,6 +29,13 @@ type Verifier struct {
 	ParametrizedVerifiers map[encoding.EncodingParams]*ParametrizedVerifier
 }
 
+func NewVerifierWithSRS(g1SRS kzg.G1SRS) *Verifier {
+	return &Verifier{
+		G1SRS:                 g1SRS,
+		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
+	}
+}
+
 func NewVerifier(config *Config) (*Verifier, error) {
 	if config.SRSNumberToLoad > encoding.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
