@@ -34,8 +34,8 @@ type Config struct {
 	// secondary storage cfgs
 	S3Config s3.Config
 
-	// eth rpc retry cfg
-	NumRetry int
+	// eth rpc retry count
+	RetryCount int
 }
 
 // ReadConfig ... parses the Config from the provided flags or environment variables.
@@ -89,7 +89,7 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		MemstoreConfig:   memstoreConfig,
 		MemstoreEnabled:  ctx.Bool(memstore.EnabledFlagName),
 		S3Config:         s3.ReadConfig(ctx),
-		NumRetry:         ctx.Int(eigendaflags_v2.EthRPCNumRetryFlagName),
+		RetryCount:       ctx.Int(eigendaflags_v2.EthRPCRetryCountFlagName),
 	}
 
 	return cfg, nil
