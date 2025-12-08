@@ -110,7 +110,7 @@ func EigenDANetworkFromString(inputString string) (EigenDANetwork, error) {
 func BuildEthClient(ctx context.Context, log logging.Logger, gethCfg geth.EthClientConfig,
 	expectedNetwork EigenDANetwork) (common_eigenda.EthClient, string, error) {
 
-	ethClient, err := geth.NewClient(gethCfg, geth_common.Address{}, 0, log)
+	ethClient, err := geth.NewMultiHomingClient(gethCfg, geth_common.Address{}, log)
 	if err != nil {
 		return nil, "", fmt.Errorf("create geth client: %w", err)
 	}

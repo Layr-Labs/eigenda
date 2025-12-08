@@ -34,6 +34,7 @@ var (
 	BlobParamsVersionFlagName       = withFlagPrefix("blob-version")
 	EthRPCURLFlagName               = withFlagPrefix("eth-rpc")
 	EthRPCRetryCountFlagName        = withFlagPrefix("eth-rpc-retry-count")
+	EthRPCRetryDelayFlagName        = withFlagPrefix("eth-rpc-retry-delay")
 	MaxBlobLengthFlagName           = withFlagPrefix("max-blob-length")
 	NetworkFlagName                 = withFlagPrefix("network")
 	RBNRecencyWindowSizeFlagName    = withFlagPrefix("rbn-recency-window-size")
@@ -97,6 +98,18 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Value:    2,
 			Category: category,
 			Required: false,
+		},
+		&cli.DurationFlag{
+			Name: EthRPCRetryDelayFlagName,
+			Usage: "Time unit for linear retry delay. For instance, if the retries count is 2 and retry delay is " +
+				"1 second, then 0 second is waited for the first call; 1 seconds are waited before the next retry; " +
+				"2 seconds are waited for the second retry; if the call failed, the total waited time for retry is " +
+				"3 seconds. If the retry delay is 0 second, the total waited time for retry is 0 second, " +
+				"which is useful when there are multiple rpc providers.",
+			Required: false,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC_RETRY_DELAY")},
+			Value:    1 * time.Second,
+			Category: category,
 		},
 		&cli.IntFlag{
 			Name: PutRetriesFlagName,

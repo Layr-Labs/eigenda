@@ -62,6 +62,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 	gethCfg := geth.EthClientConfig{
 		RPCURLs:    []string{cfg.SecretConfig.EthRPCURL},
 		NumRetries: cfg.StoreBuilderConfig.RetryCount,
+		RetryDelay: cfg.StoreBuilderConfig.RetryDelay,
 	}
 
 	var ethClient common_eigenda.EthClient
