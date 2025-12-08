@@ -43,8 +43,8 @@ contract EigenDACertVerifier is
 
     uint8 internal constant CERT_VERSION = 4;
 
-    uint8 internal constant MAJOR_VERSION = 3;
-    uint8 internal constant MINOR_VERSION = 2;
+    uint8 internal constant MAJOR_VERSION = 4;
+    uint8 internal constant MINOR_VERSION = 0;
     uint8 internal constant PATCH_VERSION = 0;
 
     /// @notice Status codes for certificate verification results
