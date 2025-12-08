@@ -60,7 +60,6 @@ library EigenDACertVerificationLib {
     error InvalidOffchainDerivationVersion(uint16 certVersion, uint16 requiredVersion);
 
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
-    /// @dev Uses the same verification logic as verifyDACertV2. The only difference is that the certificate is ABI encoded bytes.
     /// @param eigenDAThresholdRegistry The threshold registry contract
     /// @param eigenDASignatureVerifier The signature verifier contract
     /// @param daCert The EigenDA certificate
@@ -76,6 +75,8 @@ library EigenDACertVerificationLib {
         bytes memory requiredQuorumNumbers,
         uint16 offchainDerivationVersion
     ) internal view {
+        checkOffchainDerivationVersion(daCert.offchainDerivationVersion, offchainDerivationVersion);
+
         checkBlobInclusion(daCert.batchHeader, daCert.blobInclusionInfo);
 
         checkSecurityParams(
@@ -99,8 +100,6 @@ library EigenDACertVerificationLib {
             daCert.blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
             confirmedQuorumsBitmap
         );
-
-        checkOffchainDerivationVersion(daCert.offchainDerivationVersion, offchainDerivationVersion);
     }
 
     /// @notice Checks blob inclusion in the batch using Merkle proof
@@ -230,12 +229,15 @@ library EigenDACertVerificationLib {
         }
     }
 
+    /// @notice Checks that the offchain derivation version matches the required version
+    /// @param certDerivationVer The offchain derivation version in the certificate
+    /// @param requiredDerivationVer The required offchain derivation version
     function checkOffchainDerivationVersion(
-        uint16 certOffchainDerivationVersion,
-        uint16 requiredOffchainDerivationVersion
+        uint16 certDerivationVer,
+        uint16 requiredDerivationVer
     ) internal pure {
-        if (certOffchainDerivationVersion != requiredOffchainDerivationVersion) {
-            revert InvalidOffchainDerivationVersion(certOffchainDerivationVersion, requiredOffchainDerivationVersion);
+        if (certDerivationVer != requiredDerivationVer) {
+            revert InvalidOffchainDerivationVersion(certDerivationVer, requiredDerivationVer);
         }
     }
 
