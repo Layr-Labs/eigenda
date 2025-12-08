@@ -2263,7 +2263,6 @@ dependencies = [
  "eigenda-ethereum",
  "eigenda-proxy",
  "eigenda-verification",
- "proptest",
  "rand 0.8.5",
  "testcontainers",
  "tokio",
