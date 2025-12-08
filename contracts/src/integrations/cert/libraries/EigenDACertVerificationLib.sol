@@ -55,9 +55,9 @@ library EigenDACertVerificationLib {
     error InvalidBlobVersion(uint16 blobVersion, uint16 nextBlobVersion);
 
     /// @notice Thrown when the offchain derivation version is invalid
-    /// @param certVersion The offchain derivation version in the certificate
-    /// @param requiredVersion The required offchain derivation version
-    error InvalidOffchainDerivationVersion(uint16 certVersion, uint16 requiredVersion);
+    /// @param certDerivationVer The offchain derivation version in the certificate
+    /// @param requiredDerivationVer The required offchain derivation version
+    error InvalidOffchainDerivationVersion(uint16 certDerivationVer, uint16 requiredDerivationVer);
 
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
     /// @param eigenDAThresholdRegistry The threshold registry contract
