@@ -16,9 +16,9 @@ Consensus systems (L1/L2) typically upgrade logic via hardfork at block `X`:
 
 ### Onchain Integration Upgrade
 
-Integrations upgrade onchain logic by adding a new [certVerifier](./4-contracts.md#eigendacertverifier) to a [certVerifierRouter](./4-contracts.md#eigendacertverifierrouter). Each verifier has an corresponding activationBlockNumber (ABN) within the `certVerifierRouter`. The router uses the DACert's reference block number determines which verifier to use by comparing against its ABN. More see section [contracts](./4-contracts.md)
+Integrations upgrade onchain logic by adding a new [EigenDACertVerifier](./4-contracts.md#eigendacertverifier) to a [EigenDACertVerifierRouter](./4-contracts.md#eigendacertverifierrouter). Each verifier has an corresponding activationBlockNumber (ABN) within the `EigenDACertVerifierRouter`. The router uses the DACert's reference block number determines which verifier to use by comparing against its ABN. More see section [contracts](./4-contracts.md)
 
-This mechanism mirrors hardfork behavior: it is backward compatible and enforceable. Each certVerifier also embeds a constant `offchain derivation version`, set at deployment, which governs off-chain logic.
+This mechanism mirrors hardfork behavior: it is backward compatible and enforceable. Each `EigenDACertVerifier` also embeds a constant `offchain derivation version`, set at deployment, which governs off-chain logic.
 
 
 ### Offchain Integration Upgrade

@@ -191,7 +191,7 @@ The [cert verification](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0
 3. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L198-L218) blob security params (blob_params + security thresholds)
 4. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L259-L279) each quorum part of the blob_header has met its threshold
 5. verify the submitted calldata bytes can be ABI decoded into the DA Cert struct via the `EigenDACertVerifier`
-6. verify the equality between `offchainDerivationVersion` within the DAcert from the calldata and `offchainDerivationVersion` hardcoded in the certVerifier
+6. verify equality between `offchainDerivationVersion` present in the DA Cert and `offchainDerivationVersion` that's hardcoded in the `EigenDACertVerifier`
 
 More information about upgrading the cert verification can be found in the [section](#upgradable-quorums-and-thresholds-for-optimistic-verification).
 
