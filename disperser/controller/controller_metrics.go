@@ -65,7 +65,7 @@ func newControllerMetrics(
 	collectDetailedValidatorMetrics bool,
 	// If false, per-account blob completion metrics will be aggregated under "0x0" to reduce cardinality.
 	enablePerAccountMetrics bool,
-	// Name remapping for metric labels. Maps account IDs to user-friendly names.
+	// Maps account IDs to user-friendly names.
 	userAccountRemapping map[string]string,
 ) (*controllerMetrics, error) {
 	if registry == nil {

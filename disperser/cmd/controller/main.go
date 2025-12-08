@@ -152,8 +152,8 @@ func RunController(cliCtx *cli.Context) error {
 	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
 
 	var userAccountRemapping map[string]string
-	if config.UserAccountRemappingFile != "" {
-		userAccountRemapping, err = nameremapping.LoadNameRemapping(config.UserAccountRemappingFile)
+	if config.UserAccountRemappingFilePath != "" {
+		userAccountRemapping, err = nameremapping.LoadNameRemapping(config.UserAccountRemappingFilePath)
 		if err != nil {
 			logger.Error("Failed to load user account remapping", "error", err)
 		} else {

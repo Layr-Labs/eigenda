@@ -45,7 +45,7 @@ var (
 	}
 	UserAccountRemappingFileFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "user-account-remapping-file"),
-		Usage:    "Path to YAML file for name remapping",
+		Usage:    "Path to YAML file for mapping account IDs to user-friendly names",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USER_ACCOUNT_REMAPPING_FILE"),
 		Required: false,
 	}
