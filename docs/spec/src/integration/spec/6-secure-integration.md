@@ -56,7 +56,7 @@ When validation fails, the DA Cert is discarded and nothing is forwarded downstr
 - Host provides false recency window size that leads to failure
 
 #### Cert Validity Check Failed
-- Certificate doesn't satisfy [quorum-attestation constraint](../spec/6-secure-integration.md#2-cert-validation) or the `offchain derivation version` from the DACert differ from the one stored within the certVerifier. More see [upgrade](./7-upgrade.md)
+- DA Cert doesn't satisfy [quorum-attestation constraint](../spec/6-secure-integration.md#2-cert-validation) or the `offchain derivation version` in the DA Cert differs from the immutable one stored in the `EigenDACertVerifier`'s bytecode. For more information, see [upgrade](./7-upgrade.md).
 - Host provides false validity information via preimage oracle
 
 #### Decode Blob Failed
@@ -150,7 +150,7 @@ However, if the RecencyWindowSize is configured to be 0, the entire recency chec
 
 #### Protocol controlled recency window size
 
-The RecencyWindowSize is determined by `offchainDerivationVersion` if the integration uses `EigenDACertV4`. For `offchainDerivationVersion=0`, the RecencyWindowSize is 14400 measured in number of L1 blocks, which corresponds to 48 hours. `EigenDACertV2` and `EigenDACertV3` do not contain `offchainDerivationVersion` in the DACert, the corresponding RecencyWindowSize is `0`, effectively disabling the recency check.
+The RecencyWindowSize is determined by `offchainDerivationVersion` if the integration uses a DA Cert with version >= 4. For `offchainDerivationVersion=0`, the RecencyWindowSize is 14400 measured in number of Ethereum blocks (assuming 12 second block production time), roughly corresponding to 48 hours. Any DA Cert before V4 isn't checked for recency (i.e,`RecencyWindowSize=0`) since there's no `offchainDerivationVersion` field present in the legacy DA Certs. 
 
 ### 2. Cert Validation
 
@@ -179,7 +179,7 @@ The `EigenDACertVerifier` contract maintains three status codes that define roll
   - Any Solidity compiler-injected runtime error.  
 
 - **`INVALID_CERT`**  
-  Indicates that the DA Certificate violates critical invariants.
+  Indicates that the DA Cert violates critical invariants.
   This implies an **invalid or insecure** certificate, and rollup posting must not proceed and derivation must treat the associated     Rollup Payload as an empty batch.
 
 
@@ -190,7 +190,7 @@ The [cert verification](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0
 2. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/libraries/EigenDACertVerificationLib.sol#L203-L240) `sigma` (operators’ bls signature) over `batchRoot` using the `NonSignerStakesAndSignature` struct
 3. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L198-L218) blob security params (blob_params + security thresholds)
 4. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L259-L279) each quorum part of the blob_header has met its threshold
-5. verify the submitted calldata can be abi decoded into the DACert struct from the certVerifier
+5. verify the submitted calldata bytes can be ABI decoded into the DA Cert struct via the `EigenDACertVerifier`
 6. verify the equality between `offchainDerivationVersion` within the DAcert from the calldata and `offchainDerivationVersion` hardcoded in the certVerifier
 
 More information about upgrading the cert verification can be found in the [section](#upgradable-quorums-and-thresholds-for-optimistic-verification).

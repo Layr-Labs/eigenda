@@ -4,7 +4,7 @@
 
 ## Overview
 
-This section describes scheme to smoothly upgrade an eigenda blob derivation to a new one. The eigenda blob derivation contains two parts
+This section describes a schema for smoothly upgrading an eigenda blob derivation pipeline. The eigenda blob derivation pipeline contains two components:
 - onchain: cert verifier and cert verifier router
 - offchain derivation: kzg verification, recency check, parsing check and other logics defined in [secure-integration](./6-secure-integration.md).
 

@@ -29,4 +29,4 @@ where each key refers to an `activation_block_number` (ABN). When calling `check
 
 The `EigenDACertVerifierRouter` enables the use of a certificate’s Reference Block Number (RBN) as a commitment to the specific `EigenDACertVerifier` that should be used for verification. This mechanism ensures backward compatibility with older DA Certs, allowing an optimistic rollup to continue verifying historical data availability proofs accurately across verifier upgrades.
 
-CertVerifierRouter deployment instruction can be found on [github](https://github.com/Layr-Labs/eigenda/blob/26709ca468f176eb23c09f52a3122e5e18681c7d/contracts/script/deploy/router/README.md).
+`EigenDACertVerifierRouter` deployment instruction can be found on [github](https://github.com/Layr-Labs/eigenda/blob/26709ca468f176eb23c09f52a3122e5e18681c7d/contracts/script/deploy/router/README.md).
