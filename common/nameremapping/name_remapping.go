@@ -32,14 +32,20 @@ func LoadNameRemapping(path string) (map[string]string, error) {
 	return remapping, nil
 }
 
-// Accepts an account name and an account ID. Returns the name with a truncated account ID appended. If account ID is
-// less than 8 characters, the full ID is used.
-//
-// E.g., "MyAccount (0x123456)"
-func FormatNameWithAccountPrefix(name string, accountId string) string {
-	truncatedId := accountId
-	if len(accountId) >= 8 {
-		truncatedId = accountId[:8]
+// Returns the appropriate label for an account based on remapping and cardinality settings.
+// Remapped names are formatted as "Name (0x123456)" with the account ID truncated to 8 characters.
+func GetAccountLabel(accountId string, remappedNames map[string]string, highCardinalityNames bool) string {
+	if remappedName, found := remappedNames[accountId]; found && remappedName != "" {
+		truncatedId := accountId
+		if len(accountId) >= 8 {
+			truncatedId = accountId[:8]
+		}
+		return fmt.Sprintf("%s (%s)", remappedName, truncatedId)
 	}
-	return fmt.Sprintf("%s (%s)", name, truncatedId)
+
+	if highCardinalityNames {
+		return accountId
+	}
+
+	return "0x0"
 }

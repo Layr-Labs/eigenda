@@ -219,7 +219,7 @@ func (m *encodingManagerMetrics) reportFailedSubmission() {
 }
 
 func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus, accountID string) {
-	accountLabel := m.getAccountLabel(accountID)
+	accountLabel := nameremapping.GetAccountLabel(accountID, m.userAccountRemapping, m.enablePerAccountMetrics)
 
 	switch status {
 	case dispv2.Encoded:
@@ -242,30 +242,4 @@ func (m *encodingManagerMetrics) reportBlobSetSize(size int) {
 
 func (m *encodingManagerMetrics) reportStaleDispersal() {
 	m.staleDispersalCount.Inc()
-}
-
-// Gets the appropriate account label based on remapping and per-account settings.
-func (m *encodingManagerMetrics) getAccountLabel(accountId string) string {
-	if m.userAccountRemapping == nil {
-		if m.enablePerAccountMetrics {
-			// if there aren't any remappings, and per-account metrics are enabled, just return the account ID
-			return accountId
-		} else {
-			// otherwise, return the catch-all label to keep cardinality low
-			return "0x0"
-		}
-	}
-
-	if remappedName, found := m.userAccountRemapping[accountId]; found && remappedName != "" {
-		// Found in remapping - always use the formatted label
-		return nameremapping.FormatNameWithAccountPrefix(remappedName, accountId)
-	} else {
-		// if no remapping is found, and per-account metrics are enabled, just return the account ID
-		if m.enablePerAccountMetrics {
-			return accountId
-		} else {
-			// otherwise, return the catch-all label to keep cardinality low
-			return "0x0"
-		}
-	}
 }
