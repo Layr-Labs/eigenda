@@ -93,7 +93,7 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.IntFlag{
 			Name: EthRPCRetryCountFlagName,
-			Usage: "The retry count for the Ethereum RPC request after the initial call fails. Please see" +
+			Usage: "The retry count for the Ethereum RPC request after the initial call fails. Please see " +
 				"EIGENDA_PROXY_EIGENDA_V2_ETH_RPC_RETRY_DELAY for the linear retry backoff strategy.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC_NUM_RETRY")},
 			Value:    2,
