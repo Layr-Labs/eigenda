@@ -800,7 +800,7 @@ func startController(
 	encodingManagerConfig.EncoderAddress = encoderAddress
 
 	// Build dispatcher configs
-	dispatcherConfig := controller.DefaultDispatcherConfig()
+	dispatcherConfig := controller.DefaultControllerConfig()
 	dispatcherConfig.FinalizationBlockDelay = 5
 	dispatcherConfig.BatchMetadataUpdatePeriod = 100 * time.Millisecond
 

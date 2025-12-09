@@ -790,23 +790,20 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 	metadataManager := metadata.NewMockBatchMetadataManager(
 		metadata.NewBatchMetadata(referenceBlockNumber, operatorState))
 
+	controllerConfig := controller.DefaultControllerConfig()
+	controllerConfig.FinalizationBlockDelay = finalizationBlockDelay
+	controllerConfig.AttestationTimeout = 1 * time.Second
+	controllerConfig.BatchAttestationTimeout = 2 * time.Second
+	controllerConfig.SignatureTickInterval = 1 * time.Second
+	controllerConfig.MaxBatchSize = maxBatchSize
+	controllerConfig.NumConcurrentRequests = 10
+	controllerConfig.NodeClientCacheSize = 10
+	controllerConfig.SigningRateRetentionPeriod = 1 * time.Minute
+	controllerConfig.SigningRateBucketSpan = 30 * time.Second
+
 	d, err := controller.NewController(
 		t.Context(),
-		&controller.ControllerConfig{
-			PullInterval:               1 * time.Second,
-			FinalizationBlockDelay:     finalizationBlockDelay,
-			AttestationTimeout:         1 * time.Second,
-			BatchMetadataUpdatePeriod:  1 * time.Minute,
-			BatchAttestationTimeout:    2 * time.Second,
-			SignatureTickInterval:      1 * time.Second,
-			MaxBatchSize:               maxBatchSize,
-			NumConcurrentRequests:      10,
-			NodeClientCacheSize:        10,
-			MaxDispersalAge:            45 * time.Second,
-			SigningRateRetentionPeriod: 1 * time.Minute,
-			SigningRateBucketSpan:      30 * time.Second,
-			BlobDispersalQueueSize:     32,
-		},
+		controllerConfig,
 		time.Now,
 		blobMetadataStore,
 		pool,

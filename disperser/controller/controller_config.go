@@ -93,7 +93,7 @@ type ControllerConfig struct {
 
 var _ config.VerifiableConfig = &ControllerConfig{}
 
-func DefaultDispatcherConfig() *ControllerConfig {
+func DefaultControllerConfig() *ControllerConfig {
 	return &ControllerConfig{
 		PullInterval:                        1 * time.Second,
 		FinalizationBlockDelay:              75,
