@@ -31,6 +31,23 @@ contract EigenDADirectoryTest is Test {
     // ===========================
 
     function test_initialize() public {
+        accessControl = new EigenDAAccessControl(owner);
+
+        // Deploy and initialize DA Directory
+        directory = new EigenDADirectory();
+
+        vm.expectEmit(true, true, true, true);
+        emit IEigenDAAddressDirectory.AddressAdded(
+            AddressDirectoryConstants.ACCESS_CONTROL_NAME,
+            keccak256(abi.encodePacked(AddressDirectoryConstants.ACCESS_CONTROL_NAME)),
+            address(accessControl)
+        );
+
+        // Verify event and genesis state
+        directory.initialize(address(accessControl));
+    }
+
+    function test_initialize_revertAlreadyInitialized() public {
         string[] memory names = directory.getAllNames();
         assertNotEq(
             directory.getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME),
@@ -79,6 +96,7 @@ contract EigenDADirectoryTest is Test {
 
         vm.startPrank(owner);
         directory.addAddress(testNamedKey, oldAddress);
+        assertEq(directory.getAllNames().length, 2, "Two named entries should exist");
 
         vm.expectEmit(true, true, true, true);
         emit IEigenDAAddressDirectory.AddressReplaced(
@@ -86,7 +104,7 @@ contract EigenDADirectoryTest is Test {
         );
         directory.replaceAddress(testNamedKey, newAddress);
         vm.stopPrank();
-
+        assertEq(directory.getAllNames().length, 2, "Two named entries should still exist");
         assertEq(directory.getAddress(testNamedKey), newAddress, "Address should be replaced");
     }
 
@@ -133,12 +151,14 @@ contract EigenDADirectoryTest is Test {
     function test_removeAddress_success() public {
         vm.startPrank(owner);
         directory.addAddress(testNamedKey, testAddress);
+        assertEq(directory.getAllNames().length, 2);
 
         vm.expectEmit(true, true, true, true);
         emit IEigenDAAddressDirectory.AddressRemoved(testNamedKey, keccak256(abi.encodePacked(testNamedKey)));
         directory.removeAddress(testNamedKey);
         vm.stopPrank();
 
+        assertEq(directory.getAllNames().length, 1);
         assertEq(directory.getAddress(testNamedKey), address(0), "Address should be removed");
     }
 
