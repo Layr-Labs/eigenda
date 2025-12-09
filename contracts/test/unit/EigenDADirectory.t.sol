@@ -32,7 +32,11 @@ contract EigenDADirectoryTest is Test {
 
     function test_initialize() public {
         string[] memory names = directory.getAllNames();
-        assertNotEq(directory.getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME), address(0x0), "AccessControl contract should have entry");
+        assertNotEq(
+            directory.getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME),
+            address(0x0),
+            "AccessControl contract should have entry"
+        );
         assertEq(names.length, 1, "Should have one name (AccessControl) after initialization");
 
         vm.expectRevert("AlreadyInitialized()");
@@ -127,7 +131,6 @@ contract EigenDADirectoryTest is Test {
     }
 
     function test_removeAddress_success() public {
-
         vm.startPrank(owner);
         directory.addAddress(testNamedKey, testAddress);
 
@@ -174,7 +177,9 @@ contract EigenDADirectoryTest is Test {
 
     function test_getAddress_nonexistent() public view {
         string memory unknownTestNameKey = "nonexistentAddress";
-        assertEq(directory.getAddress(unknownTestNameKey), address(0), "Should return zero address for nonexistent name");
+        assertEq(
+            directory.getAddress(unknownTestNameKey), address(0), "Should return zero address for nonexistent name"
+        );
     }
 
     function test_getName_success() public {
