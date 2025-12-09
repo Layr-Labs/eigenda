@@ -517,15 +517,17 @@ func (c *Controller) NewBatch(
 	probe.SetStage("get_blob_metadata")
 
 	blobMetadatas := make([]*v2.BlobMetadata, 0, c.MaxBatchSize)
-	for int32(len(blobMetadatas)) < c.MaxBatchSize {
+	keepLooking := true
+	for keepLooking && int32(len(blobMetadatas)) < c.MaxBatchSize {
 		var next *v2.BlobMetadata
 		select {
 		case next = <-c.blobDispersalQueue.GetNextBlobForDispersal(ctx):
 		default:
 			// no more blobs available right now
+			keepLooking = false
 		}
 
-		if c.isUniqueAndFresh(ctx, next) {
+		if next != nil && c.isUniqueAndFresh(ctx, next) {
 			blobMetadatas = append(blobMetadatas, next)
 		}
 	}

@@ -59,7 +59,7 @@ func NewDynamodbBlobDispersalQueue(
 		return nil, fmt.Errorf("requestBatchSize cannot be greater than %d, got %d", math.MaxInt32, requestBatchSize)
 	}
 	if requestBackoffPeriod < 0 {
-		return nil, fmt.Errorf("requestBackoffPeriod not be negative, got %v", requestBackoffPeriod)
+		return nil, fmt.Errorf("requestBackoffPeriod must not be negative, got %v", requestBackoffPeriod)
 	}
 
 	bdq := &dynamodbBlobDispersalQueue{
