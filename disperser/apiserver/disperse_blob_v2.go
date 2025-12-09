@@ -10,10 +10,10 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
+	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstore "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -91,7 +91,8 @@ func (s *DispersalServerV2) disperseBlob(
 		req.GetBlobHeader().GetQuorumNumbers(),
 	)
 
-	blobKey, st := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
+	blobKey, st := s.StoreBlob(
+		ctx, blob, blobHeader, req.GetSignature(), req.GetAnchorSignature(), time.Now(), onchainState.TTL)
 	if st != nil && st.Code() != codes.OK {
 		return nil, st
 	}
@@ -124,6 +125,7 @@ func (s *DispersalServerV2) StoreBlob(
 	data []byte,
 	blobHeader *corev2.BlobHeader,
 	signature []byte,
+	anchorSignature []byte,
 	requestedAt time.Time,
 	ttl time.Duration,
 ) (corev2.BlobKey, *status.Status) {
@@ -143,14 +145,15 @@ func (s *DispersalServerV2) StoreBlob(
 
 	s.logger.Debug("storing blob metadata", "blobHeader", blobHeader)
 	blobMetadata := &dispv2.BlobMetadata{
-		BlobHeader:  blobHeader,
-		Signature:   signature,
-		BlobStatus:  dispv2.Queued,
-		Expiry:      uint64(requestedAt.Add(ttl).Unix()),
-		NumRetries:  0,
-		BlobSize:    uint64(len(data)),
-		RequestedAt: uint64(requestedAt.UnixNano()),
-		UpdatedAt:   uint64(requestedAt.UnixNano()),
+		BlobHeader:      blobHeader,
+		Signature:       signature,
+		AnchorSignature: anchorSignature,
+		BlobStatus:      dispv2.Queued,
+		Expiry:          uint64(requestedAt.Add(ttl).Unix()),
+		NumRetries:      0,
+		BlobSize:        uint64(len(data)),
+		RequestedAt:     uint64(requestedAt.UnixNano()),
+		UpdatedAt:       uint64(requestedAt.UnixNano()),
 	}
 	err = s.blobMetadataStore.PutBlobMetadata(ctx, blobMetadata)
 	if err != nil {
@@ -212,38 +215,6 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	signature := req.GetSignature()
 	if len(signature) != 65 {
 		return nil, fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(signature))
-	}
-
-	requestVersion := hashing.DisperseBlobRequestVersion(req.GetRequestVersion())
-
-	switch requestVersion {
-	case hashing.DisperseBlobRequestVersion0:
-		if !s.serverConfig.AcceptV0Requests {
-			return nil, errors.New("version 0 requests are no longer accepted by this disperser")
-		}
-	case hashing.DisperseBlobRequestVersion1:
-		if req.GetDisperserId() != s.serverConfig.DisperserId {
-			return nil, fmt.Errorf(
-				"disperser ID mismatch: request specifies %d but this disperser is %d",
-				req.GetDisperserId(),
-				s.serverConfig.DisperserId,
-			)
-		}
-
-		reqChainId, err := common.ChainIdFromBytes(req.GetChainId())
-		if err != nil {
-			return nil, fmt.Errorf("invalid chain ID: %w", err)
-		}
-		if s.serverConfig.ChainId.Cmp(reqChainId) != 0 {
-			return nil, fmt.Errorf(
-				"chain ID mismatch: request specifies %s but this disperser is on chain %s",
-				reqChainId.String(),
-				s.serverConfig.ChainId.String(),
-			)
-		}
-
-	default:
-		return nil, fmt.Errorf("unsupported request version: %d", requestVersion)
 	}
 
 	blob := req.GetBlob()
@@ -329,15 +300,37 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		)
 	}
 
-	// Determine which hashing version to use
-	useNewHashVersion := requestVersion >= hashing.DisperseBlobRequestVersion1
+	var reqChainId *big.Int
+	// The chain ID and disperser ID only need to be verified if an anchor signature is provided. If there isn't an
+	// anchor signature, then these values aren't used at all.
+	if len(req.GetAnchorSignature()) > 0 {
+		if req.GetDisperserId() != s.serverConfig.DisperserId {
+			return nil, fmt.Errorf(
+				"disperser ID mismatch: request specifies %d but this disperser is %d",
+				req.GetDisperserId(),
+				s.serverConfig.DisperserId,
+			)
+		}
 
-	if err = s.blobRequestAuthenticator.AuthenticateBlobRequest(
+		reqChainId, err = common.ChainIdFromBytes(req.GetChainId())
+		if err != nil {
+			return nil, fmt.Errorf("invalid chain ID: %w", err)
+		}
+		if s.serverConfig.ChainId.Cmp(reqChainId) != 0 {
+			return nil, fmt.Errorf(
+				"chain ID mismatch: request specifies %s but this disperser is on chain %s",
+				reqChainId.String(),
+				s.serverConfig.ChainId.String(),
+			)
+		}
+	}
+
+	if err = authv2.AuthenticateBlobRequest(
 		blobHeader,
-		signature,
-		useNewHashVersion,
-		s.serverConfig.DisperserId,
-		s.serverConfig.ChainId,
+		req.GetSignature(),
+		req.GetAnchorSignature(),
+		req.GetDisperserId(),
+		reqChainId,
 	); err != nil {
 		return nil, fmt.Errorf("authenticate blob request: %w", err)
 	}

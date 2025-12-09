@@ -35,41 +35,62 @@ func NewPaymentStateAuthenticator(maxTimeInPast, maxTimeInFuture time.Duration) 
 	}
 }
 
-var _ core.BlobRequestAuthenticator = &authenticator{}
-
-func (*authenticator) AuthenticateBlobRequest(
+// TODO: make doc with explicit details of why the logic is the way that it is
+func AuthenticateBlobRequest(
 	header *core.BlobHeader,
 	signature []byte,
-	useNewHashVersion bool,
+	anchorSignature []byte,
 	disperserId uint32,
 	chainId *big.Int,
 ) error {
-	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
-	if len(signature) != 65 {
-		return fmt.Errorf("signature length is unexpected: %d", len(signature))
+	hasLegacySignature := len(signature) > 0
+	hasAnchorSignature := len(anchorSignature) > 0
+
+	// At least one signature must be present
+	if !hasLegacySignature && !hasAnchorSignature {
+		return errors.New("no signatures provided")
 	}
 
 	blobKey, err := header.BlobKey()
 	if err != nil {
-		return fmt.Errorf("get blob key: %w", err)
+		return fmt.Errorf("failed to get blob key: %v", err)
 	}
 
-	hash, err := hashing.HashDisperseBlobRequest(useNewHashVersion, blobKey, disperserId, chainId)
-	if err != nil {
-		return fmt.Errorf("compute request hash: %w", err)
+	// Validate legacy signature if present
+	if hasLegacySignature {
+		if len(signature) != 65 {
+			return fmt.Errorf("signature length is unexpected: %d", len(signature))
+		}
+
+		sigPublicKeyECDSA, err := crypto.SigToPub(blobKey[:], signature)
+		if err != nil {
+			return fmt.Errorf("failed to recover public key from signature: %w", err)
+		}
+
+		if header.PaymentMetadata.AccountID.Cmp(crypto.PubkeyToAddress(*sigPublicKeyECDSA)) != 0 {
+			return errors.New("signature doesn't match with provided public key")
+		}
 	}
 
-	// Recover public key from signature
-	sigPublicKeyECDSA, err := crypto.SigToPub(hash, signature)
-	if err != nil {
-		return fmt.Errorf("recover public key from signature: %w", err)
-	}
+	// Validate anchor signature if present
+	if hasAnchorSignature {
+		if len(anchorSignature) != 65 {
+			return fmt.Errorf("anchor signature length is unexpected: %d", len(signature))
+		}
 
-	accountAddr := header.PaymentMetadata.AccountID
-	pubKeyAddr := crypto.PubkeyToAddress(*sigPublicKeyECDSA)
+		anchorHash, err := hashing.ComputeDispersalAnchorHash(chainId, disperserId, blobKey)
+		if err != nil {
+			return fmt.Errorf("compute dispersal anchor hash: %w", err)
+		}
 
-	if accountAddr.Cmp(pubKeyAddr) != 0 {
-		return errors.New("signature doesn't match with provided public key")
+		anchorSignaturePublicKeyECDSA, err := crypto.SigToPub(anchorHash, anchorSignature)
+		if err != nil {
+			return fmt.Errorf("recover public key from anchor signature: %w", err)
+		}
+
+		if header.PaymentMetadata.AccountID.Cmp(crypto.PubkeyToAddress(*anchorSignaturePublicKeyECDSA)) != 0 {
+			return errors.New("anchor signature doesn't match with provided public key")
+		}
 	}
 
 	return nil

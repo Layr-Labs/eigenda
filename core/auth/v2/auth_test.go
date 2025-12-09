@@ -2,12 +2,13 @@ package v2_test
 
 import (
 	"crypto/sha256"
-	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/api/hashing"
-	"github.com/Layr-Labs/eigenda/common/replay"
 	"math/big"
 	"testing"
 	"time"
+
+	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common/replay"
 
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -26,10 +27,11 @@ var (
 	fixedTimestamp = uint64(1609459200000000000)
 )
 
+// TODO: augment tests to exercise new logic
+
 func TestAuthentication(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
-	blobRequestAuthenticator := auth.NewBlobRequestAuthenticator()
 
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
@@ -39,14 +41,13 @@ func TestAuthentication(t *testing.T) {
 	signature, err := signer.SignBlobRequest(header)
 	assert.NoError(t, err)
 
-	err = blobRequestAuthenticator.AuthenticateBlobRequest(header, signature)
+	err = auth.AuthenticateBlobRequest(header, signature, nil, 0, nil)
 	assert.NoError(t, err)
 }
 
 func TestAuthenticationFail(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
-	blobRequestAuthenticator := auth.NewBlobRequestAuthenticator()
 
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
@@ -61,7 +62,7 @@ func TestAuthenticationFail(t *testing.T) {
 	signature, err := signer.SignBlobRequest(header)
 	assert.NoError(t, err)
 
-	err = blobRequestAuthenticator.AuthenticateBlobRequest(header, signature)
+	err = auth.AuthenticateBlobRequest(header, signature, nil, 0, nil)
 	assert.Error(t, err)
 }
 

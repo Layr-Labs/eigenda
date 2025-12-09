@@ -287,12 +287,6 @@ var (
 		Value:    time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_POLL_INTERVAL"),
 	}
-	AcceptV0RequestsFlag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "accept-v0-requests"),
-		Usage:    "Whether to accept version 0 (legacy) DisperseBlobRequests",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ACCEPT_V0_REQUESTS"),
-	}
 	DisperserIdFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-id"),
 		Usage:    "Unique identifier for this disperser instance",
@@ -372,7 +366,6 @@ var optionalFlags = []cli.Flag{
 	DisablePerAccountMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRatePollIntervalFlag,
-	AcceptV0RequestsFlag,
 	DisperserIdFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,

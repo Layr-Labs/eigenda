@@ -2,13 +2,13 @@ package eigendaflags
 
 import (
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
-	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
@@ -352,8 +352,7 @@ func readDisperserCfg(ctx *cli.Context) (dispersal.DisperserClientConfig, error)
 		GrpcUri:           grpcUri,
 		UseSecureGrpcFlag: !ctx.Bool(DisableTLSFlagName),
 		DisperserID:       0,
-		RequestVersion:    hashing.DisperseBlobRequestVersion0,
-		ChainID:           nil,
+		ChainID:           big.NewInt(1),
 	}, nil
 }
 

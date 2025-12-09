@@ -102,7 +102,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			DisableGetBlobCommitment:   ctx.GlobalBool(flags.DisableGetBlobCommitment.Name),
 			SigningRateRetentionPeriod: ctx.GlobalDuration(flags.SigningRateRetentionPeriodFlag.Name),
 			SigningRatePollInterval:    ctx.GlobalDuration(flags.SigningRatePollIntervalFlag.Name),
-			AcceptV0Requests:           ctx.GlobalBool(flags.AcceptV0RequestsFlag.Name),
 			DisperserId:                uint32(ctx.GlobalUint64(flags.DisperserIdFlag.Name)),
 			ChainId:                    nil, // Will be populated after eth client is created
 		},

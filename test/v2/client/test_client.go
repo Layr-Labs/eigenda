@@ -20,7 +20,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	"github.com/Layr-Labs/eigenda/api/hashing"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
@@ -65,6 +64,7 @@ type TestClient struct {
 	config                      *TestClientConfig
 	payloadClientConfig         *clientsv2.PayloadClientConfig
 	logger                      logging.Logger
+	chainID                     *big.Int
 	certVerifierAddressProvider clientsv2.CertVerifierAddressProvider
 	disperserClientMultiplexer  *dispersal.DisperserClientMultiplexer
 	payloadDisperser            *dispersal.PayloadDisperser
@@ -450,9 +450,7 @@ func NewTestClient(
 						GrpcUri:           fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
 						UseSecureGrpcFlag: true,
 						DisperserID:       0,
-						// use v0 for now, until all dispersers support v1
-						RequestVersion: hashing.DisperseBlobRequestVersion0,
-						ChainID:        chainId,
+						ChainID:           chainId,
 					},
 					PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 						PayloadClientConfig:    *payloadClientConfig,
@@ -487,6 +485,7 @@ func NewTestClient(
 		config:                      config,
 		payloadClientConfig:         payloadClientConfig,
 		logger:                      logger,
+		chainID:                     chainId,
 		certVerifierAddressProvider: certVerifierAddressProvider,
 		disperserClientMultiplexer:  disperserClientMultiplexer,
 		payloadDisperser:            payloadDisperser,
@@ -520,6 +519,11 @@ func (c *TestClient) GetConfig() *TestClientConfig {
 // GetLogger returns the test client's logger.
 func (c *TestClient) GetLogger() logging.Logger {
 	return c.logger
+}
+
+// GetChainID returns the chain ID.
+func (c *TestClient) GetChainID() *big.Int {
+	return c.chainID
 }
 
 // GetDisperserClient returns the test client's disperser client multiplexer.

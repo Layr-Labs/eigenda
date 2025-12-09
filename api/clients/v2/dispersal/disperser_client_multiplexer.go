@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/common/disperser"
 	"github.com/Layr-Labs/eigenda/common/reputation"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -31,7 +31,7 @@ type DisperserClientMultiplexer struct {
 	logger            logging.Logger
 	config            *DisperserClientMultiplexerConfig
 	disperserRegistry disperser.DisperserRegistry
-	signer            corev2.BlobRequestSigner
+	signer            *authv2.LocalBlobRequestSigner
 	committer         *committer.Committer
 	dispersalMetrics  metrics.DispersalMetricer
 	// map from disperser ID to corresponding client that can communicate with that disperser
@@ -49,7 +49,7 @@ func NewDisperserClientMultiplexer(
 	logger logging.Logger,
 	config *DisperserClientMultiplexerConfig,
 	disperserRegistry disperser.DisperserRegistry,
-	signer corev2.BlobRequestSigner,
+	signer *authv2.LocalBlobRequestSigner,
 	committer *committer.Committer,
 	dispersalMetrics metrics.DispersalMetricer,
 	random *rand.Rand,
@@ -139,7 +139,6 @@ func (dcm *DisperserClientMultiplexer) GetDisperserClient(
 			UseSecureGrpcFlag:        dcm.config.UseSecureGrpcFlag,
 			DisperserConnectionCount: dcm.config.DisperserConnectionCount,
 			DisperserID:              selectedDisperserInfo.id,
-			RequestVersion:           dcm.config.RequestVersion,
 			ChainID:                  dcm.config.ChainID,
 		}
 

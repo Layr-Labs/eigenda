@@ -1245,7 +1245,6 @@ func startAPIServer(
 		MaxConnectionAge:      5 * time.Minute,
 		MaxConnectionAgeGrace: 30 * time.Second,
 		MaxIdleConnectionAge:  1 * time.Minute,
-		AcceptV0Requests:      true,
 		DisperserId:           0,
 		ChainId:               chainId,
 	}

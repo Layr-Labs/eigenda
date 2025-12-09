@@ -338,12 +338,6 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_ID"),
 	}
-	AcceptV0RequestsFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "accept-v0-requests"),
-		Usage:    "Whether to accept version 0 (legacy) DisperseBlobRequest signatures.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ACCEPT_V0_REQUESTS"),
-	}
 	SigningRateRetentionPeriodFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-retention-period"),
 		Usage:    "The amount of time to retain signing rate data",
@@ -414,7 +408,6 @@ var optionalFlags = []cli.Flag{
 	EnablePerAccountBlobStatusMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRateBucketSpanFlag,
-	AcceptV0RequestsFlag,
 }
 
 var Flags []cli.Flag

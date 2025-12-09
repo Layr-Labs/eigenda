@@ -74,7 +74,9 @@ func BlobStatusFromProtobuf(s pb.BlobStatus) (BlobStatus, error) {
 type BlobMetadata struct {
 	BlobHeader *corev2.BlobHeader
 	Signature  []byte
-
+	// Ties the blob to a specific disperser and chain.
+	// Produced by signing Keccak256(domain || chainID || disperserID || blobKey) with the account's key.
+	AnchorSignature []byte
 	// BlobStatus indicates the current status of the blob
 	BlobStatus BlobStatus
 	// Expiry is Unix timestamp of the blob expiry in seconds from epoch

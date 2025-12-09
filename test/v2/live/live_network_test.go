@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
-	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -495,8 +494,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 		GrpcUri:           fmt.Sprintf("%s:%d", c.GetConfig().DisperserHostname, c.GetConfig().DisperserPort),
 		UseSecureGrpcFlag: true,
 		DisperserID:       0,
-		RequestVersion:    hashing.DisperseBlobRequestVersion0, // Use v0 for live tests for now.
-		ChainID:           nil,                                 // Not needed for v0
+		ChainID:           c.GetChainID(),
 	}
 
 	disperserClient, err := dispersal.NewDisperserClient(

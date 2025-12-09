@@ -1,32 +1,16 @@
 package v2
 
 import (
-	"math/big"
-
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type BlobRequestAuthenticator interface {
-	AuthenticateBlobRequest(
-		header *BlobHeader,
-		signature []byte,
-		useNewHashVersion bool,
-		disperserId uint32,
-		chainId *big.Int,
-	) error
-
 	AuthenticatePaymentStateRequest(accountId gethcommon.Address, request *pb.GetPaymentStateRequest) error
 }
 
 type BlobRequestSigner interface {
-	SignBlobRequest(
-		header *BlobHeader,
-		useNewHashVersion bool,
-		disperserId uint32,
-		chainId *big.Int,
-	) ([]byte, error)
-
+	SignBlobRequest(header *BlobHeader) ([]byte, error)
 	SignPaymentStateRequest(timestamp uint64) ([]byte, error)
 	GetAccountID() (gethcommon.Address, error)
 }

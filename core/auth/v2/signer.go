@@ -4,9 +4,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
-	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
+
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -30,26 +30,25 @@ func NewLocalBlobRequestSigner(privateKeyHex string) (*LocalBlobRequestSigner, e
 	}, nil
 }
 
-func (s *LocalBlobRequestSigner) SignBlobRequest(
-	header *core.BlobHeader,
-	useNewHashVersion bool,
-	disperserId uint32,
-	chainId *big.Int,
-) ([]byte, error) {
+func (s *LocalBlobRequestSigner) SignBytes(bytesToSign []byte) ([]byte, error) {
+	signature, err := crypto.Sign(bytesToSign, s.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign bytes: %w", err)
+	}
+
+	return signature, nil
+}
+
+func (s *LocalBlobRequestSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, error) {
 	blobKey, err := header.BlobKey()
 	if err != nil {
-		return nil, fmt.Errorf("get blob key: %w", err)
+		return nil, fmt.Errorf("failed to get blob key: %v", err)
 	}
 
-	hash, err := hashing.HashDisperseBlobRequest(useNewHashVersion, blobKey, disperserId, chainId)
+	// Sign the blob key using the private key
+	sig, err := crypto.Sign(blobKey[:], s.PrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("compute request hash: %w", err)
-	}
-
-	// Sign the hash using the private key
-	sig, err := crypto.Sign(hash, s.PrivateKey)
-	if err != nil {
-		return nil, fmt.Errorf("sign hash: %w", err)
+		return nil, fmt.Errorf("failed to sign hash: %v", err)
 	}
 
 	return sig, nil
@@ -89,12 +88,7 @@ func NewLocalNoopSigner() *LocalNoopSigner {
 	return &LocalNoopSigner{}
 }
 
-func (s *LocalNoopSigner) SignBlobRequest(
-	header *core.BlobHeader,
-	useNewHashVersion bool,
-	disperserId uint32,
-	chainId *big.Int,
-) ([]byte, error) {
+func (s *LocalNoopSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, error) {
 	return nil, fmt.Errorf("noop signer cannot sign blob request")
 }
 

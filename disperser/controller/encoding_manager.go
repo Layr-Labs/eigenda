@@ -388,9 +388,10 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					break
 				}
 				cert := &corev2.BlobCertificate{
-					BlobHeader: blob.BlobHeader,
-					Signature:  blob.Signature,
-					RelayKeys:  relayKeys,
+					BlobHeader:      blob.BlobHeader,
+					Signature:       blob.Signature,
+					AnchorSignature: blob.AnchorSignature,
+					RelayKeys:       relayKeys,
 				}
 
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)

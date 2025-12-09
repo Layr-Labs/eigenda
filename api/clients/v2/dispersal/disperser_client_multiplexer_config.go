@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/reputation"
 )
@@ -28,8 +27,6 @@ type DisperserClientMultiplexerConfig struct {
 	SelectorConfig reputation.ReputationSelectorConfig
 	// Number of grpc connections to each disperser
 	DisperserConnectionCount uint
-	// Version to use for DisperseBlobRequests
-	RequestVersion hashing.DisperseBlobRequestVersion
 	// Ethereum chain ID
 	ChainID *big.Int
 }
@@ -42,7 +39,6 @@ func DefaultDisperserClientMultiplexerConfig() *DisperserClientMultiplexerConfig
 		UseSecureGrpcFlag:        true,
 		SelectorConfig:           reputation.DefaultReputationSelectorConfig(),
 		DisperserConnectionCount: 8,
-		RequestVersion:           hashing.DisperseBlobRequestVersion1,
 	}
 }
 
@@ -56,13 +52,6 @@ func (c *DisperserClientMultiplexerConfig) Verify() error {
 	err = c.SelectorConfig.Verify()
 	if err != nil {
 		return fmt.Errorf("verify selector config: %w", err)
-	}
-
-	switch c.RequestVersion {
-	case hashing.DisperseBlobRequestVersion0, hashing.DisperseBlobRequestVersion1:
-		// Valid versions
-	default:
-		return fmt.Errorf("invalid request version: %d", c.RequestVersion)
 	}
 
 	if c.ChainID == nil {

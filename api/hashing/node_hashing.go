@@ -12,18 +12,6 @@ import (
 
 // This file contains code for hashing gRPC messages that are sent to the DA node.
 
-// Version of the protobuf StoreChunksRequest
-type StoreChunksRequestVersion = uint32
-
-const (
-	// The version from before request versioning was introduced.
-	// Use of this version indicates that legacy hashing was used for blob signatures: signature over blobKey.
-	StoreChunksRequestVersion0 StoreChunksRequestVersion = 0
-
-	// Blob signatures use hash(domain || chainID || disperserID || blobKey).
-	StoreChunksRequestVersion1 StoreChunksRequestVersion = 1
-)
-
 // ValidatorStoreChunksRequestDomain is the domain for hashing StoreChunksRequest messages (i.e. this string
 // is added to the digest before hashing the message). This makes it difficult for an attacker to create a
 // different type of object that has the same hash as a StoreChunksRequest.

@@ -190,6 +190,10 @@ type BlobCertificate struct {
 	// which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
 	Signature []byte
 
+	// AnchorSignature ties the blob to a specific disperser and chain.
+	// Produced by signing Keccak256(domain || chainID || disperserID || blobKey) with the account's key.
+	AnchorSignature []byte
+
 	// RelayKeys
 	RelayKeys []RelayKey
 }
@@ -210,9 +214,10 @@ func (c *BlobCertificate) ToProtobuf() (*commonpb.BlobCertificate, error) {
 	}
 
 	return &commonpb.BlobCertificate{
-		BlobHeader: blobHeader,
-		Signature:  c.Signature,
-		RelayKeys:  relays,
+		BlobHeader:      blobHeader,
+		Signature:       c.Signature,
+		AnchorSignature: c.AnchorSignature,
+		RelayKeys:       relays,
 	}, nil
 }
 
@@ -232,9 +237,10 @@ func BlobCertificateFromProtobuf(proto *commonpb.BlobCertificate) (*BlobCertific
 	}
 
 	return &BlobCertificate{
-		BlobHeader: blobHeader,
-		Signature:  proto.GetSignature(),
-		RelayKeys:  relayKeys,
+		BlobHeader:      blobHeader,
+		Signature:       proto.GetSignature(),
+		AnchorSignature: proto.GetAnchorSignature(),
+		RelayKeys:       relayKeys,
 	}, nil
 }
 
