@@ -96,7 +96,7 @@ impl QuorumCountExtractor {
     ///
     /// # Arguments
     /// * `_certificate` - Certificate (not used but kept for consistency)
-    pub fn new(_certificate: &StandardCommitment) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -193,7 +193,7 @@ impl NextBlobVersionExtractor {
     ///
     /// # Arguments
     /// * `_certificate` - Certificate (not used but kept for consistency)
-    pub fn new(_certificate: &StandardCommitment) -> Self {
+    pub fn new() -> Self {
         Self
     }
 }
@@ -704,7 +704,7 @@ impl SecurityThresholdsV2Extractor {
     ///
     /// # Arguments
     /// * `_certificate` - Certificate (not used but kept for consistency)
-    pub fn new(_certificate: &StandardCommitment) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -758,7 +758,7 @@ impl QuorumNumbersRequiredV2Extractor {
     ///
     /// # Arguments
     /// * `_certificate` - Certificate (not used but kept for consistency)
-    pub fn new(_certificate: &StandardCommitment) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -835,8 +835,7 @@ mod tests {
 
     #[test]
     fn quorum_count_extractor() {
-        let cert = create_mock_certificate();
-        let extractor = QuorumCountExtractor::new(&cert);
+        let extractor = QuorumCountExtractor::new();
 
         let keys = extractor.storage_keys();
         assert_eq!(
@@ -888,8 +887,7 @@ mod tests {
 
     #[test]
     fn next_blob_version_extractor() {
-        let cert = create_mock_certificate();
-        let extractor = NextBlobVersionExtractor::new(&cert);
+        let extractor = NextBlobVersionExtractor::new();
 
         let keys = extractor.storage_keys();
         assert_eq!(keys.len(), 1);
@@ -907,8 +905,7 @@ mod tests {
 
     #[test]
     fn security_thresholds_v2_extractor() {
-        let cert = create_mock_certificate();
-        let extractor = SecurityThresholdsV2Extractor::new(&cert);
+        let extractor = SecurityThresholdsV2Extractor::new();
 
         let keys = extractor.storage_keys();
         assert_eq!(keys.len(), 1);
@@ -932,8 +929,7 @@ mod tests {
 
     #[test]
     fn quorum_numbers_required_v2_extractor() {
-        let cert = create_mock_certificate();
-        let extractor = QuorumNumbersRequiredV2Extractor::new(&cert);
+        let extractor = QuorumNumbersRequiredV2Extractor::new();
 
         let keys = extractor.storage_keys();
         assert_eq!(keys.len(), 1);
@@ -1064,7 +1060,7 @@ mod stale_stakes_forbidden {
         ///
         /// # Arguments
         /// * `_certificate` - Certificate (not used but kept for consistency)
-        pub fn new(_certificate: &StandardCommitment) -> Self {
+        pub fn new() -> Self {
             Self {}
         }
     }
@@ -1110,7 +1106,7 @@ mod stale_stakes_forbidden {
         ///
         /// # Arguments
         /// * `_certificate` - Certificate (not used but kept for consistency)
-        pub fn new(_certificate: &StandardCommitment) -> Self {
+        pub fn new() -> Self {
             Self {}
         }
     }
@@ -1234,8 +1230,7 @@ mod stale_stakes_forbidden {
 
             #[test]
             fn stale_stakes_forbidden_extractor() {
-                let cert = create_mock_certificate();
-                let extractor = StaleStakesForbiddenExtractor::new(&cert);
+                let extractor = StaleStakesForbiddenExtractor::new();
 
                 let keys = extractor.storage_keys();
                 assert_eq!(
@@ -1257,8 +1252,7 @@ mod stale_stakes_forbidden {
 
             #[test]
             fn min_withdrawal_delay_blocks_extractor() {
-                let cert = create_mock_certificate();
-                let extractor = MinWithdrawalDelayBlocksExtractor::new(&cert);
+                let extractor = MinWithdrawalDelayBlocksExtractor::new();
 
                 let keys = extractor.storage_keys();
                 assert_eq!(
