@@ -89,6 +89,7 @@ pub trait DataDecoder: StorageKeyProvider {
 /// Extractor for the total number of quorums in the registry
 ///
 /// Reads the `quorumCount` variable from the RegistryCoordinator contract.
+#[derive(Default)]
 pub struct QuorumCountExtractor;
 
 impl QuorumCountExtractor {
@@ -186,6 +187,7 @@ impl DataDecoder for VersionedBlobParamsExtractor {
 ///
 /// Reads the `nextBlobVersion` variable from the EigenDaThresholdRegistry contract.
 /// This indicates the next version number that will be assigned to blob parameters.
+#[derive(Default)]
 pub struct NextBlobVersionExtractor;
 
 impl NextBlobVersionExtractor {
@@ -697,6 +699,7 @@ impl<'a> StorageKeyProvider for CertVerifiersExtractor<'a> {
 /// This extractor fetches the security threshold parameters that define the minimum
 /// requirements for certificate validation, including confirmation and adversary thresholds
 /// that determine the minimum stake percentages needed for valid signatures.
+#[derive(Default)]
 pub struct SecurityThresholdsV2Extractor;
 
 impl SecurityThresholdsV2Extractor {
@@ -751,6 +754,7 @@ impl DataDecoder for SecurityThresholdsV2Extractor {
 /// This extractor fetches the list of quorum numbers that are required to participate
 /// in certificate signing for the certificate to be considered valid. This defines
 /// which quorums must have sufficient stake participation.
+#[derive(Default)]
 pub struct QuorumNumbersRequiredV2Extractor;
 
 impl QuorumNumbersRequiredV2Extractor {
@@ -1053,6 +1057,7 @@ mod stale_stakes_forbidden {
     /// This extractor determines whether stale stakes are forbidden in the current
     /// configuration. When enabled, this prevents operators from using outdated
     /// stake information for validation.
+    #[derive(Default)]
     pub struct StaleStakesForbiddenExtractor;
 
     impl StaleStakesForbiddenExtractor {
@@ -1099,6 +1104,7 @@ mod stale_stakes_forbidden {
     /// This extractor fetches the minimum number of blocks that must pass before
     /// stake withdrawals can be completed. This delay is a security mechanism
     /// to prevent rapid stake changes that could affect validation integrity.
+    #[derive(Default)]
     pub struct MinWithdrawalDelayBlocksExtractor;
 
     impl MinWithdrawalDelayBlocksExtractor {
