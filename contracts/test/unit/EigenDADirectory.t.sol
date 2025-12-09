@@ -257,9 +257,7 @@ contract EigenDADirectoryTest is Test {
 
         // Verify address2 is not present
         for (uint256 i = 0; i < names.length; i++) {
-            assertTrue(
-                keccak256(bytes(names[i])) != keccak256(bytes("address2")), "address2 should not be in the list"
-            );
+            assertTrue(keccak256(bytes(names[i])) != keccak256(bytes("address2")), "address2 should not be in the list");
         }
     }
 
