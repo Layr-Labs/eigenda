@@ -106,9 +106,9 @@ func NewController(
 		ctx,
 		logger,
 		blobMetadataStore,
-		100,                 // queue size
-		100,                 // request batch size
-		50*time.Millisecond, // request backoff period
+		config.BlobDispersalQueueSize,
+		config.BlobDispersalRequestBatchSize,
+		config.BlobDispersalRequestBackoffPeriod,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("NewDynamodbBlobDispersalQueue: %w", err)

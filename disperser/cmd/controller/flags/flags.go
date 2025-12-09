@@ -352,6 +352,27 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_BUCKET_SPAN"),
 		Value:    10 * time.Minute,
 	}
+	BlobDispersalQueueSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-dispersal-queue-size"),
+		Usage:    "Maximum number of blobs that can be queued for dispersal",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_DISPERSAL_QUEUE_SIZE"),
+		Value:    1024,
+	}
+	BlobDispersalRequestBatchSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-dispersal-request-batch-size"),
+		Usage:    "Number of blob metadata items to fetch from the store in a single request",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_DISPERSAL_REQUEST_BATCH_SIZE"),
+		Value:    32,
+	}
+	BlobDispersalRequestBackoffPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-dispersal-request-backoff-period"),
+		Usage:    "Delay between fetch attempts when the dispersal queue is empty",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_DISPERSAL_REQUEST_BACKOFF_PERIOD"),
+		Value:    50 * time.Millisecond,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -408,6 +429,9 @@ var optionalFlags = []cli.Flag{
 	EnablePerAccountBlobStatusMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRateBucketSpanFlag,
+	BlobDispersalQueueSizeFlag,
+	BlobDispersalRequestBatchSizeFlag,
+	BlobDispersalRequestBackoffPeriodFlag,
 }
 
 var Flags []cli.Flag

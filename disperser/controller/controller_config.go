@@ -78,25 +78,39 @@ type ControllerConfig struct {
 	// The duration of each signing rate bucket. Smaller buckets yield more granular data, at the cost of memory
 	// and storage overhead.
 	SigningRateBucketSpan time.Duration
+
+	// BlobDispersalQueueSize is the maximum number of blobs that can be queued for dispersal.
+	BlobDispersalQueueSize uint32
+
+	// BlobDispersalRequestBatchSize is the number of blob metadata items to fetch from the store in a single request.
+	// Must be at least 1.
+	BlobDispersalRequestBatchSize uint32
+
+	// BlobDispersalRequestBackoffPeriod is the delay between fetch attempts when there are no blobs ready
+	// for dispersal.
+	BlobDispersalRequestBackoffPeriod time.Duration
 }
 
 var _ config.VerifiableConfig = &ControllerConfig{}
 
 func DefaultDispatcherConfig() *ControllerConfig {
 	return &ControllerConfig{
-		PullInterval:                        1 * time.Second,
-		FinalizationBlockDelay:              75,
-		AttestationTimeout:                  45 * time.Second,
-		BatchMetadataUpdatePeriod:           time.Minute,
-		BatchAttestationTimeout:             55 * time.Second,
-		SignatureTickInterval:               50 * time.Millisecond,
-		MaxBatchSize:                        32,
-		SignificantSigningThresholdFraction: 0.55,
-		NumConcurrentRequests:               600,
-		NodeClientCacheSize:                 400,
-		MaxDispersalAge:                     45 * time.Second,
-		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
-		SigningRateBucketSpan:               10 * time.Minute,
+		PullInterval:                          1 * time.Second,
+		FinalizationBlockDelay:                75,
+		AttestationTimeout:                    45 * time.Second,
+		BatchMetadataUpdatePeriod:             time.Minute,
+		BatchAttestationTimeout:               55 * time.Second,
+		SignatureTickInterval:                 50 * time.Millisecond,
+		MaxBatchSize:                          32,
+		SignificantSigningThresholdFraction:   0.55,
+		NumConcurrentRequests:                 600,
+		NodeClientCacheSize:                   400,
+		MaxDispersalAge:                       45 * time.Second,
+		SigningRateRetentionPeriod:            14 * 24 * time.Hour, // 2 weeks
+		SigningRateBucketSpan:                 10 * time.Minute,
+		BlobDispersalQueueSize:                1024,
+		BlobDispersalRequestBatchSize:         32,
+		BlobDispersalRequestBackoffPeriod:     50 * time.Millisecond,
 	}
 }
 
@@ -142,6 +156,15 @@ func (c *ControllerConfig) Verify() error {
 	}
 	if c.SigningRateBucketSpan <= 0 {
 		return fmt.Errorf("SigningRateBucketSpan must be positive, got %v", c.SigningRateBucketSpan)
+	}
+	if c.BlobDispersalQueueSize < 1 {
+		return fmt.Errorf("BlobDispersalQueueSize must be at least 1, got %d", c.BlobDispersalQueueSize)
+	}
+	if c.BlobDispersalRequestBatchSize < 1 {
+		return fmt.Errorf("BlobDispersalRequestBatchSize must be at least 1, got %d", c.BlobDispersalRequestBatchSize)
+	}
+	if c.BlobDispersalRequestBackoffPeriod <= 0 {
+		return fmt.Errorf("BlobDispersalRequestBackoffPeriod must be positive, got %v", c.BlobDispersalRequestBackoffPeriod)
 	}
 	return nil
 }

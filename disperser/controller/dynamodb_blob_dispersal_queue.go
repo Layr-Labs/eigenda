@@ -56,7 +56,10 @@ func NewDynamodbBlobDispersalQueue(
 	}
 	if requestBatchSize > math.MaxInt32 {
 		// This is annoying, but I'd rather not mess with the types of pre-existing interfaces right now.
-		return nil, fmt.Errorf("requestBatchSize cannot be greater than %d", math.MaxInt32)
+		return nil, fmt.Errorf("requestBatchSize cannot be greater than %d, got %d", math.MaxInt32, requestBatchSize)
+	}
+	if requestBackoffPeriod < 0 {
+		return nil, fmt.Errorf("requestBackoffPeriod not be negative, got %v", requestBackoffPeriod)
 	}
 
 	bdq := &dynamodbBlobDispersalQueue{
