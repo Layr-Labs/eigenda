@@ -27,8 +27,6 @@ var (
 	fixedTimestamp = uint64(1609459200000000000)
 )
 
-// TODO: augment tests to exercise new logic
-
 func TestAuthentication(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)

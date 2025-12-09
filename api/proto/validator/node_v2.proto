@@ -81,10 +81,6 @@ message StoreChunksRequest {
   //
   // Note that this signature is not included in the hash for obvious reasons.
   bytes signature = 4;
-
-  // The chain ID that blobs in this batch were signed for.
-  // Represented as bytes to accommodate uint256 values (32 bytes, big-endian).
-  bytes chain_id = 6;
 }
 
 // StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
