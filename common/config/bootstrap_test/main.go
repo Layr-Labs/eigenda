@@ -49,7 +49,7 @@ func DefaultTestConfig() *TestConfig {
 }
 
 func main() {
-	cfg, err := config.Bootstrap(DefaultTestConfig)
+	cfg, err := config.Bootstrap(DefaultTestConfig, nil, nil)
 	if err != nil {
 		panic(err)
 	}

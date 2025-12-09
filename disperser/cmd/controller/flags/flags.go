@@ -183,6 +183,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DETAILED_VALIDATOR_METRICS"),
 	}
+	EnablePerAccountBlobStatusMetricsFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-blob-status-metrics"),
+		Usage:    "Whether to report per-account blob status metrics. If false, all metrics will be aggregated under account 0x0. (default: true)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PER_ACCOUNT_BLOB_STATUS_METRICS"),
+	}
 	MaxBatchSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-batch-size"),
 		Usage:    "Max number of blobs to disperse in a batch",
@@ -399,6 +405,7 @@ var optionalFlags = []cli.Flag{
 	PaymentVaultUpdateIntervalFlag,
 	EnablePerAccountPaymentMetricsFlag,
 	DetailedValidatorMetricsFlag,
+	EnablePerAccountBlobStatusMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRateBucketSpanFlag,
 }

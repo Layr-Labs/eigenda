@@ -10,6 +10,14 @@ use crate::verification::cert::error::CertVerificationError;
 /// Errors that can occur during EigenDA verification.
 #[derive(Error, Debug, PartialEq)]
 pub enum EigenDaVerificationError {
+    /// Transaction is not EIP1559
+    #[error("Transaction is not EIP1559")]
+    TxNotEip1559(B256),
+
+    /// Standard commitment parse error
+    #[error(transparent)]
+    StandardCommitmentParseError(#[from] StandardCommitmentParseError),
+
     /// Certificate is too old relative to the current block (recency validation failure)
     #[error("The recency window was missed, inclusion_height ({0}), recency height ({1})")]
     RecencyWindowMissed(u64, u64),
@@ -17,14 +25,6 @@ pub enum EigenDaVerificationError {
     /// Certificate verification error
     #[error(transparent)]
     CertVerificationError(#[from] CertVerificationError),
-
-    /// Standard commitment parse error
-    #[error(transparent)]
-    StandardCommitmentParseError(#[from] StandardCommitmentParseError),
-
-    /// Transaction is not EIP1559
-    #[error("Transacion is not EIP1559")]
-    TxNotEip1559(B256),
 
     /// Proof verification error
     #[error(transparent)]
