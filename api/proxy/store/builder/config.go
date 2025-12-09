@@ -92,7 +92,7 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		MemstoreEnabled:  ctx.Bool(memstore.EnabledFlagName),
 		S3Config:         s3.ReadConfig(ctx),
 		RetryCount:       ctx.Int(eigendaflags_v2.EthRPCRetryCountFlagName),
-		RetryDelay:       ctx.Duration(eigendaflags_v2.EthRPCRetryDelayFlagName),
+		RetryDelay:       ctx.Duration(eigendaflags_v2.EthRPCRetryDelayIncrementFlagName),
 	}
 
 	return cfg, nil

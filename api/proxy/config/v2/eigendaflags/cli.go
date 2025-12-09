@@ -27,18 +27,18 @@ var (
 	CertVerifierRouterOrImmutableVerifierAddrFlagName = withFlagPrefix(
 		"cert-verifier-router-or-immutable-verifier-addr",
 	)
-	EigenDADirectoryFlagName        = withFlagPrefix("eigenda-directory")
-	RelayTimeoutFlagName            = withFlagPrefix("relay-timeout")
-	ValidatorTimeoutFlagName        = withFlagPrefix("validator-timeout")
-	ContractCallTimeoutFlagName     = withFlagPrefix("contract-call-timeout")
-	BlobParamsVersionFlagName       = withFlagPrefix("blob-version")
-	EthRPCURLFlagName               = withFlagPrefix("eth-rpc")
-	EthRPCRetryCountFlagName        = withFlagPrefix("eth-rpc-retry-count")
-	EthRPCRetryDelayFlagName        = withFlagPrefix("eth-rpc-retry-delay")
-	MaxBlobLengthFlagName           = withFlagPrefix("max-blob-length")
-	NetworkFlagName                 = withFlagPrefix("network")
-	RBNRecencyWindowSizeFlagName    = withFlagPrefix("rbn-recency-window-size")
-	RelayConnectionPoolSizeFlagName = withFlagPrefix("relay-connection-pool-size")
+	EigenDADirectoryFlagName          = withFlagPrefix("eigenda-directory")
+	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
+	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
+	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")
+	BlobParamsVersionFlagName         = withFlagPrefix("blob-version")
+	EthRPCURLFlagName                 = withFlagPrefix("eth-rpc")
+	EthRPCRetryCountFlagName          = withFlagPrefix("eth-rpc-retry-count")
+	EthRPCRetryDelayIncrementFlagName = withFlagPrefix("eth-rpc-retry-delay-increment")
+	MaxBlobLengthFlagName             = withFlagPrefix("max-blob-length")
+	NetworkFlagName                   = withFlagPrefix("network")
+	RBNRecencyWindowSizeFlagName      = withFlagPrefix("rbn-recency-window-size")
+	RelayConnectionPoolSizeFlagName   = withFlagPrefix("relay-connection-pool-size")
 
 	ClientLedgerModeFlagName            = withFlagPrefix("client-ledger-mode")
 	PaymentVaultMonitorIntervalFlagName = withFlagPrefix("payment-vault-monitor-interval")
@@ -95,20 +95,20 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Name: EthRPCRetryCountFlagName,
 			Usage: "The retry count for the Ethereum RPC request after the initial call fails. Please see " +
 				"EIGENDA_PROXY_EIGENDA_V2_ETH_RPC_RETRY_DELAY for the linear retry backoff strategy.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC_NUM_RETRY")},
-			Value:    2,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC_RETRY_COUNT")},
+			Value:    1,
 			Category: category,
 			Required: false,
 		},
 		&cli.DurationFlag{
-			Name: EthRPCRetryDelayFlagName,
+			Name: EthRPCRetryDelayIncrementFlagName,
 			Usage: "Time unit for linear retry delay. For instance, if the retries count is 2 and retry delay is " +
 				"1 second, then 0 second is waited for the first call; 1 seconds are waited before the next retry; " +
 				"2 seconds are waited for the second retry; if the call failed, the total waited time for retry is " +
 				"3 seconds. If the retry delay is 0 second, the total waited time for retry is 0 second, " +
 				"which is useful when there are multiple rpc providers.",
 			Required: false,
-			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC_RETRY_DELAY")},
+			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC_RETRY_DELAY_INCREMENT")},
 			Value:    1 * time.Second,
 			Category: category,
 		},
