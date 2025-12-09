@@ -499,6 +499,7 @@ func (c *Controller) isUniqueAndFresh(ctx context.Context, blobMetadata *v2.Blob
 		// discard duplicate blob
 		return false
 	}
+	c.blobSet.AddBlob(blobKey)
 
 	return true
 }
@@ -660,11 +661,6 @@ func (c *Controller) NewBatch(
 	err = c.blobMetadataStore.PutBlobInclusionInfos(ctx, inclusionInfos)
 	if err != nil {
 		return nil, fmt.Errorf("failed to put blob inclusion infos: %w", err)
-	}
-
-	// Add blobs to the blob set to deduplicate blobs
-	for _, blobKey := range keys {
-		c.blobSet.AddBlob(blobKey)
 	}
 
 	batchSizeBytes := uint64(0)
