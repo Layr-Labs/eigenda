@@ -89,14 +89,12 @@ pub trait DataDecoder: StorageKeyProvider {
 /// Extractor for the total number of quorums in the registry
 ///
 /// Reads the `quorumCount` variable from the RegistryCoordinator contract.
+#[derive(Default)]
 pub struct QuorumCountExtractor;
 
 impl QuorumCountExtractor {
     /// Create a new quorum count extractor
-    ///
-    /// # Arguments
-    /// * `_certificate` - Certificate (not used but kept for consistency)
-    pub fn new(_certificate: &StandardCommitment) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -186,14 +184,12 @@ impl DataDecoder for VersionedBlobParamsExtractor {
 ///
 /// Reads the `nextBlobVersion` variable from the EigenDaThresholdRegistry contract.
 /// This indicates the next version number that will be assigned to blob parameters.
+#[derive(Default)]
 pub struct NextBlobVersionExtractor;
 
 impl NextBlobVersionExtractor {
     /// Create a new next blob version extractor
-    ///
-    /// # Arguments
-    /// * `_certificate` - Certificate (not used but kept for consistency)
-    pub fn new(_certificate: &StandardCommitment) -> Self {
+    pub fn new() -> Self {
         Self
     }
 }
@@ -697,14 +693,12 @@ impl<'a> StorageKeyProvider for CertVerifiersExtractor<'a> {
 /// This extractor fetches the security threshold parameters that define the minimum
 /// requirements for certificate validation, including confirmation and adversary thresholds
 /// that determine the minimum stake percentages needed for valid signatures.
+#[derive(Default)]
 pub struct SecurityThresholdsV2Extractor;
 
 impl SecurityThresholdsV2Extractor {
     /// Create a new security thresholds extractor
-    ///
-    /// # Arguments
-    /// * `_certificate` - Certificate (not used but kept for consistency)
-    pub fn new(_certificate: &StandardCommitment) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -751,14 +745,12 @@ impl DataDecoder for SecurityThresholdsV2Extractor {
 /// This extractor fetches the list of quorum numbers that are required to participate
 /// in certificate signing for the certificate to be considered valid. This defines
 /// which quorums must have sufficient stake participation.
+#[derive(Default)]
 pub struct QuorumNumbersRequiredV2Extractor;
 
 impl QuorumNumbersRequiredV2Extractor {
     /// Create a new required quorum numbers extractor
-    ///
-    /// # Arguments
-    /// * `_certificate` - Certificate (not used but kept for consistency)
-    pub fn new(_certificate: &StandardCommitment) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -835,8 +827,7 @@ mod tests {
 
     #[test]
     fn quorum_count_extractor() {
-        let cert = create_mock_certificate();
-        let extractor = QuorumCountExtractor::new(&cert);
+        let extractor = QuorumCountExtractor::new();
 
         let keys = extractor.storage_keys();
         assert_eq!(
@@ -888,8 +879,7 @@ mod tests {
 
     #[test]
     fn next_blob_version_extractor() {
-        let cert = create_mock_certificate();
-        let extractor = NextBlobVersionExtractor::new(&cert);
+        let extractor = NextBlobVersionExtractor::new();
 
         let keys = extractor.storage_keys();
         assert_eq!(keys.len(), 1);
@@ -907,8 +897,7 @@ mod tests {
 
     #[test]
     fn security_thresholds_v2_extractor() {
-        let cert = create_mock_certificate();
-        let extractor = SecurityThresholdsV2Extractor::new(&cert);
+        let extractor = SecurityThresholdsV2Extractor::new();
 
         let keys = extractor.storage_keys();
         assert_eq!(keys.len(), 1);
@@ -932,8 +921,7 @@ mod tests {
 
     #[test]
     fn quorum_numbers_required_v2_extractor() {
-        let cert = create_mock_certificate();
-        let extractor = QuorumNumbersRequiredV2Extractor::new(&cert);
+        let extractor = QuorumNumbersRequiredV2Extractor::new();
 
         let keys = extractor.storage_keys();
         assert_eq!(keys.len(), 1);
@@ -1057,14 +1045,12 @@ mod stale_stakes_forbidden {
     /// This extractor determines whether stale stakes are forbidden in the current
     /// configuration. When enabled, this prevents operators from using outdated
     /// stake information for validation.
+    #[derive(Default)]
     pub struct StaleStakesForbiddenExtractor;
 
     impl StaleStakesForbiddenExtractor {
         /// Create a new stale stakes forbidden extractor
-        ///
-        /// # Arguments
-        /// * `_certificate` - Certificate (not used but kept for consistency)
-        pub fn new(_certificate: &StandardCommitment) -> Self {
+        pub fn new() -> Self {
             Self {}
         }
     }
@@ -1103,14 +1089,12 @@ mod stale_stakes_forbidden {
     /// This extractor fetches the minimum number of blocks that must pass before
     /// stake withdrawals can be completed. This delay is a security mechanism
     /// to prevent rapid stake changes that could affect validation integrity.
+    #[derive(Default)]
     pub struct MinWithdrawalDelayBlocksExtractor;
 
     impl MinWithdrawalDelayBlocksExtractor {
         /// Create a new minimum withdrawal delay blocks extractor
-        ///
-        /// # Arguments
-        /// * `_certificate` - Certificate (not used but kept for consistency)
-        pub fn new(_certificate: &StandardCommitment) -> Self {
+        pub fn new() -> Self {
             Self {}
         }
     }
@@ -1234,8 +1218,7 @@ mod stale_stakes_forbidden {
 
             #[test]
             fn stale_stakes_forbidden_extractor() {
-                let cert = create_mock_certificate();
-                let extractor = StaleStakesForbiddenExtractor::new(&cert);
+                let extractor = StaleStakesForbiddenExtractor::new();
 
                 let keys = extractor.storage_keys();
                 assert_eq!(
@@ -1257,8 +1240,7 @@ mod stale_stakes_forbidden {
 
             #[test]
             fn min_withdrawal_delay_blocks_extractor() {
-                let cert = create_mock_certificate();
-                let extractor = MinWithdrawalDelayBlocksExtractor::new(&cert);
+                let extractor = MinWithdrawalDelayBlocksExtractor::new();
 
                 let keys = extractor.storage_keys();
                 assert_eq!(
