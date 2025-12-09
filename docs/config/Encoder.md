@@ -6,10 +6,6 @@
 
 | Name | Type | Description |
 |------|------|-------------|
-| $${\color{red}\texttt{Aws.AccessKey}}$$<br>`ENCODER_AWS_ACCESS_KEY` | `string` | AccessKey to use when interacting with S3. |
-| $${\color{red}\texttt{Aws.EndpointURL}}$$<br>`ENCODER_AWS_ENDPOINT_URL` | `string` | EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used. |
-| $${\color{red}\texttt{Aws.Region}}$$<br>`ENCODER_AWS_REGION` | `string` | Region is the region to use when interacting with S3. Default is "us-east-2". |
-| $${\color{red}\texttt{Aws.SecretAccessKey}}$$<br>`ENCODER_AWS_SECRET_ACCESS_KEY` | `string` | SecretAccessKey to use when interacting with S3. |
 | $${\color{red}\texttt{BlobStore.BucketName}}$$<br>`ENCODER_BLOB_STORE_BUCKET_NAME` | `string` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
 | $${\color{red}\texttt{BlobStore.TableName}}$$<br>`ENCODER_BLOB_STORE_TABLE_NAME` | `string` | TableName is the name of the DynamoDB table that stores blob metadata. |
 | $${\color{red}\texttt{ChunkStore.BucketName}}$$<br>`ENCODER_CHUNK_STORE_BUCKET_NAME` | `string` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
@@ -20,8 +16,12 @@
 
 | Name | Type<br>Default | Description |
 |------|--------------|-------------|
+| $${\color{red}\texttt{Aws.AccessKey}}$$<br>`ENCODER_AWS_ACCESS_KEY` | `string`<br>`""` | AccessKey to use when interacting with S3. |
+| $${\color{red}\texttt{Aws.EndpointURL}}$$<br>`ENCODER_AWS_ENDPOINT_URL` | `string`<br>`""` | EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used. |
 | $${\color{red}\texttt{Aws.FragmentParallelismConstant}}$$<br>`ENCODER_AWS_FRAGMENT_PARALLELISM_CONSTANT` | `int`<br>`0` | FragmentParallelismConstant helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a constant number of workers. Default is 0. |
 | $${\color{red}\texttt{Aws.FragmentParallelismFactor}}$$<br>`ENCODER_AWS_FRAGMENT_PARALLELISM_FACTOR` | `int`<br>`8` | FragmentParallelismFactor helps determine the size of the pool of workers to help upload/download files. A non-zero value for this parameter adds a number of workers equal to the number of cores times this value. Default is 8. In general, the number of workers here can be a lot larger than the number of cores because the workers will be blocked on I/O most of the time. |
+| $${\color{red}\texttt{Aws.Region}}$$<br>`ENCODER_AWS_REGION` | `string`<br>`"us-east-2"` | Region is the region to use when interacting with S3. Default is "us-east-2". |
+| $${\color{red}\texttt{Aws.SecretAccessKey}}$$<br>`ENCODER_AWS_SECRET_ACCESS_KEY` | `string`<br>`""` | SecretAccessKey to use when interacting with S3. |
 | $${\color{red}\texttt{BlobStore.Backend}}$$<br>`ENCODER_BLOB_STORE_BACKEND` | `blobstore.ObjectStorageBackend`<br>`s3` | Backend is the backend to use for object storage (s3 or oci). |
 | $${\color{red}\texttt{BlobStore.OCICompartmentID}}$$<br>`ENCODER_BLOB_STORE_OCI_COMPARTMENT_ID` | `string`<br>`""` | OCI compartment ID (only used when object-storage-backend is oci) |
 | $${\color{red}\texttt{BlobStore.OCINamespace}}$$<br>`ENCODER_BLOB_STORE_OCI_NAMESPACE` | `string`<br>`""` | OCI namespace (only used when object-storage-backend is oci). If not provided, will be retrieved dynamically. |
