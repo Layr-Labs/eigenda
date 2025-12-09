@@ -94,9 +94,6 @@ pub struct QuorumCountExtractor;
 
 impl QuorumCountExtractor {
     /// Create a new quorum count extractor
-    ///
-    /// # Arguments
-    /// * `_certificate` - Certificate (not used but kept for consistency)
     pub fn new() -> Self {
         Self {}
     }
@@ -192,9 +189,6 @@ pub struct NextBlobVersionExtractor;
 
 impl NextBlobVersionExtractor {
     /// Create a new next blob version extractor
-    ///
-    /// # Arguments
-    /// * `_certificate` - Certificate (not used but kept for consistency)
     pub fn new() -> Self {
         Self
     }
@@ -704,9 +698,6 @@ pub struct SecurityThresholdsV2Extractor;
 
 impl SecurityThresholdsV2Extractor {
     /// Create a new security thresholds extractor
-    ///
-    /// # Arguments
-    /// * `_certificate` - Certificate (not used but kept for consistency)
     pub fn new() -> Self {
         Self {}
     }
@@ -759,9 +750,6 @@ pub struct QuorumNumbersRequiredV2Extractor;
 
 impl QuorumNumbersRequiredV2Extractor {
     /// Create a new required quorum numbers extractor
-    ///
-    /// # Arguments
-    /// * `_certificate` - Certificate (not used but kept for consistency)
     pub fn new() -> Self {
         Self {}
     }
@@ -1062,9 +1050,6 @@ mod stale_stakes_forbidden {
 
     impl StaleStakesForbiddenExtractor {
         /// Create a new stale stakes forbidden extractor
-        ///
-        /// # Arguments
-        /// * `_certificate` - Certificate (not used but kept for consistency)
         pub fn new() -> Self {
             Self {}
         }
@@ -1109,9 +1094,6 @@ mod stale_stakes_forbidden {
 
     impl MinWithdrawalDelayBlocksExtractor {
         /// Create a new minimum withdrawal delay blocks extractor
-        ///
-        /// # Arguments
-        /// * `_certificate` - Certificate (not used but kept for consistency)
         pub fn new() -> Self {
             Self {}
         }
