@@ -67,18 +67,17 @@ message DisperseBlobRequest {
 
   // Signature to anchor the request to a specific domain, chainID, and disperserID.
   // Signature is produced over Keccak256(domain || chainID || disperserID || blobKey).
-  // When present, the disperser will validate this signature against blob_header.payment_header.account_id
-  // and enforce disperser_id and chain_id matching.
+  // When present, the disperser will validate this signature against blob_header.payment_header.account_id.
   bytes anchor_signature = 5;
 
   // The disperser ID that this request is intended for.
-  // The disperser will reject requests where this doesn't match its configured ID (when anchor_signature is present).
+  // The disperser will reject requests where this doesn't match the expected value, if anchor_signature is present.
   uint32 disperser_id = 6;
 
   // The chain ID that this request is valid for.
   // Represented as bytes to accommodate uint256 values (32 bytes, big-endian).
   // Should match the Ethereum chain ID where the EigenDA contracts are deployed.
-  // The disperser will reject requests where this doesn't match the actual chain ID (when anchor_signature is present).
+  // The disperser will reject requests where this doesn't match the expected value, if anchor_signature is present.
   bytes chain_id = 7;
 }
 

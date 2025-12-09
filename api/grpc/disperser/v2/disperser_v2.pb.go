@@ -139,16 +139,15 @@ type DisperseBlobRequest struct {
 	Signature []byte `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
 	// Signature to anchor the request to a specific domain, chainID, and disperserID.
 	// Signature is produced over Keccak256(domain || chainID || disperserID || blobKey).
-	// When present, the disperser will validate this signature against blob_header.payment_header.account_id
-	// and enforce disperser_id and chain_id matching.
+	// When present, the disperser will validate this signature against blob_header.payment_header.account_id.
 	AnchorSignature []byte `protobuf:"bytes,5,opt,name=anchor_signature,json=anchorSignature,proto3" json:"anchor_signature,omitempty"`
 	// The disperser ID that this request is intended for.
-	// The disperser will reject requests where this doesn't match its configured ID (when anchor_signature is present).
+	// The disperser will reject requests where this doesn't match the expected value, if anchor_signature is present.
 	DisperserId uint32 `protobuf:"varint,6,opt,name=disperser_id,json=disperserId,proto3" json:"disperser_id,omitempty"`
 	// The chain ID that this request is valid for.
 	// Represented as bytes to accommodate uint256 values (32 bytes, big-endian).
 	// Should match the Ethereum chain ID where the EigenDA contracts are deployed.
-	// The disperser will reject requests where this doesn't match the actual chain ID (when anchor_signature is present).
+	// The disperser will reject requests where this doesn't match the expected value, if anchor_signature is present.
 	ChainId []byte `protobuf:"bytes,7,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 }
 

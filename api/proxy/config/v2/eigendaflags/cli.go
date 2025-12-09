@@ -2,7 +2,6 @@ package eigendaflags
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -351,8 +350,6 @@ func readDisperserCfg(ctx *cli.Context) (dispersal.DisperserClientConfig, error)
 	return dispersal.DisperserClientConfig{
 		GrpcUri:           grpcUri,
 		UseSecureGrpcFlag: !ctx.Bool(DisableTLSFlagName),
-		DisperserID:       0,
-		ChainID:           big.NewInt(1),
 	}, nil
 }
 

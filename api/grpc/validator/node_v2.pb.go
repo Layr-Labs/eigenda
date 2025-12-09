@@ -143,8 +143,6 @@ type StoreChunksRequest struct {
 	Signature []byte `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`
 	// The chain ID that blobs in this batch were signed for.
 	// Represented as bytes to accommodate uint256 values (32 bytes, big-endian).
-	// Required when BlobCertificate.version >= 1 to verify blob signatures.
-	// Should match the Ethereum chain ID where EigenDA contracts are deployed.
 	ChainId []byte `protobuf:"bytes,6,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 }
 
