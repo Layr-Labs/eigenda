@@ -243,6 +243,7 @@ func RunController(cliCtx *cli.Context) error {
 	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
 
 	dispatcher, err := controller.NewController(
+		ctx,
 		&config.DispatcherConfig,
 		time.Now,
 		blobMetadataStore,

@@ -39,8 +39,6 @@ type Controller struct {
 	metrics           *controllerMetrics
 	getNow            func() time.Time
 
-	cursor *blobstore.StatusIndexCursor
-
 	// beforeDispatch function is called before dispatching a blob
 	beforeDispatch BlobCallback
 
@@ -56,6 +54,9 @@ type Controller struct {
 
 	// Tracks signing rates for validators and serves queries about signing rates.
 	signingRateTracker signingrate.SigningRateTracker
+
+	// Acquires blobs ready for dispersal from the encoder->controller pipeline.
+	blobDispersalQueue BlobDispersalQueue
 }
 
 type batchData struct {
@@ -68,6 +69,7 @@ type batchData struct {
 }
 
 func NewController(
+	ctx context.Context,
 	config *ControllerConfig,
 	getNow func() time.Time,
 	blobMetadataStore blobstore.MetadataStore,
@@ -100,6 +102,18 @@ func NewController(
 		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
 	}
 
+	blobDispersalQueue, err := NewDynamodbBlobDispersalQueue(
+		ctx,
+		logger,
+		blobMetadataStore,
+		100,                 // queue size
+		100,                 // request batch size
+		50*time.Millisecond, // request backoff period
+	)
+	if err != nil {
+		return nil, fmt.Errorf("NewDynamodbBlobDispersalQueue: %w", err)
+	}
+
 	return &Controller{
 		ControllerConfig:       config,
 		blobMetadataStore:      blobMetadataStore,
@@ -110,12 +124,12 @@ func NewController(
 		logger:                 logger.With("component", "controller"),
 		metrics:                metrics,
 		getNow:                 getNow,
-		cursor:                 nil,
 		beforeDispatch:         beforeDispatch,
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 		batchMetadataManager:   batchMetadataManager,
 		signingRateTracker:     signingRateTracker,
+		blobDispersalQueue:     blobDispersalQueue,
 	}, nil
 }
 
@@ -466,36 +480,27 @@ func (c *Controller) logAttestationUpdate(batchHeaderHash string, quorumResults 
 		"quorumPercentages", quorumPercentagesBuilder.String())
 }
 
-// Iterates over the input metadata slice, and returns a new slice with stale and duplicate metadatas filtered out
-func (c *Controller) filterStaleAndDedupBlobs(
-	ctx context.Context,
-	inputMetadatas []*v2.BlobMetadata,
-) []*v2.BlobMetadata {
-	outputMetadatas := make([]*v2.BlobMetadata, 0, len(inputMetadatas))
-	now := c.getNow()
-
-	for _, metadata := range inputMetadatas {
-		blobKey, err := metadata.BlobHeader.BlobKey()
-		if err != nil {
-			c.logger.Errorf("compute blob key: %w", err)
-			// we must discard if we cannot compute key, since it's used for deduplication
-			continue
-		}
-
-		if c.checkAndHandleStaleBlob(ctx, blobKey, now, metadata.BlobHeader.PaymentMetadata.Timestamp) {
-			// discard stale blob
-			continue
-		}
-
-		if c.blobSet.Contains(blobKey) {
-			// discard duplicate blob
-			continue
-		}
-
-		outputMetadatas = append(outputMetadatas, metadata)
+// Returns true if the blob is both unique (i.e. not already being dispatched) and fresh (i.e. not stale).
+// This method has the side effect of adding the blob to the blobSet, and updating metrics.
+func (c *Controller) isUniqueAndFresh(ctx context.Context, blobMetadata *v2.BlobMetadata) bool {
+	blobKey, err := blobMetadata.BlobHeader.BlobKey()
+	if err != nil {
+		c.logger.Errorf("compute blob key: %w", err)
+		// we must discard if we cannot compute key, since it's used for deduplication
+		return false
 	}
 
-	return outputMetadatas
+	if c.checkAndHandleStaleBlob(ctx, blobKey, c.getNow(), blobMetadata.BlobHeader.PaymentMetadata.Timestamp) {
+		// discard stale blob
+		return false
+	}
+
+	if c.blobSet.Contains(blobKey) {
+		// discard duplicate blob
+		return false
+	}
+
+	return true
 }
 
 // NewBatch creates a batch of blobs to dispatch
@@ -510,17 +515,21 @@ func (c *Controller) NewBatch(
 	operatorState := batchMetadata.OperatorState()
 
 	probe.SetStage("get_blob_metadata")
-	blobMetadatas, cursor, err := c.blobMetadataStore.GetBlobMetadataByStatusPaginated(
-		ctx,
-		v2.Encoded,
-		c.cursor,
-		c.MaxBatchSize,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get blob metadata by status: %w", err)
+
+	blobMetadatas := make([]*v2.BlobMetadata, 0, c.MaxBatchSize)
+	for int32(len(blobMetadatas)) < c.MaxBatchSize {
+		var next *v2.BlobMetadata
+		select {
+		case next = <-c.blobDispersalQueue.GetNextBlobForDispersal(ctx):
+		default:
+			// no more blobs available right now
+		}
+
+		if c.isUniqueAndFresh(ctx, next) {
+			blobMetadatas = append(blobMetadatas, next)
+		}
 	}
 
-	blobMetadatas = c.filterStaleAndDedupBlobs(ctx, blobMetadatas)
 	c.metrics.reportBlobSetSize(c.blobSet.Size())
 	if len(blobMetadatas) == 0 {
 		return nil, errNoBlobsToDispatch
@@ -650,8 +659,6 @@ func (c *Controller) NewBatch(
 	if err != nil {
 		return nil, fmt.Errorf("failed to put blob inclusion infos: %w", err)
 	}
-
-	c.cursor = cursor
 
 	// Add blobs to the blob set to deduplicate blobs
 	for _, blobKey := range keys {

@@ -791,6 +791,7 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 		metadata.NewBatchMetadata(referenceBlockNumber, operatorState))
 
 	d, err := controller.NewController(
+		t.Context(),
 		&controller.ControllerConfig{
 			PullInterval:               1 * time.Second,
 			FinalizationBlockDelay:     finalizationBlockDelay,

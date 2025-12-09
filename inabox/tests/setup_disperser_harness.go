@@ -911,6 +911,7 @@ func startController(
 
 	// Create controller
 	dispatcher, err := controller.NewController(
+		ctx,
 		dispatcherConfig,
 		time.Now,
 		metadataStore,
