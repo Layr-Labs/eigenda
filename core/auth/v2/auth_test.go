@@ -32,6 +32,7 @@ var (
 func TestAuthentication(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
+	blobRequestAuthenticator := auth.NewBlobRequestAuthenticator()
 
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
@@ -41,13 +42,14 @@ func TestAuthentication(t *testing.T) {
 	signature, err := signer.SignBlobRequest(header)
 	assert.NoError(t, err)
 
-	err = auth.AuthenticateBlobRequest(header, signature, nil, 0, nil)
+	err = blobRequestAuthenticator.AuthenticateBlobRequest(header, signature)
 	assert.NoError(t, err)
 }
 
 func TestAuthenticationFail(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
+	blobRequestAuthenticator := auth.NewBlobRequestAuthenticator()
 
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
@@ -62,7 +64,7 @@ func TestAuthenticationFail(t *testing.T) {
 	signature, err := signer.SignBlobRequest(header)
 	assert.NoError(t, err)
 
-	err = auth.AuthenticateBlobRequest(header, signature, nil, 0, nil)
+	err = blobRequestAuthenticator.AuthenticateBlobRequest(header, signature)
 	assert.Error(t, err)
 }
 

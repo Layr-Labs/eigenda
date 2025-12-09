@@ -59,9 +59,6 @@ message BlobCertificate {
   // To retrieve a blob from the relay, one can find that relay's URL in the EigenDARelayRegistry contract:
   // https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol
   repeated uint32 relay_keys = 3;
-  // Anchor signature ties the blob to a specific disperser and chain.
-  // Produced by signing Keccak256(domain || chainID || disperserID || blobKey) with the account's key.
-  bytes anchor_signature = 4;
 }
 
 // BatchHeader is the header of a batch of blobs

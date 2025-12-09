@@ -294,6 +294,12 @@ var (
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_ID"),
 	}
+	TolerateMissingAnchorSignatureFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "tolerate-missing-anchor-signature"),
+		Usage:    "Whether to accept DisperseBlob requests without an anchor signature.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TOLERATE_MISSING_ANCHOR_SIGNATURE"),
+	}
 )
 
 // Flags needed for computing kzg commitments.
@@ -367,6 +373,7 @@ var optionalFlags = []cli.Flag{
 	SigningRateRetentionPeriodFlag,
 	SigningRatePollIntervalFlag,
 	DisperserIdFlag,
+	TolerateMissingAnchorSignatureFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,

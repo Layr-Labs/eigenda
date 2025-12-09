@@ -41,4 +41,12 @@ type ServerConfig struct {
 
 	// Ethereum chain ID for this disperser.
 	ChainId *big.Int
+
+	// Whether to tolerate requests without an anchor signature.
+	// If false, DisperseBlob requests without an anchor_signature will be rejected.
+	// Default: true (for backwards compatibility with old client code during migration)
+	//
+	// TODO (litt3): this field should eventually be set to false, and then removed, once all clients have updated
+	// to a version that includes anchor signatures.
+	TolerateMissingAnchorSignature bool
 }

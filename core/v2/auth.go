@@ -6,6 +6,7 @@ import (
 )
 
 type BlobRequestAuthenticator interface {
+	AuthenticateBlobRequest(header *BlobHeader, signature []byte) error
 	AuthenticatePaymentStateRequest(accountId gethcommon.Address, request *pb.GetPaymentStateRequest) error
 }
 

@@ -10,16 +10,17 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
-	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstore "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -300,39 +301,8 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		)
 	}
 
-	var reqChainId *big.Int
-	// The chain ID and disperser ID only need to be verified if an anchor signature is provided. If there isn't an
-	// anchor signature, then these values aren't used at all.
-	if len(req.GetAnchorSignature()) > 0 {
-		if req.GetDisperserId() != s.serverConfig.DisperserId {
-			return nil, fmt.Errorf(
-				"disperser ID mismatch: request specifies %d but this disperser is %d",
-				req.GetDisperserId(),
-				s.serverConfig.DisperserId,
-			)
-		}
-
-		reqChainId, err = common.ChainIdFromBytes(req.GetChainId())
-		if err != nil {
-			return nil, fmt.Errorf("invalid chain ID: %w", err)
-		}
-		if s.serverConfig.ChainId.Cmp(reqChainId) != 0 {
-			return nil, fmt.Errorf(
-				"chain ID mismatch: request specifies %s but this disperser is on chain %s",
-				reqChainId.String(),
-				s.serverConfig.ChainId.String(),
-			)
-		}
-	}
-
-	if err = authv2.AuthenticateBlobRequest(
-		blobHeader,
-		req.GetSignature(),
-		req.GetAnchorSignature(),
-		req.GetDisperserId(),
-		reqChainId,
-	); err != nil {
-		return nil, fmt.Errorf("authenticate blob request: %w", err)
+	if err = s.validateAnchorSignature(req, blobHeader); err != nil {
+		return nil, fmt.Errorf("validate anchor signature: %w", err)
 	}
 
 	commitments, err := s.committer.GetCommitmentsForPaddedLength(blob)
@@ -345,6 +315,74 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	}
 
 	return blobHeader, nil
+}
+
+// Validates the anchor signature included in the DisperseBlobRequest.
+//
+// If TolerateMissingAnchorSignature is true, then this method will pass validation even if no anchor signature is
+// provided in the request.
+//
+// If an anchor signature is provided, it will be validated whether or not TolerateMissingAnchorSignature is true.
+// While validating the anchor signature, this method will also verify that the disperser ID and chain ID in the request
+// match the expected values.
+func (s *DispersalServerV2) validateAnchorSignature(
+	req *pb.DisperseBlobRequest,
+	blobHeader *corev2.BlobHeader,
+) error {
+	anchorSignature := req.GetAnchorSignature()
+
+	if len(anchorSignature) == 0 {
+		if s.serverConfig.TolerateMissingAnchorSignature {
+			return nil
+		}
+
+		return errors.New("anchor signature is required but not provided")
+	}
+
+	if len(anchorSignature) != 65 {
+		return fmt.Errorf("anchor signature length is unexpected: %d", len(anchorSignature))
+	}
+
+	if req.GetDisperserId() != s.serverConfig.DisperserId {
+		return fmt.Errorf(
+			"disperser ID mismatch: request specifies %d but this disperser is %d",
+			req.GetDisperserId(),
+			s.serverConfig.DisperserId,
+		)
+	}
+
+	reqChainId, err := common.ChainIdFromBytes(req.GetChainId())
+	if err != nil {
+		return fmt.Errorf("invalid chain ID: %w", err)
+	}
+	if s.serverConfig.ChainId.Cmp(reqChainId) != 0 {
+		return fmt.Errorf(
+			"chain ID mismatch: request specifies %s but this disperser is on chain %s",
+			reqChainId.String(),
+			s.serverConfig.ChainId.String(),
+		)
+	}
+
+	blobKey, err := blobHeader.BlobKey()
+	if err != nil {
+		return fmt.Errorf("compute blob key: %w", err)
+	}
+
+	anchorHash, err := hashing.ComputeDispersalAnchorHash(reqChainId, req.GetDisperserId(), blobKey)
+	if err != nil {
+		return fmt.Errorf("compute anchor hash: %w", err)
+	}
+
+	anchorSigPubKey, err := crypto.SigToPub(anchorHash, anchorSignature)
+	if err != nil {
+		return fmt.Errorf("recover public key from anchor signature: %w", err)
+	}
+
+	if blobHeader.PaymentMetadata.AccountID.Cmp(crypto.PubkeyToAddress(*anchorSigPubKey)) != 0 {
+		return errors.New("anchor signature doesn't match account ID")
+	}
+
+	return nil
 }
 
 // Validates that the dispersal timestamp in the blob header is neither too old, nor too far in the future.

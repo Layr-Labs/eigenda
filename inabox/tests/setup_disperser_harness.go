@@ -1240,13 +1240,14 @@ func startAPIServer(
 
 	// Create server config
 	serverConfig := disperser.ServerConfig{
-		GrpcPort:              fmt.Sprintf("%d", assignedPort),
-		GrpcTimeout:           10 * time.Second,
-		MaxConnectionAge:      5 * time.Minute,
-		MaxConnectionAgeGrace: 30 * time.Second,
-		MaxIdleConnectionAge:  1 * time.Minute,
-		DisperserId:           0,
-		ChainId:               chainId,
+		GrpcPort:                       fmt.Sprintf("%d", assignedPort),
+		GrpcTimeout:                    10 * time.Second,
+		MaxConnectionAge:               5 * time.Minute,
+		MaxConnectionAgeGrace:          30 * time.Second,
+		MaxIdleConnectionAge:           1 * time.Minute,
+		DisperserId:                    0,
+		TolerateMissingAnchorSignature: false,
+		ChainId:                        chainId,
 	}
 
 	metricsConfig := disperser.MetricsConfig{
