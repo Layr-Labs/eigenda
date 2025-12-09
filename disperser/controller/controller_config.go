@@ -95,22 +95,22 @@ var _ config.VerifiableConfig = &ControllerConfig{}
 
 func DefaultDispatcherConfig() *ControllerConfig {
 	return &ControllerConfig{
-		PullInterval:                          1 * time.Second,
-		FinalizationBlockDelay:                75,
-		AttestationTimeout:                    45 * time.Second,
-		BatchMetadataUpdatePeriod:             time.Minute,
-		BatchAttestationTimeout:               55 * time.Second,
-		SignatureTickInterval:                 50 * time.Millisecond,
-		MaxBatchSize:                          32,
-		SignificantSigningThresholdFraction:   0.55,
-		NumConcurrentRequests:                 600,
-		NodeClientCacheSize:                   400,
-		MaxDispersalAge:                       45 * time.Second,
-		SigningRateRetentionPeriod:            14 * 24 * time.Hour, // 2 weeks
-		SigningRateBucketSpan:                 10 * time.Minute,
-		BlobDispersalQueueSize:                1024,
-		BlobDispersalRequestBatchSize:         32,
-		BlobDispersalRequestBackoffPeriod:     50 * time.Millisecond,
+		PullInterval:                        1 * time.Second,
+		FinalizationBlockDelay:              75,
+		AttestationTimeout:                  45 * time.Second,
+		BatchMetadataUpdatePeriod:           time.Minute,
+		BatchAttestationTimeout:             55 * time.Second,
+		SignatureTickInterval:               50 * time.Millisecond,
+		MaxBatchSize:                        32,
+		SignificantSigningThresholdFraction: 0.55,
+		NumConcurrentRequests:               600,
+		NodeClientCacheSize:                 400,
+		MaxDispersalAge:                     45 * time.Second,
+		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
+		SigningRateBucketSpan:               10 * time.Minute,
+		BlobDispersalQueueSize:              1024,
+		BlobDispersalRequestBatchSize:       32,
+		BlobDispersalRequestBackoffPeriod:   50 * time.Millisecond,
 	}
 }
 

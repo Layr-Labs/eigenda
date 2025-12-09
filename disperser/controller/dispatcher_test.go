@@ -805,6 +805,7 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 			MaxDispersalAge:            45 * time.Second,
 			SigningRateRetentionPeriod: 1 * time.Minute,
 			SigningRateBucketSpan:      30 * time.Second,
+			BlobDispersalQueueSize:     32,
 		},
 		time.Now,
 		blobMetadataStore,
