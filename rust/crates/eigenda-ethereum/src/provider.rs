@@ -72,10 +72,10 @@ pub struct EigenDaProviderConfig {
     pub rpc_url: String,
 
     /// Optional address of an EigenDACertVerifierRouter contract. See
-    /// https://layr-labs.github.io/eigenda/integration/spec/4-contracts.html#eigendacertverifierrouter
+    /// <https://layr-labs.github.io/eigenda/integration/spec/4-contracts.html#eigendacertverifierrouter>
     /// If None, the default EigenDA maintained Router for the selected network will be used.
     /// For a trustless integration, we strongly recommend that teams deploy and use their own Router contract. See
-    /// https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#upgradable-quorums-and-thresholds-for-optimistic-verification
+    /// <https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#upgradable-quorums-and-thresholds-for-optimistic-verification>
     /// for more details.
     pub cert_verifier_router_address: Option<EthereumAddress>,
 
@@ -230,20 +230,16 @@ impl EigenDaProvider {
     }
 
     /// Fetches the relevant state used to validate the EigenDA certificate.
+    ///
+    /// See the contracts storage diagram in the [crate documentation](crate#contracts-storage-diagram)
+    /// to get a visual understanding of the different pieces of state being fetched here.
     #[instrument(skip_all)]
     pub async fn fetch_cert_state(
         &self,
         block_height: u64,
         cert: &StandardCommitment,
     ) -> Result<CertStateData, alloy_contract::Error> {
-        let keys = contract::EigenDaThresholdRegistry::storage_keys(cert);
-        let threshold_registry_fut = self
-            .ethereum
-            .get_proof(self.contracts.threshold_registry, keys)
-            .number(block_height)
-            .into_future()
-            .map_err(alloy_contract::Error::TransportError);
-
+        // First we extract all the cert-dependent storage slots from the registry contracts.
         let keys = contract::RegistryCoordinator::storage_keys(cert);
         let registry_coordinator_fut = self
             .ethereum
@@ -252,10 +248,10 @@ impl EigenDaProvider {
             .into_future()
             .map_err(alloy_contract::Error::TransportError);
 
-        let keys = contract::ServiceManager::storage_keys(cert);
-        let service_manager_fut = self
+        let keys = contract::EigenDaThresholdRegistry::storage_keys(cert);
+        let threshold_registry_fut = self
             .ethereum
-            .get_proof(self.contracts.service_manager, keys)
+            .get_proof(self.contracts.threshold_registry, keys)
             .number(block_height)
             .into_future()
             .map_err(alloy_contract::Error::TransportError);
@@ -276,7 +272,15 @@ impl EigenDaProvider {
             .into_future()
             .map_err(alloy_contract::Error::TransportError);
 
-        let keys = contract::DelegationManager::storage_keys(cert);
+        let keys = contract::ServiceManager::storage_keys();
+        let service_manager_fut = self
+            .ethereum
+            .get_proof(self.contracts.service_manager, keys)
+            .number(block_height)
+            .into_future()
+            .map_err(alloy_contract::Error::TransportError);
+
+        let keys = contract::DelegationManager::storage_keys();
         let delegation_manager_fut = self
             .ethereum
             .get_proof(self.contracts.delegation_manager, keys)
@@ -300,7 +304,7 @@ impl EigenDaProvider {
                 .get_cert_verifier_at_rbn(cert.reference_block() as u32)
                 .await?;
 
-            let keys = contract::EigenDaCertVerifier::storage_keys(cert);
+            let keys = contract::EigenDaCertVerifier::storage_keys();
             self.ethereum
                 .get_proof(cert_verifier_addr, keys)
                 .number(block_height)
