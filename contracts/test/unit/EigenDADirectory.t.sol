@@ -291,7 +291,6 @@ contract EigenDADirectoryTest is Test {
         vm.stopPrank();
     }
 
-
     // ===========================
     // Config Registry: BlockNumber Config Tests
     // ===========================
@@ -604,7 +603,9 @@ contract EigenDADirectoryTest is Test {
         // Verify they don't interfere with each other
         assertEq(resultsBlock.length, 2, "BlockNumber should have 2 checkpoints");
         assertEq(resultsTimestamp.length, 2, "Timestamp should have 2 checkpoints");
-        assertEq(keccak256(resultsBlock[0].value), keccak256(bytes("blockValue1")), "BlockNumber values should be correct");
+        assertEq(
+            keccak256(resultsBlock[0].value), keccak256(bytes("blockValue1")), "BlockNumber values should be correct"
+        );
         assertEq(keccak256(resultsTimestamp[0].value), keccak256(hex"aa"), "Timestamp values should be correct");
     }
 }
