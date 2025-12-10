@@ -320,7 +320,7 @@ func (c *Controller) HandleSignatures(
 
 	batchHeaderHash := hex.EncodeToString(batchData.BatchHeaderHash[:])
 	for _, key := range batchData.BlobKeys {
-		err := c.blobMetadataStore.UpdateBlobStatus(ctx, key, v2.GatheringSignatures)
+		err := c.updateBlobStatus(ctx, key, v2.GatheringSignatures)
 		if err != nil {
 			c.logger.Error("failed to update blob status to 'gathering signatures'",
 				"blobKey", key.Hex(),
@@ -528,6 +528,7 @@ func (c *Controller) NewBatch(
 			keepLooking = false
 		}
 
+
 		if next != nil && c.isUniqueAndFresh(ctx, next) {
 			blobMetadatas = append(blobMetadatas, next)
 		}
@@ -712,9 +713,9 @@ func (c *Controller) checkAndHandleStaleBlob(
 		dispersalTime.Format(time.RFC3339),
 	)
 
-	err := c.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
+	err := c.updateBlobStatus(ctx, blobKey, v2.Failed)
 	if err != nil {
-		c.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
+		c.logger.Errorf("update blob status: %w", err)
 	} else {
 		// Call beforeDispatch to clean up the blob from upstream encodingManager blobSet.
 		// Since the stale check occurs before beforeDispatch would normally be called,
@@ -724,7 +725,6 @@ func (c *Controller) checkAndHandleStaleBlob(
 				c.logger.Errorf("beforeDispatch cleanup failed for stale blob: blobKey=%s err=%w", blobKey.Hex(), err)
 			}
 		}
-		c.blobSet.RemoveBlob(blobKey)
 	}
 
 	return true
@@ -766,12 +766,9 @@ func (c *Controller) updateBatchStatus(
 		blobKey := batch.BlobKeys[i]
 		if cert == nil || cert.BlobHeader == nil {
 			c.logger.Error("invalid blob certificate in batch")
-			err := c.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
+			err := c.updateBlobStatus(ctx, blobKey, v2.Failed)
 			if err != nil {
-				multierr = multierror.Append(multierr,
-					fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
-			} else {
-				c.blobSet.RemoveBlob(blobKey)
+				multierr = multierror.Append(multierr, fmt.Errorf("update blob status: %w", err))
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
 				c.metrics.reportCompletedBlob(
@@ -790,12 +787,9 @@ func (c *Controller) updateBatchStatus(
 		}
 
 		if failed {
-			err := c.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
+			err := c.updateBlobStatus(ctx, blobKey, v2.Failed)
 			if err != nil {
-				multierr = multierror.Append(multierr,
-					fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
-			} else {
-				c.blobSet.RemoveBlob(blobKey)
+				multierr = multierror.Append(multierr, fmt.Errorf("update blob status: %w", err))
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
 				c.metrics.reportCompletedBlob(
@@ -804,12 +798,10 @@ func (c *Controller) updateBatchStatus(
 			continue
 		}
 
-		err := c.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Complete)
+		err := c.updateBlobStatus(ctx, blobKey, v2.Complete)
+
 		if err != nil {
-			multierr = multierror.Append(multierr,
-				fmt.Errorf("failed to update blob status for blob %s to complete: %w", blobKey.Hex(), err))
-		} else {
-			c.blobSet.RemoveBlob(blobKey)
+			multierr = multierror.Append(multierr, fmt.Errorf("update blob status: %w", err))
 		}
 		if metadata, ok := batch.Metadata[blobKey]; ok {
 			requestedAt := time.Unix(0, int64(metadata.RequestedAt))
@@ -825,17 +817,30 @@ func (c *Controller) updateBatchStatus(
 func (c *Controller) failBatch(ctx context.Context, batch *batchData) error {
 	var multierr error
 	for _, blobKey := range batch.BlobKeys {
-		err := c.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
+		err := c.updateBlobStatus(ctx, blobKey, v2.Failed)
 		if err != nil {
 			multierr = multierror.Append(multierr,
-				fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
+				fmt.Errorf("update blob status: %w", err))
 		}
 		if metadata, ok := batch.Metadata[blobKey]; ok {
 			c.metrics.reportCompletedBlob(
 				int(metadata.BlobSize), v2.Failed, metadata.BlobHeader.PaymentMetadata.AccountID.Hex())
 		}
-		c.blobSet.RemoveBlob(blobKey)
 	}
 
 	return multierr
+}
+
+// Update the blob status. If the status is terminal, remove the blob from the blob set.
+func (c *Controller) updateBlobStatus(ctx context.Context, blobKey corev2.BlobKey, status v2.BlobStatus) error {
+	err := c.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, status)
+	if err != nil {
+		return fmt.Errorf("failed to update blob status for blob %s to %s: %w", blobKey.Hex(), status.String(), err)
+	}
+
+	if status == v2.Complete || status == v2.Failed {
+		c.blobSet.RemoveBlob(blobKey)
+	}
+
+	return nil
 }
