@@ -60,42 +60,10 @@ func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) error {
-	var (
-		certVerifierAddr gethcommon.Address
-		certBytes        []byte
-		err              error
-	)
-	// 1 - Determine cert version and serialize appropriately
-	// V2 certs are normalized to V3 for verification
-	if certV4, ok := cert.(*coretypes.EigenDACertV4); ok {
-		// V4 cert
-		certVerifierAddr, err = cv.addressProvider.GetCertVerifierAddress(
-			ctx,
-			certV4.ReferenceBlockNumber(),
-		)
-		if err != nil {
-			return &CertVerifierInternalError{Msg: "get verifier address", Err: err}
-		}
-
-		certBytes, err = certV4.Serialize(coretypes.CertSerializationABI)
-		if err != nil {
-			return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
-		}
-	} else {
-		// Normalize cert to V3
-		certV3 := NormalizeCertV3(cert)
-		certVerifierAddr, err = cv.addressProvider.GetCertVerifierAddress(
-			ctx,
-			certV3.ReferenceBlockNumber(),
-		)
-		if err != nil {
-			return &CertVerifierInternalError{Msg: "get verifier address", Err: err}
-		}
-
-		certBytes, err = certV3.Serialize(coretypes.CertSerializationABI)
-		if err != nil {
-			return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
-		}
+	// 1 - Serialize the certificate to bytes
+	certBytes, err := SerializeCert(cert)
+	if err != nil {
+		return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
 	}
 
 	// 2 - Call the contract method CheckDACert to verify the certificate
@@ -113,6 +81,14 @@ func (cv *CertVerifier) CheckDACert(
 	callMsgBytes, err := cv.v2VerifierBinding.TryPackCheckDACert(certBytes)
 	if err != nil {
 		return &CertVerifierInternalError{Msg: "pack checkDACert call", Err: err}
+	}
+
+	certVerifierAddr, err := cv.addressProvider.GetCertVerifierAddress(
+		ctx,
+		cert.ReferenceBlockNumber(),
+	)
+	if err != nil {
+		return &CertVerifierInternalError{Msg: "get verifier address", Err: err}
 	}
 
 	// TODO(ethenoethan): understand the best mechanisms for determining if the call ran into an
@@ -152,41 +128,18 @@ func (cv *CertVerifier) EstimateGasCheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) (uint64, error) {
-	var (
-		certVerifierAddress gethcommon.Address
-		certBytes           []byte
-		err                 error
+	// Serialize the certificate to bytes
+	certBytes, err := SerializeCert(cert)
+	if err != nil {
+		return 0, fmt.Errorf("serialize cert: %w", err)
+	}
+
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(
+		ctx,
+		cert.ReferenceBlockNumber(),
 	)
-
-	if certV4, ok := cert.(*coretypes.EigenDACertV4); ok {
-		// V4 cert
-		certVerifierAddress, err = cv.addressProvider.GetCertVerifierAddress(
-			ctx,
-			certV4.ReferenceBlockNumber(),
-		)
-		if err != nil {
-			return 0, fmt.Errorf("get cert verifier address: %w", err)
-		}
-
-		certBytes, err = certV4.Serialize(coretypes.CertSerializationABI)
-		if err != nil {
-			return 0, fmt.Errorf("serialize cert: %w", err)
-		}
-	} else {
-		// Normalize cert to V3
-		certV3 := NormalizeCertV3(cert)
-		certVerifierAddress, err = cv.addressProvider.GetCertVerifierAddress(
-			ctx,
-			certV3.ReferenceBlockNumber(),
-		)
-		if err != nil {
-			return 0, fmt.Errorf("get cert verifier address: %w", err)
-		}
-
-		certBytes, err = certV3.Serialize(coretypes.CertSerializationABI)
-		if err != nil {
-			return 0, fmt.Errorf("serialize cert: %w", err)
-		}
+	if err != nil {
+		return 0, fmt.Errorf("get cert verifier address: %w", err)
 	}
 
 	// Pack the checkDACert method call data
@@ -403,27 +356,23 @@ func (cv *CertVerifier) GetOffchainDerivationVersion(ctx context.Context, refere
 	return offchainDerivationVersion, nil
 }
 
-// NormalizeCertV3 returns a EigenDACertV3 for a given EigenDACert
-//
-// This method normalizes a given EigenDACert (V2 or V3) to V3. If a V2 cert is given
-// it is converted to V3 then returned, otherwise the given V3 cert is returned. All
-// other versions will result in a panic.
-func NormalizeCertV3(cert coretypes.EigenDACert) *coretypes.EigenDACertV3 {
-	// switch on the certificate type to determine which contract to call
-	var certV3 *coretypes.EigenDACertV3
+func SerializeCert(cert coretypes.EigenDACert) ([]byte, error) {
+	var certBytes []byte
+	var err error
+
 	switch cert := cert.(type) {
-	case *coretypes.EigenDACertV3:
-		certV3 = cert
 	case *coretypes.EigenDACertV2:
-		// EigenDACertV3 is the only version that is supported by the CheckDACert function
-		// but the V2 cert is a simple permutation of the V3 cert fields, so we convert it.
-		certV3 = cert.ToV3()
+		certV3 := cert.ToV3()
+		certBytes, err = certV3.Serialize(coretypes.CertSerializationABI)
+	case *coretypes.EigenDACertV3, *coretypes.EigenDACertV4:
+		certBytes, err = cert.Serialize(coretypes.CertSerializationABI)
 	default:
-		// If golang had enums the world would be a better place.
-		panic(fmt.Sprintf("unsupported cert version: %T. All cert versions that we can "+
-			"construct offchain should have a CertVerifier contract which we can call to "+
-			"verify the certificate", cert))
+		return nil, fmt.Errorf("unsupported cert version: %T", cert)
 	}
 
-	return certV3
+	if err != nil {
+		return nil, fmt.Errorf("serialize: %w", err)
+	}
+
+	return certBytes, nil
 }
