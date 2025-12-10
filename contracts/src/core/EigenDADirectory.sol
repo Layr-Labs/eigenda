@@ -203,10 +203,7 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
         return ConfigRegistryLib.getNameListTimeStamp();
     }
 
-    /// @notice Retrieves the currently active block number config checkpoint and all future checkpoints for a given name.
-    /// @dev Returns the checkpoint with the highest activation block that is less than or equal to the provided reference block,
-    ///      plus all checkpoints with activation block numbers greater than the provided reference block.
-    ///      This allows offchain clients to know the current configuration value and plan ahead for upcoming updates.
+    /// @inheritdoc IEigenDAConfigRegistry
     function getActiveAndFutureBlockNumberConfigs(string memory name, uint256 referenceBlockNumber)
         external
         view
@@ -215,10 +212,7 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
         return ConfigRegistryLib.getActiveAndFutureBlockNumberConfigs(name, referenceBlockNumber);
     }
 
-    /// @notice Retrieves the currently active timestamp config checkpoint and all future checkpoints for a given name.
-    /// @dev Returns the checkpoint with the highest activation timestamp that is less than or equal to the provided reference timestamp,
-    ///      plus all checkpoints with activation timestamps greater than the provided reference timestamp.
-    ///      This allows offchain clients to know the current configuration value and plan ahead for upcoming updates.
+    /// @inheritdoc IEigenDAConfigRegistry
     function getActiveAndFutureTimestampConfigs(string memory name, uint256 referenceTimestamp)
         external
         view
