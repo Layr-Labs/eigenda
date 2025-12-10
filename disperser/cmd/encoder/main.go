@@ -115,10 +115,6 @@ func run(_ context.Context) error {
 		}
 
 		blobStoreBucketName := config.BlobStore.BucketName
-		if blobStoreBucketName == "" {
-			return fmt.Errorf("blob store bucket name is required")
-		}
-
 		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, objectStorageClient, logger)
 		logger.Info("Blob store", "bucket", blobStoreBucketName, "backend", config.BlobStore.Backend)
 

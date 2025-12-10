@@ -7,7 +7,6 @@
 | Name | Type | Description |
 |------|------|-------------|
 | $${\color{red}\texttt{BlobStore.BucketName}}$$<br>`ENCODER_BLOB_STORE_BUCKET_NAME` | `string` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
-| $${\color{red}\texttt{BlobStore.TableName}}$$<br>`ENCODER_BLOB_STORE_TABLE_NAME` | `string` | TableName is the name of the DynamoDB table that stores blob metadata. |
 | $${\color{red}\texttt{ChunkStore.BucketName}}$$<br>`ENCODER_CHUNK_STORE_BUCKET_NAME` | `string` | BucketName is the name of the bucket that stores blobs (S3 or OCI). |
 | $${\color{red}\texttt{Kzg.CacheDir}}$$<br>`ENCODER_KZG_CACHE_DIR` | `string` | Path to SRS Table directory. Always required even if PreloadEncoder is false, because the prover will write the SRS tables to this directory if they are not already present. |
 | $${\color{red}\texttt{Kzg.G1Path}}$$<br>`ENCODER_KZG_G1_PATH` | `string` | G1 points are needed by both the prover and verifier, so G1Path is always needed. |
@@ -26,6 +25,7 @@
 | $${\color{red}\texttt{BlobStore.OCICompartmentID}}$$<br>`ENCODER_BLOB_STORE_OCI_COMPARTMENT_ID` | `string`<br>`""` | OCI compartment ID (only used when object-storage-backend is oci) |
 | $${\color{red}\texttt{BlobStore.OCINamespace}}$$<br>`ENCODER_BLOB_STORE_OCI_NAMESPACE` | `string`<br>`""` | OCI namespace (only used when object-storage-backend is oci). If not provided, will be retrieved dynamically. |
 | $${\color{red}\texttt{BlobStore.OCIRegion}}$$<br>`ENCODER_BLOB_STORE_OCI_REGION` | `string`<br>`""` | OCI region (only used when object-storage-backend is oci) |
+| $${\color{red}\texttt{BlobStore.TableName}}$$<br>`ENCODER_BLOB_STORE_TABLE_NAME` | `string`<br>`""` | TableName is the name of the DynamoDB table that stores blob metadata. |
 | $${\color{red}\texttt{ChunkStore.Backend}}$$<br>`ENCODER_CHUNK_STORE_BACKEND` | `string`<br>`"s3"` | Backend is the backend to use for object storage (s3 or oci). |
 | $${\color{red}\texttt{EnableMetrics}}$$<br>`ENCODER_ENABLE_METRICS` | `bool`<br>`true` | EnableMetrics enables the metrics HTTP server for prometheus metrics collection |
 | $${\color{red}\texttt{GrpcPort}}$$<br>`ENCODER_GRPC_PORT` | `string`<br>`"34000"` | Port at which encoder listens for gRPC calls (default: 34000) |
