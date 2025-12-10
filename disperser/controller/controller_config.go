@@ -61,7 +61,6 @@ type ControllerConfig struct {
 	// NOTE: No matter the value of this field, accounts that DO have a human-friendly name remapping will be reported
 	// as their remapped name in metrics. If you must reduce metric cardinality by reporting ALL accounts as "0x0",
 	// you shouldn't define any human-friendly name remappings.
-	EnableFullAccountIDInMetrics      bool
 	EnablePerAccountBlobStatusMetrics bool
 
 	// NumConcurrentRequests is the size of the worker pool for processing dispersal requests concurrently.
