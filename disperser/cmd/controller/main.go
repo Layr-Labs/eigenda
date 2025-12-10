@@ -157,7 +157,11 @@ func RunController(cliCtx *cli.Context) error {
 		if err != nil {
 			logger.Error("Failed to load user account remapping", "error", err)
 		} else {
-			logger.Info("Loaded user account remapping")
+			var mappings []string
+			for oldName, newName := range userAccountRemapping {
+				mappings = append(mappings, fmt.Sprintf("%s->%s", oldName, newName))
+			}
+			logger.Info("Loaded user account remapping", "count", len(userAccountRemapping), "mappings", strings.Join(mappings, ", "))
 		}
 	}
 
