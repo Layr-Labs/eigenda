@@ -13,6 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	controllermocks "github.com/Layr-Labs/eigenda/api/grpc/controller/mocks"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/math"
@@ -40,6 +42,10 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
+var invalidSignature = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+	26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+	55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65}
+
 type testComponents struct {
 	DispersalServerV2 *apiserver.DispersalServerV2
 	BlobStore         *blobstore.BlobStore
@@ -47,6 +53,40 @@ type testComponents struct {
 	ChainReader       *mock.MockWriter
 	Signer            *auth.LocalBlobRequestSigner
 	Peer              *peer.Peer
+}
+
+// buildDisperseBlobRequest creates a properly signed DisperseBlobRequest with both blob key and anchor signatures.
+// Uses chainID=31337 and disperserID=0 to match the test server configuration.
+// Returns the request and the blob key.
+func buildDisperseBlobRequest(
+	t *testing.T,
+	signer *auth.LocalBlobRequestSigner,
+	data []byte,
+	blobHeaderProto *pbcommonv2.BlobHeader,
+) (*pbv2.DisperseBlobRequest, corev2.BlobKey) {
+	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
+	require.NoError(t, err)
+
+	blobKey, err := blobHeader.BlobKey()
+	require.NoError(t, err)
+
+	blobKeySignature, err := signer.SignBytes(blobKey[:])
+	require.NoError(t, err)
+
+	anchorHash, err := hashing.ComputeDispersalAnchorHash(big.NewInt(31337), 0, blobKey)
+	require.NoError(t, err)
+	anchorSignature, err := signer.SignBytes(anchorHash)
+	require.NoError(t, err)
+
+	request := &pbv2.DisperseBlobRequest{
+		Blob:            data,
+		Signature:       blobKeySignature,
+		BlobHeader:      blobHeaderProto,
+		AnchorSignature: anchorSignature,
+		DisperserId:     0,
+		ChainId:         common.ChainIdToBytes(big.NewInt(31337)),
+	}
+	return request, blobKey
 }
 
 func TestV2DisperseBlob(t *testing.T) {
@@ -77,21 +117,15 @@ func TestV2DisperseBlob(t *testing.T) {
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	fmt.Println("blobHeader", blobHeader)
 	require.NoError(t, err)
+
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
-	require.NoError(t, err)
-	sig, err := signer.SignBlobRequest(blobHeader)
 	require.NoError(t, err)
 
 	now := time.Now()
-	reply, err := c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  sig,
-		BlobHeader: blobHeaderProto,
-	})
+	request, blobKey := buildDisperseBlobRequest(t, signer, data, blobHeaderProto)
+	reply, err := c.DispersalServerV2.DisperseBlob(ctx, request)
 	require.NoError(t, err)
 
-	blobKey, err := blobHeader.BlobKey()
-	require.NoError(t, err)
 	require.Equal(t, pbv2.BlobStatus_QUEUED, reply.GetResult())
 	require.Equal(t, blobKey[:], reply.GetBlobKey())
 
@@ -112,11 +146,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	require.Equal(t, blobMetadata.RequestedAt, blobMetadata.UpdatedAt)
 
 	// Try dispersing the same blob; blob key check will fail if the blob is already stored
-	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  sig,
-		BlobHeader: blobHeaderProto,
-	})
+	reply, err = c.DispersalServerV2.DisperseBlob(ctx, request)
 	require.Nil(t, reply)
 	require.ErrorContains(t, err, "blob already exists")
 
@@ -154,10 +184,14 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
+	// Can't use helper for structurally invalid headers (missing commitments breaks BlobKey computation)
 	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
-		BlobHeader: invalidReqProto,
+		Blob:            data,
+		Signature:       invalidSignature,
+		BlobHeader:      invalidReqProto,
+		AnchorSignature: invalidSignature,
+		DisperserId:     0,
+		ChainId:         common.ChainIdToBytes(big.NewInt(31337)),
 	})
 	require.ErrorContains(t, err, "blob header must contain commitments")
 	commitmentProto, err := commitments.ToProtobuf()
@@ -175,9 +209,12 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		},
 	}
 	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
-		BlobHeader: invalidReqProto,
+		Blob:            data,
+		Signature:       invalidSignature,
+		BlobHeader:      invalidReqProto,
+		AnchorSignature: invalidSignature,
+		DisperserId:     0,
+		ChainId:         common.ChainIdToBytes(big.NewInt(31337)),
 	})
 	require.ErrorContains(t, err, "too many quorum numbers specified")
 
@@ -192,11 +229,8 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
-		BlobHeader: invalidReqProto,
-	})
+	request, _ := buildDisperseBlobRequest(t, signer, data, invalidReqProto)
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, request)
 	require.ErrorContains(t, err, "invalid quorum")
 
 	// request with invalid blob version
@@ -210,11 +244,8 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
-		BlobHeader: invalidReqProto,
-	})
+	request, _ = buildDisperseBlobRequest(t, signer, data, invalidReqProto)
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, request)
 	require.ErrorContains(t, err, "invalid blob version 2")
 
 	invalidReqProto = &pbcommonv2.BlobHeader{
@@ -227,12 +258,10 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	// request with invalid signature
-	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
-		BlobHeader: invalidReqProto,
-	})
+	// request with invalid signature - build valid request then corrupt signature to test signature validation
+	request, _ = buildDisperseBlobRequest(t, signer, data, invalidReqProto)
+	request.Signature = invalidSignature
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, request)
 	require.ErrorContains(t, err, "authentication failed")
 
 	// request with invalid payment metadata
@@ -246,15 +275,8 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(0).Bytes(),
 		},
 	}
-	blobHeader, err := corev2.BlobHeaderFromProtobuf(invalidReqProto)
-	require.NoError(t, err)
-	sig, err := signer.SignBlobRequest(blobHeader)
-	require.NoError(t, err)
-	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  sig,
-		BlobHeader: invalidReqProto,
-	})
+	request, _ = buildDisperseBlobRequest(t, signer, data, invalidReqProto)
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, request)
 	require.ErrorContains(t, err, "invalid payment metadata")
 
 	// request with invalid commitment
@@ -270,15 +292,8 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	blobHeader, err = corev2.BlobHeaderFromProtobuf(invalidReqProto)
-	require.NoError(t, err)
-	sig, err = signer.SignBlobRequest(blobHeader)
-	require.NoError(t, err)
-	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  sig,
-		BlobHeader: invalidReqProto,
-	})
+	request, _ = buildDisperseBlobRequest(t, signer, data, invalidReqProto)
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, request)
 	require.ErrorContains(t, err, "is less than blob length")
 
 	// request with blob size exceeding the limit
@@ -300,15 +315,8 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	blobHeader, err = corev2.BlobHeaderFromProtobuf(validHeader)
-	require.NoError(t, err)
-	sig, err = signer.SignBlobRequest(blobHeader)
-	require.NoError(t, err)
-	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  sig,
-		BlobHeader: validHeader,
-	})
+	request, _ = buildDisperseBlobRequest(t, signer, data, validHeader)
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, request)
 	require.ErrorContains(t, err, "blob size too big")
 
 }
@@ -703,17 +711,8 @@ func TestTimestampValidation(t *testing.T) {
 				},
 			}
 
-			blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
-			require.NoError(t, err)
-
-			sig, err := signer.SignBlobRequest(blobHeader)
-			require.NoError(t, err)
-
-			_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-				Blob:       data,
-				Signature:  sig,
-				BlobHeader: blobHeaderProto,
-			})
+			request, _ := buildDisperseBlobRequest(t, signer, data, blobHeaderProto)
+			_, err = c.DispersalServerV2.DisperseBlob(ctx, request)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -756,18 +755,11 @@ func TestInvalidLength(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
-	require.NoError(t, err)
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	require.NoError(t, err)
-	sig, err := signer.SignBlobRequest(blobHeader)
-	require.NoError(t, err)
 
-	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  sig,
-		BlobHeader: blobHeaderProto,
-	})
+	request, _ := buildDisperseBlobRequest(t, signer, data, blobHeaderProto)
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, request)
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid commitment length, must be a power of 2")
@@ -808,18 +800,11 @@ func TestTooShortCommitment(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
-	require.NoError(t, err)
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	require.NoError(t, err)
-	sig, err := signer.SignBlobRequest(blobHeader)
-	require.NoError(t, err)
 
-	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  sig,
-		BlobHeader: blobHeaderProto,
-	})
+	request, _ := buildDisperseBlobRequest(t, signer, data, blobHeaderProto)
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, request)
 
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "invalid commitment length") ||
