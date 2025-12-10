@@ -268,7 +268,7 @@ library ConfigRegistryLib {
         return S.layout().blockNumberCfg.nameSet.nameList;
     }
 
-    function getActiveAndFutureBlockNumberConfigs(string memory name, uint256 activationKey)
+    function getActiveAndFutureBlockNumberConfigs(string memory name, uint256 referenceBlockNumber)
         internal
         view
         returns (T.BlockNumberCheckpoint[] memory)
@@ -277,14 +277,14 @@ library ConfigRegistryLib {
         uint256 numCheckpoints = getNumCheckpointsBlockNumber(nameDigest);
 
         // There are 3 cases to handle:
-        // 1. If no checkpoints have activation keys less than or equal to the provided activation key, we return an empty array.
-        // 2. If all checkpoints have activation keys less than or equal to the provided activation key, we return the last checkpoint only.
-        // 3. If some checkpoints have activation keys less than or equal to the provided activation key, we return the currently active checkpoint and all future ones.
+        // 1. If no checkpoints have activation block numbers less than or equal to the provided reference block, we return an empty array.
+        // 2. If all checkpoints have activation block numbers less than or equal to the provided reference block, we return the last checkpoint only.
+        // 3. If some checkpoints have activation block numbers less than or equal to or greater than the provided reference block, we return the currently active checkpoint and all future ones.
 
         uint256 startIndex = numCheckpoints; // Default to numCheckpoints (case 1)
         for (uint256 i = 0; i < numCheckpoints; i++) {
-            uint256 checkpointActivationKey = getActivationBlockNumber(nameDigest, numCheckpoints - 1 - i);
-            if (checkpointActivationKey <= activationKey) {
+            uint256 checkpointActivationBlock = getActivationBlockNumber(nameDigest, numCheckpoints - 1 - i);
+            if (checkpointActivationBlock <= referenceBlockNumber) {
                 startIndex = numCheckpoints - 1 - i; // Found the currently active checkpoint (include it)
                 break;
             }
@@ -299,7 +299,7 @@ library ConfigRegistryLib {
         return results;
     }
 
-        function getActiveAndFutureTimestampConfigs(string memory name, uint256 activationKey)
+        function getActiveAndFutureTimestampConfigs(string memory name, uint256 referenceTimestamp)
         internal
         view
         returns (T.TimeStampCheckpoint[] memory)
@@ -308,14 +308,14 @@ library ConfigRegistryLib {
         uint256 numCheckpoints = getNumCheckpointsTimeStamp(nameDigest);
 
         // There are 3 cases to handle:
-        // 1. If no checkpoints have activation keys less than or equal to the provided activation key, we return an empty array.
-        // 2. If all checkpoints have activation keys less than or equal to the provided activation key, we return the last checkpoint only.
-        // 3. If some checkpoints have activation keys less than or equal to the provided activation key, we return the currently active checkpoint and all future ones.
+        // 1. If no checkpoints have activation timetamps less than or equal to the provided reference timestamp, we return an empty array.
+        // 2. If all checkpoints have activation timestamps less than or equal to the provided reference timestamp, we return the last checkpoint only.
+        // 3. If some checkpoints have activation timestamps less than or equal to the provided reference timestamp, we return the currently active checkpoint and all future ones.
 
         uint256 startIndex = numCheckpoints; // Default to numCheckpoints (case 1)
         for (uint256 i = 0; i < numCheckpoints; i++) {
             uint256 activationTS = getActivationTimeStamp(nameDigest, numCheckpoints - 1 - i);
-            if (activationTS <= activationKey) {
+            if (activationTS <= referenceTimestamp) {
                 startIndex = numCheckpoints - 1 - i; // Found the currently active checkpoint (include it)
                 break;
             }

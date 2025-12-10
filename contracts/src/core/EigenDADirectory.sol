@@ -204,28 +204,28 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     }
 
 
-    /// @notice Retrieves the currently active block number configuration checkpoint and all future checkpoints for a given name.
-    /// @dev Returns the checkpoint with the highest activation key that is less than or equal to the provided activation key,
-    ///      plus all checkpoints with activation keys greater than the provided activation key.
-    ///      This allows clients to know the current configuration value and plan ahead for upcoming updates.
-    function getActiveAndFutureBlockNumberConfigs(string memory name, uint256 activationKey)
+    /// @notice Retrieves the currently active block number config checkpoint and all future checkpoints for a given name.
+    /// @dev Returns the checkpoint with the highest activation block that is less than or equal to the provided reference block,
+    ///      plus all checkpoints with activation block numbers greater than the provided reference block.
+    ///      This allows offchain clients to know the current configuration value and plan ahead for upcoming updates.
+    function getActiveAndFutureBlockNumberConfigs(string memory name, uint256 referenceBlockNumber)
         external
         view
         returns (ConfigRegistryTypes.BlockNumberCheckpoint[] memory)
     {
-        return ConfigRegistryLib.getActiveAndFutureBlockNumberConfigs(name, activationKey);
+        return ConfigRegistryLib.getActiveAndFutureBlockNumberConfigs(name, referenceBlockNumber);
     }
 
-    /// @notice Retrieves the currently active bytes configuration checkpoint and all future checkpoints for a given name.
-    /// @dev Returns the checkpoint with the highest activation key that is less than or equal to the provided activation key,
-    ///      plus all checkpoints with activation keys greater than the provided activation key.
-    ///      This allows clients to know the current configuration value and plan ahead for upcoming updates.
-    function getActiveAndFutureTimestampConfigs(string memory name, uint256 activationKey)
+    /// @notice Retrieves the currently active timestamp config checkpoint and all future checkpoints for a given name.
+    /// @dev Returns the checkpoint with the highest activation timestamp that is less than or equal to the provided reference timestamp,
+    ///      plus all checkpoints with activation timestamps greater than the provided reference timestamp.
+    ///      This allows offchain clients to know the current configuration value and plan ahead for upcoming updates.
+    function getActiveAndFutureTimestampConfigs(string memory name, uint256 referenceTimestamp)
         external
         view
         returns (ConfigRegistryTypes.TimeStampCheckpoint[] memory)
     {
-        return ConfigRegistryLib.getActiveAndFutureTimestampConfigs(name, activationKey);
+        return ConfigRegistryLib.getActiveAndFutureTimestampConfigs(name, referenceTimestamp);
     }
 
     /// @inheritdoc IEigenDASemVer
