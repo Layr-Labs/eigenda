@@ -203,6 +203,24 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
         return ConfigRegistryLib.getNameListTimeStamp();
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
+    function getActiveAndFutureBlockNumberConfigs(string memory name, uint256 referenceBlockNumber)
+        external
+        view
+        returns (ConfigRegistryTypes.BlockNumberCheckpoint[] memory)
+    {
+        return ConfigRegistryLib.getActiveAndFutureBlockNumberConfigs(name, referenceBlockNumber);
+    }
+
+    /// @inheritdoc IEigenDAConfigRegistry
+    function getActiveAndFutureTimestampConfigs(string memory name, uint256 referenceTimestamp)
+        external
+        view
+        returns (ConfigRegistryTypes.TimeStampCheckpoint[] memory)
+    {
+        return ConfigRegistryLib.getActiveAndFutureTimestampConfigs(name, referenceTimestamp);
+    }
+
     /// @inheritdoc IEigenDASemVer
     function semver() external pure returns (uint8 major, uint8 minor, uint8 patch) {
         major = 2;
