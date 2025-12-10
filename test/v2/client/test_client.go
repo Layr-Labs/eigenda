@@ -150,9 +150,25 @@ func NewTestClient(
 
 	accountantMetrics := metricsv2.NewAccountantMetrics(registry)
 	dispersalMetrics := metricsv2.NewDispersalMetrics(registry)
+	ethClientConfig := geth.EthClientConfig{
+		RPCURLs:          config.EthRpcUrls,
+		PrivateKeyString: config.PrivateKey,
+		NumConfirmations: 0,
+		NumRetries:       3,
+	}
+	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, accountId, logger)
+	if err != nil {
+		return nil, fmt.Errorf("create Ethereum client: %w", err)
+	}
+
+	chainId, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get chain ID: %w", err)
+	}
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
 	multiplexerConfig.DisperserConnectionCount = config.DisperserConnectionCount
+	multiplexerConfig.ChainID = chainId
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(
 		fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort))
 
@@ -167,22 +183,6 @@ func NewTestClient(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create disperser client multiplexer: %w", err)
-	}
-
-	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          config.EthRpcUrls,
-		PrivateKeyString: config.PrivateKey,
-		NumConfirmations: 0,
-		NumRetries:       3,
-	}
-	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, accountId, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Ethereum client: %w", err)
-	}
-
-	chainId, err := ethClient.ChainID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get chain ID: %w", err)
 	}
 
 	contractDirectoryAddress := gethcommon.HexToAddress(config.ContractDirectoryAddress)
