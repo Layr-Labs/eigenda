@@ -66,8 +66,8 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 				"2 seconds are waited for the second retry; if the call failed, the total waited time for retry is " +
 				"3 seconds. If the retry delay is 0 second, the total waited time for retry is 0 second.",
 			Required: false,
-			Value:    1 * time.Second,
-			EnvVar:   common.PrefixEnvVar(envPrefix, "RETRY_DELAY"),
+			Value:    0 * time.Second,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "RETRY_DELAY_INCREMENT"),
 		},
 	}
 }
