@@ -297,6 +297,10 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		)
 	}
 
+	if err = s.blobRequestAuthenticator.AuthenticateBlobRequest(blobHeader, signature); err != nil {
+		return nil, fmt.Errorf("authentication failed: %w", err)
+	}
+
 	if err = s.validateAnchorSignature(req, blobHeader); err != nil {
 		return nil, fmt.Errorf("validate anchor signature: %w", err)
 	}

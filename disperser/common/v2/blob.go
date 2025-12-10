@@ -74,6 +74,7 @@ func BlobStatusFromProtobuf(s pb.BlobStatus) (BlobStatus, error) {
 type BlobMetadata struct {
 	BlobHeader *corev2.BlobHeader
 	Signature  []byte
+
 	// BlobStatus indicates the current status of the blob
 	BlobStatus BlobStatus
 	// Expiry is Unix timestamp of the blob expiry in seconds from epoch

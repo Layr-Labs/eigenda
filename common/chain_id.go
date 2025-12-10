@@ -6,7 +6,6 @@ import (
 )
 
 // Converts a chain ID to 32-byte big-endian representation compatible with EIP-155.
-// Returns an empty byte slice if chainId is nil.
 func ChainIdToBytes(chainId *big.Int) []byte {
 	if chainId == nil {
 		return nil

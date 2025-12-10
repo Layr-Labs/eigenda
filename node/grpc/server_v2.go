@@ -448,9 +448,8 @@ func (s *ServerV2) validateDispersalRequest(
 		return nil, fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(blobCert.Signature))
 	}
 	err := s.blobAuthenticator.AuthenticateBlobRequest(blobCert.BlobHeader, blobCert.Signature)
-
 	if err != nil {
-		return nil, fmt.Errorf("authenticate blob request: %w", err)
+		return nil, fmt.Errorf("failed to authenticate blob request: %v", err)
 	}
 
 	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
