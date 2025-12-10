@@ -4,6 +4,9 @@ name = "eigenda-verification"
 version = "0.1.0"
 
 [dependencies]
+# workspace dependencies
+eigenda-srs-data = { path = "../eigenda-srs-data" }
+
 alloy-consensus = { workspace = true, features = [
   "serde",
   "serde-bincode-compat",
@@ -18,10 +21,9 @@ ark-ff = { workspace = true }
 bitvec = { version = "1.0.1", default-features = false }
 bytes = { workspace = true }
 derive_more = { workspace = true }
-eigenda-srs-data = { path = "../eigenda-srs-data" }
 hashbrown = { workspace = true, features = ["default-hasher"] }
 hex = { workspace = true }
-proptest = { workspace = true, features = ["alloc", "std"], optional = true }
+proptest = { workspace = true, features = ["alloc", "std"] }
 reth-trie-common = { workspace = true, features = ["serde", "std"] }
 rust-kzg-bn254-primitives = { git = "https://github.com/Layr-Labs/rust-kzg-bn254.git", rev = "60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6", default-features = false }
 rust-kzg-bn254-prover = { workspace = true }
@@ -30,7 +32,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-arbitrary = { workspace = true }
 bincode = { workspace = true, features = ["derive", "serde", "std"] }
 criterion = { workspace = true, features = ["html_reports"] }
 hex = { workspace = true }
@@ -43,7 +44,6 @@ testcontainers = { workspace = true }
 wiremock = { workspace = true }
 
 [features]
-arbitrary = ["dep:proptest"]
 default = []
 test-utils = []
 

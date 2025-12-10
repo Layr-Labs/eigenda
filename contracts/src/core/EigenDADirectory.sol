@@ -37,7 +37,8 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     function initialize(address accessControl) external initializer {
         require(accessControl != address(0), "Access control address cannot be zero");
         bytes32 key = AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey();
-        AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey().setAddress(accessControl);
+        key.setAddress(accessControl);
+        AddressDirectoryLib.registerKey(AddressDirectoryConstants.ACCESS_CONTROL_NAME);
         emit AddressAdded(AddressDirectoryConstants.ACCESS_CONTROL_NAME, key, accessControl);
     }
 

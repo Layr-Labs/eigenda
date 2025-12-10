@@ -31,7 +31,6 @@ sha2 = { version = "0.10", optional = true }
 alloy-consensus = { workspace = true, features = ["arbitrary"] }
 alloy-provider = { workspace = true, features = ["anvil-api"] }
 alloy-rpc-types = { workspace = true, features = ["anvil"] }
-arbitrary = { workspace = true }
 bincode = { workspace = true, features = ["derive", "serde", "std"] }
 hex = { workspace = true }
 jsonschema = { workspace = true }
