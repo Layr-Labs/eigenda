@@ -528,7 +528,6 @@ func (c *Controller) NewBatch(
 			keepLooking = false
 		}
 
-
 		if next != nil && c.isUniqueAndFresh(ctx, next) {
 			blobMetadatas = append(blobMetadatas, next)
 		}
