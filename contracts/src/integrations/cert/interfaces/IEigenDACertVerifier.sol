@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifierBase} from "src/integrations/cert/interfaces/IEigenDACertVerifierBase.sol";
+import {IEigenDACertVerifierBase} from "./IEigenDACertVerifierBase.sol";
 
-import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
+import {IEigenDAThresholdRegistry} from "../../../core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDASignatureVerifier} from "../../../core/interfaces/IEigenDASignatureVerifier.sol";
 
-import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV1 as DATypesV1} from "../../../core/libraries/v1/EigenDATypesV1.sol";
 
 /// @notice The IEigenDACertVerifier interface provides the getters necessary to transform a BlobStatusReply received after a dispersal
 ///         into a Blob Certificate that can be verified by the EigenDACertVerifier that implements this interface version.

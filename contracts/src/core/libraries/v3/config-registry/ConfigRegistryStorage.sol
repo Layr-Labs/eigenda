@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {ConfigRegistryTypes as T} from "src/core/libraries/v3/config-registry/ConfigRegistryTypes.sol";
+import {ConfigRegistryTypes as T} from "./ConfigRegistryTypes.sol";
 
 /// @notice Defines the storage layout for a config registry based on ERC-7201
 ///         https://eips.ethereum.org/EIPS/eip-7201

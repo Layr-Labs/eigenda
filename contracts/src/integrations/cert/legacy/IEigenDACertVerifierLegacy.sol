@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {IEigenDAThresholdRegistry} from "../../../core/interfaces/IEigenDAThresholdRegistry.sol";
+import {EigenDATypesV1 as DATypesV1} from "../../../core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "../../../core/libraries/v2/EigenDATypesV2.sol";
 
 interface IEigenDACertVerifierLegacy is IEigenDAThresholdRegistry {
     /// @notice Verifies a the blob cert is valid for the required quorums

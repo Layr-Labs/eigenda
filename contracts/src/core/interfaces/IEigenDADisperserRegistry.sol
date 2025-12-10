@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV2} from "../libraries/v2/EigenDATypesV2.sol";
 
 interface IEigenDADisperserRegistry {
     event DisperserAdded(uint32 indexed key, address indexed disperser);

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.12;
 
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {IEigenDAAddressDirectory} from "src/core/interfaces/IEigenDADirectory.sol";
+import {IEigenDAAddressDirectory} from "./interfaces/IEigenDADirectory.sol";
 
 abstract contract EigenDARegistryCoordinatorStorage is IRegistryCoordinator {
     ///

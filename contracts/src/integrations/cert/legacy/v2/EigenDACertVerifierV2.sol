@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
-import {
-    EigenDACertVerificationV2Lib as CertV2Lib
-} from "src/integrations/cert/legacy/v2/EigenDACertVerificationV2Lib.sol";
+import {IEigenDAThresholdRegistry} from "../../../../core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDASignatureVerifier} from "../../../../core/interfaces/IEigenDASignatureVerifier.sol";
+import {EigenDACertVerificationV2Lib as CertV2Lib} from "./EigenDACertVerificationV2Lib.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
-import {IRegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
-import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
-import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {IRegistryCoordinator} from "../../../../core/EigenDARegistryCoordinator.sol";
+import {EigenDATypesV2 as DATypesV2} from "../../../../core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV1 as DATypesV1} from "../../../../core/libraries/v1/EigenDATypesV1.sol";
 
 /// @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
 /// @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,

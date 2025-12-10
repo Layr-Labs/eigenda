@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDAThresholdRegistry} from "./interfaces/IEigenDAThresholdRegistry.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
-import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV1 as DATypesV1} from "./libraries/v1/EigenDATypesV1.sol";
 
 /// @title The `EigenDAThresholdRegistryImmutableV1` contract.
 /// @author Layr Labs, Inc.
