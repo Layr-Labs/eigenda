@@ -4,6 +4,9 @@ name = "eigenda-ethereum"
 version = "0.1.0"
 
 [dependencies]
+# workspace dependencies
+eigenda-verification = { path = "../eigenda-verification" }
+
 alloy-consensus = { workspace = true, features = [
   "serde",
   "serde-bincode-compat",
@@ -17,10 +20,10 @@ alloy-rpc-types-eth = { workspace = true }
 alloy-signer-local = { workspace = true }
 alloy-sol-types = { workspace = true }
 alloy-transport = { workspace = true }
-derive_more.workspace = true
-eigenda-verification = { path = "../eigenda-verification" }
-futures = { workspace = true }
 reth-trie-common = { workspace = true, features = ["serde", "eip1186"] }
+
+derive_more.workspace = true
+futures = { workspace = true }
 rustls = { workspace = true, features = ["aws-lc-rs"] }
 schemars = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["alloc", "derive"] }
