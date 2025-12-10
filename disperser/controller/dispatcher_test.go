@@ -817,7 +817,9 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 		beforeDispatch,
 		blobSet,
 		livenessChan,
-		signingrate.NewNoOpSigningRateTracker())
+		signingrate.NewNoOpSigningRateTracker(),
+		nil, // userAccountRemapping
+	)
 	require.NoError(t, err)
 	return &controllerComponents{
 		Controller:           d,

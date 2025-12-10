@@ -4,6 +4,7 @@ import (
 	"time"
 
 	common "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -27,10 +28,15 @@ type encodingManagerMetrics struct {
 	blobSetSize             *prometheus.GaugeVec
 	staleDispersalCount     prometheus.Counter
 	enablePerAccountMetrics bool
+	userAccountRemapping    map[string]string
 }
 
 // NewEncodingManagerMetrics sets up metrics for the encoding manager.
-func newEncodingManagerMetrics(registry *prometheus.Registry, enablePerAccountMetrics bool) *encodingManagerMetrics {
+func newEncodingManagerMetrics(
+	registry *prometheus.Registry,
+	enablePerAccountMetrics bool,
+	userAccountRemapping map[string]string,
+) *encodingManagerMetrics {
 	batchSubmissionLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  encodingManagerNamespace,
@@ -168,6 +174,7 @@ func newEncodingManagerMetrics(registry *prometheus.Registry, enablePerAccountMe
 		blobSetSize:             blobSetSize,
 		staleDispersalCount:     staleDispersalCount,
 		enablePerAccountMetrics: enablePerAccountMetrics,
+		userAccountRemapping:    userAccountRemapping,
 	}
 }
 
@@ -212,11 +219,7 @@ func (m *encodingManagerMetrics) reportFailedSubmission() {
 }
 
 func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus, accountID string) {
-	// If per-account metrics are disabled, aggregate under "0x0"
-	accountLabel := accountID
-	if !m.enablePerAccountMetrics {
-		accountLabel = "0x0"
-	}
+	accountLabel := nameremapping.GetAccountLabel(accountID, m.userAccountRemapping, m.enablePerAccountMetrics)
 
 	switch status {
 	case dispv2.Encoded:

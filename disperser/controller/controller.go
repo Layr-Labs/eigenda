@@ -82,6 +82,7 @@ func NewController(
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 	signingRateTracker signingrate.SigningRateTracker,
+	userAccountRemapping map[string]string,
 ) (*Controller, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -95,7 +96,8 @@ func NewController(
 		registry,
 		config.SignificantSigningThresholdFraction,
 		config.CollectDetailedValidatorSigningMetrics,
-		config.EnablePerAccountBlobStatusMetrics)
+		config.EnablePerAccountBlobStatusMetrics,
+		userAccountRemapping)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
 	}

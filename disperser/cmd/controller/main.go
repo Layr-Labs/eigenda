@@ -24,6 +24,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
@@ -150,6 +151,20 @@ func RunController(cliCtx *cli.Context) error {
 
 	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
 
+	var userAccountRemapping map[string]string
+	if config.UserAccountRemappingFilePath != "" {
+		userAccountRemapping, err = nameremapping.LoadNameRemapping(config.UserAccountRemappingFilePath)
+		if err != nil {
+			logger.Error("Failed to load user account remapping", "error", err)
+		} else {
+			var mappings []string
+			for oldName, newName := range userAccountRemapping {
+				mappings = append(mappings, fmt.Sprintf("%s->%s", oldName, newName))
+			}
+			logger.Info("Loaded user account remapping", "count", len(userAccountRemapping), "mappings", strings.Join(mappings, ", "))
+		}
+	}
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
@@ -167,6 +182,7 @@ func RunController(cliCtx *cli.Context) error {
 		metricsRegistry,
 		encodingManagerBlobSet,
 		controllerLivenessChan,
+		userAccountRemapping,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -257,6 +273,7 @@ func RunController(cliCtx *cli.Context) error {
 		dispatcherBlobSet,
 		controllerLivenessChan,
 		signingRateTracker,
+		userAccountRemapping,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)

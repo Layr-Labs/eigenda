@@ -852,6 +852,7 @@ func startController(
 		metricsRegistry,
 		encodingManagerBlobSet,
 		controllerLivenessChan,
+		nil, // userAccountRemapping
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoding manager: %w", err)
@@ -925,6 +926,7 @@ func startController(
 		dispatcherBlobSet,
 		controllerLivenessChan,
 		signingRateTracker,
+		nil, // userAccountRemapping
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dispatcher: %w", err)
