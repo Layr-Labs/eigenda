@@ -67,7 +67,7 @@ func (cb *CertBuilder) BuildCert(
 	ctx context.Context,
 	certVersion coretypes.CertificateVersion,
 	blobStatusReply *disperser.BlobStatusReply,
-	offchainDerivationVersion uint16,
+	offchainDerivationVersion coretypes.OffchainDerivationVersion,
 ) (coretypes.EigenDACert, error) {
 	switch certVersion {
 	case coretypes.VersionFourCert:
@@ -102,7 +102,7 @@ func (cb *CertBuilder) buildEigenDAV3Cert(
 func (cb *CertBuilder) buildEigenDAV4Cert(
 	ctx context.Context,
 	blobStatusReply *disperser.BlobStatusReply,
-	offchainDerivationVersion uint16,
+	offchainDerivationVersion coretypes.OffchainDerivationVersion,
 ) (*coretypes.EigenDACertV4, error) {
 	nonSignerStakesAndSignature, err := cb.getNonSignerStakesAndSignature(
 		ctx, blobStatusReply.GetSignedBatch())

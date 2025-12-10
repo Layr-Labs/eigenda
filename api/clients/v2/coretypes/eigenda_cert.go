@@ -48,6 +48,11 @@ func init() {
 // CertVersion() view function
 type CertificateVersion = uint8
 
+// OffchainDerivationVersion denotes the version of offchain derivation
+// logic used to verify the EigenDA certificate. This is only applicable
+// for cert versions >= V4
+type OffchainDerivationVersion = uint16
+
 const (
 	// starting at two since we never formally defined a V1 cert in the core codebase
 	VersionTwoCert   = 0x2
@@ -110,7 +115,7 @@ type EigenDACertV4 certTypesBinding.EigenDACertTypesEigenDACertV4
 func NewEigenDACertV4(
 	blobStatusReply *disperser.BlobStatusReply,
 	nonSignerStakesAndSignature *certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature,
-	offchainDerivationVersion uint16,
+	offchainDerivationVersion OffchainDerivationVersion,
 ) (*EigenDACertV4, error) {
 	bindingInclusionInfo, err := InclusionInfoProtoToIEigenDATypesBinding(blobStatusReply.GetBlobInclusionInfo())
 	if err != nil {

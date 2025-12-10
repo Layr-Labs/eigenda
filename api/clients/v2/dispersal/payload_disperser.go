@@ -204,7 +204,7 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	}
 
 	// For cert versions >= V4, we need to get the offchain derivation version from the CertVerifier contract
-	var offchainDerivationVersion uint16
+	var offchainDerivationVersion coretypes.OffchainDerivationVersion
 	if certVersion >= coretypes.VersionFourCert {
 		offchainDerivationVersion, err = pd.certVerifier.GetOffchainDerivationVersion(
 			ctx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
