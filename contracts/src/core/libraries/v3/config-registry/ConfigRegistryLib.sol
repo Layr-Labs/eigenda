@@ -307,7 +307,7 @@ library ConfigRegistryLib {
         uint256 numCheckpoints = getNumCheckpointsTimeStamp(nameDigest);
 
         // There are 3 cases to handle:
-        // 1. If no checkpoints have activation timetamps less than or equal to the provided reference timestamp, we return an empty array.
+        // 1. If no checkpoints have activation timestamps less than or equal to the provided reference timestamp, we return an empty array.
         // 2. If all checkpoints have activation timestamps less than or equal to the provided reference timestamp, we return the last checkpoint only.
         // 3. If some checkpoints have activation timestamps less than or equal to the provided reference timestamp, we return the currently active checkpoint and all future ones.
 
