@@ -33,7 +33,7 @@ func NewLocalBlobRequestSigner(privateKeyHex string) (*LocalBlobRequestSigner, e
 func (s *LocalBlobRequestSigner) SignBytes(bytesToSign []byte) ([]byte, error) {
 	signature, err := crypto.Sign(bytesToSign, s.PrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign bytes: %w", err)
+		return nil, fmt.Errorf("sign: %w", err)
 	}
 
 	return signature, nil

@@ -92,8 +92,7 @@ func (s *DispersalServerV2) disperseBlob(
 		req.GetBlobHeader().GetQuorumNumbers(),
 	)
 
-	blobKey, st := s.StoreBlob(
-		ctx, blob, blobHeader, req.GetSignature(), req.GetAnchorSignature(), time.Now(), onchainState.TTL)
+	blobKey, st := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
 	if st != nil && st.Code() != codes.OK {
 		return nil, st
 	}
@@ -126,7 +125,6 @@ func (s *DispersalServerV2) StoreBlob(
 	data []byte,
 	blobHeader *corev2.BlobHeader,
 	signature []byte,
-	anchorSignature []byte,
 	requestedAt time.Time,
 	ttl time.Duration,
 ) (corev2.BlobKey, *status.Status) {
@@ -146,15 +144,14 @@ func (s *DispersalServerV2) StoreBlob(
 
 	s.logger.Debug("storing blob metadata", "blobHeader", blobHeader)
 	blobMetadata := &dispv2.BlobMetadata{
-		BlobHeader:      blobHeader,
-		Signature:       signature,
-		AnchorSignature: anchorSignature,
-		BlobStatus:      dispv2.Queued,
-		Expiry:          uint64(requestedAt.Add(ttl).Unix()),
-		NumRetries:      0,
-		BlobSize:        uint64(len(data)),
-		RequestedAt:     uint64(requestedAt.UnixNano()),
-		UpdatedAt:       uint64(requestedAt.UnixNano()),
+		BlobHeader:  blobHeader,
+		Signature:   signature,
+		BlobStatus:  dispv2.Queued,
+		Expiry:      uint64(requestedAt.Add(ttl).Unix()),
+		NumRetries:  0,
+		BlobSize:    uint64(len(data)),
+		RequestedAt: uint64(requestedAt.UnixNano()),
+		UpdatedAt:   uint64(requestedAt.UnixNano()),
 	}
 	err = s.blobMetadataStore.PutBlobMetadata(ctx, blobMetadata)
 	if err != nil {
@@ -217,7 +214,6 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	if len(signature) != 65 {
 		return nil, fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(signature))
 	}
-
 	blob := req.GetBlob()
 	blobSize := uint32(len(blob))
 	if blobSize == 0 {
