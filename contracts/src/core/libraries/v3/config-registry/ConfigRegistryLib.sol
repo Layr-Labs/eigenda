@@ -291,15 +291,14 @@ library ConfigRegistryLib {
         }
         // Collect the checkpoints from startIndex to the end (currently active + all future)
         uint256 resultCount = numCheckpoints - startIndex;
-        T.BlockNumberCheckpoint[] memory results =
-            new T.BlockNumberCheckpoint[](resultCount);
+        T.BlockNumberCheckpoint[] memory results = new T.BlockNumberCheckpoint[](resultCount);
         for (uint256 i = 0; i < resultCount; i++) {
             results[i] = getCheckpointBlockNumber(nameDigest, startIndex + i);
         }
         return results;
     }
 
-        function getActiveAndFutureTimestampConfigs(string memory name, uint256 referenceTimestamp)
+    function getActiveAndFutureTimestampConfigs(string memory name, uint256 referenceTimestamp)
         internal
         view
         returns (T.TimeStampCheckpoint[] memory)
