@@ -322,7 +322,8 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 //
 // This method will return the offchain derivation version from an internal cache if it is already known for the cert
 // verifier which corresponds to the input reference block number. Otherwise, this method will query the offchain
-// derivation version and cache the result for future use.
+// derivation version and cache the result for future use. The offchain derivation version was introduced in cert
+// verifier v4. This method should only be called with certs of version 4 or higher.
 func (cv *CertVerifier) GetOffchainDerivationVersion(ctx context.Context, referenceBlockNumber uint64) (uint16, error) {
 	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
@@ -356,6 +357,8 @@ func (cv *CertVerifier) GetOffchainDerivationVersion(ctx context.Context, refere
 	return offchainDerivationVersion, nil
 }
 
+// SerializeCert serializes the input EigenDACert into its ABI-encoded byte representation.
+// V2 certs are first converted to V3 before serialization.
 func SerializeCert(cert coretypes.EigenDACert) ([]byte, error) {
 	var certBytes []byte
 	var err error

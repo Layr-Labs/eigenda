@@ -102,7 +102,7 @@ var _ EigenDACert = &EigenDACertV2{}
 var _ EigenDACert = &EigenDACertV3{}
 var _ EigenDACert = &EigenDACertV4{}
 
-// This struct represents the composition of a EigenDA V4 certificate, as it would exist in a rollup inbox.
+// This struct represents an EigenDA V4 certificate, as it would exist in a rollup inbox.
 type EigenDACertV4 certTypesBinding.EigenDACertTypesEigenDACertV4
 
 // NewEigenDACertV4 creates a new EigenDACertV4 from a BlobStatusReply, NonSignerStakesAndSignature and
@@ -259,7 +259,7 @@ func (c *EigenDACertV4) Commitments() (*encoding.BlobCommitments, error) {
 // defined in this package
 func (c *EigenDACertV4) isEigenDACert() {}
 
-// This struct represents the composition of a EigenDA V3 certificate, as it would exist in a rollup inbox.
+// This struct represents an EigenDA V3 certificate, as it would exist in a rollup inbox.
 type EigenDACertV3 certTypesBinding.EigenDACertTypesEigenDACertV3
 
 // NewEigenDACertV3 creates a new EigenDACertV3 from a BlobStatusReply, and NonSignerStakesAndSignature
@@ -434,7 +434,7 @@ func (c *EigenDACertV3) Commitments() (*encoding.BlobCommitments, error) {
 // defined in this package
 func (c *EigenDACertV3) isEigenDACert() {}
 
-// This struct represents the composition of an EigenDA V2 certificate
+// This struct represents an EigenDA V2 certificate
 // NOTE: This type is hardforked from the V3 type and will no longer
 // be supported for dispersals after the CertV3 hardfork
 type EigenDACertV2 struct {
@@ -642,7 +642,9 @@ func convertV2PubkeysToV3(v2Pubkeys []contractEigenDACertVerifierV2.BN254G1Point
 	return result
 }
 
-func commitments(blobInclusionInfo *certTypesBinding.EigenDATypesV2BlobInclusionInfo) (*encoding.BlobCommitments, error) {
+func commitments(
+	blobInclusionInfo *certTypesBinding.EigenDATypesV2BlobInclusionInfo,
+) (*encoding.BlobCommitments, error) {
 	// TODO: figure out how to remove this casting entirely
 	commitments := contractEigenDACertVerifierV2.EigenDATypesV2BlobCommitment{
 		Commitment: contractEigenDACertVerifierV2.BN254G1Point{
