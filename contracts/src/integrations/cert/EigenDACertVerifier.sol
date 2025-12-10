@@ -23,6 +23,9 @@ contract EigenDACertVerifier is
     IVersionedEigenDACertVerifier,
     IEigenDASemVer
 {
+    /// @notice The maximum calldata bytes length this contracts supports
+    uint256 internal constant MAX_CALLDATA_BYTES_LENGTH = 524_288;
+
     error InvalidSecurityThresholds();
     error InvalidQuorumNumbersRequired(uint256 length);
 
@@ -100,6 +103,17 @@ contract EigenDACertVerifier is
     /// @dev Make sure to call this at a block number that is > RBN, otherwise this function will
     /// return an INVALID_CERT status code because of a require in the BLSSignatureChecker library that we use.
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
+        // This is a coarse bound on maximal input size
+        // if calldata size is larger than MAX_CALLDATA_BYTES_LENGTH, the system treats the input as invalid.
+        // Thus prevents abi decode from having out of gas issue, making honest party unable to invoke this function.
+        // The number is chosen such that it
+        // 1. should not prevent valid use case that there is a valid cert more than this size
+        // 2. should prevent a malicious abiEncodedCert that contains too much data that triggers out of gas for
+        //    abi.encode.
+        if (abiEncodedCert.length > MAX_CALLDATA_BYTES_LENGTH) {
+            return uint8(StatusCode.INVALID_CERT);
+        }
+
         CT.EigenDACertV4 memory daCert;
         // We try catch this here because decoding error would appear as a Panic,
         // which we consider bugs in the try/catch for the checkDACertReverts call below.

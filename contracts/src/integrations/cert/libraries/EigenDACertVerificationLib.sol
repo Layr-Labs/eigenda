@@ -19,6 +19,13 @@ library EigenDACertVerificationLib {
     /// @notice Denominator used for threshold percentage calculations (100 for percentages)
     uint256 internal constant THRESHOLD_DENOMINATOR = 100;
 
+    /// @notice The maximum number of quorums this contract supports
+    uint256 internal constant MAX_QUORUM_COUNT = 100;
+
+    /// @notice The maximum number of nonsigner this contract supports. The count can contain duplicate count if
+    ///         an operator belongs to multiple quorums
+    uint256 internal constant MAX_NONSIGNER_COUNT_ALL_QUORUM = 450;
+
     /// @notice Thrown when the inclusion proof is invalid
     /// @param blobIndex The index of the blob in the batch
     /// @param blobHash The hash of the blob certificate
@@ -59,6 +66,11 @@ library EigenDACertVerificationLib {
     /// @param requiredDerivationVer The required offchain derivation version
     error InvalidOffchainDerivationVersion(uint16 certDerivationVer, uint16 requiredDerivationVer);
 
+    /// @notice Thrown when the blob version is invalid (doesn't exist in the ThresholdRegistry contract)
+    /// @param quorumsCount The number of quorums. Default to 0.
+    /// @param nonsignersCount The number of nonsigners. Default to 0.
+    error InvalidLargeInput(uint256 quorumsCount, uint256 nonsignersCount);
+
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
     /// @param eigenDAThresholdRegistry The threshold registry contract
     /// @param eigenDASignatureVerifier The signature verifier contract
@@ -77,8 +89,12 @@ library EigenDACertVerificationLib {
     ) internal view {
         checkOffchainDerivationVersion(daCert.offchainDerivationVersion, offchainDerivationVersion);
 
+        // verifying merkle inclusion proof is very efficient, even assuming the worst depth 256.
+        // A single depth verification takes about 300 gas for KECCAK256 and CALLDATALOAD
+        // so at worst 80K Gas.
         checkBlobInclusion(daCert.batchHeader, daCert.blobInclusionInfo);
 
+        // checkSecurityParams have only math check and IO call, no need to bound gas cost
         checkSecurityParams(
             eigenDAThresholdRegistry, daCert.blobInclusionInfo.blobCertificate.blobHeader.version, securityThresholds
         );
@@ -190,6 +206,18 @@ library EigenDACertVerificationLib {
         DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         DATypesV1.SecurityThresholds memory securityThresholds
     ) internal view returns (uint256 confirmedQuorumsBitmap) {
+        // the maximal supported number of quorum is 192
+        // https://github.com/Layr-Labs/eigenda/blob/00cc8868b7e2d742fc6584dc1dea312193c8d4c2/contracts/src/core/EigenDARegistryCoordinatorStorage.sol#L36
+        if (nonSignerStakesAndSignature.quorumApks.length > MAX_QUORUM_COUNT) {
+            revert InvalidLargeInput(nonSignerStakesAndSignature.quorumApks.length, 0);
+        }
+
+        // if an nonsigning operator belongs to multiple quorums, the totalNonsignersCount counts it multiple times
+        uint256 totalNonsignersCount = countElements(nonSignerStakesAndSignature.nonSignerStakeIndices);
+        if (totalNonsignersCount > MAX_NONSIGNER_COUNT_ALL_QUORUM) {
+            revert InvalidLargeInput(0, totalNonsignersCount);
+        }
+
         (DATypesV1.QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
             batchHashRoot, signedQuorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature
         );
@@ -207,6 +235,17 @@ library EigenDACertVerificationLib {
         }
 
         return confirmedQuorumsBitmap;
+    }
+
+    /// @notice Counts the total number of uint32 elements in a 2D array.
+    /// @dev Sums the length of each inner array in the outer array.
+    /// @param arr The 2D array of uint32 values to count.
+    /// @return total The total number of uint32 elements across all inner arrays.
+    function countElements(uint32[][] memory arr) public pure returns (uint256 total) {
+        uint256 outerLen = arr.length;
+        for (uint256 i = 0; i < outerLen; i++) {
+            total += arr[i].length;
+        }
     }
 
     /// @notice Checks that requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums
