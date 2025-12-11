@@ -120,6 +120,9 @@ func CreateTestSuite(
 		panic(fmt.Sprintf("new compatibility config: %v", err.Error()))
 	}
 
+	// NOTE: this dependency injection logic is pseudo-identical to what's defined in
+	//       in the existing entrypoint.go file. at some point we should look to deduplicate
+	//       & simplify where possible.
 	if appConfig.EnabledServersConfig.RestAPIConfig.DAEndpointEnabled() {
 		appConfig.RestSvrCfg.CompatibilityCfg = compatibilityCfg
 		restServer = rest.NewServer(appConfig.RestSvrCfg, certMgr, keccakMgr, logger, metrics)
@@ -136,6 +139,7 @@ func CreateTestSuite(
 	}
 
 	if appConfig.EnabledServersConfig.ArbCustomDA {
+		appConfig.ArbCustomDASvrCfg.CompatibilityCfg = compatibilityCfg
 		arbHandlers := arbitrum_altda.NewHandlers(certMgr, logger, true, compatibilityCfg)
 		arbServer, err = arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
 		if err != nil {

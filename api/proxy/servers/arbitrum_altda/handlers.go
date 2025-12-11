@@ -120,6 +120,15 @@ func NewHandlers(
 	}
 }
 
+// GetMaxMessageSize returns the max allowed payload size
+// this method is called every-time before the nitro batch poster begins building the
+// tx batch.
+func (h *Handlers) GetMaxMessageSize(ctx context.Context) (*MaxMessageSizeResult, error) {
+	return &MaxMessageSizeResult{
+		MaxSize: int(h.compatibilityCfg.MaxPayloadSizeBytes),
+	}, nil
+}
+
 // GetSupportedHeaderBytes returns the supported DA Header bytes by the CustomDA server
 // this method is designed to return a span of bytes for compatibility with
 // Arbitrum AnyTrust where multiple message types are supported.

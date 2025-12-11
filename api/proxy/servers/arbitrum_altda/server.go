@@ -26,6 +26,7 @@ type Config struct {
 	Port               int
 	JWTSecret          string
 	ProcessInvalidCert bool
+	CompatibilityCfg   common.CompatibilityConfig
 }
 
 type Server struct {
@@ -45,6 +46,9 @@ func NewServer(ctx context.Context, cfg *Config, h IHandlers) (*Server, error) {
 	if err := rpcServer.RegisterName("daprovider", h); err != nil {
 		return nil, fmt.Errorf("failed to register daprovider: %w", err)
 	}
+
+	// TODO: understand if this can be set dynamically via the MaxPayloadSizeBytes
+	//       field in the CompatibilityCfg that's computed by the MaxBlobSizeBytes
 	rpcServer.SetHTTPBodyLimit(int(common.MaxServerPOSTRequestBodySize))
 
 	var handler http.Handler
