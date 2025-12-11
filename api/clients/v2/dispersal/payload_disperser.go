@@ -203,10 +203,20 @@ func (pd *PayloadDisperser) buildEigenDACert(
 		return nil, fmt.Errorf("get certificate version: %w", err)
 	}
 
+	// For cert versions >= V4, we need to get the offchain derivation version from the CertVerifier contract
+	var offchainDerivationVersion coretypes.OffchainDerivationVersion
+	if certVersion >= coretypes.VersionFourCert {
+		offchainDerivationVersion, err = pd.certVerifier.GetOffchainDerivationVersion(
+			ctx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
+		if err != nil {
+			return nil, fmt.Errorf("get offchain derivation version: %w", err)
+		}
+	}
+
 	probe.SetStage("build_cert")
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	eigenDACert, err := pd.certBuilder.BuildCert(timeoutCtx, certVersion, blobStatusReply)
+	eigenDACert, err := pd.certBuilder.BuildCert(timeoutCtx, certVersion, blobStatusReply, offchainDerivationVersion)
 	if err != nil {
 		return nil, fmt.Errorf("build cert: %w", err)
 	}
