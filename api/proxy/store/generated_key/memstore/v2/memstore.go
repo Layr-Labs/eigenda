@@ -79,6 +79,21 @@ func New(
 	}
 }
 
+func (e *MemStore) generateRandomV4Cert(blobContents []byte) (*coretypes.EigenDACertV4, error) {
+	v3Cert, err := e.generateRandomV3Cert(blobContents)
+	if err != nil {
+		return nil, err
+	}
+
+	return &coretypes.EigenDACertV4{
+		BlobInclusionInfo:           v3Cert.BlobInclusionInfo,
+		BatchHeader:                 v3Cert.BatchHeader,
+		NonSignerStakesAndSignature: v3Cert.NonSignerStakesAndSignature,
+		SignedQuorumNumbers:         v3Cert.SignedQuorumNumbers,
+		OffchainDerivationVersion:   0,
+	}, nil
+}
+
 // generateRandomCert ... generates a pseudo random EigenDA V3 certificate
 func (e *MemStore) generateRandomV3Cert(blobContents []byte) (*coretypes.EigenDACertV3, error) {
 	// compute kzg data commitment. this is useful for testing
@@ -188,18 +203,17 @@ func (e *MemStore) Get(
 		return nil, fmt.Errorf("fetching entry via memstore: %w", err)
 	}
 
-	v3cert, err := coretypes.DeserializeEigenDACertV3(
+	v4cert, err := coretypes.DeserializeEigenDACertV4(
 		versionedCert.SerializedCert,
 		serializationType,
 	)
-
 	if err != nil {
 		return nil, coretypes.ErrCertParsingFailedDerivationError
 	}
 
 	blob, err := coretypes.DeserializeBlob(
 		blobSerialized,
-		v3cert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
+		v4cert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize blob: %w", err)
@@ -233,15 +247,15 @@ func (e *MemStore) Put(
 
 	blobSerialized := blob.Serialize()
 
-	// generateRandomV3Cert produces valid blob commitment on G1
-	artificialV3Cert, err := e.generateRandomV3Cert(blobSerialized)
+	// generateRandomV4Cert produces valid blob commitment on G1
+	artificialV4Cert, err := e.generateRandomV4Cert(blobSerialized)
 	if err != nil {
 		return nil, fmt.Errorf("generating random cert: %w", err)
 	}
 
-	certBytes, err := artificialV3Cert.Serialize(serializationType)
+	certBytes, err := artificialV4Cert.Serialize(serializationType)
 	if err != nil {
-		return nil, fmt.Errorf("serialize v3 cert: %w", err)
+		return nil, fmt.Errorf("serialize v4 cert: %w", err)
 	}
 
 	err = e.InsertEntry(crypto.Keccak256Hash(certBytes).Bytes(), blobSerialized)
@@ -249,7 +263,7 @@ func (e *MemStore) Put(
 		return nil, err
 	}
 
-	return certs.NewVersionedCert(certBytes, certs.V2VersionByte), nil
+	return certs.NewVersionedCert(certBytes, certs.V3VersionByte), nil
 }
 
 func (e *MemStore) VerifyCert(
