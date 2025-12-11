@@ -128,8 +128,8 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 	h.logMethodCall(MethodGetSupportedHeaderBytes)
 
 	return &SupportedHeaderBytesResult{
-		HeaderBytes: []hexutil.Bytes{
-			{commitments.ArbCustomDAHeaderByte, commitments.EigenDALayerByte},
+		HeaderBytes: hexutil.Bytes{
+			commitments.ArbCustomDAHeaderByte, commitments.EigenDALayerByte,
 		},
 	}, nil
 }

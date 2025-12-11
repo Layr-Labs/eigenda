@@ -135,7 +135,7 @@ type PayloadResult struct {
 // SupportedHeaderBytesResult is the result struct that data availability providers should use to respond with
 // their supported header bytes
 type SupportedHeaderBytesResult struct {
-	HeaderBytes []hexutil.Bytes `json:"headerBytes,omitempty"`
+	HeaderBytes hexutil.Bytes `json:"headerBytes,omitempty"`
 }
 
 // StoreResult is the result struct that data availability providers should use to respond with a commitment to a
