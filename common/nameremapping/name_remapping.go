@@ -3,6 +3,7 @@ package nameremapping
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -48,4 +49,14 @@ func GetAccountLabel(accountId string, remappedNames map[string]string, highCard
 	}
 
 	return "0x0"
+}
+
+// Formats name remap as a comma-separated string for logging.
+// Output format: "0xabc...->Name1, 0xdef...->Name2"
+func FormatMappings(remapping map[string]string) string {
+	var mappings []string
+	for oldName, newName := range remapping {
+		mappings = append(mappings, fmt.Sprintf("%s->%s", oldName, newName))
+	}
+	return strings.Join(mappings, ", ")
 }
