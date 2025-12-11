@@ -169,7 +169,7 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 			endPoint = n
 		}
 
-		go deserializePointsInRange(buf, points, startPoint, endPoint, pointSizeBytes, results)
+		go DeserializePointsInRange(buf, points, startPoint, endPoint, pointSizeBytes, results)
 	}
 
 	for w := uint64(0); w < numWorker; w++ {
@@ -181,8 +181,8 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 	return points, nil
 }
 
-// deserializePointsInRange deserializes a range of points from byte data for a worker goroutine.
-func deserializePointsInRange[T bn254.G1Affine | bn254.G2Affine](
+// DeserializePointsInRange deserializes a range of points from byte data for a worker goroutine.
+func DeserializePointsInRange[T bn254.G1Affine | bn254.G2Affine](
 	buf []byte,
 	points []T,
 	startPoint, endPoint uint64,

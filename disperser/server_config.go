@@ -26,4 +26,10 @@ type ServerConfig struct {
 	// DisableGetBlobCommitment, if true, causes the GetBlobCommitment gRPC endpoint to return
 	// a deprecation error. This endpoint is deprecated and will be removed in a future release.
 	DisableGetBlobCommitment bool
+
+	// The amount of time to retain signing rate data.
+	SigningRateRetentionPeriod time.Duration
+
+	// The interval at which to poll for signing rate data from the controller.
+	SigningRatePollInterval time.Duration
 }

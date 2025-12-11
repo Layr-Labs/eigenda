@@ -48,6 +48,8 @@ type Config struct {
 	HeartbeatMonitorConfig       healthcheck.HeartbeatMonitorConfig
 
 	PaymentAuthorizationConfig controller.PaymentAuthorizationConfig
+
+	UserAccountRemappingFilePath string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -147,17 +149,18 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			Endpoint:   awsClientConfig.EndpointURL,
 		},
 		EncodingManagerConfig: controller.EncodingManagerConfig{
-			PullInterval:                ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
-			EncodingRequestTimeout:      ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
-			StoreTimeout:                ctx.GlobalDuration(flags.EncodingStoreTimeoutFlag.Name),
-			NumEncodingRetries:          ctx.GlobalInt(flags.NumEncodingRetriesFlag.Name),
-			NumRelayAssignment:          uint16(numRelayAssignments),
-			AvailableRelays:             relays,
-			EncoderAddress:              ctx.GlobalString(flags.EncoderAddressFlag.Name),
-			MaxNumBlobsPerIteration:     int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
-			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
-			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-			MaxDispersalAge:             ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
+			PullInterval:                      ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
+			EncodingRequestTimeout:            ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
+			StoreTimeout:                      ctx.GlobalDuration(flags.EncodingStoreTimeoutFlag.Name),
+			NumEncodingRetries:                ctx.GlobalInt(flags.NumEncodingRetriesFlag.Name),
+			NumRelayAssignment:                uint16(numRelayAssignments),
+			AvailableRelays:                   relays,
+			EncoderAddress:                    ctx.GlobalString(flags.EncoderAddressFlag.Name),
+			MaxNumBlobsPerIteration:           int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
+			OnchainStateRefreshInterval:       ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+			NumConcurrentRequests:             ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
+			MaxDispersalAge:                   ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
+			EnablePerAccountBlobStatusMetrics: ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
 		},
 		DispatcherConfig: controller.ControllerConfig{
 			PullInterval:                           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
@@ -172,6 +175,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			NumConcurrentRequests:                  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
 			NodeClientCacheSize:                    ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 			CollectDetailedValidatorSigningMetrics: ctx.GlobalBool(flags.DetailedValidatorMetricsFlag.Name),
+			EnablePerAccountBlobStatusMetrics:      ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
 			MaxDispersalAge:                        ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 			SigningRateRetentionPeriod:             ctx.GlobalDuration(flags.SigningRateRetentionPeriodFlag.Name),
 			SigningRateBucketSpan:                  ctx.GlobalDuration(flags.SigningRateBucketSpanFlag.Name),
@@ -185,6 +189,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ServerConfig:                    serverConfig,
 		HeartbeatMonitorConfig:          heartbeatMonitorConfig,
 		PaymentAuthorizationConfig:      paymentAuthorizationConfig,
+		UserAccountRemappingFilePath:    ctx.GlobalString(flags.UserAccountRemappingFileFlag.Name),
 	}
 
 	if err := config.DispersalRequestSignerConfig.Verify(); err != nil {

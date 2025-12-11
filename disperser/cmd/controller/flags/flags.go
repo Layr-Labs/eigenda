@@ -43,6 +43,12 @@ var (
 		Required: false,
 		Value:    "./data/",
 	}
+	UserAccountRemappingFileFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "user-account-remapping-file"),
+		Usage:    "Path to YAML file for mapping account IDs to user-friendly names",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USER_ACCOUNT_REMAPPING_FILE"),
+		Required: false,
+	}
 	// EncodingManager Flags
 	EncodingPullIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "encoding-pull-interval"),
@@ -182,6 +188,12 @@ var (
 		Usage:    "Whether to collect detailed validator metrics",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DETAILED_VALIDATOR_METRICS"),
+	}
+	EnablePerAccountBlobStatusMetricsFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-blob-status-metrics"),
+		Usage:    "Whether to report per-account blob status metrics for unmapped accounts. Accounts with valid name remappings will always use their remapped labels. If false, unmapped accounts will be aggregated under account 0x0. (default: true)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PER_ACCOUNT_BLOB_STATUS_METRICS"),
 	}
 	MaxBatchSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-batch-size"),
@@ -363,6 +375,7 @@ var requiredFlags = []cli.Flag{
 
 var optionalFlags = []cli.Flag{
 	IndexerDataDirFlag,
+	UserAccountRemappingFileFlag,
 	EncodingRequestTimeoutFlag,
 	EncodingStoreTimeoutFlag,
 	NumEncodingRetriesFlag,
@@ -399,6 +412,7 @@ var optionalFlags = []cli.Flag{
 	PaymentVaultUpdateIntervalFlag,
 	EnablePerAccountPaymentMetricsFlag,
 	DetailedValidatorMetricsFlag,
+	EnablePerAccountBlobStatusMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRateBucketSpanFlag,
 }

@@ -101,7 +101,7 @@ type DisperserHarness struct {
 	// Controller components
 	// TODO: Refactor into a single struct for controller components
 	EncodingManager  *controller.EncodingManager
-	Dispatcher       *controller.Dispatcher
+	Controller       *controller.Controller
 	ControllerServer *server.Server
 }
 
@@ -124,7 +124,7 @@ type EncoderComponents struct {
 // ControllerComponents contains the components created by startController
 type ControllerComponents struct {
 	EncodingManager  *controller.EncodingManager
-	Dispatcher       *controller.Dispatcher
+	Dispatcher       *controller.Controller
 	ControllerServer *server.Server
 	Address          string
 }
@@ -279,7 +279,7 @@ func SetupDisperserHarness(
 		return nil, fmt.Errorf("failed to start controller: %w", err)
 	}
 	harness.EncodingManager = controllerComponents.EncodingManager
-	harness.Dispatcher = controllerComponents.Dispatcher
+	harness.Controller = controllerComponents.Dispatcher
 	harness.ControllerServer = controllerComponents.ControllerServer
 
 	// Start API server goroutine
@@ -852,6 +852,7 @@ func startController(
 		metricsRegistry,
 		encodingManagerBlobSet,
 		controllerLivenessChan,
+		nil, // userAccountRemapping
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoding manager: %w", err)
@@ -902,6 +903,13 @@ func startController(
 	}
 	dispatcherBlobSet := controller.NewBlobSet()
 
+	signingRateTracker, err := signingrate.NewSigningRateTracker(
+		controllerLogger,
+		1*time.Minute,
+		1*time.Second,
+		time.Now)
+	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
+
 	// Create controller
 	dispatcher, err := controller.NewController(
 		dispatcherConfig,
@@ -917,7 +925,8 @@ func startController(
 		beforeDispatch,
 		dispatcherBlobSet,
 		controllerLivenessChan,
-		signingrate.NewNoOpSigningRateTracker(),
+		signingRateTracker,
+		nil, // userAccountRemapping
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dispatcher: %w", err)
@@ -1264,6 +1273,13 @@ func startAPIServer(
 		controllerClient = grpccontroller.NewControllerServiceClient(connection)
 	}
 
+	signingRateTracker, err := signingrate.NewSigningRateTracker(
+		apiServerLogger,
+		1*time.Minute,
+		1*time.Second,
+		time.Now)
+	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
+
 	// Create API server
 	// Note: meterer is nil when using controller-mediated payments, otherwise it's the legacy meterer
 	apiServer, err := apiserver.NewDispersalServerV2(
@@ -1287,6 +1303,7 @@ func startAPIServer(
 		controllerConnection,
 		controllerClient,
 		listener,
+		signingRateTracker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API server: %w", err)

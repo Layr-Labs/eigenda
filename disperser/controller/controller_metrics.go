@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	"github.com/Layr-Labs/eigenda/core"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -49,6 +50,8 @@ type controllerMetrics struct {
 	globalSigningFractionHistogram *prometheus.HistogramVec
 
 	collectDetailedValidatorMetrics bool
+	enablePerAccountMetrics         bool
+	userAccountRemapping            map[string]string
 }
 
 // Sets up metrics for the controller.
@@ -60,6 +63,10 @@ func newControllerMetrics(
 	// If true, collect detailed per-validator metrics. This can be disabled if the volume of data
 	// produced is too high.
 	collectDetailedValidatorMetrics bool,
+	// If false, per-account blob completion metrics will be aggregated under "0x0" to reduce cardinality.
+	enablePerAccountMetrics bool,
+	// Maps account IDs to user-friendly names.
+	userAccountRemapping map[string]string,
 ) (*controllerMetrics, error) {
 	if registry == nil {
 		return nil, nil
@@ -180,9 +187,9 @@ func newControllerMetrics(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
 			Name:      "completed_blobs_total",
-			Help:      "The number and size of completed blobs by status.",
+			Help:      "The number and size of completed blobs by status and account.",
 		},
-		[]string{"state", "data"},
+		[]string{"state", "data", "account_id"},
 	)
 
 	blobSetSize := promauto.With(registry).NewGaugeVec(
@@ -328,6 +335,8 @@ func newControllerMetrics(
 		validatorUnsignedByteCount:      validatorUnsignedByteCount,
 		validatorSigningLatency:         validatorSigningLatency,
 		collectDetailedValidatorMetrics: collectDetailedValidatorMetrics,
+		enablePerAccountMetrics:         enablePerAccountMetrics,
+		userAccountRemapping:            userAccountRemapping,
 		globalSignedBatchCount:          globalSignedBatchCount,
 		globalUnsignedBatchCount:        globalUnsignedBatchCount,
 		globalSignedByteCount:           globalSignedByteCount,
@@ -400,23 +409,26 @@ func (m *controllerMetrics) reportE2EDispersalLatency(duration time.Duration) {
 	m.blobE2EDispersalLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *controllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
+func (m *controllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus, accountID string) {
 	if m == nil {
 		return
 	}
+
+	accountLabel := nameremapping.GetAccountLabel(accountID, m.userAccountRemapping, m.enablePerAccountMetrics)
+
 	switch status {
 	case dispv2.Complete:
-		m.completedBlobs.WithLabelValues("complete", "number").Inc()
-		m.completedBlobs.WithLabelValues("complete", "size").Add(float64(size))
+		m.completedBlobs.WithLabelValues("complete", "number", accountLabel).Inc()
+		m.completedBlobs.WithLabelValues("complete", "size", accountLabel).Add(float64(size))
 	case dispv2.Failed:
-		m.completedBlobs.WithLabelValues("failed", "number").Inc()
-		m.completedBlobs.WithLabelValues("failed", "size").Add(float64(size))
+		m.completedBlobs.WithLabelValues("failed", "number", accountLabel).Inc()
+		m.completedBlobs.WithLabelValues("failed", "size", accountLabel).Add(float64(size))
 	default:
 		return
 	}
 
-	m.completedBlobs.WithLabelValues("total", "number").Inc()
-	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
+	m.completedBlobs.WithLabelValues("total", "number", accountLabel).Inc()
+	m.completedBlobs.WithLabelValues("total", "size", accountLabel).Add(float64(size))
 }
 
 func (m *controllerMetrics) reportBlobSetSize(size int) {

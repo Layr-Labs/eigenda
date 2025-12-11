@@ -14,7 +14,6 @@ import (
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/enforce"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -25,14 +24,14 @@ import (
 //
 // This struct is goroutine safe.
 type PayloadDisperser struct {
-	logger          logging.Logger
-	config          PayloadDisperserConfig
-	disperserClient *DisperserClient
-	blockMonitor    *verification.BlockNumberMonitor
-	certBuilder     *clients.CertBuilder
-	certVerifier    *verification.CertVerifier
-	stageTimer      *common.StageTimer
-	clientLedger    *clientledger.ClientLedger
+	logger                     logging.Logger
+	config                     PayloadDisperserConfig
+	disperserClientMultiplexer *DisperserClientMultiplexer
+	blockMonitor               *verification.BlockNumberMonitor
+	certBuilder                *clients.CertBuilder
+	certVerifier               *verification.CertVerifier
+	stageTimer                 *common.StageTimer
+	clientLedger               *clientledger.ClientLedger
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
@@ -40,19 +39,10 @@ type PayloadDisperser struct {
 func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
-	// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
-	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for
-	// computing the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these
-	// commitments.
-	//
-	// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
-	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
-	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
-	disperserClient *DisperserClient,
+	disperserClientMultiplexer *DisperserClientMultiplexer,
 	blockMonitor *verification.BlockNumberMonitor,
 	certBuilder *clients.CertBuilder,
 	certVerifier *verification.CertVerifier,
-	// Manages payment state for the client. May be nil for legacy payment mode.
 	clientLedger *clientledger.ClientLedger,
 	// if nil, then no metrics will be collected
 	registry *prometheus.Registry,
@@ -66,14 +56,14 @@ func NewPayloadDisperser(
 	stageTimer := common.NewStageTimer(registry, "PayloadDisperser", "SendPayload", false)
 
 	return &PayloadDisperser{
-		logger:          logger,
-		config:          payloadDisperserConfig,
-		disperserClient: disperserClient,
-		blockMonitor:    blockMonitor,
-		certBuilder:     certBuilder,
-		certVerifier:    certVerifier,
-		stageTimer:      stageTimer,
-		clientLedger:    clientLedger,
+		logger:                     logger,
+		config:                     payloadDisperserConfig,
+		disperserClientMultiplexer: disperserClientMultiplexer,
+		blockMonitor:               blockMonitor,
+		certBuilder:                certBuilder,
+		certVerifier:               certVerifier,
+		stageTimer:                 stageTimer,
+		clientLedger:               clientLedger,
 	}, nil
 }
 
@@ -118,15 +108,32 @@ func (pd *PayloadDisperser) SendPayload(
 
 	symbolCount := blob.LenSymbols()
 
-	var paymentMetadata *core.PaymentMetadata
-	if pd.clientLedger != nil {
-		// we are using the new payment system if clientLedger is non nil
-		probe.SetStage("debit")
-		paymentMetadata, err = pd.clientLedger.Debit(ctx, symbolCount, requiredQuorums)
-		if err != nil {
-			return nil, fmt.Errorf("debit: %w", err)
-		}
+	probe.SetStage("debit")
+	paymentMetadata, err := pd.clientLedger.Debit(ctx, symbolCount, requiredQuorums)
+	if err != nil {
+		return nil, fmt.Errorf("debit: %w", err)
 	}
+
+	probe.SetStage("get disperser client")
+	disperserClient, err := pd.disperserClientMultiplexer.GetDisperserClient(
+		ctx, time.Now(), paymentMetadata.IsOnDemand())
+	if err != nil {
+		revertErr := pd.clientLedger.RevertDebit(ctx, paymentMetadata, symbolCount)
+		if revertErr != nil {
+			return nil, fmt.Errorf("get disperser client and revert debit: %w", errors.Join(err, revertErr))
+		}
+
+		return nil, fmt.Errorf("get disperser client: %w", err)
+	}
+
+	disperserID := disperserClient.GetConfig().DisperserID
+	dispersalSuccess := false
+	defer func() {
+		err := pd.disperserClientMultiplexer.ReportDispersalOutcome(disperserID, dispersalSuccess, time.Now())
+		if err != nil {
+			pd.logger.Errorf("failed to report dispersal outcome for disperserID %d: %v", disperserID, err)
+		}
+	}()
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
@@ -135,7 +142,7 @@ func (pd *PayloadDisperser) SendPayload(
 	//  serialized bytes. The operations taking place in DisperseBlob require the bytes to be converted into field
 	//  elements anyway, so serializing the blob here is unnecessary work. This will be a larger change that affects
 	//  many areas of code, though.
-	blobHeader, reply, err := pd.disperserClient.DisperseBlob(
+	blobHeader, reply, err := disperserClient.DisperseBlob(
 		timeoutCtx,
 		blob.Serialize(),
 		pd.config.BlobVersion,
@@ -143,11 +150,9 @@ func (pd *PayloadDisperser) SendPayload(
 		probe,
 		paymentMetadata)
 	if err != nil {
-		if pd.clientLedger != nil {
-			revertErr := pd.clientLedger.RevertDebit(ctx, paymentMetadata, symbolCount)
-			if revertErr != nil {
-				return nil, fmt.Errorf("disperse blob and revert debit: %w", errors.Join(err, revertErr))
-			}
+		revertErr := pd.clientLedger.RevertDebit(ctx, paymentMetadata, symbolCount)
+		if revertErr != nil {
+			return nil, fmt.Errorf("disperse blob and revert debit: %w", errors.Join(err, revertErr))
 		}
 
 		return nil, fmt.Errorf("disperse blob: %w", err)
@@ -160,7 +165,13 @@ func (pd *PayloadDisperser) SendPayload(
 		return nil, fmt.Errorf("verify received blob key: %w", err)
 	}
 
-	return pd.buildEigenDACert(ctx, reply.GetResult(), blobKey, probe)
+	cert, err := pd.buildEigenDACert(ctx, disperserClient, reply.GetResult(), blobKey, probe)
+	if err != nil {
+		return cert, err
+	}
+
+	dispersalSuccess = true
+	return cert, nil
 }
 
 // Waits for a blob to be signed, and builds the EigenDA cert with the operator signatures
@@ -168,6 +179,7 @@ func (pd *PayloadDisperser) SendPayload(
 // If the blob does not become fully signed before the BlobCompleteTimeout timeout elapses, returns an error
 func (pd *PayloadDisperser) buildEigenDACert(
 	ctx context.Context,
+	disperserClient *DisperserClient,
 	initialBlobStatus dispgrpc.BlobStatus,
 	blobKey corev2.BlobKey,
 	probe *common.SequenceProbe,
@@ -179,7 +191,7 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	// confirmation thresholds, a terminal error, or a timeout
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, initialBlobStatus, probe)
+	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, disperserClient, blobKey, initialBlobStatus, probe)
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
@@ -275,11 +287,10 @@ func (pd *PayloadDisperser) logSigningPercentages(blobKey corev2.BlobKey, blobSt
 //
 // This method should only be called once.
 func (pd *PayloadDisperser) Close() error {
-	err := pd.disperserClient.Close()
+	err := pd.disperserClientMultiplexer.Close()
 	if err != nil {
-		return fmt.Errorf("close disperser client: %w", err)
+		return fmt.Errorf("close disperser client multiplexer: %w", err)
 	}
-
 	return nil
 }
 
@@ -290,6 +301,7 @@ func (pd *PayloadDisperser) Close() error {
 // failure.
 func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	ctx context.Context,
+	disperserClient *DisperserClient,
 	blobKey corev2.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
 	probe *common.SequenceProbe,
@@ -312,7 +324,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 		case <-ticker.C:
 			// This call to the disperser doesn't have a dedicated timeout configured.
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
-			blobStatusReply, err := pd.disperserClient.GetBlobStatus(ctx, blobKey)
+			blobStatusReply, err := disperserClient.GetBlobStatus(ctx, blobKey)
 			if err != nil {
 				// this is expected to fail multiple times before we get a valid response, so only do a Debug log
 				pd.logger.Debug("get blob status", "err", err, "blobKey", blobKey.Hex())

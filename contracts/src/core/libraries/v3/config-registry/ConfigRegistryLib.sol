@@ -267,4 +267,64 @@ library ConfigRegistryLib {
     function getNameListBlockNumber() internal view returns (string[] memory) {
         return S.layout().blockNumberCfg.nameSet.nameList;
     }
+
+    function getActiveAndFutureBlockNumberConfigs(string memory name, uint256 referenceBlockNumber)
+        internal
+        view
+        returns (T.BlockNumberCheckpoint[] memory)
+    {
+        bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
+        uint256 numCheckpoints = getNumCheckpointsBlockNumber(nameDigest);
+
+        // There are 3 cases to handle:
+        // 1. If no checkpoints have activation block numbers less than or equal to the provided reference block, we return an empty array.
+        // 2. If all checkpoints have activation block numbers less than or equal to the provided reference block, we return the last checkpoint only.
+        // 3. If some checkpoints have activation block numbers less than or equal to or greater than the provided reference block, we return the currently active checkpoint and all future ones.
+
+        uint256 startIndex = numCheckpoints; // Default to numCheckpoints (case 1)
+        for (uint256 i = 0; i < numCheckpoints; ++i) {
+            uint256 checkpointActivationBlock = getActivationBlockNumber(nameDigest, numCheckpoints - 1 - i);
+            if (checkpointActivationBlock <= referenceBlockNumber) {
+                startIndex = numCheckpoints - 1 - i; // Found the currently active checkpoint (include it)
+                break;
+            }
+        }
+        // Collect the checkpoints from startIndex to the end (currently active + all future)
+        uint256 resultCount = numCheckpoints - startIndex;
+        T.BlockNumberCheckpoint[] memory results = new T.BlockNumberCheckpoint[](resultCount);
+        for (uint256 i = 0; i < resultCount; ++i) {
+            results[i] = getCheckpointBlockNumber(nameDigest, startIndex + i);
+        }
+        return results;
+    }
+
+    function getActiveAndFutureTimestampConfigs(string memory name, uint256 referenceTimestamp)
+        internal
+        view
+        returns (T.TimeStampCheckpoint[] memory)
+    {
+        bytes32 nameDigest = ConfigRegistryLib.getNameDigest(name);
+        uint256 numCheckpoints = getNumCheckpointsTimeStamp(nameDigest);
+
+        // There are 3 cases to handle:
+        // 1. If no checkpoints have activation timestamps less than or equal to the provided reference timestamp, we return an empty array.
+        // 2. If all checkpoints have activation timestamps less than or equal to the provided reference timestamp, we return the last checkpoint only.
+        // 3. If some checkpoints have activation timestamps less than or equal to the provided reference timestamp, we return the currently active checkpoint and all future ones.
+
+        uint256 startIndex = numCheckpoints; // Default to numCheckpoints (case 1)
+        for (uint256 i = 0; i < numCheckpoints; ++i) {
+            uint256 activationTS = getActivationTimeStamp(nameDigest, numCheckpoints - 1 - i);
+            if (activationTS <= referenceTimestamp) {
+                startIndex = numCheckpoints - 1 - i; // Found the currently active checkpoint (include it)
+                break;
+            }
+        }
+        // Collect the checkpoints from startIndex to the end (currently active + all future)
+        uint256 resultCount = numCheckpoints - startIndex;
+        T.TimeStampCheckpoint[] memory results = new T.TimeStampCheckpoint[](resultCount);
+        for (uint256 i = 0; i < resultCount; i++) {
+            results[i] = getCheckpointTimeStamp(nameDigest, startIndex + i);
+        }
+        return results;
+    }
 }
