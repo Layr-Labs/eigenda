@@ -46,7 +46,7 @@ func TestMethod_GetSupportedHeaderBytes(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
-	compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0"}
+	compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0", MaxPayloadSizeBytes: 100_000_000}
 	handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg)
 
 	result, err := handlers.GetSupportedHeaderBytes(context.Background())
@@ -132,7 +132,8 @@ func TestMethod_Store(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
-			compatCfg := proxy_common.CompatibilityConfig{}
+			// bump MaxPayloadSizeBytes to avoid triggering errors when >= limit
+			compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0", MaxPayloadSizeBytes: 100_000_000}
 			handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg)
 
 			mockEigenDAManager.EXPECT().
