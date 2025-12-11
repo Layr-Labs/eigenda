@@ -31,11 +31,11 @@ func (r *LegacyDisperserRegistry) GetDefaultDispersers(ctx context.Context) ([]u
 	return []uint32{0}, nil
 }
 
-// GetOnDemandDispersers implements [DisperserRegistry].
+// IsOnDemandDisperser implements [DisperserRegistry].
 //
-// Return a single on-demand disperser with ID 0, which is the only disperser currently deployed on the network.
-func (r *LegacyDisperserRegistry) GetOnDemandDispersers(ctx context.Context) ([]uint32, error) {
-	return []uint32{0}, nil
+// Returns true if disperserID is 0, which is the only on-demand disperser currently deployed on the network.
+func (r *LegacyDisperserRegistry) IsOnDemandDisperser(ctx context.Context, disperserID uint32) (bool, error) {
+	return disperserID == 0, nil
 }
 
 // Implements [DisperserRegistry].

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	common "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -26,10 +27,16 @@ type encodingManagerMetrics struct {
 	completedBlobs          *prometheus.CounterVec
 	blobSetSize             *prometheus.GaugeVec
 	staleDispersalCount     prometheus.Counter
+	enablePerAccountMetrics bool
+	userAccountRemapping    map[string]string
 }
 
 // NewEncodingManagerMetrics sets up metrics for the encoding manager.
-func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMetrics {
+func newEncodingManagerMetrics(
+	registry *prometheus.Registry,
+	enablePerAccountMetrics bool,
+	userAccountRemapping map[string]string,
+) *encodingManagerMetrics {
 	batchSubmissionLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  encodingManagerNamespace,
@@ -130,9 +137,9 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		prometheus.CounterOpts{
 			Namespace: encodingManagerNamespace,
 			Name:      "completed_blobs_total",
-			Help:      "The number and size of completed blobs by status.",
+			Help:      "The number and size of completed blobs by status and account.",
 		},
-		[]string{"state", "data"},
+		[]string{"state", "data", "account_id"},
 	)
 
 	blobSetSize := promauto.With(registry).NewGaugeVec(
@@ -166,6 +173,8 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		completedBlobs:          completedBlobs,
 		blobSetSize:             blobSetSize,
 		staleDispersalCount:     staleDispersalCount,
+		enablePerAccountMetrics: enablePerAccountMetrics,
+		userAccountRemapping:    userAccountRemapping,
 	}
 }
 
@@ -209,20 +218,22 @@ func (m *encodingManagerMetrics) reportFailedSubmission() {
 	m.failedSubmissionCount.WithLabelValues().Inc()
 }
 
-func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
+func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus, accountID string) {
+	accountLabel := nameremapping.GetAccountLabel(accountID, m.userAccountRemapping, m.enablePerAccountMetrics)
+
 	switch status {
 	case dispv2.Encoded:
-		m.completedBlobs.WithLabelValues("encoded", "number").Inc()
-		m.completedBlobs.WithLabelValues("encoded", "size").Add(float64(size))
+		m.completedBlobs.WithLabelValues("encoded", "number", accountLabel).Inc()
+		m.completedBlobs.WithLabelValues("encoded", "size", accountLabel).Add(float64(size))
 	case dispv2.Failed:
-		m.completedBlobs.WithLabelValues("failed", "number").Inc()
-		m.completedBlobs.WithLabelValues("failed", "size").Add(float64(size))
+		m.completedBlobs.WithLabelValues("failed", "number", accountLabel).Inc()
+		m.completedBlobs.WithLabelValues("failed", "size", accountLabel).Add(float64(size))
 	default:
 		return
 	}
 
-	m.completedBlobs.WithLabelValues("total", "number").Inc()
-	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
+	m.completedBlobs.WithLabelValues("total", "number", accountLabel).Inc()
+	m.completedBlobs.WithLabelValues("total", "size", accountLabel).Add(float64(size))
 }
 
 func (m *encodingManagerMetrics) reportBlobSetSize(size int) {

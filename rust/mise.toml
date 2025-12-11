@@ -1,3 +1,6 @@
 [tools]
-"cargo:cargo-deny" = { version = "latest", default-features = false }
+# For some reason can't get this cargo-deny to work properly... keep running into
+# this issue: https://github.com/rustsec/rustsec/issues/1151
+# Installing manually via `cargo install cargo-deny` works fine...
+# "cargo:cargo-deny" = { version = "latest", default-features = false }
 "cargo:cargo-machete" = { version = "latest", default-features = false }

@@ -119,9 +119,9 @@ WORKDIR /app/disperser
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go build -ldflags="-X 'main.version=${SEMVER}' \
-                       -X 'main.gitCommit=${GITCOMMIT}' \
-                       -X 'main.gitDate=${GITDATE}'" \
-        -o ./bin/blobapi ./cmd/blobapi
+    -X 'main.gitCommit=${GITCOMMIT}' \
+    -X 'main.gitDate=${GITDATE}'" \
+    -o ./bin/blobapi ./cmd/blobapi
 
 # Proxy build stage
 FROM common-builder AS proxy-builder
@@ -131,10 +131,10 @@ ARG GITDATE
 WORKDIR /app/api/proxy
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-        go build -ldflags="-X 'main.Version=${SEMVER}' \
-                       -X 'main.Commit=${GITCOMMIT}' \
-                       -X 'main.Date=${GITDATE}'" \
-        -o ./bin/eigenda-proxy ./cmd/server
+    go build -ldflags="-X 'main.Version=${SEMVER}' \
+    -X 'main.Commit=${GITCOMMIT}' \
+    -X 'main.Date=${GITDATE}'" \
+    -o ./bin/eigenda-proxy ./cmd/server
 
 # Final stages for each component
 FROM alpine:3.22 AS churner
@@ -198,7 +198,9 @@ ENTRYPOINT ["blobapi"]
 FROM alpine:3.22 AS proxy
 WORKDIR /app
 COPY --from=proxy-builder /app/api/proxy/bin/eigenda-proxy .
-COPY --from=proxy-builder /app/api/proxy/resources/ /app/resources/
+# All SRS points are now embedded into the binary, but we keep g1.point here
+# because it is needed for V1 codepaths that need to dynamically read single srs points from the file.
+COPY --from=proxy-builder /app/api/proxy/resources/g1.point /app/resources/g1.point
 # default ports for data and metrics
 EXPOSE 3100 7300
 ENTRYPOINT ["./eigenda-proxy"]

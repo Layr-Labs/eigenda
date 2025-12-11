@@ -41,8 +41,10 @@ contract EigenDACertVerifier is
     bytes internal _quorumNumbersRequired;
     uint16 internal _offchainDerivationVersion;
 
-    uint8 internal constant MAJOR_VERSION = 3;
-    uint8 internal constant MINOR_VERSION = 2;
+    uint8 internal constant CERT_VERSION = 4;
+
+    uint8 internal constant MAJOR_VERSION = 4;
+    uint8 internal constant MINOR_VERSION = 0;
     uint8 internal constant PATCH_VERSION = 0;
 
     /// @notice Status codes for certificate verification results
@@ -53,7 +55,6 @@ contract EigenDACertVerifier is
         // The below 4 status codes are kept for backwards compatibility, but are no longer used.
         // We previously had plans to have more granular error codes, but decided this was not necessary,
         // and the only signal useful to offchain is to separate certs into: success, invalid (400), and bugs (500).
-        // TODO(4.0.0): get rid of these
         UNUSED_HISTORICAL_INVALID_INCLUSION_PROOF,
         UNUSED_HISTORICAL_SECURITY_ASSUMPTIONS_NOT_MET,
         UNUSED_HISTORICAL_BLOB_QUORUMS_NOT_SUBSET,
@@ -82,12 +83,12 @@ contract EigenDACertVerifier is
         _offchainDerivationVersion = initOffchainDerivationVersion;
     }
 
-    /// @notice Decodes a certificate from bytes to an EigenDACertV3
+    /// @notice Decodes a certificate from bytes to an EigenDACertV4
     /// @dev This function is external for the purpose of try/catch'ing it inside checkDACert,
     /// and should be considered an implementation detail. Do not rely on this function being
     /// part of the public interface of this contract.
-    function _decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
-        return abi.decode(data, (CT.EigenDACertV3));
+    function _decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV4 memory cert) {
+        return abi.decode(data, (CT.EigenDACertV4));
     }
 
     /// @inheritdoc IEigenDACertVerifierBase
@@ -98,12 +99,11 @@ contract EigenDACertVerifier is
     /// which is also useful for optimistic rollup one step prover contracts.
     /// @dev Make sure to call this at a block number that is > RBN, otherwise this function will
     /// return an INVALID_CERT status code because of a require in the BLSSignatureChecker library that we use.
-    /// TODO(4.0.0): return (uint8, bytes) instead to include the revert reason.
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
-        CT.EigenDACertV3 memory daCert;
+        CT.EigenDACertV4 memory daCert;
         // We try catch this here because decoding error would appear as a Panic,
         // which we consider bugs in the try/catch for the checkDACertReverts call below.
-        try this._decodeCert(abiEncodedCert) returns (CT.EigenDACertV3 memory _daCert) {
+        try this._decodeCert(abiEncodedCert) returns (CT.EigenDACertV4 memory _daCert) {
             daCert = _daCert;
         } catch {
             return uint8(StatusCode.INVALID_CERT);
@@ -146,9 +146,14 @@ contract EigenDACertVerifier is
     /// @notice Check a DA cert's validity
     /// @param daCert The EigenDA certificate
     /// @dev This function will revert if the certificate is invalid.
-    function checkDACertReverts(CT.EigenDACertV3 calldata daCert) external view {
+    function checkDACertReverts(CT.EigenDACertV4 calldata daCert) external view {
         CertLib.checkDACert(
-            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, daCert, _securityThresholds, _quorumNumbersRequired
+            _eigenDAThresholdRegistry,
+            _eigenDASignatureVerifier,
+            daCert,
+            _securityThresholds,
+            _quorumNumbersRequired,
+            _offchainDerivationVersion
         );
     }
 
@@ -179,7 +184,7 @@ contract EigenDACertVerifier is
 
     /// @inheritdoc IVersionedEigenDACertVerifier
     function certVersion() external pure returns (uint8) {
-        return MAJOR_VERSION;
+        return CERT_VERSION;
     }
 
     /// @inheritdoc IEigenDASemVer

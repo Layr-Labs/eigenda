@@ -143,8 +143,8 @@ impl CertStateData {
         cert: &StandardCommitment,
         current_block: u32,
     ) -> Result<CertVerificationInputs, CertExtractionError> {
-        let quorum_count = QuorumCountExtractor::new(cert)
-            .decode_data(&self.registry_coordinator.storage_proofs)?;
+        let quorum_count =
+            QuorumCountExtractor::new().decode_data(&self.registry_coordinator.storage_proofs)?;
 
         let quorum_bitmap_history = OperatorBitmapHistoryExtractor::new(cert)
             .decode_data(&self.registry_coordinator.storage_proofs)?;
@@ -161,14 +161,14 @@ impl CertStateData {
         let versioned_blob_params = VersionedBlobParamsExtractor::new(cert)
             .decode_data(&self.threshold_registry.storage_proofs)?;
 
-        let next_blob_version = NextBlobVersionExtractor::new(cert)
-            .decode_data(&self.threshold_registry.storage_proofs)?;
+        let next_blob_version =
+            NextBlobVersionExtractor::new().decode_data(&self.threshold_registry.storage_proofs)?;
 
         let staleness = {
-            let stale_stakes_forbidden = StaleStakesForbiddenExtractor::new(cert)
+            let stale_stakes_forbidden = StaleStakesForbiddenExtractor::new()
                 .decode_data(&self.service_manager.storage_proofs)?;
 
-            let min_withdrawal_delay_blocks = MinWithdrawalDelayBlocksExtractor::new(cert)
+            let min_withdrawal_delay_blocks = MinWithdrawalDelayBlocksExtractor::new()
                 .decode_data(&self.delegation_manager.storage_proofs)?;
 
             let quorum_update_block_number = QuorumUpdateBlockNumberExtractor::new(cert)
@@ -207,10 +207,10 @@ impl CertStateData {
             });
         }
 
-        let security_thresholds = SecurityThresholdsV2Extractor::new(cert)
-            .decode_data(&self.cert_verifier.storage_proofs)?;
+        let security_thresholds =
+            SecurityThresholdsV2Extractor::new().decode_data(&self.cert_verifier.storage_proofs)?;
 
-        let required_quorum_numbers = QuorumNumbersRequiredV2Extractor::new(cert)
+        let required_quorum_numbers = QuorumNumbersRequiredV2Extractor::new()
             .decode_data(&self.cert_verifier.storage_proofs)?;
 
         let storage = Storage {

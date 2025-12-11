@@ -82,6 +82,7 @@ func NewController(
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 	signingRateTracker signingrate.SigningRateTracker,
+	userAccountRemapping map[string]string,
 ) (*Controller, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -94,7 +95,9 @@ func NewController(
 	metrics, err := newControllerMetrics(
 		registry,
 		config.SignificantSigningThresholdFraction,
-		config.CollectDetailedValidatorSigningMetrics)
+		config.CollectDetailedValidatorSigningMetrics,
+		config.EnablePerAccountBlobStatusMetrics,
+		userAccountRemapping)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
 	}
@@ -724,35 +727,6 @@ func (c *Controller) checkAndHandleStaleBlob(
 	return true
 }
 
-// GetOperatorState returns the operator state for the given quorums at the given block number
-func (c *Controller) GetOperatorState(
-	ctx context.Context,
-	metadatas []*v2.BlobMetadata,
-	blockNumber uint64,
-) (*core.IndexedOperatorState, error) {
-
-	quorums := make(map[core.QuorumID]struct{}, 0)
-	for _, m := range metadatas {
-		for _, quorum := range m.BlobHeader.QuorumNumbers {
-			quorums[quorum] = struct{}{}
-		}
-	}
-
-	quorumIds := make([]core.QuorumID, len(quorums))
-	i := 0
-	for id := range quorums {
-		quorumIds[i] = id
-		i++
-	}
-
-	// GetIndexedOperatorState should return state for valid quorums only
-	indexedOperatorState, err := c.chainState.GetIndexedOperatorState(ctx, uint(blockNumber), quorumIds)
-	if err != nil {
-		return nil, fmt.Errorf("GetIndexedOperatorState: %w", err)
-	}
-	return indexedOperatorState, nil
-}
-
 func (c *Controller) sendChunks(
 	ctx context.Context,
 	client clients.NodeClient,
@@ -797,7 +771,8 @@ func (c *Controller) updateBatchStatus(
 				c.blobSet.RemoveBlob(blobKey)
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
-				c.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
+				c.metrics.reportCompletedBlob(
+					int(metadata.BlobSize), v2.Failed, metadata.BlobHeader.PaymentMetadata.AccountID.Hex())
 			}
 			continue
 		}
@@ -820,7 +795,8 @@ func (c *Controller) updateBatchStatus(
 				c.blobSet.RemoveBlob(blobKey)
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
-				c.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
+				c.metrics.reportCompletedBlob(
+					int(metadata.BlobSize), v2.Failed, metadata.BlobHeader.PaymentMetadata.AccountID.Hex())
 			}
 			continue
 		}
@@ -835,7 +811,8 @@ func (c *Controller) updateBatchStatus(
 		if metadata, ok := batch.Metadata[blobKey]; ok {
 			requestedAt := time.Unix(0, int64(metadata.RequestedAt))
 			c.metrics.reportE2EDispersalLatency(time.Since(requestedAt))
-			c.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Complete)
+			c.metrics.reportCompletedBlob(
+				int(metadata.BlobSize), v2.Complete, metadata.BlobHeader.PaymentMetadata.AccountID.Hex())
 		}
 	}
 
@@ -851,7 +828,8 @@ func (c *Controller) failBatch(ctx context.Context, batch *batchData) error {
 				fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 		}
 		if metadata, ok := batch.Metadata[blobKey]; ok {
-			c.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
+			c.metrics.reportCompletedBlob(
+				int(metadata.BlobSize), v2.Failed, metadata.BlobHeader.PaymentMetadata.AccountID.Hex())
 		}
 		c.blobSet.RemoveBlob(blobKey)
 	}

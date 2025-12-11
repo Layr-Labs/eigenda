@@ -33,7 +33,7 @@ impl RegistryCoordinator {
     /// - Operator bitmap histories  
     /// - Quorum update block numbers
     pub fn storage_keys(certificate: &StandardCommitment) -> Vec<StorageKey> {
-        let quorum_count = QuorumCountExtractor::new(certificate).storage_keys();
+        let quorum_count = QuorumCountExtractor::new().storage_keys();
         let quorum_bitmap_history = OperatorBitmapHistoryExtractor::new(certificate).storage_keys();
         let quorum_update_block_number =
             QuorumUpdateBlockNumberExtractor::new(certificate).storage_keys();
@@ -113,7 +113,7 @@ impl EigenDaThresholdRegistry {
     /// - Next blob version
     pub fn storage_keys(certificate: &StandardCommitment) -> Vec<StorageKey> {
         let versioned_blob_params = VersionedBlobParamsExtractor::new(certificate).storage_keys();
-        let next_blob_version = NextBlobVersionExtractor::new(certificate).storage_keys();
+        let next_blob_version = NextBlobVersionExtractor::new().storage_keys();
 
         [versioned_blob_params, next_blob_version]
             .into_iter()
@@ -166,10 +166,9 @@ impl EigenDaCertVerifier {
     /// Vector of storage keys for:
     /// - Security thresholds (confirmation and adversary thresholds)
     /// - Required quorum numbers
-    pub fn storage_keys(certificate: &StandardCommitment) -> Vec<StorageKey> {
-        let security_thresholds = SecurityThresholdsV2Extractor::new(certificate).storage_keys();
-        let required_quorum_numbers =
-            QuorumNumbersRequiredV2Extractor::new(certificate).storage_keys();
+    pub fn storage_keys() -> Vec<StorageKey> {
+        let security_thresholds = SecurityThresholdsV2Extractor::new().storage_keys();
+        let required_quorum_numbers = QuorumNumbersRequiredV2Extractor::new().storage_keys();
 
         [security_thresholds, required_quorum_numbers]
             .into_iter()
@@ -185,7 +184,6 @@ mod stale_stakes_forbidden {
 
     use alloy_primitives::StorageKey;
 
-    use crate::cert::StandardCommitment;
     use crate::extraction::extractor::{
         MinWithdrawalDelayBlocksExtractor, StaleStakesForbiddenExtractor, StorageKeyProvider,
     };
@@ -195,6 +193,10 @@ mod stale_stakes_forbidden {
     /// Provides access to the `staleStakesForbidden` flag which controls whether
     /// the system accepts operator stakes that may be considered "stale" during
     /// certificate verification.
+    ///
+    /// TODO(samlaf): we should move the staleStakesForbidden value from the ServiceManager
+    /// and into the EigenDACertVerifier so that it can be RBN-checkpointed and hence versioned
+    /// like the other values in the CertVerifier.
     pub struct ServiceManager;
 
     impl ServiceManager {
@@ -213,8 +215,8 @@ mod stale_stakes_forbidden {
         /// When `staleStakesForbidden` is enabled, the system prevents potential attacks
         /// where an adversary could exploit the delay between stake updates and verification
         /// by using operator stake information that is too old to be trustworthy.
-        pub fn storage_keys(certificate: &StandardCommitment) -> Vec<StorageKey> {
-            StaleStakesForbiddenExtractor::new(certificate).storage_keys()
+        pub fn storage_keys() -> Vec<StorageKey> {
+            StaleStakesForbiddenExtractor::new().storage_keys()
         }
     }
 
@@ -241,8 +243,8 @@ mod stale_stakes_forbidden {
         /// `minWithdrawalDelayBlocks` blocks before the `referenceBlockNumber`.
         /// This ensures that operator stakes reflect a recent enough view of the
         /// network state to be trusted for verification.
-        pub fn storage_keys(certificate: &StandardCommitment) -> Vec<StorageKey> {
-            MinWithdrawalDelayBlocksExtractor::new(certificate).storage_keys()
+        pub fn storage_keys() -> Vec<StorageKey> {
+            MinWithdrawalDelayBlocksExtractor::new().storage_keys()
         }
     }
 }
@@ -285,7 +287,7 @@ mod tests {
         );
 
         // Verify expected item count based on feature flags
-        let quorum_count_keys = QuorumCountExtractor::new(&certificate).storage_keys();
+        let quorum_count_keys = QuorumCountExtractor::new().storage_keys();
         let quorum_bitmap_keys = OperatorBitmapHistoryExtractor::new(&certificate).storage_keys();
         let quorum_update_keys = QuorumUpdateBlockNumberExtractor::new(&certificate).storage_keys();
         let expected_total =
@@ -349,7 +351,7 @@ mod tests {
         assert!(!keys.is_empty(), "Should generate required data");
 
         let versioned_blob_keys = VersionedBlobParamsExtractor::new(&certificate).storage_keys();
-        let next_blob_keys = NextBlobVersionExtractor::new(&certificate).storage_keys();
+        let next_blob_keys = NextBlobVersionExtractor::new().storage_keys();
         let expected_total = versioned_blob_keys.len() + next_blob_keys.len();
 
         assert_eq!(
@@ -368,15 +370,12 @@ mod tests {
 
     #[test]
     fn eigen_da_cert_verifier_storage_keys() {
-        let certificate = create_test_commitment();
-        let keys = EigenDaCertVerifier::storage_keys(&certificate);
+        let keys = EigenDaCertVerifier::storage_keys();
 
         assert!(!keys.is_empty(), "Should generate required data");
 
-        let security_threshold_keys =
-            SecurityThresholdsV2Extractor::new(&certificate).storage_keys();
-        let quorum_numbers_keys =
-            QuorumNumbersRequiredV2Extractor::new(&certificate).storage_keys();
+        let security_threshold_keys = SecurityThresholdsV2Extractor::new().storage_keys();
+        let quorum_numbers_keys = QuorumNumbersRequiredV2Extractor::new().storage_keys();
         let expected_total = security_threshold_keys.len() + quorum_numbers_keys.len();
 
         assert_eq!(
@@ -395,12 +394,11 @@ mod tests {
 
     #[test]
     fn service_manager_storage_keys() {
-        let certificate = create_test_commitment();
-        let keys = ServiceManager::storage_keys(&certificate);
+        let keys = ServiceManager::storage_keys();
 
         assert!(!keys.is_empty(), "Should generate required data");
 
-        let stale_stakes_keys = StaleStakesForbiddenExtractor::new(&certificate).storage_keys();
+        let stale_stakes_keys = StaleStakesForbiddenExtractor::new().storage_keys();
         assert_eq!(
             keys.len(),
             stale_stakes_keys.len(),
@@ -414,13 +412,11 @@ mod tests {
 
     #[test]
     fn delegation_manager_storage_keys() {
-        let certificate = create_test_commitment();
-        let keys = DelegationManager::storage_keys(&certificate);
+        let keys = DelegationManager::storage_keys();
 
         assert!(!keys.is_empty(), "Should generate required data");
 
-        let min_withdrawal_keys =
-            MinWithdrawalDelayBlocksExtractor::new(&certificate).storage_keys();
+        let min_withdrawal_keys = MinWithdrawalDelayBlocksExtractor::new().storage_keys();
         assert_eq!(
             keys.len(),
             min_withdrawal_keys.len(),

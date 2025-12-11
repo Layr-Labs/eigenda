@@ -130,6 +130,30 @@ interface IEigenDAConfigRegistry {
     /// @notice Gets all names of timestamp configuration entries.
     /// @return An array of all configuration entry names.
     function getAllConfigNamesTimeStamp() external view returns (string[] memory);
+
+    /// @notice Retrieves the currently active block number config checkpoint and all future checkpoints for a given name.
+    ///         this is only expected to be used via eth_calls by offchain EigenDA services.
+    /// @param name the config string name
+    /// @param referenceBlockNumber the reference block number used for filtered lookups against the checkpoints
+    /// @return checkpoints with the highest activation block that is less than or equal to the provided reference block,
+    ///      plus all checkpoints with activation block numbers greater than the provided reference block.
+    ///      This allows offchain clients to know the current configuration value and plan ahead for upcoming updates.
+    function getActiveAndFutureBlockNumberConfigs(string memory name, uint256 referenceBlockNumber)
+        external
+        view
+        returns (ConfigRegistryTypes.BlockNumberCheckpoint[] memory);
+
+    /// @notice Retrieves the currently active timestamp config checkpoint and all future checkpoints for a given name.
+    ///         this is only expected to be used via eth_calls by offchain EigenDA services.
+    /// @param name the config string name
+    /// @param referenceTimestamp the reference timestamp used for filtered lookups against the checkpoints
+    /// @return checkpoints with the highest activation timestamp that is less than or equal to the provided reference timestamp,
+    ///      plus all checkpoints with activation timestamps greater than the provided reference timestamp.
+    ///      This allows offchain clients to know the current configuration value and plan ahead for upcoming updates.
+    function getActiveAndFutureTimestampConfigs(string memory name, uint256 referenceTimestamp)
+        external
+        view
+        returns (ConfigRegistryTypes.TimeStampCheckpoint[] memory);
 }
 
 /// @notice Interface for the EigenDA Directory
