@@ -76,7 +76,7 @@ func NewDynamodbBlobDispersalQueue(
 	return bdq, nil
 }
 
-func (bdq *dynamodbBlobDispersalQueue) GetNextBlobForDispersal(ctx context.Context) <-chan *v2.BlobMetadata {
+func (bdq *dynamodbBlobDispersalQueue) GetBlobChannel() <-chan *v2.BlobMetadata {
 	return bdq.queue
 }
 
@@ -122,6 +122,15 @@ func (bdq *dynamodbBlobDispersalQueue) fetchBlobs() (bool, error) {
 	bdq.cursor = cursor
 
 	for _, blobMetadata := range blobMetadatas {
+		if blobMetadata == nil {
+			bdq.logger.Errorf("Fetched nil blob metadata, skipping.")
+			continue
+		}
+		if blobMetadata.BlobHeader == nil {
+			bdq.logger.Errorf("Fetched blob metadata with nil BlobHeader, skipping.")
+			continue
+		}
+
 		bdq.queue <- blobMetadata
 	}
 

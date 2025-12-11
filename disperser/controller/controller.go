@@ -522,7 +522,7 @@ func (c *Controller) NewBatch(
 	for keepLooking && int32(len(blobMetadatas)) < c.MaxBatchSize {
 		var next *v2.BlobMetadata
 		select {
-		case next = <-c.blobDispersalQueue.GetNextBlobForDispersal(ctx):
+		case next = <-c.blobDispersalQueue.GetBlobChannel():
 		default:
 			// no more blobs available right now
 			keepLooking = false
@@ -532,6 +532,16 @@ func (c *Controller) NewBatch(
 			blobMetadatas = append(blobMetadatas, next)
 		}
 	}
+
+	// If we fail to finish batch creation, we need to go back and ensure that we mark all of the blobs
+	// that were about to be in the batch as having failed.
+	batchCreationSuccessful := false
+	defer func() {
+		if !batchCreationSuccessful {
+			c.logger.Warnf("batch creation failed, marking %d blobs as failed", len(blobMetadatas))
+			c.markBatchAsFailed(ctx, blobMetadatas)
+		}
+	}()
 
 	c.metrics.reportBlobSetSize(c.blobSet.Size())
 	if len(blobMetadatas) == 0 {
@@ -544,9 +554,6 @@ func (c *Controller) NewBatch(
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
 	metadataMap := make(map[corev2.BlobKey]*v2.BlobMetadata, len(blobMetadatas))
 	for i, metadata := range blobMetadatas {
-		if metadata == nil || metadata.BlobHeader == nil {
-			return nil, fmt.Errorf("invalid blob metadata")
-		}
 		blobKey, err := metadata.BlobHeader.BlobKey()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get blob key: %w", err)
@@ -676,6 +683,7 @@ func (c *Controller) NewBatch(
 	}
 
 	c.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))
+	batchCreationSuccessful = true // TODO claude: will the lambda function in the defer see this change?
 	return &batchData{
 		Batch:           batch,
 		BatchHeaderHash: batchHeaderHash,
@@ -684,6 +692,26 @@ func (c *Controller) NewBatch(
 		OperatorState:   operatorState,
 		BatchSizeBytes:  batchSizeBytes,
 	}, nil
+}
+
+// If when creating a batch we encounter a failure, we need to mark each blob that was planned to be a part of that
+// batch as Failed.
+func (c *Controller) markBatchAsFailed(
+	ctx context.Context,
+	blobsInBatch []*v2.BlobMetadata,
+) {
+	for _, blobMetadata := range blobsInBatch {
+		blobKey, err := blobMetadata.BlobHeader.BlobKey()
+		if err != nil {
+			c.logger.Errorf("compute blob key: %w", err)
+			continue
+		}
+
+		err = c.updateBlobStatus(ctx, blobKey, v2.Failed)
+		if err != nil {
+			c.logger.Errorf("update blob status to failed: %w", err)
+		}
+	}
 }
 
 // Checks if a blob is older than MaxDispersalAge and handles it accordingly.

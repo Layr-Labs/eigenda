@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"context"
-
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 )
 
@@ -10,6 +8,9 @@ import (
 // forms the controller's interface to the encoder->controller pipeline.
 type BlobDispersalQueue interface {
 
-	// GetNextBlobForDispersal returns a channel that yields blobs ready for dispersal.
-	GetNextBlobForDispersal(ctx context.Context) <-chan *v2.BlobMetadata
+	// GetBlobChannel returns a channel that yields blobs ready for dispersal.
+	//
+	// Due to some tech debt with the dynamoDB implementation, assume that this channel may return
+	// the same blob multiple times, and that the caller is responsible for deduplicating them.
+	GetBlobChannel() <-chan *v2.BlobMetadata
 }
