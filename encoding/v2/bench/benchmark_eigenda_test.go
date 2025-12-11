@@ -200,7 +200,7 @@ func benchmarkMultiproofGeneration(b *testing.B, encodingConfig encoding.Config)
 	}
 	b.Log("Reading precomputed SRSTables, this may take a while...")
 	// use a non-silent logger to see the "Multiproof Time Decomp" log lines.
-	p, err := prover.NewProver(common.TestLogger(b), &proverConfig, &encodingConfig)
+	p, err := prover.NewProver(common.SilentLogger(), &proverConfig, &encodingConfig)
 	require.NoError(b, err)
 
 	rand := random.NewTestRandomNoPrint(1337)
@@ -275,7 +275,7 @@ func benchmarkFrameGeneration(b *testing.B, encodingConfig encoding.Config) {
 
 	b.Log("Reading precomputed SRSTables, this may take a while...")
 	// use a non-silent logger to see the "Multiproof Time Decomp" log lines.
-	p, err := prover.NewProver(common.TestLogger(b), &proverConfig, &encodingConfig)
+	p, err := prover.NewProver(common.SilentLogger(), &proverConfig, &encodingConfig)
 	require.NoError(b, err)
 
 	rand := random.NewTestRandomNoPrint(1337)
