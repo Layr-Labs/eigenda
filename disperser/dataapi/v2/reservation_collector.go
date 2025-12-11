@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,9 +12,8 @@ import (
 // ReservationExpirationCollector is a custom Prometheus collector that queries reservation data
 // and exposes metrics about expiring reservations
 type ReservationExpirationCollector struct {
-	subgraphClient       dataapi.SubgraphClient
-	logger               logging.Logger
-	userAccountRemapping map[string]string
+	subgraphClient dataapi.SubgraphClient
+	logger         logging.Logger
 
 	// Metrics
 	reservationsActive         prometheus.Gauge
@@ -23,15 +21,10 @@ type ReservationExpirationCollector struct {
 }
 
 // NewReservationExpirationCollector creates a new collector
-func NewReservationExpirationCollector(
-	subgraphClient dataapi.SubgraphClient,
-	logger logging.Logger,
-	userAccountRemapping map[string]string,
-) *ReservationExpirationCollector {
+func NewReservationExpirationCollector(subgraphClient dataapi.SubgraphClient, logger logging.Logger) *ReservationExpirationCollector {
 	return &ReservationExpirationCollector{
-		subgraphClient:       subgraphClient,
-		logger:               logger,
-		userAccountRemapping: userAccountRemapping,
+		subgraphClient: subgraphClient,
+		logger:         logger,
 		reservationsActive: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "eigenda_reservations_active",
 			Help: "Number of active reservations",
@@ -106,8 +99,7 @@ func (c *ReservationExpirationCollector) updateMetrics(ctx context.Context) {
 		}
 
 		// Record gauge value
-		accountLabel := nameremapping.GetAccountLabel(res.Account, c.userAccountRemapping, true)
-		c.reservationTimeUntilExpiry.WithLabelValues(accountLabel).Set(timeUntilExpiration.Seconds())
+		c.reservationTimeUntilExpiry.WithLabelValues(string(res.Account)).Set(timeUntilExpiration.Seconds())
 	}
 
 	// Update gauges
