@@ -82,6 +82,7 @@ func New(
 	}
 }
 
+// generateRandomV4Cert ... generates a pseudo random EigenDA V4 certificate with a offchain derivation version of 0
 func (e *MemStore) generateRandomV4Cert(blobContents []byte) (*coretypes.EigenDACertV4, error) {
 	v3Cert, err := e.generateRandomV3Cert(blobContents)
 	if err != nil {
@@ -97,7 +98,7 @@ func (e *MemStore) generateRandomV4Cert(blobContents []byte) (*coretypes.EigenDA
 	}, nil
 }
 
-// generateRandomCert ... generates a pseudo random EigenDA V3 certificate
+// generateRandomV3Cert ... generates a pseudo random EigenDA V3 certificate
 func (e *MemStore) generateRandomV3Cert(blobContents []byte) (*coretypes.EigenDACertV3, error) {
 	// compute kzg data commitment. this is useful for testing
 	// READPREIMAGE functionality in the arbitrum x eigenda integration since
