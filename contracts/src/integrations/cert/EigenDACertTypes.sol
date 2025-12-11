@@ -14,4 +14,17 @@ library EigenDACertTypes {
         DATypesV1.NonSignerStakesAndSignature nonSignerStakesAndSignature;
         bytes signedQuorumNumbers;
     }
+
+    // EigenDACertV4 extends V3 by adding offchainDerivationVersion
+    struct EigenDACertV4 {
+        DATypesV2.BatchHeaderV2 batchHeader;
+        DATypesV2.BlobInclusionInfo blobInclusionInfo;
+        DATypesV1.NonSignerStakesAndSignature nonSignerStakesAndSignature;
+        bytes signedQuorumNumbers;
+        // Used to version the offchain logic that is used to verify this code.
+        // It's main usage is for versioning the recency_window, but can also be used
+        // for example to change parts of the derivation pipeline that aren't onchain, such
+        // as the blob decoding algorithm.
+        uint16 offchainDerivationVersion;
+    }
 }
