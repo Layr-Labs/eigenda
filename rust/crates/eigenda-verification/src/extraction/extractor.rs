@@ -1086,9 +1086,16 @@ mod tests {
     #[test]
     fn cert_verifier_abns_extractor() {
         let extractor = CertVerifierABNsExtractor::new(3);
-
         let keys = extractor.storage_keys();
-        assert_eq!(keys.len(), 3);
+        assert_eq!(keys.len(), 3u64.div_ceil(8) as usize);
+
+        let extractor = CertVerifierABNsExtractor::new(8);
+        let keys = extractor.storage_keys();
+        assert_eq!(keys.len(), 8u64.div_ceil(8) as usize);
+
+        let extractor = CertVerifierABNsExtractor::new(15);
+        let keys = extractor.storage_keys();
+        assert_eq!(keys.len(), 15u64.div_ceil(8) as usize);
     }
 
     #[test]
