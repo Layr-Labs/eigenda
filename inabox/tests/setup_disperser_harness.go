@@ -979,6 +979,7 @@ func startController(
 			ethClient,
 			dynamoClient.GetAwsClient(),
 			metricsRegistry,
+			nil,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)

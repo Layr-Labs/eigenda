@@ -39,6 +39,8 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
+
+	UserAccountRemappingFilePath string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -86,6 +88,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
 		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
+
+		UserAccountRemappingFilePath: ctx.GlobalString(flags.UserAccountRemappingFileFlag.Name),
 	}
 	return config, nil
 }

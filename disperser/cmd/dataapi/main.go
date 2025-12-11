@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	commonaws "github.com/Layr-Labs/eigenda/common/s3/aws"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
@@ -118,8 +119,20 @@ func RunDataApi(ctx *cli.Context) error {
 			Backend:     blobstorev2.BackendDynamoDB,
 		})
 
+		var userAccountRemapping map[string]string
+		if config.UserAccountRemappingFilePath != "" {
+			userAccountRemapping, err = nameremapping.LoadNameRemapping(config.UserAccountRemappingFilePath)
+			if err != nil {
+				logger.Error("Failed to load user account remapping", "error", err)
+			} else {
+				logger.Info("Loaded user account remapping",
+					"count", len(userAccountRemapping),
+					"mappings", nameremapping.FormatMappings(userAccountRemapping))
+			}
+		}
+
 		// Register reservation collector
-		reservationCollector := serverv2.NewReservationExpirationCollector(subgraphClient, logger)
+		reservationCollector := serverv2.NewReservationExpirationCollector(subgraphClient, logger, userAccountRemapping)
 		reg.MustRegister(reservationCollector)
 
 		metrics := dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)

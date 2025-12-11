@@ -1,6 +1,7 @@
 package reservationvalidation
 
 import (
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,6 +22,7 @@ type ReservationValidatorMetrics struct {
 	reservationTimeMovedBackward     prometheus.Counter
 	reservationUnexpectedErrors      prometheus.Counter
 	enablePerAccountMetrics          bool
+	userAccountRemapping             map[string]string
 }
 
 func NewReservationValidatorMetrics(
@@ -28,6 +30,7 @@ func NewReservationValidatorMetrics(
 	namespace string,
 	subsystem string,
 	enablePerAccountMetrics bool,
+	userAccountRemapping map[string]string,
 ) *ReservationValidatorMetrics {
 	if registry == nil {
 		return nil
@@ -121,6 +124,7 @@ func NewReservationValidatorMetrics(
 		reservationTimeMovedBackward:     timeMovedBackward,
 		reservationUnexpectedErrors:      unexpectedErrors,
 		enablePerAccountMetrics:          enablePerAccountMetrics,
+		userAccountRemapping:             userAccountRemapping,
 	}
 }
 
@@ -131,11 +135,7 @@ func (m *ReservationValidatorMetrics) RecordSuccess(accountID string, symbolCoun
 	}
 	m.reservationBytes.Observe(float64(symbolCount) * encoding.BYTES_PER_SYMBOL)
 
-	// If per-account metrics are disabled, aggregate under "0x0"
-	labelValue := accountID
-	if !m.enablePerAccountMetrics {
-		labelValue = "0x0"
-	}
+	labelValue := nameremapping.GetAccountLabel(accountID, m.userAccountRemapping, m.enablePerAccountMetrics)
 	m.reservationSymbolsTotal.WithLabelValues(labelValue).Add(float64(symbolCount))
 	m.reservationDispersalsTotal.WithLabelValues(labelValue).Inc()
 }

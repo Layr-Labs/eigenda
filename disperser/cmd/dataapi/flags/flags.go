@@ -153,6 +153,12 @@ var (
 		Value:    1,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DATA_API_VERSION"),
 	}
+	UserAccountRemappingFileFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "user-account-remapping-file"),
+		Usage:    "Path to a YAML file containing user account ID to name remappings for metrics labels",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USER_ACCOUNT_REMAPPING_FILE"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -180,6 +186,7 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	UserAccountRemappingFileFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
