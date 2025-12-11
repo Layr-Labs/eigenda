@@ -129,7 +129,7 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 
 	return &SupportedHeaderBytesResult{
 		HeaderBytes: hexutil.Bytes{
-			commitments.ArbCustomDAHeaderByte, commitments.EigenDALayerByte,
+			commitments.ArbCustomDAHeaderByte,
 		},
 	}, nil
 }
