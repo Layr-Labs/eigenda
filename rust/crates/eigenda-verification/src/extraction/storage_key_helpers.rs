@@ -52,7 +52,7 @@ pub fn mapping_key(key: U256, slot: u64) -> StorageKey {
 ///
 /// Implements the Ethereum dynamic array storage rule:
 /// `storage_key = keccak256(slot) + index`
-/// 
+///
 /// SAFETY CAVEAT: This function assumes that the values in the array have size >= 16 bytes.
 /// Smaller values get packed into 32 byte slots, and hence the indexing would be different.
 ///

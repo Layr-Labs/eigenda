@@ -690,12 +690,11 @@ impl DataDecoder for CertVerifierABNsExtractor {
                 out.push(abn);
             }
         }
-        out.windows(2)
-            .all(|w| w[0] < w[1])
-            .then(|| ())
-            .ok_or_else(|| {
-                CertExtractionError::CertVerifierABNsNotStrictlyIncreasing(out.clone())
-            })?;
+        if !out.windows(2).all(|w| w[0] < w[1]) {
+            return Err(CertExtractionError::CertVerifierABNsNotStrictlyIncreasing(
+                out.clone(),
+            ));
+        }
 
         Ok(out)
     }

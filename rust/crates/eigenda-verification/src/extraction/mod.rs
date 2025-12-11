@@ -56,12 +56,17 @@ pub enum CertExtractionError {
 
     /// Likely a configuration error in the contract itself. Are there any CertVerifiers registered in the router?
     #[error("No active block number found at reference block {rbn}")]
-    NoActiveCertVerifierAtRBN { rbn: u64 },
+    NoActiveCertVerifierAtRBN {
+        /// The reference block number at which no active cert verifier was found.
+        rbn: u64,
+    },
 
+    /// The provided off-chain active cert verifier does not match the on-chain active cert verifier at the given reference block number.
     #[error(
         "Wrong Cert Verifier. Proofs of storage provided for {offchain:?}, which doesn't match onchain router's active cert verifier {onchain:?} at RBN {rbn}"
     )]
     WrongActiveCertVerifier {
+        /// The reference block number at which the mismatch was detected.
         rbn: u64,
         /// The address of the active certificate verifier as reported off-chain,
         /// for which we received proofs of storage.
