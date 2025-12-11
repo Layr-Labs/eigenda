@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
@@ -65,12 +66,26 @@ func TestArbCustomDAGetMaxMessageSizeMethod(t *testing.T) {
 	require.NoError(t, err)
 	rpcClient := ethClient.Client()
 
+	// ensure that the max payload size value returned is correct
 	var maxMessageSizeResult *arbitrum_altda.MaxMessageSizeResult
 	err = rpcClient.Call(&maxMessageSizeResult,
 		arbitrum_altda.MethodGetMaxMessageSize)
 	require.NoError(t, err)
 	require.NotNil(t, maxMessageSizeResult)
 	require.Equal(t, expectedMaxPayloadSize, uint32(maxMessageSizeResult.MaxSize))
+
+	// ensure that the max payload size value is respected as an upper limit for dispersal attempts
+
+	var storeResult *arbitrum_altda.StoreResult
+	seqMessageArg := "0x" + hex.EncodeToString(testutils.RandBytes(int(expectedMaxPayloadSize)+5))
+	timeoutArg := hexutil.Uint(200)
+
+	err = rpcClient.Call(&storeResult, arbitrum_altda.MethodStore,
+		seqMessageArg,
+		timeoutArg)
+
+	require.Error(t, err)
+	require.Equal(t, err.Error(), arbitrum_altda.ErrMessageTooLarge.Error())
 }
 
 func TestArbCustomDAStoreAndRecoverMethods(t *testing.T) {

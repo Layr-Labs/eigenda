@@ -254,8 +254,14 @@ func (h *Handlers) Store(
 		return nil, fmt.Errorf("expected EigenDAV2 backend, got: %v", dispersalBackend)
 	}
 
-	if len(message) == 0 {
+	messageLength := len(message)
+
+	if messageLength == 0 {
 		return nil, fmt.Errorf("received empty rollup payload")
+	}
+
+	if messageLength > int(h.compatibilityCfg.MaxPayloadSizeBytes) {
+		return nil, ErrMessageTooLarge
 	}
 
 	versionedCert, err := h.eigenDAManager.Put(ctx, message, coretypes.CertSerializationABI)
