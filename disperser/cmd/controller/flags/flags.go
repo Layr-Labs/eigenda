@@ -356,9 +356,8 @@ var (
 	SigningRateDynamoDbTableNameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-dynamodb-table-name"),
 		Usage:    "The name of the DynamoDB table used to store signing rate data",
-		Required: false,
+		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_DYNAMODB_TABLE_NAME"),
-		Value:    "validator-signing-rates",
 	}
 )
 
@@ -368,11 +367,11 @@ var requiredFlags = []cli.Flag{
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,
 	EncoderAddressFlag,
-
 	DispatcherPullIntervalFlag,
 	AttestationTimeoutFlag,
 	BatchAttestationTimeoutFlag,
 	DisperserIDFlag,
+	SigningRateDynamoDbTableNameFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -416,7 +415,6 @@ var optionalFlags = []cli.Flag{
 	SigningRateRetentionPeriodFlag,
 	SigningRateBucketSpanFlag,
 	SigningRateFlushPeriodFlag,
-	SigningRateDynamoDbTableNameFlag,
 }
 
 var Flags []cli.Flag
