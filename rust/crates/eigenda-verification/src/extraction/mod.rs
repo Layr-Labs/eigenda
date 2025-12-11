@@ -195,13 +195,13 @@ impl CertStateData {
             .iter()
             .rev()
             .find(|abn| **abn as u64 <= rbn)
-            .ok_or_else(|| CertExtractionError::NoActiveCertVerifierAtRBN { rbn: rbn })?;
+            .ok_or_else(|| CertExtractionError::NoActiveCertVerifierAtRBN { rbn })?;
         let cert_verifier = cert_verifiers
             .get(abn)
-            .ok_or_else(|| CertExtractionError::NoActiveCertVerifierAtRBN { rbn: rbn })?;
+            .ok_or_else(|| CertExtractionError::NoActiveCertVerifierAtRBN { rbn })?;
         if !cert_verifier.eq(&self.cert_verifier.address) {
             return Err(CertExtractionError::WrongActiveCertVerifier {
-                rbn: rbn,
+                rbn,
                 offchain: self.cert_verifier.address,
                 onchain: *cert_verifier,
             });
