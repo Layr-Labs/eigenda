@@ -163,6 +163,19 @@ func RunController(cliCtx *cli.Context) error {
 		}
 	}
 
+	var validatorIdRemapping map[string]string
+	if config.ValidatorIdRemappingFilePath != "" {
+		validatorIdRemapping, err = nameremapping.LoadNameRemapping(
+			config.ValidatorIdRemappingFilePath)
+		if err != nil {
+			logger.Error("Failed to load validator ID remapping", "error", err)
+		} else {
+			logger.Info("Loaded validator ID remapping",
+				"count", len(validatorIdRemapping),
+				"mappings", nameremapping.FormatMappings(validatorIdRemapping))
+		}
+	}
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
@@ -272,6 +285,7 @@ func RunController(cliCtx *cli.Context) error {
 		controllerLivenessChan,
 		signingRateTracker,
 		userAccountRemapping,
+		validatorIdRemapping,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)

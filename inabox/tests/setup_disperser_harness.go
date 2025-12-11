@@ -927,6 +927,7 @@ func startController(
 		controllerLivenessChan,
 		signingRateTracker,
 		nil, // userAccountRemapping
+		nil, // validatorIdRemapping
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dispatcher: %w", err)
