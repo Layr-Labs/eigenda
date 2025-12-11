@@ -62,6 +62,8 @@ type MemStore struct {
 	g1SRS []bn254.G1Affine
 
 	polyForm codecs.PolynomialForm
+
+	config *memconfig.SafeConfig
 }
 
 var _ common.EigenDAV2Store = (*MemStore)(nil)
@@ -72,10 +74,11 @@ func New(
 	g1SRS []bn254.G1Affine,
 ) *MemStore {
 	return &MemStore{
-		ephemeraldb.New(ctx, config, log),
-		log,
-		g1SRS,
-		codecs.PolynomialFormEval,
+		DB:       ephemeraldb.New(ctx, config, log),
+		log:      log,
+		g1SRS:    g1SRS,
+		polyForm: codecs.PolynomialFormEval,
+		config:   config,
 	}
 }
 
@@ -203,17 +206,42 @@ func (e *MemStore) Get(
 		return nil, fmt.Errorf("fetching entry via memstore: %w", err)
 	}
 
-	v4cert, err := coretypes.DeserializeEigenDACertV4(
-		versionedCert.SerializedCert,
-		serializationType,
-	)
+	// Convert version byte to certificate version
+	certVersion, err := versionedCert.Version.IntoCertVersion()
 	if err != nil {
-		return nil, coretypes.ErrCertParsingFailedDerivationError
+		return nil, fmt.Errorf("convert version byte to cert version: %w", err)
+	}
+
+	// Deserialize the certificate based on its version to extract blob length
+	var blobLength uint32
+	switch certVersion {
+	case coretypes.VersionThreeCert:
+		v3cert, err := coretypes.DeserializeEigenDACertV3(
+			versionedCert.SerializedCert,
+			serializationType,
+		)
+		if err != nil {
+			return nil, coretypes.ErrCertParsingFailedDerivationError
+		}
+		blobLength = v3cert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+
+	case coretypes.VersionFourCert:
+		v4cert, err := coretypes.DeserializeEigenDACertV4(
+			versionedCert.SerializedCert,
+			serializationType,
+		)
+		if err != nil {
+			return nil, coretypes.ErrCertParsingFailedDerivationError
+		}
+		blobLength = v4cert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+
+	default:
+		return nil, fmt.Errorf("unsupported certificate version: %d", certVersion)
 	}
 
 	blob, err := coretypes.DeserializeBlob(
 		blobSerialized,
-		v4cert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
+		blobLength,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize blob: %w", err)
@@ -247,15 +275,39 @@ func (e *MemStore) Put(
 
 	blobSerialized := blob.Serialize()
 
-	// generateRandomV4Cert produces valid blob commitment on G1
-	artificialV4Cert, err := e.generateRandomV4Cert(blobSerialized)
-	if err != nil {
-		return nil, fmt.Errorf("generating random cert: %w", err)
-	}
+	// Get configured cert version
+	certVersion := e.config.CertVersion()
 
-	certBytes, err := artificialV4Cert.Serialize(serializationType)
-	if err != nil {
-		return nil, fmt.Errorf("serialize v4 cert: %w", err)
+	var certBytes []byte
+	var versionByte certs.VersionByte
+
+	switch certVersion {
+	case coretypes.VersionThreeCert:
+		// Generate V3 cert
+		artificialV3Cert, err := e.generateRandomV3Cert(blobSerialized)
+		if err != nil {
+			return nil, fmt.Errorf("generating random v3 cert: %w", err)
+		}
+		certBytes, err = artificialV3Cert.Serialize(serializationType)
+		if err != nil {
+			return nil, fmt.Errorf("serialize v3 cert: %w", err)
+		}
+		versionByte = certs.V2VersionByte
+
+	case coretypes.VersionFourCert:
+		// Generate V4 cert (produces valid blob commitment on G1)
+		artificialV4Cert, err := e.generateRandomV4Cert(blobSerialized)
+		if err != nil {
+			return nil, fmt.Errorf("generating random v4 cert: %w", err)
+		}
+		certBytes, err = artificialV4Cert.Serialize(serializationType)
+		if err != nil {
+			return nil, fmt.Errorf("serialize v4 cert: %w", err)
+		}
+		versionByte = certs.V3VersionByte
+
+	default:
+		return nil, fmt.Errorf("unsupported certificate version: %d", certVersion)
 	}
 
 	err = e.InsertEntry(crypto.Keccak256Hash(certBytes).Bytes(), blobSerialized)
@@ -263,7 +315,7 @@ func (e *MemStore) Put(
 		return nil, err
 	}
 
-	return certs.NewVersionedCert(certBytes, certs.V3VersionByte), nil
+	return certs.NewVersionedCert(certBytes, versionByte), nil
 }
 
 func (e *MemStore) VerifyCert(
