@@ -38,7 +38,10 @@ import (
 // IHandlers defines the expected JSON RPC interface as defined per Arbitrum Nitro's Custom DA interface:
 // https://github.com/OffchainLabs/nitro/blob/c1bdcd8c571c1b22fdcdd4cc030a8ff49cbc5184/daprovider/daclient/daclient.go
 type IHandlers interface {
+	CompatibilityConfig(ctx context.Context) (*CompatibilityConfigResult, error)
+
 	GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeaderBytesResult, error)
+	GetMaxMessageSize(ctx context.Context) (*MaxMessageSizeResult, error)
 
 	RecoverPayload(
 		ctx context.Context,
@@ -71,8 +74,6 @@ type IHandlers interface {
 		ctx context.Context,
 		certificate hexutil.Bytes,
 	) (*GenerateCertificateValidityProofResult, error)
-
-	CompatibilityConfig(ctx context.Context) (*CompatibilityConfigResult, error)
 }
 
 // Handlers defines the Arbitrum ALT DA server spec's JSON RPC methods
