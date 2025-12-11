@@ -52,6 +52,7 @@ type controllerMetrics struct {
 	collectDetailedValidatorMetrics bool
 	enablePerAccountMetrics         bool
 	userAccountRemapping            map[string]string
+	validatorIdRemapping            map[string]string
 }
 
 // Sets up metrics for the controller.
@@ -67,6 +68,8 @@ func newControllerMetrics(
 	enablePerAccountMetrics bool,
 	// Maps account IDs to user-friendly names.
 	userAccountRemapping map[string]string,
+	// Maps validator IDs to validator names.
+	validatorIdRemapping map[string]string,
 ) (*controllerMetrics, error) {
 	if registry == nil {
 		return nil, nil
@@ -337,6 +340,7 @@ func newControllerMetrics(
 		collectDetailedValidatorMetrics: collectDetailedValidatorMetrics,
 		enablePerAccountMetrics:         enablePerAccountMetrics,
 		userAccountRemapping:            userAccountRemapping,
+		validatorIdRemapping:            validatorIdRemapping,
 		globalSignedBatchCount:          globalSignedBatchCount,
 		globalUnsignedBatchCount:        globalUnsignedBatchCount,
 		globalSignedByteCount:           globalSignedByteCount,
@@ -526,7 +530,11 @@ func (m *controllerMetrics) ReportValidatorSigningResult(
 		return
 	}
 
-	label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
+	idLabel := nameremapping.GetAccountLabel(
+		"0x"+id.Hex(),
+		m.validatorIdRemapping,
+		m.collectDetailedValidatorMetrics)
+	label := prometheus.Labels{"id": idLabel, "quorum": fmt.Sprintf("%d", quorum)}
 
 	if success {
 		m.validatorSignedBatchCount.With(label).Add(1)
@@ -543,5 +551,9 @@ func (m *controllerMetrics) ReportValidatorSigningLatency(id core.OperatorID, la
 		return
 	}
 
-	m.validatorSigningLatency.WithLabelValues(id.Hex()).Observe(common.ToMilliseconds(latency))
+	idLabel := nameremapping.GetAccountLabel(
+		"0x"+id.Hex(),
+		m.validatorIdRemapping,
+		m.collectDetailedValidatorMetrics)
+	m.validatorSigningLatency.WithLabelValues(idLabel).Observe(common.ToMilliseconds(latency))
 }

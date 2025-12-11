@@ -50,6 +50,7 @@ type Config struct {
 	PaymentAuthorizationConfig controller.PaymentAuthorizationConfig
 
 	UserAccountRemappingFilePath string
+	ValidatorIdRemappingFilePath string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -189,7 +190,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ServerConfig:                    serverConfig,
 		HeartbeatMonitorConfig:          heartbeatMonitorConfig,
 		PaymentAuthorizationConfig:      paymentAuthorizationConfig,
-		UserAccountRemappingFilePath:    ctx.GlobalString(flags.UserAccountRemappingFileFlag.Name),
+		UserAccountRemappingFilePath: ctx.GlobalString(flags.UserAccountRemappingFileFlag.Name),
+		ValidatorIdRemappingFilePath: ctx.GlobalString(flags.ValidatorIdRemappingFileFlag.Name),
 	}
 
 	if err := config.DispersalRequestSignerConfig.Verify(); err != nil {
