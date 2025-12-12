@@ -54,72 +54,51 @@ library EigenDACertVerificationLib {
     /// @param nextBlobVersion The next blob version (valid versions need to be less than this number)
     error InvalidBlobVersion(uint16 blobVersion, uint16 nextBlobVersion);
 
+    /// @notice Thrown when the offchain derivation version is invalid
+    /// @param certDerivationVer The offchain derivation version in the certificate
+    /// @param requiredDerivationVer The required offchain derivation version
+    error InvalidOffchainDerivationVersion(uint16 certDerivationVer, uint16 requiredDerivationVer);
+
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
-    /// @dev Uses the same verification logic as verifyDACertV2. The only difference is that the certificate is ABI encoded bytes.
     /// @param eigenDAThresholdRegistry The threshold registry contract
     /// @param eigenDASignatureVerifier The signature verifier contract
     /// @param daCert The EigenDA certificate
     /// @param securityThresholds The security thresholds to verify against
     /// Callers should ensure that the requiredQuorumNumbers passed are non-empty if needed.
     /// @param requiredQuorumNumbers The required quorum numbers. Can be empty if not required.
+    /// @param offchainDerivationVersion The offchain derivation version to verify against
     function checkDACert(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier eigenDASignatureVerifier,
-        CT.EigenDACertV3 memory daCert,
-        DATypesV1.SecurityThresholds memory securityThresholds,
-        bytes memory requiredQuorumNumbers
-    ) internal view {
-        checkDACertV2(
-            eigenDAThresholdRegistry,
-            eigenDASignatureVerifier,
-            daCert.batchHeader,
-            daCert.blobInclusionInfo,
-            daCert.nonSignerStakesAndSignature,
-            securityThresholds,
-            requiredQuorumNumbers,
-            daCert.signedQuorumNumbers
-        );
-    }
-
-    /// @notice Checks a complete blob certificate for V2 in a single call
-    /// @param eigenDAThresholdRegistry The threshold registry contract
-    /// @param signatureVerifier The signature verifier contract
-    /// @param batchHeader The batch header
-    /// @param blobInclusionInfo The blob inclusion info
-    /// @param nonSignerStakesAndSignature The non-signer stakes and signature
-    /// @param securityThresholds The security thresholds to verify against
-    /// @param requiredQuorumNumbers The required quorum numbers
-    /// @param signedQuorumNumbers The signed quorum numbers
-    function checkDACertV2(
-        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
-        IEigenDASignatureVerifier signatureVerifier,
-        DATypesV2.BatchHeaderV2 memory batchHeader,
-        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
-        DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        CT.EigenDACertV4 memory daCert,
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers,
-        bytes memory signedQuorumNumbers
+        uint16 offchainDerivationVersion
     ) internal view {
-        checkBlobInclusion(batchHeader, blobInclusionInfo);
+        checkOffchainDerivationVersion(daCert.offchainDerivationVersion, offchainDerivationVersion);
+
+        checkBlobInclusion(daCert.batchHeader, daCert.blobInclusionInfo);
 
         checkSecurityParams(
-            eigenDAThresholdRegistry, blobInclusionInfo.blobCertificate.blobHeader.version, securityThresholds
+            eigenDAThresholdRegistry, daCert.blobInclusionInfo.blobCertificate.blobHeader.version, securityThresholds
         );
 
         // Verify signatures and build confirmed quorums bitmap
         uint256 confirmedQuorumsBitmap = checkSignaturesAndBuildConfirmedQuorums(
-            signatureVerifier,
-            hashBatchHeaderV2(batchHeader),
-            signedQuorumNumbers,
-            batchHeader.referenceBlockNumber,
-            nonSignerStakesAndSignature,
+            eigenDASignatureVerifier,
+            hashBatchHeaderV2(daCert.batchHeader),
+            daCert.signedQuorumNumbers,
+            daCert.batchHeader.referenceBlockNumber,
+            daCert.nonSignerStakesAndSignature,
             securityThresholds
         );
 
         // The different quorums are related by: requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums ⊆ signedQuorums
         // checkSignaturesAndBuildConfirmedQuorums checked the last inequality. We now verify the other two.
         checkQuorumSubsets(
-            requiredQuorumNumbers, blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap
+            requiredQuorumNumbers,
+            daCert.blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
+            confirmedQuorumsBitmap
         );
     }
 
@@ -247,6 +226,15 @@ library EigenDACertVerificationLib {
         uint256 requiredQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers);
         if (!BitmapUtils.isSubsetOf(requiredQuorumsBitmap, blobQuorumsBitmap)) {
             revert RequiredQuorumsNotSubset(requiredQuorumsBitmap, blobQuorumsBitmap);
+        }
+    }
+
+    /// @notice Checks that the offchain derivation version matches the required version
+    /// @param certDerivationVer The offchain derivation version in the certificate
+    /// @param requiredDerivationVer The required offchain derivation version
+    function checkOffchainDerivationVersion(uint16 certDerivationVer, uint16 requiredDerivationVer) internal pure {
+        if (certDerivationVer != requiredDerivationVer) {
+            revert InvalidOffchainDerivationVersion(certDerivationVer, requiredDerivationVer);
         }
     }
 

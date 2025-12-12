@@ -50,7 +50,14 @@ type ControllerConfig struct {
 	// Must be between 0.0 and 1.0.
 	SignificantSigningThresholdFraction float64
 
-	// Whether or not to collect detailed validator signing metrics.
+	// If true, validators that DON'T have a human-friendly name remapping will be reported as their full validator ID
+	// in metrics.
+	//
+	// If false, validators that DON'T have a human-friendly name remapping will be reported as "0x0" in metrics.
+	//
+	// NOTE: No matter the value of this field, validators that DO have a human-friendly name remapping will be reported
+	// as their remapped name in metrics. If you must reduce metric cardinality by reporting ALL validators as "0x0",
+	// you shouldn't define any human-friendly name remappings.
 	CollectDetailedValidatorSigningMetrics bool
 
 	// If true, accounts that DON'T have a human-friendly name remapping will be reported as their full account ID

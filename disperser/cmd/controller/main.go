@@ -157,11 +157,22 @@ func RunController(cliCtx *cli.Context) error {
 		if err != nil {
 			logger.Error("Failed to load user account remapping", "error", err)
 		} else {
-			var mappings []string
-			for oldName, newName := range userAccountRemapping {
-				mappings = append(mappings, fmt.Sprintf("%s->%s", oldName, newName))
-			}
-			logger.Info("Loaded user account remapping", "count", len(userAccountRemapping), "mappings", strings.Join(mappings, ", "))
+			logger.Info("Loaded user account remapping",
+				"count", len(userAccountRemapping),
+				"mappings", nameremapping.FormatMappings(userAccountRemapping))
+		}
+	}
+
+	var validatorIdRemapping map[string]string
+	if config.ValidatorIdRemappingFilePath != "" {
+		validatorIdRemapping, err = nameremapping.LoadNameRemapping(
+			config.ValidatorIdRemappingFilePath)
+		if err != nil {
+			logger.Error("Failed to load validator ID remapping", "error", err)
+		} else {
+			logger.Info("Loaded validator ID remapping",
+				"count", len(validatorIdRemapping),
+				"mappings", nameremapping.FormatMappings(validatorIdRemapping))
 		}
 	}
 
@@ -274,6 +285,7 @@ func RunController(cliCtx *cli.Context) error {
 		controllerLivenessChan,
 		signingRateTracker,
 		userAccountRemapping,
+		validatorIdRemapping,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
@@ -307,6 +319,7 @@ func RunController(cliCtx *cli.Context) error {
 				gethClient,
 				dynamoClient.GetAwsClient(),
 				metricsRegistry,
+				userAccountRemapping,
 			)
 			if err != nil {
 				return fmt.Errorf("build payment authorization handler: %w", err)
