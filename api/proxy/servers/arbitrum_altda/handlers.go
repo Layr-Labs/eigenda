@@ -122,9 +122,11 @@ func NewHandlers(
 }
 
 // GetMaxMessageSize returns the max allowed payload size
-// this method is called every-time before the nitro batch poster begins building the
+// this method is called every time before the nitro batch poster begins building the
 // tx batch.
 func (h *Handlers) GetMaxMessageSize(ctx context.Context) (*MaxMessageSizeResult, error) {
+	h.logMethodCall(MethodGetMaxMessageSize)
+
 	return &MaxMessageSizeResult{
 		MaxSize: int(h.compatibilityCfg.MaxPayloadSizeBytes),
 	}, nil

@@ -28,7 +28,7 @@ var (
 	//
 	// ErrMessageTooLarge is returned by a DA provider when the batch is too large
 	// for the current backend. When this error is returned, the batch poster will
-	// a smaller size), and rebuild with the new size limit.
+	// retry with a smaller size, and rebuild with the new size limit.
 	ErrMessageTooLarge = errors.New("message too large for current DA backend")
 )
 

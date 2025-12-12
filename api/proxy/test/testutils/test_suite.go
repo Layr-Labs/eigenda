@@ -120,7 +120,7 @@ func CreateTestSuite(
 		panic(fmt.Sprintf("new compatibility config: %v", err.Error()))
 	}
 
-	// NOTE: this dependency injection logic is pseudo-identical to what's defined in
+	// NOTE: this dependency injection logic is pseudo-identical to what's defined
 	//       in the existing entrypoint.go file. at some point we should look to deduplicate
 	//       & simplify where possible.
 	if appConfig.EnabledServersConfig.RestAPIConfig.DAEndpointEnabled() {

@@ -90,6 +90,7 @@ func TestMethod_Store(t *testing.T) {
 		dispersalBackend proxy_common.EigenDABackend
 		mockPutReturn    *certs.VersionedCert
 		mockPutError     error
+		expectPutCall    bool
 		expectError      bool
 		errorContains    string
 		errorIs          error
@@ -102,6 +103,7 @@ func TestMethod_Store(t *testing.T) {
 			dispersalBackend: proxy_common.V2EigenDABackend,
 			mockPutReturn:    mockCert,
 			mockPutError:     nil,
+			expectPutCall:    true,
 			expectError:      false,
 			validateResult: func(t *testing.T, result *StoreResult) {
 				require.NotNil(t, result)
@@ -116,6 +118,7 @@ func TestMethod_Store(t *testing.T) {
 			payload:          []byte{},
 			timeout:          hexutil.Uint64(60),
 			dispersalBackend: proxy_common.V2EigenDABackend,
+			expectPutCall:    false,
 			expectError:      true,
 			errorContains:    "empty rollup payload",
 		},
@@ -124,6 +127,7 @@ func TestMethod_Store(t *testing.T) {
 			payload:          []byte("test payload"),
 			timeout:          hexutil.Uint64(60),
 			dispersalBackend: proxy_common.V1EigenDABackend,
+			expectPutCall:    false,
 			expectError:      true,
 			errorContains:    "expected EigenDAV2 backend",
 		},
@@ -133,6 +137,7 @@ func TestMethod_Store(t *testing.T) {
 			timeout:          hexutil.Uint64(60),
 			dispersalBackend: proxy_common.V2EigenDABackend,
 			mockPutError:     &api.ErrorFailover{},
+			expectPutCall:    true,
 			expectError:      true,
 			errorIs:          ErrFallbackRequested,
 		},
@@ -142,6 +147,7 @@ func TestMethod_Store(t *testing.T) {
 			timeout:          hexutil.Uint64(60),
 			dispersalBackend: proxy_common.V2EigenDABackend,
 			mockPutError:     errors.New("put failed"),
+			expectPutCall:    true,
 			expectError:      true,
 			errorContains:    "put rollup payload",
 		},
@@ -150,6 +156,7 @@ func TestMethod_Store(t *testing.T) {
 			payload:          []byte("test payload that exceeds 10 bytes"),
 			timeout:          hexutil.Uint64(60),
 			dispersalBackend: proxy_common.V2EigenDABackend,
+			expectPutCall:    false,
 			expectError:      true,
 			errorIs:          ErrMessageTooLarge,
 		},
@@ -173,8 +180,7 @@ func TestMethod_Store(t *testing.T) {
 				GetDispersalBackend().
 				Return(tt.dispersalBackend)
 
-			// Only expect Put call if we have a valid backend, non-empty payload, and payload is within size limit
-			if tt.dispersalBackend == proxy_common.V2EigenDABackend && len(tt.payload) > 0 && len(tt.payload) <= int(maxPayloadSize) {
+			if tt.expectPutCall {
 				mockEigenDAManager.EXPECT().
 					Put(gomock.Any(), tt.payload, coretypes.CertSerializationABI).
 					Return(tt.mockPutReturn, tt.mockPutError)
