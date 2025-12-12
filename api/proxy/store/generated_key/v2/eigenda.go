@@ -40,14 +40,32 @@ type Store struct {
 	// If cert.L1InclusionBlock > batch.RBN + rbnRecencyWindowSize, an
 	// [RBNRecencyCheckFailedError] is returned.
 	// This check is optional and will be skipped when rbnRecencyWindowSize is set to 0.
-	rbnRecencyWindowSize uint64
+	rbnRecencyWindowSize uint64 // TODO(iquidus): remove this along with the optional cli flag that sets this value
 
 	// Retrieval related fields.
 	retrievers []clients.PayloadRetriever
 
 	// Timeout used for contract calls
 	contractCallTimeout time.Duration
+
+	// offchainDerivationMap maps offchain derivation versions to their parameters.
+	// offchain derivation version was introduced with EigenDA V4 certs, and is not used for earlier cert versions.
+	offchainDerivationMap OffchainDerivationMap
 }
+
+// OffchainDerivationParameters holds parameters for offchain derivation for a given derivation version.
+// Version 0 is currently the only offchain derivation version, which only contains the RBN recency window size
+// parameter. However this struct is designed to be extensible for future offchain derivation versions.
+type OffchainDerivationParameters struct {
+	// Allowed distance (in L1 blocks) between the eigenDA cert's reference block number (RBN)
+	// and the L1 block number at which the cert was included in the rollup's batch inbox.
+	// If cert.L1InclusionBlock > batch.RBN + rbnRecencyWindowSize, an
+	// [RBNRecencyCheckFailedError] is returned.
+	RBNRecencyWindowSize uint64
+}
+
+// OffchainDerivationMap maps offchain derivation versions to their parameters.
+type OffchainDerivationMap = map[coretypes.OffchainDerivationVersion]OffchainDerivationParameters
 
 var _ common.EigenDAV2Store = (*Store)(nil)
 
@@ -65,14 +83,21 @@ func NewStore(
 			"putTries==0 is not permitted. >0 means 'try N times', <0 means 'retry indefinitely'")
 	}
 
+	offchainDerivationMap := make(OffchainDerivationMap)
+	// Currently only offchain derivation version 0 exists.
+	offchainDerivationMap[0] = OffchainDerivationParameters{
+		RBNRecencyWindowSize: 14400,
+	}
+
 	return &Store{
-		log:                  log,
-		putTries:             putTries,
-		rbnRecencyWindowSize: rbnRecencyWindowSize,
-		disperser:            disperser,
-		retrievers:           retrievers,
-		certVerifier:         certVerifier,
-		contractCallTimeout:  contractCallTimeout,
+		log:                   log,
+		putTries:              putTries,
+		rbnRecencyWindowSize:  rbnRecencyWindowSize,
+		disperser:             disperser,
+		retrievers:            retrievers,
+		certVerifier:          certVerifier,
+		contractCallTimeout:   contractCallTimeout,
+		offchainDerivationMap: offchainDerivationMap,
 	}, nil
 }
 
@@ -237,6 +262,7 @@ func (e Store) BackendType() common.BackendType {
 func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCert,
 	serializationType coretypes.CertSerializationType, l1InclusionBlockNum uint64) error {
 	var sumDACert coretypes.EigenDACert
+	var certVersion coretypes.CertificateVersion
 
 	switch versionedCert.Version {
 	case certs.V0VersionByte:
@@ -245,7 +271,7 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCer
 			"version 0 byte certs should never be verified by the EigenDA V2 store",
 		)
 
-	case certs.V1VersionByte, certs.V2VersionByte:
+	case certs.V1VersionByte, certs.V2VersionByte, certs.V3VersionByte:
 		certTypeVersion, err := versionedCert.Version.IntoCertVersion()
 		if err != nil {
 			return coretypes.NewCertParsingFailedError(
@@ -262,7 +288,7 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCer
 				hex.EncodeToString(versionedCert.SerializedCert),
 				fmt.Sprintf("deserialize EigenDA cert: %v", err))
 		}
-
+		certVersion = certTypeVersion
 		sumDACert = cert
 
 	default:
@@ -271,18 +297,11 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCer
 			fmt.Sprintf("unknown EigenDA cert version: %d", versionedCert.Version))
 	}
 
-	// check recency first since it requires less processing and no IO vs verifying the cert
-	err := verifyCertRBNRecencyCheck(sumDACert.ReferenceBlockNumber(), l1InclusionBlockNum, e.rbnRecencyWindowSize)
-	if err != nil {
-		// Already a structured error converted to a 418 HTTP error by the error middleware.
-		return err
-	}
-
 	timeoutCtx, cancel := context.WithTimeout(ctx, e.contractCallTimeout)
 	defer cancel()
 
 	// verify cert via simulation call to verifier contract
-	err = e.certVerifier.CheckDACert(timeoutCtx, sumDACert)
+	err := e.certVerifier.CheckDACert(timeoutCtx, sumDACert)
 	if err != nil {
 		var certVerifierInvalidCertErr *verification.CertVerifierInvalidCertError
 		if errors.As(err, &certVerifierInvalidCertErr) {
@@ -293,6 +312,41 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCer
 		// Other errors are internal proxy errors, so we just wrap them for extra context.
 		// They will be converted to 500 HTTP errors by the error middleware.
 		return fmt.Errorf("eth-call to CertVerifier.checkDACert: %w", err)
+	}
+
+	// For cert versions that support offchain derivation versioning (v4+),
+	// we need to fetch the offchain derivation version from the contract,
+	// and then use that to get the relevant offchain derivation parameters
+	// (e.g. RBN recency window size) to perform additional checks.
+	//
+	// For cert versions that do not support offchain derivation versioning (v3 and below),
+	// we skip these additional checks.
+	//
+	// Note: offchain derivation versioning was introduced in cert version 4.
+	if certVersion >= coretypes.VersionFourCert {
+		timeoutCtx, cancel := context.WithTimeout(ctx, e.contractCallTimeout)
+		defer cancel()
+
+		offchainDerivationVersion, err := e.certVerifier.GetOffchainDerivationVersion(timeoutCtx, sumDACert.ReferenceBlockNumber())
+		if err != nil {
+			return fmt.Errorf("eth-call to CertVerifier.offchainDerivationVersion: %w", err)
+		}
+
+		offchainDerivationParams, exists := e.offchainDerivationMap[offchainDerivationVersion]
+		if !exists {
+			// Note: we've already verified the cert's onchain validity above, if we encounter this error,
+			// we've updated the derivation version onchain and not updated the hardcoded offchain map.
+			return coretypes.NewCertParsingFailedError(
+				hex.EncodeToString(versionedCert.SerializedCert),
+				fmt.Sprintf("unsupported offchain derivation version: %d", offchainDerivationVersion),
+			)
+		}
+
+		err = verifyCertRBNRecencyCheck(sumDACert.ReferenceBlockNumber(), l1InclusionBlockNum, offchainDerivationParams.RBNRecencyWindowSize)
+		if err != nil {
+			// Already a structured error converted to a 418 HTTP error by the error middleware.
+			return err
+		}
 	}
 
 	return nil
