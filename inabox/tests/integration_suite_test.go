@@ -59,12 +59,11 @@ func setupSuite(logger logging.Logger) error {
 
 	// Setup the global infrastructure
 	config := &integration.InfrastructureConfig{
-		TemplateName:   templateName,
-		TestName:       testName,
-		Logger:         logger,
-		RelayCount:     4,
-		RootPath:       "../../",
-		UseNewPayments: true,
+		TemplateName: templateName,
+		TestName:     testName,
+		Logger:       logger,
+		RelayCount:   4,
+		RootPath:     "../../",
 	}
 	var err error
 	globalInfra, err = integration.SetupInfrastructure(context.Background(), config)

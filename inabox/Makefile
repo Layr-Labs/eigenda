@@ -6,22 +6,16 @@ run-e2e-tests:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
 
 # Uses the inabox framework to run tests of the payment system
-# Runs each test individually with cleanup between them to avoid teardown issues. This is an ugly workaround, and should
-# be removed as soon as we figure out why in-test teardown isn't always succeeding.
 run-payments-tests:
-	@for test in \
-		TestLegacyPayments \
-		TestNewPayments; do \
-		echo "Running $$test..."; \
-		if ! gotestsum --format pkgname-and-test-fails -- ./tests/payments -run "^$$test$$" -parallel=9; then \
-			echo "❌ TEST FAILED: $$test"; \
-			$(MAKE) -s stop-inabox; \
-			exit 1; \
-		fi; \
+	@echo "Running TestPayments..."; \
+	if ! gotestsum --format pkgname-and-test-fails -- ./tests/payments -run "^TestPayments$$" -parallel=9; then \
+		echo "❌ TEST FAILED: TestPayments"; \
 		$(MAKE) -s stop-inabox; \
-	done; \
+		exit 1; \
+	fi; \
+	$(MAKE) -s stop-inabox; \
 	echo "========================================="; \
-	echo "✅ ALL PAYMENT TESTS PASSED"
+	echo "✅ PAYMENT TESTS PASSED"
 
 # Starts a long-lived inabox local devnet.
 # If you need to make configuration changes to inabox,

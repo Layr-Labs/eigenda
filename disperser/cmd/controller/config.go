@@ -16,7 +16,6 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
-	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
@@ -44,7 +43,7 @@ type Config struct {
 
 	MetricsPort                  int
 	ControllerReadinessProbePath string
-	ServerConfig                 server.Config
+	ServerConfig                 common.GRPCServerConfig
 	HeartbeatMonitorConfig       healthcheck.HeartbeatMonitorConfig
 
 	PaymentAuthorizationConfig controller.PaymentAuthorizationConfig
@@ -76,7 +75,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	grpcServerConfig, err := common.NewGRPCServerConfig(
-		ctx.GlobalBool(flags.GrpcServerEnableFlag.Name),
 		uint16(ctx.GlobalUint64(flags.GrpcPortFlag.Name)),
 		ctx.GlobalInt(flags.GrpcMaxMessageSizeFlag.Name),
 		ctx.GlobalDuration(flags.GrpcMaxIdleConnectionAgeFlag.Name),
@@ -85,14 +83,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	)
 	if err != nil {
 		return Config{}, fmt.Errorf("invalid gRPC server config: %w", err)
-	}
-
-	serverConfig, err := server.NewConfig(
-		grpcServerConfig,
-		ctx.GlobalBool(flags.GrpcPaymentAuthenticationFlag.Name),
-	)
-	if err != nil {
-		return Config{}, fmt.Errorf("invalid controller service config: %w", err)
 	}
 
 	paymentVaultUpdateInterval := ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name)
@@ -192,7 +182,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAContractDirectoryAddress: ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
 		MetricsPort:                     ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
-		ServerConfig:                    serverConfig,
+		ServerConfig:                    grpcServerConfig,
 		HeartbeatMonitorConfig:          heartbeatMonitorConfig,
 		PaymentAuthorizationConfig:      paymentAuthorizationConfig,
 		UserAccountRemappingFilePath:    ctx.GlobalString(flags.UserAccountRemappingFileFlag.Name),

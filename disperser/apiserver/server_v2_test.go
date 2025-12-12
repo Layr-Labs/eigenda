@@ -606,7 +606,6 @@ func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment b
 			EnableMetrics: false,
 		},
 		false, // enable both reservation and on-demand
-		true,  // use new payment system
 		nil,   // controllerConnection - not needed for unit tests
 		mockControllerClient,
 		listener,

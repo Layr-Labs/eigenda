@@ -255,12 +255,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_ADDRESS"),
 	}
-	UseControllerMediatedPayments = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "use-controller-mediated-payments"),
-		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using new controller-mediated system.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_CONTROLLER_MEDIATED_PAYMENTS"),
-	}
 	DisableGetBlobCommitment = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disable-get-blob-commitment"),
 		Usage:    "If true, the GetBlobCommitment gRPC endpoint will return a deprecation error. This endpoint is deprecated and will be removed in a future release.",
@@ -373,7 +367,6 @@ var optionalFlags = []cli.Flag{
 	MaxFutureDispersalTimeFlag,
 	ReservedOnly,
 	ControllerAddressFlag,
-	UseControllerMediatedPayments,
 	DisableGetBlobCommitment,
 	DisablePerAccountMetricsFlag,
 	SigningRateRetentionPeriodFlag,
