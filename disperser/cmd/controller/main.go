@@ -296,6 +296,7 @@ func RunController(cliCtx *cli.Context) error {
 	)
 
 	dispatcher, err := controller.NewController(
+		ctx,
 		&config.DispatcherConfig,
 		time.Now,
 		blobMetadataStore,
