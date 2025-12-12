@@ -4,6 +4,9 @@ name = "eigenda-verification"
 version = "0.1.0"
 
 [dependencies]
+# workspace dependencies
+eigenda-srs-data = { path = "../eigenda-srs-data" }
+
 alloy-consensus = { workspace = true, features = [
   "serde",
   "serde-bincode-compat",
@@ -18,7 +21,6 @@ ark-ff = { workspace = true }
 bitvec = { version = "1.0.1", default-features = false }
 bytes = { workspace = true }
 derive_more = { workspace = true }
-eigenda-srs-data = { path = "../eigenda-srs-data" }
 hashbrown = { workspace = true, features = ["default-hasher"] }
 hex = { workspace = true }
 proptest = { workspace = true, features = ["alloc", "std"] }

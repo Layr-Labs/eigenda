@@ -50,11 +50,24 @@ type ControllerConfig struct {
 	// Must be between 0.0 and 1.0.
 	SignificantSigningThresholdFraction float64
 
-	// Whether or not to collect detailed validator signing metrics.
+	// If true, validators that DON'T have a human-friendly name remapping will be reported as their full validator ID
+	// in metrics.
+	//
+	// If false, validators that DON'T have a human-friendly name remapping will be reported as "0x0" in metrics.
+	//
+	// NOTE: No matter the value of this field, validators that DO have a human-friendly name remapping will be reported
+	// as their remapped name in metrics. If you must reduce metric cardinality by reporting ALL validators as "0x0",
+	// you shouldn't define any human-friendly name remappings.
 	CollectDetailedValidatorSigningMetrics bool
 
-	// Whether to enable per-account blob status metrics.
-	// If false, all per-account blob status metrics will be aggregated under "0x0" to reduce cardinality.
+	// If true, accounts that DON'T have a human-friendly name remapping will be reported as their full account ID
+	// in metrics.
+	//
+	// If false, accounts that DON'T have a human-friendly name remapping will be reported as "0x0" in metrics.
+	//
+	// NOTE: No matter the value of this field, accounts that DO have a human-friendly name remapping will be reported
+	// as their remapped name in metrics. If you must reduce metric cardinality by reporting ALL accounts as "0x0",
+	// you shouldn't define any human-friendly name remappings.
 	EnablePerAccountBlobStatusMetrics bool
 
 	// NumConcurrentRequests is the size of the worker pool for processing dispersal requests concurrently.
@@ -89,6 +102,12 @@ type ControllerConfig struct {
 	// BlobDispersalRequestBackoffPeriod is the delay between fetch attempts when there are no blobs ready
 	// for dispersal.
 	BlobDispersalRequestBackoffPeriod time.Duration
+
+	// The period at which signing rate data is flushed to persistent storage.
+	SigningRateFlushPeriod time.Duration
+
+	// The name of the DynamoDB table used to store signing rate data.
+	SigningRateDynamoDbTableName string `docs:"required"`
 }
 
 var _ config.VerifiableConfig = &ControllerConfig{}
@@ -111,6 +130,7 @@ func DefaultControllerConfig() *ControllerConfig {
 		BlobDispersalQueueSize:              1024,
 		BlobDispersalRequestBatchSize:       32,
 		BlobDispersalRequestBackoffPeriod:   50 * time.Millisecond,
+		SigningRateFlushPeriod:              1 * time.Minute,
 	}
 }
 
@@ -165,6 +185,12 @@ func (c *ControllerConfig) Verify() error {
 	}
 	if c.BlobDispersalRequestBackoffPeriod <= 0 {
 		return fmt.Errorf("BlobDispersalRequestBackoffPeriod must be positive, got %v", c.BlobDispersalRequestBackoffPeriod)
+	}
+	if c.SigningRateFlushPeriod <= 0 {
+		return fmt.Errorf("SigningRateFlushPeriod must be positive, got %v", c.SigningRateFlushPeriod)
+	}
+	if c.SigningRateDynamoDbTableName == "" {
+		return fmt.Errorf("SigningRateDynamoDbTableName must not be empty")
 	}
 	return nil
 }

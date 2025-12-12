@@ -617,6 +617,7 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		prometheus.NewRegistry(),
 		blobSet,
 		livenessChan,
+		nil, // userAccountRemapping
 	)
 	assert.NoError(t, err)
 

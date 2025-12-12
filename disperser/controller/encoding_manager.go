@@ -69,8 +69,14 @@ type EncodingManagerConfig struct {
 	// client at dispersal request creation time (in nanoseconds since Unix epoch).
 	MaxDispersalAge time.Duration
 
-	// Whether to enable per-account blob status metrics.
-	// If false, all per-account blob status metrics will be aggregated under "0x0" to reduce cardinality.
+	// If true, accounts that DON'T have a human-friendly name remapping will be reported as their full account ID
+	// in metrics.
+	//
+	// If false, accounts that DON'T have a human-friendly name remapping will be reported as "0x0" in metrics.
+	//
+	// NOTE: No matter the value of this field, accounts that DO have a human-friendly name remapping will be reported
+	// as their remapped name in metrics. If you must reduce metric cardinality by reporting ALL accounts as "0x0",
+	// you shouldn't define any human-friendly name remappings.
 	EnablePerAccountBlobStatusMetrics bool
 }
 
@@ -169,21 +175,23 @@ func NewEncodingManager(
 	registry *prometheus.Registry,
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
+	userAccountRemapping map[string]string,
 ) (*EncodingManager, error) {
 	if err := config.Verify(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
 	return &EncodingManager{
-		EncodingManagerConfig:  config,
-		getNow:                 getNow,
-		blobMetadataStore:      blobMetadataStore,
-		pool:                   pool,
-		encodingClient:         encodingClient,
-		chainReader:            chainReader,
-		logger:                 logger.With("component", "EncodingManager"),
-		cursor:                 nil,
-		metrics:                newEncodingManagerMetrics(registry, config.EnablePerAccountBlobStatusMetrics),
+		EncodingManagerConfig: config,
+		getNow:                getNow,
+		blobMetadataStore:     blobMetadataStore,
+		pool:                  pool,
+		encodingClient:        encodingClient,
+		chainReader:           chainReader,
+		logger:                logger.With("component", "EncodingManager"),
+		cursor:                nil,
+		metrics: newEncodingManagerMetrics(
+			registry, config.EnablePerAccountBlobStatusMetrics, userAccountRemapping),
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 	}, nil

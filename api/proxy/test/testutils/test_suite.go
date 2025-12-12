@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 )
@@ -79,12 +80,16 @@ func CreateTestSuite(
 		chainID      = ""
 	)
 
+	gethCfg := geth.EthClientConfig{
+		RPCURLs: []string{appConfig.SecretConfig.EthRPCURL},
+	}
+
 	if !appConfig.StoreBuilderConfig.MemstoreEnabled {
 		var err error
 		ethClient, chainID, err = common.BuildEthClient(
 			ctx,
 			logger,
-			appConfig.SecretConfig.EthRPCURL,
+			gethCfg,
 			appConfig.StoreBuilderConfig.ClientConfigV2.EigenDANetwork)
 		if err != nil {
 			panic(fmt.Sprintf("build eth client: %v", err.Error()))
@@ -115,6 +120,9 @@ func CreateTestSuite(
 		panic(fmt.Sprintf("new compatibility config: %v", err.Error()))
 	}
 
+	// NOTE: this dependency injection logic is pseudo-identical to what's defined
+	//       in the existing entrypoint.go file. at some point we should look to deduplicate
+	//       & simplify where possible.
 	if appConfig.EnabledServersConfig.RestAPIConfig.DAEndpointEnabled() {
 		appConfig.RestSvrCfg.CompatibilityCfg = compatibilityCfg
 		restServer = rest.NewServer(appConfig.RestSvrCfg, certMgr, keccakMgr, logger, metrics)
@@ -131,6 +139,7 @@ func CreateTestSuite(
 	}
 
 	if appConfig.EnabledServersConfig.ArbCustomDA {
+		appConfig.ArbCustomDASvrCfg.CompatibilityCfg = compatibilityCfg
 		arbHandlers := arbitrum_altda.NewHandlers(certMgr, logger, true, compatibilityCfg)
 		arbServer, err = arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
 		if err != nil {

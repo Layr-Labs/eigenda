@@ -16,6 +16,12 @@
 //! - Contract storage proof extraction
 //! - State data decoding
 //! - Cryptographic verification
+//!
+//! ## Contracts Storage Diagram
+//!
+//! In order to prove a certificate's validity, all of the (red) storage slots in the diagram below
+//! need to be extracted. This can be done with this crate's most important function [provider::EigenDaProvider::fetch_cert_state].
+#![doc = include_str!("../contracts-diagram.svg")]
 
 /// Smart contract interfaces and data structures for EigenDA contracts.
 pub mod contracts;

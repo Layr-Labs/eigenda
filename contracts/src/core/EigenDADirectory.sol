@@ -37,7 +37,8 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     function initialize(address accessControl) external initializer {
         require(accessControl != address(0), "Access control address cannot be zero");
         bytes32 key = AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey();
-        AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey().setAddress(accessControl);
+        key.setAddress(accessControl);
+        AddressDirectoryLib.registerKey(AddressDirectoryConstants.ACCESS_CONTROL_NAME);
         emit AddressAdded(AddressDirectoryConstants.ACCESS_CONTROL_NAME, key, accessControl);
     }
 
@@ -200,6 +201,24 @@ contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     /// @inheritdoc IEigenDAConfigRegistry
     function getAllConfigNamesTimeStamp() external view returns (string[] memory) {
         return ConfigRegistryLib.getNameListTimeStamp();
+    }
+
+    /// @inheritdoc IEigenDAConfigRegistry
+    function getActiveAndFutureBlockNumberConfigs(string memory name, uint256 referenceBlockNumber)
+        external
+        view
+        returns (ConfigRegistryTypes.BlockNumberCheckpoint[] memory)
+    {
+        return ConfigRegistryLib.getActiveAndFutureBlockNumberConfigs(name, referenceBlockNumber);
+    }
+
+    /// @inheritdoc IEigenDAConfigRegistry
+    function getActiveAndFutureTimestampConfigs(string memory name, uint256 referenceTimestamp)
+        external
+        view
+        returns (ConfigRegistryTypes.TimeStampCheckpoint[] memory)
+    {
+        return ConfigRegistryLib.getActiveAndFutureTimestampConfigs(name, referenceTimestamp);
     }
 
     /// @inheritdoc IEigenDASemVer
