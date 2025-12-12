@@ -4,6 +4,7 @@ pragma solidity ^0.8.9;
 import {IEigenDACertVerifier} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
 import {IEigenDACertVerifierBase} from "src/integrations/cert/interfaces/IEigenDACertVerifierBase.sol";
 import {IVersionedEigenDACertVerifier} from "src/integrations/cert/interfaces/IVersionedEigenDACertVerifier.sol";
+import {IVersionedDerivationEigenDACertVerifier} from "src/integrations/cert/interfaces/IVersionedDerivationEigenDACertVerifier.sol";
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
@@ -21,7 +22,8 @@ contract EigenDACertVerifier is
     IEigenDACertVerifier,
     IEigenDACertVerifierBase,
     IVersionedEigenDACertVerifier,
-    IEigenDASemVer
+    IEigenDASemVer,
+    IVersionedDerivationEigenDACertVerifier
 {
     error InvalidSecurityThresholds();
     error InvalidQuorumNumbersRequired(uint256 length);
