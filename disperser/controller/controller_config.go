@@ -91,6 +91,12 @@ type ControllerConfig struct {
 	// The duration of each signing rate bucket. Smaller buckets yield more granular data, at the cost of memory
 	// and storage overhead.
 	SigningRateBucketSpan time.Duration
+
+	// The period at which signing rate data is flushed to persistent storage.
+	SigningRateFlushPeriod time.Duration
+
+	// The name of the DynamoDB table used to store signing rate data.
+	SigningRateDynamoDbTableName string `docs:"required"`
 }
 
 var _ config.VerifiableConfig = &ControllerConfig{}
@@ -110,6 +116,7 @@ func DefaultDispatcherConfig() *ControllerConfig {
 		MaxDispersalAge:                     45 * time.Second,
 		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
 		SigningRateBucketSpan:               10 * time.Minute,
+		SigningRateFlushPeriod:              1 * time.Minute,
 	}
 }
 
@@ -155,6 +162,12 @@ func (c *ControllerConfig) Verify() error {
 	}
 	if c.SigningRateBucketSpan <= 0 {
 		return fmt.Errorf("SigningRateBucketSpan must be positive, got %v", c.SigningRateBucketSpan)
+	}
+	if c.SigningRateFlushPeriod <= 0 {
+		return fmt.Errorf("SigningRateFlushPeriod must be positive, got %v", c.SigningRateFlushPeriod)
+	}
+	if c.SigningRateDynamoDbTableName == "" {
+		return fmt.Errorf("SigningRateDynamoDbTableName must not be empty")
 	}
 	return nil
 }

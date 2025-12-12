@@ -364,6 +364,19 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_BUCKET_SPAN"),
 		Value:    10 * time.Minute,
 	}
+	SigningRateFlushPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-flush-period"),
+		Usage:    "The period at which signing rate data is flushed to persistent storage",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_FLUSH_PERIOD"),
+		Value:    1 * time.Minute,
+	}
+	SigningRateDynamoDbTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-dynamodb-table-name"),
+		Usage:    "The name of the DynamoDB table used to store signing rate data",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_DYNAMODB_TABLE_NAME"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -372,11 +385,11 @@ var requiredFlags = []cli.Flag{
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,
 	EncoderAddressFlag,
-
 	DispatcherPullIntervalFlag,
 	AttestationTimeoutFlag,
 	BatchAttestationTimeoutFlag,
 	DisperserIDFlag,
+	SigningRateDynamoDbTableNameFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -422,6 +435,7 @@ var optionalFlags = []cli.Flag{
 	EnablePerAccountBlobStatusMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRateBucketSpanFlag,
+	SigningRateFlushPeriodFlag,
 }
 
 var Flags []cli.Flag
