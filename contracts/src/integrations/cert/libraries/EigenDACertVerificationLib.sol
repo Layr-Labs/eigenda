@@ -19,6 +19,13 @@ library EigenDACertVerificationLib {
     /// @notice Denominator used for threshold percentage calculations (100 for percentages)
     uint256 internal constant THRESHOLD_DENOMINATOR = 100;
 
+    /// @notice The maximum number of quorums this contract supports
+    uint256 internal constant MAX_QUORUM_COUNT = 5;
+
+    /// @notice The maximum number of nonsigner this contract supports. The count can contain duplicate count if
+    ///         an operator belongs to multiple quorums
+    uint256 internal constant MAX_NONSIGNER_COUNT_ALL_QUORUM = 415;
+
     /// @notice Thrown when the inclusion proof is invalid
     /// @param blobIndex The index of the blob in the batch
     /// @param blobHash The hash of the blob certificate
@@ -59,6 +66,14 @@ library EigenDACertVerificationLib {
     /// @param requiredDerivationVer The required offchain derivation version
     error InvalidOffchainDerivationVersion(uint16 certDerivationVer, uint16 requiredDerivationVer);
 
+    /// @notice Thrown when the number of signed quorums exceeds the maximum allowed
+    /// @param count The actual number of signed quorums provided
+    error QuorumCountExceedsMaximum(uint256 count);
+
+    /// @notice Thrown when the total number of non-signers across all quorums exceeds the maximum allowed
+    /// @param count The total number of non-signers counted
+    error NonSignerCountExceedsMaximum(uint256 count);
+
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
     /// @param eigenDAThresholdRegistry The threshold registry contract
     /// @param eigenDASignatureVerifier The signature verifier contract
@@ -77,6 +92,9 @@ library EigenDACertVerificationLib {
     ) internal view {
         checkOffchainDerivationVersion(daCert.offchainDerivationVersion, offchainDerivationVersion);
 
+        // verifying merkle inclusion proof is very efficient, even assuming the worst depth 256.
+        // A single depth verification takes about 300 gas for KECCAK256 and CALLDATALOAD
+        // so at worst 80K Gas.
         checkBlobInclusion(daCert.batchHeader, daCert.blobInclusionInfo);
 
         checkSecurityParams(
@@ -190,6 +208,21 @@ library EigenDACertVerificationLib {
         DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         DATypesV1.SecurityThresholds memory securityThresholds
     ) internal view returns (uint256 confirmedQuorumsBitmap) {
+        // the maximal supported number of quorum is 192
+        // https://github.com/Layr-Labs/eigenda/blob/00cc8868b7e2d742fc6584dc1dea312193c8d4c2/contracts/src/core/EigenDARegistryCoordinatorStorage.sol#L36
+        if (signedQuorumNumbers.length > MAX_QUORUM_COUNT) {
+            revert QuorumCountExceedsMaximum(signedQuorumNumbers.length);
+        }
+
+        // if an nonsigning operator belongs to multiple quorums, the totalNonsignersCount counts it multiple times
+        uint256 totalNonsignersCount = 0;
+        for (uint256 i = 0; i < nonSignerStakesAndSignature.nonSignerStakeIndices.length; i++) {
+            totalNonsignersCount += nonSignerStakesAndSignature.nonSignerStakeIndices[i].length;
+        }
+        if (totalNonsignersCount > MAX_NONSIGNER_COUNT_ALL_QUORUM) {
+            revert NonSignerCountExceedsMaximum(totalNonsignersCount);
+        }
+
         (DATypesV1.QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
             batchHashRoot, signedQuorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature
         );
