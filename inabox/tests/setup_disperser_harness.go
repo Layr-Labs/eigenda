@@ -1245,13 +1245,14 @@ func startAPIServer(
 
 	// Create server config
 	serverConfig := disperser.ServerConfig{
-		GrpcPort:                       fmt.Sprintf("%d", assignedPort),
-		GrpcTimeout:                    10 * time.Second,
-		MaxConnectionAge:               5 * time.Minute,
-		MaxConnectionAgeGrace:          30 * time.Second,
-		MaxIdleConnectionAge:           1 * time.Minute,
-		DisperserId:                    0,
-		TolerateMissingAnchorSignature: false,
+		GrpcPort:                           fmt.Sprintf("%d", assignedPort),
+		GrpcTimeout:                        10 * time.Second,
+		MaxConnectionAge:                   5 * time.Minute,
+		MaxConnectionAgeGrace:              30 * time.Second,
+		MaxIdleConnectionAge:               1 * time.Minute,
+		DisperserId:                        0,
+		TolerateMissingAnchorSignature:     false,
+		DisableAnchorSignatureVerification: false,
 	}
 
 	metricsConfig := disperser.MetricsConfig{

@@ -580,11 +580,12 @@ func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment b
 
 	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
-			GrpcPort:                       "51002",
-			GrpcTimeout:                    1 * time.Second,
-			DisableGetBlobCommitment:       disableGetBlobCommitment,
-			DisperserId:                    0,
-			TolerateMissingAnchorSignature: false,
+			GrpcPort:                           "51002",
+			GrpcTimeout:                        1 * time.Second,
+			DisableGetBlobCommitment:           disableGetBlobCommitment,
+			DisperserId:                        0,
+			TolerateMissingAnchorSignature:     false,
+			DisableAnchorSignatureVerification: false,
 		},
 		time.Now,
 		big.NewInt(31337),
