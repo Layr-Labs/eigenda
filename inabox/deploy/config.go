@@ -232,12 +232,6 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_ONCHAIN_STATE_REFRESH_INTERVAL: "1s",
 	}
 
-	if env.UseNewPayments {
-		v.DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS = "true"
-	} else {
-		v.DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS = "false"
-	}
-
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
 
 	return v
@@ -367,16 +361,10 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_DISPERSER_ID:                            "0",
 	}
 
-	if env.UseNewPayments {
-		v.CONTROLLER_GRPC_SERVER_ENABLE = "true"
-		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "true"
-		v.CONTROLLER_GRPC_PORT = fmt.Sprintf("%d", controllerGrpcPort)
-		v.CONTROLLER_ON_DEMAND_PAYMENTS_TABLE_NAME = "e2e_v2_ondemand"
-		v.CONTROLLER_PAYMENT_VAULT_UPDATE_INTERVAL = "1s"
-	} else {
-		v.CONTROLLER_GRPC_SERVER_ENABLE = "false"
-		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "false"
-	}
+	v.CONTROLLER_GRPC_PORT = fmt.Sprintf("%d", controllerGrpcPort)
+	v.CONTROLLER_ON_DEMAND_PAYMENTS_TABLE_NAME = "e2e_v2_ondemand"
+	v.CONTROLLER_PAYMENT_VAULT_UPDATE_INTERVAL = "1s"
+
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
 	return v

@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -333,56 +332,43 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
 
-	if config.ServerConfig.EnableServer {
-		logger.Info("Controller gRPC server ENABLED", "port", config.ServerConfig.GrpcPort)
-		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
-		if config.ServerConfig.EnablePaymentAuthentication {
-			logger.Info("Payment authentication ENABLED - building payment authorization handler")
-			paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
-				ctx,
-				logger,
-				config.PaymentAuthorizationConfig,
-				contractDirectory,
-				gethClient,
-				dynamoClient.GetAwsClient(),
-				metricsRegistry,
-				userAccountRemapping,
-			)
-			if err != nil {
-				return fmt.Errorf("build payment authorization handler: %w", err)
-			}
-		} else {
-			logger.Warn("Payment authentication DISABLED - payment requests will fail")
-		}
-
-		// Create listener for the gRPC server
-		addr := fmt.Sprintf("0.0.0.0:%d", config.ServerConfig.GrpcPort)
-		listener, err := net.Listen("tcp", addr)
-		if err != nil {
-			return fmt.Errorf("failed to create listener: %w", err)
-		}
-
-		grpcServer, err := server.NewServer(
-			ctx,
-			config.ServerConfig,
-			logger,
-			metricsRegistry,
-			paymentAuthorizationHandler,
-			listener,
-			signingRateTracker)
-		if err != nil {
-			return fmt.Errorf("create gRPC server: %w", err)
-		}
-
-		go func() {
-			logger.Info("Starting controller gRPC server", "address", listener.Addr().String())
-			if err := grpcServer.Start(); err != nil {
-				panic(fmt.Sprintf("gRPC server failed: %v", err))
-			}
-		}()
-	} else {
-		logger.Info("Controller gRPC server disabled")
+	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
+		ctx,
+		logger,
+		config.PaymentAuthorizationConfig,
+		contractDirectory,
+		gethClient,
+		dynamoClient.GetAwsClient(),
+		metricsRegistry,
+		userAccountRemapping,
+	)
+	if err != nil {
+		return fmt.Errorf("build payment authorization handler: %w", err)
 	}
+
+	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", config.ServerConfig.GrpcPort))
+	if err != nil {
+		return fmt.Errorf("create listener: %w", err)
+	}
+
+	grpcServer, err := server.NewServer(
+		ctx,
+		config.ServerConfig,
+		logger,
+		metricsRegistry,
+		paymentAuthorizationHandler,
+		listener,
+		signingRateTracker)
+	if err != nil {
+		return fmt.Errorf("create gRPC server: %w", err)
+	}
+
+	go func() {
+		logger.Info("Starting controller gRPC server", "address", listener.Addr().String())
+		if err := grpcServer.Start(); err != nil {
+			panic(fmt.Sprintf("gRPC server failed: %v", err))
+		}
+	}()
 
 	go func() {
 		err := metricsServer.ListenAndServe()

@@ -17,7 +17,6 @@ import (
 	blobstore "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -58,22 +57,13 @@ func (s *DispersalServerV2) disperseBlob(
 		return nil, st
 	}
 
-	if s.useControllerMediatedPayments {
-		// Use the new controller-based payment system
-		authorizePaymentRequest := &controller.AuthorizePaymentRequest{
-			BlobHeader:      req.GetBlobHeader(),
-			ClientSignature: req.GetSignature(),
-		}
-		_, err := s.controllerClient.AuthorizePayment(ctx, authorizePaymentRequest)
-		if err != nil {
-			return nil, status.Convert(err)
-		}
-	} else {
-		// Use the legacy payment metering system
-		// Check against payment meter to make sure there is quota remaining
-		if st := s.checkPaymentMeter(ctx, req, start); st != nil && st.Code() != codes.OK {
-			return nil, st
-		}
+	authorizePaymentRequest := &controller.AuthorizePaymentRequest{
+		BlobHeader:      req.GetBlobHeader(),
+		ClientSignature: req.GetSignature(),
+	}
+	_, err = s.controllerClient.AuthorizePayment(ctx, authorizePaymentRequest)
+	if err != nil {
+		return nil, status.Convert(err)
 	}
 
 	finishedValidation := time.Now()
@@ -160,47 +150,6 @@ func (s *DispersalServerV2) StoreBlob(
 		return corev2.BlobKey{}, status.Newf(codes.Internal, "failed to store blob metadata: %v", err)
 	}
 	return blobKey, status.New(codes.OK, "blob stored successfully")
-}
-
-func (s *DispersalServerV2) checkPaymentMeter(
-	ctx context.Context,
-	req *pb.DisperseBlobRequest,
-	receivedAt time.Time,
-) *status.Status {
-	blobHeaderProto := req.GetBlobHeader()
-	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
-	if err != nil {
-		return status.Newf(codes.InvalidArgument, "invalid blob header: %s", err.Error())
-	}
-	blobLength := encoding.GetBlobLengthPowerOf2(uint32(len(req.GetBlob())))
-
-	// handle payments and check rate limits
-	timestamp := blobHeaderProto.GetPaymentHeader().GetTimestamp()
-	cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
-	accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
-	if !gethcommon.IsHexAddress(accountID) {
-		return status.Newf(codes.InvalidArgument, "invalid account ID: %s", accountID)
-	}
-
-	paymentHeader := core.PaymentMetadata{
-		AccountID:         gethcommon.HexToAddress(accountID),
-		Timestamp:         timestamp,
-		CumulativePayment: cumulativePayment,
-	}
-
-	symbolsCharged, err := s.meterer.MeterRequest(
-		ctx,
-		paymentHeader,
-		uint64(blobLength),
-		blobHeader.QuorumNumbers,
-		receivedAt,
-	)
-	if err != nil {
-		return status.New(codes.ResourceExhausted, err.Error())
-	}
-	s.metrics.reportDisperseMeteredBytes(int(symbolsCharged) * encoding.BYTES_PER_SYMBOL)
-
-	return status.New(codes.OK, "payment meter check passed")
 }
 
 func (s *DispersalServerV2) validateDispersalRequest(
