@@ -91,11 +91,28 @@ type ControllerConfig struct {
 	// The duration of each signing rate bucket. Smaller buckets yield more granular data, at the cost of memory
 	// and storage overhead.
 	SigningRateBucketSpan time.Duration
+
+	// BlobDispersalQueueSize is the maximum number of blobs that can be queued for dispersal.
+	BlobDispersalQueueSize uint32
+
+	// BlobDispersalRequestBatchSize is the number of blob metadata items to fetch from the store in a single request.
+	// Must be at least 1.
+	BlobDispersalRequestBatchSize uint32
+
+	// BlobDispersalRequestBackoffPeriod is the delay between fetch attempts when there are no blobs ready
+	// for dispersal.
+	BlobDispersalRequestBackoffPeriod time.Duration
+
+	// The period at which signing rate data is flushed to persistent storage.
+	SigningRateFlushPeriod time.Duration
+
+	// The name of the DynamoDB table used to store signing rate data.
+	SigningRateDynamoDbTableName string `docs:"required"`
 }
 
 var _ config.VerifiableConfig = &ControllerConfig{}
 
-func DefaultDispatcherConfig() *ControllerConfig {
+func DefaultControllerConfig() *ControllerConfig {
 	return &ControllerConfig{
 		PullInterval:                        1 * time.Second,
 		FinalizationBlockDelay:              75,
@@ -110,6 +127,10 @@ func DefaultDispatcherConfig() *ControllerConfig {
 		MaxDispersalAge:                     45 * time.Second,
 		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
 		SigningRateBucketSpan:               10 * time.Minute,
+		BlobDispersalQueueSize:              1024,
+		BlobDispersalRequestBatchSize:       32,
+		BlobDispersalRequestBackoffPeriod:   50 * time.Millisecond,
+		SigningRateFlushPeriod:              1 * time.Minute,
 	}
 }
 
@@ -155,6 +176,21 @@ func (c *ControllerConfig) Verify() error {
 	}
 	if c.SigningRateBucketSpan <= 0 {
 		return fmt.Errorf("SigningRateBucketSpan must be positive, got %v", c.SigningRateBucketSpan)
+	}
+	if c.BlobDispersalQueueSize < 1 {
+		return fmt.Errorf("BlobDispersalQueueSize must be at least 1, got %d", c.BlobDispersalQueueSize)
+	}
+	if c.BlobDispersalRequestBatchSize < 1 {
+		return fmt.Errorf("BlobDispersalRequestBatchSize must be at least 1, got %d", c.BlobDispersalRequestBatchSize)
+	}
+	if c.BlobDispersalRequestBackoffPeriod <= 0 {
+		return fmt.Errorf("BlobDispersalRequestBackoffPeriod must be positive, got %v", c.BlobDispersalRequestBackoffPeriod)
+	}
+	if c.SigningRateFlushPeriod <= 0 {
+		return fmt.Errorf("SigningRateFlushPeriod must be positive, got %v", c.SigningRateFlushPeriod)
+	}
+	if c.SigningRateDynamoDbTableName == "" {
+		return fmt.Errorf("SigningRateDynamoDbTableName must not be empty")
 	}
 	return nil
 }
