@@ -290,8 +290,7 @@ var (
 	DisperserIdFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-id"),
 		Usage:    "Unique identifier for this disperser instance",
-		Required: false,
-		Value:    0,
+		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_ID"),
 	}
 	TolerateMissingAnchorSignatureFlag = cli.BoolTFlag{
@@ -342,6 +341,7 @@ var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
 	GrpcPortFlag,
 	BucketTableName,
+	DisperserIdFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -378,7 +378,6 @@ var optionalFlags = []cli.Flag{
 	DisablePerAccountMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRatePollIntervalFlag,
-	DisperserIdFlag,
 	TolerateMissingAnchorSignatureFlag,
 	DisableAnchorSignatureVerificationFlag,
 	OperatorStateRetrieverFlag,
