@@ -58,8 +58,8 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     }
 
     function test_verifyDACert_revert_calldata_size() public view {
-        // MAX_CALLDATA_BYTES_LENGTH is 524_288, so test with slightly over the limit
-        bytes memory large_bytes = new bytes(524_289);
+        // MAX_CALLDATA_BYTES_LENGTH is 262_144, so test with slightly over the limit
+        bytes memory large_bytes = new bytes(262_145);
         uint8 res = eigenDACertVerifier.checkDACert(large_bytes);
 
         assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));

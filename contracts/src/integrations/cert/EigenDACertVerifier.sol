@@ -24,7 +24,7 @@ contract EigenDACertVerifier is
     IEigenDASemVer
 {
     /// @notice The maximum calldata bytes length this contracts supports
-    uint256 internal constant MAX_CALLDATA_BYTES_LENGTH = 524_288;
+    uint256 internal constant MAX_CALLDATA_BYTES_LENGTH = 262_144;
 
     error InvalidSecurityThresholds();
     error InvalidQuorumNumbersRequired(uint256 length);
