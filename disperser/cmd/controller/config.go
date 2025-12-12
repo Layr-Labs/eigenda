@@ -180,6 +180,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxDispersalAge:                        ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 			SigningRateRetentionPeriod:             ctx.GlobalDuration(flags.SigningRateRetentionPeriodFlag.Name),
 			SigningRateBucketSpan:                  ctx.GlobalDuration(flags.SigningRateBucketSpanFlag.Name),
+			SigningRateFlushPeriod:                 ctx.GlobalDuration(flags.SigningRateFlushPeriodFlag.Name),
+			SigningRateDynamoDbTableName:           ctx.GlobalString(flags.SigningRateDynamoDbTableNameFlag.Name),
 		},
 		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),
