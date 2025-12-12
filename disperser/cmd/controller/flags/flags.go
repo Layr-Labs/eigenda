@@ -384,7 +384,7 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_DISPERSAL_REQUEST_BACKOFF_PERIOD"),
 		Value:    50 * time.Millisecond,
-}
+	}
 	SigningRateFlushPeriodFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-flush-period"),
 		Usage:    "The period at which signing rate data is flushed to persistent storage",
