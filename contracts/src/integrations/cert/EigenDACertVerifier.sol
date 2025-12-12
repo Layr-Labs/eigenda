@@ -26,6 +26,9 @@ contract EigenDACertVerifier is
     /// @notice The maximum calldata bytes length this contracts supports
     uint256 internal constant MAX_CALLDATA_BYTES_LENGTH = 262_144;
 
+    /// @notice The maximum gas spent on abi decode
+    uint256 internal constant MAX_ABI_DECODE_GAS = 2_097_152;
+
     error InvalidSecurityThresholds();
     error InvalidQuorumNumbersRequired(uint256 length);
 
@@ -117,7 +120,7 @@ contract EigenDACertVerifier is
         CT.EigenDACertV4 memory daCert;
         // We try catch this here because decoding error would appear as a Panic,
         // which we consider bugs in the try/catch for the checkDACertReverts call below.
-        try this._decodeCert(abiEncodedCert) returns (CT.EigenDACertV4 memory _daCert) {
+        try this._decodeCert{gas: MAX_ABI_DECODE_GAS}(abiEncodedCert) returns (CT.EigenDACertV4 memory _daCert) {
             daCert = _daCert;
         } catch {
             return uint8(StatusCode.INVALID_CERT);

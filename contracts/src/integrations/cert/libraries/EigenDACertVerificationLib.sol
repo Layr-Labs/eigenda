@@ -20,7 +20,7 @@ library EigenDACertVerificationLib {
     uint256 internal constant THRESHOLD_DENOMINATOR = 100;
 
     /// @notice The maximum number of quorums this contract supports
-    uint256 internal constant MAX_QUORUM_COUNT = 192;
+    uint256 internal constant MAX_QUORUM_COUNT = 5;
 
     /// @notice The maximum number of nonsigner this contract supports. The count can contain duplicate count if
     ///         an operator belongs to multiple quorums
