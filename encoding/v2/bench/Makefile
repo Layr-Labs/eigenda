@@ -15,6 +15,11 @@ bench_eigenda:
 	$(eval GOARCH=$(shell go env GOARCH))
 	go test -benchmem -bench=. -run=^$$ benchmark_eigenda_test.go | tee results/golang_bench_eigenda_$(GOOS)_$(GOARCH).txt
 
+bench_eigenda_icicle:
+	$(eval GOOS=$(shell go env GOOS))
+	$(eval GOARCH=$(shell go env GOARCH))
+	go test -tags icicle -benchmem -bench=. -run=^$$ benchmark_eigenda_test.go | tee results/golang_bench_eigenda_$(GOOS)_$(GOARCH).txt
+
 bench_primitives:
 	$(eval GOOS=$(shell go env GOOS))
 	$(eval GOARCH=$(shell go env GOARCH))

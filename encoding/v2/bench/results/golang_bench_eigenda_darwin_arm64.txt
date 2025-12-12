@@ -1,21 +1,23 @@
-2025/10/15 15:18:26 maxprocs: Leaving GOMAXPROCS=12: CPU quota undefined
+2025/12/11 12:15:54 maxprocs: Leaving GOMAXPROCS=12: CPU quota undefined
 goos: darwin
 goarch: arm64
 cpu: Apple M4 Pro
-BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^17_bytes-12         	     722	   1600042 ns/op	 1720483 B/op	      11 allocs/op
-BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^20_bytes-12         	      75	  14344391 ns/op	13648058 B/op	      12 allocs/op
-BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^21_bytes-12         	      33	  30752650 ns/op	27279546 B/op	      12 allocs/op
-BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^24_bytes-12         	       3	 338523431 ns/op	218120464 B/op	      14 allocs/op
-BenchmarkCommittmentGeneration/Commitments_size_2^17_bytes-12             	      56	  21127379 ns/op	  834764 B/op	     476 allocs/op
-BenchmarkCommittmentGeneration/Commitments_size_2^20_bytes-12             	      12	  94027549 ns/op	42898616 B/op	     336 allocs/op
-BenchmarkCommittmentGeneration/Commitments_size_2^21_bytes-12             	       6	 174494403 ns/op	82610336 B/op	     334 allocs/op
-BenchmarkCommittmentGeneration/Commitments_size_2^24_bytes-12             	       1	1041497167 ns/op	537948560 B/op	     298 allocs/op
-BenchmarkBlobToChunksEncoding/Encode_size_2^17_bytes-12                   	      78	  14341698 ns/op	 5612857 B/op	   16444 allocs/op
-BenchmarkBlobToChunksEncoding/Encode_size_2^20_bytes-12                   	      12	  87004580 ns/op	43685468 B/op	   16444 allocs/op
-BenchmarkBlobToChunksEncoding/Encode_size_2^21_bytes-12                   	       6	 191573201 ns/op	89824028 B/op	   16443 allocs/op
-BenchmarkBlobToChunksEncoding/Encode_size_2^24_bytes-12                   	       1	1933645625 ns/op	939883368 B/op	   16452 allocs/op
-BenchmarkMultiproofFrameGeneration/Multiproof_size_2^17_bytes-12          	       1	8483347042 ns/op	583194896 B/op	 3794671 allocs/op
-BenchmarkMultiproofFrameGeneration/Multiproof_size_2^20_bytes-12          	       1	8988746833 ns/op	772311088 B/op	 3944709 allocs/op
-BenchmarkMultiproofFrameGeneration/Multiproof_size_2^21_bytes-12          	       1	9539889334 ns/op	838424712 B/op	 3478075 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^17_bytes-12         	     758	   1494374 ns/op	 1720484 B/op	      10 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^20_bytes-12         	      79	  13546072 ns/op	13648046 B/op	      12 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^21_bytes-12         	      37	  28516364 ns/op	27279571 B/op	      13 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^24_bytes-12         	       4	 319635542 ns/op	218120472 B/op	      14 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^17_bytes-12             	      56	  20860459 ns/op	  835063 B/op	     477 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^20_bytes-12             	      12	  93558983 ns/op	42898616 B/op	     336 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^21_bytes-12             	       6	 167593750 ns/op	82610336 B/op	     334 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^24_bytes-12             	       1	1055706291 ns/op	537948848 B/op	     301 allocs/op
+BenchmarkRSBackendGnark/2^15_Frs-12                                       	    1155	    990670 ns/op	 2097153 B/op	       2 allocs/op
+BenchmarkRSBackendGnark/2^18_Frs-12                                       	     100	  10954052 ns/op	16777227 B/op	       2 allocs/op
+BenchmarkRSBackendGnark/2^19_Frs-12                                       	      51	  24029074 ns/op	33554453 B/op	       2 allocs/op
+BenchmarkRSBackendGnark/2^22_Frs-12                                       	       1	1789150209 ns/op	268436704 B/op	      32 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^17_bytes-12                   	      74	  14398304 ns/op	 5613886 B/op	   16442 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^20_bytes-12                   	      12	  84616729 ns/op	43685532 B/op	   16445 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^21_bytes-12                   	       6	 178156729 ns/op	89824188 B/op	   16445 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^24_bytes-12                   	       1	1830809583 ns/op	939883272 B/op	   16451 allocs/op
+BenchmarkFrameGenerationGnark/Multiproof_size_2^24_bytes-12               	       1	29407839375 ns/op	20247656248 B/op	15208723 allocs/op
 PASS
-ok  	command-line-arguments	80.323s
+ok  	command-line-arguments	135.409s
