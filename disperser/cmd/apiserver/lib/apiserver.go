@@ -52,7 +52,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("get chain ID: %w", err)
 	}
-	config.ServerConfig.ChainId = chainId
 
 	transactor, err := eth.NewReader(
 		logger, client, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
@@ -238,6 +237,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			time.Now,
+			chainId,
 			blobStore,
 			blobMetadataStore,
 			transactor,

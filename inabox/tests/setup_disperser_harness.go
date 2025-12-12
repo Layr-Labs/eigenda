@@ -1251,7 +1251,6 @@ func startAPIServer(
 		MaxIdleConnectionAge:           1 * time.Minute,
 		DisperserId:                    0,
 		TolerateMissingAnchorSignature: false,
-		ChainId:                        chainId,
 	}
 
 	metricsConfig := disperser.MetricsConfig{
@@ -1295,6 +1294,7 @@ func startAPIServer(
 	apiServer, err := apiserver.NewDispersalServerV2(
 		serverConfig,
 		time.Now,
+		chainId,
 		blobStore,
 		metadataStore,
 		chainReader,

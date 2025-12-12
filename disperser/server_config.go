@@ -1,7 +1,6 @@
 package disperser
 
 import (
-	"math/big"
 	"time"
 )
 
@@ -38,9 +37,6 @@ type ServerConfig struct {
 
 	// Unique identifier for this disperser instance.
 	DisperserId uint32
-
-	// Ethereum chain ID for this disperser.
-	ChainId *big.Int
 
 	// Whether to tolerate requests without an anchor signature.
 	// If false, DisperseBlob requests without an anchor_signature will be rejected.

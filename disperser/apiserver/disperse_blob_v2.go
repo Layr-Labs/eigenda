@@ -355,11 +355,11 @@ func (s *DispersalServerV2) validateAnchorSignature(
 	if err != nil {
 		return fmt.Errorf("invalid chain ID: %w", err)
 	}
-	if s.serverConfig.ChainId.Cmp(reqChainId) != 0 {
+	if s.chainId.Cmp(reqChainId) != 0 {
 		return fmt.Errorf(
 			"chain ID mismatch: request specifies %s but this disperser is on chain %s",
 			reqChainId.String(),
-			s.serverConfig.ChainId.String(),
+			s.chainId.String(),
 		)
 	}
 

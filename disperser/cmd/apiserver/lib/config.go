@@ -104,7 +104,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			SigningRatePollInterval:        ctx.GlobalDuration(flags.SigningRatePollIntervalFlag.Name),
 			DisperserId:                    uint32(ctx.GlobalUint64(flags.DisperserIdFlag.Name)),
 			TolerateMissingAnchorSignature: ctx.GlobalBool(flags.TolerateMissingAnchorSignatureFlag.Name),
-			ChainId:                        nil, // Will be populated after eth client is created
 		},
 		BlobstoreConfig: blobstore.Config{
 			BucketName:       ctx.GlobalString(flags.S3BucketNameFlag.Name),
