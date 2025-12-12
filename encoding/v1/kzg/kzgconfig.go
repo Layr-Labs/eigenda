@@ -22,7 +22,7 @@ type KzgConfig struct {
 	SRSNumberToLoad uint64
 
 	// G1 points are needed by both the prover and verifier, so G1Path is always needed.
-	G1Path string
+	G1Path string `docs:"required"`
 
 	// G2 SRS points are only needed by the prover, since the verifier uses hardcoded G2 powers of 2.
 	// See [srs.G2PowerOf2SRS] for details.
@@ -37,7 +37,13 @@ type KzgConfig struct {
 	//    contains the trailing end of the G2 SRS file.
 	// TODO(samlaf): to prevent misconfigurations and simplify the code, we should probably not multiplex G2Path like this,
 	// and instead use a G2PrefixPath config. Then EITHER G2Path is used, OR both G2PrefixPath and G2TrailingPath are used.
-	G2Path         string
+	G2Path string
+	// G2TrailingPath is the path to trailing G2 SRS file. Its intended purpose is to allow local generation the blob
+	// length proof. If you already downloaded the entire G2 SRS file which contains 268435456 G2 points with total size
+	// 16GiB, this setting is not needed.
+	// With this G2TrailingPath, user can use a smaller file that contains only the trailing end of the whole G2 SRS file.
+	// Ignoring this setting, the program assumes the entire G2 SRS file is provided. With this setting, the size of the
+	// provided file must be at least SRSNumberToLoad * 64 Bytes.
 	G2TrailingPath string
 
 	// PreloadEncoder is only used by the prover to generate kzg multiproofs.
@@ -48,14 +54,15 @@ type KzgConfig struct {
 	PreloadEncoder bool
 	// Path to SRS Table directory. Always required even if PreloadEncoder is false,
 	// because the prover will write the SRS tables to this directory if they are not already present.
-	CacheDir string
+	CacheDir string `docs:"required"`
 
 	// NumWorker is used in a few places:
 	// 1. Num goroutines used to parse the SRS points read from the SRS files.
 	// 2. Num goroutines used by the prover and verifier.
 	// TODO(samlaf): split into separate configs only specified for prover or verifier, where needed.
 	NumWorker uint64
-	Verbose   bool
+	// Verbose is a flag to enable verbose output for encoding/decoding.
+	Verbose bool
 }
 
 // Populates a [KzgConfig] from urfave flags.
