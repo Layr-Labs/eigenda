@@ -64,7 +64,7 @@ func TestGetSetV3Cert(t *testing.T) {
 	err = config.SetCertVersion(coretypes.VersionThreeCert)
 	require.NoError(t, err)
 
-	msV2 := New(
+	msV3 := New(
 		t.Context(),
 		testLogger,
 		config,
@@ -72,18 +72,18 @@ func TestGetSetV3Cert(t *testing.T) {
 	)
 
 	expected := []byte(testPreimage)
-	versionedCert, err := msV2.Put(t.Context(), expected, coretypes.CertSerializationRLP)
+	versionedCert, err := msV3.Put(t.Context(), expected, coretypes.CertSerializationRLP)
 	require.NoError(t, err)
 
 	// Verify the version byte is correct for V3
 	require.Equal(t, byte(0x2), byte(versionedCert.Version), "V3 cert should use V2VersionByte (0x2)")
 
-	actual, err := msV2.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, false)
+	actual, err := msV3.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
 
 	// Test getting the encoded payload
-	encodedPayload, err := msV2.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, true)
+	encodedPayload, err := msV3.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, true)
 	require.NoError(t, err)
 	require.NotEqual(t, expected, encodedPayload)
 }
@@ -97,7 +97,7 @@ func TestGetSetV4Cert(t *testing.T) {
 	err = config.SetCertVersion(coretypes.VersionFourCert)
 	require.NoError(t, err)
 
-	msV2 := New(
+	msV4 := New(
 		t.Context(),
 		testLogger,
 		config,
@@ -105,18 +105,18 @@ func TestGetSetV4Cert(t *testing.T) {
 	)
 
 	expected := []byte(testPreimage)
-	versionedCert, err := msV2.Put(t.Context(), expected, coretypes.CertSerializationRLP)
+	versionedCert, err := msV4.Put(t.Context(), expected, coretypes.CertSerializationRLP)
 	require.NoError(t, err)
 
 	// Verify the version byte is correct for V4
 	require.Equal(t, byte(0x3), byte(versionedCert.Version), "V4 cert should use V3VersionByte (0x3)")
 
-	actual, err := msV2.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, false)
+	actual, err := msV4.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
 
 	// Test getting the encoded payload
-	encodedPayload, err := msV2.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, true)
+	encodedPayload, err := msV4.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, true)
 	require.NoError(t, err)
 	require.NotEqual(t, expected, encodedPayload)
 }
@@ -126,7 +126,7 @@ func TestSwitchCertVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	config := getDefaultMemStoreTestConfig()
-	msV2 := New(
+	ms := New(
 		t.Context(),
 		testLogger,
 		config,
@@ -136,7 +136,7 @@ func TestSwitchCertVersion(t *testing.T) {
 	expected := []byte(testPreimage)
 
 	// Store with V4 (default)
-	versionedCertV4, err := msV2.Put(t.Context(), expected, coretypes.CertSerializationRLP)
+	versionedCertV4, err := ms.Put(t.Context(), expected, coretypes.CertSerializationRLP)
 	require.NoError(t, err)
 	require.Equal(t, byte(0x3), byte(versionedCertV4.Version), "Should use V3VersionByte for V4 cert")
 
@@ -145,16 +145,16 @@ func TestSwitchCertVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	// Store with V3
-	versionedCertV3, err := msV2.Put(t.Context(), expected, coretypes.CertSerializationRLP)
+	versionedCertV3, err := ms.Put(t.Context(), expected, coretypes.CertSerializationRLP)
 	require.NoError(t, err)
 	require.Equal(t, byte(0x2), byte(versionedCertV3.Version), "Should use V2VersionByte for V3 cert")
 
 	// Verify both can be retrieved correctly regardless of current config
-	actualV4, err := msV2.Get(t.Context(), versionedCertV4, coretypes.CertSerializationRLP, false)
+	actualV4, err := ms.Get(t.Context(), versionedCertV4, coretypes.CertSerializationRLP, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, actualV4)
 
-	actualV3, err := msV2.Get(t.Context(), versionedCertV3, coretypes.CertSerializationRLP, false)
+	actualV3, err := ms.Get(t.Context(), versionedCertV3, coretypes.CertSerializationRLP, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, actualV3)
 }
