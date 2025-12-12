@@ -19,7 +19,7 @@ const ValidatorStoreChunksRequestDomain = "validator.StoreChunksRequest"
 
 // HashStoreChunksRequest hashes the given StoreChunksRequest.
 func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
-	hasher := sha3.NewLegacyKeccak256()
+	hasher := sha3.New256()
 
 	hasher.Write([]byte(ValidatorStoreChunksRequestDomain))
 
@@ -41,6 +41,29 @@ func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
 	hashUint32(hasher, request.GetTimestamp())
 
 	return hasher.Sum(nil), nil
+}
+
+// HashStoreChunksRequestBlobHeaders returns a list of per-BlobHeader hashes (one per BlobCertificate).
+func HashStoreChunksRequestBlobHeaders(request *grpc.StoreChunksRequest) ([][]byte, error) {
+	certs := request.GetBatch().GetBlobCertificates()
+	blobHeaderHashes := make([][]byte, len(certs))
+	for i, cert := range certs {
+		if cert == nil {
+			return nil, fmt.Errorf("nil BlobCertificate at index %d", i)
+		}
+		header := cert.GetBlobHeader()
+		if header == nil {
+			return nil, fmt.Errorf("nil BlobHeader at index %d", i)
+		}
+
+		h := sha3.New256()
+		if err := hashBlobHeader(h, header); err != nil {
+			return nil, fmt.Errorf("failed to hash blob header at index %d: %w", i, err)
+		}
+		blobHeaderHashes[i] = h.Sum(nil)
+	}
+
+	return blobHeaderHashes, nil
 }
 
 func hashBlobCertificate(hasher hash.Hash, blobCertificate *common.BlobCertificate) error {

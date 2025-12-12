@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/replay"
@@ -179,7 +180,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
+	_, err = s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
 	if err != nil {
 		//nolint:wrapcheck
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
@@ -191,11 +192,19 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
 	}
 
-	timestamp := time.Unix(int64(in.GetTimestamp()), 0)
-	err = s.replayGuardian.VerifyRequest(hash, timestamp)
+	blobHeaderHashes, err := hashing.HashStoreChunksRequestBlobHeaders(in)
 	if err != nil {
 		//nolint:wrapcheck
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers: %v", err))
+	}
+
+	timestamp := time.Unix(int64(in.GetTimestamp()), 0)
+	for i, blobHeaderHash := range blobHeaderHashes {
+		err = s.replayGuardian.VerifyRequest(blobHeaderHash, timestamp)
+		if err != nil {
+			//nolint:wrapcheck
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify blob header hash at index %d: %v", i, err))
+		}
 	}
 
 	for _, blobCert := range batch.BlobCertificates {
