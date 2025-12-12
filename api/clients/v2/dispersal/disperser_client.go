@@ -3,6 +3,7 @@ package dispersal
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -10,8 +11,10 @@ import (
 	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
@@ -27,13 +30,16 @@ type DisperserClientConfig struct {
 	// The number of grpc connections to the disperser server. A value of 0 is treated as 1.
 	DisperserConnectionCount uint
 	DisperserID              uint32
+
+	// Ethereum chain ID.
+	ChainID *big.Int
 }
 
 // DisperserClient manages communication with the disperser server.
 type DisperserClient struct {
 	logger     logging.Logger
 	config     *DisperserClientConfig
-	signer     corev2.BlobRequestSigner
+	signer     *authv2.LocalBlobRequestSigner
 	clientPool *common.GRPCClientPool[disperser_rpc.DisperserClient]
 	committer  *committer.Committer
 	metrics    metrics.DispersalMetricer
@@ -62,7 +68,7 @@ type DisperserClient struct {
 func NewDisperserClient(
 	logger logging.Logger,
 	config *DisperserClientConfig,
-	signer corev2.BlobRequestSigner,
+	signer *authv2.LocalBlobRequestSigner,
 	committer *committer.Committer,
 	metrics metrics.DispersalMetricer,
 ) (*DisperserClient, error) {
@@ -186,18 +192,36 @@ func (c *DisperserClient) DisperseBlob(
 
 	probe.SetStage("sign_blob_request")
 
-	sig, err := c.signer.SignBlobRequest(blobHeader)
+	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
-		return nil, nil, fmt.Errorf("error signing blob request: %w", err)
+		return nil, nil, fmt.Errorf("compute blob key: %w", err)
 	}
+	blobKeySignature, err := c.signer.SignBytes(blobKey[:])
+	if err != nil {
+		return nil, nil, fmt.Errorf("sign blob key: %w", err)
+	}
+
+	anchorHash, err := hashing.ComputeDispersalAnchorHash(c.config.ChainID, c.config.DisperserID, blobKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("compute anchor hash: %w", err)
+	}
+	anchorSignature, err := c.signer.SignBytes(anchorHash)
+	if err != nil {
+		return nil, nil, fmt.Errorf("sign anchor hash: %w", err)
+	}
+
 	blobHeaderProto, err := blobHeader.ToProtobuf()
 	if err != nil {
 		return nil, nil, fmt.Errorf("error converting blob header to protobuf: %w", err)
 	}
+
 	request := &disperser_rpc.DisperseBlobRequest{
-		Blob:       data,
-		Signature:  sig,
-		BlobHeader: blobHeaderProto,
+		Blob:            data,
+		Signature:       blobKeySignature,
+		AnchorSignature: anchorSignature,
+		BlobHeader:      blobHeaderProto,
+		DisperserId:     c.config.DisperserID,
+		ChainId:         common.ChainIdToBytes(c.config.ChainID),
 	}
 
 	probe.SetStage("send_to_disperser")

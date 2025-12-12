@@ -1208,13 +1208,21 @@ func startAPIServer(
 	assignedPort := listener.Addr().(*net.TCPAddr).Port
 	apiServerLogger.Info("Created listener for API server", "assigned_port", assignedPort)
 
+	chainId, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get chain ID: %w", err)
+	}
+
 	// Create server config
 	serverConfig := disperser.ServerConfig{
-		GrpcPort:              fmt.Sprintf("%d", assignedPort),
-		GrpcTimeout:           10 * time.Second,
-		MaxConnectionAge:      5 * time.Minute,
-		MaxConnectionAgeGrace: 30 * time.Second,
-		MaxIdleConnectionAge:  1 * time.Minute,
+		GrpcPort:                           fmt.Sprintf("%d", assignedPort),
+		GrpcTimeout:                        10 * time.Second,
+		MaxConnectionAge:                   5 * time.Minute,
+		MaxConnectionAgeGrace:              30 * time.Second,
+		MaxIdleConnectionAge:               1 * time.Minute,
+		DisperserId:                        0,
+		TolerateMissingAnchorSignature:     false,
+		DisableAnchorSignatureVerification: false,
 	}
 
 	metricsConfig := disperser.MetricsConfig{
@@ -1250,6 +1258,7 @@ func startAPIServer(
 	apiServer, err := apiserver.NewDispersalServerV2(
 		serverConfig,
 		time.Now,
+		chainId,
 		blobStore,
 		metadataStore,
 		chainReader,

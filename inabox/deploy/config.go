@@ -160,6 +160,7 @@ func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort stri
 		DISPERSER_SERVER_CHAIN_RPC:              "",
 		DISPERSER_SERVER_PRIVATE_KEY:            "123",
 		DISPERSER_SERVER_NUM_CONFIRMATIONS:      "0",
+		DISPERSER_SERVER_DISPERSER_ID:           fmt.Sprintf("%d", ind),
 
 		DISPERSER_SERVER_REGISTERED_QUORUM_ID:      "0,1",
 		DISPERSER_SERVER_TOTAL_UNAUTH_BYTE_RATE:    "10000000,10000000",
@@ -199,6 +200,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_CHAIN_RPC:              "",
 		DISPERSER_SERVER_PRIVATE_KEY:            "123",
 		DISPERSER_SERVER_NUM_CONFIRMATIONS:      "0",
+		DISPERSER_SERVER_DISPERSER_ID:           fmt.Sprintf("%d", ind),
 
 		DISPERSER_SERVER_REGISTERED_QUORUM_ID:      "0,1",
 		DISPERSER_SERVER_TOTAL_UNAUTH_BYTE_RATE:    "10000000,10000000",

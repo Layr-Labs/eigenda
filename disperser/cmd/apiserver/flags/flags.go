@@ -281,6 +281,24 @@ var (
 		Value:    time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_POLL_INTERVAL"),
 	}
+	DisperserIdFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-id"),
+		Usage:    "Unique identifier for this disperser instance",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_ID"),
+	}
+	TolerateMissingAnchorSignatureFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "tolerate-missing-anchor-signature"),
+		Usage:    "Whether to accept DisperseBlob requests without an anchor signature. Ignored if disable-anchor-signature-verification is true.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TOLERATE_MISSING_ANCHOR_SIGNATURE"),
+	}
+	DisableAnchorSignatureVerificationFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disable-anchor-signature-verification"),
+		Usage:    "If true, anchor signature verification is skipped entirely. Takes precedence over tolerate-missing-anchor-signature.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISABLE_ANCHOR_SIGNATURE_VERIFICATION"),
+	}
 )
 
 // Flags needed for computing kzg commitments.
@@ -317,6 +335,7 @@ var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
 	GrpcPortFlag,
 	BucketTableName,
+	DisperserIdFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -352,6 +371,8 @@ var optionalFlags = []cli.Flag{
 	DisablePerAccountMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRatePollIntervalFlag,
+	TolerateMissingAnchorSignatureFlag,
+	DisableAnchorSignatureVerificationFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,

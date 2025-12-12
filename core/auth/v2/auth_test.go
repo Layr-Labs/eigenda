@@ -2,12 +2,13 @@ package v2_test
 
 import (
 	"crypto/sha256"
-	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/api/hashing"
-	"github.com/Layr-Labs/eigenda/common/replay"
 	"math/big"
 	"testing"
 	"time"
+
+	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common/replay"
 
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
