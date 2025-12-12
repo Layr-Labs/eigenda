@@ -683,7 +683,7 @@ func (c *Controller) NewBatch(
 	}
 
 	c.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))
-	batchCreationSuccessful = true // TODO claude: will the lambda function in the defer see this change?
+	batchCreationSuccessful = true
 	return &batchData{
 		Batch:           batch,
 		BatchHeaderHash: batchHeaderHash,
