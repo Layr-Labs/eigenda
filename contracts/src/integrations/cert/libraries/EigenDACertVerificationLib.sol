@@ -97,7 +97,6 @@ library EigenDACertVerificationLib {
         // so at worst 80K Gas.
         checkBlobInclusion(daCert.batchHeader, daCert.blobInclusionInfo);
 
-        // checkSecurityParams have only math check and IO call, no need to bound gas cost
         checkSecurityParams(
             eigenDAThresholdRegistry, daCert.blobInclusionInfo.blobCertificate.blobHeader.version, securityThresholds
         );
