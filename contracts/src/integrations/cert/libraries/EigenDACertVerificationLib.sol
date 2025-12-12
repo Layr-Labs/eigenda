@@ -20,7 +20,7 @@ library EigenDACertVerificationLib {
     uint256 internal constant THRESHOLD_DENOMINATOR = 100;
 
     /// @notice The maximum number of quorums this contract supports
-    uint256 internal constant MAX_QUORUM_COUNT = 100;
+    uint256 internal constant MAX_QUORUM_COUNT = 192;
 
     /// @notice The maximum number of nonsigner this contract supports. The count can contain duplicate count if
     ///         an operator belongs to multiple quorums
@@ -66,10 +66,13 @@ library EigenDACertVerificationLib {
     /// @param requiredDerivationVer The required offchain derivation version
     error InvalidOffchainDerivationVersion(uint16 certDerivationVer, uint16 requiredDerivationVer);
 
-    /// @notice Thrown when the blob version is invalid (doesn't exist in the ThresholdRegistry contract)
-    /// @param quorumsCount The number of quorums. Default to 0.
-    /// @param nonsignersCount The number of nonsigners. Default to 0.
-    error InvalidLargeInput(uint256 quorumsCount, uint256 nonsignersCount);
+    /// @notice Thrown when the number of signed quorums exceeds the maximum allowed
+    /// @param count The actual number of signed quorums provided
+    error QuorumCountExceedsMaximum(uint256 count);
+
+    /// @notice Thrown when the total number of non-signers across all quorums exceeds the maximum allowed
+    /// @param count The total number of non-signers counted
+    error NonSignerCountExceedsMaximum(uint256 count);
 
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
     /// @param eigenDAThresholdRegistry The threshold registry contract
@@ -208,14 +211,14 @@ library EigenDACertVerificationLib {
     ) internal view returns (uint256 confirmedQuorumsBitmap) {
         // the maximal supported number of quorum is 192
         // https://github.com/Layr-Labs/eigenda/blob/00cc8868b7e2d742fc6584dc1dea312193c8d4c2/contracts/src/core/EigenDARegistryCoordinatorStorage.sol#L36
-        if (nonSignerStakesAndSignature.quorumApks.length > MAX_QUORUM_COUNT) {
-            revert InvalidLargeInput(nonSignerStakesAndSignature.quorumApks.length, 0);
+        if (signedQuorumNumbers.length > MAX_QUORUM_COUNT) {
+            revert QuorumCountExceedsMaximum(signedQuorumNumbers.length);
         }
 
         // if an nonsigning operator belongs to multiple quorums, the totalNonsignersCount counts it multiple times
         uint256 totalNonsignersCount = countElements(nonSignerStakesAndSignature.nonSignerStakeIndices);
         if (totalNonsignersCount > MAX_NONSIGNER_COUNT_ALL_QUORUM) {
-            revert InvalidLargeInput(0, totalNonsignersCount);
+            revert NonSignerCountExceedsMaximum(totalNonsignersCount);
         }
 
         (DATypesV1.QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
