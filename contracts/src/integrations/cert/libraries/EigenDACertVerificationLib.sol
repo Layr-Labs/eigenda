@@ -24,7 +24,7 @@ library EigenDACertVerificationLib {
 
     /// @notice The maximum number of nonsigner this contract supports. The count can contain duplicate count if
     ///         an operator belongs to multiple quorums
-    uint256 internal constant MAX_NONSIGNER_COUNT_ALL_QUORUM = 450;
+    uint256 internal constant MAX_NONSIGNER_COUNT_ALL_QUORUM = 415;
 
     /// @notice Thrown when the inclusion proof is invalid
     /// @param blobIndex The index of the blob in the batch

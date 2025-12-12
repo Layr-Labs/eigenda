@@ -68,8 +68,8 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     function test_verifyDACert_revert_exceeding_maximal_quorum_count(uint256 pseudoRandomNumber) public {
         EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
 
-        // MAX_QUORUM_COUNT is 192, so test with slightly over the limit
-        cert.signedQuorumNumbers = new bytes(193);
+        // MAX_QUORUM_COUNT is 5, so test with slightly over the limit
+        cert.signedQuorumNumbers = new bytes(6);
 
         uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
 
@@ -81,11 +81,11 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     {
         EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
 
-        // MAX_NONSIGNER_COUNT_ALL_QUORUM is 450, so test with 451 total non-signers
-        // Distribute across 2 quorums: 226 + 225 = 451 total
+        // MAX_NONSIGNER_COUNT_ALL_QUORUM is 415, so test with 416 total non-signers
+        // Distribute across 2 quorums: 208 + 208 = 416 total
         uint32[][] memory largeNonSignerStakeIndices = new uint32[][](2);
-        largeNonSignerStakeIndices[0] = new uint32[](226);
-        largeNonSignerStakeIndices[1] = new uint32[](225);
+        largeNonSignerStakeIndices[0] = new uint32[](208);
+        largeNonSignerStakeIndices[1] = new uint32[](208);
 
         cert.nonSignerStakesAndSignature.nonSignerStakeIndices = largeNonSignerStakeIndices;
 
