@@ -66,7 +66,6 @@ func NewCompatibilityConfig(
 		DirectoryAddress:    clientConfigV2.EigenDADirectory,
 		CertVerifierAddress: clientConfigV2.EigenDACertVerifierOrRouterAddress,
 		MaxPayloadSizeBytes: maxPayloadSize,
-		RecencyWindowSize:   clientConfigV2.RBNRecencyWindowSize,
 		APIsEnabled:         APIsEnabled,
 		ReadOnlyMode:        readOnly,
 	}, nil

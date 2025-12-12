@@ -390,7 +390,6 @@ func buildEigenDAV2Backend(
 		payloadDisperser,
 		config.ClientConfigV2.PutTries,
 		certVerifier,
-		config.ClientConfigV2.RBNRecencyWindowSize,
 		retrievers,
 		// PayloadDisperserCfg.ContractCallTimeout is set by the --eigenda.v2.contract-call-timeout flag, the value
 		// is not read into any other configs. For simplicity the PayloadDisperserCfg value is reused here.

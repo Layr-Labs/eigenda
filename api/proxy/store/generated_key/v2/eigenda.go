@@ -35,12 +35,6 @@ type Store struct {
 
 	// Verification related fields.
 	certVerifier *verification.CertVerifier
-	// Allowed distance (in L1 blocks) between the eigenDA cert's reference block number (RBN)
-	// and the L1 block number at which the cert was included in the rollup's batch inbox.
-	// If cert.L1InclusionBlock > batch.RBN + rbnRecencyWindowSize, an
-	// [RBNRecencyCheckFailedError] is returned.
-	// This check is optional and will be skipped when rbnRecencyWindowSize is set to 0.
-	rbnRecencyWindowSize uint64 // TODO(iquidus): remove this along with the optional cli flag that sets this value
 
 	// Retrieval related fields.
 	retrievers []clients.PayloadRetriever
@@ -61,6 +55,7 @@ type OffchainDerivationParameters struct {
 	// and the L1 block number at which the cert was included in the rollup's batch inbox.
 	// If cert.L1InclusionBlock > batch.RBN + rbnRecencyWindowSize, an
 	// [RBNRecencyCheckFailedError] is returned.
+	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation
 	RBNRecencyWindowSize uint64
 }
 
@@ -74,7 +69,6 @@ func NewStore(
 	disperser *dispersal.PayloadDisperser,
 	putTries int,
 	certVerifier *verification.CertVerifier,
-	rbnRecencyWindowSize uint64,
 	retrievers []clients.PayloadRetriever,
 	contractCallTimeout time.Duration,
 ) (*Store, error) {
@@ -86,13 +80,12 @@ func NewStore(
 	offchainDerivationMap := make(OffchainDerivationMap)
 	// Currently only offchain derivation version 0 exists.
 	offchainDerivationMap[0] = OffchainDerivationParameters{
-		RBNRecencyWindowSize: 14400,
+		RBNRecencyWindowSize: 14400, // 48 hours worth of blocks at 12s block time
 	}
 
 	return &Store{
 		log:                   log,
 		putTries:              putTries,
-		rbnRecencyWindowSize:  rbnRecencyWindowSize,
 		disperser:             disperser,
 		retrievers:            retrievers,
 		certVerifier:          certVerifier,
@@ -327,7 +320,10 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCer
 		timeoutCtx, cancel := context.WithTimeout(ctx, e.contractCallTimeout)
 		defer cancel()
 
-		offchainDerivationVersion, err := e.certVerifier.GetOffchainDerivationVersion(timeoutCtx, sumDACert.ReferenceBlockNumber())
+		offchainDerivationVersion, err := e.certVerifier.GetOffchainDerivationVersion(
+			timeoutCtx,
+			sumDACert.ReferenceBlockNumber(),
+		)
 		if err != nil {
 			return fmt.Errorf("eth-call to CertVerifier.offchainDerivationVersion: %w", err)
 		}
@@ -342,7 +338,11 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCer
 			)
 		}
 
-		err = verifyCertRBNRecencyCheck(sumDACert.ReferenceBlockNumber(), l1InclusionBlockNum, offchainDerivationParams.RBNRecencyWindowSize)
+		err = verifyCertRBNRecencyCheck(
+			sumDACert.ReferenceBlockNumber(),
+			l1InclusionBlockNum,
+			offchainDerivationParams.RBNRecencyWindowSize,
+		)
 		if err != nil {
 			// Already a structured error converted to a 418 HTTP error by the error middleware.
 			return err
