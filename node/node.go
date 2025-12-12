@@ -321,6 +321,7 @@ func NewNode(
 				Namespace,
 				PaymentsSubsystem,
 				config.EnablePerAccountPaymentMetrics,
+				nil, // userAccountRemapping - not yet supported in validator
 			),
 			reservationvalidation.NewReservationCacheMetrics(reg, Namespace, PaymentsSubsystem),
 		)

@@ -83,6 +83,7 @@ func NewController(
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 	signingRateTracker signingrate.SigningRateTracker,
 	userAccountRemapping map[string]string,
+	validatorIdRemapping map[string]string,
 ) (*Controller, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -97,7 +98,8 @@ func NewController(
 		config.SignificantSigningThresholdFraction,
 		config.CollectDetailedValidatorSigningMetrics,
 		config.EnablePerAccountBlobStatusMetrics,
-		userAccountRemapping)
+		userAccountRemapping,
+		validatorIdRemapping)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
 	}

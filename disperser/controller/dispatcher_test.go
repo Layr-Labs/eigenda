@@ -819,6 +819,7 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 		livenessChan,
 		signingrate.NewNoOpSigningRateTracker(),
 		nil, // userAccountRemapping
+		nil, // validatorIdRemapping
 	)
 	require.NoError(t, err)
 	return &controllerComponents{
