@@ -17,6 +17,16 @@ import (
 // different type of object that has the same hash as a StoreChunksRequest.
 const ValidatorStoreChunksRequestDomain = "validator.StoreChunksRequest"
 
+// TODO(taras): Very clumsy implementation. IMO hashing module has to be rewritten.
+// As of now, package does two things:
+// 1. Serializes message into "canonical" form (protobufs are not deterministic).
+// 2. Hashes the canonical form.
+// Those two things are independent, and should be separated.
+type BlobHeaderHashWithTimestamp struct {
+	Hash      []byte
+	Timestamp int64
+}
+
 // HashStoreChunksRequest hashes the given StoreChunksRequest.
 func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
 	hasher := sha3.New256()
@@ -43,10 +53,11 @@ func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
-// HashStoreChunksRequestBlobHeaders returns a list of per-BlobHeader hashes (one per BlobCertificate).
-func HashStoreChunksRequestBlobHeaders(request *grpc.StoreChunksRequest) ([][]byte, error) {
+// HashStoreChunksRequestBlobHeaders returns a list of per-BlobHeader hashes (one per BlobCertificate)
+// with the timestamp.
+func HashStoreChunksRequestBlobHeaders(request *grpc.StoreChunksRequest) ([]BlobHeaderHashWithTimestamp, error) {
 	certs := request.GetBatch().GetBlobCertificates()
-	blobHeaderHashes := make([][]byte, len(certs))
+	out := make([]BlobHeaderHashWithTimestamp, len(certs))
 	for i, cert := range certs {
 		if cert == nil {
 			return nil, fmt.Errorf("nil BlobCertificate at index %d", i)
@@ -55,15 +66,22 @@ func HashStoreChunksRequestBlobHeaders(request *grpc.StoreChunksRequest) ([][]by
 		if header == nil {
 			return nil, fmt.Errorf("nil BlobHeader at index %d", i)
 		}
+		paymentHeader := header.GetPaymentHeader()
+		if paymentHeader == nil {
+			return nil, fmt.Errorf("nil PaymentHeader at index %d", i)
+		}
 
 		h := sha3.New256()
 		if err := hashBlobHeader(h, header); err != nil {
 			return nil, fmt.Errorf("failed to hash blob header at index %d: %w", i, err)
 		}
-		blobHeaderHashes[i] = h.Sum(nil)
+		out[i] = BlobHeaderHashWithTimestamp{
+			Hash:      h.Sum(nil),
+			Timestamp: paymentHeader.GetTimestamp(),
+		}
 	}
 
-	return blobHeaderHashes, nil
+	return out, nil
 }
 
 func hashBlobCertificate(hasher hash.Hash, blobCertificate *common.BlobCertificate) error {

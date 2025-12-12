@@ -192,15 +192,15 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
 	}
 
-	blobHeaderHashes, err := hashing.HashStoreChunksRequestBlobHeaders(in)
+	blobHeaders, err := hashing.HashStoreChunksRequestBlobHeaders(in)
 	if err != nil {
 		//nolint:wrapcheck
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers: %v", err))
 	}
 
-	timestamp := time.Unix(int64(in.GetTimestamp()), 0)
-	for i, blobHeaderHash := range blobHeaderHashes {
-		err = s.replayGuardian.VerifyRequest(blobHeaderHash, timestamp)
+	for i, blobHeader := range blobHeaders {
+		timestamp := time.Unix(blobHeader.Timestamp, 0)
+		err = s.replayGuardian.VerifyRequest(blobHeader.Hash, timestamp)
 		if err != nil {
 			//nolint:wrapcheck
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify blob header hash at index %d: %v", i, err))
