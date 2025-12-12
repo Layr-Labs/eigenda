@@ -76,7 +76,9 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
     }
 
-    function test_verifyDACert_revert_exceeding_maximal_non_signers_across_all_quorums(uint256 pseudoRandomNumber) public {
+    function test_verifyDACert_revert_exceeding_maximal_non_signers_across_all_quorums(uint256 pseudoRandomNumber)
+        public
+    {
         EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
 
         // MAX_NONSIGNER_COUNT_ALL_QUORUM is 450, so test with 451 total non-signers
@@ -215,12 +217,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         cert.signedQuorumNumbers = new bytes(193);
 
         // Expect QuorumCountExceedsMaximum error with count = 193
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CertLib.QuorumCountExceedsMaximum.selector,
-                193
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(CertLib.QuorumCountExceedsMaximum.selector, 193));
 
         // Test via the public checkDACertReverts function
         eigenDACertVerifier.checkDACertReverts(cert);
@@ -237,12 +234,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         cert.nonSignerStakesAndSignature.nonSignerStakeIndices = largeNonSignerStakeIndices;
 
         // Expect NonSignerCountExceedsMaximum error with count = 451
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CertLib.NonSignerCountExceedsMaximum.selector,
-                451
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(CertLib.NonSignerCountExceedsMaximum.selector, 451));
 
         // Test via the public checkDACertReverts function
         eigenDACertVerifier.checkDACertReverts(cert);

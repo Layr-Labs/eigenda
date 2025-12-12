@@ -216,7 +216,10 @@ library EigenDACertVerificationLib {
         }
 
         // if an nonsigning operator belongs to multiple quorums, the totalNonsignersCount counts it multiple times
-        uint256 totalNonsignersCount = countElements(nonSignerStakesAndSignature.nonSignerStakeIndices);
+        uint256 totalNonsignersCount = 0;
+        for (uint256 i = 0; i < nonSignerStakesAndSignature.nonSignerStakeIndices.length; i++) {
+            totalNonsignersCount += nonSignerStakesAndSignature.nonSignerStakeIndices[i].length;
+        }
         if (totalNonsignersCount > MAX_NONSIGNER_COUNT_ALL_QUORUM) {
             revert NonSignerCountExceedsMaximum(totalNonsignersCount);
         }
@@ -238,17 +241,6 @@ library EigenDACertVerificationLib {
         }
 
         return confirmedQuorumsBitmap;
-    }
-
-    /// @notice Counts the total number of uint32 elements in a 2D array.
-    /// @dev Sums the length of each inner array in the outer array.
-    /// @param arr The 2D array of uint32 values to count.
-    /// @return total The total number of uint32 elements across all inner arrays.
-    function countElements(uint32[][] memory arr) public pure returns (uint256 total) {
-        uint256 outerLen = arr.length;
-        for (uint256 i = 0; i < outerLen; i++) {
-            total += arr[i].length;
-        }
     }
 
     /// @notice Checks that requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums
