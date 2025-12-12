@@ -40,9 +40,20 @@ type ServerConfig struct {
 
 	// Whether to tolerate requests without an anchor signature.
 	// If false, DisperseBlob requests without an anchor_signature will be rejected.
+	// Ignored if DisableAnchorSignatureVerification is true.
 	// Default: true (for backwards compatibility with old client code during migration)
 	//
 	// TODO (litt3): this field should eventually be set to false, and then removed, once all clients have updated
 	// to a version that includes anchor signatures.
 	TolerateMissingAnchorSignature bool
+
+	// Whether to disable anchor signature verification entirely.
+	// If true, anchor signatures will not be verified even if present.
+	// Takes precedence over TolerateMissingAnchorSignature.
+	// Default: false
+	//
+	// TODO (litt3): This is a temporary flag to allow a second LayrLabs disperser to handle dispersal requests created
+	// for the main LayrLabs disperser. This flag will eventually be removed, and anchor signature verification will
+	// always be performed.
+	DisableAnchorSignatureVerification bool
 }

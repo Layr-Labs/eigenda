@@ -319,6 +319,8 @@ func (s *DispersalServerV2) validateDispersalRequest(
 
 // Validates the anchor signature included in the DisperseBlobRequest.
 //
+// If DisableAnchorSignatureVerification is true, then this method will skip all validation and return nil.
+//
 // If TolerateMissingAnchorSignature is true, then this method will pass validation even if no anchor signature is
 // provided in the request.
 //
@@ -329,6 +331,10 @@ func (s *DispersalServerV2) validateAnchorSignature(
 	req *pb.DisperseBlobRequest,
 	blobHeader *corev2.BlobHeader,
 ) error {
+	if s.serverConfig.DisableAnchorSignatureVerification {
+		return nil
+	}
+
 	anchorSignature := req.GetAnchorSignature()
 
 	if len(anchorSignature) == 0 {
