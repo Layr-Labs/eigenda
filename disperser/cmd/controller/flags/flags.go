@@ -43,6 +43,18 @@ var (
 		Required: false,
 		Value:    "./data/",
 	}
+	UserAccountRemappingFileFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "user-account-remapping-file"),
+		Usage:    "Path to YAML file for mapping account IDs to user-friendly names",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USER_ACCOUNT_REMAPPING_FILE"),
+		Required: false,
+	}
+	ValidatorIdRemappingFileFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "validator-id-remapping-file"),
+		Usage:    "Path to YAML file for mapping validator IDs to user-friendly names",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "VALIDATOR_ID_REMAPPING_FILE"),
+		Required: false,
+	}
 	// EncodingManager Flags
 	EncodingPullIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "encoding-pull-interval"),
@@ -185,7 +197,7 @@ var (
 	}
 	EnablePerAccountBlobStatusMetricsFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-blob-status-metrics"),
-		Usage:    "Whether to report per-account blob status metrics. If false, all metrics will be aggregated under account 0x0. (default: true)",
+		Usage:    "Whether to report per-account blob status metrics for unmapped accounts. Accounts with valid name remappings will always use their remapped labels. If false, unmapped accounts will be aggregated under account 0x0. (default: true)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PER_ACCOUNT_BLOB_STATUS_METRICS"),
 	}
@@ -369,6 +381,8 @@ var requiredFlags = []cli.Flag{
 
 var optionalFlags = []cli.Flag{
 	IndexerDataDirFlag,
+	UserAccountRemappingFileFlag,
+	ValidatorIdRemappingFileFlag,
 	EncodingRequestTimeoutFlag,
 	EncodingStoreTimeoutFlag,
 	NumEncodingRetriesFlag,

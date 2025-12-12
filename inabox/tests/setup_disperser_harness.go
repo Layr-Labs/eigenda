@@ -852,6 +852,7 @@ func startController(
 		metricsRegistry,
 		encodingManagerBlobSet,
 		controllerLivenessChan,
+		nil, // userAccountRemapping
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoding manager: %w", err)
@@ -925,6 +926,8 @@ func startController(
 		dispatcherBlobSet,
 		controllerLivenessChan,
 		signingRateTracker,
+		nil, // userAccountRemapping
+		nil, // validatorIdRemapping
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dispatcher: %w", err)
@@ -977,6 +980,7 @@ func startController(
 			ethClient,
 			dynamoClient.GetAwsClient(),
 			metricsRegistry,
+			nil,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)
