@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {EigenDAEjectionTypes} from "src/periphery/ejection/libraries/EigenDAEjectionTypes.sol";
-import {EigenDAEjectionStorage} from "src/periphery/ejection/libraries/EigenDAEjectionStorage.sol";
+import {EigenDAEjectionTypes} from "./EigenDAEjectionTypes.sol";
+import {EigenDAEjectionStorage} from "./EigenDAEjectionStorage.sol";
 
 library EigenDAEjectionLib {
     event EjectionStarted(

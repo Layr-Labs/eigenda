@@ -1,19 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {AddressDirectoryLib} from "src/core/libraries/v3/address-directory/AddressDirectoryLib.sol";
-import {
-    IEigenDADirectory,
-    IEigenDAAddressDirectory,
-    IEigenDAConfigRegistry
-} from "src/core/interfaces/IEigenDADirectory.sol";
-import {AccessControlConstants} from "src/core/libraries/v3/access-control/AccessControlConstants.sol";
-import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
+import {AddressDirectoryLib} from "./libraries/v3/address-directory/AddressDirectoryLib.sol";
+import {IEigenDADirectory, IEigenDAAddressDirectory, IEigenDAConfigRegistry} from "./interfaces/IEigenDADirectory.sol";
+import {AccessControlConstants} from "./libraries/v3/access-control/AccessControlConstants.sol";
+import {AddressDirectoryConstants} from "./libraries/v3/address-directory/AddressDirectoryConstants.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {InitializableLib} from "src/core/libraries/v3/initializable/InitializableLib.sol";
-import {ConfigRegistryLib} from "src/core/libraries/v3/config-registry/ConfigRegistryLib.sol";
-import {ConfigRegistryTypes} from "src/core/libraries/v3/config-registry/ConfigRegistryTypes.sol";
-import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
+import {InitializableLib} from "./libraries/v3/initializable/InitializableLib.sol";
+import {ConfigRegistryLib} from "./libraries/v3/config-registry/ConfigRegistryLib.sol";
+import {ConfigRegistryTypes} from "./libraries/v3/config-registry/ConfigRegistryTypes.sol";
+import {IEigenDASemVer} from "./interfaces/IEigenDASemVer.sol";
 
 contract EigenDADirectory is IEigenDADirectory, IEigenDASemVer {
     using AddressDirectoryLib for string;

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifierBase} from "src/integrations/cert/interfaces/IEigenDACertVerifierBase.sol";
-import {IEigenDACertVerifierRouter} from "src/integrations/cert/interfaces/IEigenDACertVerifierRouter.sol";
-import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import {IEigenDACertVerifierBase} from "../interfaces/IEigenDACertVerifierBase.sol";
+import {IEigenDACertVerifierRouter} from "../interfaces/IEigenDACertVerifierRouter.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgradeable {
     /// @notice A mapping from an activation block number (ABN) to a cert verifier address.

@@ -2,20 +2,20 @@
 pragma solidity ^0.8.12;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
-import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
-import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
-import {EigenDACertVerificationV1Lib} from "src/integrations/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
-import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
-import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
-import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
-import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
-import {PaymentVault} from "src/core/PaymentVault.sol";
-import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
-import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
+import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
+import {EigenDATypesV1 as DATypesV1} from "../src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "../src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDACertVerificationV1Lib} from "../src/integrations/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
+import {EigenDACertVerifier} from "../src/integrations/cert/EigenDACertVerifier.sol";
+import {EigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
+import {IEigenDAThresholdRegistry} from "../src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDASignatureVerifier} from "../src/core/interfaces/IEigenDASignatureVerifier.sol";
+import {EigenDARelayRegistry} from "../src/core/EigenDARelayRegistry.sol";
+import {PaymentVault} from "../src/core/PaymentVault.sol";
+import {IPaymentVault} from "../src/core/interfaces/IPaymentVault.sol";
+import {EigenDADisperserRegistry} from "../src/core/EigenDADisperserRegistry.sol";
 import "forge-std/StdStorage.sol";
 
 contract MockEigenDADeployer is BLSMockAVSDeployer {

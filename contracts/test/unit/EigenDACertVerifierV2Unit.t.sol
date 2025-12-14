@@ -2,12 +2,14 @@
 pragma solidity ^0.8.12;
 
 import "../MockEigenDADeployer.sol";
-import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
-import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
-import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-import {EigenDACertTypes} from "src/integrations/cert/EigenDACertTypes.sol";
-import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
-import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {
+    EigenDACertVerificationLib as CertLib
+} from "../../src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
+import {EigenDATypesV2} from "../../src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV1} from "../../src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDACertTypes} from "../../src/integrations/cert/EigenDACertTypes.sol";
+import {EigenDACertVerifier} from "../../src/integrations/cert/EigenDACertVerifier.sol";
+import {IEigenDAThresholdRegistry} from "../../src/core/interfaces/IEigenDAThresholdRegistry.sol";
 
 // Test harness to expose internal library functions
 contract CertLibTestHarness {
