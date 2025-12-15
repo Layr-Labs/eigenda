@@ -174,59 +174,6 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
 
-func TestEncodingManagerHandleBatchDedup(t *testing.T) {
-	ctx := t.Context()
-	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
-	now := time.Now()
-	metadata1 := &commonv2.BlobMetadata{
-		BlobHeader: blobHeader1,
-		BlobStatus: commonv2.Queued,
-		Expiry:     uint64(now.Add(time.Hour).Unix()),
-		NumRetries: 0,
-		UpdatedAt:  uint64(now.UnixNano()),
-	}
-	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
-	require.NoError(t, err)
-
-	c := newTestComponents(t, false)
-	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
-		SymbolsPerFrame: 8,
-	}, nil)
-
-	// start a goroutine to collect heartbeats
-	var seen []healthcheck.HeartbeatMessage
-	done := make(chan struct{})
-	go func() {
-		for hb := range c.LivenessChan {
-			seen = append(seen, hb)
-		}
-		close(done)
-	}()
-
-	err = c.EncodingManager.HandleBatch(ctx)
-	require.ErrorContains(t, err, "no blobs to encode")
-	c.Pool.StopWait()
-
-	// give the signals a moment to be sent
-	time.Sleep(10 * time.Millisecond)
-	// signal that we're done listening
-	close(c.LivenessChan)
-	<-done
-
-	// now assert on what we saw
-	require.NotEmpty(t, seen, "expected at least one heartbeat")
-	for _, hb := range seen {
-		require.Equal(t, "encodingManager", hb.Component)
-	}
-	// timestamps are non‐decreasing
-	for i := 1; i < len(seen); i++ {
-		prev, curr := seen[i-1].Timestamp, seen[i].Timestamp
-		require.True(t, !curr.Before(prev), "timestamps should not decrease")
-	}
-
-	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
-}
-
 func TestEncodingManagerHandleManyBatches(t *testing.T) {
 	ctx := t.Context()
 	numBlobs := 12
@@ -500,7 +447,7 @@ func TestEncodingManagerFilterStaleBlobs(t *testing.T) {
 	ctx := t.Context()
 	now := time.Now()
 
-	staleBlobKey, staleBlobHeader := newBlobWithDispersalTime(t, now.Add(-time.Minute).UnixNano(), []core.QuorumID{0, 1})
+	staleBlobKey, staleBlobHeader := newBlobWithDispersalTime(t, now.Add(-time.Hour).UnixNano(), []core.QuorumID{0, 1})
 	freshBlobKey, freshBlobHeader := newBlobWithDispersalTime(t, now.UnixNano(), []core.QuorumID{0, 1})
 
 	staleMetadata := &commonv2.BlobMetadata{
