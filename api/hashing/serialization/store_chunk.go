@@ -225,7 +225,9 @@ func SerializeStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, erro
 		}
 		canonicalRequest.BlobCertificates[i] = canonicalBlobCertificate{
 			BlobHeader: canonicalBlobHeader{
-				Version:             cert.GetBlobHeader().GetVersion(),
+				Version: cert.GetBlobHeader().GetVersion(),
+				// TODO(taras): QuorumNumbersLength is redundant. As QuorumNumbers is a list and length will
+				// the first uint32 in the list
 				QuorumNumbersLength: uint32(len(cert.GetBlobHeader().GetQuorumNumbers())),
 				QuorumNumbers:       cert.GetBlobHeader().GetQuorumNumbers(),
 				Commitment: canonicalBlobCommitment{
@@ -258,7 +260,10 @@ func SerializeBlobHeader(header *commonv2.BlobHeader) ([]byte, error) {
 		QuorumNumbersLength: uint32(len(header.GetQuorumNumbers())),
 		QuorumNumbers:       header.GetQuorumNumbers(),
 		Commitment: canonicalBlobCommitment{
-			Commitment: header.GetCommitment().GetCommitment(),
+			Commitment:       header.GetCommitment().GetCommitment(),
+			LengthCommitment: header.GetCommitment().GetLengthCommitment(),
+			LengthProof:      header.GetCommitment().GetLengthProof(),
+			Length:           header.GetCommitment().GetLength(),
 		},
 		PaymentHeader: canonicalPaymentHeader{
 			AccountId:         header.GetPaymentHeader().GetAccountId(),

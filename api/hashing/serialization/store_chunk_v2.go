@@ -166,8 +166,10 @@ func SerializeBlobHeaderV2(header *commonv2.BlobHeader) ([]byte, error) {
 		QuorumNumbersLength: qnLen,
 		QuorumNumbers:       qnums,
 		Commitment: canonicalBlobCommitmentV2{
-			Commitment: header.GetCommitment().GetCommitment(),
-			// LengthCommitment / LengthProof / Length remain empty/zero by design
+			Commitment:       header.GetCommitment().GetCommitment(),
+			LengthCommitment: header.GetCommitment().GetLengthCommitment(),
+			LengthProof:      header.GetCommitment().GetLengthProof(),
+			Length:           header.GetCommitment().GetLength(),
 		},
 		PaymentHeader: canonicalPaymentHeaderV2{
 			AccountId:         []byte(header.GetPaymentHeader().GetAccountId()),
