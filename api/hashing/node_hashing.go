@@ -19,7 +19,7 @@ const ValidatorStoreChunksRequestDomain = "validator.StoreChunksRequest"
 
 // HashStoreChunksRequest hashes the given StoreChunksRequest.
 func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
-	hasher := sha3.New256()
+	hasher := sha3.NewLegacyKeccak256()
 
 	hasher.Write([]byte(ValidatorStoreChunksRequestDomain))
 
