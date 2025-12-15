@@ -85,6 +85,11 @@ type ControllerConfig struct {
 	// client at dispersal request creation time (in nanoseconds since Unix epoch).
 	MaxDispersalAge time.Duration
 
+	// The maximum a blob dispersal's self-reported timestamp can be ahead of the local wall clock time.
+	// This is a preventative measure needed to prevent an attacker from sending far future timestamps
+	// that result in data being tracked for a long time.
+	MaxDispersalFutureAge time.Duration
+
 	// The amount of time to retain signing rate data.
 	SigningRateRetentionPeriod time.Duration
 
@@ -124,7 +129,8 @@ func DefaultControllerConfig() *ControllerConfig {
 		SignificantSigningThresholdFraction: 0.55,
 		NumConcurrentRequests:               600,
 		NodeClientCacheSize:                 400,
-		MaxDispersalAge:                     45 * time.Second,
+		MaxDispersalAge:                     45 * time.Second, // TODO check what the current default should be
+		MaxDispersalFutureAge:               45 * time.Second,
 		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
 		SigningRateBucketSpan:               10 * time.Minute,
 		BlobDispersalQueueSize:              1024,

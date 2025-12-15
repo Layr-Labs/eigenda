@@ -158,6 +158,7 @@ type EncodingManager struct {
 	blobVersionParameters atomic.Pointer[corev2.BlobVersionParameterMap]
 
 	metrics                *encodingManagerMetrics
+	controllerMetrics      *ControllerMetrics
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
 
 	// Prevents the same blob from being processed multiple times, regardless of dynamo shenanigans.
@@ -181,6 +182,7 @@ func NewEncodingManager(
 	// For each blob, compare the blob's timestamp to the current time. If it's older than this, ignore it.
 	// This is used by a replay guardian to prevent double-processing of blobs.
 	maxPastAge time.Duration,
+	controllerMetrics *ControllerMetrics,
 ) (*EncodingManager, error) {
 
 	if err := config.Verify(); err != nil {
@@ -208,6 +210,7 @@ func NewEncodingManager(
 			registry, config.EnablePerAccountBlobStatusMetrics, userAccountRemapping),
 		controllerLivenessChan: controllerLivenessChan,
 		replayGuardian:         replayGuardian,
+		controllerMetrics:      controllerMetrics,
 	}, nil
 }
 
@@ -281,9 +284,11 @@ func (e *EncodingManager) filterStaleAndDedupBlobs(
 		case replay.StatusValid:
 			outputMetadatas = append(outputMetadatas, metadata)
 		case replay.StatusTooOld:
-			// TODO increment a metric
+			e.controllerMetrics.reportStaleDispersal()
+			e.markBlobAsFailed(ctx, blobKey)
 		case replay.StatusTooFarInFuture:
-			// TODO increment a metric
+			e.controllerMetrics.reportTimeTravelerDispersal()
+			e.markBlobAsFailed(ctx, blobKey)
 		case replay.StatusDuplicate:
 			// Ignore duplicates
 		default:
@@ -294,48 +299,16 @@ func (e *EncodingManager) filterStaleAndDedupBlobs(
 	return outputMetadatas
 }
 
-// TODO remove
-
-// Checks if a blob is older than MaxDispersalAge and handles it accordingly.
-// If the blob is stale, it increments metrics, logs a warning, and updates the database status to Failed.
-// Returns true if the blob is stale, otherwise false.
-// func (e *EncodingManager) checkAndHandleStaleBlob(
-// 	ctx context.Context,
-// 	blobKey corev2.BlobKey,
-// 	now time.Time,
-// 	dispersalTimestamp int64,
-// ) bool {
-// 	dispersalTime := time.Unix(0, dispersalTimestamp)
-// 	dispersalAge := now.Sub(dispersalTime)
-
-// 	if dispersalAge <= e.MaxDispersalAge {
-// 		return false
-// 	}
-
-// 	e.metrics.reportStaleDispersal()
-
-// 	e.logger.Warnf(
-// 		"discarding stale dispersal: blobKey=%s dispersalAge=%s maxAge=%s dispersalTime=%s",
-// 		blobKey.Hex(),
-// 		dispersalAge.String(),
-// 		e.MaxDispersalAge.String(),
-// 		dispersalTime.Format(time.RFC3339),
-// 	)
-
-// 	storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
-// 	err := e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Failed)
-// 	cancel()
-// 	if err != nil {
-// 		e.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
-// 	} else {
-// 		// we need to remove the blobKey from the blobSet once the BlobStatus is set to FAILED
-// 		// the Dispatcher removes the blobKey from the blobSet when batching, but blobs that are set to FAILED
-// 		// never are batched, and therefore must be removed manually
-// 		e.blobSet.RemoveBlob(blobKey)
-// 	}
-
-// 	return true
-// }
+func (e *EncodingManager) markBlobAsFailed(ctx context.Context, blobKey corev2.BlobKey) {
+	err := e.blobMetadataStore.UpdateBlobStatus(
+		ctx,
+		blobKey,
+		v2.Failed,
+	)
+	if err != nil {
+		e.logger.Errorf("Failed to mark blob %s as failed: %v", blobKey.Hex(), err)
+	}
+}
 
 // HandleBatch handles a batch of blobs to encode
 // It retrieves a batch of blobs from the blob metadata store, encodes them, and updates their status

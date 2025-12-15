@@ -25,7 +25,6 @@ type encodingManagerMetrics struct {
 	batchRetryCount         *prometheus.GaugeVec
 	failedSubmissionCount   *prometheus.CounterVec
 	completedBlobs          *prometheus.CounterVec
-	staleDispersalCount     prometheus.Counter
 	enablePerAccountMetrics bool
 	userAccountRemapping    map[string]string
 }
@@ -141,14 +140,6 @@ func newEncodingManagerMetrics(
 		[]string{"state", "data", "account_id"},
 	)
 
-	staleDispersalCount := promauto.With(registry).NewCounter(
-		prometheus.CounterOpts{
-			Namespace: encodingManagerNamespace,
-			Name:      "stale_dispersal_discarded_total",
-			Help:      "The number of stale dispersals that were discarded.",
-		},
-	)
-
 	return &encodingManagerMetrics{
 		batchSubmissionLatency:  batchSubmissionLatency,
 		blobHandleLatency:       blobHandleLatency,
@@ -161,7 +152,6 @@ func newEncodingManagerMetrics(
 		batchRetryCount:         batchRetryCount,
 		failedSubmissionCount:   failSubmissionCount,
 		completedBlobs:          completedBlobs,
-		staleDispersalCount:     staleDispersalCount,
 		enablePerAccountMetrics: enablePerAccountMetrics,
 		userAccountRemapping:    userAccountRemapping,
 	}
@@ -223,8 +213,4 @@ func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.Blo
 
 	m.completedBlobs.WithLabelValues("total", "number", accountLabel).Inc()
 	m.completedBlobs.WithLabelValues("total", "size", accountLabel).Add(float64(size))
-}
-
-func (m *encodingManagerMetrics) reportStaleDispersal() {
-	m.staleDispersalCount.Inc()
 }

@@ -854,6 +854,7 @@ func startController(
 		nil, // userAccountRemapping
 		10*time.Minute,
 		10*time.Minute,
+		nil, // metrics, ignored if nil
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoding manager: %w", err)
@@ -916,7 +917,7 @@ func startController(
 		sigAgg,
 		nodeClientManager,
 		controllerLogger,
-		metricsRegistry,
+		nil, // Metrics become a no-op if nil
 		nil,
 		controllerLivenessChan,
 		signingRateTracker,

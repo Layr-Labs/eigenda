@@ -20,7 +20,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/hashicorp/go-multierror"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var errNoBlobsToDispatch = errors.New("no blobs to dispatch")
@@ -36,11 +35,8 @@ type Controller struct {
 	aggregator        core.SignatureAggregator
 	nodeClientManager NodeClientManager
 	logger            logging.Logger
-	metrics           *controllerMetrics
+	metrics           *ControllerMetrics
 	getNow            func() time.Time
-
-	// beforeDispatch function is called before dispatching a blob
-	beforeDispatch BlobCallback
 
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
 
@@ -74,7 +70,7 @@ func NewController(
 	aggregator core.SignatureAggregator,
 	nodeClientManager NodeClientManager,
 	logger logging.Logger,
-	registry *prometheus.Registry,
+	metrics *ControllerMetrics,
 	beforeDispatch func(blobKey corev2.BlobKey) error,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 	signingRateTracker signingrate.SigningRateTracker,
@@ -89,17 +85,6 @@ func NewController(
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	metrics, err := newControllerMetrics(
-		registry,
-		config.SignificantSigningThresholdFraction,
-		config.CollectDetailedValidatorSigningMetrics,
-		config.EnablePerAccountBlobStatusMetrics,
-		userAccountRemapping,
-		validatorIdRemapping)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
-	}
-
 	blobDispersalQueue, err := NewDynamodbBlobDispersalQueue(
 		ctx,
 		logger,
@@ -107,8 +92,9 @@ func NewController(
 		config.BlobDispersalQueueSize,
 		config.BlobDispersalRequestBatchSize,
 		config.BlobDispersalRequestBackoffPeriod,
-		10*time.Minute, // TODO flags
-		10*time.Minute,
+		config.MaxDispersalFutureAge,
+		config.MaxDispersalAge,
+		metrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("NewDynamodbBlobDispersalQueue: %w", err)
@@ -124,7 +110,6 @@ func NewController(
 		logger:                 logger.With("component", "controller"),
 		metrics:                metrics,
 		getNow:                 getNow,
-		beforeDispatch:         beforeDispatch,
 		controllerLivenessChan: controllerLivenessChan,
 		batchMetadataManager:   batchMetadataManager,
 		signingRateTracker:     signingRateTracker,
@@ -548,13 +533,6 @@ func (c *Controller) NewBatch(
 		}
 		keys[i] = blobKey
 		metadataMap[blobKey] = metadata
-
-		if c.beforeDispatch != nil {
-			err = c.beforeDispatch(blobKey)
-			if err != nil {
-				c.logger.Error("beforeDispatch function failed", "blobKey", blobKey.Hex(), "err", err)
-			}
-		}
 	}
 
 	probe.SetStage("get_blob_certs")
@@ -731,15 +709,6 @@ func (c *Controller) checkAndHandleStaleBlob(
 	err := c.updateBlobStatus(ctx, blobKey, v2.Failed)
 	if err != nil {
 		c.logger.Errorf("update blob status: %w", err)
-	} else {
-		// Call beforeDispatch to clean up the blob from upstream encodingManager blobSet.
-		// Since the stale check occurs before beforeDispatch would normally be called,
-		// we must invoke it here to prevent orphaning the blob in the encoding manager's tracking.
-		if c.beforeDispatch != nil {
-			if err := c.beforeDispatch(blobKey); err != nil {
-				c.logger.Errorf("beforeDispatch cleanup failed for stale blob: blobKey=%s err=%w", blobKey.Hex(), err)
-			}
-		}
 	}
 
 	return true

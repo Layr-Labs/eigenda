@@ -175,6 +175,17 @@ func RunController(cliCtx *cli.Context) error {
 		}
 	}
 
+	metrics, err := controller.NewControllerMetrics(
+		metricsRegistry,
+		config.DispatcherConfig.SignificantSigningThresholdFraction,
+		config.DispatcherConfig.CollectDetailedValidatorSigningMetrics,
+		config.DispatcherConfig.EnablePerAccountBlobStatusMetrics,
+		userAccountRemapping,
+		validatorIdRemapping)
+	if err != nil {
+		return fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
@@ -191,8 +202,9 @@ func RunController(cliCtx *cli.Context) error {
 		metricsRegistry,
 		controllerLivenessChan,
 		userAccountRemapping,
-		10*time.Minute, // TODO wire into flags!!!
-		10*time.Minute,
+		config.DispatcherConfig.MaxDispersalFutureAge,
+		config.DispatcherConfig.MaxDispersalAge,
+		metrics,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -300,7 +312,7 @@ func RunController(cliCtx *cli.Context) error {
 		sigAgg,
 		nodeClientManager,
 		logger,
-		metricsRegistry,
+		metrics,
 		nil, // TODO remove this callback
 		controllerLivenessChan,
 		signingRateTracker,

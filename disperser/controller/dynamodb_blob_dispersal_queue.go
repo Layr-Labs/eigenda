@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/replay"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -37,6 +38,9 @@ type dynamodbBlobDispersalQueue struct {
 
 	// Prevents the same blob from being returned multiple times, regardless of backend dynamo shenanigans.
 	replayGuardian replay.ReplayGuardian
+
+	// Encapsulated metrics for the controller.
+	metrics *ControllerMetrics
 }
 
 // NewDynamodbBlobDispersalQueue creates a new instance of DynamodbBlobDispersalQueue.
@@ -54,6 +58,8 @@ func NewDynamodbBlobDispersalQueue(
 	maxFutureAge time.Duration,
 	// For each blob, compare the blob's timestamp to the current time. If it's older than this, ignore it.
 	maxPastAge time.Duration,
+	// Encapsulated metrics for the controller. No-op if nil.
+	metrics *ControllerMetrics,
 ) (BlobDispersalQueue, error) {
 
 	if dynamoClient == nil {
@@ -86,6 +92,7 @@ func NewDynamodbBlobDispersalQueue(
 		requestBatchSize:     requestBatchSize,
 		requestBackoffPeriod: requestBackoffPeriod,
 		replayGuardian:       replayGuardian,
+		metrics:              metrics,
 	}
 
 	go bdq.run()
@@ -160,9 +167,11 @@ func (bdq *dynamodbBlobDispersalQueue) fetchBlobs() (bool, error) {
 		case replay.StatusValid:
 			bdq.queue <- blobMetadata
 		case replay.StatusTooOld:
-			// TODO increment a metric
+			bdq.metrics.reportStaleDispersal()
+			bdq.markBlobAsFailed(hash)
 		case replay.StatusTooFarInFuture:
-			// TODO increment a metric
+			bdq.metrics.reportTimeTravelerDispersal()
+			bdq.markBlobAsFailed(hash)
 		case replay.StatusDuplicate:
 			// Ignore duplicates
 		default:
@@ -171,4 +180,15 @@ func (bdq *dynamodbBlobDispersalQueue) fetchBlobs() (bool, error) {
 	}
 
 	return len(blobMetadatas) > 0, nil
+}
+
+func (bdq *dynamodbBlobDispersalQueue) markBlobAsFailed(blobKey corev2.BlobKey) {
+	err := bdq.dynamoClient.UpdateBlobStatus(
+		bdq.ctx,
+		blobKey,
+		v2.Failed,
+	)
+	if err != nil {
+		bdq.logger.Errorf("Failed to mark blob %s as failed: %v", blobKey.Hex(), err)
+	}
 }

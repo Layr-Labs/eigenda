@@ -596,6 +596,7 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		nil, // userAccountRemapping,
 		10*time.Minute,
 		10*time.Minute,
+		nil, // metrics, ignored if nil
 	)
 	assert.NoError(t, err)
 

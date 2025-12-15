@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	"github.com/prometheus/client_golang/prometheus"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/common"
@@ -61,7 +60,7 @@ type controllerComponents struct {
 	NodeClientManager    *controller.MockClientManager
 	BeforeDispatch       controller.BlobCallback
 	// CallbackBlobSet is a mock queue used to test the BeforeDispatch callback function
-	LivenessChan    chan healthcheck.HeartbeatMessage
+	LivenessChan chan healthcheck.HeartbeatMessage
 }
 
 func TestControllerInsufficientSignatures(t *testing.T) {
@@ -470,7 +469,7 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 		agg,
 		nodeClientManager,
 		logger,
-		prometheus.NewRegistry(),
+		nil, // metrics, no-op if nil
 		nil,
 		livenessChan,
 		signingrate.NewNoOpSigningRateTracker(),
