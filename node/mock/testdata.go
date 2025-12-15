@@ -3,6 +3,7 @@ package mock
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -33,7 +34,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         account0Addr,
-			Timestamp:         5,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(100),
 		},
 	}
@@ -43,7 +44,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         account1Addr,
-			Timestamp:         6,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(200),
 		},
 	}
@@ -53,7 +54,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		QuorumNumbers:   []core.QuorumID{1, 2},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         account2Addr,
-			Timestamp:         7,
+			Timestamp:         time.Now().UnixNano(),
 			CumulativePayment: big.NewInt(300),
 		},
 	}

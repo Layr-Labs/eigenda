@@ -2,6 +2,7 @@ package hashing
 
 import (
 	"fmt"
+	"time"
 
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/api/hashing/serialization"
@@ -11,7 +12,7 @@ import (
 // BlobHeaderHashWithTimestamp is a tuple of a blob header hash and the timestamp of the blob header.
 type BlobHeaderHashWithTimestamp struct {
 	Hash      []byte
-	Timestamp int64
+	Timestamp time.Time
 }
 
 // BlobHeadersHashesAndTimestamps returns a list of per-BlobHeader hashes (one per BlobCertificate)
@@ -39,8 +40,11 @@ func BlobHeadersHashesAndTimestamps(request *grpc.StoreChunksRequest) ([]BlobHea
 		hasher := sha3.New256()
 		_, _ = hasher.Write(headerBytes)
 		out[i] = BlobHeaderHashWithTimestamp{
-			Hash:      hasher.Sum(nil),
-			Timestamp: paymentHeader.GetTimestamp(),
+			Hash: hasher.Sum(nil),
+			Timestamp: time.Unix(
+				paymentHeader.GetTimestamp()/int64(time.Second),
+				paymentHeader.GetTimestamp()%int64(time.Second),
+			),
 		}
 	}
 

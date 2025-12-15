@@ -199,8 +199,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 
 	for i, blobHeader := range blobHeaders {
-		timestamp := time.Unix(blobHeader.Timestamp, 0)
-		err = s.replayGuardian.VerifyRequest(blobHeader.Hash, timestamp)
+		err = s.replayGuardian.VerifyRequest(blobHeader.Hash, blobHeader.Timestamp)
 		if err != nil {
 			//nolint:wrapcheck
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify blob header hash at index %d: %v", i, err))

@@ -19,6 +19,7 @@ contracts/broadcast
 lightnode/docker/build-info.txt
 lightnode/docker/args.sh
 
+.cache
 .idea
 .env
 .vscode
