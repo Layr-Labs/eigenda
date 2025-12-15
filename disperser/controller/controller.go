@@ -513,6 +513,13 @@ func (c *Controller) NewBatch(
 		blobMetadatas = append(blobMetadatas, next)
 	}
 
+	if len(blobMetadatas) == 0 {
+		return nil, errNoBlobsToDispatch
+	}
+	c.logger.Debug("got new metadatas to make batch",
+		"numBlobs", len(blobMetadatas),
+		"referenceBlockNumber", referenceBlockNumber)
+
 	// If we fail to finish batch creation, we need to go back and ensure that we mark all of the blobs
 	// that were about to be in the batch as having failed.
 	batchCreationSuccessful := false
@@ -522,13 +529,6 @@ func (c *Controller) NewBatch(
 			c.markBatchAsFailed(ctx, blobMetadatas)
 		}
 	}()
-
-	if len(blobMetadatas) == 0 {
-		return nil, errNoBlobsToDispatch
-	}
-	c.logger.Debug("got new metadatas to make batch",
-		"numBlobs", len(blobMetadatas),
-		"referenceBlockNumber", referenceBlockNumber)
 
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
 	metadataMap := make(map[corev2.BlobKey]*v2.BlobMetadata, len(blobMetadatas))
