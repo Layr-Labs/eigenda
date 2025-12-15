@@ -264,6 +264,7 @@ require (
 
 require (
 	github.com/go-viper/mapstructure/v2 v2.4.0
+	github.com/lunixbochs/struc v0.0.0-20241101090106-8d528fa2c543
 	github.com/spf13/viper v1.21.0
 )
 
