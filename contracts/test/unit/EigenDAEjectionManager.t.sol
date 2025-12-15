@@ -50,8 +50,7 @@ contract EigenDAEjectionManagerTest is Test {
         ejector = makeAddr("ejector");
         ejectee = makeAddr("ejectee");
 
-        ejectionManager =
-            new EigenDAEjectionManager(address(token), DEPOSIT_BASE_FEE_MULTIPLIER, address(directory), 39_128, 70_000);
+        ejectionManager = new EigenDAEjectionManager(address(directory));
         directory.addAddress(AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(ejectionManager));
 
         /// TODO: figure out the proper way to wire this for testing E2E signature recovery
@@ -67,7 +66,6 @@ contract EigenDAEjectionManagerTest is Test {
         // 0) Wire up access mgmt dependencies and set protocol params on contract
         accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, ejector);
         accessControl.grantRole(AccessControlConstants.OWNER_ROLE, ejector);
-        depositEjectorFunds(EXPECTED_DEPOSIT);
 
         vm.startPrank(ejector);
         ejectionManager.setCooldown(cooldown);
@@ -80,28 +78,16 @@ contract EigenDAEjectionManagerTest is Test {
             ejector,
             "0x", // quorums (empty for this test)
             uint64(block.timestamp),
-            uint64(block.timestamp + ejectionManager.ejectionDelay()),
-            EXPECTED_DEPOSIT
+            uint64(block.timestamp + ejectionManager.ejectionDelay())
         );
 
         ejectionManager.startEjection(ejectee, "0x");
         vm.stopPrank();
 
         // 2) verify that ejectee record was properly created
-        assertEq(ejectionManager.getEjectorBalance(ejector), 0);
         assertEq(ejectionManager.getEjector(ejectee), ejector);
         assertEq(ejectionManager.ejectionTime(ejectee), block.timestamp + ejectionManager.ejectionDelay());
         assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp);
-    }
-
-    function depositEjectorFunds(uint256 amount) private {
-        token.mint(ejector, amount);
-        vm.startPrank(ejector);
-        token.approve(address(ejectionManager), amount);
-        ejectionManager.addEjectorBalance(amount);
-        vm.stopPrank();
-
-        assertEq(ejectionManager.getEjectorBalance(ejector), amount);
     }
 
     function testCancelEjectionByEjector() public {
@@ -112,7 +98,6 @@ contract EigenDAEjectionManagerTest is Test {
         // 0) grant roles
         accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, ejector);
         accessControl.grantRole(AccessControlConstants.OWNER_ROLE, ejector);
-        depositEjectorFunds(EXPECTED_DEPOSIT);
 
         // 1) Ejector "deposits" by escrowing ERC20 tokens to the contract
         //    address and starting the ejection
@@ -121,38 +106,16 @@ contract EigenDAEjectionManagerTest is Test {
         ejectionManager.setDelay(delay);
         ejectionManager.startEjection(ejectee, "0x");
 
-        // 2) Ensure that the deposited funds are actually escrowed into the contract
-        assertEq(
-            token.balanceOf(address(ejectionManager)),
-            EXPECTED_DEPOSIT,
-            "Deposit should result in funds escrowed to contract"
-        );
-
-        // 3) Issue a cancellation from the Ejector role and withdraw the ERC20 funds
+        // 2) Issue a cancellation from the Ejector role and withdraw the ERC20 funds
         //    (i.e, contract -> ejector)
         ejectionManager.cancelEjectionByEjector(ejectee);
 
-        // 4) Ensure the ejectee record has been nullified
+        // 3) Ensure the ejectee record has been nullified
         assertEq(ejectionManager.getEjector(ejectee), address(0));
         assertEq(ejectionManager.ejectionTime(ejectee), 0);
         assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
 
-        ejectionManager.withdrawEjectorBalance(EXPECTED_DEPOSIT);
         vm.stopPrank();
-
-        // 5) Ensure the ejector has received the full amount of their deposited ERC20 tokens back
-        //    and their book-kept balance in contract state is zero'd
-        assertEq(ejectionManager.getEjectorBalance(ejector), 0);
-        assertEq(
-            token.balanceOf(address(ejectionManager)),
-            0,
-            "Ejections manager should not have any escrowed collateral tokens after ejector withdraw"
-        );
-        assertEq(
-            token.balanceOf(address(ejector)),
-            EXPECTED_DEPOSIT,
-            "withdrawn tokens should be fully reissued to the ejector"
-        );
     }
 
     function testCancelEjectionByEjectee() public {
@@ -166,19 +129,16 @@ contract EigenDAEjectionManagerTest is Test {
         ejectionManager.cancelEjection();
         vm.stopPrank();
 
-        // 2) Ensure the ejectee record is nullified and the ejector
-        //    deposit has been reimbursed to offset transaction gas cost
+        // 2) Ensure the ejectee record is nullified
         assertEq(ejectionManager.getEjector(ejectee), address(0));
         assertEq(ejectionManager.ejectionTime(ejectee), 0);
         assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
-        assertEq(token.balanceOf(ejectee), CANCEL_EJECTION_WITHOUT_SIG_GAS_REFUND * block.basefee);
     }
 
     function testCompleteEjection() public {
         // 0) start an ejection via ejector
 
         testStartEjection(0, 0);
-        assertEq(ejectionManager.getEjectorBalance(ejector), 0);
 
         // 1) complete ejection via ejector
         vm.startPrank(ejector);
@@ -192,7 +152,6 @@ contract EigenDAEjectionManagerTest is Test {
         assertEq(ejectionManager.getEjector(ejectee), address(0));
         assertEq(ejectionManager.ejectionTime(ejectee), 0);
         assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
-        assertEq(ejectionManager.getEjectorBalance(ejector), EXPECTED_DEPOSIT);
     }
 
     function testDelayEnforcementCausesEjectorCompletionsToRevert() public {
@@ -221,7 +180,6 @@ contract EigenDAEjectionManagerTest is Test {
         // 1) set an artificial cooldown period for which the ejector has to wait
         //    until completing the ejection
         testCancelEjectionByEjector(6000, 0);
-        depositEjectorFunds(EXPECTED_DEPOSIT);
 
         // 2) ensure that a too-early attempted ejector completion reverts
         vm.expectRevert("Ejection cooldown not met");
