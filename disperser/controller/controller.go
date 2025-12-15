@@ -696,7 +696,7 @@ func (c *Controller) checkAndHandleStaleBlob(
 		return false
 	}
 
-	c.metrics.reportStaleDispersal()
+	c.metrics.reportDiscardedBlob("batchCreation", true)
 
 	c.logger.Warnf(
 		"discarding stale dispersal: blobKey=%s dispersalAge=%s maxAge=%s dispersalTime=%s",

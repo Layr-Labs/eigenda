@@ -272,10 +272,10 @@ func (e *EncodingManager) filterStaleAndDedupBlobs(
 		case replay.StatusValid:
 			outputMetadatas = append(outputMetadatas, metadata)
 		case replay.StatusTooOld:
-			e.controllerMetrics.reportStaleDispersal()
+			e.controllerMetrics.reportDiscardedBlob("encodingManager", true)
 			e.markBlobAsFailed(ctx, blobKey)
 		case replay.StatusTooFarInFuture:
-			e.controllerMetrics.reportTimeTravelerDispersal()
+			e.controllerMetrics.reportDiscardedBlob("encodingManager", false)
 			e.markBlobAsFailed(ctx, blobKey)
 		case replay.StatusDuplicate:
 			// Ignore duplicates

@@ -29,7 +29,7 @@ type ControllerMetrics struct {
 	blobE2EDispersalLatency      *prometheus.SummaryVec
 	completedBlobs               *prometheus.CounterVec
 	attestation                  *prometheus.GaugeVec
-	staleDispersalCount          prometheus.Counter
+	discardedBlobCount           *prometheus.CounterVec
 	batchStageTimer              *common.StageTimer
 	sendToValidatorStageTimer    *common.StageTimer
 
@@ -194,12 +194,13 @@ func NewControllerMetrics(
 		[]string{"state", "data", "account_id"},
 	)
 
-	staleDispersalCount := promauto.With(registry).NewCounter(
+	discardedBlobCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
-			Name:      "stale_dispersal_count",
-			Help:      "Total number of dispersals discarded due to being stale.",
+			Name:      "discarded_blob_count",
+			Help:      "Total number of blobs discarded due to being stale or for being too far in the future.",
 		},
+		[]string{"location" /* the part of the code that discarded */, "reason" /* "stale" or "future" */},
 	)
 
 	batchStageTimer := common.NewStageTimer(registry, controllerNamespace, "batch", false)
@@ -317,7 +318,7 @@ func NewControllerMetrics(
 		blobE2EDispersalLatency:         blobE2EDispersalLatency,
 		completedBlobs:                  completedBlobs,
 		attestation:                     attestation,
-		staleDispersalCount:             staleDispersalCount,
+		discardedBlobCount:              discardedBlobCount,
 		batchStageTimer:                 batchStageTimer,
 		sendToValidatorStageTimer:       sendToValidatorStageTimer,
 		minimumSigningThreshold:         minimumSigningThreshold,
@@ -424,20 +425,23 @@ func (m *ControllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStat
 	m.completedBlobs.WithLabelValues("total", "size", accountLabel).Add(float64(size))
 }
 
-// Report a blob that is discarded because it is stale.
-func (m *ControllerMetrics) reportStaleDispersal() {
+// Report a blob that is discarded.
+func (m *ControllerMetrics) reportDiscardedBlob(
+	// The location where the blob was discarded.
+	location string,
+	// True if the blob was discarded for being stale, false if for being too far in the future.
+	stale bool,
+) {
 	if m == nil {
 		return
 	}
-	m.staleDispersalCount.Inc()
-}
 
-// Report a blob that is discarded because its timestamp is too far in the future.
-func (m *ControllerMetrics) reportTimeTravelerDispersal() {
-	if m == nil {
-		return
+	reason := "future"
+	if stale {
+		reason = "stale"
 	}
-	// TODO implement this!
+
+	m.discardedBlobCount.WithLabelValues(location, reason).Inc()
 }
 
 func (m *ControllerMetrics) reportLegacyAttestation(
