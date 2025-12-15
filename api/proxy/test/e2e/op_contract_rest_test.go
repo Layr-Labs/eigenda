@@ -20,6 +20,8 @@ import (
 // RBN Recency Check is part of the derivation versioning introduced with V4 certificates.
 // Contract Test here refers to https://pactflow.io/blog/what-is-contract-testing/, not evm contracts.
 func TestOPContractTestRBNRecencyCheck(t *testing.T) {
+	// TODO(iquidus): Remove skip when V4 certs are deployed to testnets
+	t.Skip("Skipping RBN recency check test until V4 certs are deployed to testnets")
 	t.Parallel()
 	if testutils.GetBackend() == testutils.MemstoreBackend {
 		t.Skip("Don't run for memstore backend, since rbn recency check is only implemented for eigenda v2 backend")
