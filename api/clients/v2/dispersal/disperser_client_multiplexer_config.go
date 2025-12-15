@@ -2,6 +2,7 @@ package dispersal
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/reputation"
@@ -26,6 +27,8 @@ type DisperserClientMultiplexerConfig struct {
 	SelectorConfig reputation.ReputationSelectorConfig
 	// Number of grpc connections to each disperser
 	DisperserConnectionCount uint
+	// Ethereum chain ID
+	ChainID *big.Int
 }
 
 func DefaultDisperserClientMultiplexerConfig() *DisperserClientMultiplexerConfig {
@@ -49,6 +52,10 @@ func (c *DisperserClientMultiplexerConfig) Verify() error {
 	err = c.SelectorConfig.Verify()
 	if err != nil {
 		return fmt.Errorf("verify selector config: %w", err)
+	}
+
+	if c.ChainID == nil {
+		return fmt.Errorf("chainID must be set")
 	}
 
 	return nil

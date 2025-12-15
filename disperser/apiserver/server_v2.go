@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"sync/atomic"
 	"time"
@@ -48,6 +49,7 @@ type DispersalServerV2 struct {
 	pb.UnimplementedDisperserServer
 
 	serverConfig      disperser.ServerConfig
+	chainId           *big.Int
 	blobStore         *blobstore.BlobStore
 	blobMetadataStore blobstore.MetadataStore
 	meterer           *meterer.Meterer
@@ -114,6 +116,7 @@ type DispersalServerV2 struct {
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
 	getNow func() time.Time,
+	chainId *big.Int,
 	blobStore *blobstore.BlobStore,
 	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
@@ -140,6 +143,12 @@ func NewDispersalServerV2(
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
 	}
+	if getNow == nil {
+		return nil, errors.New("getNow is required")
+	}
+	if chainId == nil {
+		return nil, errors.New("chainId is required")
+	}
 	if blobStore == nil {
 		return nil, errors.New("blob store is required")
 	}
@@ -164,9 +173,6 @@ func NewDispersalServerV2(
 	if _logger == nil {
 		return nil, errors.New("logger is required")
 	}
-	if getNow == nil {
-		return nil, errors.New("getNow is required")
-	}
 	if maxDispersalAge <= 0 {
 		return nil, fmt.Errorf("maxDispersalAge must be positive (got: %v)", maxDispersalAge)
 	}
@@ -187,6 +193,7 @@ func NewDispersalServerV2(
 
 	return &DispersalServerV2{
 		serverConfig:      serverConfig,
+		chainId:           chainId,
 		blobStore:         blobStore,
 		blobMetadataStore: blobMetadataStore,
 
