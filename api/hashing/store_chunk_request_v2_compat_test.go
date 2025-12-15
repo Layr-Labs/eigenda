@@ -6,11 +6,11 @@ import (
 	commonv1 "github.com/Layr-Labs/eigenda/api/grpc/common"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	legacyhashing "github.com/Layr-Labs/eigenda/api/hashing"
+	hashingv2 "github.com/Layr-Labs/eigenda/api/hashing/v2"
 	"github.com/stretchr/testify/require"
 )
 
-func TestHashStoreChunksRequest_CanonicalMatchesHasherImplementation(t *testing.T) {
+func TestHashStoreChunksRequestMatchesLegacyHashStoreChunksRequest(t *testing.T) {
 	req := &grpc.StoreChunksRequest{
 		Batch: &commonv2.Batch{
 			Header: &commonv2.BatchHeader{
@@ -62,10 +62,10 @@ func TestHashStoreChunksRequest_CanonicalMatchesHasherImplementation(t *testing.
 		Timestamp:   55,
 	}
 
-	h1, err := legacyhashing.HashStoreChunksRequest(req)
+	h1, err := HashStoreChunksRequest(req)
 	require.NoError(t, err)
 
-	h2, err := HashStoreChunksRequest(req)
+	h2, err := hashingv2.HashStoreChunksRequest(req)
 	require.NoError(t, err)
 
 	require.Equal(t, h1, h2, "legacy (manual) serializer hash must match canonical (struc) serializer hash")

@@ -14,7 +14,8 @@ func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize store chunks request: %w", err)
 	}
-	hasher := sha3.New256()
+	// Must match legacy hashing (Keccak-256, not SHA3-256).
+	hasher := sha3.NewLegacyKeccak256()
 	_, _ = hasher.Write(canonicalRequest)
 	return hasher.Sum(nil), nil
 }

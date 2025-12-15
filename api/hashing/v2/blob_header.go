@@ -13,7 +13,7 @@ import (
 type BlobHeaderHashWithTimestamp struct {
 	// Hash is canonical serialized blob header hash.
 	Hash []byte
-	// Timestamp is a timestamp from the payment header (seconds since epoch).
+	// Timestamp is derived from PaymentHeader.Timestamp (nanoseconds since epoch).
 	Timestamp time.Time
 }
 
@@ -39,14 +39,12 @@ func BlobHeadersHashesAndTimestamps(request *grpc.StoreChunksRequest) ([]BlobHea
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize blob header at index %d: %w", i, err)
 		}
-		hasher := sha3.New256()
+		// Must match legacy hashing (Keccak-256, not SHA3-256).
+		hasher := sha3.NewLegacyKeccak256()
 		_, _ = hasher.Write(headerBytes)
 		out[i] = BlobHeaderHashWithTimestamp{
-			Hash: hasher.Sum(nil),
-			Timestamp: time.Unix(
-				paymentHeader.GetTimestamp()/int64(time.Second),
-				paymentHeader.GetTimestamp()%int64(time.Second),
-			),
+			Hash:      hasher.Sum(nil),
+			Timestamp: time.Unix(0, paymentHeader.GetTimestamp()),
 		}
 	}
 
