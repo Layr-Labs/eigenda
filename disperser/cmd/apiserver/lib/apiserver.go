@@ -164,22 +164,17 @@ func RunDisperserServer(ctx *cli.Context) error {
 			})
 		blobStore := blobstorev2.NewBlobStore(bucketName, objectStorageClient, logger)
 
-		var controllerConnection *grpc.ClientConn
-		var controllerClient controller.ControllerServiceClient
-		if config.UseControllerMediatedPayments {
-			if config.ControllerAddress == "" {
-				return fmt.Errorf("controller address is required when using controller-mediated payments")
-			}
-			connection, err := grpc.NewClient(
-				config.ControllerAddress,
-				grpc.WithTransportCredentials(insecure.NewCredentials()),
-			)
-			if err != nil {
-				return fmt.Errorf("create controller connection: %w", err)
-			}
-			controllerConnection = connection
-			controllerClient = controller.NewControllerServiceClient(connection)
+		if config.ControllerAddress == "" {
+			return fmt.Errorf("controller address is required")
 		}
+		controllerConnection, err := grpc.NewClient(
+			config.ControllerAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			return fmt.Errorf("create controller connection: %w", err)
+		}
+		controllerClient := controller.NewControllerServiceClient(controllerConnection)
 
 		// Create listener for the gRPC server
 		addr := fmt.Sprintf("%s:%s", "0.0.0.0", config.ServerConfig.GrpcPort)
@@ -254,7 +249,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 			reg,
 			config.MetricsConfig,
 			config.ReservedOnly,
-			config.UseControllerMediatedPayments,
 			controllerConnection,
 			controllerClient,
 			listener,

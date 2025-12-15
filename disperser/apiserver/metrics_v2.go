@@ -26,7 +26,6 @@ type metricsV2 struct {
 	getPaymentStateLatency            *prometheus.SummaryVec
 	disperseBlobLatency               *prometheus.SummaryVec
 	disperseBlobSize                  *prometheus.CounterVec
-	disperseBlobMeteredBytes          *prometheus.CounterVec
 	validateDispersalRequestLatency   *prometheus.SummaryVec
 	storeBlobLatency                  *prometheus.SummaryVec
 	getBlobStatusLatency              *prometheus.SummaryVec
@@ -86,15 +85,6 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 			Namespace: namespace,
 			Name:      "disperse_blob_size_bytes",
 			Help:      "The size of the blob in bytes.",
-		},
-		[]string{},
-	)
-
-	disperseBlobMeteredBytes := promauto.With(registry).NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "disperse_blob_metered_bytes",
-			Help:      "The number of bytes charged for the blob.",
 		},
 		[]string{},
 	)
@@ -170,7 +160,6 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 		getPaymentStateLatency:            getPaymentStateLatency,
 		disperseBlobLatency:               disperseBlobLatency,
 		disperseBlobSize:                  disperseBlobSize,
-		disperseBlobMeteredBytes:          disperseBlobMeteredBytes,
 		validateDispersalRequestLatency:   validateDispersalRequestLatency,
 		storeBlobLatency:                  storeBlobLatency,
 		getBlobStatusLatency:              getBlobStatusLatency,
@@ -215,10 +204,6 @@ func (m *metricsV2) reportDisperseBlobLatency(duration time.Duration) {
 
 func (m *metricsV2) reportDisperseBlobSize(size int) {
 	m.disperseBlobSize.WithLabelValues().Add(float64(size))
-}
-
-func (m *metricsV2) reportDisperseMeteredBytes(usageInBytes int) {
-	m.disperseBlobMeteredBytes.WithLabelValues().Add(float64(usageInBytes))
 }
 
 func (m *metricsV2) reportValidateDispersalRequestLatency(duration time.Duration) {
