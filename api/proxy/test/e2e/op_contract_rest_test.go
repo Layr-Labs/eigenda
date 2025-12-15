@@ -20,8 +20,6 @@ import (
 // RBN Recency Check is part of the derivation versioning introduced with V4 certificates.
 // Contract Test here refers to https://pactflow.io/blog/what-is-contract-testing/, not evm contracts.
 func TestOPContractTestRBNRecencyCheck(t *testing.T) {
-	// TODO(iquidus): remove skip when V4 cert verifier contracts are supported on test networks
-	t.Skip("Don't run for networks with V3 cert verifier contracts only")
 	t.Parallel()
 	if testutils.GetBackend() == testutils.MemstoreBackend {
 		t.Skip("Don't run for memstore backend, since rbn recency check is only implemented for eigenda v2 backend")
@@ -89,7 +87,7 @@ func TestOPContractTestRBNRecencyCheck(t *testing.T) {
 			t.Cleanup(kill)
 
 			// Build + Serialize (empty) cert with the given RBN
-			certV4 := coretypes.EigenDACertV3{
+			certV4 := coretypes.EigenDACertV4{
 				BatchHeader: bindings.EigenDATypesV2BatchHeaderV2{
 					ReferenceBlockNumber: tt.certRBN,
 				},
@@ -98,7 +96,7 @@ func TestOPContractTestRBNRecencyCheck(t *testing.T) {
 			require.NoError(t, err)
 			// altdaCommitment is what is returned by the proxy
 			altdaCommitment, err := commitments.EncodeCommitment(
-				certs.NewVersionedCert(serializedCertV4, certs.V2VersionByte),
+				certs.NewVersionedCert(serializedCertV4, certs.V3VersionByte),
 				commitments.OptimismGenericCommitmentMode)
 			require.NoError(t, err)
 			// the op client expects a typed commitment, so we have to decode the altdaCommitment
