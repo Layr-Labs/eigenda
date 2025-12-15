@@ -25,8 +25,6 @@ type CompatibilityConfig struct {
 	CertVerifierAddress string `json:"cert_verifier_address"`
 	// The max supported payload size in bytes supported by the proxy instance. Calculated from `MaxBlobSizeBytes`.
 	MaxPayloadSizeBytes uint32 `json:"max_payload_size_bytes"`
-	// The recency window size. This allows a service (e.g batch poster) to check alignment with the proxy instance.
-	RecencyWindowSize uint64 `json:"recency_window_size"`
 	// The APIs currently enabled on the rest server
 	APIsEnabled []string `json:"apis_enabled,omitempty"`
 	// Whether the proxy is in read-only mode (no signer payment key)
