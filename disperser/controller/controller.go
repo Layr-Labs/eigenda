@@ -478,14 +478,20 @@ func (c *Controller) NewBatch(
 	probe.SetStage("get_blob_metadata")
 
 	blobMetadatas := make([]*v2.BlobMetadata, 0, c.MaxBatchSize)
-	keepLooking := true
-	for keepLooking && int32(len(blobMetadatas)) < c.MaxBatchSize {
+	for int32(len(blobMetadatas)) < c.MaxBatchSize {
+		var breakLoop bool
+
 		var next *v2.BlobMetadata
 		select {
 		case next = <-c.blobDispersalQueue.GetBlobChannel():
 		default:
-			// no more blobs available right now
-			keepLooking = false
+			// No more blobs available right now. We hit this condition whenever there aren't
+			// any blobs in the queue at the exact moment we try to read from it.
+			breakLoop = true
+		}
+
+		if breakLoop {
+			break
 		}
 
 		blobKey, err := next.BlobHeader.BlobKey()
