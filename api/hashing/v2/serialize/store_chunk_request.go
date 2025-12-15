@@ -11,7 +11,7 @@ import (
 )
 
 // This file provides a struc-based encoder that preserves the *exact* byte layout of
-// store_chunk.go's manual serializer.
+// node_hashing.go's manual serializer+hash and separates the serialization from the hashing.
 //
 // Wire-format invariants preserved:
 // - Big-endian integers (struc defaults to big-endian)
@@ -23,7 +23,7 @@ import (
 const initialBufCap = 512
 
 // validatorStoreChunksRequestDomain is the StoreChunksRequest hash domain prefix.
-// Kept here to avoid an import cycle (hashing <-> serialization).
+// Kept here to avoid an import cycle (hashing <-> serialize).
 const validatorStoreChunksRequestDomain = "validator.StoreChunksRequest"
 
 type canonicalStoreChunksRequestBody struct {

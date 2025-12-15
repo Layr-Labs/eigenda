@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+// HashStoreChunksRequest hashes the given StoreChunksRequest using the canonical serialization.
 func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
 	canonicalRequest, err := serialize.SerializeStoreChunksRequest(request)
 	if err != nil {

@@ -11,7 +11,9 @@ import (
 
 // BlobHeaderHashWithTimestamp is a tuple of a blob header hash and the timestamp of the blob header.
 type BlobHeaderHashWithTimestamp struct {
-	Hash      []byte
+	// Hash is canonical serialized blob header hash.
+	Hash []byte
+	// Timestamp is a timestamp from the payment header (seconds since epoch).
 	Timestamp time.Time
 }
 

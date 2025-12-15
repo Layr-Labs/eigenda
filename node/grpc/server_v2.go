@@ -192,6 +192,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
 	}
 
+	// Hash each blob header and verify the replay guardian.
 	blobHeaders, err := hashingv2.BlobHeadersHashesAndTimestamps(in)
 	if err != nil {
 		//nolint:wrapcheck
