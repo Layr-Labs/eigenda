@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/api/hashing"
+	hashingv2 "github.com/Layr-Labs/eigenda/api/hashing/v2"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -13,7 +14,7 @@ import (
 // SignStoreChunksRequest signs the given StoreChunksRequest with the given private key. Does not
 // write the signature into the request.
 func SignStoreChunksRequest(key *ecdsa.PrivateKey, request *grpc.StoreChunksRequest) ([]byte, error) {
-	requestHash, err := hashing.HashStoreChunksRequest(request)
+	requestHash, err := hashingv2.HashStoreChunksRequest(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash request: %w", err)
 	}
@@ -29,7 +30,7 @@ func SignStoreChunksRequest(key *ecdsa.PrivateKey, request *grpc.StoreChunksRequ
 // VerifyStoreChunksRequest verifies the given signature of the given StoreChunksRequest with the given
 // public key. Returns the hash of the request.
 func VerifyStoreChunksRequest(key gethcommon.Address, request *grpc.StoreChunksRequest) ([]byte, error) {
-	requestHash, err := hashing.HashStoreChunksRequest(request)
+	requestHash, err := hashingv2.HashStoreChunksRequest(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash request: %w", err)
 	}
