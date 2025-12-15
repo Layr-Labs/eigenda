@@ -131,6 +131,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_DISPERSAL_AGE"),
 		Value:    45 * time.Second,
 	}
+	MaxDispersalFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-dispersal-future-age"),
+		Usage:    "Maximum amount a blob dispersal's self-reported timestamp can be ahead of the local wall clock time",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_DISPERSAL_FUTURE_AGE"),
+		Value:    45 * time.Second,
+	}
 
 	// Dispatcher Flags
 	DispatcherPullIntervalFlag = cli.DurationFlag{
@@ -425,6 +432,7 @@ var optionalFlags = []cli.Flag{
 	MaxNumBlobsPerIterationFlag,
 	OnchainStateRefreshIntervalFlag,
 	MaxDispersalAgeFlag,
+	MaxDispersalFutureAgeFlag,
 	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,
 	NumConcurrentDispersalRequestsFlag,

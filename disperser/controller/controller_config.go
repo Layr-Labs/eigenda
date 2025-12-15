@@ -129,7 +129,7 @@ func DefaultControllerConfig() *ControllerConfig {
 		SignificantSigningThresholdFraction: 0.55,
 		NumConcurrentRequests:               600,
 		NodeClientCacheSize:                 400,
-		MaxDispersalAge:                     45 * time.Second, // TODO check what the current default should be
+		MaxDispersalAge:                     45 * time.Second,
 		MaxDispersalFutureAge:               45 * time.Second,
 		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
 		SigningRateBucketSpan:               10 * time.Minute,
@@ -176,6 +176,9 @@ func (c *ControllerConfig) Verify() error {
 	}
 	if c.MaxDispersalAge <= 0 {
 		return fmt.Errorf("MaxDispersalAge must be positive, got %v", c.MaxDispersalAge)
+	}
+	if c.MaxDispersalFutureAge <= 0 {
+		return fmt.Errorf("MaxDispersalFutureAge must be positive, got %v", c.MaxDispersalFutureAge)
 	}
 	if c.SigningRateRetentionPeriod <= 0 {
 		return fmt.Errorf("SigningRateRetentionPeriod must be positive, got %v", c.SigningRateRetentionPeriod)

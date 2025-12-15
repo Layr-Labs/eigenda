@@ -583,7 +583,6 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 			OnchainStateRefreshInterval: onchainRefreshInterval,
 			NumConcurrentRequests:       5,
 			EncoderAddress:              "localhost:50051",
-			MaxDispersalAge:             45 * time.Second,
 		},
 		time.Now,
 		blobMetadataStore,

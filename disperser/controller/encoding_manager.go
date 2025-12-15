@@ -62,14 +62,6 @@ type EncodingManagerConfig struct {
 	// NumConcurrentRequests is the size of the worker pool for processing encoding requests concurrently.
 	// Must be at least 1.
 	NumConcurrentRequests int
-
-	// MaxDispersalAge is the maximum age a dispersal request can be before it is discarded.
-	// Dispersals older than this duration are marked as Failed and not processed.
-	//
-	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
-	// client at dispersal request creation time (in nanoseconds since Unix epoch).
-	MaxDispersalAge time.Duration
-
 	// If true, accounts that DON'T have a human-friendly name remapping will be reported as their full account ID
 	// in metrics.
 	//
@@ -93,7 +85,6 @@ func DefaultEncodingManagerConfig() *EncodingManagerConfig {
 		OnchainStateRefreshInterval: 1 * time.Hour,
 		NumConcurrentRequests:       250,
 		NumRelayAssignment:          1,
-		MaxDispersalAge:             45 * time.Second,
 	}
 }
 
@@ -132,9 +123,6 @@ func (c *EncodingManagerConfig) Verify() error {
 	}
 	if c.EncoderAddress == "" {
 		return fmt.Errorf("EncoderAddress cannot be empty")
-	}
-	if c.MaxDispersalAge <= 0 {
-		return fmt.Errorf("MaxDispersalAge must be positive, got %v", c.MaxDispersalAge)
 	}
 	return nil
 }

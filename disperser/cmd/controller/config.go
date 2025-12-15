@@ -160,7 +160,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxNumBlobsPerIteration:           int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
 			OnchainStateRefreshInterval:       ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 			NumConcurrentRequests:             ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-			MaxDispersalAge:                   ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 			EnablePerAccountBlobStatusMetrics: ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
 		},
 		DispatcherConfig: controller.ControllerConfig{
@@ -178,6 +177,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			CollectDetailedValidatorSigningMetrics: ctx.GlobalBool(flags.DetailedValidatorMetricsFlag.Name),
 			EnablePerAccountBlobStatusMetrics:      ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
 			MaxDispersalAge:                        ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
+			MaxDispersalFutureAge:                  ctx.GlobalDuration(flags.MaxDispersalFutureAgeFlag.Name),
 			SigningRateRetentionPeriod:             ctx.GlobalDuration(flags.SigningRateRetentionPeriodFlag.Name),
 			SigningRateBucketSpan:                  ctx.GlobalDuration(flags.SigningRateBucketSpanFlag.Name),
 			BlobDispersalQueueSize:                 uint32(ctx.GlobalUint64(flags.BlobDispersalQueueSizeFlag.Name)),
