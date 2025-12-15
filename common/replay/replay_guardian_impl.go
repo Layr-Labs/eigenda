@@ -37,22 +37,22 @@ type hashWithTimestamp struct {
 	timestamp time.Time
 }
 
-// NewReplayGuardian creates a new ReplayGuardian.
-//
-// maxTimeInFuture is the maximum amount of time that a request's timestamp can be ahead of the local wall clock time.
-// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost of a higher
-// memory overhead. In theory, if requests are sent with a timestamp exactly at the maximum time in the future,
-// this utility will remember them for a total of (maxTimeInFuture + maxTimeInPast), since that is the amount of time
-// that will need to elapse locally before the request exceeds the maximum age. If maxTimeInFuture is extremely large,
-// then an attacker may be able to cause this utility to be forced to remember a very large amount of data.
-//
-// maxTimeInPast is the maximum amount of time that a request's timestamp can be behind the local wall clock time.
-// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost of a higher
-// memory overhead.
+// NewReplayGuardian creates a new ReplayGuardian. This implementation is thread safe.
 func NewReplayGuardian(
 	timeSource func() time.Time,
+	// The maximum amount of time that a request's timestamp can be ahead of the local wall clock time.
+	// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost of a
+	// higher memory overhead. In theory, if requests are sent with a timestamp exactly at the maximum time in the
+	// future, this utility will remember them for a total of (maxTimeInFuture + maxTimeInPast), since that is the
+	// amount of time that will need to elapse locally before the request exceeds the maximum age. If maxTimeInFuture
+	// is extremely large, then an attacker may be able to cause this utility to be forced to remember a very large
+	// amount of data.
 	maxTimeInPast time.Duration,
-	maxTimeInFuture time.Duration) ReplayGuardian {
+	// The maximum amount of time that a request's timestamp can be behind the local wall clock time.
+	// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost
+	// of a higher memory overhead.
+	maxTimeInFuture time.Duration,
+) ReplayGuardian {
 
 	return &replayGuardian{
 		timeSource:      timeSource,
@@ -77,8 +77,6 @@ func compareHashWithTimestamp(a interface{}, b interface{}) int {
 	}
 	return 0
 }
-
-// TODO unit test the new method
 
 func (r *replayGuardian) DetailedVerifyRequest(
 	requestHash []byte,
