@@ -36,7 +36,7 @@ func TestOPContractTestRBNRecencyCheck(t *testing.T) {
 		{
 			name:      "RBN recency check failed",
 			certRBN:   100,
-			certL1IBN: 14501, // recency window for derivation version 0 os 14400 blocks
+			certL1IBN: 14501, // recency window for derivation version 0 is 14400 blocks
 			requireErrorFn: func(t *testing.T, err error) {
 				// expect proxy to return a 418 error which the client converts to this structured error
 				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
