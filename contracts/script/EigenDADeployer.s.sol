@@ -77,6 +77,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     EigenDAEjectionManager public eigenDAEjectionManager;
 
     EigenDADirectory public eigenDADirectoryImplementation;
+    EigenDAEjectionManager public eigenDAEjectionManagerImplementation;
 
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
@@ -410,20 +411,38 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
         );
 
-        // Deploy EigenDAEjectionManager
+        // Deploy EigenDAEjectionManager with proxy pattern
         // Using the first deployed strategy token as deposit token
         address depositToken = address(deployedStrategyArray[0].underlyingToken());
         uint256 depositBaseFeeMultiplier = 100; // 100x base fee multiplier
         uint256 estimatedGasUsedWithoutSig = 100_000; // 100k gas estimate
         uint256 estimatedGasUsedWithSig = 200_000; // 200k gas estimate with signature verification
 
-        eigenDAEjectionManager = new EigenDAEjectionManager(
-            depositToken,
-            depositBaseFeeMultiplier,
-            address(eigenDADirectory),
-            estimatedGasUsedWithoutSig,
-            estimatedGasUsedWithSig
+        // Deploy implementation
+        eigenDAEjectionManagerImplementation = new EigenDAEjectionManager();
+
+        // Deploy proxy with initialization
+        eigenDAEjectionManager = EigenDAEjectionManager(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(eigenDAEjectionManagerImplementation),
+                    address(eigenDAProxyAdmin),
+                    abi.encodeWithSelector(
+                        EigenDAEjectionManager.initialize.selector,
+                        depositToken,
+                        address(eigenDAAccessControl),
+                        address(apkRegistry),
+                        address(eigenDAServiceManager),
+                        address(registryCoordinator),
+                        depositBaseFeeMultiplier,
+                        estimatedGasUsedWithoutSig,
+                        estimatedGasUsedWithSig
+                    )
+                )
+            )
         );
+
+        // Set cooldown and delay after initialization
         eigenDAEjectionManager.setCooldown(60);
         eigenDAEjectionManager.setDelay(60);
         eigenDADirectory.addAddress(
