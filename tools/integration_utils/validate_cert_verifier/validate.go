@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"time"
 
@@ -177,6 +178,11 @@ func initializePayloadDisperser(
 		return nil, nil, gethcommon.Address{}, fmt.Errorf("create eth client: %w", err)
 	}
 
+	chainID, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, nil, gethcommon.Address{}, fmt.Errorf("get chain ID: %w", err)
+	}
+
 	// Create contract directory to fetch addresses
 	contractDirectory, err := directory.NewContractDirectory(ctx, logger, ethClient, eigenDADirectoryAddr)
 	if err != nil {
@@ -249,7 +255,7 @@ func initializePayloadDisperser(
 	}
 
 	disperserClientMultiplexer, err := createDisperserClientMultiplexer(
-		logger, disperserGrpcUri, signerAuthKey, kzgCommitter)
+		logger, disperserGrpcUri, signerAuthKey, chainID, kzgCommitter)
 	if err != nil {
 		return nil, nil, gethcommon.Address{}, fmt.Errorf("create disperser client multiplexer: %w", err)
 	}
@@ -276,6 +282,7 @@ func createDisperserClientMultiplexer(
 	logger logging.Logger,
 	grpcUri string,
 	privateKey string,
+	chainID *big.Int,
 	kzgCommitter *committer.Committer,
 ) (*dispersal.DisperserClientMultiplexer, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
@@ -284,6 +291,7 @@ func createDisperserClientMultiplexer(
 	}
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
+	multiplexerConfig.ChainID = chainID
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(grpcUri)
 
 	multiplexer, err := dispersal.NewDisperserClientMultiplexer(

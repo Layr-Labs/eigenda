@@ -255,10 +255,6 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
-	// TODO(cody.littley):
-	// 1. wire up signing rate tracker to answer gRPC signing rate queries
-	// 2. set up background goroutine to periodically flush signing rate data to persistent storage
-	// 3. load signing rate data from persistent storage on startup
 	signingRateTracker, err := signingrate.NewSigningRateTracker(
 		logger,
 		config.DispatcherConfig.SigningRateRetentionPeriod,
@@ -269,7 +265,38 @@ func RunController(cliCtx *cli.Context) error {
 	}
 	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
 
+	signingRateStorage, err := signingrate.NewDynamoSigningRateStorage(
+		ctx,
+		logger,
+		dynamoClient.GetAwsClient(),
+		config.DispatcherConfig.SigningRateDynamoDbTableName)
+	if err != nil {
+		return fmt.Errorf("failed to create signing rate storage: %w", err)
+	}
+
+	// Load existing signing rate data from persistent storage.
+	err = signingrate.LoadSigningRateDataFromStorage(
+		ctx,
+		logger,
+		signingRateTracker,
+		signingRateStorage,
+		config.DispatcherConfig.SigningRateRetentionPeriod,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load signing rate data from storage: %w", err)
+	}
+
+	// Periodically flush signing rate data to persistent storage.
+	go signingrate.SigningRateStorageFlusher(
+		ctx,
+		logger,
+		signingRateTracker,
+		signingRateStorage,
+		config.DispatcherConfig.SigningRateFlushPeriod,
+	)
+
 	dispatcher, err := controller.NewController(
+		ctx,
 		&config.DispatcherConfig,
 		time.Now,
 		blobMetadataStore,

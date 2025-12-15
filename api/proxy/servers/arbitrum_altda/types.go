@@ -10,18 +10,26 @@ import (
 
 var (
 	// Vendored from:
-	// https://github.com/OffchainLabs/nitro/blob/d298d2b62e033e3195f33740c55e5396ff76a478/daprovider/writer.go
+	// https://github.com/OffchainLabs/nitro/blob/f8bbec49f71d52d3f85bc8bb6dcc09db30ae833c/daprovider/writer.go#L12-L20
 	//
 	// ErrFallbackRequested is returned by a CustomDA provider to explicitly signal that
 	// the batch poster should fall back to the next available DA writer (e.g, AnyTrust).
 	ErrFallbackRequested = errors.New("DA provider requests fallback to next writer")
 
 	// Vendored from:
-	// https://github.com/OffchainLabs/nitro/blob/2b3cf2138b17af6411e7e391eac346267fec121a/daprovider/reader.go#L19-L31
+	// https://github.com/OffchainLabs/nitro/blob/f8bbec49f71d52d3f85bc8bb6dcc09db30ae833c/daprovider/reader.go#L19-L31
 	//
 	// ErrCertValidationError is returned by a CustomDA provider to signal an "invalid DA Cert"
 	// condition to the Arbitrum derivation pipeline.
 	ErrCertValidationError = errors.New("certificate validation failed")
+
+	// Vendored from:
+	// https://github.com/OffchainLabs/nitro/blob/f8bbec49f71d52d3f85bc8bb6dcc09db30ae833c/daprovider/writer.go#L22-L26
+	//
+	// ErrMessageTooLarge is returned by a DA provider when the batch is too large
+	// for the current backend. When this error is returned, the batch poster will
+	// retry with a smaller size, and rebuild with the new size limit.
+	ErrMessageTooLarge = errors.New("message too large for current DA backend")
 )
 
 const (
@@ -67,6 +75,7 @@ const (
 
 const (
 	// trusted integration
+	MethodGetMaxMessageSize       = "daprovider_getMaxMessageSize"
 	MethodGetSupportedHeaderBytes = "daprovider_getSupportedHeaderBytes"
 	MethodStore                   = "daprovider_store"
 	MethodRecoverPayload          = "daprovider_recoverPayload"
@@ -136,6 +145,11 @@ type PayloadResult struct {
 // their supported header bytes
 type SupportedHeaderBytesResult struct {
 	HeaderBytes []hexutil.Bytes `json:"headerBytes,omitempty"`
+}
+
+// MaxMessageSizeResult is the result struct for daprovider_getMaxMessageSize
+type MaxMessageSizeResult struct {
+	MaxSize int `json:"maxSize"`
 }
 
 // StoreResult is the result struct that data availability providers should use to respond with a commitment to a
