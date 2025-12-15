@@ -19,25 +19,32 @@ import (
 // - Domain is written as raw bytes (no length prefix) at the start
 // - Redundant QuorumNumbersLength field is preserved (it appears before the slice length prefix)
 
-type canonicalStoreChunksRequestBodyV2 struct {
-	BatchHeader canonicalBatchHeaderV2
+// initialBufCap is a preallocation hint to reduce allocations.
+const initialBufCap = 512
+
+// validatorStoreChunksRequestDomain is the StoreChunksRequest hash domain prefix.
+// Kept here to avoid an import cycle (hashing <-> serialization).
+const validatorStoreChunksRequestDomain = "validator.StoreChunksRequest"
+
+type canonicalStoreChunksRequestBody struct {
+	BatchHeader canonicalBatchHeader
 
 	BlobCertificatesLen uint32 `struc:"uint32,sizeof=BlobCertificates"`
-	BlobCertificates    []canonicalBlobCertificateV2
+	BlobCertificates    []canonicalBlobCertificate
 
 	DisperserID uint32
 	Timestamp   uint32
 }
 
-type canonicalBatchHeaderV2 struct {
+type canonicalBatchHeader struct {
 	RootLen uint32 `struc:"uint32,sizeof=Root"`
 	Root    []byte
 
 	ReferenceBlockNumber uint64
 }
 
-type canonicalBlobCertificateV2 struct {
-	BlobHeader canonicalBlobHeaderV2
+type canonicalBlobCertificate struct {
+	BlobHeader canonicalBlobHeader
 
 	SignatureLen uint32 `struc:"uint32,sizeof=Signature"`
 	Signature    []byte
@@ -46,7 +53,7 @@ type canonicalBlobCertificateV2 struct {
 	RelayKeys    []uint32
 }
 
-type canonicalBlobHeaderV2 struct {
+type canonicalBlobHeader struct {
 	Version uint32
 
 	// Kept for backwards-compatible encoding: this is written first...
@@ -55,11 +62,11 @@ type canonicalBlobHeaderV2 struct {
 	QuorumNumbersLen uint32 `struc:"uint32,sizeof=QuorumNumbers"`
 	QuorumNumbers    []uint32
 
-	Commitment    canonicalBlobCommitmentV2
-	PaymentHeader canonicalPaymentHeaderV2
+	Commitment    canonicalBlobCommitment
+	PaymentHeader canonicalPaymentHeader
 }
 
-type canonicalBlobCommitmentV2 struct {
+type canonicalBlobCommitment struct {
 	CommitmentLen uint32 `struc:"uint32,sizeof=Commitment"`
 	Commitment    []byte
 
@@ -72,7 +79,7 @@ type canonicalBlobCommitmentV2 struct {
 	Length uint32
 }
 
-type canonicalPaymentHeaderV2 struct {
+type canonicalPaymentHeader struct {
 	// store_chunk.go encodes AccountId as serializeBytes([]byte(string))
 	AccountIdLen uint32 `struc:"uint32,sizeof=AccountId"`
 	AccountId    []byte
@@ -83,7 +90,7 @@ type canonicalPaymentHeaderV2 struct {
 	CumulativePayment    []byte
 }
 
-func SerializeStoreChunksRequestV2(request *grpc.StoreChunksRequest) ([]byte, error) {
+func SerializeStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
 	if request.GetBatch() == nil || request.GetBatch().GetHeader() == nil {
 		return nil, fmt.Errorf("missing batch/header")
 	}
@@ -93,12 +100,12 @@ func SerializeStoreChunksRequestV2(request *grpc.StoreChunksRequest) ([]byte, er
 		return nil, fmt.Errorf("array is too long: %d", len(certs))
 	}
 
-	body := canonicalStoreChunksRequestBodyV2{
-		BatchHeader: canonicalBatchHeaderV2{
+	body := canonicalStoreChunksRequestBody{
+		BatchHeader: canonicalBatchHeader{
 			Root:                 request.GetBatch().GetHeader().GetBatchRoot(),
 			ReferenceBlockNumber: request.GetBatch().GetHeader().GetReferenceBlockNumber(),
 		},
-		BlobCertificates: make([]canonicalBlobCertificateV2, len(certs)),
+		BlobCertificates: make([]canonicalBlobCertificate, len(certs)),
 		DisperserID:      request.GetDisperserID(),
 		Timestamp:        request.GetTimestamp(),
 	}
@@ -117,18 +124,18 @@ func SerializeStoreChunksRequestV2(request *grpc.StoreChunksRequest) ([]byte, er
 		qnums := bh.GetQuorumNumbers()
 		qnLen := uint32(len(qnums))
 
-		body.BlobCertificates[i] = canonicalBlobCertificateV2{
-			BlobHeader: canonicalBlobHeaderV2{
+		body.BlobCertificates[i] = canonicalBlobCertificate{
+			BlobHeader: canonicalBlobHeader{
 				Version:             bh.GetVersion(),
 				QuorumNumbersLength: qnLen,
 				QuorumNumbers:       qnums,
-				Commitment: canonicalBlobCommitmentV2{
+				Commitment: canonicalBlobCommitment{
 					Commitment:       commitment.GetCommitment(),
 					LengthCommitment: commitment.GetLengthCommitment(),
 					LengthProof:      commitment.GetLengthProof(),
 					Length:           commitment.GetLength(),
 				},
-				PaymentHeader: canonicalPaymentHeaderV2{
+				PaymentHeader: canonicalPaymentHeader{
 					AccountId:         []byte(payment.GetAccountId()),
 					Timestamp:         payment.GetTimestamp(),
 					CumulativePayment: payment.GetCumulativePayment(),
@@ -140,9 +147,8 @@ func SerializeStoreChunksRequestV2(request *grpc.StoreChunksRequest) ([]byte, er
 	}
 
 	var buf bytes.Buffer
-	buf.Grow(initialStoreChunksRequestCap)
+	buf.Grow(initialBufCap)
 
-	// IMPORTANT: preserve store_chunk.go behavior: raw domain bytes, no length prefix
 	_, _ = buf.WriteString(validatorStoreChunksRequestDomain)
 
 	if err := struc.Pack(&buf, &body); err != nil {
@@ -151,7 +157,7 @@ func SerializeStoreChunksRequestV2(request *grpc.StoreChunksRequest) ([]byte, er
 	return buf.Bytes(), nil
 }
 
-func SerializeBlobHeaderV2(header *commonv2.BlobHeader) ([]byte, error) {
+func SerializeBlobHeader(header *commonv2.BlobHeader) ([]byte, error) {
 	if header == nil || header.GetCommitment() == nil || header.GetPaymentHeader() == nil {
 		return nil, fmt.Errorf("missing blob header fields")
 	}
@@ -161,17 +167,17 @@ func SerializeBlobHeaderV2(header *commonv2.BlobHeader) ([]byte, error) {
 
 	// Preserve current SerializeBlobHeader behavior from store_chunk.go:
 	// it only sets Commitment.Commitment and leaves the rest empty/zero.
-	ch := canonicalBlobHeaderV2{
+	ch := canonicalBlobHeader{
 		Version:             header.GetVersion(),
 		QuorumNumbersLength: qnLen,
 		QuorumNumbers:       qnums,
-		Commitment: canonicalBlobCommitmentV2{
+		Commitment: canonicalBlobCommitment{
 			Commitment:       header.GetCommitment().GetCommitment(),
 			LengthCommitment: header.GetCommitment().GetLengthCommitment(),
 			LengthProof:      header.GetCommitment().GetLengthProof(),
 			Length:           header.GetCommitment().GetLength(),
 		},
-		PaymentHeader: canonicalPaymentHeaderV2{
+		PaymentHeader: canonicalPaymentHeader{
 			AccountId:         []byte(header.GetPaymentHeader().GetAccountId()),
 			Timestamp:         header.GetPaymentHeader().GetTimestamp(),
 			CumulativePayment: header.GetPaymentHeader().GetCumulativePayment(),
@@ -179,7 +185,7 @@ func SerializeBlobHeaderV2(header *commonv2.BlobHeader) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	buf.Grow(initialBlobHeaderCap)
+	buf.Grow(initialBufCap)
 
 	if err := struc.Pack(&buf, &ch); err != nil {
 		return nil, fmt.Errorf("failed to pack canonical BlobHeader: %w", err)
