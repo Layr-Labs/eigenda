@@ -5,7 +5,7 @@ import (
 	"time"
 
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/api/hashing/serialization"
+	"github.com/Layr-Labs/eigenda/api/hashing/v2/serialize"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -33,7 +33,7 @@ func BlobHeadersHashesAndTimestamps(request *grpc.StoreChunksRequest) ([]BlobHea
 			return nil, fmt.Errorf("nil PaymentHeader at index %d", i)
 		}
 
-		headerBytes, err := serialization.SerializeBlobHeader(header)
+		headerBytes, err := serialize.SerializeBlobHeader(header)
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize blob header at index %d: %w", i, err)
 		}

@@ -12,7 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/api/hashing"
+	hashingv2 "github.com/Layr-Labs/eigenda/api/hashing/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/replay"
@@ -192,7 +192,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
 	}
 
-	blobHeaders, err := hashing.BlobHeadersHashesAndTimestamps(in)
+	blobHeaders, err := hashingv2.BlobHeadersHashesAndTimestamps(in)
 	if err != nil {
 		//nolint:wrapcheck
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers: %v", err))

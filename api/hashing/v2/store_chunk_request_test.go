@@ -6,6 +6,7 @@ import (
 	commonv1 "github.com/Layr-Labs/eigenda/api/grpc/common"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,7 +62,7 @@ func TestHashStoreChunksRequest_CanonicalMatchesHasherImplementation(t *testing.
 		Timestamp:   55,
 	}
 
-	h1, err := HashStoreChunksRequest(req)
+	h1, err := hashing.HashStoreChunksRequest(req)
 	require.NoError(t, err)
 
 	h2, err := HashStoreChunksRequest_Canonical(req)
