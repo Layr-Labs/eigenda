@@ -7,7 +7,6 @@ import (
 
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/api/hashing"
 )
 
 // initialStoreChunksRequestCap is just a preallocation hint to reduce allocations.
@@ -15,6 +14,10 @@ import (
 const initialStoreChunksRequestCap = 512
 
 const initialBlobHeaderCap = 512
+
+// validatorStoreChunksRequestDomain is the StoreChunksRequest hash domain prefix.
+// Kept here to avoid an import cycle (hashing <-> serialization).
+const validatorStoreChunksRequestDomain = "validator.StoreChunksRequest"
 
 type canonicalStoreChunksRequest struct {
 	Domain           string
@@ -203,7 +206,7 @@ func SerializeStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, erro
 	}
 
 	canonicalRequest := canonicalStoreChunksRequest{
-		Domain: hashing.ValidatorStoreChunksRequestDomain,
+		Domain: validatorStoreChunksRequestDomain,
 		BatchHeader: canonicalBatchHeader{
 			Root:                 request.GetBatch().GetHeader().GetBatchRoot(),
 			ReferenceBlockNumber: request.GetBatch().GetHeader().GetReferenceBlockNumber(),

@@ -7,7 +7,6 @@ import (
 
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/lunixbochs/struc"
 )
 
@@ -144,7 +143,7 @@ func SerializeStoreChunksRequestV2(request *grpc.StoreChunksRequest) ([]byte, er
 	buf.Grow(initialStoreChunksRequestCap)
 
 	// IMPORTANT: preserve store_chunk.go behavior: raw domain bytes, no length prefix
-	_, _ = buf.WriteString(hashing.ValidatorStoreChunksRequestDomain)
+	_, _ = buf.WriteString(validatorStoreChunksRequestDomain)
 
 	if err := struc.Pack(&buf, &body); err != nil {
 		return nil, fmt.Errorf("failed to pack canonical StoreChunksRequest: %w", err)
