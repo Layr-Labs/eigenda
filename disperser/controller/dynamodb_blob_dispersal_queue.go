@@ -6,6 +6,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/replay"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -33,6 +34,9 @@ type dynamodbBlobDispersalQueue struct {
 
 	// If we query dynamo and it has no blobs ready for dispersal, wait this long before trying again.
 	requestBackoffPeriod time.Duration
+
+	// Prevents the same blob from being returned multiple times, regardless of backend dynamo shenanigans.
+	replayGuardian replay.ReplayGuardian
 }
 
 // NewDynamodbBlobDispersalQueue creates a new instance of DynamodbBlobDispersalQueue.
@@ -46,6 +50,10 @@ func NewDynamodbBlobDispersalQueue(
 	requestBatchSize uint32,
 	// How long to wait before re-querying DynamoDB if no blobs are found.
 	requestBackoffPeriod time.Duration,
+	// For each blob, compare the blob's timestamp to the current time. If it's this far in the future, ignore it.
+	maxFutureAge time.Duration,
+	// For each blob, compare the blob's timestamp to the current time. If it's older than this, ignore it.
+	maxPastAge time.Duration,
 ) (BlobDispersalQueue, error) {
 
 	if dynamoClient == nil {
@@ -61,6 +69,14 @@ func NewDynamodbBlobDispersalQueue(
 	if requestBackoffPeriod < 0 {
 		return nil, fmt.Errorf("requestBackoffPeriod must not be negative, got %v", requestBackoffPeriod)
 	}
+	if maxFutureAge < 0 {
+		return nil, fmt.Errorf("maxFutureAge must not be negative, got %v", maxFutureAge)
+	}
+	if maxPastAge < 0 {
+		return nil, fmt.Errorf("maxPastAge must not be negative, got %v", maxPastAge)
+	}
+
+	replayGuardian := replay.NewReplayGuardian(time.Now, maxPastAge, maxFutureAge)
 
 	bdq := &dynamodbBlobDispersalQueue{
 		ctx:                  ctx,
@@ -69,6 +85,7 @@ func NewDynamodbBlobDispersalQueue(
 		queue:                make(chan *v2.BlobMetadata, queueSize),
 		requestBatchSize:     requestBatchSize,
 		requestBackoffPeriod: requestBackoffPeriod,
+		replayGuardian:       replayGuardian,
 	}
 
 	go bdq.run()
@@ -131,7 +148,26 @@ func (bdq *dynamodbBlobDispersalQueue) fetchBlobs() (bool, error) {
 			continue
 		}
 
-		bdq.queue <- blobMetadata
+		hash, err := blobMetadata.BlobHeader.BlobKey()
+		if err != nil {
+			bdq.logger.Errorf("Failed to compute blob header hash, skipping: %v", err)
+			continue
+		}
+		timestamp := time.Unix(0, blobMetadata.BlobHeader.PaymentMetadata.Timestamp)
+
+		status := bdq.replayGuardian.DetailedVerifyRequest(hash[:], timestamp)
+		switch status {
+		case replay.StatusValid:
+			bdq.queue <- blobMetadata
+		case replay.StatusTooOld:
+			// TODO increment a metric
+		case replay.StatusTooFarInFuture:
+			// TODO increment a metric
+		case replay.StatusDuplicate:
+			// Ignore duplicates
+		default:
+			bdq.logger.Errorf("Unknown replay guardian status %d for blob %s, skipping.", status, hash.Hex())
+		}
 	}
 
 	return len(blobMetadatas) > 0, nil

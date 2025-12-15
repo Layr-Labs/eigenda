@@ -841,7 +841,6 @@ func startController(
 
 	// Create encoding manager with workerpool and blob set
 	encodingPool := workerpool.New(encodingManagerConfig.NumConcurrentRequests)
-	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		encodingManagerConfig,
 		time.Now,
@@ -851,9 +850,10 @@ func startController(
 		chainReader,
 		controllerLogger,
 		metricsRegistry,
-		encodingManagerBlobSet,
 		controllerLivenessChan,
 		nil, // userAccountRemapping
+		10*time.Minute,
+		10*time.Minute,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoding manager: %w", err)
@@ -897,13 +897,6 @@ func startController(
 		return nil, fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
-	// Create beforeDispatch callback to remove blobs from encoding manager's set
-	beforeDispatch := func(blobKey corev2.BlobKey) error {
-		encodingManagerBlobSet.RemoveBlob(blobKey)
-		return nil
-	}
-	dispatcherBlobSet := controller.NewBlobSet()
-
 	signingRateTracker, err := signingrate.NewSigningRateTracker(
 		controllerLogger,
 		1*time.Minute,
@@ -924,8 +917,7 @@ func startController(
 		nodeClientManager,
 		controllerLogger,
 		metricsRegistry,
-		beforeDispatch,
-		dispatcherBlobSet,
+		nil,
 		controllerLivenessChan,
 		signingRateTracker,
 		nil, // userAccountRemapping

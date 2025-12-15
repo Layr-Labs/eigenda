@@ -78,16 +78,13 @@ func compareHashWithTimestamp(a interface{}, b interface{}) int {
 	return 0
 }
 
-// VerifyRequest verifies that a request with the given hash and timestamp is not a replay
-// of a previous request. If it cannot be determined if a request is a replay or not,
-// then the request is rejected. Only if it can be guaranteed that the request is not a replay
-// will this method return nil.
-//
-// In order to be a verified unique request, the following conditions must be met:
-// - the request's timestamp must be no more than X minutes ahead of the local wall clock time
-// - the request's timestamp must be no more than Y minutes behind the local wall clock time
-// - the request's hash must not have been previously observed (hashes are remembered until they are Y in the past)
-func (r *replayGuardian) VerifyRequest(requestHash []byte, requestTimestamp time.Time) error {
+// TODO unit test the new method
+
+func (r *replayGuardian) DetailedVerifyRequest(
+	requestHash []byte,
+	requestTimestamp time.Time,
+) ReplayGuardianStatus {
+
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -97,14 +94,14 @@ func (r *replayGuardian) VerifyRequest(requestHash []byte, requestTimestamp time
 	r.pruneObservedHashes(now)
 
 	// Reject requests that fall outside the time window we are tracking.
-	err := r.verifyTimestamp(now, requestTimestamp)
-	if err != nil {
-		return err
+	status := r.verifyTimestamp(now, requestTimestamp)
+	if status != StatusValid {
+		return status
 	}
 
 	// If we've reached this point, then the request will still be in the observedHashes set if it is a replay.
 	if _, ok := r.observedHashes[string(requestHash)]; ok {
-		return fmt.Errorf("request hash %x has been observed before", requestHash)
+		return StatusDuplicate
 	}
 
 	// The request is not a replay. Add the hash to the observedHashes set and the expirationQueue.
@@ -114,29 +111,35 @@ func (r *replayGuardian) VerifyRequest(requestHash []byte, requestTimestamp time
 		timestamp: requestTimestamp,
 	})
 
+	return StatusValid
+}
+
+func (r *replayGuardian) VerifyRequest(requestHash []byte, requestTimestamp time.Time) error {
+	status := r.DetailedVerifyRequest(requestHash, requestTimestamp)
+
+	if status != StatusValid {
+		return fmt.Errorf("replay guardian request rejected: %s", status.String())
+	}
+
 	return nil
 }
 
 // verifyTimestamp verifies that a request's timestamp is within the acceptable range.
-func (r *replayGuardian) verifyTimestamp(now time.Time, requestTimestamp time.Time) error {
+func (r *replayGuardian) verifyTimestamp(now time.Time, requestTimestamp time.Time) ReplayGuardianStatus {
 	if requestTimestamp.After(now) {
 		// The request has a timestamp that is ahead of the local wall clock time.
 		timeInFuture := requestTimestamp.Sub(now)
 		if timeInFuture > r.maxTimeInFuture {
-			return fmt.Errorf("request timestamp %v is too far in the future. "+
-				"Current time is %v, maximum time in the future is %v",
-				requestTimestamp, now, r.maxTimeInFuture)
+			return StatusTooFarInFuture
 		}
 	} else {
 		// The request has a timestamp that is behind the local wall clock time.
 		timeInPast := now.Sub(requestTimestamp)
 		if timeInPast > r.maxTimeInPast {
-			return fmt.Errorf("request timestamp %v is too far in the past. "+
-				"Current time is %v, maximum time in the past is %v",
-				requestTimestamp, now, r.maxTimeInPast)
+			return StatusTooOld
 		}
 	}
-	return nil
+	return StatusValid
 }
 
 // pruneObservedHashes removes any hashes from the observedHashes set that have expired. A hash is considered to have

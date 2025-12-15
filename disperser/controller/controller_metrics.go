@@ -29,7 +29,6 @@ type controllerMetrics struct {
 	blobE2EDispersalLatency      *prometheus.SummaryVec
 	completedBlobs               *prometheus.CounterVec
 	attestation                  *prometheus.GaugeVec
-	blobSetSize                  *prometheus.GaugeVec
 	staleDispersalCount          prometheus.Counter
 	batchStageTimer              *common.StageTimer
 	sendToValidatorStageTimer    *common.StageTimer
@@ -195,15 +194,6 @@ func newControllerMetrics(
 		[]string{"state", "data", "account_id"},
 	)
 
-	blobSetSize := promauto.With(registry).NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: controllerNamespace,
-			Name:      "blob_queue_size",
-			Help:      "The size of the blob queue used for deduplication.",
-		},
-		[]string{},
-	)
-
 	staleDispersalCount := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
@@ -327,7 +317,6 @@ func newControllerMetrics(
 		blobE2EDispersalLatency:         blobE2EDispersalLatency,
 		completedBlobs:                  completedBlobs,
 		attestation:                     attestation,
-		blobSetSize:                     blobSetSize,
 		staleDispersalCount:             staleDispersalCount,
 		batchStageTimer:                 batchStageTimer,
 		sendToValidatorStageTimer:       sendToValidatorStageTimer,
@@ -433,13 +422,6 @@ func (m *controllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStat
 
 	m.completedBlobs.WithLabelValues("total", "number", accountLabel).Inc()
 	m.completedBlobs.WithLabelValues("total", "size", accountLabel).Add(float64(size))
-}
-
-func (m *controllerMetrics) reportBlobSetSize(size int) {
-	if m == nil {
-		return
-	}
-	m.blobSetSize.WithLabelValues().Set(float64(size))
 }
 
 func (m *controllerMetrics) reportStaleDispersal() {

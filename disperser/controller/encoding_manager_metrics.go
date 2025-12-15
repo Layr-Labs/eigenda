@@ -25,7 +25,6 @@ type encodingManagerMetrics struct {
 	batchRetryCount         *prometheus.GaugeVec
 	failedSubmissionCount   *prometheus.CounterVec
 	completedBlobs          *prometheus.CounterVec
-	blobSetSize             *prometheus.GaugeVec
 	staleDispersalCount     prometheus.Counter
 	enablePerAccountMetrics bool
 	userAccountRemapping    map[string]string
@@ -142,15 +141,6 @@ func newEncodingManagerMetrics(
 		[]string{"state", "data", "account_id"},
 	)
 
-	blobSetSize := promauto.With(registry).NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: encodingManagerNamespace,
-			Name:      "blob_queue_size",
-			Help:      "The number of blobs in the encoding queue.",
-		},
-		[]string{},
-	)
-
 	staleDispersalCount := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: encodingManagerNamespace,
@@ -171,7 +161,6 @@ func newEncodingManagerMetrics(
 		batchRetryCount:         batchRetryCount,
 		failedSubmissionCount:   failSubmissionCount,
 		completedBlobs:          completedBlobs,
-		blobSetSize:             blobSetSize,
 		staleDispersalCount:     staleDispersalCount,
 		enablePerAccountMetrics: enablePerAccountMetrics,
 		userAccountRemapping:    userAccountRemapping,
@@ -234,10 +223,6 @@ func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.Blo
 
 	m.completedBlobs.WithLabelValues("total", "number", accountLabel).Inc()
 	m.completedBlobs.WithLabelValues("total", "size", accountLabel).Add(float64(size))
-}
-
-func (m *encodingManagerMetrics) reportBlobSetSize(size int) {
-	m.blobSetSize.WithLabelValues().Set(float64(size))
 }
 
 func (m *encodingManagerMetrics) reportStaleDispersal() {

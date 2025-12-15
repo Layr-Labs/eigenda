@@ -61,8 +61,6 @@ type controllerComponents struct {
 	NodeClientManager    *controller.MockClientManager
 	BeforeDispatch       controller.BlobCallback
 	// CallbackBlobSet is a mock queue used to test the BeforeDispatch callback function
-	CallbackBlobSet *controller.MockBlobSet
-	BlobSet         controller.BlobSet
 	LivenessChan    chan healthcheck.HeartbeatMessage
 }
 
@@ -70,7 +68,6 @@ func TestControllerInsufficientSignatures(t *testing.T) {
 	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	failedObjs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	successfulObjs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
 	ctx := context.Background()
@@ -177,7 +174,6 @@ func TestControllerInsufficientSignatures2(t *testing.T) {
 	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	objsInBothQuorum := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	objsInQuorum1 := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
 	ctx := context.Background()
@@ -275,7 +271,6 @@ func TestControllerMaxBatchSize(t *testing.T) {
 	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	numBlobs := 12
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, numBlobs)
 	ctx := context.Background()
@@ -305,10 +300,7 @@ func TestControllerDedupBlobs(t *testing.T) {
 	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 1)
-	// It should be dedup'd
-	components.BlobSet.AddBlob(objs.blobKeys[0])
 
 	ctx := context.Background()
 	batchData, err := components.Controller.NewBatch(ctx, nil)
@@ -442,12 +434,6 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 	require.NoError(t, err)
 	nodeClientManager := &controller.MockClientManager{}
 	mockChainState.On("GetCurrentBlockNumber").Return(uint(blockNumber), nil)
-	callBackBlobSet := &controller.MockBlobSet{}
-	beforeDispatch := func(blobKey corev2.BlobKey) error {
-		callBackBlobSet.RemoveBlob(blobKey)
-		return nil
-	}
-	blobSet := controller.NewBlobSet()
 
 	livenessChan := make(chan healthcheck.HeartbeatMessage, 100)
 
@@ -485,8 +471,7 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 		nodeClientManager,
 		logger,
 		prometheus.NewRegistry(),
-		beforeDispatch,
-		blobSet,
+		nil,
 		livenessChan,
 		signingrate.NewNoOpSigningRateTracker(),
 		nil, // userAccountRemapping
@@ -502,9 +487,6 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 		ChainState:           mockChainState,
 		SigAggregator:        agg,
 		NodeClientManager:    nodeClientManager,
-		BeforeDispatch:       beforeDispatch,
-		CallbackBlobSet:      callBackBlobSet,
-		BlobSet:              blobSet,
 		LivenessChan:         livenessChan,
 	}
 }

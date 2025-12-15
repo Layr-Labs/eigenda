@@ -42,11 +42,6 @@ type Controller struct {
 	// beforeDispatch function is called before dispatching a blob
 	beforeDispatch BlobCallback
 
-	// blobSet keeps track of blobs that are being dispatched
-	// This is used to deduplicate blobs to prevent the same blob from being dispatched multiple times
-	// Blobs are removed from the queue when they are in a terminal state (Complete or Failed)
-	blobSet BlobSet
-
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
 
 	// A utility responsible for fetching batch metadata (i.e. reference block number and operator state).
@@ -81,7 +76,6 @@ func NewController(
 	logger logging.Logger,
 	registry *prometheus.Registry,
 	beforeDispatch func(blobKey corev2.BlobKey) error,
-	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 	signingRateTracker signingrate.SigningRateTracker,
 	userAccountRemapping map[string]string,
@@ -113,6 +107,8 @@ func NewController(
 		config.BlobDispersalQueueSize,
 		config.BlobDispersalRequestBatchSize,
 		config.BlobDispersalRequestBackoffPeriod,
+		10*time.Minute, // TODO flags
+		10*time.Minute,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("NewDynamodbBlobDispersalQueue: %w", err)
@@ -129,7 +125,6 @@ func NewController(
 		metrics:                metrics,
 		getNow:                 getNow,
 		beforeDispatch:         beforeDispatch,
-		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 		batchMetadataManager:   batchMetadataManager,
 		signingRateTracker:     signingRateTracker,
@@ -484,30 +479,6 @@ func (c *Controller) logAttestationUpdate(batchHeaderHash string, quorumResults 
 		"quorumPercentages", quorumPercentagesBuilder.String())
 }
 
-// Returns true if the blob is both unique (i.e. not already being dispatched) and fresh (i.e. not stale).
-// This method has the side effect of adding the blob to the blobSet, and updating metrics.
-func (c *Controller) isUniqueAndFresh(ctx context.Context, blobMetadata *v2.BlobMetadata) bool {
-	blobKey, err := blobMetadata.BlobHeader.BlobKey()
-	if err != nil {
-		c.logger.Errorf("compute blob key: %w", err)
-		// we must discard if we cannot compute key, since it's used for deduplication
-		return false
-	}
-
-	if c.checkAndHandleStaleBlob(ctx, blobKey, c.getNow(), blobMetadata.BlobHeader.PaymentMetadata.Timestamp) {
-		// discard stale blob
-		return false
-	}
-
-	if c.blobSet.Contains(blobKey) {
-		// discard duplicate blob
-		return false
-	}
-	c.blobSet.AddBlob(blobKey)
-
-	return true
-}
-
 // NewBatch creates a batch of blobs to dispatch
 // Warning: This function is not thread-safe
 func (c *Controller) NewBatch(
@@ -532,9 +503,23 @@ func (c *Controller) NewBatch(
 			keepLooking = false
 		}
 
-		if next != nil && c.isUniqueAndFresh(ctx, next) {
-			blobMetadatas = append(blobMetadatas, next)
+		blobKey, err := next.BlobHeader.BlobKey()
+		if err != nil {
+			c.logger.Errorf("failed to compute blob key for fetched blob, skipping: %v", err)
+			continue
 		}
+
+		if c.checkAndHandleStaleBlob(
+			ctx,
+			blobKey,
+			c.getNow(),
+			next.BlobHeader.PaymentMetadata.Timestamp) {
+
+			// discard stale blob
+			continue
+		}
+
+		blobMetadatas = append(blobMetadatas, next)
 	}
 
 	// If we fail to finish batch creation, we need to go back and ensure that we mark all of the blobs
@@ -547,7 +532,6 @@ func (c *Controller) NewBatch(
 		}
 	}()
 
-	c.metrics.reportBlobSetSize(c.blobSet.Size())
 	if len(blobMetadatas) == 0 {
 		return nil, errNoBlobsToDispatch
 	}
@@ -867,10 +851,6 @@ func (c *Controller) updateBlobStatus(ctx context.Context, blobKey corev2.BlobKe
 	err := c.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, status)
 	if err != nil {
 		return fmt.Errorf("failed to update blob status for blob %s to %s: %w", blobKey.Hex(), status.String(), err)
-	}
-
-	if status == v2.Complete || status == v2.Failed {
-		c.blobSet.RemoveBlob(blobKey)
 	}
 
 	return nil
