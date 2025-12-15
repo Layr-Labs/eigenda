@@ -39,7 +39,8 @@ func TestArbCustomDAGetSupportedHeaderBytesMethod(t *testing.T) {
 	err = rpcClient.Call(&supportedHeaderBytesResult,
 		arbitrum_altda.MethodGetSupportedHeaderBytes)
 	require.NoError(t, err)
-	require.Equal(t, supportedHeaderBytesResult.HeaderBytes[0][0], uint8(commitments.ArbCustomDAHeaderByte))
+	require.Len(t, supportedHeaderBytesResult.HeaderBytes, 1)
+	require.Equal(t, supportedHeaderBytesResult.HeaderBytes[0], uint8(commitments.ArbCustomDAHeaderByte))
 
 }
 
