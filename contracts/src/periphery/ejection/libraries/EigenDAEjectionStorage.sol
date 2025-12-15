@@ -9,6 +9,17 @@ library EigenDAEjectionStorage {
         keccak256(abi.encode(uint256(keccak256(abi.encodePacked(STORAGE_ID))) - 1)) & ~bytes32(uint256(0xff));
 
     struct Layout {
+        /// @dev callee dependencies
+        address accessControl;
+        address depositToken;
+        address blsApkKeyRegistry;
+        address serviceManager;
+        address registryCoordinator;
+        /// @dev params set for financial safety
+        uint256 estimatedGasUsedWithoutSig;
+        uint256 estimatedGasUsedWithSig;
+        uint256 depositBaseFeeMultiplier;
+
         mapping(address => EigenDAEjectionTypes.EjecteeState) ejectees;
         /// @dev ejectorBalanceRecord is a book-keeping value of the ejector's balance
         ///      which reflects total_ejector_amount_added - ∑(ejector_ejection_deposit_i)
