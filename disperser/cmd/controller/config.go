@@ -50,6 +50,7 @@ type Config struct {
 	PaymentAuthorizationConfig controller.PaymentAuthorizationConfig
 
 	UserAccountRemappingFilePath string
+	ValidatorIdRemappingFilePath string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -179,6 +180,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxDispersalAge:                        ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 			SigningRateRetentionPeriod:             ctx.GlobalDuration(flags.SigningRateRetentionPeriodFlag.Name),
 			SigningRateBucketSpan:                  ctx.GlobalDuration(flags.SigningRateBucketSpanFlag.Name),
+			BlobDispersalQueueSize:                 uint32(ctx.GlobalUint64(flags.BlobDispersalQueueSizeFlag.Name)),
+			BlobDispersalRequestBatchSize:          uint32(ctx.GlobalUint64(flags.BlobDispersalRequestBatchSizeFlag.Name)),
+			BlobDispersalRequestBackoffPeriod:      ctx.GlobalDuration(flags.BlobDispersalRequestBackoffPeriodFlag.Name),
+			SigningRateFlushPeriod:                 ctx.GlobalDuration(flags.SigningRateFlushPeriodFlag.Name),
+			SigningRateDynamoDbTableName:           ctx.GlobalString(flags.SigningRateDynamoDbTableNameFlag.Name),
 		},
 		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),
@@ -190,6 +196,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		HeartbeatMonitorConfig:          heartbeatMonitorConfig,
 		PaymentAuthorizationConfig:      paymentAuthorizationConfig,
 		UserAccountRemappingFilePath:    ctx.GlobalString(flags.UserAccountRemappingFileFlag.Name),
+		ValidatorIdRemappingFilePath:    ctx.GlobalString(flags.ValidatorIdRemappingFileFlag.Name),
 	}
 
 	if err := config.DispersalRequestSignerConfig.Verify(); err != nil {

@@ -49,6 +49,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USER_ACCOUNT_REMAPPING_FILE"),
 		Required: false,
 	}
+	ValidatorIdRemappingFileFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "validator-id-remapping-file"),
+		Usage:    "Path to YAML file for mapping validator IDs to user-friendly names",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "VALIDATOR_ID_REMAPPING_FILE"),
+		Required: false,
+	}
 	// EncodingManager Flags
 	EncodingPullIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "encoding-pull-interval"),
@@ -358,6 +364,40 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_BUCKET_SPAN"),
 		Value:    10 * time.Minute,
 	}
+	BlobDispersalQueueSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-dispersal-queue-size"),
+		Usage:    "Maximum number of blobs that can be queued for dispersal",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_DISPERSAL_QUEUE_SIZE"),
+		Value:    1024,
+	}
+	BlobDispersalRequestBatchSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-dispersal-request-batch-size"),
+		Usage:    "Number of blob metadata items to fetch from the store in a single request",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_DISPERSAL_REQUEST_BATCH_SIZE"),
+		Value:    32,
+	}
+	BlobDispersalRequestBackoffPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-dispersal-request-backoff-period"),
+		Usage:    "Delay between fetch attempts when the dispersal queue is empty",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_DISPERSAL_REQUEST_BACKOFF_PERIOD"),
+		Value:    50 * time.Millisecond,
+	}
+	SigningRateFlushPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-flush-period"),
+		Usage:    "The period at which signing rate data is flushed to persistent storage",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_FLUSH_PERIOD"),
+		Value:    1 * time.Minute,
+	}
+	SigningRateDynamoDbTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-dynamodb-table-name"),
+		Usage:    "The name of the DynamoDB table used to store signing rate data",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_DYNAMODB_TABLE_NAME"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -366,16 +406,17 @@ var requiredFlags = []cli.Flag{
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,
 	EncoderAddressFlag,
-
 	DispatcherPullIntervalFlag,
 	AttestationTimeoutFlag,
 	BatchAttestationTimeoutFlag,
 	DisperserIDFlag,
+	SigningRateDynamoDbTableNameFlag,
 }
 
 var optionalFlags = []cli.Flag{
 	IndexerDataDirFlag,
 	UserAccountRemappingFileFlag,
+	ValidatorIdRemappingFileFlag,
 	EncodingRequestTimeoutFlag,
 	EncodingStoreTimeoutFlag,
 	NumEncodingRetriesFlag,
@@ -415,6 +456,10 @@ var optionalFlags = []cli.Flag{
 	EnablePerAccountBlobStatusMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRateBucketSpanFlag,
+	BlobDispersalQueueSizeFlag,
+	BlobDispersalRequestBatchSizeFlag,
+	BlobDispersalRequestBackoffPeriodFlag,
+	SigningRateFlushPeriodFlag,
 }
 
 var Flags []cli.Flag

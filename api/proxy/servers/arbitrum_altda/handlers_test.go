@@ -40,13 +40,34 @@ func createSequencerMsg(cert *certs.VersionedCert) hexutil.Bytes {
 	return hexutil.Bytes(fullMsg)
 }
 
+// TestMethod_GetMaxMessageSize verifies that the handler returns the correct max message size
+func TestMethod_GetMaxMessageSize(t *testing.T) {
+	testMaxPayloadSize := uint32(500)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
+	compatCfg := proxy_common.CompatibilityConfig{
+		Version:             "1.0.0",
+		MaxPayloadSizeBytes: testMaxPayloadSize,
+	}
+	handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg)
+
+	result, err := handlers.GetMaxMessageSize(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, int(testMaxPayloadSize), result.MaxSize)
+
+}
+
 // TestMethod_GetSupportedHeaderBytes verifies that the handler returns the correct header bytes
 func TestMethod_GetSupportedHeaderBytes(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
-	compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0"}
+	compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0", MaxPayloadSizeBytes: 100_000_000}
 	handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg)
 
 	result, err := handlers.GetSupportedHeaderBytes(context.Background())
@@ -68,6 +89,7 @@ func TestMethod_Store(t *testing.T) {
 		dispersalBackend proxy_common.EigenDABackend
 		mockPutReturn    *certs.VersionedCert
 		mockPutError     error
+		expectPutCall    bool
 		expectError      bool
 		errorContains    string
 		errorIs          error
@@ -80,6 +102,7 @@ func TestMethod_Store(t *testing.T) {
 			dispersalBackend: proxy_common.V2EigenDABackend,
 			mockPutReturn:    mockCert,
 			mockPutError:     nil,
+			expectPutCall:    true,
 			expectError:      false,
 			validateResult: func(t *testing.T, result *StoreResult) {
 				require.NotNil(t, result)
@@ -94,6 +117,7 @@ func TestMethod_Store(t *testing.T) {
 			payload:          []byte{},
 			timeout:          hexutil.Uint64(60),
 			dispersalBackend: proxy_common.V2EigenDABackend,
+			expectPutCall:    false,
 			expectError:      true,
 			errorContains:    "empty rollup payload",
 		},
@@ -102,6 +126,7 @@ func TestMethod_Store(t *testing.T) {
 			payload:          []byte("test payload"),
 			timeout:          hexutil.Uint64(60),
 			dispersalBackend: proxy_common.V1EigenDABackend,
+			expectPutCall:    false,
 			expectError:      true,
 			errorContains:    "expected EigenDAV2 backend",
 		},
@@ -111,6 +136,7 @@ func TestMethod_Store(t *testing.T) {
 			timeout:          hexutil.Uint64(60),
 			dispersalBackend: proxy_common.V2EigenDABackend,
 			mockPutError:     &api.ErrorFailover{},
+			expectPutCall:    true,
 			expectError:      true,
 			errorIs:          ErrFallbackRequested,
 		},
@@ -120,8 +146,18 @@ func TestMethod_Store(t *testing.T) {
 			timeout:          hexutil.Uint64(60),
 			dispersalBackend: proxy_common.V2EigenDABackend,
 			mockPutError:     errors.New("put failed"),
+			expectPutCall:    true,
 			expectError:      true,
 			errorContains:    "put rollup payload",
+		},
+		{
+			name:             "Error - Batch Too Large",
+			payload:          []byte("test payload that exceeds 10 bytes"),
+			timeout:          hexutil.Uint64(60),
+			dispersalBackend: proxy_common.V2EigenDABackend,
+			expectPutCall:    false,
+			expectError:      true,
+			errorIs:          ErrMessageTooLarge,
 		},
 	}
 
@@ -131,15 +167,19 @@ func TestMethod_Store(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
-			compatCfg := proxy_common.CompatibilityConfig{}
+			// Set MaxPayloadSizeBytes to 10 for the "Batch Too Large" test, otherwise use a large value
+			maxPayloadSize := uint32(1000)
+			if tt.name == "Error - Batch Too Large" {
+				maxPayloadSize = 10
+			}
+			compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0", MaxPayloadSizeBytes: maxPayloadSize}
 			handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg)
 
 			mockEigenDAManager.EXPECT().
 				GetDispersalBackend().
 				Return(tt.dispersalBackend)
 
-			// Only expect Put call if we have a valid backend and non-empty payload
-			if tt.dispersalBackend == proxy_common.V2EigenDABackend && len(tt.payload) > 0 {
+			if tt.expectPutCall {
 				mockEigenDAManager.EXPECT().
 					Put(gomock.Any(), tt.payload, coretypes.CertSerializationABI).
 					Return(tt.mockPutReturn, tt.mockPutError)

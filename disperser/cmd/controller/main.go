@@ -157,11 +157,22 @@ func RunController(cliCtx *cli.Context) error {
 		if err != nil {
 			logger.Error("Failed to load user account remapping", "error", err)
 		} else {
-			var mappings []string
-			for oldName, newName := range userAccountRemapping {
-				mappings = append(mappings, fmt.Sprintf("%s->%s", oldName, newName))
-			}
-			logger.Info("Loaded user account remapping", "count", len(userAccountRemapping), "mappings", strings.Join(mappings, ", "))
+			logger.Info("Loaded user account remapping",
+				"count", len(userAccountRemapping),
+				"mappings", nameremapping.FormatMappings(userAccountRemapping))
+		}
+	}
+
+	var validatorIdRemapping map[string]string
+	if config.ValidatorIdRemappingFilePath != "" {
+		validatorIdRemapping, err = nameremapping.LoadNameRemapping(
+			config.ValidatorIdRemappingFilePath)
+		if err != nil {
+			logger.Error("Failed to load validator ID remapping", "error", err)
+		} else {
+			logger.Info("Loaded validator ID remapping",
+				"count", len(validatorIdRemapping),
+				"mappings", nameremapping.FormatMappings(validatorIdRemapping))
 		}
 	}
 
@@ -244,10 +255,6 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
-	// TODO(cody.littley):
-	// 1. wire up signing rate tracker to answer gRPC signing rate queries
-	// 2. set up background goroutine to periodically flush signing rate data to persistent storage
-	// 3. load signing rate data from persistent storage on startup
 	signingRateTracker, err := signingrate.NewSigningRateTracker(
 		logger,
 		config.DispatcherConfig.SigningRateRetentionPeriod,
@@ -258,7 +265,38 @@ func RunController(cliCtx *cli.Context) error {
 	}
 	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
 
+	signingRateStorage, err := signingrate.NewDynamoSigningRateStorage(
+		ctx,
+		logger,
+		dynamoClient.GetAwsClient(),
+		config.DispatcherConfig.SigningRateDynamoDbTableName)
+	if err != nil {
+		return fmt.Errorf("failed to create signing rate storage: %w", err)
+	}
+
+	// Load existing signing rate data from persistent storage.
+	err = signingrate.LoadSigningRateDataFromStorage(
+		ctx,
+		logger,
+		signingRateTracker,
+		signingRateStorage,
+		config.DispatcherConfig.SigningRateRetentionPeriod,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load signing rate data from storage: %w", err)
+	}
+
+	// Periodically flush signing rate data to persistent storage.
+	go signingrate.SigningRateStorageFlusher(
+		ctx,
+		logger,
+		signingRateTracker,
+		signingRateStorage,
+		config.DispatcherConfig.SigningRateFlushPeriod,
+	)
+
 	dispatcher, err := controller.NewController(
+		ctx,
 		&config.DispatcherConfig,
 		time.Now,
 		blobMetadataStore,
@@ -274,6 +312,7 @@ func RunController(cliCtx *cli.Context) error {
 		controllerLivenessChan,
 		signingRateTracker,
 		userAccountRemapping,
+		validatorIdRemapping,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
@@ -307,6 +346,7 @@ func RunController(cliCtx *cli.Context) error {
 				gethClient,
 				dynamoClient.GetAwsClient(),
 				metricsRegistry,
+				userAccountRemapping,
 			)
 			if err != nil {
 				return fmt.Errorf("build payment authorization handler: %w", err)
