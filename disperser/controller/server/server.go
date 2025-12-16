@@ -51,7 +51,10 @@ func NewServer(
 		return nil, fmt.Errorf("listener is required")
 	}
 
-	replayGuardian := replay.NewReplayGuardian(time.Now, config.RequestMaxPastAge, config.RequestMaxFutureAge)
+	replayGuardian, err := replay.NewReplayGuardian(time.Now, config.RequestMaxPastAge, config.RequestMaxFutureAge)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replay guardian: %w", err)
+	}
 
 	return &Server{
 		config:                      config,

@@ -35,7 +35,6 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     /// @notice Initializes the contract via setting the required parameters into storage
     /// @param accessControl_ the EigenDA access control contract used for checking caller role ownership
     ///                       for ejector and owner
-    /// @param depositToken_ The ERC20 token used for deposits
     /// @param blsApkKeyRegistry_ The BLS agg pub key registry contract address
     /// @param serviceManager_ The EigenDA AVS ServiceManager contract address
     /// @param depositBaseFeeMultiplier_ The multiplier for calculating deposit amounts based on base fee
@@ -43,7 +42,6 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     /// @param estimatedGasUsedWithoutSig_ Estimated gas for operations without signature verification
     /// @param estimatedGasUsedWithSig_ Estimated gas for operations with signature verification
     function initialize(
-        address depositToken_,
         address accessControl_,
         address blsApkKeyRegistry_,
         address serviceManager_,
@@ -52,14 +50,12 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         uint256 estimatedGasUsedWithoutSig_,
         uint256 estimatedGasUsedWithSig_
     ) external initializer {
-        require(depositToken_ != address(0), "EigenDAEjectionManager: deposit token cannot be zero");
         require(accessControl_ != address(0), "EigenDAEjectionManager: access control cannot be zero");
         require(blsApkKeyRegistry_ != address(0), "EigenDAEjectionManager: bls apk key cannot be zero");
         require(serviceManager_ != address(0), "EigenDAEjectionManager: service manager cannot be zero");
         require(registryCoordinator_ != address(0), "EigenDAEjectionManager: registry coordinator cannot be zero");
 
         EigenDAEjectionStorage.Layout storage s = EigenDAEjectionStorage.layout();
-        s.depositToken = depositToken_;
         s.accessControl = accessControl_;
         s.blsApkKeyRegistry = blsApkKeyRegistry_;
         s.serviceManager = serviceManager_;
@@ -95,35 +91,17 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     /// EJECTOR FUNCTIONS
 
     /// @inheritdoc IEigenDAEjectionManager
-    function addEjectorBalance(uint256 amount) external onlyEjector(msg.sender) {
-        msg.sender.addEjectorBalance(amount);
-        IERC20(EigenDAEjectionStorage.layout().depositToken).safeTransferFrom(msg.sender, address(this), amount);
-    }
-
-    /// @inheritdoc IEigenDAEjectionManager
-    function withdrawEjectorBalance(uint256 amount) external onlyEjector(msg.sender) {
-        msg.sender.subtractEjectorBalance(amount);
-        IERC20(EigenDAEjectionStorage.layout().depositToken).safeTransfer(msg.sender, amount);
-    }
-
-    /// @inheritdoc IEigenDAEjectionManager
     function startEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
-        uint256 depositAmount = _depositAmount();
-        msg.sender.subtractEjectorBalance(depositAmount);
-        operator.startEjection(msg.sender, quorums, depositAmount);
+        operator.startEjection(msg.sender, quorums);
     }
 
     /// @inheritdoc IEigenDAEjectionManager
     function cancelEjectionByEjector(address operator) external onlyEjector(msg.sender) {
-        uint256 depositAmount = operator.getDepositAmount();
-        operator.getEjector().addEjectorBalance(depositAmount);
         operator.cancelEjection();
     }
 
     /// @inheritdoc IEigenDAEjectionManager
     function completeEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
-        uint256 depositAmount = operator.getDepositAmount();
-        operator.getEjector().addEjectorBalance(depositAmount);
         operator.completeEjection(quorums);
         _tryEjectOperator(operator, quorums);
     }
@@ -141,33 +119,19 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         (BN254.G1Point memory apk,) = IBLSApkRegistry(blsApkRegistry).getRegisteredPubkey(operator);
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
 
-        uint256 depositAmount = EigenDAEjectionLib.getEjectionRecord(operator).depositAmount;
         operator.cancelEjection();
-        _refundGas(recipient, EigenDAEjectionStorage.layout().estimatedGasUsedWithSig, depositAmount);
     }
 
     /// @inheritdoc IEigenDAEjectionManager
     function cancelEjection() external {
-        uint256 depositAmount = EigenDAEjectionLib.getEjectionRecord(msg.sender).depositAmount;
         msg.sender.cancelEjection();
-        _refundGas(msg.sender, EigenDAEjectionStorage.layout().estimatedGasUsedWithoutSig, depositAmount);
     }
 
     /// GETTERS
 
     /// @inheritdoc IEigenDAEjectionManager
-    function getDepositToken() external view returns (address) {
-        return EigenDAEjectionStorage.layout().depositToken;
-    }
-
-    /// @inheritdoc IEigenDAEjectionManager
     function getEjector(address operator) external view returns (address) {
         return operator.getEjector();
-    }
-
-    /// @inheritdoc IEigenDAEjectionManager
-    function getEjectorBalance(address ejector) external view returns (uint256) {
-        return ejector.getEjectorBalance();
     }
 
     /// @inheritdoc IEigenDAEjectionManager
@@ -201,18 +165,6 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     }
 
     /// INTERNAL FUNCTIONS
-    /// @notice Returns the required deposit for initiating an ejection based on a multiple of the base fee of the block.
-    function _depositAmount() internal virtual returns (uint256) {
-        EigenDAEjectionStorage.Layout storage s = EigenDAEjectionStorage.layout();
-        return s.estimatedGasUsedWithSig * block.basefee * s.depositBaseFeeMultiplier;
-    }
-
-    function _refundGas(address receiver, uint256 estimatedGasUsed, uint256 depositAmount) internal virtual {
-        uint256 estimatedRefund = estimatedGasUsed * block.basefee;
-        IERC20(EigenDAEjectionStorage.layout().depositToken).safeTransfer(
-            receiver, estimatedRefund > depositAmount ? depositAmount : estimatedRefund
-        );
-    }
 
     /// @notice Attempts to eject an operator. If the ejection fails, it catches the error and does nothing.
     function _tryEjectOperator(address operator, bytes memory quorums) internal {

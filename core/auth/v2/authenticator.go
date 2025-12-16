@@ -28,10 +28,14 @@ func NewBlobRequestAuthenticator() *authenticator {
 
 // NewPaymentStateAuthenticator creates an authenticator for payment state requests,
 // which requires replay protection.
-func NewPaymentStateAuthenticator(maxTimeInPast, maxTimeInFuture time.Duration) *authenticator {
-	return &authenticator{
-		ReplayGuardian: replay.NewReplayGuardian(time.Now, maxTimeInPast, maxTimeInFuture),
+func NewPaymentStateAuthenticator(maxTimeInPast, maxTimeInFuture time.Duration) (*authenticator, error) {
+	rGuard, err := replay.NewReplayGuardian(time.Now, maxTimeInPast, maxTimeInFuture)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replay guardian: %w", err)
 	}
+	return &authenticator{
+		ReplayGuardian: rGuard,
+	}, nil
 }
 
 var _ core.BlobRequestAuthenticator = &authenticator{}

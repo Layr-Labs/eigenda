@@ -229,6 +229,13 @@ func RunDisperserServer(ctx *cli.Context) error {
 			config.ServerConfig.SigningRateRetentionPeriod,
 		)
 
+		authenticator, err := authv2.NewPaymentStateAuthenticator(
+			config.AuthPmtStateRequestMaxPastAge,
+			config.AuthPmtStateRequestMaxFutureAge)
+		if err != nil {
+			return fmt.Errorf("failed to create payment state authenticator: %w", err)
+		}
+
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			time.Now,
@@ -237,9 +244,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			blobMetadataStore,
 			transactor,
 			meterer,
-			authv2.NewPaymentStateAuthenticator(
-				config.AuthPmtStateRequestMaxPastAge,
-				config.AuthPmtStateRequestMaxFutureAge),
+			authenticator,
 			committer,
 			config.MaxNumSymbolsPerBlob,
 			config.OnchainStateRefreshInterval,

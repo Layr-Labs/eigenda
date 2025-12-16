@@ -20,7 +20,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/hashicorp/go-multierror"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var errNoBlobsToDispatch = errors.New("no blobs to dispatch")
@@ -36,16 +35,8 @@ type Controller struct {
 	aggregator        core.SignatureAggregator
 	nodeClientManager NodeClientManager
 	logger            logging.Logger
-	metrics           *controllerMetrics
+	metrics           *ControllerMetrics
 	getNow            func() time.Time
-
-	// beforeDispatch function is called before dispatching a blob
-	beforeDispatch BlobCallback
-
-	// blobSet keeps track of blobs that are being dispatched
-	// This is used to deduplicate blobs to prevent the same blob from being dispatched multiple times
-	// Blobs are removed from the queue when they are in a terminal state (Complete or Failed)
-	blobSet BlobSet
 
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
 
@@ -79,9 +70,7 @@ func NewController(
 	aggregator core.SignatureAggregator,
 	nodeClientManager NodeClientManager,
 	logger logging.Logger,
-	registry *prometheus.Registry,
-	beforeDispatch func(blobKey corev2.BlobKey) error,
-	blobSet BlobSet,
+	metrics *ControllerMetrics,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 	signingRateTracker signingrate.SigningRateTracker,
 	userAccountRemapping map[string]string,
@@ -95,17 +84,6 @@ func NewController(
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	metrics, err := newControllerMetrics(
-		registry,
-		config.SignificantSigningThresholdFraction,
-		config.CollectDetailedValidatorSigningMetrics,
-		config.EnablePerAccountBlobStatusMetrics,
-		userAccountRemapping,
-		validatorIdRemapping)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
-	}
-
 	blobDispersalQueue, err := NewDynamodbBlobDispersalQueue(
 		ctx,
 		logger,
@@ -113,6 +91,9 @@ func NewController(
 		config.BlobDispersalQueueSize,
 		config.BlobDispersalRequestBatchSize,
 		config.BlobDispersalRequestBackoffPeriod,
+		config.MaxDispersalFutureAge,
+		config.MaxDispersalAge,
+		metrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("NewDynamodbBlobDispersalQueue: %w", err)
@@ -128,8 +109,6 @@ func NewController(
 		logger:                 logger.With("component", "controller"),
 		metrics:                metrics,
 		getNow:                 getNow,
-		beforeDispatch:         beforeDispatch,
-		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 		batchMetadataManager:   batchMetadataManager,
 		signingRateTracker:     signingRateTracker,
@@ -484,30 +463,6 @@ func (c *Controller) logAttestationUpdate(batchHeaderHash string, quorumResults 
 		"quorumPercentages", quorumPercentagesBuilder.String())
 }
 
-// Returns true if the blob is both unique (i.e. not already being dispatched) and fresh (i.e. not stale).
-// This method has the side effect of adding the blob to the blobSet, and updating metrics.
-func (c *Controller) isUniqueAndFresh(ctx context.Context, blobMetadata *v2.BlobMetadata) bool {
-	blobKey, err := blobMetadata.BlobHeader.BlobKey()
-	if err != nil {
-		c.logger.Errorf("compute blob key: %w", err)
-		// we must discard if we cannot compute key, since it's used for deduplication
-		return false
-	}
-
-	if c.checkAndHandleStaleBlob(ctx, blobKey, c.getNow(), blobMetadata.BlobHeader.PaymentMetadata.Timestamp) {
-		// discard stale blob
-		return false
-	}
-
-	if c.blobSet.Contains(blobKey) {
-		// discard duplicate blob
-		return false
-	}
-	c.blobSet.AddBlob(blobKey)
-
-	return true
-}
-
 // NewBatch creates a batch of blobs to dispatch
 // Warning: This function is not thread-safe
 func (c *Controller) NewBatch(
@@ -522,20 +477,47 @@ func (c *Controller) NewBatch(
 	probe.SetStage("get_blob_metadata")
 
 	blobMetadatas := make([]*v2.BlobMetadata, 0, c.MaxBatchSize)
-	keepLooking := true
-	for keepLooking && int32(len(blobMetadatas)) < c.MaxBatchSize {
+	for int32(len(blobMetadatas)) < c.MaxBatchSize {
+		var breakLoop bool
+
 		var next *v2.BlobMetadata
 		select {
 		case next = <-c.blobDispersalQueue.GetBlobChannel():
 		default:
-			// no more blobs available right now
-			keepLooking = false
+			// No more blobs available right now. We hit this condition whenever there aren't
+			// any blobs in the queue at the exact moment we try to read from it.
+			breakLoop = true
 		}
 
-		if next != nil && c.isUniqueAndFresh(ctx, next) {
-			blobMetadatas = append(blobMetadatas, next)
+		if breakLoop || next == nil {
+			break
 		}
+
+		blobKey, err := next.BlobHeader.BlobKey()
+		if err != nil {
+			c.logger.Errorf("failed to compute blob key for fetched blob, skipping: %v", err)
+			continue
+		}
+
+		if c.checkAndHandleStaleBlob(
+			ctx,
+			blobKey,
+			c.getNow(),
+			next.BlobHeader.PaymentMetadata.Timestamp) {
+
+			// discard stale blob
+			continue
+		}
+
+		blobMetadatas = append(blobMetadatas, next)
 	}
+
+	if len(blobMetadatas) == 0 {
+		return nil, errNoBlobsToDispatch
+	}
+	c.logger.Debug("got new metadatas to make batch",
+		"numBlobs", len(blobMetadatas),
+		"referenceBlockNumber", referenceBlockNumber)
 
 	// If we fail to finish batch creation, we need to go back and ensure that we mark all of the blobs
 	// that were about to be in the batch as having failed.
@@ -547,14 +529,6 @@ func (c *Controller) NewBatch(
 		}
 	}()
 
-	c.metrics.reportBlobSetSize(c.blobSet.Size())
-	if len(blobMetadatas) == 0 {
-		return nil, errNoBlobsToDispatch
-	}
-	c.logger.Debug("got new metadatas to make batch",
-		"numBlobs", len(blobMetadatas),
-		"referenceBlockNumber", referenceBlockNumber)
-
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
 	metadataMap := make(map[corev2.BlobKey]*v2.BlobMetadata, len(blobMetadatas))
 	for i, metadata := range blobMetadatas {
@@ -564,13 +538,6 @@ func (c *Controller) NewBatch(
 		}
 		keys[i] = blobKey
 		metadataMap[blobKey] = metadata
-
-		if c.beforeDispatch != nil {
-			err = c.beforeDispatch(blobKey)
-			if err != nil {
-				c.logger.Error("beforeDispatch function failed", "blobKey", blobKey.Hex(), "err", err)
-			}
-		}
 	}
 
 	probe.SetStage("get_blob_certs")
@@ -734,7 +701,7 @@ func (c *Controller) checkAndHandleStaleBlob(
 		return false
 	}
 
-	c.metrics.reportStaleDispersal()
+	c.metrics.reportDiscardedBlob("batchCreation", "stale")
 
 	c.logger.Warnf(
 		"discarding stale dispersal: blobKey=%s dispersalAge=%s maxAge=%s dispersalTime=%s",
@@ -747,15 +714,6 @@ func (c *Controller) checkAndHandleStaleBlob(
 	err := c.updateBlobStatus(ctx, blobKey, v2.Failed)
 	if err != nil {
 		c.logger.Errorf("update blob status: %w", err)
-	} else {
-		// Call beforeDispatch to clean up the blob from upstream encodingManager blobSet.
-		// Since the stale check occurs before beforeDispatch would normally be called,
-		// we must invoke it here to prevent orphaning the blob in the encoding manager's tracking.
-		if c.beforeDispatch != nil {
-			if err := c.beforeDispatch(blobKey); err != nil {
-				c.logger.Errorf("beforeDispatch cleanup failed for stale blob: blobKey=%s err=%w", blobKey.Hex(), err)
-			}
-		}
 	}
 
 	return true
@@ -867,10 +825,6 @@ func (c *Controller) updateBlobStatus(ctx context.Context, blobKey corev2.BlobKe
 	err := c.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, status)
 	if err != nil {
 		return fmt.Errorf("failed to update blob status for blob %s to %s: %w", blobKey.Hex(), status.String(), err)
-	}
-
-	if status == v2.Complete || status == v2.Failed {
-		c.blobSet.RemoveBlob(blobKey)
 	}
 
 	return nil
