@@ -83,7 +83,7 @@ func DefaultEncoderConfig() *EncoderConfig {
 		},
 		Kzg: kzg.KzgConfig{
 			SRSOrder:        268435456,
-			SRSNumberToLoad: 2097152,
+			SRSNumberToLoad: 524288,
 			NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 			PreloadEncoder:  false,
 			Verbose:         false,
