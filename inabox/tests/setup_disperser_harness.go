@@ -918,7 +918,6 @@ func startController(
 		nodeClientManager,
 		controllerLogger,
 		nil, // Metrics become a no-op if nil
-		nil,
 		controllerLivenessChan,
 		signingRateTracker,
 		nil, // userAccountRemapping
@@ -1171,10 +1170,13 @@ func startAPIServer(
 	}
 
 	// Create blob request authenticator
-	authenticator := authv2.NewPaymentStateAuthenticator(
+	authenticator, err := authv2.NewPaymentStateAuthenticator(
 		5*time.Minute, // AuthPmtStateRequestMaxPastAge
 		5*time.Minute, // AuthPmtStateRequestMaxFutureAge
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payment state authenticator: %w", err)
+	}
 
 	// Create meterer
 	// Note: The meterer is always created to serve GetPaymentState calls, even when using

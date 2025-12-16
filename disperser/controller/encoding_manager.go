@@ -176,14 +176,11 @@ func NewEncodingManager(
 	if err := config.Verify(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	if maxFutureAge < 0 {
-		return nil, fmt.Errorf("MaxFutureAge must not be negative, got %v", maxFutureAge)
-	}
-	if maxPastAge < 0 {
-		return nil, fmt.Errorf("MaxPastAge must not be negative, got %v", maxPastAge)
-	}
 
-	replayGuardian := replay.NewReplayGuardian(getNow, maxPastAge, maxFutureAge)
+	replayGuardian, err := replay.NewReplayGuardian(getNow, maxPastAge, maxFutureAge)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replay guardian: %w", err)
+	}
 
 	return &EncodingManager{
 		EncodingManagerConfig: config,

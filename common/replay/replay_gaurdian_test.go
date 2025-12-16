@@ -20,12 +20,13 @@ func TestTooOldRequest(t *testing.T) {
 	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
 	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
 
-	rGuard := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
 
 	requestAge := maxTimeInPast + 1
 	requestTime := now.Add(-requestAge)
 
-	err := rGuard.VerifyRequest(rand.Bytes(32), requestTime)
+	err = rGuard.VerifyRequest(rand.Bytes(32), requestTime)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), StatusTooOld.String()))
 
@@ -46,7 +47,8 @@ func TestTooOldRequestDetailed(t *testing.T) {
 	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
 	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
 
-	rGuard := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
 
 	requestAge := maxTimeInPast + 1
 	requestTime := now.Add(-requestAge)
@@ -71,12 +73,13 @@ func TestTooFarInFutureRequest(t *testing.T) {
 	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
 	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
 
-	rGuard := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
 
 	requestTimeInFuture := maxTimeInFuture + 1
 	requestTime := now.Add(requestTimeInFuture)
 
-	err := rGuard.VerifyRequest(rand.Bytes(32), requestTime)
+	err = rGuard.VerifyRequest(rand.Bytes(32), requestTime)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), StatusTooFarInFuture.String()))
 
@@ -97,7 +100,8 @@ func TestTooFarInFutureRequestDetailed(t *testing.T) {
 	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
 	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
 
-	rGuard := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
 
 	requestTimeInFuture := maxTimeInFuture + 1
 	requestTime := now.Add(requestTimeInFuture)
@@ -122,7 +126,8 @@ func TestDuplicateRequests(t *testing.T) {
 	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
 	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
 
-	rGuard := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
 	submittedHashes := make(map[string]struct{})
 
 	for i := 0; i < 5; i++ {
@@ -164,7 +169,7 @@ func TestDuplicateRequests(t *testing.T) {
 	// Move time forward a long time in order to prune all the hashes. Submit a single request to trigger cleanup.
 	now = now.Add(maxTimeInPast + maxTimeInFuture + 1)
 
-	err := rGuard.VerifyRequest(rand.Bytes(32), now)
+	err = rGuard.VerifyRequest(rand.Bytes(32), now)
 	require.NoError(t, err)
 
 	// Only the most recent hash should be in the observedHashes set.
@@ -184,7 +189,8 @@ func TestDuplicateRequestsDetailed(t *testing.T) {
 	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
 	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
 
-	rGuard := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
 	submittedHashes := make(map[string]struct{})
 
 	for i := 0; i < 5; i++ {

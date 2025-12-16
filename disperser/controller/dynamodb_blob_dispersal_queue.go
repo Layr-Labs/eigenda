@@ -75,14 +75,11 @@ func NewDynamodbBlobDispersalQueue(
 	if requestBackoffPeriod < 0 {
 		return nil, fmt.Errorf("requestBackoffPeriod must not be negative, got %v", requestBackoffPeriod)
 	}
-	if maxFutureAge < 0 {
-		return nil, fmt.Errorf("maxFutureAge must not be negative, got %v", maxFutureAge)
-	}
-	if maxPastAge < 0 {
-		return nil, fmt.Errorf("maxPastAge must not be negative, got %v", maxPastAge)
-	}
 
-	replayGuardian := replay.NewReplayGuardian(time.Now, maxPastAge, maxFutureAge)
+	replayGuardian, err := replay.NewReplayGuardian(time.Now, maxPastAge, maxFutureAge)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replay guardian: %w", err)
+	}
 
 	bdq := &dynamodbBlobDispersalQueue{
 		ctx:                  ctx,

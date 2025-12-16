@@ -71,7 +71,6 @@ func NewController(
 	nodeClientManager NodeClientManager,
 	logger logging.Logger,
 	metrics *ControllerMetrics,
-	beforeDispatch func(blobKey corev2.BlobKey) error,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 	signingRateTracker signingrate.SigningRateTracker,
 	userAccountRemapping map[string]string,
@@ -490,7 +489,7 @@ func (c *Controller) NewBatch(
 			breakLoop = true
 		}
 
-		if breakLoop {
+		if breakLoop || next == nil {
 			break
 		}
 

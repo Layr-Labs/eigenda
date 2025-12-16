@@ -313,7 +313,6 @@ func RunController(cliCtx *cli.Context) error {
 		nodeClientManager,
 		logger,
 		metrics,
-		nil, // TODO remove this callback
 		controllerLivenessChan,
 		signingRateTracker,
 		userAccountRemapping,

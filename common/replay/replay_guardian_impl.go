@@ -40,6 +40,10 @@ type hashWithTimestamp struct {
 // NewReplayGuardian creates a new ReplayGuardian. This implementation is thread safe.
 func NewReplayGuardian(
 	timeSource func() time.Time,
+	// The maximum amount of time that a request's timestamp can be behind the local wall clock time.
+	// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost
+	// of a higher memory overhead.
+	maxTimeInPast time.Duration,
 	// The maximum amount of time that a request's timestamp can be ahead of the local wall clock time.
 	// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost of a
 	// higher memory overhead. In theory, if requests are sent with a timestamp exactly at the maximum time in the
@@ -47,12 +51,18 @@ func NewReplayGuardian(
 	// amount of time that will need to elapse locally before the request exceeds the maximum age. If maxTimeInFuture
 	// is extremely large, then an attacker may be able to cause this utility to be forced to remember a very large
 	// amount of data.
-	maxTimeInPast time.Duration,
-	// The maximum amount of time that a request's timestamp can be behind the local wall clock time.
-	// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost
-	// of a higher memory overhead.
 	maxTimeInFuture time.Duration,
-) ReplayGuardian {
+) (ReplayGuardian, error) {
+
+	if timeSource == nil {
+		return nil, fmt.Errorf("timeSource cannot be nil")
+	}
+	if maxTimeInPast < 0 {
+		return nil, fmt.Errorf("maxTimeInPast must not be negative, got %v", maxTimeInPast)
+	}
+	if maxTimeInFuture < 0 {
+		return nil, fmt.Errorf("maxTimeInFuture must not be negative, got %v", maxTimeInFuture)
+	}
 
 	return &replayGuardian{
 		timeSource:      timeSource,
@@ -60,7 +70,7 @@ func NewReplayGuardian(
 		maxTimeInPast:   maxTimeInPast,
 		observedHashes:  make(map[string]struct{}),
 		expirationQueue: priorityqueue.NewWith(compareHashWithTimestamp),
-	}
+	}, nil
 }
 
 // compareKeyWithExpiration compares two hashWithTimestamp objects by their expiration time. Used to create

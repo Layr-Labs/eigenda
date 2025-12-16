@@ -26,30 +26,19 @@ type ReplayGuardian interface {
 }
 
 // ReplayGuardianStatus indicates the result of a replay guardian check.
-type ReplayGuardianStatus int
+type ReplayGuardianStatus string
 
 const (
 	// The request is not a duplicate and is within the acceptable time range.
-	StatusValid ReplayGuardianStatus = 0
+	StatusValid ReplayGuardianStatus = "Valid"
 	// The request is too old to be accepted.
-	StatusTooOld ReplayGuardianStatus = 1
+	StatusTooOld ReplayGuardianStatus = "TooOld"
 	// The request is too far in the future to be accepted.
-	StatusTooFarInFuture ReplayGuardianStatus = 2
+	StatusTooFarInFuture ReplayGuardianStatus = "TooFarInFuture"
 	// The request is a duplicate of a previously seen request.
-	StatusDuplicate ReplayGuardianStatus = 3
+	StatusDuplicate ReplayGuardianStatus = "Duplicate"
 )
 
 func (s ReplayGuardianStatus) String() string {
-	switch s {
-	case StatusValid:
-		return "Valid"
-	case StatusTooOld:
-		return "TooOld"
-	case StatusTooFarInFuture:
-		return "TooFarInFuture"
-	case StatusDuplicate:
-		return "Duplicate"
-	default:
-		return "Unknown"
-	}
+	return string(s)
 }

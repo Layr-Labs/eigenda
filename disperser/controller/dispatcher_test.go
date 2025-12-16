@@ -470,7 +470,6 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 		nodeClientManager,
 		logger,
 		nil, // metrics, no-op if nil
-		nil,
 		livenessChan,
 		signingrate.NewNoOpSigningRateTracker(),
 		nil, // userAccountRemapping
