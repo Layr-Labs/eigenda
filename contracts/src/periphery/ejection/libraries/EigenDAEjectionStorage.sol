@@ -15,12 +15,11 @@ library EigenDAEjectionStorage {
         address blsApkKeyRegistry;
         address serviceManager;
         address registryCoordinator;
-        /// @dev params set for financial safety
-        uint256 estimatedGasUsedWithoutSig;
-        uint256 estimatedGasUsedWithSig;
-        uint256 depositBaseFeeMultiplier;
-
+        
+        /// @dev ejection state
         mapping(address => EigenDAEjectionTypes.EjecteeState) ejectees;
+
+        /// @dev protocol params
         uint64 delay;
         uint64 cooldown;
     }

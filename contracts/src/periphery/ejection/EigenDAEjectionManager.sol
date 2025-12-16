@@ -37,18 +37,12 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     ///                       for ejector and owner
     /// @param blsApkKeyRegistry_ The BLS agg pub key registry contract address
     /// @param serviceManager_ The EigenDA AVS ServiceManager contract address
-    /// @param depositBaseFeeMultiplier_ The multiplier for calculating deposit amounts based on base fee
-    /// @param accessControl_ The access control contract
-    /// @param estimatedGasUsedWithoutSig_ Estimated gas for operations without signature verification
-    /// @param estimatedGasUsedWithSig_ Estimated gas for operations with signature verification
+    /// @param registryCoordinator_ The EigenDA Registy Coordinator contract address
     function initialize(
         address accessControl_,
         address blsApkKeyRegistry_,
         address serviceManager_,
-        address registryCoordinator_,
-        uint256 depositBaseFeeMultiplier_,
-        uint256 estimatedGasUsedWithoutSig_,
-        uint256 estimatedGasUsedWithSig_
+        address registryCoordinator_
     ) external initializer {
         require(accessControl_ != address(0), "EigenDAEjectionManager: access control cannot be zero");
         require(blsApkKeyRegistry_ != address(0), "EigenDAEjectionManager: bls apk key cannot be zero");
@@ -60,10 +54,6 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         s.blsApkKeyRegistry = blsApkKeyRegistry_;
         s.serviceManager = serviceManager_;
         s.registryCoordinator = registryCoordinator_;
-
-        s.depositBaseFeeMultiplier = depositBaseFeeMultiplier_;
-        s.estimatedGasUsedWithoutSig = estimatedGasUsedWithoutSig_;
-        s.estimatedGasUsedWithSig = estimatedGasUsedWithSig_;
     }
 
     modifier onlyOwner(address sender) {
