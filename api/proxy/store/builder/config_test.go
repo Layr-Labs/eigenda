@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"math/big"
 	"testing"
 	"time"
 
@@ -66,6 +67,7 @@ func validCfg() Config {
 				GrpcUri:           "localhost:9999",
 				UseSecureGrpcFlag: true,
 				DisperserID:       0,
+				ChainID:           big.NewInt(1),
 			},
 			EigenDACertVerifierOrRouterAddress: "0x0000000000032443134",
 			MaxBlobSizeBytes:                   maxBlobLengthBytes,

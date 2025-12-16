@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -28,7 +27,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
@@ -176,12 +174,22 @@ func RunController(cliCtx *cli.Context) error {
 		}
 	}
 
+	metrics, err := controller.NewControllerMetrics(
+		metricsRegistry,
+		config.SignificantSigningThresholdFraction,
+		config.CollectDetailedValidatorSigningMetrics,
+		config.EnablePerAccountBlobStatusMetrics,
+		userAccountRemapping,
+		validatorIdRemapping)
+	if err != nil {
+		return fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManager.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
 	encodingPool := workerpool.New(config.EncodingManager.NumConcurrentRequests)
-	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		&config.EncodingManager,
 		time.Now,
@@ -191,9 +199,11 @@ func RunController(cliCtx *cli.Context) error {
 		chainReader,
 		logger,
 		metricsRegistry,
-		encodingManagerBlobSet,
 		controllerLivenessChan,
 		userAccountRemapping,
+		config.MaxDispersalFutureAge,
+		config.MaxDispersalAge,
+		metrics,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -236,11 +246,6 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
-	beforeDispatch := func(blobKey corev2.BlobKey) error {
-		encodingManagerBlobSet.RemoveBlob(blobKey)
-		return nil
-	}
-	dispatcherBlobSet := controller.NewBlobSet()
 
 	batchMetadataManager, err := metadata.NewBatchMetadataManager(
 		ctx,
@@ -306,9 +311,7 @@ func RunController(cliCtx *cli.Context) error {
 		sigAgg,
 		nodeClientManager,
 		logger,
-		metricsRegistry,
-		beforeDispatch,
-		dispatcherBlobSet,
+		metrics,
 		controllerLivenessChan,
 		signingRateTracker,
 		userAccountRemapping,
@@ -333,57 +336,43 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
 
-	// nolint: nestif
-	if config.Server.EnableServer {
-		logger.Info("Controller gRPC server ENABLED", "port", config.Server.GrpcPort)
-		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
-		if config.Server.EnablePaymentAuthentication {
-			logger.Info("Payment authentication ENABLED - building payment authorization handler")
-			paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
-				ctx,
-				logger,
-				config.PaymentAuthorization,
-				contractDirectory,
-				gethClient,
-				dynamoClient.GetAwsClient(),
-				metricsRegistry,
-				userAccountRemapping,
-			)
-			if err != nil {
-				return fmt.Errorf("build payment authorization handler: %w", err)
-			}
-		} else {
-			logger.Warn("Payment authentication DISABLED - payment requests will fail")
-		}
-
-		// Create listener for the gRPC server
-		addr := fmt.Sprintf("0.0.0.0:%d", config.Server.GrpcPort)
-		listener, err := net.Listen("tcp", addr)
-		if err != nil {
-			return fmt.Errorf("failed to create listener: %w", err)
-		}
-
-		grpcServer, err := server.NewServer(
-			ctx,
-			config.Server,
-			logger,
-			metricsRegistry,
-			paymentAuthorizationHandler,
-			listener,
-			signingRateTracker)
-		if err != nil {
-			return fmt.Errorf("create gRPC server: %w", err)
-		}
-
-		go func() {
-			logger.Info("Starting controller gRPC server", "address", listener.Addr().String())
-			if err := grpcServer.Start(); err != nil {
-				panic(fmt.Sprintf("gRPC server failed: %v", err))
-			}
-		}()
-	} else {
-		logger.Info("Controller gRPC server disabled")
+	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
+		ctx,
+		logger,
+		config.PaymentAuthorization,
+		contractDirectory,
+		gethClient,
+		dynamoClient.GetAwsClient(),
+		metricsRegistry,
+		userAccountRemapping,
+	)
+	if err != nil {
+		return fmt.Errorf("build payment authorization handler: %w", err)
 	}
+
+	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", config.Server.GrpcPort))
+	if err != nil {
+		return fmt.Errorf("create listener: %w", err)
+	}
+
+	grpcServer, err := server.NewServer(
+		ctx,
+		config.Server,
+		logger,
+		metricsRegistry,
+		paymentAuthorizationHandler,
+		listener,
+		signingRateTracker)
+	if err != nil {
+		return fmt.Errorf("create gRPC server: %w", err)
+	}
+
+	go func() {
+		logger.Info("Starting controller gRPC server", "address", listener.Addr().String())
+		if err := grpcServer.Start(); err != nil {
+			panic(fmt.Sprintf("gRPC server failed: %v", err))
+		}
+	}()
 
 	go func() {
 		err := metricsServer.ListenAndServe()

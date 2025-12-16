@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/Layr-Labs/eigenda/indexer"
 )
 
@@ -93,6 +92,11 @@ type ControllerConfig struct {
 	// client at dispersal request creation time (in nanoseconds since Unix epoch).
 	MaxDispersalAge time.Duration
 
+	// The maximum a blob dispersal's self-reported timestamp can be ahead of the local wall clock time.
+	// This is a preventative measure needed to prevent an attacker from sending far future timestamps
+	// that result in data being tracked for a long time.
+	MaxDispersalFutureAge time.Duration
+
 	// The amount of time to retain signing rate data.
 	SigningRateRetentionPeriod time.Duration
 
@@ -140,7 +144,7 @@ type ControllerConfig struct {
 	ValidatorIdRemappingFilePath string
 
 	// Configures the gRPC server for the controller.
-	Server server.Config
+	Server common.GRPCServerConfig
 
 	// Configures the encoding manager (i.e. the interface used to send work to encoders).
 	EncodingManager EncodingManagerConfig
@@ -188,6 +192,7 @@ func DefaultControllerConfig() *ControllerConfig {
 		NumConcurrentRequests:               600,
 		NodeClientCacheSize:                 400,
 		MaxDispersalAge:                     45 * time.Second,
+		MaxDispersalFutureAge:               45 * time.Second,
 		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
 		SigningRateBucketSpan:               10 * time.Minute,
 		BlobDispersalQueueSize:              1024,
@@ -233,6 +238,9 @@ func (c *ControllerConfig) Verify() error {
 	}
 	if c.MaxDispersalAge <= 0 {
 		return fmt.Errorf("MaxDispersalAge must be positive, got %v", c.MaxDispersalAge)
+	}
+	if c.MaxDispersalFutureAge <= 0 {
+		return fmt.Errorf("MaxDispersalFutureAge must be positive, got %v", c.MaxDispersalFutureAge)
 	}
 	if c.SigningRateRetentionPeriod <= 0 {
 		return fmt.Errorf("SigningRateRetentionPeriod must be positive, got %v", c.SigningRateRetentionPeriod)

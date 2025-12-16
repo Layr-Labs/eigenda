@@ -17,7 +17,6 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
-	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
@@ -45,7 +44,6 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 	}
 
 	grpcServerConfig, err := common.NewGRPCServerConfig(
-		ctx.GlobalBool(flags.GrpcServerEnableFlag.Name),
 		uint16(ctx.GlobalUint64(flags.GrpcPortFlag.Name)),
 		ctx.GlobalInt(flags.GrpcMaxMessageSizeFlag.Name),
 		ctx.GlobalDuration(flags.GrpcMaxIdleConnectionAgeFlag.Name),
@@ -54,14 +52,6 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid gRPC server config: %w", err)
-	}
-
-	serverConfig, err := server.NewConfig(
-		grpcServerConfig,
-		ctx.GlobalBool(flags.GrpcPaymentAuthenticationFlag.Name),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("invalid controller service config: %w", err)
 	}
 
 	paymentVaultUpdateInterval := ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name)
@@ -129,7 +119,6 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 			MaxNumBlobsPerIteration:           int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
 			OnchainStateRefreshInterval:       ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 			NumConcurrentRequests:             ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-			MaxDispersalAge:                   ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 			EnablePerAccountBlobStatusMetrics: ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
 		},
 		PullInterval:                           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
@@ -145,6 +134,7 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 		CollectDetailedValidatorSigningMetrics: ctx.GlobalBool(flags.DetailedValidatorMetricsFlag.Name),
 		EnablePerAccountBlobStatusMetrics:      ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
 		MaxDispersalAge:                        ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
+		MaxDispersalFutureAge:                  ctx.GlobalDuration(flags.MaxDispersalFutureAgeFlag.Name),
 		SigningRateRetentionPeriod:             ctx.GlobalDuration(flags.SigningRateRetentionPeriodFlag.Name),
 		SigningRateBucketSpan:                  ctx.GlobalDuration(flags.SigningRateBucketSpanFlag.Name),
 		BlobDispersalQueueSize:                 uint32(ctx.GlobalUint64(flags.BlobDispersalQueueSizeFlag.Name)),
@@ -152,14 +142,13 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 		BlobDispersalRequestBackoffPeriod:      ctx.GlobalDuration(flags.BlobDispersalRequestBackoffPeriodFlag.Name),
 		SigningRateFlushPeriod:                 ctx.GlobalDuration(flags.SigningRateFlushPeriodFlag.Name),
 		SigningRateDynamoDbTableName:           ctx.GlobalString(flags.SigningRateDynamoDbTableNameFlag.Name),
-
 		Indexer:                         indexer.ReadIndexerConfig(ctx),
 		ChainState:                      thegraph.ReadCLIConfig(ctx),
 		UseGraph:                        ctx.GlobalBool(flags.UseGraphFlag.Name),
 		EigenDAContractDirectoryAddress: ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
 		MetricsPort:                     ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
-		Server:                          serverConfig,
+		Server:                          grpcServerConfig,
 		HeartbeatMonitor:                heartbeatMonitorConfig,
 		PaymentAuthorization:            paymentAuthorizationConfig,
 		UserAccountRemappingFilePath:    ctx.GlobalString(flags.UserAccountRemappingFileFlag.Name),

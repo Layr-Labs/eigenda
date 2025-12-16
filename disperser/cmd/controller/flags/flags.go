@@ -131,6 +131,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_DISPERSAL_AGE"),
 		Value:    45 * time.Second,
 	}
+	MaxDispersalFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-dispersal-future-age"),
+		Usage:    "Maximum amount a blob dispersal's self-reported timestamp can be ahead of the local wall clock time",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_DISPERSAL_FUTURE_AGE"),
+		Value:    45 * time.Second,
+	}
 
 	// Dispatcher Flags
 	DispatcherPullIntervalFlag = cli.DurationFlag{
@@ -261,18 +268,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_FRACTION"),
 		Value:    0.55,
-	}
-	GrpcServerEnableFlag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "grpc-server-enable"),
-		Usage:    "enable the controller gRPC server. default: true",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_SERVER_ENABLE"),
-	}
-	GrpcPaymentAuthenticationFlag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "grpc-payment-authentication"),
-		Usage:    "If true, use the new payment authentication system running on the controller; if false, payment authentication is disabled and request validation will always fail. default: true.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PAYMENT_AUTHENTICATION"),
 	}
 	GrpcPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
@@ -425,6 +420,7 @@ var optionalFlags = []cli.Flag{
 	MaxNumBlobsPerIterationFlag,
 	OnchainStateRefreshIntervalFlag,
 	MaxDispersalAgeFlag,
+	MaxDispersalFutureAgeFlag,
 	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,
 	NumConcurrentDispersalRequestsFlag,
@@ -440,8 +436,6 @@ var optionalFlags = []cli.Flag{
 	SignificantSigningThresholdFractionFlag,
 	EigenDAContractDirectoryAddressFlag,
 	BatchMetadataUpdatePeriodFlag,
-	GrpcServerEnableFlag,
-	GrpcPaymentAuthenticationFlag,
 	GrpcPortFlag,
 	GrpcMaxMessageSizeFlag,
 	GrpcMaxIdleConnectionAgeFlag,

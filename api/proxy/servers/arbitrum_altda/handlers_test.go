@@ -74,9 +74,7 @@ func TestMethod_GetSupportedHeaderBytes(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Len(t, result.HeaderBytes, 1)
-	require.Len(t, result.HeaderBytes[0], 2)
-	require.Equal(t, uint8(commitments.ArbCustomDAHeaderByte), result.HeaderBytes[0][0])
-	require.Equal(t, commitments.EigenDALayerByte, result.HeaderBytes[0][1])
+	require.Equal(t, uint8(commitments.ArbCustomDAHeaderByte), result.HeaderBytes[0])
 }
 
 // TestMethod_Store verifies the Store handler behavior using table-driven tests

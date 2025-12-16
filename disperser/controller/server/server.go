@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
@@ -27,7 +28,7 @@ import (
 type Server struct {
 	controller.UnimplementedControllerServiceServer
 
-	config                      Config
+	config                      common.GRPCServerConfig
 	logger                      logging.Logger
 	server                      *grpc.Server
 	listener                    net.Listener
@@ -39,7 +40,7 @@ type Server struct {
 
 func NewServer(
 	ctx context.Context,
-	config Config,
+	config common.GRPCServerConfig,
 	logger logging.Logger,
 	metricsRegistry *prometheus.Registry,
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler,
@@ -50,7 +51,10 @@ func NewServer(
 		return nil, fmt.Errorf("listener is required")
 	}
 
-	replayGuardian := replay.NewReplayGuardian(time.Now, config.RequestMaxPastAge, config.RequestMaxFutureAge)
+	replayGuardian, err := replay.NewReplayGuardian(time.Now, config.RequestMaxPastAge, config.RequestMaxFutureAge)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replay guardian: %w", err)
+	}
 
 	return &Server{
 		config:                      config,
@@ -65,10 +69,6 @@ func NewServer(
 
 // Start the server. Blocks until the server is stopped.
 func (s *Server) Start() error {
-	if !s.config.EnableServer {
-		return fmt.Errorf("controller gRPC server is disabled")
-	}
-
 	var opts []grpc.ServerOption
 	opts = append(opts, s.metrics.GetGRPCServerOption())
 

@@ -841,7 +841,6 @@ func startController(
 
 	// Create encoding manager with workerpool and blob set
 	encodingPool := workerpool.New(encodingManagerConfig.NumConcurrentRequests)
-	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		encodingManagerConfig,
 		time.Now,
@@ -851,9 +850,11 @@ func startController(
 		chainReader,
 		controllerLogger,
 		metricsRegistry,
-		encodingManagerBlobSet,
 		controllerLivenessChan,
 		nil, // userAccountRemapping
+		10*time.Minute,
+		10*time.Minute,
+		nil, // metrics, ignored if nil
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoding manager: %w", err)
@@ -897,13 +898,6 @@ func startController(
 		return nil, fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
-	// Create beforeDispatch callback to remove blobs from encoding manager's set
-	beforeDispatch := func(blobKey corev2.BlobKey) error {
-		encodingManagerBlobSet.RemoveBlob(blobKey)
-		return nil
-	}
-	dispatcherBlobSet := controller.NewBlobSet()
-
 	signingRateTracker, err := signingrate.NewSigningRateTracker(
 		controllerLogger,
 		1*time.Minute,
@@ -923,9 +917,7 @@ func startController(
 		sigAgg,
 		nodeClientManager,
 		controllerLogger,
-		metricsRegistry,
-		beforeDispatch,
-		dispatcherBlobSet,
+		nil, // Metrics become a no-op if nil
 		controllerLivenessChan,
 		signingRateTracker,
 		nil, // userAccountRemapping
@@ -950,109 +942,83 @@ func startController(
 		return nil, fmt.Errorf("failed to start dispatcher: %w", err)
 	}
 
-	// Build and start gRPC server if payments are enabled
-	var controllerServer *server.Server
-	var controllerAddress string
-	//nolint:nestif // Complex nested block is temporary until old payment system is removed
-	if config.TestConfig.UseNewPayments {
-		controllerLogger.Info("UseNewPayments enabled - starting gRPC server")
-
-		// Create contract directory
-		contractDirectory, err := directory.NewContractDirectory(
-			ctx,
-			controllerLogger,
-			ethClient,
-			gethcommon.HexToAddress(config.TestConfig.EigenDA.EigenDADirectory),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create contract directory: %w", err)
-		}
-
-		// Build payment authorization handler
-		paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
-		paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
-		paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
-		paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
-
-		paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
-			ctx,
-			controllerLogger,
-			*paymentAuthConfig,
-			contractDirectory,
-			ethClient,
-			dynamoClient.GetAwsClient(),
-			metricsRegistry,
-			nil,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build payment authorization handler: %w", err)
-		}
-
-		// Pre-create listener with port 0 (OS assigns random port)
-		listener, err := net.Listen("tcp", "0.0.0.0:0")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create listener for controller: %w", err)
-		}
-		defer func() {
-			if err != nil {
-				_ = listener.Close()
-			}
-		}()
-
-		// Extract the port assigned by the OS
-		assignedPort := listener.Addr().(*net.TCPAddr).Port
-		controllerLogger.Info("Created listener for controller", "assigned_port", assignedPort)
-
-		// Create server config
-		grpcServerConfig, err := common.NewGRPCServerConfig(
-			true,
-			uint16(assignedPort),
-			1024*1024,
-			5*time.Minute,
-			5*time.Minute,
-			3*time.Minute,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gRPC server config: %w", err)
-		}
-
-		serverConfig, err := server.NewConfig(
-			grpcServerConfig,
-			true, // EnablePaymentAuthentication
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create server config: %w", err)
-		}
-
-		// Create and start gRPC server
-		grpcServer, err := server.NewServer(
-			ctx,
-			serverConfig,
-			controllerLogger,
-			metricsRegistry,
-			paymentAuthorizationHandler,
-			listener,
-			signingrate.NewNoOpSigningRateTracker(),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gRPC server: %w", err)
-		}
-
-		go func() {
-			controllerLogger.Info("Starting controller gRPC server", "address", listener.Addr().String())
-			if err := grpcServer.Start(); err != nil {
-				controllerLogger.Error("gRPC server failed", "error", err)
-			}
-		}()
-
-		controllerServer = grpcServer
-		controllerAddress = fmt.Sprintf("localhost:%d", assignedPort)
-		controllerLogger.Info("Controller gRPC server started successfully", "address", controllerAddress)
-	} else {
-		// When server is disabled, use empty address
-		controllerAddress = ""
-		controllerLogger.Info("UseNewPayments disabled - controller will not have server")
+	contractDirectory, err := directory.NewContractDirectory(
+		ctx,
+		controllerLogger,
+		ethClient,
+		gethcommon.HexToAddress(config.TestConfig.EigenDA.EigenDADirectory),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create contract directory: %w", err)
 	}
+
+	paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
+	paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
+	paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
+	paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
+
+	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
+		ctx,
+		controllerLogger,
+		*paymentAuthConfig,
+		contractDirectory,
+		ethClient,
+		dynamoClient.GetAwsClient(),
+		metricsRegistry,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build payment authorization handler: %w", err)
+	}
+
+	// Pre-create listener with port 0 (OS assigns random port)
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		return nil, fmt.Errorf("create listener for controller: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = listener.Close()
+		}
+	}()
+
+	// Extract the port assigned by the OS
+	assignedPort := listener.Addr().(*net.TCPAddr).Port
+	controllerLogger.Info("Created listener for controller", "assigned_port", assignedPort)
+
+	grpcServerConfig, err := common.NewGRPCServerConfig(
+		uint16(assignedPort),
+		1024*1024,
+		5*time.Minute,
+		5*time.Minute,
+		3*time.Minute,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create gRPC server config: %w", err)
+	}
+
+	controllerServer, err := server.NewServer(
+		ctx,
+		grpcServerConfig,
+		controllerLogger,
+		metricsRegistry,
+		paymentAuthorizationHandler,
+		listener,
+		signingrate.NewNoOpSigningRateTracker(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create gRPC server: %w", err)
+	}
+
+	go func() {
+		controllerLogger.Info("Starting controller gRPC server", "address", listener.Addr().String())
+		if err := controllerServer.Start(); err != nil {
+			controllerLogger.Error("gRPC server failed", "error", err)
+		}
+	}()
+
+	controllerAddress := fmt.Sprintf("localhost:%d", assignedPort)
+	controllerLogger.Info("Controller gRPC server started successfully", "address", controllerAddress)
 
 	controllerLogger.Info("Controller components started successfully",
 		"address", controllerAddress, "logFile", logFilePath)
@@ -1178,16 +1144,14 @@ func startAPIServer(
 	}
 
 	// Create blob request authenticator
-	authenticator := authv2.NewPaymentStateAuthenticator(
+	authenticator, err := authv2.NewPaymentStateAuthenticator(
 		5*time.Minute, // AuthPmtStateRequestMaxPastAge
 		5*time.Minute, // AuthPmtStateRequestMaxFutureAge
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payment state authenticator: %w", err)
+	}
 
-	// Create meterer
-	// Note: The meterer is always created to serve GetPaymentState calls, even when using
-	// controller-mediated payments. The UseNewPayments flag controls which
-	// payment system is used for authorization during dispersals, but doesn't affect
-	// whether the meterer is available for querying payment state.
 	apiServerLogger.Info("Creating meterer")
 
 	mtConfig := meterer.Config{
@@ -1239,13 +1203,21 @@ func startAPIServer(
 	assignedPort := listener.Addr().(*net.TCPAddr).Port
 	apiServerLogger.Info("Created listener for API server", "assigned_port", assignedPort)
 
+	chainId, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get chain ID: %w", err)
+	}
+
 	// Create server config
 	serverConfig := disperser.ServerConfig{
-		GrpcPort:              fmt.Sprintf("%d", assignedPort),
-		GrpcTimeout:           10 * time.Second,
-		MaxConnectionAge:      5 * time.Minute,
-		MaxConnectionAgeGrace: 30 * time.Second,
-		MaxIdleConnectionAge:  1 * time.Minute,
+		GrpcPort:                           fmt.Sprintf("%d", assignedPort),
+		GrpcTimeout:                        10 * time.Second,
+		MaxConnectionAge:                   5 * time.Minute,
+		MaxConnectionAgeGrace:              30 * time.Second,
+		MaxIdleConnectionAge:               1 * time.Minute,
+		DisperserId:                        0,
+		TolerateMissingAnchorSignature:     false,
+		DisableAnchorSignatureVerification: false,
 	}
 
 	metricsConfig := disperser.MetricsConfig{
@@ -1259,23 +1231,17 @@ func startAPIServer(
 	// Onchain state refresh interval
 	onchainStateRefreshInterval := 1 * time.Second
 
-	// Create controller client if using new payments
-	var controllerConnection *grpc.ClientConn
-	var controllerClient grpccontroller.ControllerServiceClient
-	if config.TestConfig.UseNewPayments {
-		if controllerAddress == "" {
-			return nil, fmt.Errorf("controller address is empty but UseNewPayments is true")
-		}
-		connection, err := grpc.NewClient(
-			controllerAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("create controller connection: %w", err)
-		}
-		controllerConnection = connection
-		controllerClient = grpccontroller.NewControllerServiceClient(connection)
+	if controllerAddress == "" {
+		return nil, fmt.Errorf("controller address is empty")
 	}
+	controllerConnection, err := grpc.NewClient(
+		controllerAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create controller connection: %w", err)
+	}
+	controllerClient := grpccontroller.NewControllerServiceClient(controllerConnection)
 
 	signingRateTracker, err := signingrate.NewSigningRateTracker(
 		apiServerLogger,
@@ -1284,11 +1250,10 @@ func startAPIServer(
 		time.Now)
 	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
 
-	// Create API server
-	// Note: meterer is nil when using controller-mediated payments, otherwise it's the legacy meterer
 	apiServer, err := apiserver.NewDispersalServerV2(
 		serverConfig,
 		time.Now,
+		chainId,
 		blobStore,
 		metadataStore,
 		chainReader,
@@ -1302,8 +1267,7 @@ func startAPIServer(
 		apiServerLogger,
 		metricsRegistry,
 		metricsConfig,
-		false,                            // ReservedOnly
-		config.TestConfig.UseNewPayments, // useControllerMediatedPayments
+		false, // ReservedOnly
 		controllerConnection,
 		controllerClient,
 		listener,
