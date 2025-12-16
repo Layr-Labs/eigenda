@@ -907,6 +907,13 @@ func startController(
 		time.Now)
 	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
 
+	paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
+	paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
+	paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
+	paymentAuthConfig.OnDemandConfig.MaxLedgers = 1000
+	paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
+	dispatcherConfig.PaymentAuthorization = *paymentAuthConfig
+
 	// Create controller
 	dispatcher, err := controller.NewController(
 		ctx,
@@ -953,13 +960,6 @@ func startController(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create contract directory: %w", err)
 	}
-
-	paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
-	paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
-	paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
-	paymentAuthConfig.OnDemandConfig.MaxLedgers = 1000
-	paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
-	dispatcherConfig.PaymentAuthorization = *paymentAuthConfig
 
 	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
 		ctx,
