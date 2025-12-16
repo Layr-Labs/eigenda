@@ -36,13 +36,13 @@ versionedBlobParams = [
 ```
 **Note on MaxNumOperators**
 
-The `MaxNumOperators` parameter (n = 3537) serves as an **upper bound** used in the chunk assignment algorithm and security threshold derivations. This upper bound ensures that the reconstruction threshold and other security properties remain fixed and predictable, regardless of how many operators actually register.
+The `MaxNumOperators` parameter (n = 3537) serves as an **upper bound** used in the chunk assignment algorithm and security threshold derivations. This upper bound ensures that the reconstruction threshold and other security properties remain fixed and predictable, regardless of how many validators actually register.
 
-The actual number of operators allowed to register for each quorum is controlled separately by the on-chain `maxOperatorCount` parameter in the `OperatorSetParam` struct. The current on-chain limits per quorum are:
+The actual number of validators allowed to register for each quorum is controlled separately by the on-chain `maxOperatorCount` parameter in the `OperatorSetParam` struct. The current on-chain limits per quorum are:
 
-- Quorum 0 (ETH): 200 operators
-- Quorum 1 (EIGEN): 200 operators
-- Quorum 2 (Custom): 15 operators
+- Quorum 0 (ETH): 200 validators
+- Quorum 1 (EIGEN): 200 validators
+- Quorum 2 (Custom): 15 validators
 
 The per-quorum limits can be adjusted via governance without requiring changes to the blob parameters or security thresholds, as long as they remain below the upper bound.
 
