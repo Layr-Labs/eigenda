@@ -957,6 +957,7 @@ func startController(
 	paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
 	paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
 	paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
+	paymentAuthConfig.OnDemandConfig.MaxLedgers = 1000
 	paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
 	dispatcherConfig.PaymentAuthorization = *paymentAuthConfig
 
