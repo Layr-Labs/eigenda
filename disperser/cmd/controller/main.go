@@ -27,7 +27,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
@@ -175,12 +174,22 @@ func RunController(cliCtx *cli.Context) error {
 		}
 	}
 
+	metrics, err := controller.NewControllerMetrics(
+		metricsRegistry,
+		config.DispatcherConfig.SignificantSigningThresholdFraction,
+		config.DispatcherConfig.CollectDetailedValidatorSigningMetrics,
+		config.DispatcherConfig.EnablePerAccountBlobStatusMetrics,
+		userAccountRemapping,
+		validatorIdRemapping)
+	if err != nil {
+		return fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
 	encodingPool := workerpool.New(config.EncodingManagerConfig.NumConcurrentRequests)
-	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		&config.EncodingManagerConfig,
 		time.Now,
@@ -190,9 +199,11 @@ func RunController(cliCtx *cli.Context) error {
 		chainReader,
 		logger,
 		metricsRegistry,
-		encodingManagerBlobSet,
 		controllerLivenessChan,
 		userAccountRemapping,
+		config.DispatcherConfig.MaxDispersalFutureAge,
+		config.DispatcherConfig.MaxDispersalAge,
+		metrics,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -235,11 +246,6 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
-	beforeDispatch := func(blobKey corev2.BlobKey) error {
-		encodingManagerBlobSet.RemoveBlob(blobKey)
-		return nil
-	}
-	dispatcherBlobSet := controller.NewBlobSet()
 
 	batchMetadataManager, err := metadata.NewBatchMetadataManager(
 		ctx,
@@ -305,9 +311,7 @@ func RunController(cliCtx *cli.Context) error {
 		sigAgg,
 		nodeClientManager,
 		logger,
-		metricsRegistry,
-		beforeDispatch,
-		dispatcherBlobSet,
+		metrics,
 		controllerLivenessChan,
 		signingRateTracker,
 		userAccountRemapping,
