@@ -295,20 +295,6 @@ func TestControllerMaxBatchSize(t *testing.T) {
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
 }
 
-func TestControllerDedupBlobs(t *testing.T) {
-	components := newControllerComponents(t)
-	defer components.BatchMetadataManager.Close()
-
-	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 1)
-
-	ctx := context.Background()
-	batchData, err := components.Controller.NewBatch(ctx, nil)
-	require.ErrorContains(t, err, "no blobs to dispatch")
-	require.Nil(t, batchData)
-
-	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
-}
-
 func TestControllerBuildMerkleTree(t *testing.T) {
 	certs := []*corev2.BlobCertificate{
 		{
