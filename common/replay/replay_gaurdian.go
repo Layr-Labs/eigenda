@@ -38,4 +38,3 @@ const (
 	// The request is a duplicate of a previously seen request.
 	StatusDuplicate ReplayGuardianStatus = "Duplicate"
 )
-
