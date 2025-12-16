@@ -14,7 +14,6 @@ import {EigenDADirectory} from "src/core/EigenDADirectory.sol";
 import {AccessControlConstants} from "src/core/libraries/v3/access-control/AccessControlConstants.sol";
 import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
 
-
 contract EigenDAEjectionManagerTest is Test {
     EigenDADirectory directory;
     EigenDAAccessControl accessControl;

@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {
-    PauserRegistry
-} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
+import {PauserRegistry} from
+    "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {BLSApkRegistry} from "../lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
@@ -295,7 +294,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             for (uint256 i = 0; i < numStrategies; i++) {
                 strategyAndWeightingMultipliers[i] = new IStakeRegistry.StrategyParams[](1);
                 strategyAndWeightingMultipliers[i][0] = IStakeRegistry.StrategyParams({
-                    strategy: IStrategy(address(deployedStrategyArray[i])), multiplier: 1 ether
+                    strategy: IStrategy(address(deployedStrategyArray[i])),
+                    multiplier: 1 ether
                 });
             }
 
