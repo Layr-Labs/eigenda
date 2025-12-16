@@ -6,3 +6,7 @@ lint:
 	cargo clippy --all-targets --all-features -- -D warnings -D missing-docs
 # checks for unused deps
 	cargo machete
+
+test:
+	cargo test --lib --bins --all-features
+	cargo test --doc --all-features

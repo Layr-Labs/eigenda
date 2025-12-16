@@ -68,6 +68,7 @@ func BuildPaymentAuthorizationHandler(
 	ethClient common.EthClient,
 	awsDynamoClient *awsdynamodb.Client,
 	metricsRegistry *prometheus.Registry,
+	userAccountRemapping map[string]string,
 ) (*payments.PaymentAuthorizationHandler, error) {
 	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
@@ -108,6 +109,7 @@ func BuildPaymentAuthorizationHandler(
 			"eigenda_controller",
 			"authorize_payments",
 			config.EnablePerAccountPaymentMetrics,
+			userAccountRemapping,
 		)
 		onDemandCacheMetrics = ondemandvalidation.NewOnDemandCacheMetrics(
 			metricsRegistry,
@@ -138,6 +140,7 @@ func BuildPaymentAuthorizationHandler(
 			"eigenda_controller",
 			"authorize_payments",
 			config.EnablePerAccountPaymentMetrics,
+			userAccountRemapping,
 		)
 		reservationCacheMetrics = reservationvalidation.NewReservationCacheMetrics(
 			metricsRegistry,

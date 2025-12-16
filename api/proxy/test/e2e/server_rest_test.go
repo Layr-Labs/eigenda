@@ -219,7 +219,7 @@ func testProxyClientServerIntegration(t *testing.T, dispersalBackend common.Eige
 					err.Error(),
 					"404") && !isNilPtrDerefPanic(err.Error()))
 
-			testCert = []byte{3}
+			testCert = []byte{4}
 			_, err = daClient.GetData(ts.Ctx, testCert)
 			require.Error(t, err)
 			assert.True(

@@ -1,16 +1,19 @@
 package geth
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
 )
 
 var (
-	rpcUrlFlagName           = "chain.rpc"
-	rpcFallbackUrlFlagName   = "chain.rpc_fallback"
-	privateKeyFlagName       = "chain.private-key"
-	numConfirmationsFlagName = "chain.num-confirmations"
-	numRetriesFlagName       = "chain.num-retries"
+	rpcUrlFlagName              = "chain.rpc"
+	rpcFallbackUrlFlagName      = "chain.rpc_fallback"
+	privateKeyFlagName          = "chain.private-key"
+	numConfirmationsFlagName    = "chain.num-confirmations"
+	numRetriesFlagName          = "chain.num-retries"
+	retryDelayIncrementFlagName = "chain.retry-delay-increment"
 )
 
 type EthClientConfig struct {
@@ -18,6 +21,7 @@ type EthClientConfig struct {
 	PrivateKeyString string
 	NumConfirmations int
 	NumRetries       int
+	RetryDelay       time.Duration
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {
@@ -55,6 +59,16 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 			Value:    2,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_RETRIES"),
 		},
+		cli.DurationFlag{
+			Name: retryDelayIncrementFlagName,
+			Usage: "Time unit for linear retry delay. For instance, if the retries count is 2 and retry delay is " +
+				"1 second, then 0 second is waited for the first call; 1 seconds are waited before the next retry; " +
+				"2 seconds are waited for the second retry; if the call failed, the total waited time for retry is " +
+				"3 seconds. If the retry delay is 0 second, the total waited time for retry is 0 second.",
+			Required: false,
+			Value:    0 * time.Second,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "RETRY_DELAY_INCREMENT"),
+		},
 	}
 }
 
@@ -80,6 +94,7 @@ func ReadEthClientConfigRPCOnly(ctx *cli.Context) EthClientConfig {
 	cfg.RPCURLs = ctx.GlobalStringSlice(rpcUrlFlagName)
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
+	cfg.RetryDelay = ctx.GlobalDuration(retryDelayIncrementFlagName)
 
 	fallbackRPCURL := ctx.GlobalString(rpcFallbackUrlFlagName)
 	if len(fallbackRPCURL) > 0 {

@@ -23,4 +23,7 @@ interface IEigenDACertVerifier {
 
     /// @notice Returns the quorum numbers required in bytes format for certificate verification.
     function quorumNumbersRequired() external view returns (bytes memory);
+
+    /// @notice Returns the offchain derivation version used in certificate verification.
+    function offchainDerivationVersion() external view returns (uint16);
 }

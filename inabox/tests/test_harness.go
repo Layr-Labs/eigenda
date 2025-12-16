@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/disperser"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
@@ -246,14 +248,6 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("create blob request signer: %w", err)
 	}
 
-	if tc.APIServerAddress == "" {
-		return nil, fmt.Errorf("APIServerAddress not set in test harness")
-	}
-
-	disperserClientConfig := &dispersal.DisperserClientConfig{
-		GrpcUri: tc.APIServerAddress,
-	}
-
 	accountId, err := signer.GetAccountID()
 	if err != nil {
 		return nil, fmt.Errorf("error getting account ID: %w", err)
@@ -274,17 +268,6 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("create kzg committer: %w", err)
 	}
 
-	disperserClient, err := dispersal.NewDisperserClient(
-		logger,
-		disperserClientConfig,
-		signer,
-		kzgCommitter,
-		metrics.NoopDispersalMetrics,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create disperser client: %w", err)
-	}
-
 	payloadDisperserConfig := dispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    *clientsv2.GetDefaultPayloadClientConfig(),
 		DisperseBlobTimeout:    2 * time.Minute,
@@ -298,6 +281,24 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("get PaymentVault address: %w", err)
 	}
 
+	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
+	multiplexerConfig.UseSecureGrpcFlag = false
+	multiplexerConfig.ChainID = tc.ChainID
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(tc.APIServerAddress)
+
+	disperserClientMultiplexer, err := dispersal.NewDisperserClientMultiplexer(
+		logger,
+		multiplexerConfig,
+		disperserRegistry,
+		signer,
+		kzgCommitter,
+		metrics.NoopDispersalMetrics,
+		rand.New(rand.NewSource(time.Now().UnixNano())),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create disperser client multiplexer: %w", err)
+	}
+
 	clientLedger, err := buildClientLedger(
 		ctx,
 		logger,
@@ -305,7 +306,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		paymentVaultAddr,
 		accountId,
 		config.ClientLedgerMode,
-		disperserClient,
+		disperserClientMultiplexer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build client ledger: %w", err)
@@ -314,7 +315,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
-		disperserClient,
+		disperserClientMultiplexer,
 		blockMonitor,
 		tc.CertBuilder,
 		tc.RouterCertVerifier,
@@ -335,7 +336,7 @@ func buildClientLedger(
 	paymentVaultAddr gethcommon.Address,
 	accountID gethcommon.Address,
 	mode clientledger.ClientLedgerMode,
-	disperserClient *dispersal.DisperserClient,
+	disperserClientMultiplexer *dispersal.DisperserClientMultiplexer,
 ) (*clientledger.ClientLedger, error) {
 	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddr)
 	if err != nil {
@@ -364,6 +365,11 @@ func buildClientLedger(
 	needsOnDemand := mode == clientledger.ClientLedgerModeOnDemandOnly ||
 		mode == clientledger.ClientLedgerModeReservationAndOnDemand
 	if needsOnDemand {
+		disperserClient, err := disperserClientMultiplexer.GetDisperserClient(ctx, time.Now(), true)
+		if err != nil {
+			return nil, fmt.Errorf("get disperser client: %w", err)
+		}
+
 		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
 		if err != nil {
 			return nil, fmt.Errorf("build on-demand ledger: %w", err)

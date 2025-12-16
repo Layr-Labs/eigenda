@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -24,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
@@ -150,6 +150,31 @@ func RunController(cliCtx *cli.Context) error {
 
 	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
 
+	var userAccountRemapping map[string]string
+	if config.UserAccountRemappingFilePath != "" {
+		userAccountRemapping, err = nameremapping.LoadNameRemapping(config.UserAccountRemappingFilePath)
+		if err != nil {
+			logger.Error("Failed to load user account remapping", "error", err)
+		} else {
+			logger.Info("Loaded user account remapping",
+				"count", len(userAccountRemapping),
+				"mappings", nameremapping.FormatMappings(userAccountRemapping))
+		}
+	}
+
+	var validatorIdRemapping map[string]string
+	if config.ValidatorIdRemappingFilePath != "" {
+		validatorIdRemapping, err = nameremapping.LoadNameRemapping(
+			config.ValidatorIdRemappingFilePath)
+		if err != nil {
+			logger.Error("Failed to load validator ID remapping", "error", err)
+		} else {
+			logger.Info("Loaded validator ID remapping",
+				"count", len(validatorIdRemapping),
+				"mappings", nameremapping.FormatMappings(validatorIdRemapping))
+		}
+	}
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
@@ -167,6 +192,7 @@ func RunController(cliCtx *cli.Context) error {
 		metricsRegistry,
 		encodingManagerBlobSet,
 		controllerLivenessChan,
+		userAccountRemapping,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -228,10 +254,6 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
-	// TODO(cody.littley):
-	// 1. wire up signing rate tracker to answer gRPC signing rate queries
-	// 2. set up background goroutine to periodically flush signing rate data to persistent storage
-	// 3. load signing rate data from persistent storage on startup
 	signingRateTracker, err := signingrate.NewSigningRateTracker(
 		logger,
 		config.DispatcherConfig.SigningRateRetentionPeriod,
@@ -242,7 +264,38 @@ func RunController(cliCtx *cli.Context) error {
 	}
 	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
 
+	signingRateStorage, err := signingrate.NewDynamoSigningRateStorage(
+		ctx,
+		logger,
+		dynamoClient.GetAwsClient(),
+		config.DispatcherConfig.SigningRateDynamoDbTableName)
+	if err != nil {
+		return fmt.Errorf("failed to create signing rate storage: %w", err)
+	}
+
+	// Load existing signing rate data from persistent storage.
+	err = signingrate.LoadSigningRateDataFromStorage(
+		ctx,
+		logger,
+		signingRateTracker,
+		signingRateStorage,
+		config.DispatcherConfig.SigningRateRetentionPeriod,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load signing rate data from storage: %w", err)
+	}
+
+	// Periodically flush signing rate data to persistent storage.
+	go signingrate.SigningRateStorageFlusher(
+		ctx,
+		logger,
+		signingRateTracker,
+		signingRateStorage,
+		config.DispatcherConfig.SigningRateFlushPeriod,
+	)
+
 	dispatcher, err := controller.NewController(
+		ctx,
 		&config.DispatcherConfig,
 		time.Now,
 		blobMetadataStore,
@@ -257,6 +310,8 @@ func RunController(cliCtx *cli.Context) error {
 		dispatcherBlobSet,
 		controllerLivenessChan,
 		signingRateTracker,
+		userAccountRemapping,
+		validatorIdRemapping,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
@@ -277,55 +332,43 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
 
-	if config.ServerConfig.EnableServer {
-		logger.Info("Controller gRPC server ENABLED", "port", config.ServerConfig.GrpcPort)
-		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
-		if config.ServerConfig.EnablePaymentAuthentication {
-			logger.Info("Payment authentication ENABLED - building payment authorization handler")
-			paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
-				ctx,
-				logger,
-				config.PaymentAuthorizationConfig,
-				contractDirectory,
-				gethClient,
-				dynamoClient.GetAwsClient(),
-				metricsRegistry,
-			)
-			if err != nil {
-				return fmt.Errorf("build payment authorization handler: %w", err)
-			}
-		} else {
-			logger.Warn("Payment authentication DISABLED - payment requests will fail")
-		}
-
-		// Create listener for the gRPC server
-		addr := fmt.Sprintf("0.0.0.0:%d", config.ServerConfig.GrpcPort)
-		listener, err := net.Listen("tcp", addr)
-		if err != nil {
-			return fmt.Errorf("failed to create listener: %w", err)
-		}
-
-		grpcServer, err := server.NewServer(
-			ctx,
-			config.ServerConfig,
-			logger,
-			metricsRegistry,
-			paymentAuthorizationHandler,
-			listener,
-			signingRateTracker)
-		if err != nil {
-			return fmt.Errorf("create gRPC server: %w", err)
-		}
-
-		go func() {
-			logger.Info("Starting controller gRPC server", "address", listener.Addr().String())
-			if err := grpcServer.Start(); err != nil {
-				panic(fmt.Sprintf("gRPC server failed: %v", err))
-			}
-		}()
-	} else {
-		logger.Info("Controller gRPC server disabled")
+	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
+		ctx,
+		logger,
+		config.PaymentAuthorizationConfig,
+		contractDirectory,
+		gethClient,
+		dynamoClient.GetAwsClient(),
+		metricsRegistry,
+		userAccountRemapping,
+	)
+	if err != nil {
+		return fmt.Errorf("build payment authorization handler: %w", err)
 	}
+
+	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", config.ServerConfig.GrpcPort))
+	if err != nil {
+		return fmt.Errorf("create listener: %w", err)
+	}
+
+	grpcServer, err := server.NewServer(
+		ctx,
+		config.ServerConfig,
+		logger,
+		metricsRegistry,
+		paymentAuthorizationHandler,
+		listener,
+		signingRateTracker)
+	if err != nil {
+		return fmt.Errorf("create gRPC server: %w", err)
+	}
+
+	go func() {
+		logger.Info("Starting controller gRPC server", "address", listener.Addr().String())
+		if err := grpcServer.Start(); err != nil {
+			panic(fmt.Sprintf("gRPC server failed: %v", err))
+		}
+	}()
 
 	go func() {
 		err := metricsServer.ListenAndServe()

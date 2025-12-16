@@ -16,7 +16,6 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
-	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
@@ -44,10 +43,13 @@ type Config struct {
 
 	MetricsPort                  int
 	ControllerReadinessProbePath string
-	ServerConfig                 server.Config
+	ServerConfig                 common.GRPCServerConfig
 	HeartbeatMonitorConfig       healthcheck.HeartbeatMonitorConfig
 
 	PaymentAuthorizationConfig controller.PaymentAuthorizationConfig
+
+	UserAccountRemappingFilePath string
+	ValidatorIdRemappingFilePath string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -73,7 +75,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	grpcServerConfig, err := common.NewGRPCServerConfig(
-		ctx.GlobalBool(flags.GrpcServerEnableFlag.Name),
 		uint16(ctx.GlobalUint64(flags.GrpcPortFlag.Name)),
 		ctx.GlobalInt(flags.GrpcMaxMessageSizeFlag.Name),
 		ctx.GlobalDuration(flags.GrpcMaxIdleConnectionAgeFlag.Name),
@@ -82,14 +83,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	)
 	if err != nil {
 		return Config{}, fmt.Errorf("invalid gRPC server config: %w", err)
-	}
-
-	serverConfig, err := server.NewConfig(
-		grpcServerConfig,
-		ctx.GlobalBool(flags.GrpcPaymentAuthenticationFlag.Name),
-	)
-	if err != nil {
-		return Config{}, fmt.Errorf("invalid controller service config: %w", err)
 	}
 
 	paymentVaultUpdateInterval := ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name)
@@ -147,17 +140,18 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			Endpoint:   awsClientConfig.EndpointURL,
 		},
 		EncodingManagerConfig: controller.EncodingManagerConfig{
-			PullInterval:                ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
-			EncodingRequestTimeout:      ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
-			StoreTimeout:                ctx.GlobalDuration(flags.EncodingStoreTimeoutFlag.Name),
-			NumEncodingRetries:          ctx.GlobalInt(flags.NumEncodingRetriesFlag.Name),
-			NumRelayAssignment:          uint16(numRelayAssignments),
-			AvailableRelays:             relays,
-			EncoderAddress:              ctx.GlobalString(flags.EncoderAddressFlag.Name),
-			MaxNumBlobsPerIteration:     int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
-			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
-			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-			MaxDispersalAge:             ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
+			PullInterval:                      ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
+			EncodingRequestTimeout:            ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
+			StoreTimeout:                      ctx.GlobalDuration(flags.EncodingStoreTimeoutFlag.Name),
+			NumEncodingRetries:                ctx.GlobalInt(flags.NumEncodingRetriesFlag.Name),
+			NumRelayAssignment:                uint16(numRelayAssignments),
+			AvailableRelays:                   relays,
+			EncoderAddress:                    ctx.GlobalString(flags.EncoderAddressFlag.Name),
+			MaxNumBlobsPerIteration:           int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
+			OnchainStateRefreshInterval:       ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+			NumConcurrentRequests:             ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
+			MaxDispersalAge:                   ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
+			EnablePerAccountBlobStatusMetrics: ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
 		},
 		DispatcherConfig: controller.ControllerConfig{
 			PullInterval:                           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
@@ -172,9 +166,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			NumConcurrentRequests:                  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
 			NodeClientCacheSize:                    ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
 			CollectDetailedValidatorSigningMetrics: ctx.GlobalBool(flags.DetailedValidatorMetricsFlag.Name),
+			EnablePerAccountBlobStatusMetrics:      ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
 			MaxDispersalAge:                        ctx.GlobalDuration(flags.MaxDispersalAgeFlag.Name),
 			SigningRateRetentionPeriod:             ctx.GlobalDuration(flags.SigningRateRetentionPeriodFlag.Name),
 			SigningRateBucketSpan:                  ctx.GlobalDuration(flags.SigningRateBucketSpanFlag.Name),
+			BlobDispersalQueueSize:                 uint32(ctx.GlobalUint64(flags.BlobDispersalQueueSizeFlag.Name)),
+			BlobDispersalRequestBatchSize:          uint32(ctx.GlobalUint64(flags.BlobDispersalRequestBatchSizeFlag.Name)),
+			BlobDispersalRequestBackoffPeriod:      ctx.GlobalDuration(flags.BlobDispersalRequestBackoffPeriodFlag.Name),
+			SigningRateFlushPeriod:                 ctx.GlobalDuration(flags.SigningRateFlushPeriodFlag.Name),
+			SigningRateDynamoDbTableName:           ctx.GlobalString(flags.SigningRateDynamoDbTableNameFlag.Name),
 		},
 		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),
@@ -182,9 +182,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAContractDirectoryAddress: ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
 		MetricsPort:                     ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
-		ServerConfig:                    serverConfig,
+		ServerConfig:                    grpcServerConfig,
 		HeartbeatMonitorConfig:          heartbeatMonitorConfig,
 		PaymentAuthorizationConfig:      paymentAuthorizationConfig,
+		UserAccountRemappingFilePath:    ctx.GlobalString(flags.UserAccountRemappingFileFlag.Name),
+		ValidatorIdRemappingFilePath:    ctx.GlobalString(flags.ValidatorIdRemappingFileFlag.Name),
 	}
 
 	if err := config.DispersalRequestSignerConfig.Verify(); err != nil {

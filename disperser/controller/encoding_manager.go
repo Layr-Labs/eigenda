@@ -68,6 +68,16 @@ type EncodingManagerConfig struct {
 	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
 	// client at dispersal request creation time (in nanoseconds since Unix epoch).
 	MaxDispersalAge time.Duration
+
+	// If true, accounts that DON'T have a human-friendly name remapping will be reported as their full account ID
+	// in metrics.
+	//
+	// If false, accounts that DON'T have a human-friendly name remapping will be reported as "0x0" in metrics.
+	//
+	// NOTE: No matter the value of this field, accounts that DO have a human-friendly name remapping will be reported
+	// as their remapped name in metrics. If you must reduce metric cardinality by reporting ALL accounts as "0x0",
+	// you shouldn't define any human-friendly name remappings.
+	EnablePerAccountBlobStatusMetrics bool
 }
 
 var _ config.VerifiableConfig = &EncodingManagerConfig{}
@@ -165,21 +175,23 @@ func NewEncodingManager(
 	registry *prometheus.Registry,
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
+	userAccountRemapping map[string]string,
 ) (*EncodingManager, error) {
 	if err := config.Verify(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
 	return &EncodingManager{
-		EncodingManagerConfig:  config,
-		getNow:                 getNow,
-		blobMetadataStore:      blobMetadataStore,
-		pool:                   pool,
-		encodingClient:         encodingClient,
-		chainReader:            chainReader,
-		logger:                 logger.With("component", "EncodingManager"),
-		cursor:                 nil,
-		metrics:                newEncodingManagerMetrics(registry),
+		EncodingManagerConfig: config,
+		getNow:                getNow,
+		blobMetadataStore:     blobMetadataStore,
+		pool:                  pool,
+		encodingClient:        encodingClient,
+		chainReader:           chainReader,
+		logger:                logger.With("component", "EncodingManager"),
+		cursor:                nil,
+		metrics: newEncodingManagerMetrics(
+			registry, config.EnablePerAccountBlobStatusMetrics, userAccountRemapping),
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 	}, nil
@@ -425,7 +437,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 				requestedAt := time.Unix(0, int64(blob.RequestedAt))
 				e.metrics.reportE2EEncodingLatency(time.Since(requestedAt))
-				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded)
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded, blob.BlobHeader.PaymentMetadata.AccountID.Hex())
 			} else {
 				e.metrics.reportFailedSubmission()
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
@@ -439,7 +451,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				// the Dispatcher removes the blobKey from the blobSet when batching, but blobs that are set to FAILED
 				// never are batched, and therefore must be removed manually
 				e.blobSet.RemoveBlob(blobKey)
-				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed)
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed, blob.BlobHeader.PaymentMetadata.AccountID.Hex())
 			}
 		})
 	}

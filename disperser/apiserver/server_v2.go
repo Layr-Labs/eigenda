@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"sync/atomic"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -47,6 +49,7 @@ type DispersalServerV2 struct {
 	pb.UnimplementedDisperserServer
 
 	serverConfig      disperser.ServerConfig
+	chainId           *big.Int
 	blobStore         *blobstore.BlobStore
 	blobMetadataStore blobstore.MetadataStore
 	meterer           *meterer.Meterer
@@ -83,17 +86,10 @@ type DispersalServerV2 struct {
 	// This would be removed with decentralized ratelimiting
 	ReservedOnly bool
 
-	// Determines which payment system to use. If true, use the new payments system running on the controller.
-	// If false, use the legacy payments system which executes on the API server.
-	//
-	// TODO(litt3): this field should be removed once the migration to the new payments system is complete
-	useControllerMediatedPayments bool
-
 	// Exists as a member variable so that the connection can be closed inside Stop().
 	controllerConnection *grpc.ClientConn
 
-	// Client for making gRPC calls to the controller.
-	// May be nil if useControllerMediatedPayments is false
+	// Client for making gRPC calls to the controller for payment authorization.
 	controllerClient controller.ControllerServiceClient
 
 	// Pre-created listener for the gRPC server
@@ -103,12 +99,17 @@ type DispersalServerV2 struct {
 	// DisableGetBlobCommitment, if true, causes the GetBlobCommitment gRPC endpoint to return
 	// a deprecation error. This endpoint is deprecated and will be removed in a future release.
 	disableGetBlobCommitment bool
+
+	// Tracks signing rates for validators. This data is mirrored from the controller's signing rate tracker,
+	// so that external requests can be serviced without involving the controller.
+	signingRateTracker signingrate.SigningRateTracker
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
 	getNow func() time.Time,
+	chainId *big.Int,
 	blobStore *blobstore.BlobStore,
 	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
@@ -123,16 +124,22 @@ func NewDispersalServerV2(
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
-	useControllerMediatedPayments bool,
 	controllerConnection *grpc.ClientConn,
 	controllerClient controller.ControllerServiceClient,
 	listener net.Listener,
+	signingRateTracker signingrate.SigningRateTracker,
 ) (*DispersalServerV2, error) {
 	if listener == nil {
 		return nil, errors.New("listener is required")
 	}
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
+	}
+	if getNow == nil {
+		return nil, errors.New("getNow is required")
+	}
+	if chainId == nil {
+		return nil, errors.New("chainId is required")
 	}
 	if blobStore == nil {
 		return nil, errors.New("blob store is required")
@@ -149,14 +156,14 @@ func NewDispersalServerV2(
 	if committer == nil {
 		return nil, errors.New("committer is required")
 	}
+	if signingRateTracker == nil {
+		return nil, errors.New("signingRateTracker is required")
+	}
 	if maxNumSymbolsPerBlob == 0 {
 		return nil, errors.New("maxNumSymbolsPerBlob is required")
 	}
 	if _logger == nil {
 		return nil, errors.New("logger is required")
-	}
-	if getNow == nil {
-		return nil, errors.New("getNow is required")
 	}
 	if maxDispersalAge <= 0 {
 		return nil, fmt.Errorf("maxDispersalAge must be positive (got: %v)", maxDispersalAge)
@@ -167,17 +174,13 @@ func NewDispersalServerV2(
 
 	logger := _logger.With("component", "DispersalServerV2")
 
-	if useControllerMediatedPayments {
-		if controllerClient == nil {
-			return nil, errors.New("controller client is required when using controller-mediated payments")
-		}
-		logger.Info("Using controller-based payment system")
-	} else {
-		logger.Info("Using legacy payment metering system")
+	if controllerClient == nil {
+		return nil, errors.New("controller client is required")
 	}
 
 	return &DispersalServerV2{
 		serverConfig:      serverConfig,
+		chainId:           chainId,
 		blobStore:         blobStore,
 		blobMetadataStore: blobMetadataStore,
 
@@ -196,12 +199,12 @@ func NewDispersalServerV2(
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 
-		ReservedOnly:                  ReservedOnly,
-		useControllerMediatedPayments: useControllerMediatedPayments,
-		controllerConnection:          controllerConnection,
-		controllerClient:              controllerClient,
-		listener:                      listener,
-		disableGetBlobCommitment:      serverConfig.DisableGetBlobCommitment,
+		ReservedOnly:             ReservedOnly,
+		controllerConnection:     controllerConnection,
+		controllerClient:         controllerClient,
+		listener:                 listener,
+		disableGetBlobCommitment: serverConfig.DisableGetBlobCommitment,
+		signingRateTracker:       signingRateTracker,
 	}, nil
 }
 
@@ -478,6 +481,28 @@ func (s *DispersalServerV2) getPaymentState(
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, status.New(codes.OK, "")
+}
+
+func (s *DispersalServerV2) GetValidatorSigningRate(
+	ctx context.Context,
+	request *pb.GetValidatorSigningRateRequest,
+) (*pb.GetValidatorSigningRateReply, error) {
+
+	validatorId := core.OperatorID(request.GetValidatorId())
+
+	signingRate, err := s.signingRateTracker.GetValidatorSigningRate(
+		core.QuorumID(request.GetQuorum()),
+		validatorId,
+		time.Unix(int64(request.GetStartTimestamp()), 0),
+		time.Unix(int64(request.GetEndTimestamp()), 0))
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing rate for validator %s: %w", validatorId.Hex(), err)
+	}
+
+	return &pb.GetValidatorSigningRateReply{
+		ValidatorSigningRate: signingRate,
+	}, nil
 }
 
 // Gracefully shuts down the server and closes any open connections

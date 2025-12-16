@@ -282,6 +282,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		PayloadPolynomialForm: codecs.PolynomialFormEval,
 		BlobVersion:           0,
 	}
+
 	builderConfig := builder.Config{
 		StoreConfig: store.Config{
 			AsyncPutWorkers:               testCfg.WriteThreadCount,
@@ -331,6 +332,8 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			DisperserClientCfg: dispersal.DisperserClientConfig{
 				GrpcUri:           fmt.Sprintf("%s:%s", disperserHostname, disperserPort),
 				UseSecureGrpcFlag: true,
+				DisperserID:       0,
+				ChainID:           nil, // Will be populated after eth client is created
 			},
 			PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 				PayloadClientConfig:    payloadClientConfig,

@@ -26,7 +26,6 @@ alloy-signer-local = { version = "1.0.32", default-features = false }
 alloy-sol-types = { version = "1.3.1", default-features = false }
 alloy-transport = { version = "1.0.32", default-features = false }
 anyhow = { version = "1.0.99", default-features = false }
-arbitrary = { version = "1.3" }
 ark-bn254 = { version = "0.5.0", default-features = false }
 ark-ec = { version = "0.5.0", default-features = false }
 ark-ff = { version = "0.5.0", default-features = false }
@@ -50,13 +49,13 @@ reqwest = { version = "0.12.22" }
 reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.7.0", default-features = false }
 risc0-zkvm = { version = "2.1", default-features = false }
 rust-kzg-bn254-prover = { git = "https://github.com/Layr-Labs/rust-kzg-bn254.git", rev = "60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6", default-features = false }
-rustls = { version = "0.23.31" }
+rustls = { version = "0.23.34" }
 schemars = { version = "0.8.21", default-features = false }
 serde = { version = "1.0.219", default-features = false }
 serde_json = { version = "1.0.141" }
 serde_with = { version = "3.14.0" }
 test-strategy = { version = "0.4.3" }
-testcontainers = "0.25.2"
+testcontainers = "0.26.0"
 thiserror = { version = "2.0.12", default-features = false }
 tokio = { version = "1.47.1" }
 tracing = { version = "0.1.41" }
