@@ -805,6 +805,7 @@ func startController(
 	dispatcherConfig.BatchMetadataUpdatePeriod = 100 * time.Millisecond
 	dispatcherConfig.SigningRateDynamoDbTableName = "validator-signing-rates"
 	dispatcherConfig.DispersalRequestSigner.PrivateKey = "this is just a placeholder"
+	dispatcherConfig.EncodingManager = *encodingManagerConfig
 
 	// Chain state config
 	chainStateConfig := thegraph.Config{
