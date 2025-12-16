@@ -164,13 +164,13 @@ func (bdq *dynamodbBlobDispersalQueue) fetchBlobs() (bool, error) {
 		case replay.StatusValid:
 			bdq.queue <- blobMetadata
 		case replay.StatusTooOld:
-			bdq.metrics.reportDiscardedBlob("blobDispersalQueue", true)
+			bdq.metrics.reportDiscardedBlob("blobDispersalQueue", "stale")
 			bdq.markBlobAsFailed(hash)
 		case replay.StatusTooFarInFuture:
-			bdq.metrics.reportDiscardedBlob("blobDispersalQueue", false)
+			bdq.metrics.reportDiscardedBlob("blobDispersalQueue", "future")
 			bdq.markBlobAsFailed(hash)
 		case replay.StatusDuplicate:
-			// Ignore duplicates
+			bdq.metrics.reportDuplicateBlob("blobDispersalQueue")
 		default:
 			bdq.logger.Errorf("Unknown replay guardian status %d for blob %s, skipping.", status, hash.Hex())
 		}

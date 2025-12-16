@@ -30,6 +30,7 @@ type ControllerMetrics struct {
 	completedBlobs               *prometheus.CounterVec
 	attestation                  *prometheus.GaugeVec
 	discardedBlobCount           *prometheus.CounterVec
+	duplicateBlobCount           *prometheus.CounterVec
 	batchStageTimer              *common.StageTimer
 	sendToValidatorStageTimer    *common.StageTimer
 
@@ -200,7 +201,17 @@ func NewControllerMetrics(
 			Name:      "discarded_blob_count",
 			Help:      "Total number of blobs discarded due to being stale or for being too far in the future.",
 		},
-		[]string{"location" /* the part of the code that discarded */, "reason" /* "stale" or "future" */},
+		[]string{"location" /* the part of the code that discarded */, "reason" /* e.g. "stale" or "future" */},
+	)
+
+	duplicateBlobCount := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: controllerNamespace,
+			Name:      "duplicate_blob_count",
+			Help: "Total number of blobs discarded due to being duplicates " +
+				"(from dynamoDB's eventual consistency).",
+		},
+		[]string{"location" /* the part of the code that discarded */},
 	)
 
 	batchStageTimer := common.NewStageTimer(registry, controllerNamespace, "batch", false)
@@ -319,6 +330,7 @@ func NewControllerMetrics(
 		completedBlobs:                  completedBlobs,
 		attestation:                     attestation,
 		discardedBlobCount:              discardedBlobCount,
+		duplicateBlobCount:              duplicateBlobCount,
 		batchStageTimer:                 batchStageTimer,
 		sendToValidatorStageTimer:       sendToValidatorStageTimer,
 		minimumSigningThreshold:         minimumSigningThreshold,
@@ -429,19 +441,26 @@ func (m *ControllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStat
 func (m *ControllerMetrics) reportDiscardedBlob(
 	// The location where the blob was discarded.
 	location string,
-	// True if the blob was discarded for being stale, false if for being too far in the future.
-	stale bool,
+	// The reason why the blob was discarded (i.e., stale or future).
+	reason string,
 ) {
 	if m == nil {
 		return
 	}
 
-	reason := "future"
-	if stale {
-		reason = "stale"
+	m.discardedBlobCount.WithLabelValues(location, reason).Inc()
+}
+
+// Report a blob that was a duplicate.
+func (m *ControllerMetrics) reportDuplicateBlob(
+	// The location where the blob was discarded.
+	location string,
+) {
+	if m == nil {
+		return
 	}
 
-	m.discardedBlobCount.WithLabelValues(location, reason).Inc()
+	m.duplicateBlobCount.WithLabelValues(location).Inc()
 }
 
 func (m *ControllerMetrics) reportLegacyAttestation(

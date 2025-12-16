@@ -269,13 +269,13 @@ func (e *EncodingManager) filterStaleAndDedupBlobs(
 		case replay.StatusValid:
 			outputMetadatas = append(outputMetadatas, metadata)
 		case replay.StatusTooOld:
-			e.controllerMetrics.reportDiscardedBlob("encodingManager", true)
+			e.controllerMetrics.reportDiscardedBlob("encodingManager", "stale")
 			e.markBlobAsFailed(ctx, blobKey)
 		case replay.StatusTooFarInFuture:
-			e.controllerMetrics.reportDiscardedBlob("encodingManager", false)
+			e.controllerMetrics.reportDiscardedBlob("encodingManager", "future")
 			e.markBlobAsFailed(ctx, blobKey)
 		case replay.StatusDuplicate:
-			// Ignore duplicates
+			e.controllerMetrics.reportDuplicateBlob("encodingManager")
 		default:
 			e.logger.Errorf("Unknown replay guardian status %d for blob %s, skipping.", status, blobKey.Hex())
 		}
