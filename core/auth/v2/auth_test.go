@@ -18,6 +18,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -126,7 +127,8 @@ func testHeader(t *testing.T, accountID gethcommon.Address) *corev2.BlobHeader {
 func TestAuthenticatePaymentStateRequestValid(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
-	paymentStateAuthenticator := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	paymentStateAuthenticator, err := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	require.NoError(t, err)
 	paymentStateAuthenticator.ReplayGuardian = replay.NewNoOpReplayGuardian()
 
 	signature, err := signer.SignPaymentStateRequest(fixedTimestamp)
@@ -143,18 +145,20 @@ func TestAuthenticatePaymentStateRequestValid(t *testing.T) {
 }
 
 func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
-	paymentStateAuthenticator := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	paymentStateAuthenticator, err := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	require.NoError(t, err)
 	request := mockGetPaymentStateRequest(gethcommon.HexToAddress("0x123"), []byte{1, 2, 3})
 
-	err := paymentStateAuthenticator.AuthenticatePaymentStateRequest(gethcommon.HexToAddress("0x123"), request)
+	err = paymentStateAuthenticator.AuthenticatePaymentStateRequest(gethcommon.HexToAddress("0x123"), request)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signature length is unexpected")
 }
 
 func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
-	paymentStateAuthenticator := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	paymentStateAuthenticator, err := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	require.NoError(t, err)
 	request := mockGetPaymentStateRequest(gethcommon.Address{}, make([]byte, 65))
-	err := paymentStateAuthenticator.AuthenticatePaymentStateRequest(gethcommon.Address{}, request)
+	err = paymentStateAuthenticator.AuthenticatePaymentStateRequest(gethcommon.Address{}, request)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to recover public key from signature")
 }
@@ -162,7 +166,8 @@ func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
 func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
-	paymentStateAuthenticator := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	paymentStateAuthenticator, err := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	require.NoError(t, err)
 
 	// Create a different signer with wrong private key
 	wrongSigner, err := auth.NewLocalBlobRequestSigner("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded")
@@ -185,7 +190,8 @@ func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
 func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
-	paymentStateAuthenticator := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	paymentStateAuthenticator, err := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	require.NoError(t, err)
 
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)

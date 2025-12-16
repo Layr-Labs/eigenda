@@ -154,10 +154,13 @@ func NewServer(
 		}
 	}
 
-	replayGuardian := replay.NewReplayGuardian(
+	replayGuardian, err := replay.NewReplayGuardian(
 		time.Now,
 		config.GetChunksRequestMaxPastAge,
 		config.GetChunksRequestMaxPastAge)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replay guardian: %w", err)
+	}
 
 	server := &Server{
 		config:              config,
