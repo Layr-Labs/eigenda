@@ -43,7 +43,7 @@ type BN254G2Point struct {
 
 // ContractIEigenDAEjectionManagerMetaData contains all meta data concerning the ContractIEigenDAEjectionManager contract.
 var ContractIEigenDAEjectionManagerMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"addEjectorBalance\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"cancelEjection\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"cancelEjectionByEjector\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"cancelEjectionWithSig\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"completeEjection\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"quorums\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ejectionCooldown\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"ejectionDelay\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"ejectionQuorums\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"ejectionTime\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDepositToken\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getEjector\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getEjectorBalance\",\"inputs\":[{\"name\":\"ejector\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"lastEjectionInitiated\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setCooldown\",\"inputs\":[{\"name\":\"cooldown\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setDelay\",\"inputs\":[{\"name\":\"delay\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"startEjection\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"quorums\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"withdrawEjectorBalance\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"cancelEjection\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"cancelEjectionByEjector\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"cancelEjectionWithSig\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"completeEjection\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"quorums\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ejectionCooldown\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"ejectionDelay\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"ejectionQuorums\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"ejectionTime\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getEjector\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"lastEjectionInitiated\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setCooldown\",\"inputs\":[{\"name\":\"cooldown\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setDelay\",\"inputs\":[{\"name\":\"delay\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"startEjection\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"quorums\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"}]",
 }
 
 // ContractIEigenDAEjectionManagerABI is the input ABI used to generate the binding from.
@@ -316,37 +316,6 @@ func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerCallerSes
 	return _ContractIEigenDAEjectionManager.Contract.EjectionTime(&_ContractIEigenDAEjectionManager.CallOpts, operator)
 }
 
-// GetDepositToken is a free data retrieval call binding the contract method 0xfb1b5c7b.
-//
-// Solidity: function getDepositToken() view returns(address)
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerCaller) GetDepositToken(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
-	err := _ContractIEigenDAEjectionManager.contract.Call(opts, &out, "getDepositToken")
-
-	if err != nil {
-		return *new(common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-
-	return out0, err
-
-}
-
-// GetDepositToken is a free data retrieval call binding the contract method 0xfb1b5c7b.
-//
-// Solidity: function getDepositToken() view returns(address)
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerSession) GetDepositToken() (common.Address, error) {
-	return _ContractIEigenDAEjectionManager.Contract.GetDepositToken(&_ContractIEigenDAEjectionManager.CallOpts)
-}
-
-// GetDepositToken is a free data retrieval call binding the contract method 0xfb1b5c7b.
-//
-// Solidity: function getDepositToken() view returns(address)
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerCallerSession) GetDepositToken() (common.Address, error) {
-	return _ContractIEigenDAEjectionManager.Contract.GetDepositToken(&_ContractIEigenDAEjectionManager.CallOpts)
-}
-
 // GetEjector is a free data retrieval call binding the contract method 0xc412ef3b.
 //
 // Solidity: function getEjector(address operator) view returns(address)
@@ -378,37 +347,6 @@ func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerCallerSes
 	return _ContractIEigenDAEjectionManager.Contract.GetEjector(&_ContractIEigenDAEjectionManager.CallOpts, operator)
 }
 
-// GetEjectorBalance is a free data retrieval call binding the contract method 0x7c292e47.
-//
-// Solidity: function getEjectorBalance(address ejector) view returns(uint256)
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerCaller) GetEjectorBalance(opts *bind.CallOpts, ejector common.Address) (*big.Int, error) {
-	var out []interface{}
-	err := _ContractIEigenDAEjectionManager.contract.Call(opts, &out, "getEjectorBalance", ejector)
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-// GetEjectorBalance is a free data retrieval call binding the contract method 0x7c292e47.
-//
-// Solidity: function getEjectorBalance(address ejector) view returns(uint256)
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerSession) GetEjectorBalance(ejector common.Address) (*big.Int, error) {
-	return _ContractIEigenDAEjectionManager.Contract.GetEjectorBalance(&_ContractIEigenDAEjectionManager.CallOpts, ejector)
-}
-
-// GetEjectorBalance is a free data retrieval call binding the contract method 0x7c292e47.
-//
-// Solidity: function getEjectorBalance(address ejector) view returns(uint256)
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerCallerSession) GetEjectorBalance(ejector common.Address) (*big.Int, error) {
-	return _ContractIEigenDAEjectionManager.Contract.GetEjectorBalance(&_ContractIEigenDAEjectionManager.CallOpts, ejector)
-}
-
 // LastEjectionInitiated is a free data retrieval call binding the contract method 0xe6f51414.
 //
 // Solidity: function lastEjectionInitiated(address operator) view returns(uint64)
@@ -438,27 +376,6 @@ func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerSession) 
 // Solidity: function lastEjectionInitiated(address operator) view returns(uint64)
 func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerCallerSession) LastEjectionInitiated(operator common.Address) (uint64, error) {
 	return _ContractIEigenDAEjectionManager.Contract.LastEjectionInitiated(&_ContractIEigenDAEjectionManager.CallOpts, operator)
-}
-
-// AddEjectorBalance is a paid mutator transaction binding the contract method 0x3b115362.
-//
-// Solidity: function addEjectorBalance(uint256 amount) returns()
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerTransactor) AddEjectorBalance(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error) {
-	return _ContractIEigenDAEjectionManager.contract.Transact(opts, "addEjectorBalance", amount)
-}
-
-// AddEjectorBalance is a paid mutator transaction binding the contract method 0x3b115362.
-//
-// Solidity: function addEjectorBalance(uint256 amount) returns()
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerSession) AddEjectorBalance(amount *big.Int) (*types.Transaction, error) {
-	return _ContractIEigenDAEjectionManager.Contract.AddEjectorBalance(&_ContractIEigenDAEjectionManager.TransactOpts, amount)
-}
-
-// AddEjectorBalance is a paid mutator transaction binding the contract method 0x3b115362.
-//
-// Solidity: function addEjectorBalance(uint256 amount) returns()
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerTransactorSession) AddEjectorBalance(amount *big.Int) (*types.Transaction, error) {
-	return _ContractIEigenDAEjectionManager.Contract.AddEjectorBalance(&_ContractIEigenDAEjectionManager.TransactOpts, amount)
 }
 
 // CancelEjection is a paid mutator transaction binding the contract method 0x39ff1868.
@@ -606,25 +523,4 @@ func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerSession) 
 // Solidity: function startEjection(address operator, bytes quorums) returns()
 func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerTransactorSession) StartEjection(operator common.Address, quorums []byte) (*types.Transaction, error) {
 	return _ContractIEigenDAEjectionManager.Contract.StartEjection(&_ContractIEigenDAEjectionManager.TransactOpts, operator, quorums)
-}
-
-// WithdrawEjectorBalance is a paid mutator transaction binding the contract method 0xd0ac9cdf.
-//
-// Solidity: function withdrawEjectorBalance(uint256 amount) returns()
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerTransactor) WithdrawEjectorBalance(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error) {
-	return _ContractIEigenDAEjectionManager.contract.Transact(opts, "withdrawEjectorBalance", amount)
-}
-
-// WithdrawEjectorBalance is a paid mutator transaction binding the contract method 0xd0ac9cdf.
-//
-// Solidity: function withdrawEjectorBalance(uint256 amount) returns()
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerSession) WithdrawEjectorBalance(amount *big.Int) (*types.Transaction, error) {
-	return _ContractIEigenDAEjectionManager.Contract.WithdrawEjectorBalance(&_ContractIEigenDAEjectionManager.TransactOpts, amount)
-}
-
-// WithdrawEjectorBalance is a paid mutator transaction binding the contract method 0xd0ac9cdf.
-//
-// Solidity: function withdrawEjectorBalance(uint256 amount) returns()
-func (_ContractIEigenDAEjectionManager *ContractIEigenDAEjectionManagerTransactorSession) WithdrawEjectorBalance(amount *big.Int) (*types.Transaction, error) {
-	return _ContractIEigenDAEjectionManager.Contract.WithdrawEjectorBalance(&_ContractIEigenDAEjectionManager.TransactOpts, amount)
 }
