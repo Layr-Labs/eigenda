@@ -412,18 +412,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         // Deploy EigenDAEjectionManager
         // Using the first deployed strategy token as deposit token
-        address depositToken = address(deployedStrategyArray[0].underlyingToken());
-        uint256 depositBaseFeeMultiplier = 100; // 100x base fee multiplier
-        uint256 estimatedGasUsedWithoutSig = 100_000; // 100k gas estimate
-        uint256 estimatedGasUsedWithSig = 200_000; // 200k gas estimate with signature verification
-
-        eigenDAEjectionManager = new EigenDAEjectionManager(
-            depositToken,
-            depositBaseFeeMultiplier,
-            address(eigenDADirectory),
-            estimatedGasUsedWithoutSig,
-            estimatedGasUsedWithSig
-        );
+        eigenDAEjectionManager = new EigenDAEjectionManager(address(eigenDADirectory));
         eigenDAEjectionManager.setCooldown(60);
         eigenDAEjectionManager.setDelay(60);
         eigenDADirectory.addAddress(

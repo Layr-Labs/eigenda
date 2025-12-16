@@ -6,12 +6,7 @@ import {EigenDAEjectionStorage} from "src/periphery/ejection/libraries/EigenDAEj
 
 library EigenDAEjectionLib {
     event EjectionStarted(
-        address operator,
-        address ejector,
-        bytes quorums,
-        uint64 timestampStarted,
-        uint64 ejectionTime,
-        uint256 depositAmount
+        address indexed operator, address indexed ejector, bytes quorums, uint64 timestampStarted, uint64 ejectionTime
     );
 
     event EjectionCancelled(address operator);
@@ -35,7 +30,7 @@ library EigenDAEjectionLib {
     }
 
     /// @notice Starts an ejection process for an operator.
-    function startEjection(address operator, address ejector, bytes memory quorums, uint256 depositAmount) internal {
+    function startEjection(address operator, address ejector, bytes memory quorums) internal {
         EigenDAEjectionTypes.EjecteeState storage ejectee = getEjectee(operator);
 
         require(ejectee.record.proceedingTime == 0, "Ejection already in progress");
@@ -44,11 +39,8 @@ library EigenDAEjectionLib {
         ejectee.record.ejector = ejector;
         ejectee.record.quorums = quorums;
         ejectee.record.proceedingTime = uint64(block.timestamp) + s().delay;
-        ejectee.record.depositAmount = depositAmount;
         ejectee.lastProceedingInitiated = uint64(block.timestamp);
-        emit EjectionStarted(
-            operator, ejector, quorums, ejectee.lastProceedingInitiated, ejectee.record.proceedingTime, depositAmount
-        );
+        emit EjectionStarted(operator, ejector, quorums, ejectee.lastProceedingInitiated, ejectee.record.proceedingTime);
     }
 
     /// @notice Cancels an ejection process for an operator.
@@ -79,37 +71,12 @@ library EigenDAEjectionLib {
         ejectee.record.ejector = address(0);
         ejectee.record.quorums = hex"";
         ejectee.record.proceedingTime = 0;
-        ejectee.record.depositAmount = 0;
-    }
-
-    /// @notice Adds to the ejector's balance for ejection processes.
-    /// @dev This function does not handle tokens
-    function addEjectorBalance(address ejector, uint256 amount) internal {
-        s().ejectorBalanceRecord[ejector] += amount;
-    }
-
-    /// @notice Subtracts from the ejector's balance for ejection processes.
-    /// @dev This function does not handle tokens
-    function subtractEjectorBalance(address ejector, uint256 amount) internal {
-        require(s().ejectorBalanceRecord[ejector] >= amount, "Insufficient balance");
-        // no underflow check needed
-        unchecked {
-            s().ejectorBalanceRecord[ejector] -= amount;
-        }
     }
 
     /// @notice Returns the address of the ejector for a given operator.
     /// @dev If the address is zero, it means no ejection is in progress.
     function getEjector(address operator) internal view returns (address ejector) {
         return s().ejectees[operator].record.ejector;
-    }
-
-    function getEjectorBalance(address ejector) internal view returns (uint256) {
-        return s().ejectorBalanceRecord[ejector];
-    }
-
-    function getDepositAmount(address operator) internal view returns (uint256 depositAmount) {
-        return s().ejectees[operator].record.depositAmount;
     }
 
     function lastProceedingInitiated(address operator) internal view returns (uint64) {

@@ -22,28 +22,14 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     using EigenDAEjectionLib for address;
     using SafeERC20 for IERC20;
 
-    address internal immutable _depositToken;
     address internal immutable _addressDirectory;
-    uint256 internal immutable _estimatedGasUsedWithoutSig;
-    uint256 internal immutable _estimatedGasUsedWithSig;
-    uint256 internal immutable _depositBaseFeeMultiplier;
 
     bytes32 internal constant CANCEL_EJECTION_MESSAGE_IDENTIFIER = keccak256(
         "CancelEjection(address operator,uint64 proceedingTime,uint64 lastProceedingInitiated,bytes quorums,address recipient)"
     );
 
-    constructor(
-        address depositToken_,
-        uint256 depositBaseFeeMultiplier_,
-        address addressDirectory_,
-        uint256 estimatedGasUsedWithoutSig_,
-        uint256 estimatedGasUsedWithSig_
-    ) {
-        _depositToken = depositToken_;
-        _depositBaseFeeMultiplier = depositBaseFeeMultiplier_;
+    constructor(address addressDirectory_) {
         _addressDirectory = addressDirectory_;
-        _estimatedGasUsedWithoutSig = estimatedGasUsedWithoutSig_;
-        _estimatedGasUsedWithSig = estimatedGasUsedWithSig_;
     }
 
     modifier onlyOwner(address sender) {
@@ -71,35 +57,17 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     /// EJECTOR FUNCTIONS
 
     /// @inheritdoc IEigenDAEjectionManager
-    function addEjectorBalance(uint256 amount) external onlyEjector(msg.sender) {
-        msg.sender.addEjectorBalance(amount);
-        IERC20(_depositToken).safeTransferFrom(msg.sender, address(this), amount);
-    }
-
-    /// @inheritdoc IEigenDAEjectionManager
-    function withdrawEjectorBalance(uint256 amount) external onlyEjector(msg.sender) {
-        msg.sender.subtractEjectorBalance(amount);
-        IERC20(_depositToken).safeTransfer(msg.sender, amount);
-    }
-
-    /// @inheritdoc IEigenDAEjectionManager
     function startEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
-        uint256 depositAmount = _depositAmount();
-        msg.sender.subtractEjectorBalance(depositAmount);
-        operator.startEjection(msg.sender, quorums, depositAmount);
+        operator.startEjection(msg.sender, quorums);
     }
 
     /// @inheritdoc IEigenDAEjectionManager
     function cancelEjectionByEjector(address operator) external onlyEjector(msg.sender) {
-        uint256 depositAmount = operator.getDepositAmount();
-        operator.getEjector().addEjectorBalance(depositAmount);
         operator.cancelEjection();
     }
 
     /// @inheritdoc IEigenDAEjectionManager
     function completeEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
-        uint256 depositAmount = operator.getDepositAmount();
-        operator.getEjector().addEjectorBalance(depositAmount);
         operator.completeEjection(quorums);
         _tryEjectOperator(operator, quorums);
     }
@@ -119,33 +87,19 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         (BN254.G1Point memory apk,) = IBLSApkRegistry(blsApkRegistry).getRegisteredPubkey(operator);
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
 
-        uint256 depositAmount = EigenDAEjectionLib.getEjectionRecord(operator).depositAmount;
         operator.cancelEjection();
-        _refundGas(recipient, _estimatedGasUsedWithSig, depositAmount);
     }
 
     /// @inheritdoc IEigenDAEjectionManager
     function cancelEjection() external {
-        uint256 depositAmount = EigenDAEjectionLib.getEjectionRecord(msg.sender).depositAmount;
         msg.sender.cancelEjection();
-        _refundGas(msg.sender, _estimatedGasUsedWithoutSig, depositAmount);
     }
 
     /// GETTERS
 
     /// @inheritdoc IEigenDAEjectionManager
-    function getDepositToken() external view returns (address) {
-        return _depositToken;
-    }
-
-    /// @inheritdoc IEigenDAEjectionManager
     function getEjector(address operator) external view returns (address) {
         return operator.getEjector();
-    }
-
-    /// @inheritdoc IEigenDAEjectionManager
-    function getEjectorBalance(address ejector) external view returns (uint256) {
-        return ejector.getEjectorBalance();
     }
 
     /// @inheritdoc IEigenDAEjectionManager
@@ -179,15 +133,6 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     }
 
     /// INTERNAL FUNCTIONS
-    /// @notice Returns the required deposit for initiating an ejection based on a multiple of the base fee of the block.
-    function _depositAmount() internal virtual returns (uint256) {
-        return _estimatedGasUsedWithSig * block.basefee * _depositBaseFeeMultiplier;
-    }
-
-    function _refundGas(address receiver, uint256 estimatedGasUsed, uint256 depositAmount) internal virtual {
-        uint256 estimatedRefund = estimatedGasUsed * block.basefee;
-        IERC20(_depositToken).safeTransfer(receiver, estimatedRefund > depositAmount ? depositAmount : estimatedRefund);
-    }
 
     /// @notice Attempts to eject an operator. If the ejection fails, it catches the error and does nothing.
     function _tryEjectOperator(address operator, bytes memory quorums) internal {
