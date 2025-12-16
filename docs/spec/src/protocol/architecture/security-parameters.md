@@ -34,6 +34,21 @@ versionedBlobParams = [
     { 0_maxNumOperators = 3537, 1_numChunks = 8192, 2_codingRate = 8 }
 ]
 ```
+**Note on MaxNumOperators**
+
+The `MaxNumOperators` parameter (n = 3537) serves as an **upper bound** used in the chunk assignment algorithm and security threshold derivations. This upper bound ensures that the reconstruction threshold and other security properties remain fixed and predictable, regardless of how many operators actually register.
+
+The actual number of operators allowed to register for each quorum is controlled separately by the on-chain `maxOperatorCount` parameter in the `OperatorSetParam` struct. The current on-chain limits per quorum are:
+
+- Quorum 0 (ETH): 200 operators
+- Quorum 1 (EIGEN): 200 operators
+- Quorum 2 (Custom): 15 operators
+
+The per-quorum limits can be adjusted via governance without requiring changes to the blob parameters or security thresholds, as long as they remain below the upper bound.
+
+For more details on how `maxOperatorCount` is enforced during operator registration, see the [EigenDARegistryCoordinator 
+contract](https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARegistryCoordinator.sol).
+
 
 ### Reconstruction Threshold
 
