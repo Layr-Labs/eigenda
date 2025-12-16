@@ -798,7 +798,6 @@ func startController(
 	encodingManagerConfig.NumRelayAssignment = uint16(config.RelayCount)
 	encodingManagerConfig.AvailableRelays = availableRelays
 	encodingManagerConfig.EncoderAddress = encoderAddress
-	encodingManagerConfig.PullInterval = 100 * time.Millisecond
 
 	// Build dispatcher configs
 	dispatcherConfig := controller.DefaultControllerConfig()
