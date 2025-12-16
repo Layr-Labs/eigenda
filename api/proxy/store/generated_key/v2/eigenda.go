@@ -318,21 +318,16 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCer
 	//
 	// Note: offchain derivation versioning was introduced in cert version 4.
 	if certVersion >= coretypes.VersionFourCert {
-		timeoutCtx, cancel := context.WithTimeout(ctx, e.contractCallTimeout)
-		defer cancel()
-
-		offchainDerivationVersion, err := e.certVerifier.GetOffchainDerivationVersion(
-			timeoutCtx,
-			sumDACert.ReferenceBlockNumber(),
-		)
-		if err != nil {
-			return fmt.Errorf("eth-call to CertVerifier.offchainDerivationVersion: %w", err)
-		}
+		// The CheckDACert call above has already verified the cert's onchain validity,
+		// including that the cert's offchain derivation version is supported onchain.
+		// So we can safely cast to V4 here.
+		certV4 := sumDACert.(*coretypes.EigenDACertV4)
+		offchainDerivationVersion := certV4.OffchainDerivationVersion
 
 		offchainDerivationParams, exists := e.offchainDerivationMap[offchainDerivationVersion]
 		if !exists {
-			// Note: we've already verified the cert's onchain validity above, if we encounter this error,
-			// we've updated the derivation version onchain and not updated the hardcoded offchain map.
+			// Note: If we encounter this error, we've updated the derivation version onchain and not updated the
+			// hardcoded offchain map. This should never happen in practice unless there's a misconfiguration.
 			return coretypes.NewCertParsingFailedError(
 				hex.EncodeToString(versionedCert.SerializedCert),
 				fmt.Sprintf("unsupported offchain derivation version: %d", offchainDerivationVersion),
@@ -340,7 +335,7 @@ func (e Store) VerifyCert(ctx context.Context, versionedCert *certs.VersionedCer
 		}
 
 		err = verifyCertRBNRecencyCheck(
-			sumDACert.ReferenceBlockNumber(),
+			certV4.ReferenceBlockNumber(),
 			l1InclusionBlockNum,
 			offchainDerivationParams.RBNRecencyWindowSize,
 		)
