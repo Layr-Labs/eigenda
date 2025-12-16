@@ -295,7 +295,8 @@ func benchmarkFrameGeneration(b *testing.B, encodingConfig encoding.Config) {
 			}
 
 			for b.Loop() {
-				n := 20
+				// increase to test parallelization
+				n := 1
 				wg := sync.WaitGroup{}
 				wg.Add(n)
 				for range n {
