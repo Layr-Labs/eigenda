@@ -11,7 +11,6 @@ library EigenDAEjectionStorage {
     struct Layout {
         /// @dev callee dependencies
         address accessControl;
-        address depositToken;
         address blsApkKeyRegistry;
         address serviceManager;
         address registryCoordinator;
