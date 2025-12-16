@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/consts"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/utils"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -80,7 +81,7 @@ func NewStore(
 	offchainDerivationMap := make(OffchainDerivationMap)
 	// Currently only offchain derivation version 0 exists.
 	offchainDerivationMap[0] = OffchainDerivationParameters{
-		RBNRecencyWindowSize: 14400, // 48 hours worth of blocks at 12s block time
+		RBNRecencyWindowSize: consts.RBNRecencyWindowSizeV0,
 	}
 
 	return &Store{

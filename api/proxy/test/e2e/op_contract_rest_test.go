@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	_ "github.com/Layr-Labs/eigenda/api/clients/v2/verification" // imported for docstring link
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/consts"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
@@ -36,7 +37,7 @@ func TestOPContractTestRBNRecencyCheck(t *testing.T) {
 		{
 			name:      "RBN recency check failed",
 			certRBN:   100,
-			certL1IBN: 14501, // recency window for derivation version 0 is 14400 blocks
+			certL1IBN: 100 + consts.RBNRecencyWindowSizeV0 + 1,
 			requireErrorFn: func(t *testing.T, err error) {
 				// expect proxy to return a 418 error which the client converts to this structured error
 				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
