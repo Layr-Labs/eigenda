@@ -14,7 +14,7 @@ library EigenDAEjectionStorage {
         address blsApkKeyRegistry;
         address serviceManager;
         address registryCoordinator;
-        
+
         /// @dev ejection state
         mapping(address => EigenDAEjectionTypes.EjecteeState) ejectees;
 

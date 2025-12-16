@@ -190,18 +190,16 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
 
     function _onlyOwner(address sender) internal view virtual {
         require(
-            IAccessControl(EigenDAEjectionStorage.layout().accessControl).hasRole(
-                AccessControlConstants.OWNER_ROLE, sender
-            ),
+            IAccessControl(EigenDAEjectionStorage.layout().accessControl)
+                .hasRole(AccessControlConstants.OWNER_ROLE, sender),
             "EigenDAEjectionManager: Caller is not the owner"
         );
     }
 
     function _onlyEjector(address sender) internal view virtual {
         require(
-            IAccessControl(EigenDAEjectionStorage.layout().accessControl).hasRole(
-                AccessControlConstants.EJECTOR_ROLE, sender
-            ),
+            IAccessControl(EigenDAEjectionStorage.layout().accessControl)
+                .hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
             "EigenDAEjectionManager: Caller is not an ejector"
         );
     }
