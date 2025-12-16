@@ -22,9 +22,9 @@ BenchmarkMultiproofGenerationIcicle/Multiproof_size_2^17_bytes-4         	      
 BenchmarkMultiproofGenerationIcicle/Multiproof_size_2^20_bytes-4         	      16	  67923052 ns/op	12224407 B/op	   24721 allocs/op
 BenchmarkMultiproofGenerationIcicle/Multiproof_size_2^21_bytes-4         	      14	  89145573 ns/op	21661581 B/op	   24817 allocs/op
 BenchmarkMultiproofGenerationIcicle/Multiproof_size_2^24_bytes-4         	       4	 268642522 ns/op	153782200 B/op	   26163 allocs/op
-BenchmarkFrameGenerationIcicle/Multiproof_size_2^17_bytes-4              	       2	 686213521 ns/op	206581500 B/op	  986762 allocs/op
-BenchmarkFrameGenerationIcicle/Multiproof_size_2^20_bytes-4              	       1	1241867860 ns/op	1014957568 B/op	  989418 allocs/op
-BenchmarkFrameGenerationIcicle/Multiproof_size_2^21_bytes-4              	       1	2056603526 ns/op	1916724024 B/op	  991313 allocs/op
-BenchmarkFrameGenerationIcicle/Multiproof_size_2^24_bytes-4              	       1	15891864114 ns/op	14541583376 B/op	 1018285 allocs/op
+BenchmarkFrameGenerationIcicle/Multiproof_size_2^17_bytes-4              	      20	  55552193 ns/op	11294856 B/op	   49384 allocs/op
+BenchmarkFrameGenerationIcicle/Multiproof_size_2^20_bytes-4              	      15	  74381950 ns/op	52006542 B/op	   49503 allocs/op
+BenchmarkFrameGenerationIcicle/Multiproof_size_2^21_bytes-4              	       9	 117601538 ns/op	103015183 B/op	   49692 allocs/op
+BenchmarkFrameGenerationIcicle/Multiproof_size_2^24_bytes-4              	       1	1267413298 ns/op	1396524456 B/op	   52914 allocs/op
 PASS
 ok  	command-line-arguments	199.526s
