@@ -106,8 +106,7 @@ contract EigenDAEjectionManagerTest is Test {
         ejectionManager.setDelay(delay);
         ejectionManager.startEjection(ejectee, "0x");
 
-        // 2) Issue a cancellation from the Ejector role and withdraw the ERC20 funds
-        //    (i.e, contract -> ejector)
+        // 2) Issue a cancellation from the Ejector role
         ejectionManager.cancelEjectionByEjector(ejectee);
 
         // 3) Ensure the ejectee record has been nullified

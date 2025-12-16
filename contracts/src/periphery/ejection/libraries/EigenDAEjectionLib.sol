@@ -6,7 +6,7 @@ import {EigenDAEjectionStorage} from "src/periphery/ejection/libraries/EigenDAEj
 
 library EigenDAEjectionLib {
     event EjectionStarted(
-        address operator, address ejector, bytes quorums, uint64 timestampStarted, uint64 ejectionTime
+        address indexed operator, address indexed ejector, bytes quorums, uint64 timestampStarted, uint64 ejectionTime
     );
 
     event EjectionCancelled(address operator);
