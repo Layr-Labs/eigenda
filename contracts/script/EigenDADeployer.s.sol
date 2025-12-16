@@ -411,16 +411,10 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
         );
 
-        // Deploy EigenDAEjectionManager with proxy pattern
-        // Using the first deployed strategy token as deposit token
-        uint256 depositBaseFeeMultiplier = 100; // 100x base fee multiplier
-        uint256 estimatedGasUsedWithoutSig = 100_000; // 100k gas estimate
-        uint256 estimatedGasUsedWithSig = 200_000; // 200k gas estimate with signature verification
-
-        // Deploy implementation
+        // Deploy EigenDAEjectionManager implementation
         eigenDAEjectionManagerImplementation = new EigenDAEjectionManager();
 
-        // Deploy proxy with initialization
+        // Deploy EigenDAEjectionManager proxy with initialization
         eigenDAEjectionManager = EigenDAEjectionManager(
             address(
                 new TransparentUpgradeableProxy(
@@ -431,10 +425,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                         address(eigenDAAccessControl),
                         address(apkRegistry),
                         address(eigenDAServiceManager),
-                        address(registryCoordinator),
-                        depositBaseFeeMultiplier,
-                        estimatedGasUsedWithoutSig,
-                        estimatedGasUsedWithSig
+                        address(registryCoordinator)
                     )
                 )
             )
