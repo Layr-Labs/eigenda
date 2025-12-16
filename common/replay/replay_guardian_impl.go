@@ -126,7 +126,7 @@ func (r *replayGuardian) VerifyRequest(requestHash []byte, requestTimestamp time
 	status := r.DetailedVerifyRequest(requestHash, requestTimestamp)
 
 	if status != StatusValid {
-		return fmt.Errorf("replay guardian request rejected: %s", status.String())
+		return fmt.Errorf("replay guardian request rejected: %s", status)
 	}
 
 	return nil

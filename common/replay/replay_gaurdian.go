@@ -39,6 +39,3 @@ const (
 	StatusDuplicate ReplayGuardianStatus = "Duplicate"
 )
 
-func (s ReplayGuardianStatus) String() string {
-	return string(s)
-}

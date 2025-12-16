@@ -28,7 +28,7 @@ func TestTooOldRequest(t *testing.T) {
 
 	err = rGuard.VerifyRequest(rand.Bytes(32), requestTime)
 	require.Error(t, err)
-	require.True(t, strings.Contains(err.Error(), StatusTooOld.String()))
+	require.True(t, strings.Contains(err.Error(), string(StatusTooOld)))
 
 	// Verify that nothing has been added to the observedHashes set.
 	g := rGuard.(*replayGuardian)
@@ -81,7 +81,7 @@ func TestTooFarInFutureRequest(t *testing.T) {
 
 	err = rGuard.VerifyRequest(rand.Bytes(32), requestTime)
 	require.Error(t, err)
-	require.True(t, strings.Contains(err.Error(), StatusTooFarInFuture.String()))
+	require.True(t, strings.Contains(err.Error(), string(StatusTooFarInFuture)))
 
 	// Verify that nothing has been added to the observedHashes set.
 	g := rGuard.(*replayGuardian)
@@ -161,7 +161,7 @@ func TestDuplicateRequests(t *testing.T) {
 			for submittedHash := range submittedHashes {
 				err = rGuard.VerifyRequest([]byte(submittedHash), requestTime)
 				require.Error(t, err)
-				require.True(t, strings.Contains(err.Error(), StatusDuplicate.String()))
+				require.True(t, strings.Contains(err.Error(), string(StatusDuplicate)))
 			}
 		}
 	}
