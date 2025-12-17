@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/config"
+	"github.com/Layr-Labs/eigenda/common/config/secret"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
@@ -33,14 +34,10 @@ func main() {
 
 // Run the ejector. This method is split from main() so we only have to use panic() once.
 func run(ctx context.Context) error {
-	cfg, err := config.Bootstrap(ejector.DefaultRootEjectorConfig, nil, nil)
+	ejectorConfig, err := config.Bootstrap(ejector.DefaultEjectorConfig, nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to bootstrap config: %w", err)
 	}
-	secretConfig := cfg.Secret
-	ejectorConfig := cfg.Config
-	// Ensure we don't accidentally use cfg after this point.
-	cfg = nil
 
 	loggerConfig := common.DefaultLoggerConfig()
 	loggerConfig.Format = common.LogFormat(ejectorConfig.LogOutputType)
@@ -54,9 +51,9 @@ func run(ctx context.Context) error {
 	var privateKey *ecdsa.PrivateKey
 	var senderAddress gethcommon.Address
 
-	if secretConfig.PrivateKey != "" {
+	if ejectorConfig.PrivateKey.Get() != "" {
 		// Use private key if provided
-		privateKey, err = crypto.HexToECDSA(secretConfig.PrivateKey)
+		privateKey, err = crypto.HexToECDSA(ejectorConfig.PrivateKey.Get())
 		if err != nil {
 			return fmt.Errorf("failed to parse private key: %w", err)
 		}
@@ -83,8 +80,8 @@ func run(ctx context.Context) error {
 
 	gethClient, err := geth.NewMultiHomingClient(
 		geth.EthClientConfig{
-			RPCURLs:          secretConfig.EthRpcUrls,
-			PrivateKeyString: secretConfig.PrivateKey,
+			RPCURLs:          secret.SecretSliceToStringSlice(ejectorConfig.EthRpcUrls),
+			PrivateKeyString: ejectorConfig.PrivateKey.Get(), // TODO this will need to be configured for KMS
 			NumConfirmations: ejectorConfig.EthBlockConfirmations,
 			NumRetries:       ejectorConfig.EthRpcRetryCount,
 		},

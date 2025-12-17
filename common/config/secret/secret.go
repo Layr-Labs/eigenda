@@ -28,7 +28,13 @@ func NewSecret(value string) *Secret {
 }
 
 // Get returns the secret value.
+//
+// Safe to call on a nil *Secret, in which case it returns an empty string.
 func (s *Secret) Get() string {
+	if s == nil {
+		return ""
+	}
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	value := <-s.vault
@@ -37,7 +43,13 @@ func (s *Secret) Get() string {
 }
 
 // Set updates the secret value, returning the old value.
+//
+// Not safe to call on a nil *Secret (will panic).
 func (s *Secret) Set(value string) string {
+	if s == nil {
+		panic("cannot set value on nil Secret")
+	}
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	oldValue := <-s.vault
@@ -46,9 +58,17 @@ func (s *Secret) Set(value string) string {
 }
 
 func (s *Secret) String() string {
+	if s == nil {
+		return ""
+	}
+
 	return "****"
 }
 
 func (s *Secret) GoString() string {
+	if s == nil {
+		return ""
+	}
+
 	return "****"
 }

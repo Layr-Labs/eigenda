@@ -6,22 +6,20 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
+	"github.com/Layr-Labs/eigenda/common/config/secret"
 )
 
-var _ config.DocumentedConfig = (*RootEjectorConfig)(nil)
-
-// The root configuration for the ejector service. This config should be discarded after parsing
-// and only the sub-configs should be used. This is a safety mechanism to make it harder to
-// accidentally print/log the secret config.
-type RootEjectorConfig struct {
-	Config *EjectorConfig
-	Secret *EjectorSecretConfig
-}
-
-var _ config.VerifiableConfig = (*EjectorConfig)(nil)
+var _ config.DocumentedConfig = (*EjectorConfig)(nil)
 
 // Configuration for the ejector.
 type EjectorConfig struct {
+
+	// The Ethereum RPC URL(s) to use for connecting to the blockchain.
+	EthRpcUrls []*secret.Secret `docs:"required"`
+
+	// The private key to use for signing ejection transactions, in hex.
+	// Do not include the '0x' prefix. This is required if KMS is not configured.
+	PrivateKey *secret.Secret `docs:"required"`
 
 	// The address of the contract directory contract.
 	ContractDirectoryAddress string `docs:"required"`
@@ -109,67 +107,6 @@ type EjectorConfig struct {
 	SigningRateLogPeriod time.Duration
 }
 
-var _ config.VerifiableConfig = (*EjectorSecretConfig)(nil)
-
-// Configuration for secrets used by the ejector.
-type EjectorSecretConfig struct {
-	// The Ethereum RPC URL(s) to use for connecting to the blockchain.
-	EthRpcUrls []string `docs:"required"`
-
-	// The private key to use for signing ejection transactions, in hex.
-	// Do not include the '0x' prefix. This is required if KMS is not configured.
-	PrivateKey string `docs:"required"`
-}
-
-// Create a new root ejector config with default values.
-func DefaultRootEjectorConfig() *RootEjectorConfig {
-	return &RootEjectorConfig{
-		Config: DefaultEjectorConfig(),
-		Secret: &EjectorSecretConfig{},
-	}
-}
-
-func (e *RootEjectorConfig) GetEnvVarPrefix() string {
-	return "EJECTOR"
-}
-
-func (e *RootEjectorConfig) GetName() string {
-	return "Ejector"
-}
-
-func (e *RootEjectorConfig) GetPackagePaths() []string {
-	return []string{
-		"github.com/Layr-Labs/eigenda/ejector",
-	}
-}
-
-func (e *RootEjectorConfig) Verify() error {
-	err := e.Config.Verify()
-	if err != nil {
-		return fmt.Errorf("invalid ejector config: %w", err)
-	}
-
-	err = e.Secret.Verify()
-	if err != nil {
-		return fmt.Errorf("invalid ejector secret config: %w", err)
-	}
-
-	if e.Secret.PrivateKey == "" {
-		if e.Config.KmsKeyId == "" || e.Config.KmsRegion == "" {
-			return fmt.Errorf("either private key or KMS configuration must be provided")
-		}
-	}
-
-	return nil
-}
-
-func (c *EjectorSecretConfig) Verify() error {
-	if len(c.EthRpcUrls) == 0 {
-		return fmt.Errorf("invalid Ethereum RPC URLs: must provide at least one URL")
-	}
-	return nil
-}
-
 // DefaultEjectorConfig returns a default configuration for the ejector.
 func DefaultEjectorConfig() *EjectorConfig {
 	return &EjectorConfig{
@@ -249,6 +186,42 @@ func (c *EjectorConfig) Verify() error {
 	if c.ChainDataCacheSize <= 0 {
 		return fmt.Errorf("invalid chain data cache size: %d", c.ChainDataCacheSize)
 	}
+	if c.SigningRateLogPeriod < 0 {
+		return fmt.Errorf("invalid signing rate log period: %s", c.SigningRateLogPeriod)
+	}
+	if len(c.EthRpcUrls) == 0 {
+		return fmt.Errorf("at least one Ethereum RPC URL must be provided")
+	}
+	for _, url := range c.EthRpcUrls {
+		if url.Get() == "" {
+			return fmt.Errorf("EthRpcUrls cannot be empty strings")
+		}
+	}
+
+	// Either a private key must be provided or KMS must be configured.
+	if c.PrivateKey.Get() == "" {
+		if c.KmsKeyId == "" {
+			return fmt.Errorf("either a private key or KMS Key ID must be provided")
+		}
+		if c.KmsRegion == "" {
+			return fmt.Errorf("KMS region must be provided when KMS Key ID is set")
+		}
+	}
 
 	return nil
+}
+
+func (c *EjectorConfig) GetEnvVarPrefix() string {
+	return "EJECTOR"
+}
+
+func (c *EjectorConfig) GetName() string {
+	return "Ejector"
+}
+
+func (c *EjectorConfig) GetPackagePaths() []string {
+	return []string{
+		"github.com/Layr-Labs/eigenda/ejector",
+		"github.com/Layr-Labs/eigenda/common/config/secret",
+	}
 }
