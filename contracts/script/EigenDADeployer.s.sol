@@ -19,6 +19,7 @@ import {IBLSApkRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IBLSA
 import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "src/core/EigenDAServiceManager.sol";
 import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {EigenDACertVerifierV2} from "src/integrations/cert/legacy/v2/EigenDACertVerifierV2.sol";
+import {EigenDACertVerifierV3} from "src/integrations/cert/legacy/v3/EigenDACertVerifierV3.sol";
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
@@ -62,7 +63,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     BLSApkRegistry public apkRegistry;
     EigenDAServiceManager public eigenDAServiceManager;
     EigenDAThresholdRegistry public eigenDAThresholdRegistry;
-    EigenDACertVerifierV2 public legacyEigenDACertVerifier;
+    EigenDACertVerifierV2 public legacyEigenDACertVerifierV2;
+    EigenDACertVerifierV3 public legacyEigenDACertVerifierV3;
     EigenDACertVerifier public eigenDACertVerifier;
     EigenDACertVerifierRouter public eigenDACertVerifierRouter;
     EigenDARegistryCoordinator public registryCoordinator;
@@ -367,7 +369,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         // NOTE: will be deprecated in the future with subsequent release
         //       which removes the legacy V2 cert verifier entirely
-        legacyEigenDACertVerifier = new EigenDACertVerifierV2(
+        legacyEigenDACertVerifierV2 = new EigenDACertVerifierV2(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             OperatorStateRetriever(address(operatorStateRetriever)),
@@ -376,7 +378,18 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             hex"0001"
         );
         eigenDADirectory.addAddress(
-            AddressDirectoryConstants.CERT_VERIFIER_LEGACY_V2_NAME, address(legacyEigenDACertVerifier)
+            AddressDirectoryConstants.CERT_VERIFIER_LEGACY_V2_NAME, address(legacyEigenDACertVerifierV2)
+        );
+
+        legacyEigenDACertVerifierV3 = new EigenDACertVerifierV3(
+            IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
+            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            defaultSecurityThresholds,
+            hex"0001"
+        );
+
+        eigenDADirectory.addAddress(
+            AddressDirectoryConstants.CERT_VERIFIER_LEGACY_V3_NAME, address(legacyEigenDACertVerifierV3)
         );
 
         eigenDACertVerifier = new EigenDACertVerifier(

@@ -17,7 +17,7 @@ import {EigenDACertTypes as CT} from "src/integrations/cert/EigenDACertTypes.sol
 
 /// @title EigenDACertVerifier
 /// @notice Verifies EigenDA certificates
-contract EigenDACertVerifier is
+contract EigenDACertVerifierV3 is
     IEigenDACertVerifier,
     IEigenDACertVerifierBase,
     IVersionedEigenDACertVerifier,

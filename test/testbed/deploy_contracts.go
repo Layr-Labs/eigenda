@@ -299,7 +299,8 @@ type EigenDAContract struct {
 	OperatorStateRetriever string `json:"operatorStateRetriever"`
 	BlsApkRegistry         string `json:"blsApkRegistry"`
 	RegistryCoordinator    string `json:"registryCoordinator"`
-	CertVerifierLegacy     string `json:"eigenDALegacyCertVerifier"`
+	CertVerifierLegacyV2   string `json:"eigenDALegacyCertVerifierV2"`
+	CertVerifierLegacyV3   string `json:"eigenDALegacyCertVerifierV3"`
 	CertVerifier           string `json:"eigenDACertVerifier"`
 	CertVerifierRouter     string `json:"eigenDACertVerifierRouter"`
 }
@@ -447,7 +448,8 @@ func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) 
 		"OperatorStateRetriever", result.EigenDA.OperatorStateRetriever,
 		"BlsApkRegistry", result.EigenDA.BlsApkRegistry,
 		"RegistryCoordinator", result.EigenDA.RegistryCoordinator,
-		"CertVerifierLegacy", result.EigenDA.CertVerifierLegacy,
+		"CertVerifierLegacyV2", result.EigenDA.CertVerifierLegacyV2,
+		"CertVerifierLegacyV3", result.EigenDA.CertVerifierLegacyV3,
 		"CertVerifier", result.EigenDA.CertVerifier,
 		"CertVerifierRouter", result.EigenDA.CertVerifierRouter,
 		"V1CertVerifier", result.EigenDAV1CertVerifier,
