@@ -191,4 +191,28 @@ contract EigenDAEjectionManagerTest is Test {
         ejectionManager.startEjection(ejectee, "0x");
         vm.stopPrank();
     }
+
+    function testCancelEjectionByEjectorRevertsWhenCalledByDifferentEjector() public {
+        // 0) create a second ejector and grant access for ejection role
+        address ejector2 = makeAddr("ejector2");
+        accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, ejector);
+        accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, ejector2);
+        accessControl.grantRole(AccessControlConstants.OWNER_ROLE, ejector);
+
+        // 1) first ejector starts an ejection
+        vm.startPrank(ejector);
+        ejectionManager.setCooldown(0);
+        ejectionManager.setDelay(0);
+        ejectionManager.startEjection(ejectee, "0x");
+        vm.stopPrank();
+
+        // 2) verify the ejection was created with the first ejector
+        assertEq(ejectionManager.getEjector(ejectee), ejector);
+
+        // 3) attempting to cancel the ejection from a different ejector should revert
+        vm.startPrank(ejector2);
+        vm.expectRevert("only ejector that issued ejection can cancel");
+        ejectionManager.cancelEjectionByEjector(ejectee);
+        vm.stopPrank();
+    }
 }
