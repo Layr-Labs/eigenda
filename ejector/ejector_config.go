@@ -100,6 +100,13 @@ type EjectorConfig struct {
 
 	// If non-zero, this value will be used as the gas limit for transactions, overriding the gas estimation.
 	MaxGasOverride uint64
+
+	// Flip this flag to true if you want to disable ejections. Useful for emergency situations where you want
+	// to stop the ejector from ejecting validators, but without tearing down the kube infrastructure.
+	DisableEjections bool
+
+	// The period between verbose signing rate data dumps. If zero, then verbose signing rate logging is disabled.
+	SigningRateLogPeriod time.Duration
 }
 
 var _ config.VerifiableConfig = (*EjectorSecretConfig)(nil)
@@ -184,6 +191,8 @@ func DefaultEjectorConfig() *EjectorConfig {
 		LogOutputType:                        string(common.JSONLogFormat),
 		LogColor:                             false,
 		MaxGasOverride:                       10_000_000,
+		DisableEjections:                     false,
+		SigningRateLogPeriod:                 time.Hour,
 	}
 }
 

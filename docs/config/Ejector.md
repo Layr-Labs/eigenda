@@ -19,6 +19,7 @@
 |------|--------------|-------------|
 | $${\color{red}\texttt{Config.ChainDataCacheSize}}$$<br>`EJECTOR_CONFIG_CHAIN_DATA_CACHE_SIZE` | `uint64`<br>`1024` | The size for the caches for on-chain data. |
 | $${\color{red}\texttt{Config.DataApiTimeout}}$$<br>`EJECTOR_CONFIG_DATA_API_TIMEOUT` | `time.Duration`<br>`1m0s` | The timeout to use when making requests to the Data API. |
+| $${\color{red}\texttt{Config.DisableEjections}}$$<br>`EJECTOR_CONFIG_DISABLE_EJECTIONS` | `bool`<br>`false` | Flip this flag to true if you want to disable ejections. Useful for emergency situations where you want to stop the ejector from ejecting validators, but without tearing down the kube infrastructure. |
 | $${\color{red}\texttt{Config.DoNotEjectTheseValidators}}$$<br>`EJECTOR_CONFIG_DO_NOT_EJECT_THESE_VALIDATORS` | `[]string`<br>`[]` | A list of validator addresses that we should never attempt to eject, even if they otherwise meet the ejection criteria. |
 | $${\color{red}\texttt{Config.EjectionCriteriaTimeWindow}}$$<br>`EJECTOR_CONFIG_EJECTION_CRITERIA_TIME_WINDOW` | `time.Duration`<br>`10m0s` | The time window over which to evaluate signing metrics when deciding whether to eject a validator. |
 | $${\color{red}\texttt{Config.EjectionFinalizationDelay}}$$<br>`EJECTOR_CONFIG_EJECTION_FINALIZATION_DELAY` | `time.Duration`<br>`1h0m0s` | The time between starting an ejection and when the ejection can be finalized. |
@@ -36,5 +37,6 @@
 | $${\color{red}\texttt{Config.MaxGasOverride}}$$<br>`EJECTOR_CONFIG_MAX_GAS_OVERRIDE` | `uint64`<br>`10000000` | If non-zero, this value will be used as the gas limit for transactions, overriding the gas estimation. |
 | $${\color{red}\texttt{Config.ReferenceBlockNumberOffset}}$$<br>`EJECTOR_CONFIG_REFERENCE_BLOCK_NUMBER_OFFSET` | `uint64`<br>`64` | The number of blocks to wait before using a reference block number. That is to say, do not always read data from the latest block we know about, but rather read from a block that is sufficiently old as to make choosing the wrong fork unlikely. |
 | $${\color{red}\texttt{Config.ReferenceBlockNumberPollInterval}}$$<br>`EJECTOR_CONFIG_REFERENCE_BLOCK_NUMBER_POLL_INTERVAL` | `time.Duration`<br>`10s` | The interval at which to poll for a new reference block number. |
+| $${\color{red}\texttt{Config.SigningRateLogPeriod}}$$<br>`EJECTOR_CONFIG_SIGNING_RATE_LOG_PERIOD` | `time.Duration`<br>`1h0m0s` | The period between verbose signing rate data dumps. If zero, then verbose signing rate logging is disabled. |
 | $${\color{red}\texttt{Config.StartEjectionThrottleFull}}$$<br>`EJECTOR_CONFIG_START_EJECTION_THROTTLE_FULL` | `bool`<br>`false` | If true, then the ejection manager will immediately be able to eject ejectionRateLimit fraction of stake when it starts up. If false, then the ejection manager will need to wait before it has this capacity. |
 
