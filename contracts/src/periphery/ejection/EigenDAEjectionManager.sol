@@ -24,7 +24,6 @@ contract EigenDAEjectionManager is ImmutableEigenDAEjectionsStorage, IEigenDASem
     using AddressDirectoryLib for string;
     using EigenDAEjectionLib for address;
 
-
     bytes32 internal constant CANCEL_EJECTION_MESSAGE_IDENTIFIER = keccak256(
         "CancelEjection(address operator,uint64 proceedingTime,uint64 lastProceedingInitiated,bytes quorums,address recipient)"
     );
