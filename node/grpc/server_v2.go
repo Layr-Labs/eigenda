@@ -165,6 +165,11 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal("missing bls signer")
 	}
 
+	if _, iAmANonSigner := node.NonsigningValidators[s.config.ID]; iAmANonSigner {
+		return nil, fmt.Errorf(
+			"This validator is intentionally configured to be a non-signer. You should never see this in production.")
+	}
+
 	probe := s.metrics.GetStoreChunksProbe()
 	defer probe.End()
 

@@ -32,6 +32,13 @@ const (
 	AppName                        = "da-node"
 )
 
+var nonSigner0, _ = core.OperatorIDFromHex("f012154684d79f56890ce201709230e301e55315db705b901c5bdbe67b7395db")
+
+// A set of validators that will intentionally not sign data. THIS IS FOR TESTING PURPOSES ONLY. DO NOT MERGE!
+var NonsigningValidators = map[core.OperatorID]struct{}{
+	nonSigner0: {},
+}
+
 // Config contains all of the configuration information for a DA node.
 type Config struct {
 	Hostname                        string
