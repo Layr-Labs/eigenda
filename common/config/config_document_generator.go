@@ -303,11 +303,37 @@ func gatherConfigFieldData(
 		// If true, this is a leaf value in the config struct (i.e. a field set by the user)
 		isLeaf := false
 
+		// If true, this is a struct field that requires recursion.
+		recurse := false
+
 		switch field.Type.Kind() { //nolint:exhaustive // only handling struct and pointer types
 
 		case reflect.Struct:
-			// Recurse for nested structs, using the actual field value to preserve defaults
-			nestedValue := targetValue.Field(i).Interface()
+			// Handle a nested struct.
+			recurse = true
+		case reflect.Ptr:
+			// nolint:nestif
+			if field.Type.Elem() == reflect.TypeOf((*secret.Secret)(nil)).Elem() {
+				// Special case, don't recurse into *secret.Secret structs, treat as leaf value.
+				isLeaf = true
+			} else if field.Type.Elem().Kind() == reflect.Struct {
+				// Pointer to struct type, recurse.
+				recurse = true
+			} else {
+				// Pointer to non-struct type, treat as regular field.
+				isLeaf = true
+			}
+		default:
+			// Regular field
+			isLeaf = true
+		}
+
+		if recurse {
+			// Recurse into nested structs.
+
+			fieldValue := targetValue.Field(i)
+			nestedValue := fieldValue.Interface()
+
 			nestedEnvVarPrefix := envVarPrefix + "_" + toScreamingSnakeCase(field.Name)
 
 			var nestedTomlPrefix string
@@ -318,49 +344,14 @@ func gatherConfigFieldData(
 			}
 
 			nestedFieldData, err := gatherConfigFieldData(
-				nestedValue,
-				nestedEnvVarPrefix,
-				nestedTomlPrefix,
-				packagePaths)
+				nestedValue, nestedEnvVarPrefix, nestedTomlPrefix, packagePaths)
 			if err != nil {
 				return nil, fmt.Errorf("failed to gather field data for field %s: %w", field.Name, err)
 			}
 			fields = append(fields, nestedFieldData...)
-		case reflect.Ptr:
-
-			// Handle pointer to struct
-			// nolint:nestif
-			if field.Type.Elem() == reflect.TypeOf((*secret.Secret)(nil)).Elem() {
-				// Special case, don't recurse into *secret.Secret structs, treat as leaf value.
-				isLeaf = true
-			} else if field.Type.Elem().Kind() == reflect.Struct {
-				fieldValue := targetValue.Field(i)
-				nestedValue := fieldValue.Interface()
-
-				nestedEnvVarPrefix := envVarPrefix + "_" + toScreamingSnakeCase(field.Name)
-
-				var nestedTomlPrefix string
-				if tomlPrefix == "" {
-					nestedTomlPrefix = field.Name
-				} else {
-					nestedTomlPrefix = tomlPrefix + "." + field.Name
-				}
-
-				nestedFieldData, err := gatherConfigFieldData(
-					nestedValue, nestedEnvVarPrefix, nestedTomlPrefix, packagePaths)
-				if err != nil {
-					return nil, fmt.Errorf("failed to gather field data for field %s: %w", field.Name, err)
-				}
-				fields = append(fields, nestedFieldData...)
-			} else {
-				// Pointer to non-struct type, treat as regular field.
-				isLeaf = true
-			}
-		default:
-			// Regular field
-			isLeaf = true
 		}
 
+		// nolint:nestif
 		if isLeaf {
 			// For each leaf value, gather data to be added to the documentation.
 

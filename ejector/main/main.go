@@ -78,10 +78,12 @@ func run(ctx context.Context) error {
 		}
 	}
 
+	logger.Infof("The ejector will sign transactions using the address: %s", senderAddress.Hex())
+
 	gethClient, err := geth.NewMultiHomingClient(
 		geth.EthClientConfig{
 			RPCURLs:          secret.SecretSliceToStringSlice(ejectorConfig.EthRpcUrls),
-			PrivateKeyString: ejectorConfig.PrivateKey.Get(), // TODO this will need to be configured for KMS
+			PrivateKeyString: ejectorConfig.PrivateKey.Get(), // will be "" if using KMS
 			NumConfirmations: ejectorConfig.EthBlockConfirmations,
 			NumRetries:       ejectorConfig.EthRpcRetryCount,
 		},
@@ -116,6 +118,7 @@ func run(ctx context.Context) error {
 	}
 
 	ejectionTransactor, err := ejector.NewEjectionTransactor(
+		ctx,
 		logger,
 		gethClient,
 		ejectionContractAddress,

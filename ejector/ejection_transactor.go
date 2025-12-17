@@ -70,6 +70,7 @@ type ejectionTransactor struct {
 
 // Create a new EjectionTransactor.
 func NewEjectionTransactor(
+	ctx context.Context,
 	logger logging.Logger,
 	client bind.ContractBackend,
 	ejectionContractAddress gethcommon.Address,
@@ -137,7 +138,7 @@ func NewEjectionTransactor(
 		return nil, fmt.Errorf("failed to create cached validator ID to address converter: %w", err)
 	}
 
-	signer, err := buildSigner(privateKey, chainID, cfg.KmsKeyId, cfg.KmsRegion, cfg.KmsEndpoint)
+	signer, err := buildSigner(ctx, privateKey, chainID, cfg.KmsKeyId, cfg.KmsRegion, cfg.KmsEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build signer: %w", err)
 	}
@@ -157,6 +158,7 @@ func NewEjectionTransactor(
 
 // Build a signer function.
 func buildSigner(
+	ctx context.Context,
 	privateKey *ecdsa.PrivateKey,
 	chainID *big.Int,
 	kmsKeyId string,
@@ -177,7 +179,6 @@ func buildSigner(
 	}
 
 	// Load AWS config for the specified region
-	ctx := context.Background()
 	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(kmsRegion))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
