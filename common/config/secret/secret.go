@@ -10,6 +10,9 @@ var _ fmt.GoStringer = &Secret{}
 
 // Secret holds a string that should be kept secret. It is intentionally designed in a way that makes it very hard
 // to accidentally expose the secret value, even if you print structs that contain it or use reflection.
+//
+// IMPORTANT: always pass Secret values by pointer (i.e. *Secret), never by value. Passing by value will result
+// in buggy and undefined behavior.
 type Secret struct {
 	lock sync.Mutex
 	// The secret lives in this channel, which cannot be introspected or automatically printed using reflection.

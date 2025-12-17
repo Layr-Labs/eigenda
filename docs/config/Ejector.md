@@ -9,8 +9,9 @@
 | $${\color{red}\texttt{ContractDirectoryAddress}}$$<br>`EJECTOR_CONTRACT_DIRECTORY_ADDRESS` | `string` | The address of the contract directory contract. |
 | $${\color{red}\texttt{DataApiUrl}}$$<br>`EJECTOR_DATA_API_URL` | `string` | The URL of the Eigenda Data API to use for looking up signing rates. |
 | $${\color{red}\texttt{EthRpcUrls}}$$<br>`EJECTOR_ETH_RPC_URLS` | `[]*secret.Secret` | The Ethereum RPC URL(s) to use for connecting to the blockchain. |
-| $${\color{red}\texttt{KmsKeyId}}$$<br>`EJECTOR_KMS_KEY_ID` | `string` | The AWS KMS Key ID to use for signing transactions. Only required if the private key is not provided via the Secret.PrivateKey field. |
+| $${\color{red}\texttt{KmsKeyId}}$$<br>`EJECTOR_KMS_KEY_ID` | `string` | The AWS KMS Key ID to use for signing transactions. Only required if the private key is not provided via the PrivateKey field. |
 | $${\color{red}\texttt{KmsRegion}}$$<br>`EJECTOR_KMS_REGION` | `string` | The AWS region where the KMS key is located. Only required if KmsKeyId is provided. |
+| $${\color{red}\texttt{PrivateKey}}$$<br>`EJECTOR_PRIVATE_KEY` | `*secret.Secret` | The private key to use for signing ejection transactions, in hex. Do not include the '0x' prefix. This is required if KMS is not configured. |
 
 ## Optional Fields
 

@@ -28,7 +28,7 @@ type EjectorConfig struct {
 	DataApiUrl string `docs:"required"`
 
 	// The AWS KMS Key ID to use for signing transactions. Only required if the private key is not provided via
-	// the Secret.PrivateKey field.
+	// the PrivateKey field.
 	KmsKeyId string `docs:"required"`
 
 	// The AWS region where the KMS key is located. Only required if KmsKeyId is provided.
