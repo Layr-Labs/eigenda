@@ -4,7 +4,14 @@ import (
 	"fmt"
 	"time"
 
+	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/config"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigenda/indexer"
 )
 
 // ControllerConfig contains configuration parameters for the controller.
@@ -113,6 +120,61 @@ type ControllerConfig struct {
 
 	// The name of the DynamoDB table used to store signing rate data.
 	SigningRateDynamoDbTableName string `docs:"required"`
+
+	// The name of the DynamoDB table used to store "core" metadata (i.e. blob statuses, signatures, etc.).
+	DynamoDBTableName string
+
+	// Whether or not to use subgraph.
+	UseGraph bool
+
+	// The contract directory contract address, which is used to derive other EigenDA contract addresses.
+	EigenDAContractDirectoryAddress string `docs:"required"`
+
+	// The port on which to expose prometheus metrics.
+	MetricsPort int
+
+	// The HTTP path to use for the controller readiness probe.
+	ControllerReadinessProbePath string
+
+	// The file path to a yaml file that maps user accounts (i.e. the parties submitting blobs) to human-friendly
+	// names, which are used for metrics.
+	UserAccountRemappingFilePath string
+
+	// The file path to a yaml file that maps validator IDs to human-friendly names, which are used for metrics.
+	ValidatorIdRemappingFilePath string
+
+	// Configures the gRPC server for the controller.
+	Server common.GRPCServerConfig
+
+	// Configures the encoding manager (i.e. the interface used to send work to encoders).
+	EncodingManager EncodingManagerConfig
+
+	// Configures the indexer.
+	Indexer indexer.Config
+
+	// Configures the subgraph client.
+	ChainState thegraph.Config
+
+	// Configures the Ethereum client, which is used for talking to the EigenDA contracts.
+	EthClientConfig geth.EthClientConfig
+
+	// Configures AWS clients used by the controller.
+	AwsClient aws.ClientConfig
+
+	// If true, the disperser will not sign StoreChunks requests before sending them to validators.
+	DisperserStoreChunksSigningDisabled bool
+
+	// Configures the dispersal request signer used to sign requests to validators.
+	DispersalRequestSigner clients.DispersalRequestSignerConfig
+
+	// Configures logging for the controller.
+	Logger common.LoggerConfig
+
+	// Configures healthchecks and heartbeat monitoring for the controller.
+	HeartbeatMonitor healthcheck.HeartbeatMonitorConfig
+
+	// Configures the payment authorization system.
+	PaymentAuthorization PaymentAuthorizationConfig
 }
 
 var _ config.VerifiableConfig = &ControllerConfig{}
@@ -193,13 +255,23 @@ func (c *ControllerConfig) Verify() error {
 		return fmt.Errorf("BlobDispersalRequestBatchSize must be at least 1, got %d", c.BlobDispersalRequestBatchSize)
 	}
 	if c.BlobDispersalRequestBackoffPeriod <= 0 {
-		return fmt.Errorf("BlobDispersalRequestBackoffPeriod must be positive, got %v", c.BlobDispersalRequestBackoffPeriod)
+		return fmt.Errorf("BlobDispersalRequestBackoffPeriod must be positive, got %v",
+			c.BlobDispersalRequestBackoffPeriod)
 	}
 	if c.SigningRateFlushPeriod <= 0 {
 		return fmt.Errorf("SigningRateFlushPeriod must be positive, got %v", c.SigningRateFlushPeriod)
 	}
 	if c.SigningRateDynamoDbTableName == "" {
 		return fmt.Errorf("SigningRateDynamoDbTableName must not be empty")
+	}
+	if err := c.DispersalRequestSigner.Verify(); err != nil {
+		return fmt.Errorf("invalid dispersal request signer config: %w", err)
+	}
+	if err := c.EncodingManager.Verify(); err != nil {
+		return fmt.Errorf("invalid encoding manager config: %w", err)
+	}
+	if err := c.PaymentAuthorization.Verify(); err != nil {
+		return fmt.Errorf("invalid payment authorization config: %w", err)
 	}
 	return nil
 }

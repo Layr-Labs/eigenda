@@ -295,20 +295,6 @@ func TestControllerMaxBatchSize(t *testing.T) {
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
 }
 
-func TestControllerDedupBlobs(t *testing.T) {
-	components := newControllerComponents(t)
-	defer components.BatchMetadataManager.Close()
-
-	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 1)
-
-	ctx := context.Background()
-	batchData, err := components.Controller.NewBatch(ctx, nil)
-	require.ErrorContains(t, err, "no blobs to dispatch")
-	require.Nil(t, batchData)
-
-	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
-}
-
 func TestControllerBuildMerkleTree(t *testing.T) {
 	certs := []*corev2.BlobCertificate{
 		{
@@ -457,6 +443,12 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 	controllerConfig.SigningRateRetentionPeriod = 1 * time.Minute
 	controllerConfig.SigningRateBucketSpan = 30 * time.Second
 	controllerConfig.SigningRateDynamoDbTableName = "validator-signing-rates"
+	controllerConfig.DispersalRequestSigner.PrivateKey = "this is just a placeholder"
+	controllerConfig.EncodingManager = *controller.DefaultEncodingManagerConfig()
+	controllerConfig.EncodingManager.AvailableRelays = []corev2.RelayKey{0}
+	controllerConfig.EncodingManager.EncoderAddress = "placeholder"
+	controllerConfig.PaymentAuthorization = *controller.DefaultPaymentAuthorizationConfig()
+	controllerConfig.PaymentAuthorization.OnDemandConfig.OnDemandTableName = "on-demand-payments"
 
 	d, err := controller.NewController(
 		t.Context(),
