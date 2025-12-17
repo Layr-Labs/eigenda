@@ -16,6 +16,9 @@ import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
+import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
+import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import "forge-std/StdStorage.sol";
 
 contract MockEigenDADeployer is BLSMockAVSDeployer {
@@ -37,6 +40,9 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     PaymentVault paymentVault;
     PaymentVault paymentVaultImplementation;
     EigenDACertVerifier eigenDACertVerifier;
+    EigenDAAccessControl eigenDAAccessControl;
+    EigenDAEjectionManager eigenDAEjectionManager;
+    EigenDAEjectionManager eigenDAEjectionManagerImplementation;
 
     ERC20 mockToken;
 
@@ -150,7 +156,8 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
         paymentVaultImplementation = PaymentVault(payable(address(new PaymentVault())));
 
         paymentVault = PaymentVault(
-            payable(address(
+            payable(
+                address(
                     new TransparentUpgradeableProxy(
                         address(paymentVaultImplementation),
                         address(proxyAdmin),
@@ -165,7 +172,8 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
                             globalRatePeriodInterval
                         )
                     )
-                ))
+                )
+            )
         );
 
         mockToken = new ERC20("Mock Token", "MOCK");
@@ -176,6 +184,29 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             defaultSecurityThresholds,
             quorumNumbersRequired,
             offchainDerivationVersion
+        );
+
+        // Deploy EigenDAAccessControl
+        eigenDAAccessControl = new EigenDAAccessControl(registryCoordinatorOwner);
+
+        // Deploy EigenDAEjectionManager implementation with typed dependencies
+        eigenDAEjectionManagerImplementation = new EigenDAEjectionManager(
+            IAccessControl(address(eigenDAAccessControl)), blsApkRegistry, eigenDAServiceManager, registryCoordinator
+        );
+
+        // Deploy EigenDAEjectionManager proxy with initialization
+        eigenDAEjectionManager = EigenDAEjectionManager(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(eigenDAEjectionManagerImplementation),
+                    address(proxyAdmin),
+                    abi.encodeWithSelector(
+                        EigenDAEjectionManager.initialize.selector,
+                        0, // delay
+                        0 // cooldown
+                    )
+                )
+            )
         );
     }
 
@@ -263,19 +294,15 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
 
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage =
-                eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(
-                    blobHeader.quorumBlobParams[i].quorumNumber
-                );
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDAThresholdRegistry
+                .getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(
                 uint256(
                     keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))
                 )
             );
-            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage =
-                eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(
-                    blobHeader.quorumBlobParams[i].quorumNumber
-                );
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDAThresholdRegistry
+                .getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
         }
         // mark all quorum numbers as unused
         for (uint256 i = 0; i < numQuorumsBlobParams; i++) {

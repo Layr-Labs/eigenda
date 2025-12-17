@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {
-    PauserRegistry
-} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
+import {PauserRegistry} from
+    "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {BLSApkRegistry} from "../lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
@@ -36,6 +35,7 @@ import {ISocketRegistry, SocketRegistry} from "../lib/eigenlayer-middleware/src/
 import {IEigenDADirectory, EigenDADirectory} from "src/core/EigenDADirectory.sol";
 import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
 import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {
     DeployOpenEigenLayer,
     ProxyAdmin,
@@ -295,7 +295,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             for (uint256 i = 0; i < numStrategies; i++) {
                 strategyAndWeightingMultipliers[i] = new IStakeRegistry.StrategyParams[](1);
                 strategyAndWeightingMultipliers[i][0] = IStakeRegistry.StrategyParams({
-                    strategy: IStrategy(address(deployedStrategyArray[i])), multiplier: 1 ether
+                    strategy: IStrategy(address(deployedStrategyArray[i])),
+                    multiplier: 1 ether
                 });
             }
 
@@ -412,7 +413,12 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         );
 
         // Deploy EigenDAEjectionManager implementation
-        eigenDAEjectionManagerImplementation = new EigenDAEjectionManager();
+        eigenDAEjectionManagerImplementation = new EigenDAEjectionManager(
+            IAccessControl(address(eigenDAAccessControl)), apkRegistry, eigenDAServiceManager, registryCoordinator
+        );
+
+        uint64 cooldown = 10;
+        uint64 delay = 100;
 
         // Deploy EigenDAEjectionManager proxy with initialization
         eigenDAEjectionManager = EigenDAEjectionManager(
@@ -420,13 +426,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 new TransparentUpgradeableProxy(
                     address(eigenDAEjectionManagerImplementation),
                     address(eigenDAProxyAdmin),
-                    abi.encodeWithSelector(
-                        EigenDAEjectionManager.initialize.selector,
-                        address(eigenDAAccessControl),
-                        address(apkRegistry),
-                        address(eigenDAServiceManager),
-                        address(registryCoordinator)
-                    )
+                    abi.encodeWithSelector(EigenDAEjectionManager.initialize.selector, cooldown, delay)
                 )
             )
         );

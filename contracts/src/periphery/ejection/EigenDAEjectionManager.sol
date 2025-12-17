@@ -3,8 +3,7 @@ pragma solidity ^0.8.9;
 
 import {IEigenDAEjectionManager} from "src/periphery/ejection/IEigenDAEjectionManager.sol";
 import {EigenDAEjectionLib} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
-import {EigenDAEjectionStorage} from "src/periphery/ejection/libraries/EigenDAEjectionStorage.sol";
-import {SafeERC20, IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {EigenDAEjectionStorage, ImmutableEigenDAEjectionsStorage} from "src/periphery/ejection/libraries/EigenDAEjectionStorage.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
@@ -18,10 +17,11 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
 import {InitializableLib} from "src/core/libraries/v3/initializable/InitializableLib.sol";
 
-contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
+contract EigenDAEjectionManager is ImmutableEigenDAEjectionsStorage, IEigenDASemVer {
     using AddressDirectoryLib for string;
     using EigenDAEjectionLib for address;
-    using SafeERC20 for IERC20;
+
+
 
     bytes32 internal constant CANCEL_EJECTION_MESSAGE_IDENTIFIER = keccak256(
         "CancelEjection(address operator,uint64 proceedingTime,uint64 lastProceedingInitiated,bytes quorums,address recipient)"
@@ -32,28 +32,33 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         _;
     }
 
-    /// @notice Initializes the contract via setting the required parameters into storage
+    /// @notice constructor that hardsets callee dependencies into deployed impl contract bytecode
     /// @param accessControl_ the EigenDA access control contract used for checking caller role ownership
     ///                       for ejector and owner
-    /// @param blsApkKeyRegistry_ The BLS agg pub key registry contract address
-    /// @param serviceManager_ The EigenDA AVS ServiceManager contract address
-    /// @param registryCoordinator_ The EigenDA Registy Coordinator contract address
-    function initialize(
-        address accessControl_,
-        address blsApkKeyRegistry_,
-        address serviceManager_,
-        address registryCoordinator_
-    ) external initializer {
-        require(accessControl_ != address(0), "EigenDAEjectionManager: access control cannot be zero");
-        require(blsApkKeyRegistry_ != address(0), "EigenDAEjectionManager: bls apk key cannot be zero");
-        require(serviceManager_ != address(0), "EigenDAEjectionManager: service manager cannot be zero");
-        require(registryCoordinator_ != address(0), "EigenDAEjectionManager: registry coordinator cannot be zero");
+    /// @param blsApkKeyRegistry_ The BLS agg pub key registry contract
+    /// @param serviceManager_ The EigenDA AVS ServiceManager contract (BLSSignatureChecker)
+    /// @param registryCoordinator_ The EigenDA Registry Coordinator contract
+    constructor(
+        IAccessControl accessControl_,
+        IBLSApkRegistry blsApkKeyRegistry_,
+        BLSSignatureChecker serviceManager_,
+        IRegistryCoordinator registryCoordinator_
+    )
+        ImmutableEigenDAEjectionsStorage(
+            accessControl_,
+            blsApkKeyRegistry_,
+            serviceManager_,
+            registryCoordinator_
+        )
+    {}
 
+    function initialize(
+        uint64 delay_,
+        uint64 cooldown_
+    ) external initializer {
         EigenDAEjectionStorage.Layout storage s = EigenDAEjectionStorage.layout();
-        s.accessControl = accessControl_;
-        s.blsApkKeyRegistry = blsApkKeyRegistry_;
-        s.serviceManager = serviceManager_;
-        s.registryCoordinator = registryCoordinator_;
+        s.delay = delay_;
+        s.cooldown = cooldown_;
     }
 
     modifier onlyOwner(address sender) {
@@ -105,8 +110,7 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         BN254.G1Point memory sigma,
         address recipient
     ) external {
-        address blsApkRegistry = EigenDAEjectionStorage.layout().blsApkKeyRegistry;
-        (BN254.G1Point memory apk,) = IBLSApkRegistry(blsApkRegistry).getRegisteredPubkey(operator);
+        (BN254.G1Point memory apk,) = blsApkKeyRegistry.getRegisteredPubkey(operator);
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
 
         operator.cancelEjection();
@@ -158,8 +162,7 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
 
     /// @notice Attempts to eject an operator. If the ejection fails, it catches the error and does nothing.
     function _tryEjectOperator(address operator, bytes memory quorums) internal {
-        address registryCoordinator = EigenDAEjectionStorage.layout().registryCoordinator;
-        try IRegistryCoordinator(registryCoordinator).ejectOperator(operator, quorums) {} catch {}
+        try registryCoordinator.ejectOperator(operator, quorums) {} catch {}
     }
 
     /// @notice Defines a unique identifier for a cancel ejection message to be signed by an operator for the purpose of authorizing a cancellation.
@@ -181,25 +184,22 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         BN254.G2Point memory apkG2,
         BN254.G1Point memory sigma
     ) internal view {
-        EigenDAEjectionStorage.Layout storage s = EigenDAEjectionStorage.layout();
         (bool paired, bool valid) =
-            BLSSignatureChecker(s.serviceManager).trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
+            signatureChecker.trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
         require(paired, "EigenDAEjectionManager: Pairing failed");
         require(valid, "EigenDAEjectionManager: Invalid signature");
     }
 
     function _onlyOwner(address sender) internal view virtual {
         require(
-            IAccessControl(EigenDAEjectionStorage.layout().accessControl)
-                .hasRole(AccessControlConstants.OWNER_ROLE, sender),
+            accessControl.hasRole(AccessControlConstants.OWNER_ROLE, sender),
             "EigenDAEjectionManager: Caller is not the owner"
         );
     }
 
     function _onlyEjector(address sender) internal view virtual {
         require(
-            IAccessControl(EigenDAEjectionStorage.layout().accessControl)
-                .hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
+            accessControl.hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
             "EigenDAEjectionManager: Caller is not an ejector"
         );
     }
