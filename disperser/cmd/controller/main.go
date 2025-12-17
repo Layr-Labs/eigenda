@@ -64,7 +64,7 @@ func RunController(cliCtx *cli.Context) error {
 		return err
 	}
 
-	logger, err := common.NewLogger(&config.LoggerConfig)
+	logger, err := common.NewLogger(&config.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -74,7 +74,7 @@ func RunController(cliCtx *cli.Context) error {
 		logger.Warn("Failed to clean up readiness file", "error", err, "path", config.ControllerReadinessProbePath)
 	}
 
-	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
+	dynamoClient, err := dynamodb.NewClient(config.AwsClient, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create DynamoDB client: %w", err)
 	}
@@ -176,22 +176,22 @@ func RunController(cliCtx *cli.Context) error {
 
 	metrics, err := controller.NewControllerMetrics(
 		metricsRegistry,
-		config.DispatcherConfig.SignificantSigningThresholdFraction,
-		config.DispatcherConfig.CollectDetailedValidatorSigningMetrics,
-		config.DispatcherConfig.EnablePerAccountBlobStatusMetrics,
+		config.SignificantSigningThresholdFraction,
+		config.CollectDetailedValidatorSigningMetrics,
+		config.EnablePerAccountBlobStatusMetrics,
 		userAccountRemapping,
 		validatorIdRemapping)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
-	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
+	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManager.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
-	encodingPool := workerpool.New(config.EncodingManagerConfig.NumConcurrentRequests)
+	encodingPool := workerpool.New(config.EncodingManager.NumConcurrentRequests)
 	encodingManager, err := controller.NewEncodingManager(
-		&config.EncodingManagerConfig,
+		&config.EncodingManager,
 		time.Now,
 		blobMetadataStore,
 		encodingPool,
@@ -201,8 +201,8 @@ func RunController(cliCtx *cli.Context) error {
 		metricsRegistry,
 		controllerLivenessChan,
 		userAccountRemapping,
-		config.DispatcherConfig.MaxDispersalFutureAge,
-		config.DispatcherConfig.MaxDispersalAge,
+		config.MaxDispersalFutureAge,
+		config.MaxDispersalAge,
 		metrics,
 	)
 	if err != nil {
@@ -213,14 +213,14 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create signature aggregator: %v", err)
 	}
-	dispatcherPool := workerpool.New(config.DispatcherConfig.NumConcurrentRequests)
+	dispatcherPool := workerpool.New(config.NumConcurrentRequests)
 	chainState := eth.NewChainState(chainReader, gethClient)
 	var ics core.IndexedChainState
 	if config.UseGraph {
 		logger.Info("Using graph node")
 
-		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
-		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+		logger.Info("Connecting to subgraph", "url", config.ChainState.Endpoint)
+		ics = thegraph.MakeIndexedChainState(config.ChainState, chainState, logger)
 	} else {
 		return fmt.Errorf("built-in indexer is deprecated and will be removed soon, please use UseGraph=true")
 	}
@@ -231,7 +231,7 @@ func RunController(cliCtx *cli.Context) error {
 	} else {
 		requestSigner, err = clients.NewDispersalRequestSigner(
 			ctx,
-			config.DispersalRequestSignerConfig,
+			config.DispersalRequestSigner,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create request signer: %v", err)
@@ -239,9 +239,9 @@ func RunController(cliCtx *cli.Context) error {
 	}
 
 	nodeClientManager, err := controller.NewNodeClientManager(
-		config.DispatcherConfig.NodeClientCacheSize,
+		config.NodeClientCacheSize,
 		requestSigner,
-		config.DispatcherConfig.DisperserID,
+		config.DisperserID,
 		logger)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
@@ -253,8 +253,8 @@ func RunController(cliCtx *cli.Context) error {
 		gethClient,
 		ics,
 		registryCoordinatorAddress,
-		config.DispatcherConfig.BatchMetadataUpdatePeriod,
-		config.DispatcherConfig.FinalizationBlockDelay,
+		config.BatchMetadataUpdatePeriod,
+		config.FinalizationBlockDelay,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
@@ -262,8 +262,8 @@ func RunController(cliCtx *cli.Context) error {
 
 	signingRateTracker, err := signingrate.NewSigningRateTracker(
 		logger,
-		config.DispatcherConfig.SigningRateRetentionPeriod,
-		config.DispatcherConfig.SigningRateBucketSpan,
+		config.SigningRateRetentionPeriod,
+		config.SigningRateBucketSpan,
 		time.Now)
 	if err != nil {
 		return fmt.Errorf("failed to create signing rate tracker: %w", err)
@@ -274,7 +274,7 @@ func RunController(cliCtx *cli.Context) error {
 		ctx,
 		logger,
 		dynamoClient.GetAwsClient(),
-		config.DispatcherConfig.SigningRateDynamoDbTableName)
+		config.SigningRateDynamoDbTableName)
 	if err != nil {
 		return fmt.Errorf("failed to create signing rate storage: %w", err)
 	}
@@ -285,7 +285,7 @@ func RunController(cliCtx *cli.Context) error {
 		logger,
 		signingRateTracker,
 		signingRateStorage,
-		config.DispatcherConfig.SigningRateRetentionPeriod,
+		config.SigningRateRetentionPeriod,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to load signing rate data from storage: %w", err)
@@ -297,12 +297,12 @@ func RunController(cliCtx *cli.Context) error {
 		logger,
 		signingRateTracker,
 		signingRateStorage,
-		config.DispatcherConfig.SigningRateFlushPeriod,
+		config.SigningRateFlushPeriod,
 	)
 
 	dispatcher, err := controller.NewController(
 		ctx,
-		&config.DispatcherConfig,
+		config,
 		time.Now,
 		blobMetadataStore,
 		dispatcherPool,
@@ -339,7 +339,7 @@ func RunController(cliCtx *cli.Context) error {
 	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
 		ctx,
 		logger,
-		config.PaymentAuthorizationConfig,
+		config.PaymentAuthorization,
 		contractDirectory,
 		gethClient,
 		dynamoClient.GetAwsClient(),
@@ -350,14 +350,14 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("build payment authorization handler: %w", err)
 	}
 
-	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", config.ServerConfig.GrpcPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", config.Server.GrpcPort))
 	if err != nil {
 		return fmt.Errorf("create listener: %w", err)
 	}
 
 	grpcServer, err := server.NewServer(
 		ctx,
-		config.ServerConfig,
+		config.Server,
 		logger,
 		metricsRegistry,
 		paymentAuthorizationHandler,
@@ -391,7 +391,7 @@ func RunController(cliCtx *cli.Context) error {
 		err := healthcheck.NewHeartbeatMonitor(
 			logger,
 			controllerLivenessChan,
-			config.HeartbeatMonitorConfig,
+			config.HeartbeatMonitor,
 		)
 		if err != nil {
 			logger.Warn("Heartbeat monitor failed", "err", err)
