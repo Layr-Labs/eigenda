@@ -179,7 +179,7 @@ contract EigenDACertVerifier is
         return _quorumNumbersRequired;
     }
 
-    /// @inheritdoc IEigenDACertVerifier
+    /// @inheritdoc IVersionedDerivationEigenDACertVerifier
     function offchainDerivationVersion() external view returns (uint16) {
         return _offchainDerivationVersion;
     }
