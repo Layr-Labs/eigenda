@@ -3,7 +3,10 @@ pragma solidity ^0.8.9;
 
 import {IEigenDAEjectionManager} from "src/periphery/ejection/IEigenDAEjectionManager.sol";
 import {EigenDAEjectionLib} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
-import {EigenDAEjectionStorage, ImmutableEigenDAEjectionsStorage} from "src/periphery/ejection/libraries/EigenDAEjectionStorage.sol";
+import {
+    EigenDAEjectionStorage,
+    ImmutableEigenDAEjectionsStorage
+} from "src/periphery/ejection/libraries/EigenDAEjectionStorage.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
@@ -20,7 +23,6 @@ import {InitializableLib} from "src/core/libraries/v3/initializable/Initializabl
 contract EigenDAEjectionManager is ImmutableEigenDAEjectionsStorage, IEigenDASemVer {
     using AddressDirectoryLib for string;
     using EigenDAEjectionLib for address;
-
 
 
     bytes32 internal constant CANCEL_EJECTION_MESSAGE_IDENTIFIER = keccak256(
@@ -43,19 +45,9 @@ contract EigenDAEjectionManager is ImmutableEigenDAEjectionsStorage, IEigenDASem
         IBLSApkRegistry blsApkKeyRegistry_,
         BLSSignatureChecker serviceManager_,
         IRegistryCoordinator registryCoordinator_
-    )
-        ImmutableEigenDAEjectionsStorage(
-            accessControl_,
-            blsApkKeyRegistry_,
-            serviceManager_,
-            registryCoordinator_
-        )
-    {}
+    ) ImmutableEigenDAEjectionsStorage(accessControl_, blsApkKeyRegistry_, serviceManager_, registryCoordinator_) {}
 
-    function initialize(
-        uint64 delay_,
-        uint64 cooldown_
-    ) external initializer {
+    function initialize(uint64 delay_, uint64 cooldown_) external initializer {
         EigenDAEjectionStorage.Layout storage s = EigenDAEjectionStorage.layout();
         s.delay = delay_;
         s.cooldown = cooldown_;
@@ -184,8 +176,7 @@ contract EigenDAEjectionManager is ImmutableEigenDAEjectionsStorage, IEigenDASem
         BN254.G2Point memory apkG2,
         BN254.G1Point memory sigma
     ) internal view {
-        (bool paired, bool valid) =
-            signatureChecker.trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
+        (bool paired, bool valid) = signatureChecker.trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
         require(paired, "EigenDAEjectionManager: Pairing failed");
         require(valid, "EigenDAEjectionManager: Invalid signature");
     }
