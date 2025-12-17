@@ -172,6 +172,19 @@ GLOBAL OPTIONS:
     --eigenda.v2.eth-rpc value                                             ($EIGENDA_PROXY_EIGENDA_V2_ETH_RPC)
           URL of the Ethereum RPC endpoint.
    
+    --eigenda.v2.eth-rpc-retry-count value (default: 1)                       ($EIGENDA_PROXY_EIGENDA_V2_ETH_RPC_RETRY_COUNT)
+          The retry count for the Ethereum RPC request after the initial call fails.
+          Please see EIGENDA_PROXY_EIGENDA_V2_ETH_RPC_RETRY_DELAY for the linear retry
+          backoff strategy.
+   
+    --eigenda.v2.eth-rpc-retry-delay-increment value (default: 1s)                      ($EIGENDA_PROXY_EIGENDA_V2_ETH_RPC_RETRY_DELAY_INCREMENT)
+          Time unit for linear retry delay. For instance, if the retries count is 2 and
+          retry delay is 1 second, then 0 second is waited for the first call; 1 seconds
+          are waited before the next retry; 2 seconds are waited for the second retry; if
+          the call failed, the total waited time for retry is 3 seconds. If the retry
+          delay is 0 second, the total waited time for retry is 0 second, which is useful
+          when there are multiple rpc providers.
+   
     --eigenda.v2.max-blob-length value  (default: "16MiB")                 ($EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH)
           Maximum blob length (base 2) to be written or read from EigenDA. Determines the
           number of SRS points
@@ -248,20 +261,16 @@ GLOBAL OPTIONS:
           this.
    
     --eigenda.g1-path value             (default: "resources/g1.point")    ($EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH)
-          path to g1.point file.
+          Path to g1.point file. Only needed for V1 backend. Points are embedded into the
+          binary for V2 backend.
    
     --eigenda.g2-path value             (default: "resources/g2.point")    ($EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH)
-          Path to g2.point file, which is needed to generate and verify blob length
-          proofs. If this flag doesn't point to a complete 16GiB G2 SRS file, then the
-          --eigenda.g2-path-trailing flag must be used to specify a trailing segment of
-          that file, of equivalent length to the initial segment pointed to by this flag.
+          [Deprecated] SRS points are embedded in the binary, so this flag is no longer
+          needed.
    
     --eigenda.g2-path-trailing value    (default: "resources/g2.trailing.point") ($EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH)
-          Path to g2.trailing.point file, which is needed to generate and verify blob
-          length proofs. If --eigenda.g2-path is pointing to the entire 16GiB G2 SRS file
-          which contains 268435456 G2 points, this flag is not needed. Otherwise, users
-          can truncate the G2 file by taking an initial segment, and a trailing segment
-          (both of the same size).
+          [Deprecated] SRS points are embedded in the binary, so this flag is no longer
+          needed.
 
    Logging
 

@@ -24,8 +24,19 @@ func ParseConfig[T VerifiableConfig](
 	cfg T,
 	// The prefix to use for environment variables. If empty, then environment variables are not read.
 	envPrefix string,
+	// A map of environment variable aliases. The keys are environment variables that should be aliased to something
+	// else, and the values are the environment variables they should be aliased to.
+	//
+	// Environment variables in this map should be fully qualified, including any prefixes.
+	//
+	// If nil, then no aliasing is performed.
+	aliasedEnvVars map[string]string,
 	// A list of environment variables that should be ignored when sanity checking environment variables.
 	// Useful for situations where external systems set environment variables that would otherwise cause problems.
+	//
+	// Environment variables in this list should be fully qualified, including any prefixes.
+	//
+	// If nil, then no environment variables are ignored during sanity checking.
 	ignoredEnvVars []string,
 	// A list of zero or more paths to configuration files. Later files override earlier ones.
 	// If environment variables are read, they override all configuration files.
@@ -43,6 +54,12 @@ func ParseConfig[T VerifiableConfig](
 	}
 
 	if envPrefix != "" {
+		err := aliasEnvVars(logger, aliasedEnvVars)
+		if err != nil {
+			var zero T
+			return zero, fmt.Errorf("failed to alias environment variables: %w", err)
+		}
+
 		viperInstance.SetEnvPrefix(envPrefix)
 		viperInstance.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 		viperInstance.AutomaticEnv()
@@ -55,7 +72,7 @@ func ParseConfig[T VerifiableConfig](
 		}
 
 		// Make sure there aren't any invalid environment variables set.
-		err = checkForInvalidEnvVars(logger, boundVars, envPrefix, ignoredEnvVars)
+		err = checkForInvalidEnvVars(logger, boundVars, envPrefix, aliasedEnvVars, ignoredEnvVars)
 		if err != nil {
 			var zero T
 			return zero, fmt.Errorf("invalid environment variables: %w", err)
@@ -69,7 +86,8 @@ func ParseConfig[T VerifiableConfig](
 		TagName:          "mapstructure",
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(), // Support time.Duration parsing from strings
-			secret.DecodeHook, // Support Secret parsing
+			secret.DecodeHook,        // Support Secret parsing
+			basicTypeSliceDecodeHook, // Support slices of basic types
 		),
 	}
 	decoder, err := mapstructure.NewDecoder(decoderConfig)
@@ -90,6 +108,31 @@ func ParseConfig[T VerifiableConfig](
 	}
 
 	return cfg, nil
+}
+
+// Applies environment variable aliases by copying the value of each aliased variable to its target variable.
+// This function sets new environment variables using os.Setenv if old environment variables in need of
+// aliasing are set.
+func aliasEnvVars(logger logging.Logger, aliasedEnvVars map[string]string) error {
+	for oldVar, newVar := range aliasedEnvVars {
+		value, oldVarExists := os.LookupEnv(oldVar)
+
+		if oldVarExists {
+			_, newVarExists := os.LookupEnv(newVar)
+			if newVarExists {
+				return fmt.Errorf("cannot alias environment variable %q to %q: both are set", oldVar, newVar)
+			}
+
+			logger.Warnf("Deprecated environment variable %q is set; please use %q instead. "+
+				"Support for this environment variable may be removed in a future release.", oldVar, newVar)
+
+			err := os.Setenv(newVar, value)
+			if err != nil {
+				return fmt.Errorf("failed to set aliased environment variable %q: %w", newVar, err)
+			}
+		}
+	}
+	return nil
 }
 
 func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
@@ -138,8 +181,8 @@ func loadConfigFile(v *viper.Viper, path string, firstConfig bool) error {
 //	MYSTRUCT_BAR_BAZ -> Bar.Baz
 //
 // This function uses reflection to walk the struct tree, so it only works with exported fields. It also only works
-// with basic types (string, int, bool, etc.) and nested structs. It does not work with slices, maps, or other complex
-// types.
+// with basic types (string, int, bool, etc.), slices of basic types, nested structs, secret.Secret, and slices of
+// secret.Secret. It does not work with maps or other complex types.
 //
 // This function is recursive, so it will walk nested structs to any depth.
 //
@@ -178,7 +221,7 @@ func bindEnvs(
 
 		keyPath := append(path, fieldKey)
 
-		switch field.Type.Kind() { //nolint:exhaustive // only handling struct and pointer types
+		switch field.Type.Kind() { //nolint:exhaustive // only handling struct, pointer, and slice types
 
 		case reflect.Struct:
 			// Recurse for nested structs
@@ -190,6 +233,30 @@ func bindEnvs(
 			for k := range nestedBoundVars {
 				boundVars[k] = struct{}{}
 			}
+		case reflect.Slice:
+			// Handle slices
+			elemType := field.Type.Elem()
+			// Check if this is a slice of pointers to Secret
+			if elemType.Kind() == reflect.Ptr &&
+				elemType.Elem().Kind() == reflect.Struct &&
+				elemType.Elem() == reflect.TypeOf((*secret.Secret)(nil)).Elem() {
+				// Slice of *secret.Secret, bind as leaf value
+				env := buildEnvVarName(prefix, keyPath...)
+				boundVars[env] = struct{}{}
+				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
+					return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
+				}
+			} else if isBasicType(elemType) {
+				// Slice of basic types (int, string, bool, float, etc.)
+				// Bind as leaf value - mapstructure will handle comma-separated conversion
+				env := buildEnvVarName(prefix, keyPath...)
+				boundVars[env] = struct{}{}
+				if err := v.BindEnv(strings.Join(keyPath, "."), env); err != nil {
+					return nil, fmt.Errorf("failed to bind env %s: %w", env, err)
+				}
+			}
+			// Other slice types (e.g., slices of structs) are not currently supported
+			// for environment variable binding and are silently ignored.
 		case reflect.Ptr:
 			// Handle pointer to struct
 			if field.Type.Elem().Kind() == reflect.Struct {
@@ -246,6 +313,84 @@ func buildEnvVarName(prefix string, path ...string) string {
 	return sb.String()
 }
 
+// isBasicType checks if a type is a basic type that can be parsed from environment variables.
+// This includes primitives (int, uint, float, bool), strings, and pointers to these types.
+func isBasicType(t reflect.Type) bool {
+	// Handle pointer to basic type
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	switch t.Kind() { //nolint:exhaustive // only handling basic types, default handles all others
+	case reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64,
+		reflect.String:
+		return true
+	default:
+		return false
+	}
+}
+
+// basicTypeSliceDecodeHook is a mapstructure decode hook that handles slices of basic types.
+// It converts string inputs from config files or environment variables into slices of basic types
+// by splitting on commas. This allows environment variables to represent slices using a
+// comma-separated format (e.g., "value1,value2,value3").
+var basicTypeSliceDecodeHook mapstructure.DecodeHookFunc = func(
+	from reflect.Type, to reflect.Type, data any) (any, error) {
+	// Only handle string sources
+	if from.Kind() != reflect.String {
+		return data, nil
+	}
+
+	// Only handle slice targets
+	if to.Kind() != reflect.Slice {
+		return data, nil
+	}
+
+	// Only handle slices of basic types
+	if !isBasicType(to.Elem()) {
+		return data, nil
+	}
+
+	// Get the source data as a string
+	sourceStr, ok := data.(string)
+	if !ok {
+		return data, nil
+	}
+
+	// If the source string is empty, return an empty slice
+	if len(sourceStr) == 0 {
+		return reflect.MakeSlice(to, 0, 0).Interface(), nil
+	}
+
+	// Split the string by commas
+	parts := strings.Split(sourceStr, ",")
+
+	// Create a slice of the target type
+	result := reflect.MakeSlice(to, len(parts), len(parts))
+
+	// Convert each part to the target element type using WeakDecode
+	// which handles type conversion automatically
+	for i, part := range parts {
+		trimmedPart := strings.TrimSpace(part)
+
+		// Create a pointer to a new instance of the target element type
+		elemPtr := reflect.New(to.Elem())
+
+		// Use WeakDecode directly - it's more efficient than creating a decoder each time
+		if err := mapstructure.WeakDecode(trimmedPart, elemPtr.Interface()); err != nil {
+			return nil, fmt.Errorf("failed to decode element %d (%q): %w", i, trimmedPart, err)
+		}
+
+		// Set the element in the result slice
+		result.Index(i).Set(elemPtr.Elem())
+	}
+
+	return result.Interface(), nil
+}
+
 // checkForInvalidEnvVars checks for any environment variables with the given prefix that were not bound to any
 // configuration fields. This is used to detect misconfigurations where an environment variable is set, but it does
 // not correspond to any configuration field (e.g. due to a typo).
@@ -255,6 +400,7 @@ func checkForInvalidEnvVars(
 	logger logging.Logger,
 	boundVars map[string]struct{},
 	envPrefix string,
+	aliasedEnvVars map[string]string,
 	ignoredEnvVars []string,
 ) error {
 	if envPrefix == "" {
@@ -265,6 +411,12 @@ func checkForInvalidEnvVars(
 	ignoredSet := make(map[string]struct{}, len(ignoredEnvVars))
 	for _, v := range ignoredEnvVars {
 		ignoredSet[v] = struct{}{}
+	}
+	// The config parser will return an error if it discovers an environment variable that doesn't map to a struct
+	// value. Since the aliased environment variables indirectly map to struct values, we need to instruct the config
+	// parser to ignore them when it's checking for un-mapped environment variables.
+	for k := range aliasedEnvVars {
+		ignoredSet[k] = struct{}{}
 	}
 
 	for _, env := range os.Environ() {

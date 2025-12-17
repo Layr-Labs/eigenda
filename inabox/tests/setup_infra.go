@@ -29,11 +29,6 @@ type InfrastructureConfig struct {
 	// tests that do not require the disperser infrastructure to be deployed (e.g. testing graph
 	// node with operator registration)
 	DisableDisperser bool
-
-	// The following field is temporary, to be able to test different payments configurations. It will be removed
-	// once legacy payments are removed. When true, the controller, API server, and validator nodes will all
-	// use the new payment system.
-	UseNewPayments bool
 }
 
 // SetupInfrastructure creates the shared infrastructure that persists across all tests.
@@ -66,7 +61,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 
 	testConfig := deploy.ReadTestConfig(testName, config.RootPath)
-	testConfig.UseNewPayments = config.UseNewPayments
 
 	// Create a long-lived context for the infrastructure lifecycle
 	infraCtx, infraCancel := context.WithCancel(ctx)
@@ -112,7 +106,21 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	}
 	infra.ChainHarness = *chainHarness
 
-	// Setup Disperser Harness second (LocalStack, DynamoDB tables, S3 buckets, relays)
+	// Setup Operator Harness second (requires chain harness only).
+	// Operators must be registered before the disperser harness so that the subgraph
+	// has quorum APK data available when the controller starts.
+	operatorHarnessConfig := &OperatorHarnessConfig{
+		TestConfig: testConfig,
+		TestName:   testName,
+	}
+	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup operator harness: %w", err)
+	}
+	infra.OperatorHarness = *operatorHarness
+
+	// Setup Disperser Harness third (LocalStack, DynamoDB tables, S3 buckets, relays, controller).
+	// This must come after operator harness so the subgraph has APK data for the controller.
 	if !config.DisableDisperser {
 		disperserHarnessConfig := &DisperserHarnessConfig{
 			Network:             sharedDockerNetwork,
@@ -141,17 +149,6 @@ func SetupInfrastructure(ctx context.Context, config *InfrastructureConfig) (*In
 	} else {
 		logger.Info("Disperser deployment disabled, skipping disperser harness setup")
 	}
-
-	// Setup Operator Harness third (requires chain and disperser to be ready)
-	operatorHarnessConfig := &OperatorHarnessConfig{
-		TestConfig: testConfig,
-		TestName:   testName,
-	}
-	operatorHarness, err := SetupOperatorHarness(infraCtx, logger, &infra.ChainHarness, operatorHarnessConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup operator harness: %w", err)
-	}
-	infra.OperatorHarness = *operatorHarness
 
 	return infra, nil
 }

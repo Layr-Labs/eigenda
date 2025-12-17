@@ -16,4 +16,5 @@ interface IEigenDACertTypeBindings {
     // There is no need for a V2 dummy because the V2 types are available in the V3 cert.
 
     function dummyVerifyDACertV3(EigenDACertTypes.EigenDACertV3 memory cert) external view;
+    function dummyVerifyDACertV4(EigenDACertTypes.EigenDACertV4 memory cert) external view;
 }

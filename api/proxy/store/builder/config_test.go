@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"math/big"
 	"testing"
 	"time"
 
@@ -21,6 +22,7 @@ func validCfg() Config {
 	if err != nil {
 		panic(err)
 	}
+
 	proxyCfg := Config{
 		StoreConfig: store.Config{
 			BackendsToEnable: []common.EigenDABackend{common.V1EigenDABackend, common.V2EigenDABackend},
@@ -64,6 +66,8 @@ func validCfg() Config {
 			DisperserClientCfg: dispersal.DisperserClientConfig{
 				GrpcUri:           "localhost:9999",
 				UseSecureGrpcFlag: true,
+				DisperserID:       0,
+				ChainID:           big.NewInt(1),
 			},
 			EigenDACertVerifierOrRouterAddress: "0x0000000000032443134",
 			MaxBlobSizeBytes:                   maxBlobLengthBytes,

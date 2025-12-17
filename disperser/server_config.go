@@ -1,6 +1,8 @@
 package disperser
 
-import "time"
+import (
+	"time"
+)
 
 type ServerConfig struct {
 	GrpcPort string
@@ -26,4 +28,32 @@ type ServerConfig struct {
 	// DisableGetBlobCommitment, if true, causes the GetBlobCommitment gRPC endpoint to return
 	// a deprecation error. This endpoint is deprecated and will be removed in a future release.
 	DisableGetBlobCommitment bool
+
+	// The amount of time to retain signing rate data.
+	SigningRateRetentionPeriod time.Duration
+
+	// The interval at which to poll for signing rate data from the controller.
+	SigningRatePollInterval time.Duration
+
+	// Unique identifier for this disperser instance.
+	DisperserId uint32
+
+	// Whether to tolerate requests without an anchor signature.
+	// If false, DisperseBlob requests without an anchor_signature will be rejected.
+	// Ignored if DisableAnchorSignatureVerification is true.
+	// Default: true (for backwards compatibility with old client code during migration)
+	//
+	// TODO (litt3): this field should eventually be set to false, and then removed, once all clients have updated
+	// to a version that includes anchor signatures.
+	TolerateMissingAnchorSignature bool
+
+	// Whether to disable anchor signature verification entirely.
+	// If true, anchor signatures will not be verified even if present.
+	// Takes precedence over TolerateMissingAnchorSignature.
+	// Default: false
+	//
+	// TODO (litt3): This is a temporary flag to allow a second LayrLabs disperser to handle dispersal requests created
+	// for the main LayrLabs disperser. This flag will eventually be removed, and anchor signature verification will
+	// always be performed.
+	DisableAnchorSignatureVerification bool
 }

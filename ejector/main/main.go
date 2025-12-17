@@ -33,7 +33,7 @@ func main() {
 
 // Run the ejector. This method is split from main() so we only have to use panic() once.
 func run(ctx context.Context) error {
-	cfg, err := config.Bootstrap(ejector.DefaultRootEjectorConfig)
+	cfg, err := config.Bootstrap(ejector.DefaultRootEjectorConfig, nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to bootstrap config: %w", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
 	"github.com/Layr-Labs/eigenda/core"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,8 +16,8 @@ import (
 // we will keep it for now.
 const controllerNamespace = "eigenda_dispatcher"
 
-// controllerMetrics is a struct that holds the metrics for the controller.
-type controllerMetrics struct {
+// ControllerMetrics is a struct that holds the metrics for the controller.
+type ControllerMetrics struct {
 	processSigningMessageLatency *prometheus.SummaryVec
 	attestationUpdateLatency     *prometheus.SummaryVec
 	attestationBuildingLatency   *prometheus.SummaryVec
@@ -28,8 +29,8 @@ type controllerMetrics struct {
 	blobE2EDispersalLatency      *prometheus.SummaryVec
 	completedBlobs               *prometheus.CounterVec
 	attestation                  *prometheus.GaugeVec
-	blobSetSize                  *prometheus.GaugeVec
-	staleDispersalCount          prometheus.Counter
+	discardedBlobCount           *prometheus.CounterVec
+	duplicateBlobCount           *prometheus.CounterVec
 	batchStageTimer              *common.StageTimer
 	sendToValidatorStageTimer    *common.StageTimer
 
@@ -49,10 +50,13 @@ type controllerMetrics struct {
 	globalSigningFractionHistogram *prometheus.HistogramVec
 
 	collectDetailedValidatorMetrics bool
+	enablePerAccountMetrics         bool
+	userAccountRemapping            map[string]string
+	validatorIdRemapping            map[string]string
 }
 
 // Sets up metrics for the controller.
-func newControllerMetrics(
+func NewControllerMetrics(
 	registry *prometheus.Registry,
 	// The minimum fraction of signers for a batch to be considered properly signed. Any fraction greater
 	// than or equal to this value is considered a successful signing.
@@ -60,7 +64,13 @@ func newControllerMetrics(
 	// If true, collect detailed per-validator metrics. This can be disabled if the volume of data
 	// produced is too high.
 	collectDetailedValidatorMetrics bool,
-) (*controllerMetrics, error) {
+	// If false, per-account blob completion metrics will be aggregated under "0x0" to reduce cardinality.
+	enablePerAccountMetrics bool,
+	// Maps account IDs to user-friendly names.
+	userAccountRemapping map[string]string,
+	// Maps validator IDs to validator names.
+	validatorIdRemapping map[string]string,
+) (*ControllerMetrics, error) {
 	if registry == nil {
 		return nil, nil
 	}
@@ -180,26 +190,28 @@ func newControllerMetrics(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
 			Name:      "completed_blobs_total",
-			Help:      "The number and size of completed blobs by status.",
+			Help:      "The number and size of completed blobs by status and account.",
 		},
-		[]string{"state", "data"},
+		[]string{"state", "data", "account_id"},
 	)
 
-	blobSetSize := promauto.With(registry).NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: controllerNamespace,
-			Name:      "blob_queue_size",
-			Help:      "The size of the blob queue used for deduplication.",
-		},
-		[]string{},
-	)
-
-	staleDispersalCount := promauto.With(registry).NewCounter(
+	discardedBlobCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: controllerNamespace,
-			Name:      "stale_dispersal_count",
-			Help:      "Total number of dispersals discarded due to being stale.",
+			Name:      "discarded_blob_count",
+			Help:      "Total number of blobs discarded due to being stale or for being too far in the future.",
 		},
+		[]string{"location" /* the part of the code that discarded */, "reason" /* e.g. "stale" or "future" */},
+	)
+
+	duplicateBlobCount := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: controllerNamespace,
+			Name:      "duplicate_blob_count",
+			Help: "Total number of blobs discarded due to being duplicates " +
+				"(from dynamoDB's eventual consistency).",
+		},
+		[]string{"location" /* the part of the code that discarded */},
 	)
 
 	batchStageTimer := common.NewStageTimer(registry, controllerNamespace, "batch", false)
@@ -305,7 +317,7 @@ func newControllerMetrics(
 		[]string{"quorum"},
 	)
 
-	return &controllerMetrics{
+	return &ControllerMetrics{
 		processSigningMessageLatency:    processSigningMessageLatency,
 		attestationUpdateLatency:        attestationUpdateLatency,
 		attestationBuildingLatency:      attestationBuildingLatency,
@@ -317,8 +329,8 @@ func newControllerMetrics(
 		blobE2EDispersalLatency:         blobE2EDispersalLatency,
 		completedBlobs:                  completedBlobs,
 		attestation:                     attestation,
-		blobSetSize:                     blobSetSize,
-		staleDispersalCount:             staleDispersalCount,
+		discardedBlobCount:              discardedBlobCount,
+		duplicateBlobCount:              duplicateBlobCount,
 		batchStageTimer:                 batchStageTimer,
 		sendToValidatorStageTimer:       sendToValidatorStageTimer,
 		minimumSigningThreshold:         minimumSigningThreshold,
@@ -328,6 +340,9 @@ func newControllerMetrics(
 		validatorUnsignedByteCount:      validatorUnsignedByteCount,
 		validatorSigningLatency:         validatorSigningLatency,
 		collectDetailedValidatorMetrics: collectDetailedValidatorMetrics,
+		enablePerAccountMetrics:         enablePerAccountMetrics,
+		userAccountRemapping:            userAccountRemapping,
+		validatorIdRemapping:            validatorIdRemapping,
 		globalSignedBatchCount:          globalSignedBatchCount,
 		globalUnsignedBatchCount:        globalUnsignedBatchCount,
 		globalSignedByteCount:           globalSignedByteCount,
@@ -336,28 +351,28 @@ func newControllerMetrics(
 	}, nil
 }
 
-func (m *controllerMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
+func (m *ControllerMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.processSigningMessageLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *controllerMetrics) reportAttestationUpdateLatency(duration time.Duration) {
+func (m *ControllerMetrics) reportAttestationUpdateLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.attestationUpdateLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *controllerMetrics) reportAttestationBuildingLatency(duration time.Duration) {
+func (m *ControllerMetrics) reportAttestationBuildingLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.attestationBuildingLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *controllerMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
+func (m *ControllerMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
 	if m == nil {
 		return
 	}
@@ -365,75 +380,90 @@ func (m *controllerMetrics) reportThresholdSignedToDoneLatency(quorumID core.Quo
 		common.ToMilliseconds(duration))
 }
 
-func (m *controllerMetrics) reportAggregateSignaturesLatency(duration time.Duration) {
+func (m *ControllerMetrics) reportAggregateSignaturesLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.aggregateSignaturesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *controllerMetrics) reportPutAttestationLatency(duration time.Duration) {
+func (m *ControllerMetrics) reportPutAttestationLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.putAttestationLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *controllerMetrics) reportAttestationUpdateCount(attestationCount float64) {
+func (m *ControllerMetrics) reportAttestationUpdateCount(attestationCount float64) {
 	if m == nil {
 		return
 	}
 	m.attestationUpdateCount.WithLabelValues().Observe(attestationCount)
 }
 
-func (m *controllerMetrics) reportUpdateBatchStatusLatency(duration time.Duration) {
+func (m *ControllerMetrics) reportUpdateBatchStatusLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.updateBatchStatusLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *controllerMetrics) reportE2EDispersalLatency(duration time.Duration) {
+func (m *ControllerMetrics) reportE2EDispersalLatency(duration time.Duration) {
 	if m == nil {
 		return
 	}
 	m.blobE2EDispersalLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *controllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
+func (m *ControllerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus, accountID string) {
 	if m == nil {
 		return
 	}
+
+	accountLabel := nameremapping.GetAccountLabel(accountID, m.userAccountRemapping, m.enablePerAccountMetrics)
+
 	switch status {
 	case dispv2.Complete:
-		m.completedBlobs.WithLabelValues("complete", "number").Inc()
-		m.completedBlobs.WithLabelValues("complete", "size").Add(float64(size))
+		m.completedBlobs.WithLabelValues("complete", "number", accountLabel).Inc()
+		m.completedBlobs.WithLabelValues("complete", "size", accountLabel).Add(float64(size))
 	case dispv2.Failed:
-		m.completedBlobs.WithLabelValues("failed", "number").Inc()
-		m.completedBlobs.WithLabelValues("failed", "size").Add(float64(size))
+		m.completedBlobs.WithLabelValues("failed", "number", accountLabel).Inc()
+		m.completedBlobs.WithLabelValues("failed", "size", accountLabel).Add(float64(size))
 	default:
 		return
 	}
 
-	m.completedBlobs.WithLabelValues("total", "number").Inc()
-	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
+	m.completedBlobs.WithLabelValues("total", "number", accountLabel).Inc()
+	m.completedBlobs.WithLabelValues("total", "size", accountLabel).Add(float64(size))
 }
 
-func (m *controllerMetrics) reportBlobSetSize(size int) {
+// Report a blob that is discarded.
+func (m *ControllerMetrics) reportDiscardedBlob(
+	// The location where the blob was discarded.
+	location string,
+	// The reason why the blob was discarded (i.e., stale or future).
+	reason string,
+) {
 	if m == nil {
 		return
 	}
-	m.blobSetSize.WithLabelValues().Set(float64(size))
+
+	m.discardedBlobCount.WithLabelValues(location, reason).Inc()
 }
 
-func (m *controllerMetrics) reportStaleDispersal() {
+// Report a blob that was a duplicate.
+func (m *ControllerMetrics) reportDuplicateBlob(
+	// The location where the blob was discarded.
+	location string,
+) {
 	if m == nil {
 		return
 	}
-	m.staleDispersalCount.Inc()
+
+	m.duplicateBlobCount.WithLabelValues(location).Inc()
 }
 
-func (m *controllerMetrics) reportLegacyAttestation(
+func (m *ControllerMetrics) reportLegacyAttestation(
 	operatorCount map[core.QuorumID]int,
 	signerCount map[core.QuorumID]int,
 	quorumResults map[core.QuorumID]*core.QuorumResult,
@@ -461,7 +491,7 @@ func (m *controllerMetrics) reportLegacyAttestation(
 	}
 }
 
-func (m *controllerMetrics) ReportGlobalSigningThreshold(
+func (m *ControllerMetrics) ReportGlobalSigningThreshold(
 	quorumID core.QuorumID,
 	batchSizeBytes uint64,
 	signingFraction float64,
@@ -484,7 +514,7 @@ func (m *controllerMetrics) ReportGlobalSigningThreshold(
 	m.globalSigningFractionHistogram.With(labels).Observe(signingFraction)
 }
 
-func (m *controllerMetrics) newBatchProbe() *common.SequenceProbe {
+func (m *ControllerMetrics) newBatchProbe() *common.SequenceProbe {
 	if m == nil {
 		// A sequence probe becomes a no-op when nil.
 		return nil
@@ -493,7 +523,7 @@ func (m *controllerMetrics) newBatchProbe() *common.SequenceProbe {
 	return m.batchStageTimer.NewSequence()
 }
 
-func (m *controllerMetrics) newSendToValidatorProbe() *common.SequenceProbe {
+func (m *ControllerMetrics) newSendToValidatorProbe() *common.SequenceProbe {
 	if m == nil {
 		// A sequence probe becomes a no-op when nil.
 		return nil
@@ -503,7 +533,7 @@ func (m *controllerMetrics) newSendToValidatorProbe() *common.SequenceProbe {
 }
 
 // Report the result of an attempted signing event for a validator.
-func (m *controllerMetrics) ReportValidatorSigningResult(
+func (m *ControllerMetrics) ReportValidatorSigningResult(
 	id core.OperatorID,
 	stakeFraction float64,
 	batchSize uint64,
@@ -514,7 +544,11 @@ func (m *controllerMetrics) ReportValidatorSigningResult(
 		return
 	}
 
-	label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
+	idLabel := nameremapping.GetAccountLabel(
+		"0x"+id.Hex(),
+		m.validatorIdRemapping,
+		m.collectDetailedValidatorMetrics)
+	label := prometheus.Labels{"id": idLabel, "quorum": fmt.Sprintf("%d", quorum)}
 
 	if success {
 		m.validatorSignedBatchCount.With(label).Add(1)
@@ -526,10 +560,14 @@ func (m *controllerMetrics) ReportValidatorSigningResult(
 }
 
 // Report the signing latency for a validator. Should only be used for validators that successfully signed a batch.
-func (m *controllerMetrics) ReportValidatorSigningLatency(id core.OperatorID, latency time.Duration) {
+func (m *ControllerMetrics) ReportValidatorSigningLatency(id core.OperatorID, latency time.Duration) {
 	if m == nil || !m.collectDetailedValidatorMetrics {
 		return
 	}
 
-	m.validatorSigningLatency.WithLabelValues(id.Hex()).Observe(common.ToMilliseconds(latency))
+	idLabel := nameremapping.GetAccountLabel(
+		"0x"+id.Hex(),
+		m.validatorIdRemapping,
+		m.collectDetailedValidatorMetrics)
+	m.validatorSigningLatency.WithLabelValues(idLabel).Observe(common.ToMilliseconds(latency))
 }

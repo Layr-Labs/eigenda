@@ -255,12 +255,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_ADDRESS"),
 	}
-	UseControllerMediatedPayments = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "use-controller-mediated-payments"),
-		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using new controller-mediated system.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_CONTROLLER_MEDIATED_PAYMENTS"),
-	}
 	DisableGetBlobCommitment = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disable-get-blob-commitment"),
 		Usage:    "If true, the GetBlobCommitment gRPC endpoint will return a deprecation error. This endpoint is deprecated and will be removed in a future release.",
@@ -272,6 +266,38 @@ var (
 		Usage:    "Disables account level metrics collection (default: false)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISABLE_PER_ACCOUNT_METRICS"),
+	}
+	SigningRateRetentionPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-retention-period"),
+		Usage:    "The amount of time to retain signing rate data",
+		Required: false,
+		Value:    14 * 24 * time.Hour, // 2 weeks
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_RETENTION_PERIOD"),
+	}
+	SigningRatePollIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-poll-interval"),
+		Usage:    "The interval at which to poll for signing rate data from the controller",
+		Required: false,
+		Value:    time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_POLL_INTERVAL"),
+	}
+	DisperserIdFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-id"),
+		Usage:    "Unique identifier for this disperser instance",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_ID"),
+	}
+	TolerateMissingAnchorSignatureFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "tolerate-missing-anchor-signature"),
+		Usage:    "Whether to accept DisperseBlob requests without an anchor signature. Ignored if disable-anchor-signature-verification is true.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TOLERATE_MISSING_ANCHOR_SIGNATURE"),
+	}
+	DisableAnchorSignatureVerificationFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disable-anchor-signature-verification"),
+		Usage:    "If true, anchor signature verification is skipped entirely. Takes precedence over tolerate-missing-anchor-signature.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISABLE_ANCHOR_SIGNATURE_VERIFICATION"),
 	}
 )
 
@@ -309,6 +335,7 @@ var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
 	GrpcPortFlag,
 	BucketTableName,
+	DisperserIdFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -340,9 +367,12 @@ var optionalFlags = []cli.Flag{
 	MaxFutureDispersalTimeFlag,
 	ReservedOnly,
 	ControllerAddressFlag,
-	UseControllerMediatedPayments,
 	DisableGetBlobCommitment,
 	DisablePerAccountMetricsFlag,
+	SigningRateRetentionPeriodFlag,
+	SigningRatePollIntervalFlag,
+	TolerateMissingAnchorSignatureFlag,
+	DisableAnchorSignatureVerificationFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,

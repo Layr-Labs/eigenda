@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,6 +32,21 @@ type Foo struct {
 	Baz                          *Baz
 	ThisIsAFieldWithAComplexName string
 	ThisIsASecretField           *secret.Secret
+	ThisIsASliceOfSecrets        []*secret.Secret
+	ThisIsASliceOfStrings        []string
+	ThisIsASliceOfInts           []int
+	ThisIsASliceOfInt64s         []int64
+	ThisIsASliceOfInt32s         []int32
+	ThisIsASliceOfInt16s         []int16
+	ThisIsASliceOfInt8s          []int8
+	ThisIsASliceOfUints          []uint
+	ThisIsASliceOfUint64s        []uint64
+	ThisIsASliceOfUint32s        []uint32
+	ThisIsASliceOfUint16s        []uint16
+	ThisIsASliceOfUint8s         []uint8
+	ThisIsASliceOfBools          []bool
+	ThisIsASliceOfFloat64s       []float64
+	ThisIsASliceOfFloat32s       []float32
 }
 
 func DefaultFoo() *Foo {
@@ -72,7 +88,7 @@ func TestTOMLParsing(t *testing.T) {
 
 	configFile := "test/config.toml"
 
-	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, nil, configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -94,6 +110,9 @@ func TestTOMLParsing(t *testing.T) {
 	require.Equal(t,
 		"you're no stranger to love, you know the rules and so do I (so do I)",
 		foo.ThisIsASecretField.Get())
+	// The slice of secrets is unset in this config, so we should expect an empty slice.
+	// There used to be a bug where it would instead return [""].
+	require.Equal(t, 0, len(foo.ThisIsASliceOfSecrets))
 
 	// Bar field
 	require.Equal(t, "bar A", foo.Bar.A)
@@ -116,7 +135,7 @@ func TestJSONParsing(t *testing.T) {
 
 	configFile := "test/config.json"
 
-	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, nil, configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -161,7 +180,7 @@ func TestYAMLParsing(t *testing.T) {
 
 	configFile := "test/config.yaml"
 
-	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, nil, configFile)
 	require.NoError(t, err)
 
 	// Top-level fields
@@ -207,7 +226,7 @@ func TestTOMLConfigOverride(t *testing.T) {
 	configFile := "test/config.toml"
 	overrideFile := "test/config_override.toml"
 
-	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile, overrideFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, nil, configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -244,7 +263,7 @@ func TestJSONConfigOverride(t *testing.T) {
 	configFile := "test/config.json"
 	overrideFile := "test/config_override.json"
 
-	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile, overrideFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, nil, configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -287,7 +306,7 @@ func TestYAMLConfigOverride(t *testing.T) {
 	configFile := "test/config.yaml"
 	overrideFile := "test/config_override.yaml"
 
-	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile, overrideFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, nil, configFile, overrideFile)
 	require.NoError(t, err)
 
 	// Top-level fields - mix of base and override
@@ -328,7 +347,7 @@ func TestYAMLConfigOverride(t *testing.T) {
 func TestInvalidTOML(t *testing.T) {
 	configFile := "test/invalid_config.toml"
 
-	_, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, configFile)
+	_, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "FOO", nil, nil, configFile)
 	require.Error(t, err)
 }
 
@@ -359,7 +378,7 @@ func TestDefaultValues(t *testing.T) {
 		}
 	}
 
-	foo, err := ParseConfig(common.TestLogger(t), constructor(), "FOO", nil, configFile)
+	foo, err := ParseConfig(common.TestLogger(t), constructor(), "FOO", nil, nil, configFile)
 	require.NoError(t, err)
 
 	// Fields that are overridden by config_override.toml
@@ -414,7 +433,71 @@ func TestEnvironmentVariables(t *testing.T) {
 
 	require.NoError(t, os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored"))
 
-	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, configFile)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil, configFile)
+	require.NoError(t, err)
+
+	// Verify that environment variables have overridden the config file values.
+	require.Equal(t, "value from env var", foo.String) // from env
+	require.Equal(t, -999, foo.Int)                    // from env
+	require.Equal(t, int64(0), foo.Int64)              // from env (zero value)
+	require.Equal(t, int32(0), foo.Int32)              // from env (zero value)
+	require.Equal(t, int16(4), foo.Int16)              // from config
+	require.Equal(t, int8(5), foo.Int8)                // from config
+	require.Equal(t, uint(6), foo.Uint)                // from config
+	require.Equal(t, uint64(7), foo.Uint64)            // from config
+	require.Equal(t, uint32(8), foo.Uint32)            // from config
+	require.Equal(t, uint16(9), foo.Uint16)            // from config
+	require.Equal(t, uint8(10), foo.Uint8)             // from config
+	require.Equal(t, 11.11, foo.Float64)               // from config
+	require.Equal(t, float32(12.12), foo.Float32)      // from config
+	require.Equal(t, 5*time.Second, foo.Duration)      // from config
+	require.Equal(t, false, foo.Bool)                  // from config
+
+	// Bar field
+	require.Equal(t, "bar A", foo.Bar.A) // from config
+	require.Equal(t, -777, foo.Bar.B)    // from env
+	require.Equal(t, true, foo.Bar.C)    // from config
+
+	// Bar.Baz field
+	require.NotNil(t, foo.Bar.Baz)
+	require.Equal(t, "env var bar baz X", foo.Bar.Baz.X) // from env
+	require.Equal(t, 444, foo.Bar.Baz.Y)                 // from env
+	require.Equal(t, false, foo.Bar.Baz.Z)               // from env
+
+	// Baz field - the env vars use FOO_BAZ_PARTIAL_* which doesn't match foo.Baz,
+	// so these should come from config
+	require.NotNil(t, foo.Baz)
+	require.Equal(t, "baz X", foo.Baz.X) // from config
+	require.Equal(t, 27, foo.Baz.Y)      // from config
+	require.Equal(t, true, foo.Baz.Z)    // from config
+}
+
+func TestAliasedEnvironmentVariables(t *testing.T) {
+
+	configFile := "test/config.toml"
+
+	// unset the alias variables in case they were set in previous tests
+	require.NoError(t, os.Unsetenv("PREFIX_BAR_BAZ_X"))
+	require.NoError(t, os.Unsetenv("PREFIX_BAR_BAZ_Z"))
+
+	// Set environment variables to override some config values.
+	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
+	require.NoError(t, os.Setenv("PREFIX_INT", "-999"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_B", "-777"))
+	require.NoError(t, os.Setenv("LEGACY_PREFIX_BAR_BAZ_X", "env var bar baz X")) // will be aliased
+	require.NoError(t, os.Setenv("PREFIX_BAR_BAZ_Y", "444"))
+	require.NoError(t, os.Setenv("LEGACY_PREFIX_BAR_BAZ_Z", "false")) // will be aliased
+	require.NoError(t, os.Setenv("PREFIX_INT64", "0"))                // zero value
+	require.NoError(t, os.Setenv("PREFIX_INT32", "0"))                // zero value
+
+	aliases := map[string]string{
+		"LEGACY_PREFIX_BAR_BAZ_X": "PREFIX_BAR_BAZ_X",
+		"LEGACY_PREFIX_BAR_BAZ_Z": "PREFIX_BAR_BAZ_Z",
+	}
+
+	require.NoError(t, os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored"))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", aliases, nil, configFile)
 	require.NoError(t, err)
 
 	// Verify that environment variables have overridden the config file values.
@@ -463,7 +546,7 @@ func TestInvalidEnvironmentVariable(t *testing.T) {
 	require.NoError(t, os.Setenv("PREFIX_STRING", "value from env var"))
 	require.NoError(t, os.Setenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED", "should not be ignored"))
 
-	_, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, configFile)
+	_, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil, configFile)
 	require.Error(t, err)
 
 	require.NoError(t, os.Unsetenv("PREFIX_THIS_VARIABLE_WAS_MISTYPED"))
@@ -475,7 +558,7 @@ func TestVerificationFailure(t *testing.T) {
 	// Set environment variables to override some config values.
 	require.NoError(t, os.Setenv("PREFIX_STRING", "invalid")) // will cause verification to fail
 
-	_, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, configFile)
+	_, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil, configFile)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "String may not be 'invalid'")
 }
@@ -496,7 +579,7 @@ func TestIgnoreEnvironmentVariables(t *testing.T) {
 
 	require.NoError(t, os.Setenv("A_VARIABLE_THAT_DOES_NOT_HAVE_PREFIX", "should be ignored"))
 
-	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "", nil, configFile) // intentionally empty prefix
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "", nil, nil, configFile) // intentionally empty prefix
 	require.NoError(t, err)
 
 	// Verify that environment variables did not override the config file values.
@@ -541,7 +624,7 @@ func TestScreamingSnakeCaseFlag(t *testing.T) {
 	require.NoError(t, os.Setenv("TEST_BAR_THIS_IS_A_NESTED_FIELD_WITH_A_COMPLEX_NAME", "123"))
 	require.NoError(t, os.Setenv("TEST_BAR_BAZ_THIS_FIELD_IS_NESTED_EVEN_DEEPER", "456.789"))
 
-	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "TEST", nil)
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "TEST", nil, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, "value from env var", foo.ThisIsAFieldWithAComplexName)
@@ -551,4 +634,371 @@ func TestScreamingSnakeCaseFlag(t *testing.T) {
 	require.NoError(t, os.Unsetenv("TEST_THIS_IS_A_FIELD_WITH_A_COMPLEX_NAME"))
 	require.NoError(t, os.Unsetenv("TEST_BAR_THIS_IS_A_NESTED_FIELD_WITH_A_COMPLEX_NAME"))
 	require.NoError(t, os.Unsetenv("TEST_BAR_BAZ_THIS_FIELD_IS_NESTED_EVEN_DEEPER"))
+}
+
+// If env var A is aliased to env var B, then both must not be set at the same time. This test verifies that if both
+// are set then an error is returned.
+func TestAliasAndTargetSet(t *testing.T) {
+	configFile := "test/config.toml"
+
+	aliases := map[string]string{
+		"LEGACY_PREFIX_BAR_BAZ_X": "PREFIX_BAR_BAZ_X",
+	}
+
+	// set both the alias and the target env vars
+	require.NoError(t, os.Setenv("LEGACY_PREFIX_BAR_BAZ_X", "env var bar baz X"))
+	require.NoError(t, os.Setenv("PREFIX_BAR_BAZ_X", "this conflicts with the alias"))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", aliases, nil, configFile)
+	require.Error(t, err)
+	require.Nil(t, foo)
+}
+
+func TestSecretSlice(t *testing.T) {
+	expected := []string{
+		"Never gonna give you up",
+		"Never gonna let you down",
+		"Never gonna run around and desert you",
+		"Never gonna make you cry",
+		"Never gonna say goodbye",
+		"Never gonna tell a lie and hurt you",
+	}
+
+	fullString := strings.Join(expected, ", ")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_SECRETS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfSecrets, len(expected))
+	for i, secretField := range foo.ThisIsASliceOfSecrets {
+		require.Equal(t, expected[i], secretField.Get())
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_SECRETS"))
+}
+
+func TestStringSlice(t *testing.T) {
+	expected := []string{
+		"This",
+		"is",
+		"a",
+		"slice",
+		"of",
+		"strings",
+	}
+
+	fullString := strings.Join(expected, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_STRINGS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfStrings, len(expected))
+	for i, str := range foo.ThisIsASliceOfStrings {
+		require.Equal(t, expected[i], str)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_STRINGS"))
+}
+
+func TestIntSlice(t *testing.T) {
+	expected := []int{1, 2, 3, -4, 5, 0, 42}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_INTS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfInts, len(expected))
+	for i, val := range foo.ThisIsASliceOfInts {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_INTS"))
+}
+
+func TestBoolSlice(t *testing.T) {
+	expected := []bool{true, false, true, true, false}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%t", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_BOOLS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfBools, len(expected))
+	for i, val := range foo.ThisIsASliceOfBools {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_BOOLS"))
+}
+
+func TestFloat64Slice(t *testing.T) {
+	expected := []float64{1.5, -2.3, 0.0, 42.42, 3.14159}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%f", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_FLOAT64S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfFloat64s, len(expected))
+	for i, val := range foo.ThisIsASliceOfFloat64s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_FLOAT64S"))
+}
+
+func TestInt64Slice(t *testing.T) {
+	expected := []int64{9223372036854775807, -9223372036854775808, 0, 42, -100}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_INT64S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfInt64s, len(expected))
+	for i, val := range foo.ThisIsASliceOfInt64s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_INT64S"))
+}
+
+func TestInt32Slice(t *testing.T) {
+	expected := []int32{2147483647, -2147483648, 0, 42, -100}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_INT32S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfInt32s, len(expected))
+	for i, val := range foo.ThisIsASliceOfInt32s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_INT32S"))
+}
+
+func TestInt16Slice(t *testing.T) {
+	expected := []int16{32767, -32768, 0, 42, -100}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_INT16S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfInt16s, len(expected))
+	for i, val := range foo.ThisIsASliceOfInt16s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_INT16S"))
+}
+
+func TestInt8Slice(t *testing.T) {
+	expected := []int8{127, -128, 0, 42, -100}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_INT8S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfInt8s, len(expected))
+	for i, val := range foo.ThisIsASliceOfInt8s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_INT8S"))
+}
+
+func TestUintSlice(t *testing.T) {
+	expected := []uint{0, 1, 42, 100, 4294967295}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_UINTS", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfUints, len(expected))
+	for i, val := range foo.ThisIsASliceOfUints {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_UINTS"))
+}
+
+func TestUint64Slice(t *testing.T) {
+	expected := []uint64{0, 1, 42, 100, 18446744073709551615}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_UINT64S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfUint64s, len(expected))
+	for i, val := range foo.ThisIsASliceOfUint64s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_UINT64S"))
+}
+
+func TestUint32Slice(t *testing.T) {
+	expected := []uint32{0, 1, 42, 100, 4294967295}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_UINT32S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfUint32s, len(expected))
+	for i, val := range foo.ThisIsASliceOfUint32s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_UINT32S"))
+}
+
+func TestUint16Slice(t *testing.T) {
+	expected := []uint16{0, 1, 42, 100, 65535}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_UINT16S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfUint16s, len(expected))
+	for i, val := range foo.ThisIsASliceOfUint16s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_UINT16S"))
+}
+
+func TestUint8Slice(t *testing.T) {
+	expected := []uint8{0, 1, 42, 100, 255}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_UINT8S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfUint8s, len(expected))
+	for i, val := range foo.ThisIsASliceOfUint8s {
+		require.Equal(t, expected[i], val)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_UINT8S"))
+}
+
+func TestFloat32Slice(t *testing.T) {
+	expected := []float32{1.5, -2.3, 0.0, 42.42, 3.14159}
+
+	// Build comma-separated string
+	parts := make([]string, len(expected))
+	for i, val := range expected {
+		parts[i] = fmt.Sprintf("%f", val)
+	}
+	fullString := strings.Join(parts, ",")
+
+	require.NoError(t, os.Setenv("PREFIX_THIS_IS_A_SLICE_OF_FLOAT32S", fullString))
+
+	foo, err := ParseConfig(common.TestLogger(t), DefaultFoo(), "PREFIX", nil, nil)
+	require.NoError(t, err)
+
+	require.Len(t, foo.ThisIsASliceOfFloat32s, len(expected))
+	for i, val := range foo.ThisIsASliceOfFloat32s {
+		require.InDelta(t, expected[i], val, 0.00001)
+	}
+
+	require.NoError(t, os.Unsetenv("PREFIX_THIS_IS_A_SLICE_OF_FLOAT32S"))
 }

@@ -72,7 +72,10 @@ func emptyBlobDispersalTest(t *testing.T, environment string) {
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of an empty blob
 	// This should fail with "data is empty" error
-	_, _, err = c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, paymentMetadata)
+	disperserClient, err := c.GetDisperserClientMultiplexer().GetDisperserClient(
+		ctx, time.Now(), paymentMetadata.IsOnDemand())
+	require.NoError(t, err)
+	_, _, err = disperserClient.DisperseBlob(ctx, blobBytes, 0, quorums, nil, paymentMetadata)
 	require.Error(t, err)
 }
 
@@ -149,7 +152,10 @@ func zeroBlobDispersalTest(t *testing.T, environment string) {
 
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of a blob containing all 0s
-	_, _, err = c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, paymentMetadata)
+	disperserClient, err := c.GetDisperserClientMultiplexer().GetDisperserClient(
+		ctx, time.Now(), paymentMetadata.IsOnDemand())
+	require.NoError(t, err)
+	_, _, err = disperserClient.DisperseBlob(ctx, blobBytes, 0, quorums, nil, paymentMetadata)
 	require.NoError(t, err)
 }
 
@@ -485,8 +491,10 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	require.NoError(t, err, "new committer")
 
 	disperserConfig := &dispersal.DisperserClientConfig{
-		GrpcUri:    fmt.Sprintf("%s:%d", c.GetConfig().DisperserHostname, c.GetConfig().DisperserPort),
+		GrpcUri:           fmt.Sprintf("%s:%d", c.GetConfig().DisperserHostname, c.GetConfig().DisperserPort),
 		UseSecureGrpcFlag: true,
+		DisperserID:       0,
+		ChainID:           c.GetChainID(),
 	}
 
 	disperserClient, err := dispersal.NewDisperserClient(

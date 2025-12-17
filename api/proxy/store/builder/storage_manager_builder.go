@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	srs "github.com/Layr-Labs/eigenda/api/proxy/resources"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
@@ -34,6 +35,7 @@ import (
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/Layr-Labs/eigenda/common/disperser"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
@@ -108,11 +110,7 @@ func BuildManagers(
 		// kzgVerifier and encoder are only needed when validator retrieval is enabled
 		var kzgVerifier *kzgverifierv2.Verifier
 		if slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
-			kzgConfig := kzgverifierv2.ConfigFromV1KzgConfig(&config.KzgConfig)
-			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig)
-			if err != nil {
-				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
-			}
+			kzgVerifier = kzgverifierv2.NewVerifierWithSRS(srs.GetG1SRS())
 		}
 		encoder, err := rsv2.NewEncoder(log, nil)
 		if err != nil {
@@ -228,12 +226,7 @@ func buildEigenDAV2Backend(
 	registry *prometheus.Registry,
 	ethClient common_eigenda.EthClient,
 ) (common.EigenDAV2Store, error) {
-	kzgCommitter, err := committer.NewFromConfig(committer.Config{
-		G1SRSPath:         config.KzgConfig.G1Path,
-		G2SRSPath:         config.KzgConfig.G2Path,
-		G2TrailingSRSPath: config.KzgConfig.G2TrailingPath,
-		SRSNumberToLoad:   config.KzgConfig.SRSNumberToLoad,
-	})
+	kzgCommitter, err := committer.New(srs.GetG1SRS(), srs.GetG2SRS(), srs.GetG2TrailingSRS())
 	if err != nil {
 		return nil, fmt.Errorf("new kzg committer: %w", err)
 	}
@@ -590,15 +583,30 @@ func buildPayloadDisperser(
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
-	disperserClient, err := dispersal.NewDisperserClient(
+	chainID, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get chain ID: %w", err)
+	}
+
+	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
+	multiplexerConfig.UseSecureGrpcFlag = clientConfigV2.DisperserClientCfg.UseSecureGrpcFlag
+	multiplexerConfig.DisperserConnectionCount = clientConfigV2.DisperserClientCfg.DisperserConnectionCount
+	multiplexerConfig.ChainID = chainID
+
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(
+		clientConfigV2.DisperserClientCfg.GrpcUri)
+
+	disperserClientMultiplexer, err := dispersal.NewDisperserClientMultiplexer(
 		log,
-		&clientConfigV2.DisperserClientCfg,
+		multiplexerConfig,
+		disperserRegistry,
 		signer,
 		kzgCommitter,
 		dispersalMetrics,
+		rand.New(rand.NewSource(time.Now().UnixNano())),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("new disperser client: %w", err)
+		return nil, fmt.Errorf("create disperser client multiplexer: %w", err)
 	}
 
 	clientLedger, err := buildClientLedger(
@@ -609,7 +617,7 @@ func buildPayloadDisperser(
 		accountId,
 		contractDirectory,
 		accountantMetrics,
-		disperserClient,
+		disperserClientMultiplexer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build client ledger: %w", err)
@@ -634,7 +642,7 @@ func buildPayloadDisperser(
 	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		log,
 		clientConfigV2.PayloadDisperserCfg,
-		disperserClient,
+		disperserClientMultiplexer,
 		blockNumMonitor,
 		certBuilder,
 		certVerifier,
@@ -702,7 +710,7 @@ func buildOnDemandLedger(
 	paymentVault payments.PaymentVault,
 	accountID geth_common.Address,
 	minNumSymbols uint32,
-	disperserClient *dispersal.DisperserClient,
+	cumulativePayment *big.Int,
 ) (*ondemand.OnDemandLedger, error) {
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
 	if err != nil {
@@ -712,18 +720,6 @@ func buildOnDemandLedger(
 	totalDeposits, err := paymentVault.GetTotalDeposit(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("get total deposit from vault: %w", err)
-	}
-
-	paymentState, err := disperserClient.GetPaymentState(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get payment state from disperser: %w", err)
-	}
-
-	var cumulativePayment *big.Int
-	if paymentState.GetCumulativePayment() == nil {
-		cumulativePayment = big.NewInt(0)
-	} else {
-		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
 	}
 
 	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
@@ -739,8 +735,27 @@ func buildOnDemandLedger(
 	return onDemandLedger, nil
 }
 
+func getCumulativePayment(
+	ctx context.Context,
+	disperserClientMultiplexer *dispersal.DisperserClientMultiplexer,
+) (*big.Int, error) {
+	disperserClient, err := disperserClientMultiplexer.GetDisperserClient(ctx, time.Now(), true)
+	if err != nil {
+		return nil, fmt.Errorf("get disperser client: %w", err)
+	}
+
+	paymentState, err := disperserClient.GetPaymentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get payment state: %w", err)
+	}
+
+	if paymentState.GetCumulativePayment() == nil {
+		return big.NewInt(0), nil
+	}
+	return new(big.Int).SetBytes(paymentState.GetCumulativePayment()), nil
+}
+
 // buildClientLedger creates a ClientLedger for managing payment state
-// Returns nil for legacy mode
 func buildClientLedger(
 	ctx context.Context,
 	log logging.Logger,
@@ -749,7 +764,7 @@ func buildClientLedger(
 	accountID geth_common.Address,
 	contractDirectory *directory.ContractDirectory,
 	accountantMetrics metrics_v2.AccountantMetricer,
-	disperserClient *dispersal.DisperserClient,
+	disperserClientMultiplexer *dispersal.DisperserClientMultiplexer,
 ) (*clientledger.ClientLedger, error) {
 	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
@@ -775,7 +790,11 @@ func buildClientLedger(
 			return nil, fmt.Errorf("build reservation ledger: %w", err)
 		}
 	case clientledger.ClientLedgerModeOnDemandOnly:
-		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		cumulativePayment, err := getCumulativePayment(ctx, disperserClientMultiplexer)
+		if err != nil {
+			return nil, fmt.Errorf("get cumulative payment: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, cumulativePayment)
 		if err != nil {
 			return nil, fmt.Errorf("build on-demand ledger: %w", err)
 		}
@@ -785,7 +804,11 @@ func buildClientLedger(
 		if err != nil {
 			return nil, fmt.Errorf("build reservation ledger: %w", err)
 		}
-		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		cumulativePayment, err := getCumulativePayment(ctx, disperserClientMultiplexer)
+		if err != nil {
+			return nil, fmt.Errorf("get cumulative payment: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, cumulativePayment)
 		if err != nil {
 			return nil, fmt.Errorf("build on-demand ledger: %w", err)
 		}

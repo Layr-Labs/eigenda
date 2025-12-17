@@ -4,12 +4,6 @@ pragma solidity ^0.8.9;
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 
 interface IEigenDAEjectionManager {
-    /// @notice Adds to an escrow for the ejector to use in ejection processes.
-    function addEjectorBalance(uint256 amount) external;
-
-    /// @notice Withdraws from the ejector's escrow balance that is not currently in use for an ejection process.
-    function withdrawEjectorBalance(uint256 amount) external;
-
     /// @notice Sets the delay for ejection processes.
     /// @param delay The number of seconds that must pass after initiation before an ejection can be completed.
     ///              This is also the time guaranteed to a challenger to cancel the ejection.
@@ -46,9 +40,6 @@ interface IEigenDAEjectionManager {
 
     /// @notice Cancels the ejection process for the message sender. Refunds gas to the caller.
     function cancelEjection() external;
-
-    /// @notice Returns the address of the token used for ejection deposits and refunds.
-    function getDepositToken() external view returns (address);
 
     /// @notice Returns the address of the ejector for a given operator. If the returned address is zero, then there is no ejection in progress.
     function getEjector(address operator) external view returns (address);

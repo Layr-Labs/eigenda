@@ -1,6 +1,7 @@
 package common_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
@@ -13,7 +14,9 @@ import (
 func validClientConfigV2() common.ClientConfigV2 {
 	return common.ClientConfigV2{
 		DisperserClientCfg: dispersal.DisperserClientConfig{
-			GrpcUri: "localhost:8080",
+			GrpcUri:     "localhost:8080",
+			DisperserID: 0,
+			ChainID:     big.NewInt(1),
 		},
 		PayloadDisperserCfg:                dispersal.PayloadDisperserConfig{},
 		RelayPayloadRetrieverCfg:           payloadretrieval.RelayPayloadRetrieverConfig{},

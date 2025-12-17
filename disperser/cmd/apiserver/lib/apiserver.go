@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
+	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -16,6 +17,7 @@ import (
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	mt "github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -44,6 +46,11 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return err
+	}
+
+	chainId, err := client.ChainID(context.Background())
+	if err != nil {
+		return fmt.Errorf("get chain ID: %w", err)
 	}
 
 	transactor, err := eth.NewReader(
@@ -144,30 +151,30 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("new committer: %w", err)
 		}
-		baseBlobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
-		blobMetadataStore := blobstorev2.NewInstrumentedMetadataStore(baseBlobMetadataStore, blobstorev2.InstrumentedMetadataStoreConfig{
-			ServiceName: "apiserver",
-			Registry:    reg,
-			Backend:     blobstorev2.BackendDynamoDB,
-		})
+		baseBlobMetadataStore := blobstorev2.NewBlobMetadataStore(
+			dynamoClient,
+			logger,
+			config.BlobstoreConfig.TableName)
+		blobMetadataStore := blobstorev2.NewInstrumentedMetadataStore(
+			baseBlobMetadataStore,
+			blobstorev2.InstrumentedMetadataStoreConfig{
+				ServiceName: "apiserver",
+				Registry:    reg,
+				Backend:     blobstorev2.BackendDynamoDB,
+			})
 		blobStore := blobstorev2.NewBlobStore(bucketName, objectStorageClient, logger)
 
-		var controllerConnection *grpc.ClientConn
-		var controllerClient controller.ControllerServiceClient
-		if config.UseControllerMediatedPayments {
-			if config.ControllerAddress == "" {
-				return fmt.Errorf("controller address is required when using controller-mediated payments")
-			}
-			connection, err := grpc.NewClient(
-				config.ControllerAddress,
-				grpc.WithTransportCredentials(insecure.NewCredentials()),
-			)
-			if err != nil {
-				return fmt.Errorf("create controller connection: %w", err)
-			}
-			controllerConnection = connection
-			controllerClient = controller.NewControllerServiceClient(connection)
+		if config.ControllerAddress == "" {
+			return fmt.Errorf("controller address is required")
 		}
+		controllerConnection, err := grpc.NewClient(
+			config.ControllerAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			return fmt.Errorf("create controller connection: %w", err)
+		}
+		controllerClient := controller.NewControllerServiceClient(controllerConnection)
 
 		// Create listener for the gRPC server
 		addr := fmt.Sprintf("%s:%s", "0.0.0.0", config.ServerConfig.GrpcPort)
@@ -176,14 +183,68 @@ func RunDisperserServer(ctx *cli.Context) error {
 			return fmt.Errorf("failed to create listener: %w", err)
 		}
 
+		signingRateTracker, err := signingrate.NewSigningRateTracker(
+			logger,
+			config.ServerConfig.SigningRateRetentionPeriod,
+			time.Second, // bucket size is unimportant, since it is unused when mirroring from controller
+			time.Now,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create signing rate tracker: %w", err)
+		}
+		signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(context.Background(), signingRateTracker)
+
+		// A function that can fetch signing rate data from the controller.
+		scraper := func(ctx context.Context, startTime time.Time) ([]*validator.SigningRateBucket, error) {
+			data, err := controllerClient.GetValidatorSigningRateDump(
+				ctx,
+				&controller.GetValidatorSigningRateDumpRequest{
+					StartTimestamp: uint64(startTime.Unix()),
+				})
+			if err != nil {
+				return nil, fmt.Errorf("GetValidatorSigningRateDump RPC failed: %w", err)
+			}
+			return data.GetSigningRateBuckets(), nil
+		}
+
+		// Clone signing rate data from controller. This is blocking, so that when we start the server we have
+		// data to serve right away.
+		err = signingrate.DoInitialScrape(
+			context.Background(),
+			logger,
+			scraper,
+			signingRateTracker,
+			config.ServerConfig.SigningRateRetentionPeriod)
+		if err != nil {
+			return fmt.Errorf("do initial scrape: %w", err)
+		}
+
+		// In the background, periodically refresh signing rate data from controller.
+		go signingrate.MirrorSigningRate(
+			context.Background(),
+			logger,
+			scraper,
+			signingRateTracker,
+			config.ServerConfig.SigningRatePollInterval,
+			config.ServerConfig.SigningRateRetentionPeriod,
+		)
+
+		authenticator, err := authv2.NewPaymentStateAuthenticator(
+			config.AuthPmtStateRequestMaxPastAge,
+			config.AuthPmtStateRequestMaxFutureAge)
+		if err != nil {
+			return fmt.Errorf("failed to create payment state authenticator: %w", err)
+		}
+
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			time.Now,
+			chainId,
 			blobStore,
 			blobMetadataStore,
 			transactor,
 			meterer,
-			authv2.NewPaymentStateAuthenticator(config.AuthPmtStateRequestMaxPastAge, config.AuthPmtStateRequestMaxFutureAge),
+			authenticator,
 			committer,
 			config.MaxNumSymbolsPerBlob,
 			config.OnchainStateRefreshInterval,
@@ -193,10 +254,10 @@ func RunDisperserServer(ctx *cli.Context) error {
 			reg,
 			config.MetricsConfig,
 			config.ReservedOnly,
-			config.UseControllerMediatedPayments,
 			controllerConnection,
 			controllerClient,
 			listener,
+			signingRateTracker,
 		)
 		if err != nil {
 			return err
@@ -204,7 +265,11 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return server.Start(context.Background())
 	}
 
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
+	blobMetadataStore := blobstore.NewBlobMetadataStore(
+		dynamoClient,
+		logger,
+		config.BlobstoreConfig.TableName,
+		time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
 	blobStore := blobstore.NewSharedStorage(bucketName, objectStorageClient, blobMetadataStore, logger)
 
 	grpcMetrics := grpcprom.NewServerMetrics()
