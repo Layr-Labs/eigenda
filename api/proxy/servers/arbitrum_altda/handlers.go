@@ -38,7 +38,10 @@ import (
 // IHandlers defines the expected JSON RPC interface as defined per Arbitrum Nitro's Custom DA interface:
 // https://github.com/OffchainLabs/nitro/blob/c1bdcd8c571c1b22fdcdd4cc030a8ff49cbc5184/daprovider/daclient/daclient.go
 type IHandlers interface {
+	CompatibilityConfig(ctx context.Context) (*CompatibilityConfigResult, error)
+
 	GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeaderBytesResult, error)
+	GetMaxMessageSize(ctx context.Context) (*MaxMessageSizeResult, error)
 
 	RecoverPayload(
 		ctx context.Context,
@@ -71,8 +74,6 @@ type IHandlers interface {
 		ctx context.Context,
 		certificate hexutil.Bytes,
 	) (*GenerateCertificateValidityProofResult, error)
-
-	CompatibilityConfig(ctx context.Context) (*CompatibilityConfigResult, error)
 }
 
 // Handlers defines the Arbitrum ALT DA server spec's JSON RPC methods
@@ -120,6 +121,17 @@ func NewHandlers(
 	}
 }
 
+// GetMaxMessageSize returns the max allowed payload size
+// this method is called every time before the nitro batch poster begins building the
+// tx batch.
+func (h *Handlers) GetMaxMessageSize(ctx context.Context) (*MaxMessageSizeResult, error) {
+	h.logMethodCall(MethodGetMaxMessageSize)
+
+	return &MaxMessageSizeResult{
+		MaxSize: int(h.compatibilityCfg.MaxPayloadSizeBytes),
+	}, nil
+}
+
 // GetSupportedHeaderBytes returns the supported DA Header bytes by the CustomDA server
 // this method is designed to return a span of bytes for compatibility with
 // Arbitrum AnyTrust where multiple message types are supported.
@@ -128,8 +140,8 @@ func (h *Handlers) GetSupportedHeaderBytes(ctx context.Context) (*SupportedHeade
 	h.logMethodCall(MethodGetSupportedHeaderBytes)
 
 	return &SupportedHeaderBytesResult{
-		HeaderBytes: []hexutil.Bytes{
-			{commitments.ArbCustomDAHeaderByte, commitments.EigenDALayerByte},
+		HeaderBytes: hexutil.Bytes{
+			commitments.ArbCustomDAHeaderByte,
 		},
 	}, nil
 }
@@ -245,8 +257,14 @@ func (h *Handlers) Store(
 		return nil, fmt.Errorf("expected EigenDAV2 backend, got: %v", dispersalBackend)
 	}
 
-	if len(message) == 0 {
+	messageLength := len(message)
+
+	if messageLength == 0 {
 		return nil, fmt.Errorf("received empty rollup payload")
+	}
+
+	if messageLength > int(h.compatibilityCfg.MaxPayloadSizeBytes) {
+		return nil, ErrMessageTooLarge
 	}
 
 	versionedCert, err := h.eigenDAManager.Put(ctx, message, coretypes.CertSerializationABI)

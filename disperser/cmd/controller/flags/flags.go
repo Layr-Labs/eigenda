@@ -43,6 +43,18 @@ var (
 		Required: false,
 		Value:    "./data/",
 	}
+	UserAccountRemappingFileFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "user-account-remapping-file"),
+		Usage:    "Path to YAML file for mapping account IDs to user-friendly names",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USER_ACCOUNT_REMAPPING_FILE"),
+		Required: false,
+	}
+	ValidatorIdRemappingFileFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "validator-id-remapping-file"),
+		Usage:    "Path to YAML file for mapping validator IDs to user-friendly names",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "VALIDATOR_ID_REMAPPING_FILE"),
+		Required: false,
+	}
 	// EncodingManager Flags
 	EncodingPullIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "encoding-pull-interval"),
@@ -119,6 +131,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_DISPERSAL_AGE"),
 		Value:    45 * time.Second,
 	}
+	MaxDispersalFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-dispersal-future-age"),
+		Usage:    "Maximum amount a blob dispersal's self-reported timestamp can be ahead of the local wall clock time",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_DISPERSAL_FUTURE_AGE"),
+		Value:    45 * time.Second,
+	}
 
 	// Dispatcher Flags
 	DispatcherPullIntervalFlag = cli.DurationFlag{
@@ -185,7 +204,7 @@ var (
 	}
 	EnablePerAccountBlobStatusMetricsFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-blob-status-metrics"),
-		Usage:    "Whether to report per-account blob status metrics. If false, all metrics will be aggregated under account 0x0. (default: true)",
+		Usage:    "Whether to report per-account blob status metrics for unmapped accounts. Accounts with valid name remappings will always use their remapped labels. If false, unmapped accounts will be aggregated under account 0x0. (default: true)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PER_ACCOUNT_BLOB_STATUS_METRICS"),
 	}
@@ -249,18 +268,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_FRACTION"),
 		Value:    0.55,
-	}
-	GrpcServerEnableFlag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "grpc-server-enable"),
-		Usage:    "enable the controller gRPC server. default: true",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_SERVER_ENABLE"),
-	}
-	GrpcPaymentAuthenticationFlag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "grpc-payment-authentication"),
-		Usage:    "If true, use the new payment authentication system running on the controller; if false, payment authentication is disabled and request validation will always fail. default: true.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PAYMENT_AUTHENTICATION"),
 	}
 	GrpcPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
@@ -352,6 +359,40 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_BUCKET_SPAN"),
 		Value:    10 * time.Minute,
 	}
+	BlobDispersalQueueSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-dispersal-queue-size"),
+		Usage:    "Maximum number of blobs that can be queued for dispersal",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_DISPERSAL_QUEUE_SIZE"),
+		Value:    1024,
+	}
+	BlobDispersalRequestBatchSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-dispersal-request-batch-size"),
+		Usage:    "Number of blob metadata items to fetch from the store in a single request",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_DISPERSAL_REQUEST_BATCH_SIZE"),
+		Value:    32,
+	}
+	BlobDispersalRequestBackoffPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-dispersal-request-backoff-period"),
+		Usage:    "Delay between fetch attempts when the dispersal queue is empty",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_DISPERSAL_REQUEST_BACKOFF_PERIOD"),
+		Value:    50 * time.Millisecond,
+	}
+	SigningRateFlushPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-flush-period"),
+		Usage:    "The period at which signing rate data is flushed to persistent storage",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_FLUSH_PERIOD"),
+		Value:    1 * time.Minute,
+	}
+	SigningRateDynamoDbTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-dynamodb-table-name"),
+		Usage:    "The name of the DynamoDB table used to store signing rate data",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_DYNAMODB_TABLE_NAME"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -360,15 +401,17 @@ var requiredFlags = []cli.Flag{
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,
 	EncoderAddressFlag,
-
 	DispatcherPullIntervalFlag,
 	AttestationTimeoutFlag,
 	BatchAttestationTimeoutFlag,
 	DisperserIDFlag,
+	SigningRateDynamoDbTableNameFlag,
 }
 
 var optionalFlags = []cli.Flag{
 	IndexerDataDirFlag,
+	UserAccountRemappingFileFlag,
+	ValidatorIdRemappingFileFlag,
 	EncodingRequestTimeoutFlag,
 	EncodingStoreTimeoutFlag,
 	NumEncodingRetriesFlag,
@@ -377,6 +420,7 @@ var optionalFlags = []cli.Flag{
 	MaxNumBlobsPerIterationFlag,
 	OnchainStateRefreshIntervalFlag,
 	MaxDispersalAgeFlag,
+	MaxDispersalFutureAgeFlag,
 	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,
 	NumConcurrentDispersalRequestsFlag,
@@ -392,8 +436,6 @@ var optionalFlags = []cli.Flag{
 	SignificantSigningThresholdFractionFlag,
 	EigenDAContractDirectoryAddressFlag,
 	BatchMetadataUpdatePeriodFlag,
-	GrpcServerEnableFlag,
-	GrpcPaymentAuthenticationFlag,
 	GrpcPortFlag,
 	GrpcMaxMessageSizeFlag,
 	GrpcMaxIdleConnectionAgeFlag,
@@ -408,6 +450,10 @@ var optionalFlags = []cli.Flag{
 	EnablePerAccountBlobStatusMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRateBucketSpanFlag,
+	BlobDispersalQueueSizeFlag,
+	BlobDispersalRequestBatchSizeFlag,
+	BlobDispersalRequestBackoffPeriodFlag,
+	SigningRateFlushPeriodFlag,
 }
 
 var Flags []cli.Flag

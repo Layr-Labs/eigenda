@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
+
 	"github.com/Layr-Labs/eigenda/api/hashing"
 
 	core "github.com/Layr-Labs/eigenda/core/v2"
@@ -27,6 +28,15 @@ func NewLocalBlobRequestSigner(privateKeyHex string) (*LocalBlobRequestSigner, e
 	return &LocalBlobRequestSigner{
 		PrivateKey: privateKey,
 	}, nil
+}
+
+func (s *LocalBlobRequestSigner) SignBytes(bytesToSign []byte) ([]byte, error) {
+	signature, err := crypto.Sign(bytesToSign, s.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("sign: %w", err)
+	}
+
+	return signature, nil
 }
 
 func (s *LocalBlobRequestSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, error) {

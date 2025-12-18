@@ -34,22 +34,21 @@ type Config struct {
 	RateConfig        apiserver.RateConfig
 	// KzgCommitterConfig is only needed when DisperserVersion is V2.
 	// It's used by the grpc endpoint we expose to compute client commitments.
-	KzgCommitterConfig            committer.Config
-	EnableRatelimiter             bool
-	EnablePaymentMeterer          bool
-	ReservedOnly                  bool
-	ChainReadTimeout              time.Duration
-	ReservationsTableName         string
-	OnDemandTableName             string
-	GlobalRateTableName           string
-	BucketTableName               string
-	BucketStoreSize               int
-	EthClientConfig               geth.EthClientConfig
-	MaxBlobSize                   int
-	MaxNumSymbolsPerBlob          uint32
-	OnchainStateRefreshInterval   time.Duration
-	ControllerAddress             string
-	UseControllerMediatedPayments bool
+	KzgCommitterConfig          committer.Config
+	EnableRatelimiter           bool
+	EnablePaymentMeterer        bool
+	ReservedOnly                bool
+	ChainReadTimeout            time.Duration
+	ReservationsTableName       string
+	OnDemandTableName           string
+	GlobalRateTableName         string
+	BucketTableName             string
+	BucketStoreSize             int
+	EthClientConfig             geth.EthClientConfig
+	MaxBlobSize                 int
+	MaxNumSymbolsPerBlob        uint32
+	OnchainStateRefreshInterval time.Duration
+	ControllerAddress           string
 
 	EigenDADirectory                string
 	OperatorStateRetrieverAddr      string
@@ -92,16 +91,19 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		DisperserVersion: DisperserVersion(version),
 		AwsClientConfig:  aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		ServerConfig: disperser.ServerConfig{
-			GrpcPort:                   ctx.GlobalString(flags.GrpcPortFlag.Name),
-			GrpcTimeout:                ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
-			MaxConnectionAge:           ctx.GlobalDuration(flags.MaxConnectionAgeFlag.Name),
-			MaxConnectionAgeGrace:      ctx.GlobalDuration(flags.MaxConnectionAgeGraceFlag.Name),
-			MaxIdleConnectionAge:       ctx.GlobalDuration(flags.MaxIdleConnectionAgeFlag.Name),
-			PprofHttpPort:              ctx.GlobalString(flags.PprofHttpPort.Name),
-			EnablePprof:                ctx.GlobalBool(flags.EnablePprof.Name),
-			DisableGetBlobCommitment:   ctx.GlobalBool(flags.DisableGetBlobCommitment.Name),
-			SigningRateRetentionPeriod: ctx.GlobalDuration(flags.SigningRateRetentionPeriodFlag.Name),
-			SigningRatePollInterval:    ctx.GlobalDuration(flags.SigningRatePollIntervalFlag.Name),
+			GrpcPort:                           ctx.GlobalString(flags.GrpcPortFlag.Name),
+			GrpcTimeout:                        ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
+			MaxConnectionAge:                   ctx.GlobalDuration(flags.MaxConnectionAgeFlag.Name),
+			MaxConnectionAgeGrace:              ctx.GlobalDuration(flags.MaxConnectionAgeGraceFlag.Name),
+			MaxIdleConnectionAge:               ctx.GlobalDuration(flags.MaxIdleConnectionAgeFlag.Name),
+			PprofHttpPort:                      ctx.GlobalString(flags.PprofHttpPort.Name),
+			EnablePprof:                        ctx.GlobalBool(flags.EnablePprof.Name),
+			DisableGetBlobCommitment:           ctx.GlobalBool(flags.DisableGetBlobCommitment.Name),
+			SigningRateRetentionPeriod:         ctx.GlobalDuration(flags.SigningRateRetentionPeriodFlag.Name),
+			SigningRatePollInterval:            ctx.GlobalDuration(flags.SigningRatePollIntervalFlag.Name),
+			DisperserId:                        uint32(ctx.GlobalUint64(flags.DisperserIdFlag.Name)),
+			TolerateMissingAnchorSignature:     ctx.GlobalBool(flags.TolerateMissingAnchorSignatureFlag.Name),
+			DisableAnchorSignatureVerification: ctx.GlobalBool(flags.DisableAnchorSignatureVerificationFlag.Name),
 		},
 		BlobstoreConfig: blobstore.Config{
 			BucketName:       ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -117,24 +119,23 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EnableMetrics:            ctx.GlobalBool(flags.EnableMetrics.Name),
 			DisablePerAccountMetrics: ctx.GlobalBool(flags.DisablePerAccountMetricsFlag.Name),
 		},
-		RatelimiterConfig:             ratelimiterConfig,
-		RateConfig:                    rateConfig,
-		KzgCommitterConfig:            kzgCommitterConfig,
-		EnableRatelimiter:             ctx.GlobalBool(flags.EnableRatelimiter.Name),
-		EnablePaymentMeterer:          ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
-		ReservedOnly:                  ctx.GlobalBoolT(flags.ReservedOnly.Name),
-		ControllerAddress:             ctx.GlobalString(flags.ControllerAddressFlag.Name),
-		UseControllerMediatedPayments: ctx.GlobalBool(flags.UseControllerMediatedPayments.Name),
-		ReservationsTableName:         ctx.GlobalString(flags.ReservationsTableName.Name),
-		OnDemandTableName:             ctx.GlobalString(flags.OnDemandTableName.Name),
-		GlobalRateTableName:           ctx.GlobalString(flags.GlobalRateTableName.Name),
-		BucketTableName:               ctx.GlobalString(flags.BucketTableName.Name),
-		BucketStoreSize:               ctx.GlobalInt(flags.BucketStoreSize.Name),
-		ChainReadTimeout:              ctx.GlobalDuration(flags.ChainReadTimeout.Name),
-		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
-		MaxBlobSize:                   ctx.GlobalInt(flags.MaxBlobSize.Name),
-		MaxNumSymbolsPerBlob:          uint32(ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name)),
-		OnchainStateRefreshInterval:   ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
+		RatelimiterConfig:           ratelimiterConfig,
+		RateConfig:                  rateConfig,
+		KzgCommitterConfig:          kzgCommitterConfig,
+		EnableRatelimiter:           ctx.GlobalBool(flags.EnableRatelimiter.Name),
+		EnablePaymentMeterer:        ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
+		ReservedOnly:                ctx.GlobalBoolT(flags.ReservedOnly.Name),
+		ControllerAddress:           ctx.GlobalString(flags.ControllerAddressFlag.Name),
+		ReservationsTableName:       ctx.GlobalString(flags.ReservationsTableName.Name),
+		OnDemandTableName:           ctx.GlobalString(flags.OnDemandTableName.Name),
+		GlobalRateTableName:         ctx.GlobalString(flags.GlobalRateTableName.Name),
+		BucketTableName:             ctx.GlobalString(flags.BucketTableName.Name),
+		BucketStoreSize:             ctx.GlobalInt(flags.BucketStoreSize.Name),
+		ChainReadTimeout:            ctx.GlobalDuration(flags.ChainReadTimeout.Name),
+		EthClientConfig:             geth.ReadEthClientConfigRPCOnly(ctx),
+		MaxBlobSize:                 ctx.GlobalInt(flags.MaxBlobSize.Name),
+		MaxNumSymbolsPerBlob:        uint32(ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name)),
+		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
 		EigenDADirectory:                ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		OperatorStateRetrieverAddr:      ctx.GlobalString(flags.OperatorStateRetrieverFlag.Name),

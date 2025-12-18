@@ -583,9 +583,15 @@ func buildPayloadDisperser(
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
+	chainID, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get chain ID: %w", err)
+	}
+
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
 	multiplexerConfig.UseSecureGrpcFlag = clientConfigV2.DisperserClientCfg.UseSecureGrpcFlag
 	multiplexerConfig.DisperserConnectionCount = clientConfigV2.DisperserClientCfg.DisperserConnectionCount
+	multiplexerConfig.ChainID = chainID
 
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(
 		clientConfigV2.DisperserClientCfg.GrpcUri)

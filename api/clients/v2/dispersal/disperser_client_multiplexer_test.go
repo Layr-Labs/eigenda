@@ -1,6 +1,7 @@
 package dispersal
 
 import (
+	"math/big"
 	"slices"
 	"testing"
 	"time"
@@ -20,6 +21,10 @@ func createTestMultiplexer(
 ) (*DisperserClientMultiplexer, *disperser.MockDisperserRegistry) {
 	mockRegistry := disperser.NewMockDisperserRegistry()
 	logger := common.TestLogger(t)
+
+	if config.ChainID == nil {
+		config.ChainID = big.NewInt(31337) // anvil default chain ID
+	}
 
 	privateKey := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	signer, err := authv2.NewLocalBlobRequestSigner(privateKey)

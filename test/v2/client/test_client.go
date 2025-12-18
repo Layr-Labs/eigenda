@@ -64,6 +64,7 @@ type TestClient struct {
 	config                      *TestClientConfig
 	payloadClientConfig         *clientsv2.PayloadClientConfig
 	logger                      logging.Logger
+	chainID                     *big.Int
 	certVerifierAddressProvider clientsv2.CertVerifierAddressProvider
 	disperserClientMultiplexer  *dispersal.DisperserClientMultiplexer
 	payloadDisperser            *dispersal.PayloadDisperser
@@ -149,9 +150,25 @@ func NewTestClient(
 
 	accountantMetrics := metricsv2.NewAccountantMetrics(registry)
 	dispersalMetrics := metricsv2.NewDispersalMetrics(registry)
+	ethClientConfig := geth.EthClientConfig{
+		RPCURLs:          config.EthRpcUrls,
+		PrivateKeyString: config.PrivateKey,
+		NumConfirmations: 0,
+		NumRetries:       3,
+	}
+	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, accountId, logger)
+	if err != nil {
+		return nil, fmt.Errorf("create Ethereum client: %w", err)
+	}
+
+	chainId, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get chain ID: %w", err)
+	}
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
 	multiplexerConfig.DisperserConnectionCount = config.DisperserConnectionCount
+	multiplexerConfig.ChainID = chainId
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(
 		fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort))
 
@@ -166,17 +183,6 @@ func NewTestClient(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create disperser client multiplexer: %w", err)
-	}
-
-	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          config.EthRpcUrls,
-		PrivateKeyString: config.PrivateKey,
-		NumConfirmations: 0,
-		NumRetries:       3,
-	}
-	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, accountId, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Ethereum client: %w", err)
 	}
 
 	contractDirectoryAddress := gethcommon.HexToAddress(config.ContractDirectoryAddress)
@@ -444,6 +450,7 @@ func NewTestClient(
 						GrpcUri:           fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
 						UseSecureGrpcFlag: true,
 						DisperserID:       0,
+						ChainID:           chainId,
 					},
 					PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 						PayloadClientConfig:    *payloadClientConfig,
@@ -478,6 +485,7 @@ func NewTestClient(
 		config:                      config,
 		payloadClientConfig:         payloadClientConfig,
 		logger:                      logger,
+		chainID:                     chainId,
 		certVerifierAddressProvider: certVerifierAddressProvider,
 		disperserClientMultiplexer:  disperserClientMultiplexer,
 		payloadDisperser:            payloadDisperser,
@@ -511,6 +519,11 @@ func (c *TestClient) GetConfig() *TestClientConfig {
 // GetLogger returns the test client's logger.
 func (c *TestClient) GetLogger() logging.Logger {
 	return c.logger
+}
+
+// GetChainID returns the chain ID.
+func (c *TestClient) GetChainID() *big.Int {
+	return c.chainID
 }
 
 // GetDisperserClient returns the test client's disperser client multiplexer.

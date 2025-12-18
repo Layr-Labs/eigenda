@@ -172,6 +172,19 @@ GLOBAL OPTIONS:
     --eigenda.v2.eth-rpc value                                             ($EIGENDA_PROXY_EIGENDA_V2_ETH_RPC)
           URL of the Ethereum RPC endpoint.
    
+    --eigenda.v2.eth-rpc-retry-count value (default: 1)                       ($EIGENDA_PROXY_EIGENDA_V2_ETH_RPC_RETRY_COUNT)
+          The retry count for the Ethereum RPC request after the initial call fails.
+          Please see EIGENDA_PROXY_EIGENDA_V2_ETH_RPC_RETRY_DELAY for the linear retry
+          backoff strategy.
+   
+    --eigenda.v2.eth-rpc-retry-delay-increment value (default: 1s)                      ($EIGENDA_PROXY_EIGENDA_V2_ETH_RPC_RETRY_DELAY_INCREMENT)
+          Time unit for linear retry delay. For instance, if the retries count is 2 and
+          retry delay is 1 second, then 0 second is waited for the first call; 1 seconds
+          are waited before the next retry; 2 seconds are waited for the second retry; if
+          the call failed, the total waited time for retry is 3 seconds. If the retry
+          delay is 0 second, the total waited time for retry is 0 second, which is useful
+          when there are multiple rpc providers.
+   
     --eigenda.v2.max-blob-length value  (default: "16MiB")                 ($EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH)
           Maximum blob length (base 2) to be written or read from EigenDA. Determines the
           number of SRS points

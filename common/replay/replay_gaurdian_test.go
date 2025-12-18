@@ -20,14 +20,41 @@ func TestTooOldRequest(t *testing.T) {
 	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
 	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
 
-	rGuard := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
 
 	requestAge := maxTimeInPast + 1
 	requestTime := now.Add(-requestAge)
 
-	err := rGuard.VerifyRequest(rand.Bytes(32), requestTime)
+	err = rGuard.VerifyRequest(rand.Bytes(32), requestTime)
 	require.Error(t, err)
-	require.True(t, strings.Contains(err.Error(), "too far in the past"))
+	require.True(t, strings.Contains(err.Error(), string(StatusTooOld)))
+
+	// Verify that nothing has been added to the observedHashes set.
+	g := rGuard.(*replayGuardian)
+	require.Zero(t, len(g.observedHashes))
+	require.Zero(t, g.expirationQueue.Size())
+}
+
+func TestTooOldRequestDetailed(t *testing.T) {
+	rand := random.NewTestRandom()
+
+	now := rand.Time()
+	timeSource := func() time.Time {
+		return now
+	}
+
+	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
+	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
+
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
+
+	requestAge := maxTimeInPast + 1
+	requestTime := now.Add(-requestAge)
+
+	status := rGuard.DetailedVerifyRequest(rand.Bytes(32), requestTime)
+	require.Equal(t, StatusTooOld, status)
 
 	// Verify that nothing has been added to the observedHashes set.
 	g := rGuard.(*replayGuardian)
@@ -46,14 +73,41 @@ func TestTooFarInFutureRequest(t *testing.T) {
 	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
 	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
 
-	rGuard := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
 
 	requestTimeInFuture := maxTimeInFuture + 1
 	requestTime := now.Add(requestTimeInFuture)
 
-	err := rGuard.VerifyRequest(rand.Bytes(32), requestTime)
+	err = rGuard.VerifyRequest(rand.Bytes(32), requestTime)
 	require.Error(t, err)
-	require.True(t, strings.Contains(err.Error(), "too far in the future"))
+	require.True(t, strings.Contains(err.Error(), string(StatusTooFarInFuture)))
+
+	// Verify that nothing has been added to the observedHashes set.
+	g := rGuard.(*replayGuardian)
+	require.Zero(t, len(g.observedHashes))
+	require.Zero(t, g.expirationQueue.Size())
+}
+
+func TestTooFarInFutureRequestDetailed(t *testing.T) {
+	rand := random.NewTestRandom()
+
+	now := rand.Time()
+	timeSource := func() time.Time {
+		return now
+	}
+
+	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
+	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
+
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
+
+	requestTimeInFuture := maxTimeInFuture + 1
+	requestTime := now.Add(requestTimeInFuture)
+
+	status := rGuard.DetailedVerifyRequest(rand.Bytes(32), requestTime)
+	require.Equal(t, StatusTooFarInFuture, status)
 
 	// Verify that nothing has been added to the observedHashes set.
 	g := rGuard.(*replayGuardian)
@@ -72,7 +126,8 @@ func TestDuplicateRequests(t *testing.T) {
 	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
 	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
 
-	rGuard := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
 	submittedHashes := make(map[string]struct{})
 
 	for i := 0; i < 5; i++ {
@@ -106,6 +161,7 @@ func TestDuplicateRequests(t *testing.T) {
 			for submittedHash := range submittedHashes {
 				err = rGuard.VerifyRequest([]byte(submittedHash), requestTime)
 				require.Error(t, err)
+				require.True(t, strings.Contains(err.Error(), string(StatusDuplicate)))
 			}
 		}
 	}
@@ -113,8 +169,70 @@ func TestDuplicateRequests(t *testing.T) {
 	// Move time forward a long time in order to prune all the hashes. Submit a single request to trigger cleanup.
 	now = now.Add(maxTimeInPast + maxTimeInFuture + 1)
 
-	err := rGuard.VerifyRequest(rand.Bytes(32), now)
+	err = rGuard.VerifyRequest(rand.Bytes(32), now)
 	require.NoError(t, err)
+
+	// Only the most recent hash should be in the observedHashes set.
+	g := rGuard.(*replayGuardian)
+	require.Equal(t, 1, len(g.observedHashes))
+	require.Equal(t, 1, g.expirationQueue.Size())
+}
+
+func TestDuplicateRequestsDetailed(t *testing.T) {
+	rand := random.NewTestRandom()
+
+	now := rand.Time()
+	timeSource := func() time.Time {
+		return now
+	}
+
+	maxTimeInPast := time.Duration(rand.Intn(5)+1) * time.Minute
+	maxTimeInFuture := time.Duration(rand.Intn(5)+1) * time.Minute
+
+	rGuard, err := NewReplayGuardian(timeSource, maxTimeInPast, maxTimeInFuture)
+	require.NoError(t, err)
+	submittedHashes := make(map[string]struct{})
+
+	for i := 0; i < 5; i++ {
+		now = rand.TimeInRange(now, now.Add(10*time.Second))
+
+		// Submit a new request
+		earliestLegalTime := now.Add(-maxTimeInPast)
+		latestLegalTime := now.Add(maxTimeInFuture)
+
+		hash := rand.Bytes(32)
+		var requestTime time.Time
+
+		choice := rand.Float64()
+		if choice < 0.05 {
+			// once in a while, choose a time that is the maximum time in the past
+			requestTime = earliestLegalTime
+		} else if choice < 0.1 {
+			// once in a while, choose a time that is the maximum time in the future
+			requestTime = latestLegalTime
+		} else {
+			// choose a time that is within the legal range
+			requestTime = rand.TimeInRange(earliestLegalTime, latestLegalTime)
+		}
+
+		status := rGuard.DetailedVerifyRequest(hash, requestTime)
+		require.Equal(t, StatusValid, status)
+		submittedHashes[string(hash)] = struct{}{}
+
+		if rand.Float64() < 0.01 {
+			// Once in a while, scan through the submitted hashes and verify that they are all rejected.
+			for submittedHash := range submittedHashes {
+				status = rGuard.DetailedVerifyRequest([]byte(submittedHash), requestTime)
+				require.Equal(t, StatusDuplicate, status)
+			}
+		}
+	}
+
+	// Move time forward a long time in order to prune all the hashes. Submit a single request to trigger cleanup.
+	now = now.Add(maxTimeInPast + maxTimeInFuture + 1)
+
+	status := rGuard.DetailedVerifyRequest(rand.Bytes(32), now)
+	require.Equal(t, StatusValid, status)
 
 	// Only the most recent hash should be in the observedHashes set.
 	g := rGuard.(*replayGuardian)
