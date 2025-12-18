@@ -308,8 +308,8 @@ func TestNilPubkeyG1Handling(t *testing.T) {
 	t.Log("Test passed: nil PubkeyG1 handling prevented crash")
 }
 
-// TestNilAggKeyHandling tests that ReceiveSignatures handles nil aggregate public keys gracefully
-// without crashing. This simulates the scenario where TheGraph API fails to return aggregate
+// TestNilAggKeyHandling tests that ReceiveSignatures returns an error when aggregate public keys
+// are nil. This simulates the scenario where TheGraph API fails to return aggregate
 // public keys for a quorum (e.g., due to network issues or missing data).
 func TestNilAggKeyHandling(t *testing.T) {
 	ctx := t.Context()
@@ -325,7 +325,7 @@ func TestNilAggKeyHandling(t *testing.T) {
 	// Have all operators sign successfully
 	go simulateOperators(*state, message, update, 0)
 
-	// This should not panic even with nil AggKeys
+	// This should return an error for nil AggKeys
 	aq, err := agg.ReceiveSignatures(
 		ctx,
 		ctx,
@@ -333,17 +333,10 @@ func TestNilAggKeyHandling(t *testing.T) {
 		message,
 		update)
 
-	// The function should complete without panicking
-	assert.NoError(t, err)
-	assert.NotNil(t, aq)
-
-	// Quorum 0 should be skipped (nil AggKey), quorum 1 should be present
-	assert.Nil(t, aq.QuorumAggPubKey[0], "quorum 0 should have nil AggKey since it was skipped")
-	assert.NotNil(t, aq.QuorumAggPubKey[1], "quorum 1 should have valid AggKey")
-
-	// QuorumResults should still have entries for both quorums (with percent signed)
-	assert.Contains(t, aq.QuorumResults, core.QuorumID(0))
-	assert.Contains(t, aq.QuorumResults, core.QuorumID(1))
+	// The function should return an error indicating the missing aggregate key
+	assert.Error(t, err)
+	assert.Nil(t, aq)
+	assert.Contains(t, err.Error(), "no aggregate public key found for quorum 0")
 }
 
 func TestFilterQuorums(t *testing.T) {
