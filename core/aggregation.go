@@ -303,6 +303,10 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 		// Verify that the aggregated public key for the quorum matches the on-chain quorum aggregate public key
 		// sans non-signers of the quorum
 		quorumAggKey := state.AggKeys[quorumID]
+		if quorumAggKey == nil {
+			a.Logger.Error("no aggregate public key found for quorum", "quorumID", quorumID)
+			continue
+		}
 		quorumAggPubKeys[quorumID] = quorumAggKey
 
 		signersAggKey := quorumAggKey.Clone()
