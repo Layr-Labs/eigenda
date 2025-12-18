@@ -92,7 +92,6 @@ func (r *replayGuardian) DetailedVerifyRequest(
 	requestHash []byte,
 	requestTimestamp time.Time,
 ) ReplayGuardianStatus {
-
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
