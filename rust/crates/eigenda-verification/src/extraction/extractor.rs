@@ -616,6 +616,7 @@ impl DataDecoder for CertVerifierABNsLenExtractor {
         &self,
         storage_proofs: &[StorageProof],
     ) -> Result<Self::Output, CertExtractionError> {
+        assert_eq!(self.storage_keys().len(), 1);
         let storage_key = &self.storage_keys()[0];
         let proof = decode_helpers::find_required_proof(
             storage_proofs,
