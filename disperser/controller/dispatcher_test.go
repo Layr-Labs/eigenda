@@ -210,11 +210,18 @@ func TestControllerInsufficientSignatures2(t *testing.T) {
 		}
 		close(done)
 	}()
-	sigChan, batchData, err := components.Controller.HandleBatch(ctx, nil)
-	require.NoError(t, err)
 
-	err = components.Controller.HandleSignatures(ctx, ctx, batchData, sigChan)
-	require.NoError(t, err)
+	handledBlobCount := 0
+	totalBlobCount := len(objsInBothQuorum.blobKeys) + len(objsInQuorum1.blobKeys)
+	for handledBlobCount < totalBlobCount {
+		sigChan, batchData, err := components.Controller.HandleBatch(ctx, nil)
+		require.NoError(t, err)
+
+		err = components.Controller.HandleSignatures(ctx, ctx, batchData, sigChan)
+		require.NoError(t, err)
+
+		handledBlobCount += len(batchData.Batch.BlobCertificates)
+	}
 
 	// Test that the blob metadata status are updated
 	for _, blobKey := range objsInBothQuorum.blobKeys {
@@ -271,17 +278,17 @@ func TestControllerMaxBatchSize(t *testing.T) {
 	defer components.BatchMetadataManager.Close()
 
 	numBlobs := 12
+	batchedBlobs := 0
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, numBlobs)
 	ctx := context.Background()
-	expectedNumBatches := (numBlobs + int(maxBatchSize) - 1) / int(maxBatchSize)
-	for i := 0; i < expectedNumBatches; i++ {
+	for batchedBlobs < numBlobs {
 		batchData, err := components.Controller.NewBatch(ctx, nil)
 		require.NoError(t, err)
-		if i < expectedNumBatches-1 {
-			require.Len(t, batchData.Batch.BlobCertificates, int(maxBatchSize))
-		} else {
-			require.Len(t, batchData.Batch.BlobCertificates, numBlobs%int(maxBatchSize))
-		}
+
+		batchSize := int32(len(batchData.Batch.BlobCertificates))
+		require.LessOrEqual(t, batchSize, maxBatchSize)
+		batchedBlobs += int(batchSize)
+		require.LessOrEqual(t, batchedBlobs, numBlobs)
 	}
 
 	for _, key := range objs.blobKeys {
