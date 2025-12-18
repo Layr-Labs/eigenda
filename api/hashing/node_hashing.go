@@ -3,6 +3,7 @@ package hashing
 import (
 	"fmt"
 	"hash"
+	"time"
 
 	commonv1 "github.com/Layr-Labs/eigenda/api/grpc/common"
 	common "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -16,6 +17,12 @@ import (
 // is added to the digest before hashing the message). This makes it difficult for an attacker to create a
 // different type of object that has the same hash as a StoreChunksRequest.
 const ValidatorStoreChunksRequestDomain = "validator.StoreChunksRequest"
+
+// BlobHeaderHashWithTimestamp is a tuple of the hash of a BlobHeader and the timestamp of the BlobCertificate.
+type BlobHeaderHashWithTimestamp struct {
+	Hash      []byte
+	Timestamp time.Time
+}
 
 // HashStoreChunksRequest hashes the given StoreChunksRequest.
 func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
@@ -41,6 +48,37 @@ func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
 	hashUint32(hasher, request.GetTimestamp())
 
 	return hasher.Sum(nil), nil
+}
+
+// HashBlobHeadersAndTimestamps returns a list of per-BlobHeader hashes (one per BlobCertificate)
+// with the timestamp.
+func HashBlobHeadersAndTimestamps(request *grpc.StoreChunksRequest) ([]BlobHeaderHashWithTimestamp, error) {
+	certs := request.GetBatch().GetBlobCertificates()
+	out := make([]BlobHeaderHashWithTimestamp, len(certs))
+	for i, cert := range certs {
+		if cert == nil {
+			return nil, fmt.Errorf("nil BlobCertificate at index %d", i)
+		}
+		header := cert.GetBlobHeader()
+		if header == nil {
+			return nil, fmt.Errorf("nil BlobHeader at index %d", i)
+		}
+		paymentHeader := header.GetPaymentHeader()
+		if paymentHeader == nil {
+			return nil, fmt.Errorf("nil PaymentHeader at index %d", i)
+		}
+
+		h := sha3.NewLegacyKeccak256()
+		if err := hashBlobHeader(h, header); err != nil {
+			return nil, fmt.Errorf("failed to hash blob header at index %d: %w", i, err)
+		}
+		out[i] = BlobHeaderHashWithTimestamp{
+			Hash:      h.Sum(nil),
+			Timestamp: time.Unix(0, paymentHeader.GetTimestamp()),
+		}
+	}
+
+	return out, nil
 }
 
 func hashBlobCertificate(hasher hash.Hash, blobCertificate *common.BlobCertificate) error {
