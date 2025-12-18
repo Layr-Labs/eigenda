@@ -10,11 +10,6 @@ library EigenDAEjectionStorage {
 
     struct Layout {
         mapping(address => EigenDAEjectionTypes.EjecteeState) ejectees;
-        /// @dev ejectorBalanceRecord is a book-keeping value of the ejector's balance
-        ///      which reflects total_ejector_amount_added - ∑(ejector_ejection_deposit_i)
-        ///      where some ejector_ejection_deposit_i can either be reclaimed by the ejector OR lost
-        ///      in the event of an ejectee cancellation
-        mapping(address => uint256) ejectorBalanceRecord;
         uint64 delay;
         uint64 cooldown;
     }

@@ -81,10 +81,13 @@ func NewServerV2(
 		return nil, fmt.Errorf("failed to create authenticator: %w", err)
 	}
 	blobAuthenticator := coreauthv2.NewBlobRequestAuthenticator()
-	replayGuardian := replay.NewReplayGuardian(
+	replayGuardian, err := replay.NewReplayGuardian(
 		time.Now,
 		config.StoreChunksRequestMaxPastAge,
 		config.StoreChunksRequestMaxFutureAge)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replay guardian: %w", err)
+	}
 
 	return &ServerV2{
 		config:             config,

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
@@ -33,6 +34,10 @@ type Config struct {
 
 	// secondary storage cfgs
 	S3Config s3.Config
+
+	// eth rpc retry count and delay
+	RetryCount int
+	RetryDelay time.Duration
 }
 
 // ReadConfig ... parses the Config from the provided flags or environment variables.
@@ -86,6 +91,8 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		MemstoreConfig:   memstoreConfig,
 		MemstoreEnabled:  ctx.Bool(memstore.EnabledFlagName),
 		S3Config:         s3.ReadConfig(ctx),
+		RetryCount:       ctx.Int(eigendaflags_v2.EthRPCRetryCountFlagName),
+		RetryDelay:       ctx.Duration(eigendaflags_v2.EthRPCRetryDelayIncrementFlagName),
 	}
 
 	return cfg, nil

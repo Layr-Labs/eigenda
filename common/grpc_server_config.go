@@ -7,9 +7,6 @@ import (
 
 // Contains configuration for a gRPC server
 type GRPCServerConfig struct {
-	// Enables/disables the gRPC server
-	EnableServer bool
-
 	// Port that the gRPC server listens on
 	GrpcPort uint16
 
@@ -30,7 +27,6 @@ type GRPCServerConfig struct {
 
 // NewGRPCServerConfig creates a new gRPC server config with validation
 func NewGRPCServerConfig(
-	enableServer bool,
 	grpcPort uint16,
 	maxGRPCMessageSize int,
 	maxIdleConnectionAge time.Duration,
@@ -38,25 +34,20 @@ func NewGRPCServerConfig(
 	requestMaxFutureAge time.Duration,
 ) (GRPCServerConfig, error) {
 
-	if enableServer {
-		if maxGRPCMessageSize < 0 {
-			return GRPCServerConfig{}, fmt.Errorf("max grpc message size must be >= 0, got %d", maxGRPCMessageSize)
-		}
-		if maxIdleConnectionAge < 0 {
-			return GRPCServerConfig{}, fmt.Errorf("max idle connection age must be >= 0, got %v", maxIdleConnectionAge)
-		}
-		if requestMaxPastAge < 0 {
-			return GRPCServerConfig{}, fmt.Errorf("request max past age must be >= 0, got %v",
-				requestMaxPastAge)
-		}
-		if requestMaxFutureAge < 0 {
-			return GRPCServerConfig{}, fmt.Errorf("request max future age must be >= 0, got %v",
-				requestMaxFutureAge)
-		}
+	if maxGRPCMessageSize < 0 {
+		return GRPCServerConfig{}, fmt.Errorf("max grpc message size must be >= 0, got %d", maxGRPCMessageSize)
+	}
+	if maxIdleConnectionAge < 0 {
+		return GRPCServerConfig{}, fmt.Errorf("max idle connection age must be >= 0, got %v", maxIdleConnectionAge)
+	}
+	if requestMaxPastAge < 0 {
+		return GRPCServerConfig{}, fmt.Errorf("request max past age must be >= 0, got %v", requestMaxPastAge)
+	}
+	if requestMaxFutureAge < 0 {
+		return GRPCServerConfig{}, fmt.Errorf("request max future age must be >= 0, got %v", requestMaxFutureAge)
 	}
 
 	return GRPCServerConfig{
-		EnableServer:         enableServer,
 		GrpcPort:             grpcPort,
 		MaxGRPCMessageSize:   maxGRPCMessageSize,
 		MaxIdleConnectionAge: maxIdleConnectionAge,

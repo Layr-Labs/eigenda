@@ -114,7 +114,7 @@ func (m *EigenDAManager) Get(ctx context.Context,
 			return nil, errors.New("received CertV0 but EigenDA V1 client is not initialized")
 		}
 		return m.getEigenDAV1(ctx, versionedCert)
-	case certs.V1VersionByte, certs.V2VersionByte:
+	case certs.V1VersionByte, certs.V2VersionByte, certs.V3VersionByte:
 		if m.eigendaV2 == nil {
 			return nil, errors.New("received EigenDAV2 cert but EigenDA V2 client is not initialized")
 		}

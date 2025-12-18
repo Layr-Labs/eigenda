@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"sync/atomic"
 	"time"
@@ -48,6 +49,7 @@ type DispersalServerV2 struct {
 	pb.UnimplementedDisperserServer
 
 	serverConfig      disperser.ServerConfig
+	chainId           *big.Int
 	blobStore         *blobstore.BlobStore
 	blobMetadataStore blobstore.MetadataStore
 	meterer           *meterer.Meterer
@@ -84,17 +86,10 @@ type DispersalServerV2 struct {
 	// This would be removed with decentralized ratelimiting
 	ReservedOnly bool
 
-	// Determines which payment system to use. If true, use the new payments system running on the controller.
-	// If false, use the legacy payments system which executes on the API server.
-	//
-	// TODO(litt3): this field should be removed once the migration to the new payments system is complete
-	useControllerMediatedPayments bool
-
 	// Exists as a member variable so that the connection can be closed inside Stop().
 	controllerConnection *grpc.ClientConn
 
-	// Client for making gRPC calls to the controller.
-	// May be nil if useControllerMediatedPayments is false
+	// Client for making gRPC calls to the controller for payment authorization.
 	controllerClient controller.ControllerServiceClient
 
 	// Pre-created listener for the gRPC server
@@ -114,6 +109,7 @@ type DispersalServerV2 struct {
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
 	getNow func() time.Time,
+	chainId *big.Int,
 	blobStore *blobstore.BlobStore,
 	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
@@ -128,7 +124,6 @@ func NewDispersalServerV2(
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
-	useControllerMediatedPayments bool,
 	controllerConnection *grpc.ClientConn,
 	controllerClient controller.ControllerServiceClient,
 	listener net.Listener,
@@ -139,6 +134,12 @@ func NewDispersalServerV2(
 	}
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
+	}
+	if getNow == nil {
+		return nil, errors.New("getNow is required")
+	}
+	if chainId == nil {
+		return nil, errors.New("chainId is required")
 	}
 	if blobStore == nil {
 		return nil, errors.New("blob store is required")
@@ -164,9 +165,6 @@ func NewDispersalServerV2(
 	if _logger == nil {
 		return nil, errors.New("logger is required")
 	}
-	if getNow == nil {
-		return nil, errors.New("getNow is required")
-	}
 	if maxDispersalAge <= 0 {
 		return nil, fmt.Errorf("maxDispersalAge must be positive (got: %v)", maxDispersalAge)
 	}
@@ -176,17 +174,13 @@ func NewDispersalServerV2(
 
 	logger := _logger.With("component", "DispersalServerV2")
 
-	if useControllerMediatedPayments {
-		if controllerClient == nil {
-			return nil, errors.New("controller client is required when using controller-mediated payments")
-		}
-		logger.Info("Using controller-based payment system")
-	} else {
-		logger.Info("Using legacy payment metering system")
+	if controllerClient == nil {
+		return nil, errors.New("controller client is required")
 	}
 
 	return &DispersalServerV2{
 		serverConfig:      serverConfig,
+		chainId:           chainId,
 		blobStore:         blobStore,
 		blobMetadataStore: blobMetadataStore,
 
@@ -205,13 +199,12 @@ func NewDispersalServerV2(
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 
-		ReservedOnly:                  ReservedOnly,
-		useControllerMediatedPayments: useControllerMediatedPayments,
-		controllerConnection:          controllerConnection,
-		controllerClient:              controllerClient,
-		listener:                      listener,
-		disableGetBlobCommitment:      serverConfig.DisableGetBlobCommitment,
-		signingRateTracker:            signingRateTracker,
+		ReservedOnly:             ReservedOnly,
+		controllerConnection:     controllerConnection,
+		controllerClient:         controllerClient,
+		listener:                 listener,
+		disableGetBlobCommitment: serverConfig.DisableGetBlobCommitment,
+		signingRateTracker:       signingRateTracker,
 	}, nil
 }
 
