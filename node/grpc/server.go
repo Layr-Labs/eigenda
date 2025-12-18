@@ -111,10 +111,10 @@ func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.Node
 		return &pb.NodeInfoReply{Semver: s.softwareVersion.String()}, nil
 	}
 
-	memBytes := uint64(0)
 	v, err := mem.VirtualMemory()
-	if err == nil {
-		memBytes = v.Total
+	if err != nil {
+		s.logger.Error("failed to collect node memory info", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to collect node memory info")
 	}
 
 	return &pb.NodeInfoReply{
