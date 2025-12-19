@@ -283,7 +283,22 @@ func (c *ControllerConfig) Verify() error {
 	if c.SigningRateDynamoDbTableName == "" {
 		return fmt.Errorf("SigningRateDynamoDbTableName must not be empty")
 	}
-	// TODO validate vs verify...
+	if c.DynamoDBTableName == "" {
+		return fmt.Errorf("DynamoDBTableName must not be empty")
+	}
+	if c.ContractDirectoryAddress == "" {
+		return fmt.Errorf("ContractDirectoryAddress must not be empty")
+	}
+	if c.MetricsPort < 1 || c.MetricsPort > 65535 {
+		return fmt.Errorf("MetricsPort must be between 1 and 65535, got %d", c.MetricsPort)
+	}
+	if c.ControllerReadinessProbePath == "" {
+		return fmt.Errorf("ControllerReadinessProbePath must not be empty")
+	}
+	if c.SigningRateBucketSpan > c.SigningRateRetentionPeriod {
+		return fmt.Errorf("SigningRateBucketSpan must not be greater than SigningRateRetentionPeriod, got %v > %v",
+			c.SigningRateBucketSpan, c.SigningRateRetentionPeriod)
+	}
 	if err := c.DispersalRequestSigner.Verify(); err != nil {
 		return fmt.Errorf("invalid dispersal request signer config: %w", err)
 	}

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
@@ -42,22 +41,9 @@ func (c *PaymentAuthorizationConfig) Verify() error {
 
 // DefaultPaymentAuthorizationConfig returns a new PaymentAuthorizationConfig with default values
 func DefaultPaymentAuthorizationConfig() PaymentAuthorizationConfig {
-	onDemandConfig := ondemandvalidation.OnDemandLedgerCacheConfig{
-		MaxLedgers:        1024,
-		OnDemandTableName: "",
-		UpdateInterval:    30 * time.Second,
-	}
-
-	reservationConfig := reservationvalidation.ReservationLedgerCacheConfig{
-		MaxLedgers:           1024,
-		BucketCapacityPeriod: 90 * time.Second,
-		OverfillBehavior:     ratelimit.OverfillOncePermitted,
-		UpdateInterval:       30 * time.Second,
-	}
-
 	return PaymentAuthorizationConfig{
-		OnDemand:          onDemandConfig,
-		Reservation:       reservationConfig,
+		OnDemand:          ondemandvalidation.DefaultOnDemandLedgerCacheConfig(),
+		Reservation:       reservationvalidation.DefaultReservationLedgerCacheConfig(),
 		PerAccountMetrics: true,
 	}
 }

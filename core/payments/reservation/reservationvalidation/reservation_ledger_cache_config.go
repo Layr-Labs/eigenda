@@ -46,6 +46,15 @@ func (c *ReservationLedgerCacheConfig) Verify() error {
 	return nil
 }
 
+func DefaultReservationLedgerCacheConfig() ReservationLedgerCacheConfig {
+	return ReservationLedgerCacheConfig{
+		MaxLedgers:           1024,
+		BucketCapacityPeriod: 90 * time.Second,
+		OverfillBehavior:     ratelimit.OverfillOncePermitted,
+		UpdateInterval:       30 * time.Second,
+	}
+}
+
 // Creates a new config with validation
 func NewReservationLedgerCacheConfig(
 	maxLedgers int,
