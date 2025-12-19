@@ -57,11 +57,10 @@ pub fn mapping_key(key: U256, slot: u64) -> StorageKey {
 /// For more details, see
 /// https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html#mappings-and-dynamic-arrays
 ///
-///
+/// Note that the values packed in a given slot are placed in reverse order!
 /// For example, a uint128[] containing [1,2,3] would be packed into 2 storage slots:
 /// - Slot keccak256(slot)     = 0x000000...00000002_000000000...0000001
 /// - Slot keccak256(slot) + 1 = 0x000000...0000000_000000000...0000003
-/// Note that the values packed in a given slot are placed in reverse order!
 ///
 /// # Safety Caveat
 /// This function only works for simple types. It won't work for nested arrays, such as uint256[][].
@@ -165,12 +164,12 @@ mod tests {
     fn dynamic_array_keys_not_packed_test() {
         let result = dynamic_array_keys(7, 2, 256);
 
-        let expected: Vec<_> = vec![
+        let expected: Vec<_> = [
             hex!("0xa66cc928b5edb82af9bd49922954155ab7b0942694bea4ce44661d9a8736c688"), // cast keccak $(cast abi-encode "x(uint256)" 7)
             hex!("0xa66cc928b5edb82af9bd49922954155ab7b0942694bea4ce44661d9a8736c689"),
         ]
         .iter()
-        .map(|h| StorageKey::from(h))
+        .map(StorageKey::from)
         .collect();
         assert_eq!(result, expected);
     }
@@ -179,11 +178,11 @@ mod tests {
     fn dynamic_array_keys_packed_test() {
         let result = dynamic_array_keys(10, 3, 32);
 
-        let expected: Vec<_> = vec![
+        let expected: Vec<_> = [
             hex!("0xc65a7bb8d6351c1cf70c95a316cc6a92839c986682d98bc35f958f4883f9d2a8"), // cast keccak $(cast abi-encode "x(uint256)" 10)
         ]
         .iter()
-        .map(|h| StorageKey::from(h))
+        .map(StorageKey::from)
         .collect();
         assert_eq!(result, expected);
     }
@@ -192,12 +191,12 @@ mod tests {
     fn dynamic_array_keys_also_packed_test() {
         let result = dynamic_array_keys(10, 3, 128);
 
-        let expected: Vec<_> = vec![
+        let expected: Vec<_> = [
             hex!("0xc65a7bb8d6351c1cf70c95a316cc6a92839c986682d98bc35f958f4883f9d2a8"), // cast keccak $(cast abi-encode "x(uint256)" 10)
             hex!("0xc65a7bb8d6351c1cf70c95a316cc6a92839c986682d98bc35f958f4883f9d2a9"),
         ]
         .iter()
-        .map(|h| StorageKey::from(h))
+        .map(StorageKey::from)
         .collect();
         assert_eq!(result, expected);
     }
