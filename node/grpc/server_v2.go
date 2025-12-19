@@ -201,6 +201,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			return nil, api.NewErrorInvalidArg("authenticated disperser ID does not match request disperser ID")
 		}
 	} else {
+		// Defense-in-depth: normally the gRPC interceptor authenticates StoreChunks and blocks blacklisted dispersers.
+		// This fallback exists for direct calls (e.g. tests) or alternate wiring where the interceptor isn't installed.
 		_, err = s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, now)
 		if err != nil {
 			//nolint:wrapcheck
