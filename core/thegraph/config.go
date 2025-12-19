@@ -1,6 +1,7 @@
 package thegraph
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -52,5 +53,24 @@ func ReadCLIConfig(ctx *cli.Context) Config {
 		PullInterval: ctx.Duration(BackoffFlagName),
 		MaxRetries:   ctx.Int(MaxRetriesFlagName),
 	}
+}
 
+func DefaultTheGraphConfig() Config {
+	return Config{
+		PullInterval: 100 * time.Millisecond,
+		MaxRetries:   5,
+	}
+}
+
+func (c *Config) Verify() error {
+	if c.Endpoint == "" {
+		return fmt.Errorf("thegraph endpoint is required")
+	}
+	if c.PullInterval <= 0 {
+		return fmt.Errorf("pull interval must be positive, got %v", c.PullInterval)
+	}
+	if c.MaxRetries < 0 {
+		return fmt.Errorf("max retries cannot be negative, got %d", c.MaxRetries)
+	}
+	return nil
 }

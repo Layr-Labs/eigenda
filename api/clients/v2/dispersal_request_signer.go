@@ -38,10 +38,7 @@ type DispersalRequestSignerConfig struct {
 var _ config.VerifiableConfig = &DispersalRequestSignerConfig{}
 
 func DefaultDispersalRequestSignerConfig() DispersalRequestSignerConfig {
-	return DispersalRequestSignerConfig{
-		Region:   "us-east-1",
-		Endpoint: "",
-	}
+	return DispersalRequestSignerConfig{}
 }
 
 // Verify checks that the configuration is valid, returning an error if it is not.

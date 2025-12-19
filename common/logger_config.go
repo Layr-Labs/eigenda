@@ -34,8 +34,6 @@ type LoggerConfig struct {
 	HandlerOpts  logging.SLoggerOptions
 }
 
-
-
 func LoggerCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 	return []cli.Flag{
 		cli.StringFlag{

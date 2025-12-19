@@ -41,7 +41,7 @@ func (c *PaymentAuthorizationConfig) Verify() error {
 }
 
 // DefaultPaymentAuthorizationConfig returns a new PaymentAuthorizationConfig with default values
-func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
+func DefaultPaymentAuthorizationConfig() PaymentAuthorizationConfig {
 	onDemandConfig := ondemandvalidation.OnDemandLedgerCacheConfig{
 		MaxLedgers:        1024,
 		OnDemandTableName: "",
@@ -55,7 +55,7 @@ func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
 		UpdateInterval:       30 * time.Second,
 	}
 
-	return &PaymentAuthorizationConfig{
+	return PaymentAuthorizationConfig{
 		OnDemand:          onDemandConfig,
 		Reservation:       reservationConfig,
 		PerAccountMetrics: true,

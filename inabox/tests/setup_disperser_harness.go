@@ -805,7 +805,7 @@ func startController(
 	dispatcherConfig.BatchMetadataUpdatePeriod = 100 * time.Millisecond
 	dispatcherConfig.SigningRateDynamoDbTableName = "validator-signing-rates"
 	dispatcherConfig.DispersalRequestSigner.PrivateKey = "this is just a placeholder"
-	dispatcherConfig.Encoder = *encodingManagerConfig
+	dispatcherConfig.Encoder = encodingManagerConfig
 
 	// Chain state config
 	chainStateConfig := thegraph.Config{
@@ -844,7 +844,7 @@ func startController(
 	// Create encoding manager with workerpool and blob set
 	encodingPool := workerpool.New(encodingManagerConfig.NumConcurrentRequests)
 	encodingManager, err := controller.NewEncodingManager(
-		encodingManagerConfig,
+		&encodingManagerConfig,
 		time.Now,
 		metadataStore,
 		encodingPool,
@@ -912,7 +912,7 @@ func startController(
 	paymentAuthConfig.OnDemand.UpdateInterval = 1 * time.Second
 	paymentAuthConfig.OnDemand.MaxLedgers = 1000
 	paymentAuthConfig.Reservation.UpdateInterval = 1 * time.Second
-	dispatcherConfig.Payment = *paymentAuthConfig
+	dispatcherConfig.Payment = paymentAuthConfig
 
 	// Create controller
 	dispatcher, err := controller.NewController(
@@ -964,7 +964,7 @@ func startController(
 	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
 		ctx,
 		controllerLogger,
-		*paymentAuthConfig,
+		paymentAuthConfig,
 		contractDirectory,
 		ethClient,
 		dynamoClient.GetAwsClient(),

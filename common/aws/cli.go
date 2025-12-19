@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -114,10 +115,29 @@ func ReadClientConfig(ctx *cli.Context, flagPrefix string) ClientConfig {
 }
 
 // DefaultClientConfig returns a new ClientConfig with default values.
-func DefaultClientConfig() *ClientConfig {
-	return &ClientConfig{
-		Region:                      "us-east-2",
+func DefaultClientConfig() ClientConfig {
+	return ClientConfig{
 		FragmentParallelismFactor:   8,
 		FragmentParallelismConstant: 0,
 	}
+}
+
+// Verify validates the AWS client configuration.
+func (c *ClientConfig) Verify() error {
+	if c.Region == "" {
+		return fmt.Errorf("aws region is required")
+	}
+	if c.AccessKey == "" {
+		return fmt.Errorf("aws access key id is required")
+	}
+	if c.SecretAccessKey == "" {
+		return fmt.Errorf("aws secret access key is required")
+	}
+	if c.FragmentParallelismFactor < 0 {
+		return fmt.Errorf("fragment parallelism factor cannot be negative")
+	}
+	if c.FragmentParallelismConstant < 0 {
+		return fmt.Errorf("fragment parallelism constant cannot be negative")
+	}
+	return nil
 }

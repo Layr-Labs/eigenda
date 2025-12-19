@@ -19,14 +19,15 @@ var _ config.DocumentedConfig = &ControllerConfig{}
 // ControllerConfig contains configuration parameters for the controller.
 type ControllerConfig struct {
 	// Configuration for logging.
-	Log config.SimpleLoggerConfig // TODO(cody.littley): not yet wired into flags but will be soon
+	// TODO(cody.littley): not yet wired into flags but will be soon. Ok for now since we use the defaults everywhere.
+	Log config.SimpleLoggerConfig
 
 	// PullInterval is how frequently the Dispatcher polls for new encoded blobs to batch and dispatch.
 	// Must be positive.
 	PullInterval time.Duration
 
 	// DisperserID is the unique identifier for this disperser instance.
-	DisperserID uint32
+	DisperserID uint32 `docs:"required"`
 
 	// FinalizationBlockDelay is the number of blocks to wait before using operator state.
 	// This provides a hedge against chain reorganizations.
@@ -183,7 +184,16 @@ var _ config.VerifiableConfig = &ControllerConfig{}
 
 func DefaultControllerConfig() *ControllerConfig {
 	return &ControllerConfig{
-		Log:                                    *config.DefaultSimpleLoggerConfig(),
+		Log:                                    config.DefaultSimpleLoggerConfig(),
+		Server:                                 common.DefaultGRPCServerConfig(),
+		Encoder:                                DefaultEncodingManagerConfig(),
+		Indexer:                                indexer.DefaultIndexerConfig(),
+		ChainState:                             thegraph.DefaultTheGraphConfig(),
+		EthClient:                              geth.DefaultEthClientConfig(),
+		AwsClient:                              aws.DefaultClientConfig(),
+		HeartbeatMonitor:                       healthcheck.DefaultHeartbeatMonitorConfig(),
+		DispersalRequestSigner:                 clients.DefaultDispersalRequestSignerConfig(),
+		Payment:                                DefaultPaymentAuthorizationConfig(),
 		PullInterval:                           1 * time.Second,
 		FinalizationBlockDelay:                 75,
 		AttestationTimeout:                     45 * time.Second,
@@ -202,8 +212,12 @@ func DefaultControllerConfig() *ControllerConfig {
 		BlobDispersalRequestBatchSize:          32,
 		BlobDispersalRequestBackoffPeriod:      50 * time.Millisecond,
 		SigningRateFlushPeriod:                 1 * time.Minute,
+		UseGraph:                               true,
+		MetricsPort:                            9101,
+		ControllerReadinessProbePath:           "/tmp/controller-ready",
 		CollectDetailedValidatorSigningMetrics: true,
 		EnablePerAccountBlobStatusMetrics:      true,
+		DisperserStoreChunksSigningDisabled:    false,
 	}
 }
 
@@ -269,6 +283,7 @@ func (c *ControllerConfig) Verify() error {
 	if c.SigningRateDynamoDbTableName == "" {
 		return fmt.Errorf("SigningRateDynamoDbTableName must not be empty")
 	}
+	// TODO validate vs verify...
 	if err := c.DispersalRequestSigner.Verify(); err != nil {
 		return fmt.Errorf("invalid dispersal request signer config: %w", err)
 	}
@@ -281,6 +296,24 @@ func (c *ControllerConfig) Verify() error {
 	if err := c.Log.Verify(); err != nil {
 		return fmt.Errorf("invalid logger config: %w", err)
 	}
+	if err := c.Server.Verify(); err != nil {
+		return fmt.Errorf("invalid gRPC server config: %w", err)
+	}
+	if err := c.Indexer.Verify(); err != nil {
+		return fmt.Errorf("invalid indexer config: %w", err)
+	}
+	if err := c.ChainState.Verify(); err != nil {
+		return fmt.Errorf("invalid chain state (The Graph) config: %w", err)
+	}
+	if err := c.EthClient.Verify(); err != nil {
+		return fmt.Errorf("invalid Ethereum client config: %w", err)
+	}
+	if err := c.AwsClient.Verify(); err != nil {
+		return fmt.Errorf("invalid AWS client config: %w", err)
+	}
+	if err := c.HeartbeatMonitor.Verify(); err != nil {
+		return fmt.Errorf("invalid heartbeat monitor config: %w", err)
+	}
 	return nil
 }
 
@@ -291,15 +324,6 @@ func (c *ControllerConfig) GetEnvVarPrefix() string {
 func (c *ControllerConfig) GetName() string {
 	return "Controller"
 }
-
-// clients "github.com/Layr-Labs/eigenda/api/clients/v2"
-// 	"github.com/Layr-Labs/eigenda/common"
-// 	"github.com/Layr-Labs/eigenda/common/aws"
-// 	"github.com/Layr-Labs/eigenda/common/config"
-// 	"github.com/Layr-Labs/eigenda/common/geth"
-// 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-// 	"github.com/Layr-Labs/eigenda/core/thegraph"
-// 	"github.com/Layr-Labs/eigenda/indexer"
 
 func (c *ControllerConfig) GetPackagePaths() []string {
 	return []string{

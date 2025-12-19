@@ -75,8 +75,8 @@ type EncodingManagerConfig struct {
 
 var _ config.VerifiableConfig = &EncodingManagerConfig{}
 
-func DefaultEncodingManagerConfig() *EncodingManagerConfig {
-	return &EncodingManagerConfig{
+func DefaultEncodingManagerConfig() EncodingManagerConfig {
+	return EncodingManagerConfig{
 		PullInterval:            2 * time.Second,
 		EncodingRequestTimeout:  5 * time.Minute,
 		StoreTimeout:            15 * time.Second,

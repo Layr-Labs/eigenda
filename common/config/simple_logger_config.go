@@ -55,8 +55,8 @@ type SimpleLoggerConfig struct {
 }
 
 // Create a SimpleLoggerConfig with default values. These defaults are appropriate for production deployments.
-func DefaultSimpleLoggerConfig() *SimpleLoggerConfig {
-	return &SimpleLoggerConfig{
+func DefaultSimpleLoggerConfig() SimpleLoggerConfig {
+	return SimpleLoggerConfig{
 		Format:     JSONLogFormat,
 		AddSource:  true,
 		Level:      LogLevelDebug,

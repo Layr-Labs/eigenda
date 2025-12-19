@@ -98,7 +98,7 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 		EthClient:                           ethClientConfig,
 		AwsClient:                           aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		DisperserStoreChunksSigningDisabled: ctx.GlobalBool(flags.DisperserStoreChunksSigningDisabledFlag.Name),
-		Log:                                 *config.DefaultSimpleLoggerConfig(),
+		Log:                                 config.DefaultSimpleLoggerConfig(),
 		DispersalRequestSigner: clients.DispersalRequestSignerConfig{
 			KeyID:      ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
 			PrivateKey: ctx.GlobalString(flags.DisperserPrivateKeyFlag.Name),
