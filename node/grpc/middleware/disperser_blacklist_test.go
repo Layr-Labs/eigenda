@@ -10,7 +10,7 @@ import (
 func TestDisperserBlacklist_TTL(t *testing.T) {
 	t.Parallel()
 
-	b := NewDisperserBlacklist(nil, 10*time.Minute)
+	b := NewDisperserBlacklist(nil, 10*time.Minute, 2*time.Minute, 3)
 
 	now := time.Unix(1000, 0)
 	id := uint32(123)
@@ -34,11 +34,11 @@ func TestDisperserBlacklist_DisabledWhenTTLZeroOrNegative(t *testing.T) {
 	now := time.Unix(1000, 0)
 	id := uint32(42)
 
-	b0 := NewDisperserBlacklist(nil, 0)
+	b0 := NewDisperserBlacklist(nil, 0, 2*time.Minute, 3)
 	b0.Blacklist(id, now, "reason")
 	require.False(t, b0.IsBlacklisted(id, now))
 
-	bNeg := NewDisperserBlacklist(nil, -1*time.Second)
+	bNeg := NewDisperserBlacklist(nil, -1*time.Second, 2*time.Minute, 3)
 	bNeg.Blacklist(id, now, "reason")
 	require.False(t, bNeg.IsBlacklisted(id, now))
 
@@ -46,4 +46,45 @@ func TestDisperserBlacklist_DisabledWhenTTLZeroOrNegative(t *testing.T) {
 	var bNil *DisperserBlacklist
 	require.False(t, bNil.IsBlacklisted(id, now))
 	bNil.Blacklist(id, now, "reason") // should not panic
+}
+
+func TestDisperserBlacklist_StrikeThreshold(t *testing.T) {
+	t.Parallel()
+
+	b := NewDisperserBlacklist(nil, 10*time.Minute, 2*time.Minute, 3)
+	now := time.Unix(1000, 0)
+	id := uint32(7)
+
+	b.RecordInvalid(id, now, "bad1")
+	require.False(t, b.IsBlacklisted(id, now))
+
+	b.RecordInvalid(id, now.Add(30*time.Second), "bad2")
+	require.False(t, b.IsBlacklisted(id, now.Add(30*time.Second)))
+
+	// Third invalid within the window triggers blacklisting.
+	b.RecordInvalid(id, now.Add(60*time.Second), "bad3")
+	require.True(t, b.IsBlacklisted(id, now.Add(60*time.Second)))
+
+	// After TTL expires, it should be forgiven (strikes cleared).
+	require.False(t, b.IsBlacklisted(id, now.Add(11*time.Minute)))
+
+	// One invalid after forgiveness should not immediately re-ban.
+	b.RecordInvalid(id, now.Add(11*time.Minute), "bad4")
+	require.False(t, b.IsBlacklisted(id, now.Add(11*time.Minute)))
+}
+
+func TestDisperserBlacklist_StrikeWindow(t *testing.T) {
+	t.Parallel()
+
+	b := NewDisperserBlacklist(nil, 10*time.Minute, 2*time.Minute, 3)
+	now := time.Unix(1000, 0)
+	id := uint32(8)
+
+	// Two invalids, but then we wait past the strike window before the third.
+	b.RecordInvalid(id, now, "bad1")
+	b.RecordInvalid(id, now.Add(30*time.Second), "bad2")
+	b.RecordInvalid(id, now.Add(3*time.Minute), "bad3")
+
+	// The first two are outside the 2m window at the time of the third, so no ban.
+	require.False(t, b.IsBlacklisted(id, now.Add(3*time.Minute)))
 }

@@ -399,6 +399,20 @@ var (
 		Value:    10 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_BLACKLIST_FORGIVENESS_WINDOW"),
 	}
+	DisperserBlacklistStrikeWindowFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-blacklist-strike-window"),
+		Usage:    "Time window in which invalid StoreChunks requests count toward blacklisting (e.g. 2m for \"3 invalids in 2 minutes => ban\").",
+		Required: false,
+		Value:    2 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_BLACKLIST_STRIKE_WINDOW"),
+	}
+	DisperserBlacklistMaxInvalidFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-blacklist-max-invalid"),
+		Usage:    "Number of invalid StoreChunks requests within the strike window required to trigger blacklisting (e.g. 3). If 0, blacklisting is disabled.",
+		Required: false,
+		Value:    3,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_BLACKLIST_MAX_INVALID"),
+	}
 	LevelDBDisableSeeksCompactionV1Flag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "leveldb-disable-seeks-compaction-v1"),
 		Usage:    "Disable seeks compaction for LevelDB for v1",
@@ -725,6 +739,8 @@ var optionalFlags = []cli.Flag{
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
 	DisperserBlacklistForgivenessWindowFlag,
+	DisperserBlacklistStrikeWindowFlag,
+	DisperserBlacklistMaxInvalidFlag,
 	LevelDBDisableSeeksCompactionV1Flag,
 	LevelDBEnableSyncWritesV1Flag,
 	DownloadPoolSizeFlag,

@@ -100,7 +100,7 @@ func TestStoreChunksDisperserAuthAndBlacklistInterceptor_RejectsWhenBlacklisted(
 		},
 	}
 
-	bl := NewDisperserBlacklist(nil, 10*time.Minute)
+	bl := NewDisperserBlacklist(nil, 10*time.Minute, 2*time.Minute, 3)
 	now := time.Now()
 	bl.Blacklist(9, now, "reason")
 
@@ -131,7 +131,10 @@ func TestStoreChunksDisperserAuthAndBlacklistInterceptor_AllowsAndInjectsAuthent
 		},
 	}
 
-	interceptor := StoreChunksDisperserAuthAndBlacklistInterceptor(NewDisperserBlacklist(nil, 10*time.Minute), auth)
+	interceptor := StoreChunksDisperserAuthAndBlacklistInterceptor(
+		NewDisperserBlacklist(nil, 10*time.Minute, 2*time.Minute, 3),
+		auth,
+	)
 
 	var gotID uint32
 	var gotOk bool

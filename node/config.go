@@ -83,6 +83,11 @@ type Config struct {
 	// Temporary blacklisting forgiveness window for dispersers that send invalid StoreChunks requests.
 	// If set to 0, blacklisting is disabled.
 	DisperserBlacklistForgivenessWindow time.Duration
+	// The time window in which invalid requests count toward blacklisting.
+	// Example: 2m means "3 invalids in 2 minutes => ban".
+	DisperserBlacklistStrikeWindow time.Duration
+	// The number of invalid requests within DisperserBlacklistStrikeWindow required to trigger blacklisting.
+	DisperserBlacklistMaxInvalid int
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -474,6 +479,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
 		DisperserBlacklistForgivenessWindow: ctx.GlobalDuration(flags.DisperserBlacklistForgivenessWindowFlag.Name),
+		DisperserBlacklistStrikeWindow:      ctx.GlobalDuration(flags.DisperserBlacklistStrikeWindowFlag.Name),
+		DisperserBlacklistMaxInvalid:        ctx.GlobalInt(flags.DisperserBlacklistMaxInvalidFlag.Name),
 		LittDBWriteCacheSizeBytes: uint64(ctx.GlobalFloat64(
 			flags.LittDBWriteCacheSizeGBFlag.Name) * units.GiB),
 		LittDBWriteCacheSizeFraction:    ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),

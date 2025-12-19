@@ -105,7 +105,12 @@ func NewServerV2(
 		softwareVersion:    softwareVersion,
 		dispersalListener:  dispersalListener,
 		retrievalListener:  retrievalListener,
-		blacklist:          middleware.NewDisperserBlacklist(logger, config.DisperserBlacklistForgivenessWindow),
+		blacklist: middleware.NewDisperserBlacklist(
+			logger,
+			config.DisperserBlacklistForgivenessWindow,
+			config.DisperserBlacklistStrikeWindow,
+			config.DisperserBlacklistMaxInvalid,
+		),
 	}, nil
 }
 
@@ -219,7 +224,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		_, err = s.validateDispersalRequest(blobCert)
 		if err != nil {
 			if s.blacklist != nil {
-				s.blacklist.Blacklist(in.GetDisperserID(), now, fmt.Sprintf("invalid dispersal request: %v", err))
+				s.blacklist.RecordInvalid(in.GetDisperserID(), now, fmt.Sprintf("invalid dispersal request: %v", err))
 			}
 			//nolint:wrapcheck
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
@@ -229,7 +234,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	blobHeadersAndTimestamps, err := hashing.HashBlobHeadersAndTimestamps(in)
 	if err != nil {
 		if s.blacklist != nil {
-			s.blacklist.Blacklist(in.GetDisperserID(), now, fmt.Sprintf("malformed blob headers: %v", err))
+			s.blacklist.RecordInvalid(in.GetDisperserID(), now, fmt.Sprintf("malformed blob headers: %v", err))
 		}
 		//nolint:wrapcheck
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers and timestamps: %v", err))
@@ -261,7 +266,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	if err != nil {
 		if errors.Is(err, reservationvalidation.ErrInsufficientBandwidth) {
 			if s.blacklist != nil {
-				s.blacklist.Blacklist(in.GetDisperserID(), now, fmt.Sprintf("reservation exceeded: %v", err))
+				s.blacklist.RecordInvalid(in.GetDisperserID(), now, fmt.Sprintf("reservation exceeded: %v", err))
 			}
 		}
 		return nil, fmt.Errorf("validate reservation payment: %w", err)
