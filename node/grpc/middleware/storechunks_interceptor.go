@@ -69,6 +69,16 @@ func StoreChunksDisperserAuthAndBlacklistInterceptor(
 		}
 
 		ctx = context.WithValue(ctx, ctxKeyAuthenticatedDisperserID, disperserID)
-		return handler(ctx, req)
+
+		res, handlerErr := handler(ctx, req)
+		if handlerErr == nil || blacklist == nil {
+			return res, handlerErr
+		}
+
+		if be, ok := AsBlacklistable(handlerErr); ok {
+			blacklist.RecordInvalid(disperserID, time.Now(), be.Reason)
+		}
+
+		return res, handlerErr
 	}
 }

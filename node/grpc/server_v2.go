@@ -223,21 +223,23 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	for _, blobCert := range batch.BlobCertificates {
 		_, err = s.validateDispersalRequest(blobCert)
 		if err != nil {
-			if s.blacklist != nil {
-				s.blacklist.RecordInvalid(in.GetDisperserID(), now, fmt.Sprintf("invalid dispersal request: %v", err))
-			}
 			//nolint:wrapcheck
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
+			//nolint:wrapcheck
+			return nil, middleware.WrapBlacklistable(
+				fmt.Sprintf("invalid dispersal request: %v", err),
+				api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err)),
+			)
 		}
 	}
 
 	blobHeadersAndTimestamps, err := hashing.HashBlobHeadersAndTimestamps(in)
 	if err != nil {
-		if s.blacklist != nil {
-			s.blacklist.RecordInvalid(in.GetDisperserID(), now, fmt.Sprintf("malformed blob headers: %v", err))
-		}
 		//nolint:wrapcheck
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers and timestamps: %v", err))
+		//nolint:wrapcheck
+		return nil, middleware.WrapBlacklistable(
+			fmt.Sprintf("malformed blob headers: %v", err),
+			api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers and timestamps: %v", err)),
+		)
 	}
 
 	for i, blobHeader := range blobHeadersAndTimestamps {
@@ -265,9 +267,11 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	err = s.node.ValidateReservationPayment(ctx, batch, probe)
 	if err != nil {
 		if errors.Is(err, reservationvalidation.ErrInsufficientBandwidth) {
-			if s.blacklist != nil {
-				s.blacklist.RecordInvalid(in.GetDisperserID(), now, fmt.Sprintf("reservation exceeded: %v", err))
-			}
+			//nolint:wrapcheck
+			return nil, middleware.WrapBlacklistable(
+				fmt.Sprintf("reservation exceeded: %v", err),
+				fmt.Errorf("validate reservation payment: %w", err),
+			)
 		}
 		return nil, fmt.Errorf("validate reservation payment: %w", err)
 	}
