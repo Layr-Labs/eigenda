@@ -480,8 +480,11 @@ func (n *Node) ValidateReservationPayment(ctx context.Context, batch *corev2.Bat
 
 		if !success {
 			return fmt.Errorf(
-				"debit for account %s: insufficient bandwidth for %d symbols",
-				blobCert.BlobHeader.PaymentMetadata.AccountID.Hex(), blobCert.BlobHeader.BlobCommitments.Length)
+				"%w: account %s: %d symbols",
+				reservationvalidation.ErrInsufficientBandwidth,
+				blobCert.BlobHeader.PaymentMetadata.AccountID.Hex(),
+				blobCert.BlobHeader.BlobCommitments.Length,
+			)
 		}
 	}
 
