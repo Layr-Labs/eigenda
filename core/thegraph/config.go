@@ -14,9 +14,12 @@ const (
 )
 
 type Config struct {
-	Endpoint     string        // The Graph endpoint
-	PullInterval time.Duration // The interval to pull data from The Graph
-	MaxRetries   int           // The maximum number of retries to pull data from The Graph
+	// The Graph endpoint
+	Endpoint string
+	// The interval to pull data from The Graph
+	PullInterval time.Duration
+	// The maximum number of retries to pull data from The Graph
+	MaxRetries int
 }
 
 func CLIFlags(envPrefix string) []cli.Flag {

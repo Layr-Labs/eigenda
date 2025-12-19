@@ -16,12 +16,19 @@ var (
 	retryDelayIncrementFlagName = "chain.retry-delay-increment"
 )
 
+// TODO(cody.littley): RPCURLs and PrivateKeyString should be converted to *secret.Secret types.
+
 type EthClientConfig struct {
-	RPCURLs          []string
+	// A list of RPC URL endpoints to connect to the Ethereum chain.
+	RPCURLs []string `docs:"required"`
+	// Ethereum private key in hex string format.
 	PrivateKeyString string
+	// Number of block confirmations to wait for.
 	NumConfirmations int
-	NumRetries       int
-	RetryDelay       time.Duration
+	// Number of maximal retry for each rpc call after failure/
+	NumRetries int
+	// Time duration for linear retry delay increment.
+	RetryDelay time.Duration
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {

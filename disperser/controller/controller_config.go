@@ -14,8 +14,13 @@ import (
 	"github.com/Layr-Labs/eigenda/indexer"
 )
 
+var _ config.DocumentedConfig = &ControllerConfig{}
+
 // ControllerConfig contains configuration parameters for the controller.
 type ControllerConfig struct {
+	// Configuration for logging.
+	Log config.SimpleLoggerConfig // TODO(cody.littley): not yet wired into flags but will be soon
+
 	// PullInterval is how frequently the Dispatcher polls for new encoded blobs to batch and dispatch.
 	// Must be positive.
 	PullInterval time.Duration
@@ -167,9 +172,6 @@ type ControllerConfig struct {
 	// Configures the dispersal request signer used to sign requests to validators.
 	DispersalRequestSigner clients.DispersalRequestSignerConfig
 
-	// Configures logging for the controller.
-	Logger common.LoggerConfig
-
 	// Configures healthchecks and heartbeat monitoring for the controller.
 	HeartbeatMonitor healthcheck.HeartbeatMonitorConfig
 
@@ -181,6 +183,7 @@ var _ config.VerifiableConfig = &ControllerConfig{}
 
 func DefaultControllerConfig() *ControllerConfig {
 	return &ControllerConfig{
+		Log:                                 *config.DefaultSimpleLoggerConfig(),
 		PullInterval:                        1 * time.Second,
 		FinalizationBlockDelay:              75,
 		AttestationTimeout:                  45 * time.Second,
@@ -273,5 +276,41 @@ func (c *ControllerConfig) Verify() error {
 	if err := c.PaymentAuthorization.Verify(); err != nil {
 		return fmt.Errorf("invalid payment authorization config: %w", err)
 	}
+	if err := c.Log.Verify(); err != nil {
+		return fmt.Errorf("invalid logger config: %w", err)
+	}
 	return nil
+}
+
+func (c *ControllerConfig) GetEnvVarPrefix() string {
+	return "CONTROLLER"
+}
+
+func (c *ControllerConfig) GetName() string {
+	return "Controller"
+}
+
+// clients "github.com/Layr-Labs/eigenda/api/clients/v2"
+// 	"github.com/Layr-Labs/eigenda/common"
+// 	"github.com/Layr-Labs/eigenda/common/aws"
+// 	"github.com/Layr-Labs/eigenda/common/config"
+// 	"github.com/Layr-Labs/eigenda/common/geth"
+// 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+// 	"github.com/Layr-Labs/eigenda/core/thegraph"
+// 	"github.com/Layr-Labs/eigenda/indexer"
+
+func (c *ControllerConfig) GetPackagePaths() []string {
+	return []string{
+		"github.com/Layr-Labs/eigenda/disperser/controller",
+		"github.com/Layr-Labs/eigenda/common/config",
+		"github.com/Layr-Labs/eigenda/common",
+		"github.com/Layr-Labs/eigenda/indexer",
+		"github.com/Layr-Labs/eigenda/core/thegraph",
+		"github.com/Layr-Labs/eigenda/common/geth",
+		"github.com/Layr-Labs/eigenda/common/aws",
+		"github.com/Layr-Labs/eigenda/common/healthcheck",
+		"github.com/Layr-Labs/eigenda/api/clients/v2",
+		"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation",
+		"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation",
+	}
 }

@@ -20,8 +20,12 @@ import (
 
 // PaymentAuthorizationConfig contains configuration for building a payment authorization handler
 type PaymentAuthorizationConfig struct {
-	OnDemandConfig                 ondemandvalidation.OnDemandLedgerCacheConfig
-	ReservationConfig              reservationvalidation.ReservationLedgerCacheConfig
+	// Connfiguration for on-demand payment validation.
+	OnDemandConfig ondemandvalidation.OnDemandLedgerCacheConfig
+	// Configuration for reservation payment validation.
+	ReservationConfig reservationvalidation.ReservationLedgerCacheConfig
+	// If true, enable a metric per user account for payment validation and authorization.
+	// Resulting metric may potentially have high cardinality.
 	EnablePerAccountPaymentMetrics bool
 }
 

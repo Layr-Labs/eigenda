@@ -64,7 +64,7 @@ func RunController(cliCtx *cli.Context) error {
 		return err
 	}
 
-	logger, err := common.NewLogger(&config.Logger)
+	logger, err := config.Log.BuildLogger()
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
