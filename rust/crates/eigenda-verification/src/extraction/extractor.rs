@@ -651,9 +651,7 @@ impl CertVerifierABNsExtractor {
 
 impl StorageKeyProvider for CertVerifierABNsExtractor {
     fn storage_keys(&self) -> Vec<StorageKey> {
-        // abns are u32s, so 8 abns are packed per storage slot (32 bytes)
-        let num_keys = self.num_abns.div_ceil(8);
-        storage_key_helpers::dynamic_array_keys(CERT_VERIFIER_ABNS_ARRAY_SLOT, num_keys, U32::BITS)
+        storage_key_helpers::dynamic_array_keys(CERT_VERIFIER_ABNS_ARRAY_SLOT, self.num_abns, U32::BITS)
     }
 }
 

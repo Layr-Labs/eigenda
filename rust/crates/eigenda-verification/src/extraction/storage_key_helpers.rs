@@ -76,7 +76,7 @@ pub fn mapping_key(key: U256, slot: u64) -> StorageKey {
 pub fn dynamic_array_keys(slot: u64, len: usize, type_size_bits: usize) -> Vec<StorageKey> {
     let slot = U256::from(slot);
     let data_base_slot: U256 = keccak256(slot.abi_encode()).into();
-    (0..=(len / (256 / type_size_bits)))
+    (0..=((len - 1) / (256 / type_size_bits)))
         .map(|i| (data_base_slot + U256::from(i)).into())
         .collect()
 }
