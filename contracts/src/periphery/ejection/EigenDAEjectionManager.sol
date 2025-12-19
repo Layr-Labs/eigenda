@@ -44,7 +44,14 @@ contract EigenDAEjectionManager is ImmutableEigenDAEjectionsStorage, IEigenDASem
         IBLSApkRegistry blsApkKeyRegistry_,
         BLSSignatureChecker serviceManager_,
         IRegistryCoordinator registryCoordinator_
-    ) ImmutableEigenDAEjectionsStorage(accessControl_, blsApkKeyRegistry_, serviceManager_, registryCoordinator_) {}
+    )   ImmutableEigenDAEjectionsStorage(accessControl_, blsApkKeyRegistry_, serviceManager_, registryCoordinator_)
+    {
+        /// @dev This is done to ensure the initialize function isn't callable on the implementation.
+        ///      In idiomatic Solidity, this is achieved via a call to the disableInitializers() method
+        ///      inherited from OpenZeppelin's Initializable, which isn't used here due to conflicts
+        ///      with storage representations (i.e., structured vs. namespaced).
+        InitializableLib.setInitializedVersion(1);
+    }
 
     function initialize(uint64 delay_, uint64 cooldown_) external initializer {
         EigenDAEjectionStorage.Layout storage s = EigenDAEjectionStorage.layout();
