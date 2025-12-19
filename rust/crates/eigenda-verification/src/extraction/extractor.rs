@@ -651,7 +651,11 @@ impl CertVerifierABNsExtractor {
 
 impl StorageKeyProvider for CertVerifierABNsExtractor {
     fn storage_keys(&self) -> Vec<StorageKey> {
-        storage_key_helpers::dynamic_array_keys(CERT_VERIFIER_ABNS_ARRAY_SLOT, self.num_abns, U32::BITS)
+        storage_key_helpers::dynamic_array_keys(
+            CERT_VERIFIER_ABNS_ARRAY_SLOT,
+            self.num_abns,
+            U32::BITS,
+        )
     }
 }
 
