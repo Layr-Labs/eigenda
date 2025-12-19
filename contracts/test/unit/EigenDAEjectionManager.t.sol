@@ -1,61 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import {Test} from "forge-std/Test.sol";
-
 import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
 import {EigenDAEjectionLib} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
 
-import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
-import {EigenDADirectory} from "src/core/EigenDADirectory.sol";
-
 import {AccessControlConstants} from "src/core/libraries/v3/access-control/AccessControlConstants.sol";
-import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
 
-import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {MockEigenDADeployer} from "test/MockEigenDADeployer.sol";
 
-contract ERC20Mintable is ERC20 {
-    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
-
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-}
-
-contract EigenDAEjectionManagerTest is Test {
-    EigenDADirectory directory;
-    EigenDAAccessControl accessControl;
-    EigenDAEjectionManager ejectionManager;
-    ERC20Mintable token;
-
-    address ejector;
+contract EigenDAEjectionManagerTest is MockEigenDADeployer {
+    address testEjector;
     address ejectee;
 
-    uint256 constant DEPOSIT_BASE_FEE_MULTIPLIER = 7;
-    uint256 constant CANCEL_EJECTION_WITHOUT_SIG_GAS_REFUND = 39_128;
-    uint256 constant CANCEL_EJECTION_WITH_SIG_GAS_REFUND = 70_000;
-    uint256 constant BASE_FEE = 10;
-    uint256 constant EXPECTED_DEPOSIT = BASE_FEE * DEPOSIT_BASE_FEE_MULTIPLIER * CANCEL_EJECTION_WITH_SIG_GAS_REFUND;
-    /// TODO: PLACEHOLDER UNTIL GAS COST FOR SIGNATURES IS KNOWN
     /// TODO: Add tests that ensure multiple ejections can be ran at once by a single ejector (1 ejector : N ejectees)
     ///       Also (N ejector : N ejectees)
 
     function setUp() public {
-        vm.fee(BASE_FEE);
-        token = new ERC20Mintable("WrappedETH", "WETH");
-        accessControl = new EigenDAAccessControl(address(this));
-        directory = new EigenDADirectory();
-        directory.initialize(address(accessControl));
+        // Deploy all mock contracts including EigenDAEjectionManager
+        _deployDA();
 
-        ejector = makeAddr("ejector");
+        testEjector = makeAddr("testEjector");
         ejectee = makeAddr("ejectee");
 
-        ejectionManager = new EigenDAEjectionManager(address(directory));
-        directory.addAddress(AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(ejectionManager));
-
-        /// TODO: figure out the proper way to wire this for testing E2E signature recovery
-        //        and BLS pairing verification
-        directory.addAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME, address(this));
+        // Grant roles as the registryCoordinatorOwner who has DEFAULT_ADMIN_ROLE
+        vm.startPrank(registryCoordinatorOwner);
+        eigenDAAccessControl.grantRole(eigenDAAccessControl.DEFAULT_ADMIN_ROLE(), address(this));
+        eigenDAAccessControl.grantRole(AccessControlConstants.OWNER_ROLE, address(this));
+        vm.stopPrank();
     }
 
     function testStartEjection() public {
@@ -64,30 +35,30 @@ contract EigenDAEjectionManagerTest is Test {
 
     function testStartEjection(uint64 cooldown, uint64 delay) private {
         // 0) Wire up access mgmt dependencies and set protocol params on contract
-        accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, ejector);
-        accessControl.grantRole(AccessControlConstants.OWNER_ROLE, ejector);
+        eigenDAAccessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, testEjector);
+        eigenDAAccessControl.grantRole(AccessControlConstants.OWNER_ROLE, testEjector);
 
-        vm.startPrank(ejector);
-        ejectionManager.setCooldown(cooldown);
-        ejectionManager.setDelay(delay);
+        vm.startPrank(testEjector);
+        eigenDAEjectionManager.setCooldown(cooldown);
+        eigenDAEjectionManager.setDelay(delay);
 
         // 1) start an ejection against an arbitrary ejectee
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionStarted(
             ejectee,
-            ejector,
+            testEjector,
             "0x", // quorums (empty for this test)
             uint64(block.timestamp),
-            uint64(block.timestamp + ejectionManager.ejectionDelay())
+            uint64(block.timestamp + eigenDAEjectionManager.ejectionDelay())
         );
 
-        ejectionManager.startEjection(ejectee, "0x");
+        eigenDAEjectionManager.startEjection(ejectee, "0x");
         vm.stopPrank();
 
         // 2) verify that ejectee record was properly created
-        assertEq(ejectionManager.getEjector(ejectee), ejector);
-        assertEq(ejectionManager.ejectionTime(ejectee), block.timestamp + ejectionManager.ejectionDelay());
-        assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp);
+        assertEq(eigenDAEjectionManager.getEjector(ejectee), testEjector);
+        assertEq(eigenDAEjectionManager.ejectionTime(ejectee), block.timestamp + eigenDAEjectionManager.ejectionDelay());
+        assertEq(eigenDAEjectionManager.lastEjectionInitiated(ejectee), block.timestamp);
     }
 
     function testCancelEjectionByEjector() public {
@@ -96,23 +67,22 @@ contract EigenDAEjectionManagerTest is Test {
 
     function testCancelEjectionByEjector(uint64 cooldown, uint64 delay) private {
         // 0) grant roles
-        accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, ejector);
-        accessControl.grantRole(AccessControlConstants.OWNER_ROLE, ejector);
+        eigenDAAccessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, testEjector);
+        eigenDAAccessControl.grantRole(AccessControlConstants.OWNER_ROLE, testEjector);
 
-        // 1) Ejector "deposits" by escrowing ERC20 tokens to the contract
-        //    address and starting the ejection
-        vm.startPrank(ejector);
-        ejectionManager.setCooldown(cooldown);
-        ejectionManager.setDelay(delay);
-        ejectionManager.startEjection(ejectee, "0x");
+        // 1) Ejector starts ejection for ejectee after setting contract params
+        vm.startPrank(testEjector);
+        eigenDAEjectionManager.setCooldown(cooldown);
+        eigenDAEjectionManager.setDelay(delay);
+        eigenDAEjectionManager.startEjection(ejectee, "0x");
 
         // 2) Issue a cancellation from the Ejector role
-        ejectionManager.cancelEjectionByEjector(ejectee);
+        eigenDAEjectionManager.cancelEjectionByEjector(ejectee);
 
         // 3) Ensure the ejectee record has been nullified
-        assertEq(ejectionManager.getEjector(ejectee), address(0));
-        assertEq(ejectionManager.ejectionTime(ejectee), 0);
-        assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
+        assertEq(eigenDAEjectionManager.getEjector(ejectee), address(0));
+        assertEq(eigenDAEjectionManager.ejectionTime(ejectee), 0);
+        assertEq(eigenDAEjectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
 
         vm.stopPrank();
     }
@@ -125,13 +95,13 @@ contract EigenDAEjectionManagerTest is Test {
         vm.startPrank(ejectee);
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionCancelled(ejectee);
-        ejectionManager.cancelEjection();
+        eigenDAEjectionManager.cancelEjection();
         vm.stopPrank();
 
         // 2) Ensure the ejectee record is nullified
-        assertEq(ejectionManager.getEjector(ejectee), address(0));
-        assertEq(ejectionManager.ejectionTime(ejectee), 0);
-        assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
+        assertEq(eigenDAEjectionManager.getEjector(ejectee), address(0));
+        assertEq(eigenDAEjectionManager.ejectionTime(ejectee), 0);
+        assertEq(eigenDAEjectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
     }
 
     function testCompleteEjection() public {
@@ -140,17 +110,17 @@ contract EigenDAEjectionManagerTest is Test {
         testStartEjection(0, 0);
 
         // 1) complete ejection via ejector
-        vm.startPrank(ejector);
+        vm.startPrank(testEjector);
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionCompleted(ejectee, "0x");
-        ejectionManager.completeEjection(ejectee, "0x");
+        eigenDAEjectionManager.completeEjection(ejectee, "0x");
         vm.stopPrank();
 
         // 2) ensure that ejectee's record is nullified and the
         //    ejector's book-kept balance reincorporates the initial deposit amount
-        assertEq(ejectionManager.getEjector(ejectee), address(0));
-        assertEq(ejectionManager.ejectionTime(ejectee), 0);
-        assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
+        assertEq(eigenDAEjectionManager.getEjector(ejectee), address(0));
+        assertEq(eigenDAEjectionManager.ejectionTime(ejectee), 0);
+        assertEq(eigenDAEjectionManager.lastEjectionInitiated(ejectee), block.timestamp); // should remain unchanged
     }
 
     function testDelayEnforcementCausesEjectorCompletionsToRevert() public {
@@ -158,16 +128,16 @@ contract EigenDAEjectionManagerTest is Test {
         //    until completing the ejection
         testStartEjection(0, 6000);
 
-        vm.startPrank(ejector);
+        vm.startPrank(testEjector);
         vm.expectRevert("Proceeding not yet due");
         // 1) the EVM time context hasn't been advanced and there's an artificial
         //    delay where the block.timestamp >= start_ejection_block.timestamp + 6000s
-        ejectionManager.completeEjection(ejectee, "0x");
+        eigenDAEjectionManager.completeEjection(ejectee, "0x");
 
         // 2) now advance EVM and ensure that ejection can be successfully completed
         //    by ejector
         vm.warp(block.timestamp + 7000);
-        ejectionManager.completeEjection(ejectee, "0x");
+        eigenDAEjectionManager.completeEjection(ejectee, "0x");
 
         vm.stopPrank();
     }
@@ -182,13 +152,13 @@ contract EigenDAEjectionManagerTest is Test {
 
         // 2) ensure that a too-early attempted ejector completion reverts
         vm.expectRevert("Ejection cooldown not met");
-        vm.startPrank(ejector);
-        ejectionManager.startEjection(ejectee, "0x");
+        vm.startPrank(testEjector);
+        eigenDAEjectionManager.startEjection(ejectee, "0x");
 
         // 3) after the cooldown period has successfully elapsed, the ejector
         //    should be able to successfully start a new ejection
         vm.warp(block.timestamp + 7000);
-        ejectionManager.startEjection(ejectee, "0x");
+        eigenDAEjectionManager.startEjection(ejectee, "0x");
         vm.stopPrank();
     }
 }
