@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
@@ -22,10 +23,6 @@ import (
 )
 
 func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
-	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
-	if err != nil {
-		return nil, fmt.Errorf("read logger config: %w", err)
-	}
 	ethClientConfig := geth.ReadEthClientConfigRPCOnly(ctx)
 	numRelayAssignments := ctx.GlobalInt(flags.NumRelayAssignmentFlag.Name)
 	if numRelayAssignments < 1 || numRelayAssignments > math.MaxUint16 {
@@ -98,10 +95,10 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 	config := &controller.ControllerConfig{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		DisperserID:                         disperserID,
-		EthClientConfig:                     ethClientConfig,
+		EthClient:                           ethClientConfig,
 		AwsClient:                           aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		DisperserStoreChunksSigningDisabled: ctx.GlobalBool(flags.DisperserStoreChunksSigningDisabledFlag.Name),
-		Logger:                              *loggerConfig,
+		Log:                                 *config.DefaultSimpleLoggerConfig(),
 		DispersalRequestSigner: clients.DispersalRequestSignerConfig{
 			KeyID:      ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
 			PrivateKey: ctx.GlobalString(flags.DisperserPrivateKeyFlag.Name),
@@ -145,7 +142,7 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 		Indexer:                                indexer.ReadIndexerConfig(ctx),
 		ChainState:                             thegraph.ReadCLIConfig(ctx),
 		UseGraph:                               ctx.GlobalBool(flags.UseGraphFlag.Name),
-		EigenDAContractDirectoryAddress:        ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
+		ContractDirectoryAddress:               ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
 		MetricsPort:                            ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:           ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
 		Server:                                 grpcServerConfig,

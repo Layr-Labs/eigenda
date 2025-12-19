@@ -49,10 +49,10 @@ type EncodingManagerConfig struct {
 	NumRelayAssignment uint16
 	// AvailableRelays is the list of relay keys that can be assigned to blobs.
 	// Must not be empty.
-	AvailableRelays []corev2.RelayKey
+	AvailableRelays []corev2.RelayKey `docs:"required"`
 	// EncoderAddress is the network address of the encoder service (e.g., "localhost:50051").
 	// Must not be empty.
-	EncoderAddress string
+	EncoderAddress string `docs:"required"`
 	// MaxNumBlobsPerIteration is the maximum number of blobs to pull and encode in each iteration.
 	// Must be at least 1.
 	MaxNumBlobsPerIteration int32
@@ -77,14 +77,15 @@ var _ config.VerifiableConfig = &EncodingManagerConfig{}
 
 func DefaultEncodingManagerConfig() *EncodingManagerConfig {
 	return &EncodingManagerConfig{
-		PullInterval:                2 * time.Second,
-		EncodingRequestTimeout:      5 * time.Minute,
-		StoreTimeout:                15 * time.Second,
-		NumEncodingRetries:          3,
-		MaxNumBlobsPerIteration:     128,
-		OnchainStateRefreshInterval: 1 * time.Hour,
-		NumConcurrentRequests:       250,
-		NumRelayAssignment:          1,
+		PullInterval:                      2 * time.Second,
+		EncodingRequestTimeout:            5 * time.Minute,
+		StoreTimeout:                      15 * time.Second,
+		NumEncodingRetries:                3,
+		MaxNumBlobsPerIteration:           128,
+		OnchainStateRefreshInterval:       1 * time.Hour,
+		NumConcurrentRequests:             250,
+		NumRelayAssignment:                1,
+		EnablePerAccountBlobStatusMetrics: true,
 	}
 }
 

@@ -127,13 +127,13 @@ type ControllerConfig struct {
 	SigningRateDynamoDbTableName string `docs:"required"`
 
 	// The name of the DynamoDB table used to store "core" metadata (i.e. blob statuses, signatures, etc.).
-	DynamoDBTableName string
+	DynamoDBTableName string `docs:"required"`
 
 	// Whether or not to use subgraph.
 	UseGraph bool
 
 	// The contract directory contract address, which is used to derive other EigenDA contract addresses.
-	EigenDAContractDirectoryAddress string `docs:"required"`
+	ContractDirectoryAddress string `docs:"required"`
 
 	// The port on which to expose prometheus metrics.
 	MetricsPort int
@@ -161,7 +161,7 @@ type ControllerConfig struct {
 	ChainState thegraph.Config
 
 	// Configures the Ethereum client, which is used for talking to the EigenDA contracts.
-	EthClientConfig geth.EthClientConfig
+	EthClient geth.EthClientConfig
 
 	// Configures AWS clients used by the controller.
 	AwsClient aws.ClientConfig
@@ -183,25 +183,27 @@ var _ config.VerifiableConfig = &ControllerConfig{}
 
 func DefaultControllerConfig() *ControllerConfig {
 	return &ControllerConfig{
-		Log:                                 *config.DefaultSimpleLoggerConfig(),
-		PullInterval:                        1 * time.Second,
-		FinalizationBlockDelay:              75,
-		AttestationTimeout:                  45 * time.Second,
-		BatchMetadataUpdatePeriod:           time.Minute,
-		BatchAttestationTimeout:             55 * time.Second,
-		SignatureTickInterval:               50 * time.Millisecond,
-		MaxBatchSize:                        32,
-		SignificantSigningThresholdFraction: 0.55,
-		NumConcurrentRequests:               600,
-		NodeClientCacheSize:                 400,
-		MaxDispersalAge:                     45 * time.Second,
-		MaxDispersalFutureAge:               45 * time.Second,
-		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
-		SigningRateBucketSpan:               10 * time.Minute,
-		BlobDispersalQueueSize:              1024,
-		BlobDispersalRequestBatchSize:       32,
-		BlobDispersalRequestBackoffPeriod:   50 * time.Millisecond,
-		SigningRateFlushPeriod:              1 * time.Minute,
+		Log:                                    *config.DefaultSimpleLoggerConfig(),
+		PullInterval:                           1 * time.Second,
+		FinalizationBlockDelay:                 75,
+		AttestationTimeout:                     45 * time.Second,
+		BatchMetadataUpdatePeriod:              time.Minute,
+		BatchAttestationTimeout:                55 * time.Second,
+		SignatureTickInterval:                  50 * time.Millisecond,
+		MaxBatchSize:                           32,
+		SignificantSigningThresholdFraction:    0.55,
+		NumConcurrentRequests:                  600,
+		NodeClientCacheSize:                    400,
+		MaxDispersalAge:                        45 * time.Second,
+		MaxDispersalFutureAge:                  45 * time.Second,
+		SigningRateRetentionPeriod:             14 * 24 * time.Hour, // 2 weeks
+		SigningRateBucketSpan:                  10 * time.Minute,
+		BlobDispersalQueueSize:                 1024,
+		BlobDispersalRequestBatchSize:          32,
+		BlobDispersalRequestBackoffPeriod:      50 * time.Millisecond,
+		SigningRateFlushPeriod:                 1 * time.Minute,
+		CollectDetailedValidatorSigningMetrics: true,
+		EnablePerAccountBlobStatusMetrics:      true,
 	}
 }
 

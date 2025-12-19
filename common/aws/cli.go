@@ -21,22 +21,18 @@ var (
 
 type ClientConfig struct {
 	// Region is the region to use when interacting with S3. Default is "us-east-2".
-	Region string
+	Region string `docs:"required"`
 	// AccessKey to use when interacting with S3.
-	AccessKey string
+	AccessKey string `docs:"required"`
 	// SecretAccessKey to use when interacting with S3.
-	SecretAccessKey string
+	SecretAccessKey string `docs:"required"` // TODO (cody.littley): Change to *secret.Secret
 	// EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used.
 	EndpointURL string
 
-	// FragmentParallelismFactor helps determine the size of the pool of workers to help upload/download files.
-	// A non-zero value for this parameter adds a number of workers equal to the number of cores times this value.
-	// Default is 8. In general, the number of workers here can be a lot larger than the number of cores because the
-	// workers will be blocked on I/O most of the time.
-	FragmentParallelismFactor int
-	// FragmentParallelismConstant helps determine the size of the pool of workers to help upload/download files.
-	// A non-zero value for this parameter adds a constant number of workers. Default is 0.
-	FragmentParallelismConstant int
+	// This is a deprecated setting and can be ignored.
+	FragmentParallelismFactor int // TODO (cody.littley): Remove
+	// This is a deprecated setting and can be ignored.
+	FragmentParallelismConstant int // TODO (cody.littley): Remove
 }
 
 func ClientFlags(envPrefix string, flagPrefix string) []cli.Flag {

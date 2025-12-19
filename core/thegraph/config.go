@@ -15,7 +15,7 @@ const (
 
 type Config struct {
 	// The Graph endpoint
-	Endpoint string
+	Endpoint string `docs:"required"`
 	// The interval to pull data from The Graph
 	PullInterval time.Duration
 	// The maximum number of retries to pull data from The Graph
