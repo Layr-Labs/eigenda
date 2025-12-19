@@ -299,6 +299,37 @@ func TestNilPubkeyG1Handling(t *testing.T) {
 	t.Log("Test passed: nil PubkeyG1 handling prevented crash")
 }
 
+// TestNilAggKeyHandling tests that ReceiveSignatures returns an error when aggregate public keys
+// are nil. This simulates the scenario where TheGraph API fails to return aggregate
+// public keys for a quorum (e.g., due to network issues or missing data).
+func TestNilAggKeyHandling(t *testing.T) {
+	ctx := t.Context()
+
+	state := dat.GetTotalOperatorStateWithQuorums(ctx, 0, []core.QuorumID{0, 1})
+
+	// Simulate TheGraph API failure by setting AggKeys to nil for quorum 0
+	state.IndexedOperatorState.AggKeys[0] = nil
+
+	update := make(chan core.SigningMessage)
+	message := [32]byte{1, 2, 3, 4, 5, 6}
+
+	// Have all operators sign successfully
+	go simulateOperators(*state, message, update, 0)
+
+	// This should return an error for nil AggKeys
+	aq, err := agg.ReceiveSignatures(
+		ctx,
+		ctx,
+		state.IndexedOperatorState,
+		message,
+		update)
+
+	// The function should return an error indicating the missing aggregate key
+	assert.Error(t, err)
+	assert.Nil(t, aq)
+	assert.Contains(t, err.Error(), "no aggregate public key found for quorum 0")
+}
+
 func TestFilterQuorums(t *testing.T) {
 	allQuorums := []core.QuorumID{0, 1}
 	state := dat.GetTotalOperatorStateWithQuorums(context.Background(), 0, allQuorums)
