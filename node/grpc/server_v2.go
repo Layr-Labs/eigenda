@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"net"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -22,6 +23,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
+	"github.com/Layr-Labs/eigenda/node/grpc/middleware"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/mem"
@@ -47,6 +49,8 @@ type ServerV2 struct {
 	// Pre-created listeners for the gRPC servers
 	dispersalListener net.Listener
 	retrievalListener net.Listener
+
+	blacklist *middleware.DisperserBlacklist
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -101,6 +105,7 @@ func NewServerV2(
 		softwareVersion:    softwareVersion,
 		dispersalListener:  dispersalListener,
 		retrievalListener:  retrievalListener,
+		blacklist:          middleware.NewDisperserBlacklist(logger, config.DisperserBlacklistForgivenessWindow),
 	}, nil
 }
 
@@ -183,10 +188,25 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	_, err = s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
-	if err != nil {
-		//nolint:wrapcheck
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
+	now := time.Now()
+	if authenticatedID, ok := middleware.AuthenticatedDisperserIDFromContext(ctx); ok {
+		// Defensive check: the interceptor should only set an ID that matches the request.
+		if authenticatedID != in.GetDisperserID() {
+			//nolint:wrapcheck
+			return nil, api.NewErrorInvalidArg("authenticated disperser ID does not match request disperser ID")
+		}
+	} else {
+		_, err = s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, now)
+		if err != nil {
+			//nolint:wrapcheck
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
+		}
+
+		if s.blacklist != nil && s.blacklist.IsBlacklisted(in.GetDisperserID(), now) {
+			//nolint:wrapcheck
+			return nil, api.NewErrorPermissionDenied(
+				fmt.Sprintf("disperser %d is temporarily blacklisted", in.GetDisperserID()))
+		}
 	}
 
 	if !s.chunkAuthenticator.IsDisperserAuthorized(in.GetDisperserID(), batch) {
@@ -195,8 +215,22 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
 	}
 
+	for _, blobCert := range batch.BlobCertificates {
+		_, err = s.validateDispersalRequest(blobCert)
+		if err != nil {
+			if s.blacklist != nil {
+				s.blacklist.Blacklist(in.GetDisperserID(), now, fmt.Sprintf("invalid dispersal request: %v", err))
+			}
+			//nolint:wrapcheck
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
+		}
+	}
+
 	blobHeadersAndTimestamps, err := hashing.HashBlobHeadersAndTimestamps(in)
 	if err != nil {
+		if s.blacklist != nil {
+			s.blacklist.Blacklist(in.GetDisperserID(), now, fmt.Sprintf("malformed blob headers: %v", err))
+		}
 		//nolint:wrapcheck
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers and timestamps: %v", err))
 	}
@@ -204,16 +238,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	for i, blobHeader := range blobHeadersAndTimestamps {
 		err = s.replayGuardian.VerifyRequest(blobHeader.Hash, blobHeader.Timestamp)
 		if err != nil {
-			//nolint:wrapcheck
+			// nolint:wrapcheck
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify blob header hash at index %d: %v", i, err))
-		}
-	}
-
-	for _, blobCert := range batch.BlobCertificates {
-		_, err = s.validateDispersalRequest(blobCert)
-		if err != nil {
-			//nolint:wrapcheck
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 		}
 	}
 
@@ -233,6 +259,11 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	// retried dispersals) then the accounting logic here would need to be revisited, and made retry tolerant.
 	err = s.node.ValidateReservationPayment(ctx, batch, probe)
 	if err != nil {
+		if strings.Contains(err.Error(), "insufficient bandwidth") {
+			if s.blacklist != nil {
+				s.blacklist.Blacklist(in.GetDisperserID(), now, fmt.Sprintf("reservation exceeded: %v", err))
+			}
+		}
 		return nil, fmt.Errorf("validate reservation payment: %w", err)
 	}
 
