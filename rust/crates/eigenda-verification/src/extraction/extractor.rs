@@ -746,6 +746,12 @@ impl DataDecoder for CertVerifiersExtractor<'_> {
     ) -> Result<Self::Output, CertExtractionError> {
         let mut out: HashMap<u32, Address> = HashMap::new();
 
+        if self.abns.len() != self.storage_keys().len() {
+            return Err(CertExtractionError::LengthMismatch {
+                abns: self.abns.len(),
+                storage_keys: self.storage_keys().len(),
+            });
+        }
         for (&abn, storage_key) in self.abns.iter().zip(self.storage_keys().iter()) {
             let proof =
                 decode_helpers::find_required_proof(storage_proofs, storage_key, "certVerifiers")?;

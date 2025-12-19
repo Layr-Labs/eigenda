@@ -49,6 +49,17 @@ pub enum CertExtractionError {
     #[error("Unexpected ethereum bytes long form")]
     UnexpectedEthereumBytesLongForm,
 
+    /// Length mismatch between ABNs and storage keys when extracting cert verifiers
+    #[error(
+        "Length mismatch: ABNs length {abns} does not match storage keys length {storage_keys}"
+    )]
+    LengthMismatch {
+        /// Length of the ABNs slice
+        abns: usize,
+        /// Length of the storage keys slice
+        storage_keys: usize,
+    },
+
     /// certVerifierABNs in the router should always be strictly increasing.
     /// See https://github.com/Layr-Labs/eigenda/blob/86fa3b3ee2a52ec7865804766506f6c6be53962b/contracts/src/integrations/cert/router/EigenDACertVerifierRouter.sol#L13
     #[error("ABNs extracted from Router are not strictly increasing: {0:?}")]
