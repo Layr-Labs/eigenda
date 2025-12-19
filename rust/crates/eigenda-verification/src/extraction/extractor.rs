@@ -1,5 +1,5 @@
 use alloy_primitives::aliases::{U96, U192};
-use alloy_primitives::{Address, B256, Bytes, StorageKey, U256};
+use alloy_primitives::{Address, B256, Bytes, StorageKey, U32, U256};
 use hashbrown::HashMap;
 use reth_trie_common::StorageProof;
 pub use stale_stakes_forbidden::*;
@@ -653,12 +653,7 @@ impl StorageKeyProvider for CertVerifierABNsExtractor {
     fn storage_keys(&self) -> Vec<StorageKey> {
         // abns are u32s, so 8 abns are packed per storage slot (32 bytes)
         let num_keys = self.num_abns.div_ceil(8);
-        let keys: Vec<_> = (0..num_keys)
-            .map(|i| {
-                storage_key_helpers::dynamic_array_key(CERT_VERIFIER_ABNS_ARRAY_SLOT, i as u32)
-            })
-            .collect();
-        keys
+        storage_key_helpers::dynamic_array_keys(CERT_VERIFIER_ABNS_ARRAY_SLOT, num_keys, U32::BITS)
     }
 }
 

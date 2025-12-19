@@ -16,7 +16,7 @@ use eigenda_proxy::{EigenDaProxyConfig, ProxyClient};
 use eigenda_verification::verification::verify_and_extract_payload;
 
 #[tokio::test]
-#[ignore = "Test that runs against sepolia network"]
+// #[ignore = "Test that runs against sepolia network"]
 async fn post_payload_and_verify_returned_cert_sepolia() {
     common::tracing::init_tracing();
 

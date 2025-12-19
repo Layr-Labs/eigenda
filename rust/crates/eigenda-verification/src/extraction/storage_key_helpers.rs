@@ -48,26 +48,37 @@ pub fn mapping_key(key: U256, slot: u64) -> StorageKey {
     keccak256((key, slot).abi_encode())
 }
 
-/// Generate storage key for a dynamic array element
+/// Generate all storage keys for a dynamic array of a given length and type size
 ///
 /// Implements the Ethereum dynamic array storage rule:
-/// `storage_key = keccak256(slot) + index`
+/// `storage_key = keccak256(slot) + floor(index / floor(256/type_size_bits))`
 ///
-/// SAFETY CAVEAT: This function assumes that the values in the array have size >= 16 bytes.
-/// Smaller values get packed into 32 byte slots, and hence the indexing would be different.
+/// Note that dynamic arrays are packed when possible (if type_size_bits <= 128).
+/// For more details, see
+/// https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html#mappings-and-dynamic-arrays
 ///
-/// The base slot for the array data is `keccak256(slot)`, and each element is stored sequentially.
+///
+/// For example, a uint128[] containing [1,2,3] would be packed into 2 storage slots:
+/// - Slot keccak256(slot)     = 0x000000...00000002_000000000...0000001
+/// - Slot keccak256(slot) + 1 = 0x000000...0000000_000000000...0000003
+/// Note that the values packed in a given slot are placed in reverse order!
+///
+/// # Safety Caveat
+/// This function only works for simple types. It won't work for nested arrays, such as uint256[][].
 ///
 /// # Arguments
 /// * `slot` - The storage slot of the dynamic array variable
-/// * `index` - The array index to access
+/// * `len` - The array length
+/// * `type_size_bits` - The size of the array element type in bits
 ///
 /// # Returns
-/// Storage key for the array element
-pub fn dynamic_array_key(slot: u64, index: u32) -> StorageKey {
+/// Storage keys for the array elements
+pub fn dynamic_array_keys(slot: u64, len: usize, type_size_bits: usize) -> Vec<StorageKey> {
     let slot = U256::from(slot);
-    let data_base: U256 = keccak256(slot.abi_encode()).into();
-    (data_base + U256::from(index)).into()
+    let data_base_slot: U256 = keccak256(slot.abi_encode()).into();
+    (0..=(len / (256 / type_size_bits)))
+        .map(|i| (data_base_slot + U256::from(i)).into())
+        .collect()
 }
 
 /// Generate storage key for mapping with dynamic array element value
@@ -77,6 +88,7 @@ pub fn dynamic_array_key(slot: u64, index: u32) -> StorageKey {
 ///
 /// SAFETY CAVEAT: This function assumes that the values in the array have size >= 16 bytes.
 /// Smaller values get packed into 32 byte slots, and hence the indexing would be different.
+/// See [dynamic_array_keys] for an example of packed arrays.
 ///
 /// The first keccak256 gives the array length location, the second gives
 /// the data start location, then we add the index.
@@ -102,6 +114,7 @@ pub fn mapping_to_dynamic_array_key(key: U256, slot: u64, index: u32) -> Storage
 ///
 /// SAFETY CAVEAT: This function assumes that the values in the array have size >= 16 bytes.
 /// Smaller values get packed into 32 byte slots, and hence the indexing would be different.
+/// See [dynamic_array_keys] for an example of packed arrays.
 ///
 /// This handles structures like `mapping(address => mapping(uint256 => SomeStruct[]))`
 ///
@@ -149,10 +162,43 @@ mod tests {
     }
 
     #[test]
-    fn dynamic_array_key_test() {
-        let result = dynamic_array_key(7, 3);
-        let value = hex!("0xa66cc928b5edb82af9bd49922954155ab7b0942694bea4ce44661d9a8736c68b");
-        let expected = StorageKey::from(value);
+    fn dynamic_array_keys_not_packed_test() {
+        let result = dynamic_array_keys(7, 2, 256);
+
+        let expected: Vec<_> = vec![
+            hex!("0xa66cc928b5edb82af9bd49922954155ab7b0942694bea4ce44661d9a8736c688"), // cast keccak $(cast abi-encode "x(uint256)" 7)
+            hex!("0xa66cc928b5edb82af9bd49922954155ab7b0942694bea4ce44661d9a8736c689"),
+        ]
+        .iter()
+        .map(|h| StorageKey::from(h))
+        .collect();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn dynamic_array_keys_packed_test() {
+        let result = dynamic_array_keys(10, 3, 32);
+
+        let expected: Vec<_> = vec![
+            hex!("0xc65a7bb8d6351c1cf70c95a316cc6a92839c986682d98bc35f958f4883f9d2a8"), // cast keccak $(cast abi-encode "x(uint256)" 10)
+        ]
+        .iter()
+        .map(|h| StorageKey::from(h))
+        .collect();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn dynamic_array_keys_also_packed_test() {
+        let result = dynamic_array_keys(10, 3, 128);
+
+        let expected: Vec<_> = vec![
+            hex!("0xc65a7bb8d6351c1cf70c95a316cc6a92839c986682d98bc35f958f4883f9d2a8"), // cast keccak $(cast abi-encode "x(uint256)" 10)
+            hex!("0xc65a7bb8d6351c1cf70c95a316cc6a92839c986682d98bc35f958f4883f9d2a9"),
+        ]
+        .iter()
+        .map(|h| StorageKey::from(h))
+        .collect();
         assert_eq!(result, expected);
     }
 
