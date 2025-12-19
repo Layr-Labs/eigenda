@@ -338,7 +338,7 @@ func RunController(cliCtx *cli.Context) error {
 	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
 		ctx,
 		logger,
-		config.PaymentAuthorization,
+		config.Payment,
 		contractDirectory,
 		gethClient,
 		dynamoClient.GetAwsClient(),

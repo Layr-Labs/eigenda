@@ -26,7 +26,7 @@ type PaymentAuthorizationConfig struct {
 	ReservationConfig reservationvalidation.ReservationLedgerCacheConfig
 	// If true, enable a metric per user account for payment validation and authorization.
 	// Resulting metric may potentially have high cardinality.
-	EnablePerAccountPaymentMetrics bool
+	PerAccountMetrics bool
 }
 
 // Verify validates the PaymentAuthorizationConfig
@@ -56,9 +56,9 @@ func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
 	}
 
 	return &PaymentAuthorizationConfig{
-		OnDemandConfig:                 onDemandConfig,
-		ReservationConfig:              reservationConfig,
-		EnablePerAccountPaymentMetrics: true,
+		OnDemandConfig:    onDemandConfig,
+		ReservationConfig: reservationConfig,
+		PerAccountMetrics: true,
 	}
 }
 
@@ -112,7 +112,7 @@ func BuildPaymentAuthorizationHandler(
 			metricsRegistry,
 			"eigenda_controller",
 			"authorize_payments",
-			config.EnablePerAccountPaymentMetrics,
+			config.PerAccountMetrics,
 			userAccountRemapping,
 		)
 		onDemandCacheMetrics = ondemandvalidation.NewOnDemandCacheMetrics(
@@ -143,7 +143,7 @@ func BuildPaymentAuthorizationHandler(
 			metricsRegistry,
 			"eigenda_controller",
 			"authorize_payments",
-			config.EnablePerAccountPaymentMetrics,
+			config.PerAccountMetrics,
 			userAccountRemapping,
 		)
 		reservationCacheMetrics = reservationvalidation.NewReservationCacheMetrics(

@@ -77,9 +77,9 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 	}
 
 	paymentAuthorizationConfig := controller.PaymentAuthorizationConfig{
-		OnDemandConfig:                 onDemandConfig,
-		ReservationConfig:              reservationConfig,
-		EnablePerAccountPaymentMetrics: ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
+		OnDemandConfig:    onDemandConfig,
+		ReservationConfig: reservationConfig,
+		PerAccountMetrics: ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
 	}
 
 	heartbeatMonitorConfig := healthcheck.HeartbeatMonitorConfig{
@@ -106,17 +106,17 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 			Endpoint:   awsClientConfig.EndpointURL,
 		},
 		EncodingManager: controller.EncodingManagerConfig{
-			PullInterval:                      ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
-			EncodingRequestTimeout:            ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
-			StoreTimeout:                      ctx.GlobalDuration(flags.EncodingStoreTimeoutFlag.Name),
-			NumEncodingRetries:                ctx.GlobalInt(flags.NumEncodingRetriesFlag.Name),
-			NumRelayAssignment:                uint16(numRelayAssignments),
-			AvailableRelays:                   relays,
-			EncoderAddress:                    ctx.GlobalString(flags.EncoderAddressFlag.Name),
-			MaxNumBlobsPerIteration:           int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
-			OnchainStateRefreshInterval:       ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
-			NumConcurrentRequests:             ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-			EnablePerAccountBlobStatusMetrics: ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
+			PullInterval:                ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
+			EncodingRequestTimeout:      ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
+			StoreTimeout:                ctx.GlobalDuration(flags.EncodingStoreTimeoutFlag.Name),
+			NumEncodingRetries:          ctx.GlobalInt(flags.NumEncodingRetriesFlag.Name),
+			NumRelayAssignment:          uint16(numRelayAssignments),
+			AvailableRelays:             relays,
+			EncoderAddress:              ctx.GlobalString(flags.EncoderAddressFlag.Name),
+			MaxNumBlobsPerIteration:     int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
+			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
+			PerAccountMetrics:           ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
 		},
 		PullInterval:                           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
 		FinalizationBlockDelay:                 ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
@@ -147,7 +147,7 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 		ControllerReadinessProbePath:           ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
 		Server:                                 grpcServerConfig,
 		HeartbeatMonitor:                       heartbeatMonitorConfig,
-		PaymentAuthorization:                   paymentAuthorizationConfig,
+		Payment:                                paymentAuthorizationConfig,
 		UserAccountRemappingFilePath:           ctx.GlobalString(flags.UserAccountRemappingFileFlag.Name),
 		ValidatorIdRemappingFilePath:           ctx.GlobalString(flags.ValidatorIdRemappingFileFlag.Name),
 	}

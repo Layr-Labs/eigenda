@@ -912,7 +912,7 @@ func startController(
 	paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
 	paymentAuthConfig.OnDemandConfig.MaxLedgers = 1000
 	paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
-	dispatcherConfig.PaymentAuthorization = *paymentAuthConfig
+	dispatcherConfig.Payment = *paymentAuthConfig
 
 	// Create controller
 	dispatcher, err := controller.NewController(

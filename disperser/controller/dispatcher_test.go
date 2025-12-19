@@ -454,8 +454,8 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 	controllerConfig.EncodingManager = *controller.DefaultEncodingManagerConfig()
 	controllerConfig.EncodingManager.AvailableRelays = []corev2.RelayKey{0}
 	controllerConfig.EncodingManager.EncoderAddress = "placeholder"
-	controllerConfig.PaymentAuthorization = *controller.DefaultPaymentAuthorizationConfig()
-	controllerConfig.PaymentAuthorization.OnDemandConfig.OnDemandTableName = "on-demand-payments"
+	controllerConfig.Payment = *controller.DefaultPaymentAuthorizationConfig()
+	controllerConfig.Payment.OnDemandConfig.OnDemandTableName = "on-demand-payments"
 
 	d, err := controller.NewController(
 		t.Context(),

@@ -70,22 +70,22 @@ type EncodingManagerConfig struct {
 	// NOTE: No matter the value of this field, accounts that DO have a human-friendly name remapping will be reported
 	// as their remapped name in metrics. If you must reduce metric cardinality by reporting ALL accounts as "0x0",
 	// you shouldn't define any human-friendly name remappings.
-	EnablePerAccountBlobStatusMetrics bool
+	PerAccountMetrics bool
 }
 
 var _ config.VerifiableConfig = &EncodingManagerConfig{}
 
 func DefaultEncodingManagerConfig() *EncodingManagerConfig {
 	return &EncodingManagerConfig{
-		PullInterval:                      2 * time.Second,
-		EncodingRequestTimeout:            5 * time.Minute,
-		StoreTimeout:                      15 * time.Second,
-		NumEncodingRetries:                3,
-		MaxNumBlobsPerIteration:           128,
-		OnchainStateRefreshInterval:       1 * time.Hour,
-		NumConcurrentRequests:             250,
-		NumRelayAssignment:                1,
-		EnablePerAccountBlobStatusMetrics: true,
+		PullInterval:                2 * time.Second,
+		EncodingRequestTimeout:      5 * time.Minute,
+		StoreTimeout:                15 * time.Second,
+		NumEncodingRetries:          3,
+		MaxNumBlobsPerIteration:     128,
+		OnchainStateRefreshInterval: 1 * time.Hour,
+		NumConcurrentRequests:       250,
+		NumRelayAssignment:          1,
+		PerAccountMetrics:           true,
 	}
 }
 
@@ -193,7 +193,7 @@ func NewEncodingManager(
 		logger:                logger.With("component", "EncodingManager"),
 		cursor:                nil,
 		metrics: newEncodingManagerMetrics(
-			registry, config.EnablePerAccountBlobStatusMetrics, userAccountRemapping),
+			registry, config.PerAccountMetrics, userAccountRemapping),
 		controllerLivenessChan: controllerLivenessChan,
 		replayGuardian:         replayGuardian,
 		controllerMetrics:      controllerMetrics,

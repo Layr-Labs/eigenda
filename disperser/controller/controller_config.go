@@ -176,7 +176,7 @@ type ControllerConfig struct {
 	HeartbeatMonitor healthcheck.HeartbeatMonitorConfig
 
 	// Configures the payment authorization system.
-	PaymentAuthorization PaymentAuthorizationConfig
+	Payment PaymentAuthorizationConfig
 }
 
 var _ config.VerifiableConfig = &ControllerConfig{}
@@ -275,7 +275,7 @@ func (c *ControllerConfig) Verify() error {
 	if err := c.EncodingManager.Verify(); err != nil {
 		return fmt.Errorf("invalid encoding manager config: %w", err)
 	}
-	if err := c.PaymentAuthorization.Verify(); err != nil {
+	if err := c.Payment.Verify(); err != nil {
 		return fmt.Errorf("invalid payment authorization config: %w", err)
 	}
 	if err := c.Log.Verify(); err != nil {
