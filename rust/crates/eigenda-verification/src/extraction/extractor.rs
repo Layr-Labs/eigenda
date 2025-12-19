@@ -749,8 +749,8 @@ impl DataDecoder for CertVerifiersExtractor<'_> {
         for (&abn, storage_key) in self.abns.iter().zip(self.storage_keys().iter()) {
             let proof =
                 decode_helpers::find_required_proof(storage_proofs, storage_key, "certVerifiers")?;
-            let address_bytes = proof.value.to_be_bytes::<32>();
-            let address: Address = Address::from_slice(&address_bytes[12..32]);
+            let address_word = proof.value.to_be_bytes::<32>();
+            let address: Address = Address::from_word(address_word.into());
 
             out.insert(abn, address);
         }
