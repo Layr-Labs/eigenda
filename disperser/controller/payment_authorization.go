@@ -21,9 +21,9 @@ import (
 // PaymentAuthorizationConfig contains configuration for building a payment authorization handler
 type PaymentAuthorizationConfig struct {
 	// Connfiguration for on-demand payment validation.
-	OnDemandConfig ondemandvalidation.OnDemandLedgerCacheConfig
+	OnDemand ondemandvalidation.OnDemandLedgerCacheConfig
 	// Configuration for reservation payment validation.
-	ReservationConfig reservationvalidation.ReservationLedgerCacheConfig
+	Reservation reservationvalidation.ReservationLedgerCacheConfig
 	// If true, enable a metric per user account for payment validation and authorization.
 	// Resulting metric may potentially have high cardinality.
 	PerAccountMetrics bool
@@ -31,10 +31,10 @@ type PaymentAuthorizationConfig struct {
 
 // Verify validates the PaymentAuthorizationConfig
 func (c *PaymentAuthorizationConfig) Verify() error {
-	if err := c.OnDemandConfig.Verify(); err != nil {
+	if err := c.OnDemand.Verify(); err != nil {
 		return fmt.Errorf("on-demand config: %w", err)
 	}
-	if err := c.ReservationConfig.Verify(); err != nil {
+	if err := c.Reservation.Verify(); err != nil {
 		return fmt.Errorf("reservation config: %w", err)
 	}
 	return nil
@@ -56,8 +56,8 @@ func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
 	}
 
 	return &PaymentAuthorizationConfig{
-		OnDemandConfig:    onDemandConfig,
-		ReservationConfig: reservationConfig,
+		OnDemand:          onDemandConfig,
+		Reservation:       reservationConfig,
 		PerAccountMetrics: true,
 	}
 }
@@ -125,7 +125,7 @@ func BuildPaymentAuthorizationHandler(
 	onDemandValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
 		ctx,
 		logger,
-		config.OnDemandConfig,
+		config.OnDemand,
 		paymentVault,
 		awsDynamoClient,
 		onDemandValidatorMetrics,
@@ -156,7 +156,7 @@ func BuildPaymentAuthorizationHandler(
 	reservationValidator, err := reservationvalidation.NewReservationPaymentValidator(
 		ctx,
 		logger,
-		config.ReservationConfig,
+		config.Reservation,
 		paymentVault,
 		time.Now,
 		reservationValidatorMetrics,

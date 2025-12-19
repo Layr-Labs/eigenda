@@ -152,7 +152,7 @@ type ControllerConfig struct {
 	Server common.GRPCServerConfig
 
 	// Configures the encoding manager (i.e. the interface used to send work to encoders).
-	EncodingManager EncodingManagerConfig
+	Encoder EncodingManagerConfig
 
 	// Configures the indexer.
 	Indexer indexer.Config
@@ -272,7 +272,7 @@ func (c *ControllerConfig) Verify() error {
 	if err := c.DispersalRequestSigner.Verify(); err != nil {
 		return fmt.Errorf("invalid dispersal request signer config: %w", err)
 	}
-	if err := c.EncodingManager.Verify(); err != nil {
+	if err := c.Encoder.Verify(); err != nil {
 		return fmt.Errorf("invalid encoding manager config: %w", err)
 	}
 	if err := c.Payment.Verify(); err != nil {

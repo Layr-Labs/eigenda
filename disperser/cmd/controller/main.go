@@ -184,13 +184,13 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
-	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManager.EncoderAddress)
+	encoderClient, err := encoder.NewEncoderClientV2(config.Encoder.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
-	encodingPool := workerpool.New(config.EncodingManager.NumConcurrentRequests)
+	encodingPool := workerpool.New(config.Encoder.NumConcurrentRequests)
 	encodingManager, err := controller.NewEncodingManager(
-		&config.EncodingManager,
+		&config.Encoder,
 		time.Now,
 		blobMetadataStore,
 		encodingPool,

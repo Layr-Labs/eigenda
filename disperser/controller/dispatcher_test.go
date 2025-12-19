@@ -451,11 +451,11 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 	controllerConfig.SigningRateBucketSpan = 30 * time.Second
 	controllerConfig.SigningRateDynamoDbTableName = "validator-signing-rates"
 	controllerConfig.DispersalRequestSigner.PrivateKey = "this is just a placeholder"
-	controllerConfig.EncodingManager = *controller.DefaultEncodingManagerConfig()
-	controllerConfig.EncodingManager.AvailableRelays = []corev2.RelayKey{0}
-	controllerConfig.EncodingManager.EncoderAddress = "placeholder"
+	controllerConfig.Encoder = *controller.DefaultEncodingManagerConfig()
+	controllerConfig.Encoder.AvailableRelays = []corev2.RelayKey{0}
+	controllerConfig.Encoder.EncoderAddress = "placeholder"
 	controllerConfig.Payment = *controller.DefaultPaymentAuthorizationConfig()
-	controllerConfig.Payment.OnDemandConfig.OnDemandTableName = "on-demand-payments"
+	controllerConfig.Payment.OnDemand.OnDemandTableName = "on-demand-payments"
 
 	d, err := controller.NewController(
 		t.Context(),

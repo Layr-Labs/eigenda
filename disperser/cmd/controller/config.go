@@ -77,8 +77,8 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 	}
 
 	paymentAuthorizationConfig := controller.PaymentAuthorizationConfig{
-		OnDemandConfig:    onDemandConfig,
-		ReservationConfig: reservationConfig,
+		OnDemand:          onDemandConfig,
+		Reservation:       reservationConfig,
 		PerAccountMetrics: ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
 	}
 
@@ -105,18 +105,18 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 			Region:     awsClientConfig.Region,
 			Endpoint:   awsClientConfig.EndpointURL,
 		},
-		EncodingManager: controller.EncodingManagerConfig{
-			PullInterval:                ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
-			EncodingRequestTimeout:      ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
-			StoreTimeout:                ctx.GlobalDuration(flags.EncodingStoreTimeoutFlag.Name),
-			NumEncodingRetries:          ctx.GlobalInt(flags.NumEncodingRetriesFlag.Name),
-			NumRelayAssignment:          uint16(numRelayAssignments),
-			AvailableRelays:             relays,
-			EncoderAddress:              ctx.GlobalString(flags.EncoderAddressFlag.Name),
-			MaxNumBlobsPerIteration:     int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
-			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
-			NumConcurrentRequests:       ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-			PerAccountMetrics:           ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
+		Encoder: controller.EncodingManagerConfig{
+			PullInterval:            ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
+			EncodingRequestTimeout:  ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),
+			StoreTimeout:            ctx.GlobalDuration(flags.EncodingStoreTimeoutFlag.Name),
+			NumEncodingRetries:      ctx.GlobalInt(flags.NumEncodingRetriesFlag.Name),
+			NumRelayAssignment:      uint16(numRelayAssignments),
+			AvailableRelays:         relays,
+			EncoderAddress:          ctx.GlobalString(flags.EncoderAddressFlag.Name),
+			MaxNumBlobsPerIteration: int32(ctx.GlobalInt(flags.MaxNumBlobsPerIterationFlag.Name)),
+			StateRefreshInterval:    ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+			NumConcurrentRequests:   ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
+			PerAccountMetrics:       ctx.GlobalBool(flags.EnablePerAccountBlobStatusMetricsFlag.Name),
 		},
 		PullInterval:                           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
 		FinalizationBlockDelay:                 ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),

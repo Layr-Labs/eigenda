@@ -56,9 +56,9 @@ type EncodingManagerConfig struct {
 	// MaxNumBlobsPerIteration is the maximum number of blobs to pull and encode in each iteration.
 	// Must be at least 1.
 	MaxNumBlobsPerIteration int32
-	// OnchainStateRefreshInterval is how frequently the manager refreshes blob version parameters from the chain.
+	// StateRefreshInterval is how frequently the manager refreshes blob version parameters from the chain.
 	// Must be positive.
-	OnchainStateRefreshInterval time.Duration
+	StateRefreshInterval time.Duration
 	// NumConcurrentRequests is the size of the worker pool for processing encoding requests concurrently.
 	// Must be at least 1.
 	NumConcurrentRequests int
@@ -77,15 +77,15 @@ var _ config.VerifiableConfig = &EncodingManagerConfig{}
 
 func DefaultEncodingManagerConfig() *EncodingManagerConfig {
 	return &EncodingManagerConfig{
-		PullInterval:                2 * time.Second,
-		EncodingRequestTimeout:      5 * time.Minute,
-		StoreTimeout:                15 * time.Second,
-		NumEncodingRetries:          3,
-		MaxNumBlobsPerIteration:     128,
-		OnchainStateRefreshInterval: 1 * time.Hour,
-		NumConcurrentRequests:       250,
-		NumRelayAssignment:          1,
-		PerAccountMetrics:           true,
+		PullInterval:            2 * time.Second,
+		EncodingRequestTimeout:  5 * time.Minute,
+		StoreTimeout:            15 * time.Second,
+		NumEncodingRetries:      3,
+		MaxNumBlobsPerIteration: 128,
+		StateRefreshInterval:    1 * time.Hour,
+		NumConcurrentRequests:   250,
+		NumRelayAssignment:      1,
+		PerAccountMetrics:       true,
 	}
 }
 
@@ -116,8 +116,8 @@ func (c *EncodingManagerConfig) Verify() error {
 	if c.MaxNumBlobsPerIteration < 1 {
 		return fmt.Errorf("MaxNumBlobsPerIteration must be at least 1, got %d", c.MaxNumBlobsPerIteration)
 	}
-	if c.OnchainStateRefreshInterval <= 0 {
-		return fmt.Errorf("OnchainStateRefreshInterval must be positive, got %v", c.OnchainStateRefreshInterval)
+	if c.StateRefreshInterval <= 0 {
+		return fmt.Errorf("OnchainStateRefreshInterval must be positive, got %v", c.StateRefreshInterval)
 	}
 	if c.NumConcurrentRequests < 1 {
 		return fmt.Errorf("NumConcurrentRequests must be at least 1, got %d", c.NumConcurrentRequests)
@@ -208,7 +208,7 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		ticker := time.NewTicker(e.OnchainStateRefreshInterval)
+		ticker := time.NewTicker(e.StateRefreshInterval)
 		defer ticker.Stop()
 
 		for {
