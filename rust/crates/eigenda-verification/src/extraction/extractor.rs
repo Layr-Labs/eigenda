@@ -660,12 +660,19 @@ impl StorageKeyProvider for CertVerifierABNsExtractor {
 impl DataDecoder for CertVerifierABNsExtractor {
     type Output = Vec<u32>;
 
+    /// Decode the certificate verifier ABNs from storage proofs
+    /// The ABNs are u32 values so are packed 8 per 32-byte storage slot.
+    /// For example, if certVerifierABNs contains [1,2,3,4,5,6,7,8,9], then the storage slots will be:
+    /// first slot : 0x|00000008|00000007|00000006|00000005|00000004|00000003|00000002|00000001
+    /// second slot: 0x|00000000|00000000|00000000|00000000|00000000|00000000|00000000|00000009
+    /// See https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html#mappings-and-dynamic-arrays
+    /// for more details on how dynamic arrays are stored in Solidity.
     #[instrument(skip_all, fields(component = std::any::type_name::<Self>().split("::").last().unwrap_or("Unknown")), ret)]
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
     ) -> Result<Self::Output, CertExtractionError> {
-        let mut out: Vec<u32> = Vec::with_capacity(self.num_abns);
+        let mut abns: Vec<u32> = Vec::with_capacity(self.num_abns);
 
         for storage_key in self.storage_keys().iter() {
             let proof = decode_helpers::find_required_proof(
@@ -673,26 +680,21 @@ impl DataDecoder for CertVerifierABNsExtractor {
                 storage_key,
                 "certVerifierABNs",
             )?;
-            for i in 0..8 {
-                if out.len() >= self.num_abns {
-                    break;
-                }
-                let start = 32 - (i + 1) * 4;
-                let end = start + 4;
-                let abn_bytes: [u8; 4] = proof.value.to_be_bytes::<32>()[start..end]
-                    .try_into()
-                    .unwrap();
-                let abn = u32::from_be_bytes(abn_bytes);
-                out.push(abn);
-            }
+            let slot_bytes = proof.value.to_be_bytes::<32>();
+            let abns_iter = slot_bytes
+                .chunks_exact(4) // chunk up into 4-byte segments (u32)
+                .rev() // reverse because Solidity packs array elements right-to-left in each slot
+                .map(|abn_bytes| u32::from_be_bytes(abn_bytes.try_into().unwrap()));
+            abns.extend(abns_iter);
         }
-        if !out.windows(2).all(|w| w[0] < w[1]) {
+        abns.truncate(self.num_abns);
+        if !abns.windows(2).all(|abn_pair| abn_pair[0] < abn_pair[1]) {
             return Err(CertExtractionError::CertVerifierABNsNotStrictlyIncreasing(
-                out.clone(),
+                abns.clone(),
             ));
         }
 
-        Ok(out)
+        Ok(abns)
     }
 }
 
