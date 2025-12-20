@@ -392,12 +392,12 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 	}
-	DisperserBlacklistForgivenessWindowFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "disperser-blacklist-forgiveness-window"),
-		Usage:    "How long a disperser is temporarily blacklisted after sending an invalid StoreChunks request. If 0, blacklisting is disabled.",
+	DisperserBlacklistDurationFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-blacklist-duration"),
+		Usage:    "How long a disperser is temporarily blacklisted after sending too many invalid StoreChunks requests. If 0, blacklisting is disabled.",
 		Required: false,
 		Value:    10 * time.Minute,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_BLACKLIST_FORGIVENESS_WINDOW"),
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_BLACKLIST_DURATION"),
 	}
 	DisperserBlacklistStrikeWindowFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-blacklist-strike-window"),
@@ -738,7 +738,7 @@ var optionalFlags = []cli.Flag{
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
-	DisperserBlacklistForgivenessWindowFlag,
+	DisperserBlacklistDurationFlag,
 	DisperserBlacklistStrikeWindowFlag,
 	DisperserBlacklistMaxInvalidFlag,
 	LevelDBDisableSeeksCompactionV1Flag,

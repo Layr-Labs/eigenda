@@ -107,7 +107,7 @@ func NewServerV2(
 		retrievalListener:  retrievalListener,
 		blacklist: middleware.NewDisperserBlacklist(
 			logger,
-			config.DisperserBlacklistForgivenessWindow,
+			config.DisperserBlacklistDuration,
 			config.DisperserBlacklistStrikeWindow,
 			config.DisperserBlacklistMaxInvalid,
 		),

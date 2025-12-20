@@ -80,9 +80,9 @@ type Config struct {
 	DisableNodeInfoResources       bool
 	StoreChunksRequestMaxPastAge   time.Duration
 	StoreChunksRequestMaxFutureAge time.Duration
-	// Temporary blacklisting forgiveness window for dispersers that send invalid StoreChunks requests.
+	// Temporary blacklisting duration for dispersers that send invalid StoreChunks requests.
 	// If set to 0, blacklisting is disabled.
-	DisperserBlacklistForgivenessWindow time.Duration
+	DisperserBlacklistDuration time.Duration
 	// The time window in which invalid requests count toward blacklisting.
 	// Example: 2m means "3 invalids in 2 minutes => ban".
 	DisperserBlacklistStrikeWindow time.Duration
@@ -478,7 +478,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
-		DisperserBlacklistForgivenessWindow: ctx.GlobalDuration(flags.DisperserBlacklistForgivenessWindowFlag.Name),
+		DisperserBlacklistDuration:          ctx.GlobalDuration(flags.DisperserBlacklistDurationFlag.Name),
 		DisperserBlacklistStrikeWindow:      ctx.GlobalDuration(flags.DisperserBlacklistStrikeWindowFlag.Name),
 		DisperserBlacklistMaxInvalid:        ctx.GlobalInt(flags.DisperserBlacklistMaxInvalidFlag.Name),
 		LittDBWriteCacheSizeBytes: uint64(ctx.GlobalFloat64(

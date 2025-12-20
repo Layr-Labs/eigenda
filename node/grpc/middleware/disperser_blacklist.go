@@ -85,7 +85,7 @@ func (b *DisperserBlacklist) RecordInvalid(disperserID uint32, now time.Time, re
 			"disperserID", disperserID,
 			"strikeWindow", b.strikeWindow.String(),
 			"maxInvalid", b.maxInvalid,
-			"forgivenessWindow", b.ttl.String(),
+			"blacklistDuration", b.ttl.String(),
 			"reason", reason)
 	}
 }
@@ -132,7 +132,7 @@ func (b *DisperserBlacklist) Blacklist(disperserID uint32, now time.Time, reason
 	if b.logger != nil {
 		b.logger.Warn("blacklisting disperser for invalid request",
 			"disperserID", disperserID,
-			"forgivenessWindow", b.ttl.String(),
+			"blacklistDuration", b.ttl.String(),
 			"reason", reason)
 	}
 }
