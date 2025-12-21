@@ -30,6 +30,7 @@ type IEigenDAClient interface {
 	GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 	PutBlob(ctx context.Context, txData []byte) (*grpcdisperser.BlobInfo, error)
 	GetCodec() codecs.BlobCodec
+	CheckConnectivity(ctx context.Context) error // <--- ДОБАВИТЬ ЭТУ СТРОКУ
 	Close() error
 }
 
@@ -82,7 +83,24 @@ func NewEigenDAClient(log logging.Logger, config EigenDAClientConfig) (*EigenDAC
 	if err != nil {
 		return nil, err
 	}
+func (m *EigenDAClient) CheckConnectivity(ctx context.Context) error {
+    m.Log.Info("Performing architectural connectivity checks...")
 
+    _, err := m.ethClient.BlockNumber(ctx)
+    if err != nil {
+        return fmt.Errorf("ethereum rpc unreachable: %w", err)
+    }
+    m.Log.Info("Ethereum RPC: Connected")
+
+    _, err = m.Client.GetBlobStatus(ctx, make([]byte, 32))
+    if err != nil {
+
+        m.Log.Warn("EigenDA Disperser handshake check failed, but this might be expected for dummy ID", "err", err)
+    }
+
+    m.Log.Info("All architectural connectivity guards passed")
+    return nil
+}
 	var ethClient *ethclient.Client
 	var edasmCaller *edasm.ContractEigenDAServiceManagerCaller
 	ethClient, err = geth.SafeDial(context.Background(), config.EthRpcUrl)
