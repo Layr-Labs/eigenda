@@ -41,15 +41,6 @@ type ClientConfigV2 struct {
 	// EigenDADirectory address is used to get addresses for all EigenDA contracts needed.
 	EigenDADirectory string
 
-	// Allowed distance (in L1 blocks) between the eigenDA cert's reference block number (RBN)
-	// and the L1 block number at which the cert was included in the rollup's batch inbox.
-	// A cert is valid if cert.L1InclusionBlock <= cert.RBN + RBNRecencyWindowSize, otherwise it
-	// is considered stale and should be discarded from rollups' derivation pipelines.
-	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation
-	//
-	// This check is optional and will be skipped when RBNRecencyWindowSize is set to 0.
-	RBNRecencyWindowSize uint64
-
 	// The EigenDA network that is being used.
 	// It is optional, and when set will be used for validating that the eth-rpc chain ID matches the network.
 	EigenDANetwork EigenDANetwork
