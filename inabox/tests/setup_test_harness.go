@@ -171,7 +171,7 @@ func setupVerifiersForContext(testCtx *TestHarness, infra *InfrastructureHarness
 	staticAddressProviderV3 := verification.NewStaticCertVerifierAddressProvider(
 		gethcommon.HexToAddress(infra.TestConfig.EigenDA.CertVerifierLegacyV3))
 
-	testCtx.LegacyV3CertVerifier, err = verification.NewCertVerifier(
+	testCtx.StaticCertVerifierV3, err = verification.NewCertVerifier(
 		infra.Logger,
 		testCtx.EthClient,
 		staticAddressProviderV3)

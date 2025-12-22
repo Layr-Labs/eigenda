@@ -79,7 +79,7 @@ type TestHarness struct {
 	CertBuilder                     *clientsv2.CertBuilder
 	RouterCertVerifier              *verification.CertVerifier
 	StaticCertVerifier              *verification.CertVerifier
-	LegacyV3CertVerifier            *verification.CertVerifier
+	StaticCertVerifierV3            *verification.CertVerifier
 	EigenDACertVerifierRouter       *routerbindings.ContractEigenDACertVerifierRouterTransactor
 	EigenDACertVerifierRouterCaller *routerbindings.ContractEigenDACertVerifierRouterCaller
 	EigenDACertVerifierV1           *verifierv1bindings.ContractEigenDACertVerifierV1

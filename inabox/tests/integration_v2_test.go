@@ -173,7 +173,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 
 	// create a payload disperser client configured to use the legacy v3 cert verifier
 	pdConfig := integration.GetDefaultTestPayloadDisperserConfig()
-	pdConfig.CertVerifier = testHarness.LegacyV3CertVerifier
+	pdConfig.CertVerifier = testHarness.StaticCertVerifierV3
 
 	payloadDisperserLegacyV3, err := testHarness.CreatePayloadDisperser(ctx, globalInfra.Logger, pdConfig)
 	require.NoError(t, err)
@@ -187,7 +187,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert4)
 	require.NoError(t, err)
 
-	err = testHarness.LegacyV3CertVerifier.CheckDACert(ctx, cert4)
+	err = testHarness.StaticCertVerifierV3.CheckDACert(ctx, cert4)
 	require.NoError(t, err)
 
 	// now force verification to fail by modifying the cert contents
@@ -206,7 +206,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
 
-	err = testHarness.LegacyV3CertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+	err = testHarness.StaticCertVerifierV3.CheckDACert(ctx, eigenDAV3Cert4)
 	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
 	require.True(t, errors.As(err, &certErr))
 	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
@@ -252,7 +252,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.True(t, errors.As(err, &certErr))
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
 
-	err = testHarness.LegacyV3CertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+	err = testHarness.StaticCertVerifierV3.CheckDACert(ctx, eigenDAV3Cert4)
 	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
 	require.True(t, errors.As(err, &certErr))
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
