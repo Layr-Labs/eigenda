@@ -269,46 +269,45 @@ func (e *Ejector) logSigningRates(
 		return bytes.Compare(validatorList[i][:], validatorList[j][:]) < 0
 	})
 
-	// Build JSON string manually for compact output.
-	var jsonBuilder bytes.Buffer
-	jsonBuilder.WriteString("[")
+	var logBuilder bytes.Buffer
+	logBuilder.WriteString("Signing Rates (signed batches, unsigned batches, signed bytes, unsigned bytes) | ")
 
 	for i, id := range validatorList {
 		if i > 0 {
-			jsonBuilder.WriteString(",")
+			logBuilder.WriteString(" | ")
 		}
 
 		v1Rate, v1Exists := v1Data[id]
 		v2Rate, v2Exists := v2Data[id]
 
-		jsonBuilder.WriteString(fmt.Sprintf(`{"id":"%s"`, id.Hex()))
+		logBuilder.WriteString(fmt.Sprintf("%s: ", id.Hex()))
 
 		if v1Exists {
-			jsonBuilder.WriteString(fmt.Sprintf(
-				`,"v1":{"sb":%d,"ub":%d,"sy":%d,"uy":%d}`,
+			logBuilder.WriteString(fmt.Sprintf(
+				"V1: %d, %d, %d, %d",
 				v1Rate.GetSignedBatches(),
 				v1Rate.GetUnsignedBatches(),
 				v1Rate.GetSignedBytes(),
 				v1Rate.GetUnsignedBytes(),
 			))
+		} else {
+			logBuilder.WriteString("V1: No data")
 		}
 
+		logBuilder.WriteString("; ")
+
 		if v2Exists {
-			jsonBuilder.WriteString(fmt.Sprintf(
-				`,"v2":{"sb":%d,"ub":%d,"sy":%d,"uy":%d}`,
+			logBuilder.WriteString(fmt.Sprintf(
+				"V2: %d, %d, %d, %d",
 				v2Rate.GetSignedBatches(),
 				v2Rate.GetUnsignedBatches(),
 				v2Rate.GetSignedBytes(),
 				v2Rate.GetUnsignedBytes(),
 			))
+		} else {
+			logBuilder.WriteString("V2: No data")
 		}
-
-		jsonBuilder.WriteString("}")
 	}
 
-	jsonBuilder.WriteString("]")
-
-	e.logger.Info("Signing rates",
-		"key", "id=validator_id, sb=signed_batches, ub=unsigned_batches, sy=signed_bytes, uy=unsigned_bytes",
-		"data", jsonBuilder.String())
+	e.logger.Info(logBuilder.String())
 }
