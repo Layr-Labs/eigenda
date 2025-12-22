@@ -12,10 +12,12 @@ import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.
 
 import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
 
-import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/legacy/v3/EigenDACertVerificationV3Lib.sol";
+import {
+    EigenDACertVerificationV3Lib as CertLib
+} from "src/integrations/cert/legacy/v3/EigenDACertVerificationV3Lib.sol";
 import {EigenDACertTypes as CT} from "src/integrations/cert/EigenDACertTypes.sol";
 
-/// @title EigenDACertVerifier
+/// @title EigenDACertVerifierV3
 /// @notice Verifies EigenDA certificates
 contract EigenDACertVerifierV3 is
     IEigenDACertVerifier,

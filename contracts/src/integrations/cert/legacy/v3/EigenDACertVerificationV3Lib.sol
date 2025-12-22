@@ -13,9 +13,9 @@ import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.
 
 import {EigenDACertTypes as CT} from "src/integrations/cert/EigenDACertTypes.sol";
 
-/// @title EigenDACertVerificationLib
+/// @title EigenDACertVerificationV3Lib
 /// @notice Library for verifying EigenDA certificates
-library EigenDACertVerificationLib {
+library EigenDACertVerificationV3Lib {
     /// @notice Denominator used for threshold percentage calculations (100 for percentages)
     uint256 internal constant THRESHOLD_DENOMINATOR = 100;
 
