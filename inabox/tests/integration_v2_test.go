@@ -252,7 +252,23 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.True(t, errors.As(err, &certErr))
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
 
-	err = testHarness.StaticCertVerifierV3.CheckDACert(ctx, eigenDAV3Cert4)
+	err = testHarness.StaticCertVerifier.CheckDACert(ctx, eigenDAV4Cert5)
+	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
+	require.True(t, errors.As(err, &certErr))
+	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
+
+	// submit a v3 cert while the v4 verifier is active to ensure it fails verification
+	payload6 := randomPayload(1234)
+	cert6, err := payloadDisperserLegacyV3.SendPayload(ctx, payload6)
+	require.NoError(t, err)
+
+	// verify using the v4 verifier router and static verifier - both should fail
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert6)
+	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
+	require.True(t, errors.As(err, &certErr))
+	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
+
+	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert6)
 	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
 	require.True(t, errors.As(err, &certErr))
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
