@@ -19,7 +19,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
@@ -259,10 +258,6 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	// retried dispersals) then the accounting logic here would need to be revisited, and made retry tolerant.
 	err = s.node.ValidateReservationPayment(ctx, batch, probe)
 	if err != nil {
-		if errors.Is(err, reservationvalidation.ErrInsufficientBandwidth) {
-			//nolint:wrapcheck
-			return nil, fmt.Errorf("validate reservation payment: %w", err)
-		}
 		return nil, fmt.Errorf("validate reservation payment: %w", err)
 	}
 
