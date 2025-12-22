@@ -32,13 +32,13 @@ func AuthenticatedDisperserIDFromContext(ctx context.Context) (uint32, bool) {
 	return authenticatedDisperserIDFromContext(ctx)
 }
 
-// StoreChunksDisperserAuthAndBlacklistInterceptor authenticates StoreChunks requests and rejects any requests from
-// blacklisted dispersers before entering the handler.
+// StoreChunksDisperserAuthAndRateLimitInterceptor authenticates StoreChunks requests and rejects any requests from
+// rate-limited dispersers before entering the handler.
 //
 // IMPORTANT: blacklisting is only enforced after request authentication. This prevents an attacker from spoofing
 // a disperser ID and causing an honest disperser to be blacklisted.
-func StoreChunksDisperserAuthAndBlacklistInterceptor(
-	blacklist *DisperserBlacklist,
+func StoreChunksDisperserAuthAndRateLimitInterceptor(
+	rateLimiter *DisperserRateLimiter,
 	requestAuthenticator auth.RequestAuthenticator,
 ) grpc.UnaryServerInterceptor {
 	return func(
@@ -64,20 +64,13 @@ func StoreChunksDisperserAuthAndBlacklistInterceptor(
 		}
 
 		disperserID := storeReq.GetDisperserID()
-		if blacklist != nil && blacklist.IsBlacklisted(disperserID, now) {
-			return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("disperser %d is temporarily blacklisted", disperserID))
+		if rateLimiter != nil && !rateLimiter.Allow(disperserID, now) {
+			return nil, status.Error(codes.ResourceExhausted, fmt.Sprintf("disperser %d is rate limited", disperserID))
 		}
 
 		ctx = context.WithValue(ctx, ctxKeyAuthenticatedDisperserID, disperserID)
 
 		res, handlerErr := handler(ctx, req)
-		if handlerErr == nil || blacklist == nil {
-			return res, handlerErr
-		}
-
-		if be, ok := AsBlacklistable(handlerErr); ok {
-			blacklist.RecordInvalid(disperserID, time.Now(), be.Reason)
-		}
 
 		return res, handlerErr
 	}

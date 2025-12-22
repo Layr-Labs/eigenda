@@ -7,156 +7,76 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// DisperserBlacklist is a temporary blacklist keyed by disperser ID.
-//
-// This is intended as an abuse mitigation: if a disperser sends invalid requests
-// that an honest disperser should never forward, we temporarily refuse requests
-// from that disperser to protect validator resources.
-//
-// The blacklist is best-effort and local to the process (not persisted).
-type DisperserBlacklist struct {
+// DisperserRateLimiter applies a token-bucket rate limit per disperser ID.
+// The limiter is local (per process) and best-effort.
+type DisperserRateLimiter struct {
 	logger logging.Logger
-	ttl    time.Duration
 
-	// strikeWindow is the duration in which invalid requests count toward blacklisting.
-	// For example, strikeWindow=2m and maxInvalid=3 means 3 invalids within the last 2 minutes triggers a ban.
-	strikeWindow time.Duration
-	maxInvalid   int
+	limitPerSecond float64
+	burst          int
 
 	mu    sync.Mutex
-	state map[uint32]*disperserBlacklistState
+	state map[uint32]*disperserLimiterState
 }
 
-type disperserBlacklistState struct {
-	blacklistedUntil time.Time
-	invalidTimes     []time.Time
+type disperserLimiterState struct {
+	tokens     float64
+	lastRefill time.Time
 }
 
-func NewDisperserBlacklist(
-	logger logging.Logger,
-	ttl time.Duration,
-	strikeWindow time.Duration,
-	maxInvalid int,
-) *DisperserBlacklist {
-	return &DisperserBlacklist{
-		logger:       logger,
-		ttl:          ttl,
-		strikeWindow: strikeWindow,
-		maxInvalid:   maxInvalid,
-		state:        make(map[uint32]*disperserBlacklistState),
+// NewDisperserRateLimiter creates a per-disperser rate limiter. If limitPerSecond <= 0 or
+// burst <= 0, rate limiting is disabled.
+func NewDisperserRateLimiter(logger logging.Logger, limitPerSecond float64, burst int) *DisperserRateLimiter {
+	return &DisperserRateLimiter{
+		logger:         logger,
+		limitPerSecond: limitPerSecond,
+		burst:          burst,
+		state:          make(map[uint32]*disperserLimiterState),
 	}
 }
 
-// RecordInvalid records an invalid request from the disperser and blacklists them if the configured
-// threshold is exceeded within the strikeWindow.
-func (b *DisperserBlacklist) RecordInvalid(disperserID uint32, now time.Time, reason string) {
-	if b == nil || b.ttl <= 0 || b.maxInvalid <= 0 {
-		return
+// Allow returns true if a request for the disperser is permitted at time now.
+// Each call consumes one token; tokens are replenished over time up to burst.
+func (l *DisperserRateLimiter) Allow(disperserID uint32, now time.Time) bool {
+	if l == nil || l.limitPerSecond <= 0 || l.burst <= 0 {
+		return true
 	}
 
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
-	s := b.getOrCreateStateLocked(disperserID)
+	st := l.getOrCreateStateLocked(disperserID, now)
 
-	// If currently blacklisted, keep it simple and do nothing (avoid extending bans).
-	if !s.blacklistedUntil.IsZero() && now.Before(s.blacklistedUntil) {
-		return
+	// Refill based on elapsed time.
+	elapsed := now.Sub(st.lastRefill).Seconds()
+	if elapsed > 0 {
+		st.tokens = minFloat(float64(l.burst), st.tokens+elapsed*l.limitPerSecond)
+		st.lastRefill = now
 	}
 
-	// Prune old invalid timestamps outside the strike window.
-	if b.strikeWindow > 0 {
-		cutoff := now.Add(-b.strikeWindow)
-		s.invalidTimes = pruneTimesBefore(s.invalidTimes, cutoff)
-	}
-
-	s.invalidTimes = append(s.invalidTimes, now)
-
-	if len(s.invalidTimes) < b.maxInvalid {
-		return
-	}
-
-	// Threshold exceeded: blacklist and clear strikes so the disperser is "forgiven" after the TTL expires.
-	s.invalidTimes = nil
-	s.blacklistedUntil = now.Add(b.ttl)
-
-	if b.logger != nil {
-		b.logger.Warn("blacklisting disperser for invalid requests",
-			"disperserID", disperserID,
-			"strikeWindow", b.strikeWindow.String(),
-			"maxInvalid", b.maxInvalid,
-			"blacklistDuration", b.ttl.String(),
-			"reason", reason)
-	}
-}
-
-// IsBlacklisted returns true if the disperser is currently blacklisted.
-// Expired entries are pruned on lookup.
-func (b *DisperserBlacklist) IsBlacklisted(disperserID uint32, now time.Time) bool {
-	if b == nil || b.ttl <= 0 {
+	if st.tokens < 1 {
 		return false
 	}
 
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	s, ok := b.state[disperserID]
-	if !ok || s == nil {
-		return false
-	}
-
-	if s.blacklistedUntil.IsZero() {
-		return false
-	}
-
-	if !now.Before(s.blacklistedUntil) {
-		// Expired: clear state (including strikes) to ensure forgiveness.
-		delete(b.state, disperserID)
-		return false
-	}
+	st.tokens -= 1
 	return true
 }
 
-// Blacklist temporarily blacklists the disperser for the configured TTL.
-func (b *DisperserBlacklist) Blacklist(disperserID uint32, now time.Time, reason string) {
-	if b == nil || b.ttl <= 0 {
-		return
+func (l *DisperserRateLimiter) getOrCreateStateLocked(disperserID uint32, now time.Time) *disperserLimiterState {
+	st, ok := l.state[disperserID]
+	if !ok || st == nil {
+		st = &disperserLimiterState{
+			tokens:     float64(l.burst),
+			lastRefill: now,
+		}
+		l.state[disperserID] = st
 	}
-
-	b.mu.Lock()
-	s := b.getOrCreateStateLocked(disperserID)
-	s.invalidTimes = nil
-	s.blacklistedUntil = now.Add(b.ttl)
-	b.mu.Unlock()
-
-	if b.logger != nil {
-		b.logger.Warn("blacklisting disperser for invalid request",
-			"disperserID", disperserID,
-			"blacklistDuration", b.ttl.String(),
-			"reason", reason)
-	}
+	return st
 }
 
-func (b *DisperserBlacklist) getOrCreateStateLocked(disperserID uint32) *disperserBlacklistState {
-	s := b.state[disperserID]
-	if s == nil {
-		s = &disperserBlacklistState{}
-		b.state[disperserID] = s
+func minFloat(a, b float64) float64 {
+	if a < b {
+		return a
 	}
-	return s
-}
-
-func pruneTimesBefore(times []time.Time, cutoff time.Time) []time.Time {
-	// Find first index >= cutoff and reslice.
-	i := 0
-	for i < len(times) && times[i].Before(cutoff) {
-		i++
-	}
-	if i == 0 {
-		return times
-	}
-	if i >= len(times) {
-		return nil
-	}
-	return times[i:]
+	return b
 }

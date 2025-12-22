@@ -207,7 +207,7 @@ func TestECDSAKeyValidationSuccess(t *testing.T) {
 	}
 }
 
-func TestNewConfig_BlacklistConfigFromEnv(t *testing.T) {
+func TestNewConfig_RateLimitConfigFromEnv(t *testing.T) {
 	t.Setenv("NODE_HOSTNAME", "localhost")
 	t.Setenv("NODE_DISPERSAL_PORT", "9000")
 	t.Setenv("NODE_RETRIEVAL_PORT", "9001")
@@ -239,9 +239,8 @@ func TestNewConfig_BlacklistConfigFromEnv(t *testing.T) {
 	t.Setenv("NODE_TEST_PRIVATE_BLS", "deadbeef")
 
 	// The config under test.
-	t.Setenv("NODE_DISPERSER_BLACKLIST_DURATION", "10m")
-	t.Setenv("NODE_DISPERSER_BLACKLIST_STRIKE_WINDOW", "2m")
-	t.Setenv("NODE_DISPERSER_BLACKLIST_MAX_INVALID", "3")
+	t.Setenv("NODE_DISPERSER_RATE_LIMIT_PER_SECOND", "0.5")
+	t.Setenv("NODE_DISPERSER_RATE_LIMIT_BURST", "10")
 
 	app := cli.NewApp()
 	app.Flags = flags.Flags
@@ -262,7 +261,6 @@ func TestNewConfig_BlacklistConfigFromEnv(t *testing.T) {
 	if !assert.NotNil(t, cfg) {
 		return
 	}
-	assert.Equal(t, 10*time.Minute, cfg.DisperserBlacklistDuration)
-	assert.Equal(t, 2*time.Minute, cfg.DisperserBlacklistStrikeWindow)
-	assert.Equal(t, 3, cfg.DisperserBlacklistMaxInvalid)
+	assert.InDelta(t, 0.5, cfg.DisperserRateLimitPerSecond, 1e-9)
+	assert.Equal(t, 10, cfg.DisperserRateLimitBurst)
 }

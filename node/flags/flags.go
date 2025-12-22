@@ -392,26 +392,19 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 	}
-	DisperserBlacklistDurationFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "disperser-blacklist-duration"),
-		Usage:    "How long a disperser is temporarily blacklisted after sending too many invalid StoreChunks requests. If 0, blacklisting is disabled.",
+	DisperserRateLimitPerSecondFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-rate-limit-per-second"),
+		Usage:    "Rate limit for StoreChunks requests per disperser (requests per second). If <=0, rate limiting is disabled.",
 		Required: false,
-		Value:    10 * time.Minute,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_BLACKLIST_DURATION"),
+		Value:    0.025, // ~1.5 requests per minute (similar to prior strike threshold)
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_RATE_LIMIT_PER_SECOND"),
 	}
-	DisperserBlacklistStrikeWindowFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "disperser-blacklist-strike-window"),
-		Usage:    "Time window in which invalid StoreChunks requests count toward blacklisting (e.g. 2m for \"3 invalids in 2 minutes => ban\").",
-		Required: false,
-		Value:    2 * time.Minute,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_BLACKLIST_STRIKE_WINDOW"),
-	}
-	DisperserBlacklistMaxInvalidFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "disperser-blacklist-max-invalid"),
-		Usage:    "Number of invalid StoreChunks requests within the strike window required to trigger blacklisting (e.g. 3). If 0, blacklisting is disabled.",
+	DisperserRateLimitBurstFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-rate-limit-burst"),
+		Usage:    "Burst capacity for per-disperser StoreChunks rate limit. If <=0, rate limiting is disabled.",
 		Required: false,
 		Value:    3,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_BLACKLIST_MAX_INVALID"),
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_RATE_LIMIT_BURST"),
 	}
 	LevelDBDisableSeeksCompactionV1Flag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "leveldb-disable-seeks-compaction-v1"),
@@ -738,9 +731,8 @@ var optionalFlags = []cli.Flag{
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
-	DisperserBlacklistDurationFlag,
-	DisperserBlacklistStrikeWindowFlag,
-	DisperserBlacklistMaxInvalidFlag,
+	DisperserRateLimitPerSecondFlag,
+	DisperserRateLimitBurstFlag,
 	LevelDBDisableSeeksCompactionV1Flag,
 	LevelDBEnableSyncWritesV1Flag,
 	DownloadPoolSizeFlag,

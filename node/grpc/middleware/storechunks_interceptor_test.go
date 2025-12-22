@@ -34,7 +34,7 @@ func (m *mockRequestAuthenticator) IsDisperserAuthorized(uint32, *corev2.Batch) 
 	return true
 }
 
-func TestStoreChunksDisperserAuthAndBlacklistInterceptor_PassThroughForOtherMethods(t *testing.T) {
+func TestStoreChunksDisperserAuthAndRateLimitInterceptor_PassThroughForOtherMethods(t *testing.T) {
 	t.Parallel()
 
 	var authCalled bool
@@ -46,7 +46,7 @@ func TestStoreChunksDisperserAuthAndBlacklistInterceptor_PassThroughForOtherMeth
 		},
 	}
 
-	interceptor := StoreChunksDisperserAuthAndBlacklistInterceptor(nil, auth)
+	interceptor := StoreChunksDisperserAuthAndRateLimitInterceptor(nil, auth)
 
 	handlerCalled := false
 	_, err := interceptor(
@@ -63,7 +63,7 @@ func TestStoreChunksDisperserAuthAndBlacklistInterceptor_PassThroughForOtherMeth
 	require.False(t, authCalled, "auth should not be called for other methods")
 }
 
-func TestStoreChunksDisperserAuthAndBlacklistInterceptor_RejectsWhenAuthFails(t *testing.T) {
+func TestStoreChunksDisperserAuthAndRateLimitInterceptor_RejectsWhenAuthFails(t *testing.T) {
 	t.Parallel()
 
 	auth := &mockRequestAuthenticator{
@@ -73,7 +73,7 @@ func TestStoreChunksDisperserAuthAndBlacklistInterceptor_RejectsWhenAuthFails(t 
 		},
 	}
 
-	interceptor := StoreChunksDisperserAuthAndBlacklistInterceptor(nil, auth)
+	interceptor := StoreChunksDisperserAuthAndRateLimitInterceptor(nil, auth)
 
 	handlerCalled := false
 	_, err := interceptor(
@@ -90,7 +90,7 @@ func TestStoreChunksDisperserAuthAndBlacklistInterceptor_RejectsWhenAuthFails(t 
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
-func TestStoreChunksDisperserAuthAndBlacklistInterceptor_RejectsWhenBlacklisted(t *testing.T) {
+func TestStoreChunksDisperserAuthAndRateLimitInterceptor_RejectsWhenRateLimited(t *testing.T) {
 	t.Parallel()
 
 	auth := &mockRequestAuthenticator{
@@ -100,11 +100,12 @@ func TestStoreChunksDisperserAuthAndBlacklistInterceptor_RejectsWhenBlacklisted(
 		},
 	}
 
-	bl := NewDisperserBlacklist(nil, 10*time.Minute, 2*time.Minute, 3)
+	limiter := NewDisperserRateLimiter(nil, 1, 1) // burst 1
 	now := time.Now()
-	bl.Blacklist(9, now, "reason")
+	require.True(t, limiter.Allow(9, now))
+	require.False(t, limiter.Allow(9, now)) // exhaust immediately
 
-	interceptor := StoreChunksDisperserAuthAndBlacklistInterceptor(bl, auth)
+	interceptor := StoreChunksDisperserAuthAndRateLimitInterceptor(limiter, auth)
 
 	handlerCalled := false
 	_, err := interceptor(
@@ -118,10 +119,10 @@ func TestStoreChunksDisperserAuthAndBlacklistInterceptor_RejectsWhenBlacklisted(
 	)
 	require.Error(t, err)
 	require.False(t, handlerCalled)
-	require.Equal(t, codes.PermissionDenied, status.Code(err))
+	require.Equal(t, codes.ResourceExhausted, status.Code(err))
 }
 
-func TestStoreChunksDisperserAuthAndBlacklistInterceptor_AllowsAndInjectsAuthenticatedDisperserID(t *testing.T) {
+func TestStoreChunksDisperserAuthAndRateLimitInterceptor_AllowsAndInjectsAuthenticatedDisperserID(t *testing.T) {
 	t.Parallel()
 
 	auth := &mockRequestAuthenticator{
@@ -131,8 +132,8 @@ func TestStoreChunksDisperserAuthAndBlacklistInterceptor_AllowsAndInjectsAuthent
 		},
 	}
 
-	interceptor := StoreChunksDisperserAuthAndBlacklistInterceptor(
-		NewDisperserBlacklist(nil, 10*time.Minute, 2*time.Minute, 3),
+	interceptor := StoreChunksDisperserAuthAndRateLimitInterceptor(
+		NewDisperserRateLimiter(nil, 10, 10),
 		auth,
 	)
 

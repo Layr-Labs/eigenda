@@ -50,7 +50,7 @@ type ServerV2 struct {
 	dispersalListener net.Listener
 	retrievalListener net.Listener
 
-	blacklist *middleware.DisperserBlacklist
+	rateLimiter *middleware.DisperserRateLimiter
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -105,11 +105,10 @@ func NewServerV2(
 		softwareVersion:    softwareVersion,
 		dispersalListener:  dispersalListener,
 		retrievalListener:  retrievalListener,
-		blacklist: middleware.NewDisperserBlacklist(
+		rateLimiter: middleware.NewDisperserRateLimiter(
 			logger,
-			config.DisperserBlacklistDuration,
-			config.DisperserBlacklistStrikeWindow,
-			config.DisperserBlacklistMaxInvalid,
+			config.DisperserRateLimitPerSecond,
+			config.DisperserRateLimitBurst,
 		),
 	}, nil
 }
@@ -201,7 +200,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			return nil, api.NewErrorInvalidArg("authenticated disperser ID does not match request disperser ID")
 		}
 	} else {
-		// Defense-in-depth: normally the gRPC interceptor authenticates StoreChunks and blocks blacklisted dispersers.
+		// Defense-in-depth: normally the gRPC interceptor authenticates StoreChunks and rate limits dispersers.
 		// This fallback exists for direct calls (e.g. tests) or alternate wiring where the interceptor isn't installed.
 		_, err = s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, now)
 		if err != nil {
@@ -209,10 +208,10 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
 		}
 
-		if s.blacklist != nil && s.blacklist.IsBlacklisted(in.GetDisperserID(), now) {
+		if s.rateLimiter != nil && !s.rateLimiter.Allow(in.GetDisperserID(), now) {
 			//nolint:wrapcheck
-			return nil, api.NewErrorPermissionDenied(
-				fmt.Sprintf("disperser %d is temporarily blacklisted", in.GetDisperserID()))
+			return nil, api.NewErrorResourceExhausted(
+				fmt.Sprintf("disperser %d is rate limited", in.GetDisperserID()))
 		}
 	}
 
@@ -226,22 +225,14 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		_, err = s.validateDispersalRequest(blobCert)
 		if err != nil {
 			//nolint:wrapcheck
-			//nolint:wrapcheck
-			return nil, middleware.WrapBlacklistable(
-				fmt.Sprintf("invalid dispersal request: %v", err),
-				api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err)),
-			)
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 		}
 	}
 
 	blobHeadersAndTimestamps, err := hashing.HashBlobHeadersAndTimestamps(in)
 	if err != nil {
 		//nolint:wrapcheck
-		//nolint:wrapcheck
-		return nil, middleware.WrapBlacklistable(
-			fmt.Sprintf("malformed blob headers: %v", err),
-			api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers and timestamps: %v", err)),
-		)
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers and timestamps: %v", err))
 	}
 
 	for i, blobHeader := range blobHeadersAndTimestamps {
@@ -270,10 +261,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	if err != nil {
 		if errors.Is(err, reservationvalidation.ErrInsufficientBandwidth) {
 			//nolint:wrapcheck
-			return nil, middleware.WrapBlacklistable(
-				fmt.Sprintf("reservation exceeded: %v", err),
-				fmt.Errorf("validate reservation payment: %w", err),
-			)
+			return nil, fmt.Errorf("validate reservation payment: %w", err)
 		}
 		return nil, fmt.Errorf("validate reservation payment: %w", err)
 	}

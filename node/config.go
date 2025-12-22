@@ -80,14 +80,10 @@ type Config struct {
 	DisableNodeInfoResources       bool
 	StoreChunksRequestMaxPastAge   time.Duration
 	StoreChunksRequestMaxFutureAge time.Duration
-	// Temporary blacklisting duration for dispersers that send invalid StoreChunks requests.
-	// If set to 0, blacklisting is disabled.
-	DisperserBlacklistDuration time.Duration
-	// The time window in which invalid requests count toward blacklisting.
-	// Example: 2m means "3 invalids in 2 minutes => ban".
-	DisperserBlacklistStrikeWindow time.Duration
-	// The number of invalid requests within DisperserBlacklistStrikeWindow required to trigger blacklisting.
-	DisperserBlacklistMaxInvalid int
+	// Rate limiting for StoreChunks requests per disperser.
+	// limit expressed as requests per second; disabled if <=0 or burst <=0.
+	DisperserRateLimitPerSecond float64
+	DisperserRateLimitBurst     int
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -478,9 +474,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
-		DisperserBlacklistDuration:          ctx.GlobalDuration(flags.DisperserBlacklistDurationFlag.Name),
-		DisperserBlacklistStrikeWindow:      ctx.GlobalDuration(flags.DisperserBlacklistStrikeWindowFlag.Name),
-		DisperserBlacklistMaxInvalid:        ctx.GlobalInt(flags.DisperserBlacklistMaxInvalidFlag.Name),
+		DisperserRateLimitPerSecond:         ctx.GlobalFloat64(flags.DisperserRateLimitPerSecondFlag.Name),
+		DisperserRateLimitBurst:             ctx.GlobalInt(flags.DisperserRateLimitBurstFlag.Name),
 		LittDBWriteCacheSizeBytes: uint64(ctx.GlobalFloat64(
 			flags.LittDBWriteCacheSizeGBFlag.Name) * units.GiB),
 		LittDBWriteCacheSizeFraction:    ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),

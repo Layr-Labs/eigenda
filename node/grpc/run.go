@@ -64,7 +64,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			opt,
 			grpc.ChainUnaryInterceptor(
 				serverV2.metrics.GetGRPCUnaryInterceptor(),
-				middleware.StoreChunksDisperserAuthAndBlacklistInterceptor(serverV2.blacklist, serverV2.chunkAuthenticator),
+				middleware.StoreChunksDisperserAuthAndRateLimitInterceptor(serverV2.rateLimiter, serverV2.chunkAuthenticator),
 			),
 		)
 
@@ -121,7 +121,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			opt,
 			grpc.ChainUnaryInterceptor(
 				serverV2.metrics.GetGRPCUnaryInterceptor(),
-				middleware.StoreChunksDisperserAuthAndBlacklistInterceptor(serverV2.blacklist, serverV2.chunkAuthenticator),
+				middleware.StoreChunksDisperserAuthAndRateLimitInterceptor(serverV2.rateLimiter, serverV2.chunkAuthenticator),
 			),
 		)
 

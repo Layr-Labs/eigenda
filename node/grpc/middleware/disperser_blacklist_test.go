@@ -7,84 +7,54 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDisperserBlacklist_TTL(t *testing.T) {
+func TestDisperserRateLimiter_AllowsUntilBurst(t *testing.T) {
 	t.Parallel()
 
-	b := NewDisperserBlacklist(nil, 10*time.Minute, 2*time.Minute, 3)
-
-	now := time.Unix(1000, 0)
+	limiter := NewDisperserRateLimiter(nil, 1, 3) // 1 rps, burst 3
 	id := uint32(123)
+	now := time.Unix(1000, 0)
 
-	require.False(t, b.IsBlacklisted(id, now))
-
-	b.Blacklist(id, now, "reason")
-	require.True(t, b.IsBlacklisted(id, now))
-
-	// Still blacklisted within the TTL.
-	require.True(t, b.IsBlacklisted(id, now.Add(9*time.Minute)))
-
-	// Expired after the TTL and should be pruned.
-	require.False(t, b.IsBlacklisted(id, now.Add(11*time.Minute)))
-	require.False(t, b.IsBlacklisted(id, now.Add(12*time.Minute)))
+	require.True(t, limiter.Allow(id, now))
+	require.True(t, limiter.Allow(id, now))
+	require.True(t, limiter.Allow(id, now))
+	// Burst exhausted
+	require.False(t, limiter.Allow(id, now))
 }
 
-func TestDisperserBlacklist_DisabledWhenTTLZeroOrNegative(t *testing.T) {
+func TestDisperserRateLimiter_RefillsOverTime(t *testing.T) {
 	t.Parallel()
 
-	now := time.Unix(1000, 0)
-	id := uint32(42)
-
-	b0 := NewDisperserBlacklist(nil, 0, 2*time.Minute, 3)
-	b0.Blacklist(id, now, "reason")
-	require.False(t, b0.IsBlacklisted(id, now))
-
-	bNeg := NewDisperserBlacklist(nil, -1*time.Second, 2*time.Minute, 3)
-	bNeg.Blacklist(id, now, "reason")
-	require.False(t, bNeg.IsBlacklisted(id, now))
-
-	// Nil blacklist should behave as disabled.
-	var bNil *DisperserBlacklist
-	require.False(t, bNil.IsBlacklisted(id, now))
-	bNil.Blacklist(id, now, "reason") // should not panic
-}
-
-func TestDisperserBlacklist_StrikeThreshold(t *testing.T) {
-	t.Parallel()
-
-	b := NewDisperserBlacklist(nil, 10*time.Minute, 2*time.Minute, 3)
-	now := time.Unix(1000, 0)
+	limiter := NewDisperserRateLimiter(nil, 1, 2) // 1 rps, burst 2
 	id := uint32(7)
+	start := time.Unix(1000, 0)
 
-	b.RecordInvalid(id, now, "bad1")
-	require.False(t, b.IsBlacklisted(id, now))
+	require.True(t, limiter.Allow(id, start))
+	require.True(t, limiter.Allow(id, start))
+	require.False(t, limiter.Allow(id, start))
 
-	b.RecordInvalid(id, now.Add(30*time.Second), "bad2")
-	require.False(t, b.IsBlacklisted(id, now.Add(30*time.Second)))
+	// After 1s, one token should refill.
+	require.True(t, limiter.Allow(id, start.Add(1*time.Second)))
+	// But not yet two.
+	require.False(t, limiter.Allow(id, start.Add(1*time.Second)))
 
-	// Third invalid within the window triggers blacklisting.
-	b.RecordInvalid(id, now.Add(60*time.Second), "bad3")
-	require.True(t, b.IsBlacklisted(id, now.Add(60*time.Second)))
-
-	// After TTL expires, it should be forgiven (strikes cleared).
-	require.False(t, b.IsBlacklisted(id, now.Add(11*time.Minute)))
-
-	// One invalid after forgiveness should not immediately re-ban.
-	b.RecordInvalid(id, now.Add(11*time.Minute), "bad4")
-	require.False(t, b.IsBlacklisted(id, now.Add(11*time.Minute)))
+	// After enough time, burst should be full again.
+	require.True(t, limiter.Allow(id, start.Add(3*time.Second)))
+	require.True(t, limiter.Allow(id, start.Add(3*time.Second)))
+	require.False(t, limiter.Allow(id, start.Add(3*time.Second)))
 }
 
-func TestDisperserBlacklist_StrikeWindow(t *testing.T) {
+func TestDisperserRateLimiter_DisabledWhenZeroOrNil(t *testing.T) {
 	t.Parallel()
 
-	b := NewDisperserBlacklist(nil, 10*time.Minute, 2*time.Minute, 3)
+	id := uint32(42)
 	now := time.Unix(1000, 0)
-	id := uint32(8)
 
-	// Two invalids, but then we wait past the strike window before the third.
-	b.RecordInvalid(id, now, "bad1")
-	b.RecordInvalid(id, now.Add(30*time.Second), "bad2")
-	b.RecordInvalid(id, now.Add(3*time.Minute), "bad3")
+	limiterZero := NewDisperserRateLimiter(nil, 0, 1)
+	require.True(t, limiterZero.Allow(id, now))
 
-	// The first two are outside the 2m window at the time of the third, so no ban.
-	require.False(t, b.IsBlacklisted(id, now.Add(3*time.Minute)))
+	limiterBurstZero := NewDisperserRateLimiter(nil, 1, 0)
+	require.True(t, limiterBurstZero.Allow(id, now))
+
+	var limiterNil *DisperserRateLimiter
+	require.True(t, limiterNil.Allow(id, now))
 }
