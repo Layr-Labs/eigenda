@@ -45,23 +45,8 @@ type Store struct {
 
 	// offchainDerivationMap maps offchain derivation versions to their parameters.
 	// offchain derivation version was introduced with EigenDA V4 certs, and is not used for earlier cert versions.
-	offchainDerivationMap OffchainDerivationMap
+	offchainDerivationMap certs.OffchainDerivationMap
 }
-
-// OffchainDerivationParameters holds parameters for offchain derivation for a given derivation version.
-// Version 0 is currently the only offchain derivation version, which only contains the RBN recency window size
-// parameter. However this struct is designed to be extensible for future offchain derivation versions.
-type OffchainDerivationParameters struct {
-	// Allowed distance (in L1 blocks) between the eigenDA cert's reference block number (RBN)
-	// and the L1 block number at which the cert was included in the rollup's batch inbox.
-	// If cert.L1InclusionBlock > batch.RBN + rbnRecencyWindowSize, an
-	// [RBNRecencyCheckFailedError] is returned.
-	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation
-	RBNRecencyWindowSize uint64
-}
-
-// OffchainDerivationMap maps offchain derivation versions to their parameters.
-type OffchainDerivationMap = map[coretypes.OffchainDerivationVersion]OffchainDerivationParameters
 
 var _ common.EigenDAV2Store = (*Store)(nil)
 
@@ -78,9 +63,9 @@ func NewStore(
 			"putTries==0 is not permitted. >0 means 'try N times', <0 means 'retry indefinitely'")
 	}
 
-	offchainDerivationMap := make(OffchainDerivationMap)
+	offchainDerivationMap := make(certs.OffchainDerivationMap)
 	// Currently only offchain derivation version 0 exists.
-	offchainDerivationMap[0] = OffchainDerivationParameters{
+	offchainDerivationMap[0] = certs.OffchainDerivationParameters{
 		RBNRecencyWindowSize: consts.RBNRecencyWindowSizeV0,
 	}
 
