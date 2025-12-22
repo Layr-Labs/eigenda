@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -270,40 +269,46 @@ func (e *Ejector) logSigningRates(
 		return bytes.Compare(validatorList[i][:], validatorList[j][:]) < 0
 	})
 
-	sb := strings.Builder{}
+	// Build JSON string manually for compact output.
+	var jsonBuilder bytes.Buffer
+	jsonBuilder.WriteString("[")
 
-	sb.WriteString("Signing Rates (signed batches, unsigned batches, signed bytes, unsigned bytes)\n")
+	for i, id := range validatorList {
+		if i > 0 {
+			jsonBuilder.WriteString(",")
+		}
 
-	for _, id := range validatorList {
 		v1Rate, v1Exists := v1Data[id]
 		v2Rate, v2Exists := v2Data[id]
 
-		sb.WriteString(fmt.Sprintf("%s:\n", id.Hex()))
+		jsonBuilder.WriteString(fmt.Sprintf(`{"id":"%s"`, id.Hex()))
 
 		if v1Exists {
-			sb.WriteString(fmt.Sprintf(
-				"  V1: %d, %d, %d, %d\n",
+			jsonBuilder.WriteString(fmt.Sprintf(
+				`,"v1":{"sb":%d,"ub":%d,"sy":%d,"uy":%d}`,
 				v1Rate.GetSignedBatches(),
 				v1Rate.GetUnsignedBatches(),
 				v1Rate.GetSignedBytes(),
 				v1Rate.GetUnsignedBytes(),
 			))
-		} else {
-			sb.WriteString("  V1: No data\n")
 		}
 
 		if v2Exists {
-			sb.WriteString(fmt.Sprintf(
-				"  V2: %d, %d, %d, %d\n",
+			jsonBuilder.WriteString(fmt.Sprintf(
+				`,"v2":{"sb":%d,"ub":%d,"sy":%d,"uy":%d}`,
 				v2Rate.GetSignedBatches(),
 				v2Rate.GetUnsignedBatches(),
 				v2Rate.GetSignedBytes(),
 				v2Rate.GetUnsignedBytes(),
 			))
-		} else {
-			sb.WriteString("  V2: No data\n")
 		}
+
+		jsonBuilder.WriteString("}")
 	}
 
-	e.logger.Info(sb.String())
+	jsonBuilder.WriteString("]")
+
+	e.logger.Info("Signing rates",
+		"key", "id=validator_id, sb=signed_batches, ub=unsigned_batches, sy=signed_bytes, uy=unsigned_bytes",
+		"data", jsonBuilder.String())
 }
