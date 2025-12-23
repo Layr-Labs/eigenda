@@ -239,6 +239,10 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert5)
 	require.NoError(t, err)
 
+	// attempt to cast to v3 cert - should fail
+	_, ok = cert5.(*coretypes.EigenDACertV3)
+	require.False(t, ok)
+
 	// now force verification to fail by modifying the cert contents
 	eigenDAV4Cert5, ok := cert5.(*coretypes.EigenDACertV4)
 	require.True(t, ok)
