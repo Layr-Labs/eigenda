@@ -19,7 +19,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -64,7 +63,7 @@ func RunController(cliCtx *cli.Context) error {
 		return err
 	}
 
-	logger, err := common.NewLogger(&config.Logger)
+	logger, err := config.Log.BuildLogger()
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -78,7 +77,7 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create DynamoDB client: %w", err)
 	}
-	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
+	gethClient, err := geth.NewMultiHomingClient(config.EthClient, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return fmt.Errorf("failed to create geth client: %w", err)
@@ -90,7 +89,7 @@ func RunController(cliCtx *cli.Context) error {
 		ctx,
 		logger,
 		gethClient,
-		gethcommon.HexToAddress(config.EigenDAContractDirectoryAddress))
+		gethcommon.HexToAddress(config.ContractDirectoryAddress))
 	if err != nil {
 		return fmt.Errorf("failed to create contract directory: %w", err)
 	}
@@ -185,13 +184,13 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
-	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManager.EncoderAddress)
+	encoderClient, err := encoder.NewEncoderClientV2(config.Encoder.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
-	encodingPool := workerpool.New(config.EncodingManager.NumConcurrentRequests)
+	encodingPool := workerpool.New(config.Encoder.NumConcurrentRequests)
 	encodingManager, err := controller.NewEncodingManager(
-		&config.EncodingManager,
+		&config.Encoder,
 		time.Now,
 		blobMetadataStore,
 		encodingPool,
@@ -339,7 +338,7 @@ func RunController(cliCtx *cli.Context) error {
 	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
 		ctx,
 		logger,
-		config.PaymentAuthorization,
+		config.Payment,
 		contractDirectory,
 		gethClient,
 		dynamoClient.GetAwsClient(),

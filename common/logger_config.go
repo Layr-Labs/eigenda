@@ -26,6 +26,8 @@ const (
 	TextLogFormat LogFormat = "text"
 )
 
+// Configuration for a logger. Contains complex types, so do not embed directly in config structs.
+// If you need a struct to embed in config, use SimpleLoggerConfig instead.
 type LoggerConfig struct {
 	Format       LogFormat
 	OutputWriter io.Writer
