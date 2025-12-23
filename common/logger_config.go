@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpclogging "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -136,6 +137,18 @@ func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) (*LoggerConfig, er
 	cfg.HandlerOpts.Level = level
 
 	return cfg, nil
+}
+
+// StringToLogLevel converts a string value to slog.Level.
+// Accepted values are "debug", "info", "warn", and "error" (case-insensitive).
+// Returns an error if the string cannot be parsed as a valid log level.
+func StringToLogLevel(levelStr string) (slog.Level, error) {
+	var level slog.Level
+	err := level.UnmarshalText([]byte(strings.ToLower(levelStr)))
+	if err != nil {
+		return 0, fmt.Errorf("invalid log level %q: %w", levelStr, err)
+	}
+	return level, nil
 }
 
 func NewLogger(cfg *LoggerConfig) (logging.Logger, error) {
