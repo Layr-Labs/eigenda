@@ -494,6 +494,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 		GrpcUri:           fmt.Sprintf("%s:%d", c.GetConfig().DisperserHostname, c.GetConfig().DisperserPort),
 		UseSecureGrpcFlag: true,
 		DisperserID:       0,
+		ChainID:           c.GetChainID(),
 	}
 
 	disperserClient, err := dispersal.NewDisperserClient(

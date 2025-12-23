@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -61,14 +62,6 @@ type EncodingManagerConfig struct {
 	// NumConcurrentRequests is the size of the worker pool for processing encoding requests concurrently.
 	// Must be at least 1.
 	NumConcurrentRequests int
-
-	// MaxDispersalAge is the maximum age a dispersal request can be before it is discarded.
-	// Dispersals older than this duration are marked as Failed and not processed.
-	//
-	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
-	// client at dispersal request creation time (in nanoseconds since Unix epoch).
-	MaxDispersalAge time.Duration
-
 	// If true, accounts that DON'T have a human-friendly name remapping will be reported as their full account ID
 	// in metrics.
 	//
@@ -92,7 +85,6 @@ func DefaultEncodingManagerConfig() *EncodingManagerConfig {
 		OnchainStateRefreshInterval: 1 * time.Hour,
 		NumConcurrentRequests:       250,
 		NumRelayAssignment:          1,
-		MaxDispersalAge:             45 * time.Second,
 	}
 }
 
@@ -132,9 +124,6 @@ func (c *EncodingManagerConfig) Verify() error {
 	if c.EncoderAddress == "" {
 		return fmt.Errorf("EncoderAddress cannot be empty")
 	}
-	if c.MaxDispersalAge <= 0 {
-		return fmt.Errorf("MaxDispersalAge must be positive, got %v", c.MaxDispersalAge)
-	}
 	return nil
 }
 
@@ -155,13 +144,13 @@ type EncodingManager struct {
 	// state
 	cursor                *blobstore.StatusIndexCursor
 	blobVersionParameters atomic.Pointer[corev2.BlobVersionParameterMap]
-	// blobSet keeps track of blobs that are currently being encoded
-	// This is used to deduplicate blobs to prevent the same blob from being encoded multiple times
-	// blobSet is shared with Dispatcher which removes blobs from this queue as they are packaged for dispersal
-	blobSet BlobSet
 
 	metrics                *encodingManagerMetrics
+	controllerMetrics      *ControllerMetrics
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
+
+	// Prevents the same blob from being processed multiple times, regardless of dynamo shenanigans.
+	replayGuardian replay.ReplayGuardian
 }
 
 func NewEncodingManager(
@@ -173,12 +162,24 @@ func NewEncodingManager(
 	chainReader core.Reader,
 	logger logging.Logger,
 	registry *prometheus.Registry,
-	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 	userAccountRemapping map[string]string,
+	// For each blob, compare the blob's timestamp to the current time. If it's this far in the future, ignore it.
+	// This is used by a replay guardian to prevent double-processing of blobs.
+	maxFutureAge time.Duration,
+	// For each blob, compare the blob's timestamp to the current time. If it's older than this, ignore it.
+	// This is used by a replay guardian to prevent double-processing of blobs.
+	maxPastAge time.Duration,
+	controllerMetrics *ControllerMetrics,
 ) (*EncodingManager, error) {
+
 	if err := config.Verify(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	replayGuardian, err := replay.NewReplayGuardian(getNow, maxPastAge, maxFutureAge)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replay guardian: %w", err)
 	}
 
 	return &EncodingManager{
@@ -192,8 +193,9 @@ func NewEncodingManager(
 		cursor:                nil,
 		metrics: newEncodingManagerMetrics(
 			registry, config.EnablePerAccountBlobStatusMetrics, userAccountRemapping),
-		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
+		replayGuardian:         replayGuardian,
+		controllerMetrics:      controllerMetrics,
 	}, nil
 }
 
@@ -251,7 +253,6 @@ func (e *EncodingManager) filterStaleAndDedupBlobs(
 	inputMetadatas []*v2.BlobMetadata,
 ) []*v2.BlobMetadata {
 	outputMetadatas := make([]*v2.BlobMetadata, 0, len(inputMetadatas))
-	now := e.getNow()
 
 	for _, metadata := range inputMetadatas {
 		blobKey, err := metadata.BlobHeader.BlobKey()
@@ -261,61 +262,37 @@ func (e *EncodingManager) filterStaleAndDedupBlobs(
 			continue
 		}
 
-		if e.checkAndHandleStaleBlob(ctx, blobKey, now, metadata.BlobHeader.PaymentMetadata.Timestamp) {
-			// discard stale blob
-			continue
-		}
+		timestamp := time.Unix(0, metadata.BlobHeader.PaymentMetadata.Timestamp)
 
-		if e.blobSet.Contains(blobKey) {
-			// discard duplicate blob
-			continue
+		status := e.replayGuardian.DetailedVerifyRequest(blobKey[:], timestamp)
+		switch status {
+		case replay.StatusValid:
+			outputMetadatas = append(outputMetadatas, metadata)
+		case replay.StatusTooOld:
+			e.controllerMetrics.reportDiscardedBlob("encodingManager", "stale")
+			e.markBlobAsFailed(ctx, blobKey)
+		case replay.StatusTooFarInFuture:
+			e.controllerMetrics.reportDiscardedBlob("encodingManager", "future")
+			e.markBlobAsFailed(ctx, blobKey)
+		case replay.StatusDuplicate:
+			e.controllerMetrics.reportDuplicateBlob("encodingManager")
+		default:
+			e.logger.Errorf("Unknown replay guardian status %d for blob %s, skipping.", status, blobKey.Hex())
 		}
-
-		outputMetadatas = append(outputMetadatas, metadata)
 	}
 
 	return outputMetadatas
 }
 
-// Checks if a blob is older than MaxDispersalAge and handles it accordingly.
-// If the blob is stale, it increments metrics, logs a warning, and updates the database status to Failed.
-// Returns true if the blob is stale, otherwise false.
-func (e *EncodingManager) checkAndHandleStaleBlob(
-	ctx context.Context,
-	blobKey corev2.BlobKey,
-	now time.Time,
-	dispersalTimestamp int64,
-) bool {
-	dispersalTime := time.Unix(0, dispersalTimestamp)
-	dispersalAge := now.Sub(dispersalTime)
-
-	if dispersalAge <= e.MaxDispersalAge {
-		return false
-	}
-
-	e.metrics.reportStaleDispersal()
-
-	e.logger.Warnf(
-		"discarding stale dispersal: blobKey=%s dispersalAge=%s maxAge=%s dispersalTime=%s",
-		blobKey.Hex(),
-		dispersalAge.String(),
-		e.MaxDispersalAge.String(),
-		dispersalTime.Format(time.RFC3339),
+func (e *EncodingManager) markBlobAsFailed(ctx context.Context, blobKey corev2.BlobKey) {
+	err := e.blobMetadataStore.UpdateBlobStatus(
+		ctx,
+		blobKey,
+		v2.Failed,
 	)
-
-	storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
-	err := e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Failed)
-	cancel()
 	if err != nil {
-		e.logger.Errorf("update stale blob status to Failed: blobKey=%s err=%w", blobKey.Hex(), err)
-	} else {
-		// we need to remove the blobKey from the blobSet once the BlobStatus is set to FAILED
-		// the Dispatcher removes the blobKey from the blobSet when batching, but blobs that are set to FAILED
-		// never are batched, and therefore must be removed manually
-		e.blobSet.RemoveBlob(blobKey)
+		e.logger.Errorf("Failed to mark blob %s as failed: %v", blobKey.Hex(), err)
 	}
-
-	return true
 }
 
 // HandleBatch handles a batch of blobs to encode
@@ -328,13 +305,13 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	healthcheck.SignalHeartbeat(e.logger, "encodingManager", e.controllerLivenessChan)
 
 	// Get a batch of blobs to encode
-	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
+	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(
+		ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
 	if err != nil {
 		return err
 	}
 
 	blobMetadatas = e.filterStaleAndDedupBlobs(ctx, blobMetadatas)
-	e.metrics.reportBlobSetSize(e.blobSet.Size())
 	if len(blobMetadatas) == 0 {
 		return errNoBlobsToEncode
 	}
@@ -358,7 +335,10 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		blob := blob
 		blobKey, err := blob.BlobHeader.BlobKey()
 		if err != nil {
-			e.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt, "paymentMetadata", blob.BlobHeader.PaymentMetadata)
+			e.logger.Error("failed to get blob key",
+				"err", err,
+				"requestedAt", blob.RequestedAt,
+				"paymentMetadata", blob.BlobHeader.PaymentMetadata)
 			continue
 		}
 
@@ -437,7 +417,8 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 				requestedAt := time.Unix(0, int64(blob.RequestedAt))
 				e.metrics.reportE2EEncodingLatency(time.Since(requestedAt))
-				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded, blob.BlobHeader.PaymentMetadata.AccountID.Hex())
+				e.metrics.reportCompletedBlob(
+					int(blob.BlobSize), v2.Encoded, blob.BlobHeader.PaymentMetadata.AccountID.Hex())
 			} else {
 				e.metrics.reportFailedSubmission()
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
@@ -447,11 +428,8 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
 					return
 				}
-				// we need to remove the blobKey from the blobSet once the BlobStatus is set to FAILED
-				// the Dispatcher removes the blobKey from the blobSet when batching, but blobs that are set to FAILED
-				// never are batched, and therefore must be removed manually
-				e.blobSet.RemoveBlob(blobKey)
-				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed, blob.BlobHeader.PaymentMetadata.AccountID.Hex())
+				e.metrics.reportCompletedBlob(
+					int(blob.BlobSize), v2.Failed, blob.BlobHeader.PaymentMetadata.AccountID.Hex())
 			}
 		})
 	}
@@ -460,20 +438,16 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 	e.cursor = cursor
 
-	for _, blob := range blobMetadatas {
-		key, err := blob.BlobHeader.BlobKey()
-		if err != nil {
-			e.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt)
-			continue
-		}
-		e.blobSet.AddBlob(key)
-	}
-
 	e.logger.Debug("successfully submitted encoding requests", "numBlobs", len(blobMetadatas))
 	return nil
 }
 
-func (e *EncodingManager) encodeBlob(ctx context.Context, blobKey corev2.BlobKey, blob *v2.BlobMetadata, blobParams *core.BlobVersionParameters) (*encoding.FragmentInfo, error) {
+func (e *EncodingManager) encodeBlob(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	blob *v2.BlobMetadata,
+	blobParams *core.BlobVersionParameters,
+) (*encoding.FragmentInfo, error) {
 	// Add headers for routing
 	md := metadata.New(map[string]string{
 		"content-type": "application/grpc",
@@ -501,7 +475,8 @@ func (e *EncodingManager) refreshBlobVersionParams(ctx context.Context) error {
 
 func GetRelayKeys(numAssignment uint16, availableRelays []corev2.RelayKey) ([]corev2.RelayKey, error) {
 	if int(numAssignment) > len(availableRelays) {
-		return nil, fmt.Errorf("numAssignment (%d) cannot be greater than numRelays (%d)", numAssignment, len(availableRelays))
+		return nil, fmt.Errorf(
+			"numAssignment (%d) cannot be greater than numRelays (%d)", numAssignment, len(availableRelays))
 	}
 	relayKeys := make([]corev2.RelayKey, len(availableRelays))
 	copy(relayKeys, availableRelays)

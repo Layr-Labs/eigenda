@@ -333,6 +333,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 				GrpcUri:           fmt.Sprintf("%s:%s", disperserHostname, disperserPort),
 				UseSecureGrpcFlag: true,
 				DisperserID:       0,
+				ChainID:           nil, // Will be populated after eth client is created
 			},
 			PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 				PayloadClientConfig:    payloadClientConfig,

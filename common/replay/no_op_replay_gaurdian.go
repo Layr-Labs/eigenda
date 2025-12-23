@@ -20,3 +20,10 @@ func NewNoOpReplayGuardian() ReplayGuardian {
 func (n *noOpReplayGuardian) VerifyRequest(requestHash []byte, requestTimestamp time.Time) error {
 	return nil
 }
+
+func (n *noOpReplayGuardian) DetailedVerifyRequest(
+	requestHash []byte,
+	requestTimestamp time.Time,
+) ReplayGuardianStatus {
+	return StatusValid
+}

@@ -36,6 +36,7 @@ import {ISocketRegistry, SocketRegistry} from "../lib/eigenlayer-middleware/src/
 import {IEigenDADirectory, EigenDADirectory} from "src/core/EigenDADirectory.sol";
 import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
 import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {
     DeployOpenEigenLayer,
     ProxyAdmin,
@@ -77,6 +78,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     EigenDAEjectionManager public eigenDAEjectionManager;
 
     EigenDADirectory public eigenDADirectoryImplementation;
+    EigenDAEjectionManager public eigenDAEjectionManagerImplementation;
 
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
@@ -410,20 +412,26 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
         );
 
-        // Deploy EigenDAEjectionManager
-        // Using the first deployed strategy token as deposit token
-        address depositToken = address(deployedStrategyArray[0].underlyingToken());
-        uint256 depositBaseFeeMultiplier = 100; // 100x base fee multiplier
-        uint256 estimatedGasUsedWithoutSig = 100_000; // 100k gas estimate
-        uint256 estimatedGasUsedWithSig = 200_000; // 200k gas estimate with signature verification
-
-        eigenDAEjectionManager = new EigenDAEjectionManager(
-            depositToken,
-            depositBaseFeeMultiplier,
-            address(eigenDADirectory),
-            estimatedGasUsedWithoutSig,
-            estimatedGasUsedWithSig
+        // Deploy EigenDAEjectionManager implementation
+        eigenDAEjectionManagerImplementation = new EigenDAEjectionManager(
+            IAccessControl(address(eigenDAAccessControl)), apkRegistry, eigenDAServiceManager, registryCoordinator
         );
+
+        uint64 cooldown = 10;
+        uint64 delay = 100;
+
+        // Deploy EigenDAEjectionManager proxy with initialization
+        eigenDAEjectionManager = EigenDAEjectionManager(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(eigenDAEjectionManagerImplementation),
+                    address(eigenDAProxyAdmin),
+                    abi.encodeWithSelector(EigenDAEjectionManager.initialize.selector, cooldown, delay)
+                )
+            )
+        );
+
+        // Set cooldown and delay after initialization
         eigenDAEjectionManager.setCooldown(60);
         eigenDAEjectionManager.setDelay(60);
         eigenDADirectory.addAddress(

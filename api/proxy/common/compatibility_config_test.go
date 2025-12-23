@@ -1,6 +1,7 @@
 package common_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
@@ -15,6 +16,7 @@ func validClientConfigV2() common.ClientConfigV2 {
 		DisperserClientCfg: dispersal.DisperserClientConfig{
 			GrpcUri:     "localhost:8080",
 			DisperserID: 0,
+			ChainID:     big.NewInt(1),
 		},
 		PayloadDisperserCfg:                dispersal.PayloadDisperserConfig{},
 		RelayPayloadRetrieverCfg:           payloadretrieval.RelayPayloadRetrieverConfig{},
@@ -25,7 +27,6 @@ func validClientConfigV2() common.ClientConfigV2 {
 		RelayConnectionPoolSize:            10,
 		RetrieversToEnable:                 []common.RetrieverType{common.RelayRetrieverType},
 		EigenDADirectory:                   "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-		RBNRecencyWindowSize:               100,
 		ClientLedgerMode:                   clientledger.ClientLedgerModeReservationOnly,
 	}
 }
@@ -52,7 +53,6 @@ func TestNewCompatibilityConfig(t *testing.T) {
 	require.Equal(t, chainID, result.ChainID)
 	require.Equal(t, clientConfig.EigenDADirectory, result.DirectoryAddress)
 	require.Equal(t, clientConfig.EigenDACertVerifierOrRouterAddress, result.CertVerifierAddress)
-	require.Equal(t, clientConfig.RBNRecencyWindowSize, result.RecencyWindowSize)
 	require.Equal(t, APIsEnabled, result.APIsEnabled)
 	require.Equal(t, readOnly, result.ReadOnlyMode)
 	require.Greater(t, result.MaxPayloadSizeBytes, uint32(0))
@@ -306,50 +306,4 @@ func TestNewCompatibilityConfigContractAddresses(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, directoryAddr, result.DirectoryAddress)
 	require.Equal(t, certVerifierAddr, result.CertVerifierAddress)
-}
-
-func TestNewCompatibilityConfigRecencyWindow(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name                  string
-		recencyWindowSize     uint64
-		expectedRecencyWindow uint64
-	}{
-		{
-			name:                  "standard recency window",
-			recencyWindowSize:     100,
-			expectedRecencyWindow: 100,
-		},
-		{
-			name:                  "zero recency window (disabled)",
-			recencyWindowSize:     0,
-			expectedRecencyWindow: 0,
-		},
-		{
-			name:                  "large recency window",
-			recencyWindowSize:     10000,
-			expectedRecencyWindow: 10000,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			clientConfig := validClientConfigV2()
-			clientConfig.RBNRecencyWindowSize = tc.recencyWindowSize
-
-			result, err := common.NewCompatibilityConfig(
-				"1.0.0",
-				"12345",
-				clientConfig,
-				false,
-				[]string{"arb"},
-			)
-
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedRecencyWindow, result.RecencyWindowSize)
-		})
-	}
 }

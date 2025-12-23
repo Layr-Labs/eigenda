@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	"github.com/prometheus/client_golang/prometheus"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/common"
@@ -61,132 +60,13 @@ type controllerComponents struct {
 	NodeClientManager    *controller.MockClientManager
 	BeforeDispatch       controller.BlobCallback
 	// CallbackBlobSet is a mock queue used to test the BeforeDispatch callback function
-	CallbackBlobSet *controller.MockBlobSet
-	BlobSet         *controller.MockBlobSet
-	LivenessChan    chan healthcheck.HeartbeatMessage
-}
-
-func TestControllerHandleBatch(t *testing.T) {
-	components := newControllerComponents(t)
-	defer components.BatchMetadataManager.Close()
-
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("Contains", mock.Anything).Return(false)
-	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
-	ctx := context.Background()
-	// Get batch header hash to mock signatures
-	merkleTree, err := corev2.BuildMerkleTree(objs.blobCerts)
-	require.NoError(t, err)
-	require.NotNil(t, merkleTree)
-	require.NotNil(t, merkleTree.Root())
-	batchHeader := &corev2.BatchHeader{
-		ReferenceBlockNumber: blockNumber - finalizationBlockDelay,
-	}
-	copy(batchHeader.BatchRoot[:], merkleTree.Root())
-	bhh, err := batchHeader.Hash()
-	require.NoError(t, err)
-
-	mockClient0 := clientsmock.NewNodeClient()
-	sig0 := mockChainState.KeyPairs[opId0].SignMessage(bhh)
-	mockClient0.On("StoreChunks", mock.Anything, mock.Anything).Return(sig0, nil)
-	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].V2DispersalPort
-	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].V2DispersalPort
-	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].V2DispersalPort
-	require.NotEqual(t, op0Port, op1Port)
-	require.NotEqual(t, op0Port, op2Port)
-	components.NodeClientManager.On("GetClient", mock.Anything, op0Port).Return(mockClient0, nil)
-	mockClient1 := clientsmock.NewNodeClient()
-	sig1 := mockChainState.KeyPairs[opId1].SignMessage(bhh)
-	mockClient1.On("StoreChunks", mock.Anything, mock.Anything).Return(sig1, nil)
-	components.NodeClientManager.On("GetClient", mock.Anything, op1Port).Return(mockClient1, nil)
-	mockClient2 := clientsmock.NewNodeClient()
-	sig2 := mockChainState.KeyPairs[opId2].SignMessage(bhh)
-	mockClient2.On("StoreChunks", mock.Anything, mock.Anything).Return(sig2, nil)
-	components.NodeClientManager.On("GetClient", mock.Anything, op2Port).Return(mockClient2, nil)
-
-	// start a goroutine to collect heartbeats
-	var seen []healthcheck.HeartbeatMessage
-	done := make(chan struct{})
-	go func() {
-		for hb := range components.LivenessChan {
-			seen = append(seen, hb)
-		}
-		close(done)
-	}()
-	sigChan, batchData, err := components.Controller.HandleBatch(ctx, nil)
-	require.NoError(t, err)
-	for _, key := range objs.blobKeys {
-		components.CallbackBlobSet.AssertCalled(t, "RemoveBlob", key)
-		components.BlobSet.AssertCalled(t, "AddBlob", key)
-		components.BlobSet.AssertCalled(t, "Contains", key)
-	}
-	components.CallbackBlobSet.AssertNumberOfCalls(t, "RemoveBlob", len(objs.blobKeys))
-	components.BlobSet.AssertNumberOfCalls(t, "AddBlob", len(objs.blobKeys))
-	components.BlobSet.AssertNumberOfCalls(t, "Contains", len(objs.blobKeys))
-	err = components.Controller.HandleSignatures(ctx, ctx, batchData, sigChan)
-	require.NoError(t, err)
-	for _, key := range objs.blobKeys {
-		components.BlobSet.AssertCalled(t, "RemoveBlob", key)
-	}
-
-	// Test that the blob metadata status are updated
-	bm0, err := components.BlobMetadataStore.GetBlobMetadata(ctx, objs.blobKeys[0])
-	require.NoError(t, err)
-	require.Equal(t, commonv2.Complete, bm0.BlobStatus)
-	bm1, err := components.BlobMetadataStore.GetBlobMetadata(ctx, objs.blobKeys[1])
-	require.NoError(t, err)
-	require.Equal(t, commonv2.Complete, bm1.BlobStatus)
-
-	// Get batch header
-	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, objs.blobKeys[0])
-	require.NoError(t, err)
-	require.Len(t, vis, 1)
-	bhh, err = vis[0].BatchHeader.Hash()
-	require.NoError(t, err)
-
-	// Test that attestation is written
-	att, err := components.BlobMetadataStore.GetAttestation(ctx, bhh)
-	require.NoError(t, err)
-	require.NotNil(t, att)
-	require.Equal(t, vis[0].BatchHeader, att.BatchHeader)
-	require.Greater(t, att.AttestedAt, uint64(0))
-	require.Len(t, att.NonSignerPubKeys, 0)
-	require.NotNil(t, att.APKG2)
-	require.Len(t, att.QuorumAPKs, 2)
-	require.NotNil(t, att.Sigma)
-	require.ElementsMatch(t, att.QuorumNumbers, []core.QuorumID{0, 1})
-	require.InDeltaMapValues(t, map[core.QuorumID]uint8{0: 100, 1: 100}, att.QuorumResults, 0)
-
-	// give the signals a moment to be sent
-	time.Sleep(10 * time.Millisecond)
-	// signal that we're done listening
-	close(components.LivenessChan)
-	<-done
-
-	// now assert on what we saw
-	require.NotEmpty(t, seen, "expected at least one heartbeat")
-	for _, hb := range seen {
-		require.Equal(t, "dispatcher", hb.Component)
-	}
-	// timestamps are non‐decreasing
-	for i := 1; i < len(seen); i++ {
-		prev, curr := seen[i-1].Timestamp, seen[i].Timestamp
-		require.True(t, !curr.Before(prev), "timestamps should not decrease")
-	}
-
-	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
+	LivenessChan chan healthcheck.HeartbeatMessage
 }
 
 func TestControllerInsufficientSignatures(t *testing.T) {
 	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("Contains", mock.Anything).Return(false)
-	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	failedObjs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	successfulObjs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
 	ctx := context.Background()
@@ -247,7 +127,6 @@ func TestControllerInsufficientSignatures(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, commonv2.Complete, bm.BlobStatus)
 	}
-	components.BlobSet.AssertNumberOfCalls(t, "RemoveBlob", len(failedObjs.blobKeys)+len(successfulObjs.blobKeys))
 
 	// Get batch header
 	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, failedObjs.blobKeys[0])
@@ -294,10 +173,6 @@ func TestControllerInsufficientSignatures2(t *testing.T) {
 	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("Contains", mock.Anything).Return(false)
-	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	objsInBothQuorum := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	objsInQuorum1 := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
 	ctx := context.Background()
@@ -335,11 +210,18 @@ func TestControllerInsufficientSignatures2(t *testing.T) {
 		}
 		close(done)
 	}()
-	sigChan, batchData, err := components.Controller.HandleBatch(ctx, nil)
-	require.NoError(t, err)
 
-	err = components.Controller.HandleSignatures(ctx, ctx, batchData, sigChan)
-	require.NoError(t, err)
+	handledBlobCount := 0
+	totalBlobCount := len(objsInBothQuorum.blobKeys) + len(objsInQuorum1.blobKeys)
+	for handledBlobCount < totalBlobCount {
+		sigChan, batchData, err := components.Controller.HandleBatch(ctx, nil)
+		require.NoError(t, err)
+
+		err = components.Controller.HandleSignatures(ctx, ctx, batchData, sigChan)
+		require.NoError(t, err)
+
+		handledBlobCount += len(batchData.Batch.BlobCertificates)
+	}
 
 	// Test that the blob metadata status are updated
 	for _, blobKey := range objsInBothQuorum.blobKeys {
@@ -395,22 +277,18 @@ func TestControllerMaxBatchSize(t *testing.T) {
 	components := newControllerComponents(t)
 	defer components.BatchMetadataManager.Close()
 
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("Contains", mock.Anything).Return(false)
-	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	numBlobs := 12
+	batchedBlobs := 0
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, numBlobs)
 	ctx := context.Background()
-	expectedNumBatches := (numBlobs + int(maxBatchSize) - 1) / int(maxBatchSize)
-	for i := 0; i < expectedNumBatches; i++ {
+	for batchedBlobs < numBlobs {
 		batchData, err := components.Controller.NewBatch(ctx, nil)
 		require.NoError(t, err)
-		if i < expectedNumBatches-1 {
-			require.Len(t, batchData.Batch.BlobCertificates, int(maxBatchSize))
-		} else {
-			require.Len(t, batchData.Batch.BlobCertificates, numBlobs%int(maxBatchSize))
-		}
+
+		batchSize := int32(len(batchData.Batch.BlobCertificates))
+		require.LessOrEqual(t, batchSize, maxBatchSize)
+		batchedBlobs += int(batchSize)
+		require.LessOrEqual(t, batchedBlobs, numBlobs)
 	}
 
 	for _, key := range objs.blobKeys {
@@ -420,157 +298,6 @@ func TestControllerMaxBatchSize(t *testing.T) {
 
 	_, err := components.Controller.NewBatch(ctx, nil)
 	require.ErrorContains(t, err, "no blobs to dispatch")
-
-	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
-}
-
-func TestControllerNewBatch(t *testing.T) {
-	components := newControllerComponents(t)
-	defer components.BatchMetadataManager.Close()
-
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("Contains", mock.Anything).Return(false)
-	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
-	require.Len(t, objs.blobHedaers, 2)
-	require.Len(t, objs.blobKeys, 2)
-	require.Len(t, objs.blobMetadatas, 2)
-	require.Len(t, objs.blobCerts, 2)
-	ctx := context.Background()
-
-	batchData, err := components.Controller.NewBatch(ctx, nil)
-	require.NoError(t, err)
-	batch := batchData.Batch
-	bhh, keys, state := batchData.BatchHeaderHash, batchData.BlobKeys, batchData.OperatorState
-	require.NotNil(t, batch)
-	require.NotNil(t, batch.BatchHeader)
-	require.NotNil(t, bhh)
-	require.NotNil(t, keys)
-	require.NotNil(t, state)
-	require.ElementsMatch(t, keys, objs.blobKeys)
-
-	// Test that the batch header hash is correct
-	hash, err := batch.BatchHeader.Hash()
-	require.NoError(t, err)
-	require.Equal(t, bhh, hash)
-
-	// Test that the batch header is correct
-	require.Equal(t, blockNumber-finalizationBlockDelay, batch.BatchHeader.ReferenceBlockNumber)
-	require.NotNil(t, batch.BatchHeader.BatchRoot)
-
-	// Test that the batch header is written
-	bh, err := components.BlobMetadataStore.GetBatchHeader(ctx, bhh)
-	require.NoError(t, err)
-	require.NotNil(t, bh)
-	require.Equal(t, bh, batch.BatchHeader)
-
-	// Test that blob inclusion infos are written
-	vi0, err := components.BlobMetadataStore.GetBlobInclusionInfo(ctx, objs.blobKeys[0], bhh)
-	require.NoError(t, err)
-	require.NotNil(t, vi0)
-	cert := batch.BlobCertificates[vi0.BlobIndex]
-	require.Equal(t, objs.blobHedaers[0], cert.BlobHeader)
-	require.Equal(t, objs.blobKeys[0], vi0.BlobKey)
-	require.Equal(t, bh, vi0.BatchHeader)
-	certHash, err := cert.Hash()
-	require.NoError(t, err)
-	proof, err := core.DeserializeMerkleProof(vi0.InclusionProof, uint64(vi0.BlobIndex))
-	require.NoError(t, err)
-	verified, err := merkletree.VerifyProofUsing(certHash[:], false, proof, [][]byte{vi0.BatchRoot[:]}, keccak256.New())
-	require.NoError(t, err)
-	require.True(t, verified)
-
-	for _, key := range objs.blobKeys {
-		err = blobMetadataStore.UpdateBlobStatus(ctx, key, commonv2.GatheringSignatures)
-		require.NoError(t, err)
-	}
-
-	// Attempt to create a batch with the same blobs
-	_, err = components.Controller.NewBatch(ctx, nil)
-	require.ErrorContains(t, err, "no blobs to dispatch")
-
-	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
-}
-
-func TestControllerNewBatchFailure(t *testing.T) {
-	components := newControllerComponents(t)
-	defer components.BatchMetadataManager.Close()
-
-	numBlobs := int(maxBatchSize + 1)
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("Contains", mock.Anything).Return(false)
-	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, numBlobs)
-	require.Len(t, objs.blobHedaers, numBlobs)
-	require.Len(t, objs.blobKeys, numBlobs)
-	require.Len(t, objs.blobMetadatas, numBlobs)
-	require.Len(t, objs.blobCerts, numBlobs)
-	ctx := context.Background()
-
-	// process one batch to set cursor
-	_, err := components.Controller.NewBatch(ctx, nil)
-	require.NoError(t, err)
-	for i := 0; i < int(maxBatchSize); i++ {
-		err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[i], commonv2.GatheringSignatures)
-		require.NoError(t, err)
-	}
-
-	// create blob with old UpdatedAt timestamp (will appear earlier in query results due to sorting)
-	oldTimestampKey, oldTimestampHeader := newBlob(t, []core.QuorumID{0, 1})
-	meta := &commonv2.BlobMetadata{
-		BlobHeader: oldTimestampHeader,
-		BlobStatus: commonv2.Encoded,
-		Expiry:     objs.blobMetadatas[0].Expiry,
-		NumRetries: 0,
-		UpdatedAt:  objs.blobMetadatas[0].UpdatedAt - uint64(time.Hour.Nanoseconds()),
-	}
-	err = blobMetadataStore.PutBlobMetadata(ctx, meta)
-	require.NoError(t, err)
-	oldTimestampCert := &corev2.BlobCertificate{
-		BlobHeader: oldTimestampHeader,
-		RelayKeys:  []corev2.RelayKey{0, 1, 2},
-	}
-	err = blobMetadataStore.PutBlobCertificate(ctx, oldTimestampCert, &encoding.FragmentInfo{})
-	require.NoError(t, err)
-
-	// process another batch (skips blob with old UpdatedAt due to cursor position)
-	batchData, err := components.Controller.NewBatch(ctx, nil)
-	require.NoError(t, err)
-	require.Len(t, batchData.Batch.BlobCertificates, 1)
-	require.Equal(t, objs.blobKeys[maxBatchSize], batchData.BlobKeys[0])
-	err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[maxBatchSize], commonv2.GatheringSignatures)
-	require.NoError(t, err)
-
-	// cursor resets to beginning and picks up blob with old UpdatedAt
-	newBatchData, err := components.Controller.NewBatch(ctx, nil)
-	require.NoError(t, err)
-	require.Len(t, batchData.Batch.BlobCertificates, 1)
-	require.Equal(t, oldTimestampKey, newBatchData.BlobKeys[0])
-
-	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{batchData.BatchHeaderHash, batchData.BatchHeaderHash})
-	deleteBlobs(t,
-		components.BlobMetadataStore,
-		[]corev2.BlobKey{oldTimestampKey},
-		[][32]byte{newBatchData.BatchHeaderHash})
-}
-
-func TestControllerDedupBlobs(t *testing.T) {
-	components := newControllerComponents(t)
-	defer components.BatchMetadataManager.Close()
-
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 1)
-	// It should be dedup'd
-	components.BlobSet.On("Contains", objs.blobKeys[0]).Return(true)
-
-	ctx := context.Background()
-	batchData, err := components.Controller.NewBatch(ctx, nil)
-	require.ErrorContains(t, err, "no blobs to dispatch")
-	require.Nil(t, batchData)
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
 }
@@ -628,77 +355,6 @@ func TestControllerBuildMerkleTree(t *testing.T) {
 	verified, err = merkletree.VerifyProofUsing(hash[:], false, proof, [][]byte{merkleTree.Root()}, keccak256.New())
 	require.NoError(t, err)
 	require.True(t, verified)
-}
-
-func TestControllerFilterStaleBlobs(t *testing.T) {
-	ctx := t.Context()
-	now := time.Now()
-
-	components := newControllerComponents(t)
-	defer components.BatchMetadataManager.Close()
-
-	staleBlobKey, staleBlobHeader := newBlobWithDispersalTime(t, now.Add(-time.Minute).UnixNano(), []core.QuorumID{0, 1})
-	freshBlobKey, freshBlobHeader := newBlobWithDispersalTime(t, now.UnixNano(), []core.QuorumID{0, 1})
-
-	staleMetadata := &commonv2.BlobMetadata{
-		BlobHeader: staleBlobHeader,
-		BlobStatus: commonv2.Encoded,
-		Expiry:     uint64(now.Add(time.Hour).Unix()),
-		NumRetries: 0,
-		UpdatedAt:  uint64(now.UnixNano()),
-	}
-	freshMetadata := &commonv2.BlobMetadata{
-		BlobHeader: freshBlobHeader,
-		BlobStatus: commonv2.Encoded,
-		Expiry:     uint64(now.Add(time.Hour).Unix()),
-		NumRetries: 0,
-		UpdatedAt:  uint64(now.UnixNano()),
-	}
-
-	err := blobMetadataStore.PutBlobMetadata(ctx, staleMetadata)
-	require.NoError(t, err)
-	err = blobMetadataStore.PutBlobMetadata(ctx, freshMetadata)
-	require.NoError(t, err)
-
-	staleCert := &corev2.BlobCertificate{
-		BlobHeader: staleBlobHeader,
-		RelayKeys:  []corev2.RelayKey{0, 1, 2},
-	}
-	freshCert := &corev2.BlobCertificate{
-		BlobHeader: freshBlobHeader,
-		RelayKeys:  []corev2.RelayKey{0, 1, 2},
-	}
-	err = blobMetadataStore.PutBlobCertificate(ctx, staleCert, &encoding.FragmentInfo{})
-	require.NoError(t, err)
-	err = blobMetadataStore.PutBlobCertificate(ctx, freshCert, &encoding.FragmentInfo{})
-	require.NoError(t, err)
-
-	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("Contains", mock.Anything).Return(false)
-	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
-	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
-
-	batchData, err := components.Controller.NewBatch(ctx, nil)
-	require.NoError(t, err)
-	require.NotNil(t, batchData)
-	require.Len(t, batchData.Batch.BlobCertificates, 1)
-	require.Equal(t, freshBlobKey, batchData.BlobKeys[0])
-
-	fetchedStaleMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, staleBlobKey)
-	require.NoError(t, err)
-	require.Equal(t, commonv2.Failed, fetchedStaleMetadata.BlobStatus)
-
-	fetchedFreshMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, freshBlobKey)
-	require.NoError(t, err)
-	require.Equal(t, commonv2.Encoded, fetchedFreshMetadata.BlobStatus)
-
-	components.BlobSet.AssertCalled(t, "AddBlob", freshBlobKey)
-	components.BlobSet.AssertNotCalled(t, "AddBlob", staleBlobKey)
-
-	deleteBlobs(t,
-		components.BlobMetadataStore,
-		[]corev2.BlobKey{staleBlobKey, freshBlobKey},
-		[][32]byte{batchData.BatchHeaderHash})
 }
 
 type testObjects struct {
@@ -770,13 +426,6 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 	require.NoError(t, err)
 	nodeClientManager := &controller.MockClientManager{}
 	mockChainState.On("GetCurrentBlockNumber").Return(uint(blockNumber), nil)
-	callBackBlobSet := &controller.MockBlobSet{}
-	beforeDispatch := func(blobKey corev2.BlobKey) error {
-		callBackBlobSet.RemoveBlob(blobKey)
-		return nil
-	}
-	blobSet := &controller.MockBlobSet{}
-	blobSet.On("Size", mock.Anything).Return(0)
 
 	livenessChan := make(chan healthcheck.HeartbeatMessage, 100)
 
@@ -790,21 +439,27 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 	metadataManager := metadata.NewMockBatchMetadataManager(
 		metadata.NewBatchMetadata(referenceBlockNumber, operatorState))
 
+	controllerConfig := controller.DefaultControllerConfig()
+	controllerConfig.FinalizationBlockDelay = finalizationBlockDelay
+	controllerConfig.AttestationTimeout = 1 * time.Second
+	controllerConfig.BatchAttestationTimeout = 2 * time.Second
+	controllerConfig.SignatureTickInterval = 1 * time.Second
+	controllerConfig.MaxBatchSize = maxBatchSize
+	controllerConfig.NumConcurrentRequests = 10
+	controllerConfig.NodeClientCacheSize = 10
+	controllerConfig.SigningRateRetentionPeriod = 1 * time.Minute
+	controllerConfig.SigningRateBucketSpan = 30 * time.Second
+	controllerConfig.SigningRateDynamoDbTableName = "validator-signing-rates"
+	controllerConfig.DispersalRequestSigner.PrivateKey = "this is just a placeholder"
+	controllerConfig.EncodingManager = *controller.DefaultEncodingManagerConfig()
+	controllerConfig.EncodingManager.AvailableRelays = []corev2.RelayKey{0}
+	controllerConfig.EncodingManager.EncoderAddress = "placeholder"
+	controllerConfig.PaymentAuthorization = *controller.DefaultPaymentAuthorizationConfig()
+	controllerConfig.PaymentAuthorization.OnDemandConfig.OnDemandTableName = "on-demand-payments"
+
 	d, err := controller.NewController(
-		&controller.ControllerConfig{
-			PullInterval:               1 * time.Second,
-			FinalizationBlockDelay:     finalizationBlockDelay,
-			AttestationTimeout:         1 * time.Second,
-			BatchMetadataUpdatePeriod:  1 * time.Minute,
-			BatchAttestationTimeout:    2 * time.Second,
-			SignatureTickInterval:      1 * time.Second,
-			MaxBatchSize:               maxBatchSize,
-			NumConcurrentRequests:      10,
-			NodeClientCacheSize:        10,
-			MaxDispersalAge:            45 * time.Second,
-			SigningRateRetentionPeriod: 1 * time.Minute,
-			SigningRateBucketSpan:      30 * time.Second,
-		},
+		t.Context(),
+		controllerConfig,
 		time.Now,
 		blobMetadataStore,
 		pool,
@@ -813,9 +468,7 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 		agg,
 		nodeClientManager,
 		logger,
-		prometheus.NewRegistry(),
-		beforeDispatch,
-		blobSet,
+		nil, // metrics, no-op if nil
 		livenessChan,
 		signingrate.NewNoOpSigningRateTracker(),
 		nil, // userAccountRemapping
@@ -831,9 +484,6 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 		ChainState:           mockChainState,
 		SigAggregator:        agg,
 		NodeClientManager:    nodeClientManager,
-		BeforeDispatch:       beforeDispatch,
-		CallbackBlobSet:      callBackBlobSet,
-		BlobSet:              blobSet,
 		LivenessChan:         livenessChan,
 	}
 }

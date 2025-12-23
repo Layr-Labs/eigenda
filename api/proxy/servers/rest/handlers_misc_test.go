@@ -43,7 +43,6 @@ func TestConfigEndpoint(t *testing.T) {
 			DirectoryAddress:    "0x1234567890abcdef",
 			CertVerifierAddress: "0xfedcba0987654321",
 			MaxPayloadSizeBytes: 16777216, // 16 MiB
-			RecencyWindowSize:   100,
 			APIsEnabled:         enabledServicesConfig.ToAPIStrings(),
 		}
 
@@ -75,7 +74,6 @@ func TestConfigEndpoint(t *testing.T) {
 		require.Equal(t, testCompatibilityConfig.DirectoryAddress, response.DirectoryAddress)
 		require.Equal(t, testCompatibilityConfig.CertVerifierAddress, response.CertVerifierAddress)
 		require.Equal(t, testCompatibilityConfig.MaxPayloadSizeBytes, response.MaxPayloadSizeBytes)
-		require.Equal(t, testCompatibilityConfig.RecencyWindowSize, response.RecencyWindowSize)
 		require.Equal(t, testCompatibilityConfig.APIsEnabled, response.APIsEnabled)
 	})
 }

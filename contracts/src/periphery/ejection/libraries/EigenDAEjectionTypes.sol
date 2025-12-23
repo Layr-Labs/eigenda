@@ -9,7 +9,6 @@ library EigenDAEjectionTypes {
     struct EjectionRecord {
         address ejector;
         uint64 proceedingTime;
-        uint256 depositAmount;
         bytes quorums;
     }
 
