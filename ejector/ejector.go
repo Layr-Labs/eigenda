@@ -1,9 +1,11 @@
 package ejector
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -16,6 +18,7 @@ import (
 type Ejector struct {
 	ctx    context.Context
 	logger logging.Logger
+	config *EjectorConfig
 
 	// Responsible for executing ejections and managing the ejection lifecycle.
 	ejectionManager *ThreadedEjectionManager
@@ -26,12 +29,6 @@ type Ejector struct {
 
 	// Used for looking up signing rates for V2.
 	signingRateLookupV2 SigningRateLookup
-
-	// The frequency with which to evaluate validators for ejection.
-	period time.Duration
-
-	// Defines the time window over which to evaluate signing metrics when deciding whether to eject a validator.
-	ejectionCriteriaTimeWindow time.Duration
 
 	// Used to convert validator IDs to validator addresses.
 	validatorIDToAddressCache eth.ValidatorIDToAddressConverter
@@ -44,6 +41,9 @@ type Ejector struct {
 
 	// Used to look up validator stake fractions.
 	validatorStakeLookup eth.ValidatorStakeLookup
+
+	// The last time signing rates were logged verbosely.
+	lastSigningRateLogTime time.Time
 }
 
 // NewEjector creates a new Ejector.
@@ -60,17 +60,16 @@ func NewEjector(
 	validatorStakeLookup eth.ValidatorStakeLookup,
 ) *Ejector {
 	e := &Ejector{
-		ctx:                        ctx,
-		logger:                     logger,
-		ejectionManager:            ejectionManager,
-		signingRateLookupV1:        signingRateLookupV1,
-		signingRateLookupV2:        signingRateLookupV2,
-		period:                     config.EjectionPeriod,
-		ejectionCriteriaTimeWindow: config.EjectionCriteriaTimeWindow,
-		validatorIDToAddressCache:  validatorIDToAddressCache,
-		referenceBlockProvider:     referenceBlockProvider,
-		validatorQuorumLookup:      validatorQuorumLookup,
-		validatorStakeLookup:       validatorStakeLookup,
+		ctx:                       ctx,
+		logger:                    logger,
+		config:                    config,
+		ejectionManager:           ejectionManager,
+		signingRateLookupV1:       signingRateLookupV1,
+		signingRateLookupV2:       signingRateLookupV2,
+		validatorIDToAddressCache: validatorIDToAddressCache,
+		referenceBlockProvider:    referenceBlockProvider,
+		validatorQuorumLookup:     validatorQuorumLookup,
+		validatorStakeLookup:      validatorStakeLookup,
 	}
 
 	go e.mainLoop()
@@ -80,9 +79,9 @@ func NewEjector(
 
 // The main loop periodically evaluates validators for ejection.
 func (e *Ejector) mainLoop() {
-	e.logger.Debugf("ejector started, evaluating validators for ejection every %s", e.period.String())
+	e.logger.Debugf("ejector started, evaluating validators for ejection every %s", e.config.EjectionPeriod.String())
 
-	ticker := time.NewTicker(e.period)
+	ticker := time.NewTicker(e.config.EjectionPeriod)
 	defer ticker.Stop()
 
 	for {
@@ -104,25 +103,32 @@ func (e *Ejector) evaluateValidators() error {
 
 	e.logger.Debug("evaluating validators for ejection")
 
+	omitPerfectSigners := true
+	if e.config.SigningRateLogPeriod > 0 {
+		omitPerfectSigners = false
+	}
+
 	v1SigningRates, err := e.signingRateLookupV1.GetSigningRates(
-		e.ejectionCriteriaTimeWindow,
+		e.config.EjectionCriteriaTimeWindow,
 		nil, // all quorums
 		ProtocolVersionV1,
-		true, // omit perfect signers if possible (data API has inconsistent behavior across v1 and v2)
+		omitPerfectSigners,
 	)
 	if err != nil {
 		return fmt.Errorf("error looking up v1 signing rates: %w", err)
 	}
 
 	v2SigningRates, err := e.signingRateLookupV2.GetSigningRates(
-		e.ejectionCriteriaTimeWindow,
+		e.config.EjectionCriteriaTimeWindow,
 		nil, // all quorums
 		ProtocolVersionV2,
-		true, // omit perfect signers if possible (data API has inconsistent behavior across v1 and v2)
+		omitPerfectSigners,
 	)
 	if err != nil {
 		return fmt.Errorf("error looking up v2 signing rates: %w", err)
 	}
+
+	e.logSigningRates(v1SigningRates, v2SigningRates)
 
 	// Combine data from v1 and v2 lookups, since the validator is likely to cancel ejection if it is active in either.
 	signingRates, err := combineSigningRateSlices(v1SigningRates, v2SigningRates)
@@ -217,4 +223,91 @@ func (e *Ejector) getStakeFractionMap(validatorID core.OperatorID) (map[core.Quo
 	}
 
 	return stakeFractions, nil
+}
+
+// Verbose logging of signing rates. Useful for debugging problems with signing rate tracking/lookup.
+func (e *Ejector) logSigningRates(
+	v1SigningRates []*validator.ValidatorSigningRate,
+	v2SigningRates []*validator.ValidatorSigningRate,
+) {
+
+	if e.config.SigningRateLogPeriod == 0 {
+		// Signing rate logging disabled.
+		return
+	}
+
+	if time.Since(e.lastSigningRateLogTime) < e.config.SigningRateLogPeriod {
+		// Not time to log yet.
+		return
+	}
+
+	e.lastSigningRateLogTime = time.Now()
+
+	// Create an index of all validators seen in either v1 or v2 data.
+	validatorSet := make(map[core.OperatorID]struct{})
+	v1Data := make(map[core.OperatorID]*validator.ValidatorSigningRate)
+	v2Data := make(map[core.OperatorID]*validator.ValidatorSigningRate)
+
+	for _, rate := range v1SigningRates {
+		id := core.OperatorID(rate.GetValidatorId()[:])
+		validatorSet[id] = struct{}{}
+		v1Data[id] = rate
+	}
+	for _, rate := range v2SigningRates {
+		id := core.OperatorID(rate.GetValidatorId()[:])
+		validatorSet[id] = struct{}{}
+		v2Data[id] = rate
+	}
+
+	validatorList := make([]core.OperatorID, 0, len(validatorSet))
+	for id := range validatorSet {
+		validatorList = append(validatorList, id)
+	}
+
+	// Sort by validator ID for consistent logging order.
+	sort.Slice(validatorList, func(i, j int) bool {
+		return bytes.Compare(validatorList[i][:], validatorList[j][:]) < 0
+	})
+
+	var logBuilder bytes.Buffer
+	logBuilder.WriteString("Signing Rates (signed batches, unsigned batches, signed bytes, unsigned bytes) | ")
+
+	for i, id := range validatorList {
+		if i > 0 {
+			logBuilder.WriteString(" | ")
+		}
+
+		v1Rate, v1Exists := v1Data[id]
+		v2Rate, v2Exists := v2Data[id]
+
+		logBuilder.WriteString(fmt.Sprintf("%s: ", id.Hex()))
+
+		if v1Exists {
+			logBuilder.WriteString(fmt.Sprintf(
+				"V1: %d, %d, %d, %d",
+				v1Rate.GetSignedBatches(),
+				v1Rate.GetUnsignedBatches(),
+				v1Rate.GetSignedBytes(),
+				v1Rate.GetUnsignedBytes(),
+			))
+		} else {
+			logBuilder.WriteString("V1: No data")
+		}
+
+		logBuilder.WriteString("; ")
+
+		if v2Exists {
+			logBuilder.WriteString(fmt.Sprintf(
+				"V2: %d, %d, %d, %d",
+				v2Rate.GetSignedBatches(),
+				v2Rate.GetUnsignedBatches(),
+				v2Rate.GetSignedBytes(),
+				v2Rate.GetUnsignedBytes(),
+			))
+		} else {
+			logBuilder.WriteString("V2: No data")
+		}
+	}
+
+	e.logger.Info(logBuilder.String())
 }

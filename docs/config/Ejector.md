@@ -6,32 +6,37 @@
 
 | Name | Type | Description |
 |------|------|-------------|
-| $${\color{red}\texttt{Config.ContractDirectoryAddress}}$$<br>`EJECTOR_CONFIG_CONTRACT_DIRECTORY_ADDRESS` | `string` | The address of the contract directory contract. |
-| $${\color{red}\texttt{Config.DataApiUrl}}$$<br>`EJECTOR_CONFIG_DATA_API_URL` | `string` | The URL of the Eigenda Data API to use for looking up signing rates. |
-| $${\color{red}\texttt{Secret.EthRpcUrls}}$$<br>`EJECTOR_SECRET_ETH_RPC_URLS` | `[]string` | The Ethereum RPC URL(s) to use for connecting to the blockchain. |
-| $${\color{red}\texttt{Secret.PrivateKey}}$$<br>`EJECTOR_SECRET_PRIVATE_KEY` | `string` | The private key to use for signing ejection transactions, in hex. Do not include the '0x' prefix. |
+| $${\color{red}\texttt{ContractDirectoryAddress}}$$<br>`EJECTOR_CONTRACT_DIRECTORY_ADDRESS` | `string` | The address of the contract directory contract. |
+| $${\color{red}\texttt{DataApiUrl}}$$<br>`EJECTOR_DATA_API_URL` | `string` | The URL of the Eigenda Data API to use for looking up signing rates. |
+| $${\color{red}\texttt{EthRpcUrls}}$$<br>`EJECTOR_ETH_RPC_URLS` | `[]*secret.Secret` | The Ethereum RPC URL(s) to use for connecting to the blockchain. |
+| $${\color{red}\texttt{KmsKeyId}}$$<br>`EJECTOR_KMS_KEY_ID` | `string` | The AWS KMS Key ID to use for signing transactions. Only required if the private key is not provided via the PrivateKey field. |
+| $${\color{red}\texttt{KmsRegion}}$$<br>`EJECTOR_KMS_REGION` | `string` | The AWS region where the KMS key is located. Only required if KmsKeyId is provided. |
+| $${\color{red}\texttt{PrivateKey}}$$<br>`EJECTOR_PRIVATE_KEY` | `*secret.Secret` | The private key to use for signing ejection transactions, in hex. Do not include the '0x' prefix. This is required if KMS is not configured. |
 
 ## Optional Fields
 
 | Name | Type<br>Default | Description |
 |------|--------------|-------------|
-| $${\color{red}\texttt{Config.ChainDataCacheSize}}$$<br>`EJECTOR_CONFIG_CHAIN_DATA_CACHE_SIZE` | `uint64`<br>`1024` | The size for the caches for on-chain data. |
-| $${\color{red}\texttt{Config.DataApiTimeout}}$$<br>`EJECTOR_CONFIG_DATA_API_TIMEOUT` | `time.Duration`<br>`1m0s` | The timeout to use when making requests to the Data API. |
-| $${\color{red}\texttt{Config.DoNotEjectTheseValidators}}$$<br>`EJECTOR_CONFIG_DO_NOT_EJECT_THESE_VALIDATORS` | `[]string`<br>`[]` | A list of validator addresses that we should never attempt to eject, even if they otherwise meet the ejection criteria. |
-| $${\color{red}\texttt{Config.EjectionCriteriaTimeWindow}}$$<br>`EJECTOR_CONFIG_EJECTION_CRITERIA_TIME_WINDOW` | `time.Duration`<br>`10m0s` | The time window over which to evaluate signing metrics when deciding whether to eject a validator. |
-| $${\color{red}\texttt{Config.EjectionFinalizationDelay}}$$<br>`EJECTOR_CONFIG_EJECTION_FINALIZATION_DELAY` | `time.Duration`<br>`1h0m0s` | The time between starting an ejection and when the ejection can be finalized. |
-| $${\color{red}\texttt{Config.EjectionFinalizationPeriod}}$$<br>`EJECTOR_CONFIG_EJECTION_FINALIZATION_PERIOD` | `time.Duration`<br>`1m0s` | The period at which to periodically attempt to finalize ejections that have been started. |
-| $${\color{red}\texttt{Config.EjectionPeriod}}$$<br>`EJECTOR_CONFIG_EJECTION_PERIOD` | `time.Duration`<br>`1m0s` | The period with which to evaluate validators for ejection. |
-| $${\color{red}\texttt{Config.EjectionRetryDelay}}$$<br>`EJECTOR_CONFIG_EJECTION_RETRY_DELAY` | `time.Duration`<br>`24h0m0s` | The minimum time to wait before retrying a failed ejection. |
-| $${\color{red}\texttt{Config.EjectionThrottle}}$$<br>`EJECTOR_CONFIG_EJECTION_THROTTLE` | `float64`<br>`0.05` | The maximum fraction of stake (out of 1.0) that can be ejected during an ejection time period. |
-| $${\color{red}\texttt{Config.EjectionThrottleTimePeriod}}$$<br>`EJECTOR_CONFIG_EJECTION_THROTTLE_TIME_PERIOD` | `time.Duration`<br>`24h0m0s` | The time period over which the ejection rate limit is calculated. The ejection manager will be allowed to eject ejectionRateLimit fraction of stake every EjectionThrottleTimePeriod. |
-| $${\color{red}\texttt{Config.EthBlockConfirmations}}$$<br>`EJECTOR_CONFIG_ETH_BLOCK_CONFIRMATIONS` | `int`<br>`0` | The number of block confirmations to wait for before considering an ejection transaction to be confirmed. |
-| $${\color{red}\texttt{Config.EthRpcRetryCount}}$$<br>`EJECTOR_CONFIG_ETH_RPC_RETRY_COUNT` | `int`<br>`3` | The number of times to retry a failed Ethereum RPC call. |
-| $${\color{red}\texttt{Config.LogColor}}$$<br>`EJECTOR_CONFIG_LOG_COLOR` | `bool`<br>`false` | Whether to enable color in log output (only applies to text output). |
-| $${\color{red}\texttt{Config.LogOutputType}}$$<br>`EJECTOR_CONFIG_LOG_OUTPUT_TYPE` | `string`<br>`"json"` | The output type for logs, must be "json" or "text". |
-| $${\color{red}\texttt{Config.MaxConsecutiveFailedEjectionAttempts}}$$<br>`EJECTOR_CONFIG_MAX_CONSECUTIVE_FAILED_EJECTION_ATTEMPTS` | `uint32`<br>`5` | The maximum number of consecutive failed ejection attempts before giving up on ejecting a validator. |
-| $${\color{red}\texttt{Config.MaxGasOverride}}$$<br>`EJECTOR_CONFIG_MAX_GAS_OVERRIDE` | `uint64`<br>`10000000` | If non-zero, this value will be used as the gas limit for transactions, overriding the gas estimation. |
-| $${\color{red}\texttt{Config.ReferenceBlockNumberOffset}}$$<br>`EJECTOR_CONFIG_REFERENCE_BLOCK_NUMBER_OFFSET` | `uint64`<br>`64` | The number of blocks to wait before using a reference block number. That is to say, do not always read data from the latest block we know about, but rather read from a block that is sufficiently old as to make choosing the wrong fork unlikely. |
-| $${\color{red}\texttt{Config.ReferenceBlockNumberPollInterval}}$$<br>`EJECTOR_CONFIG_REFERENCE_BLOCK_NUMBER_POLL_INTERVAL` | `time.Duration`<br>`10s` | The interval at which to poll for a new reference block number. |
-| $${\color{red}\texttt{Config.StartEjectionThrottleFull}}$$<br>`EJECTOR_CONFIG_START_EJECTION_THROTTLE_FULL` | `bool`<br>`false` | If true, then the ejection manager will immediately be able to eject ejectionRateLimit fraction of stake when it starts up. If false, then the ejection manager will need to wait before it has this capacity. |
+| $${\color{red}\texttt{ChainDataCacheSize}}$$<br>`EJECTOR_CHAIN_DATA_CACHE_SIZE` | `uint64`<br>`1024` | The size for the caches for on-chain data. |
+| $${\color{red}\texttt{DataApiTimeout}}$$<br>`EJECTOR_DATA_API_TIMEOUT` | `time.Duration`<br>`1m0s` | The timeout to use when making requests to the Data API. |
+| $${\color{red}\texttt{DisableEjections}}$$<br>`EJECTOR_DISABLE_EJECTIONS` | `bool`<br>`false` | Flip this flag to true if you want to disable ejections. Useful for emergency situations where you want to stop the ejector from ejecting validators, but without tearing down the kube infrastructure. |
+| $${\color{red}\texttt{DoNotEjectTheseValidators}}$$<br>`EJECTOR_DO_NOT_EJECT_THESE_VALIDATORS` | `[]string`<br>`[]` | A list of validator addresses that we should never attempt to eject, even if they otherwise meet the ejection criteria. |
+| $${\color{red}\texttt{EjectionCriteriaTimeWindow}}$$<br>`EJECTOR_EJECTION_CRITERIA_TIME_WINDOW` | `time.Duration`<br>`10m0s` | The time window over which to evaluate signing metrics when deciding whether to eject a validator. |
+| $${\color{red}\texttt{EjectionFinalizationDelay}}$$<br>`EJECTOR_EJECTION_FINALIZATION_DELAY` | `time.Duration`<br>`1h0m0s` | The time between starting an ejection and when the ejection can be finalized. |
+| $${\color{red}\texttt{EjectionFinalizationPeriod}}$$<br>`EJECTOR_EJECTION_FINALIZATION_PERIOD` | `time.Duration`<br>`1m0s` | The period at which to periodically attempt to finalize ejections that have been started. |
+| $${\color{red}\texttt{EjectionPeriod}}$$<br>`EJECTOR_EJECTION_PERIOD` | `time.Duration`<br>`1m0s` | The period with which to evaluate validators for ejection. |
+| $${\color{red}\texttt{EjectionRetryDelay}}$$<br>`EJECTOR_EJECTION_RETRY_DELAY` | `time.Duration`<br>`24h0m0s` | The minimum time to wait before retrying a failed ejection. |
+| $${\color{red}\texttt{EjectionThrottle}}$$<br>`EJECTOR_EJECTION_THROTTLE` | `float64`<br>`0.05` | The maximum fraction of stake (out of 1.0) that can be ejected during an ejection time period. |
+| $${\color{red}\texttt{EjectionThrottleTimePeriod}}$$<br>`EJECTOR_EJECTION_THROTTLE_TIME_PERIOD` | `time.Duration`<br>`24h0m0s` | The time period over which the ejection rate limit is calculated. The ejection manager will be allowed to eject ejectionRateLimit fraction of stake every EjectionThrottleTimePeriod. |
+| $${\color{red}\texttt{EthBlockConfirmations}}$$<br>`EJECTOR_ETH_BLOCK_CONFIRMATIONS` | `int`<br>`0` | The number of block confirmations to wait for before considering an ejection transaction to be confirmed. |
+| $${\color{red}\texttt{EthRpcRetryCount}}$$<br>`EJECTOR_ETH_RPC_RETRY_COUNT` | `int`<br>`3` | The number of times to retry a failed Ethereum RPC call. |
+| $${\color{red}\texttt{KmsEndpoint}}$$<br>`EJECTOR_KMS_ENDPOINT` | `string`<br>`""` | The AWS KMS endpoint to use. Only required if using a custom endpoint (e.g., LocalStack). |
+| $${\color{red}\texttt{LogColor}}$$<br>`EJECTOR_LOG_COLOR` | `bool`<br>`false` | Whether to enable color in log output (only applies to text output). |
+| $${\color{red}\texttt{LogOutputType}}$$<br>`EJECTOR_LOG_OUTPUT_TYPE` | `string`<br>`"json"` | The output type for logs, must be "json" or "text". |
+| $${\color{red}\texttt{MaxConsecutiveFailedEjectionAttempts}}$$<br>`EJECTOR_MAX_CONSECUTIVE_FAILED_EJECTION_ATTEMPTS` | `uint32`<br>`5` | The maximum number of consecutive failed ejection attempts before giving up on ejecting a validator. |
+| $${\color{red}\texttt{MaxGasOverride}}$$<br>`EJECTOR_MAX_GAS_OVERRIDE` | `uint64`<br>`10000000` | If non-zero, this value will be used as the gas limit for transactions, overriding the gas estimation. |
+| $${\color{red}\texttt{ReferenceBlockNumberOffset}}$$<br>`EJECTOR_REFERENCE_BLOCK_NUMBER_OFFSET` | `uint64`<br>`64` | The number of blocks to wait before using a reference block number. That is to say, do not always read data from the latest block we know about, but rather read from a block that is sufficiently old as to make choosing the wrong fork unlikely. |
+| $${\color{red}\texttt{ReferenceBlockNumberPollInterval}}$$<br>`EJECTOR_REFERENCE_BLOCK_NUMBER_POLL_INTERVAL` | `time.Duration`<br>`10s` | The interval at which to poll for a new reference block number. |
+| $${\color{red}\texttt{SigningRateLogPeriod}}$$<br>`EJECTOR_SIGNING_RATE_LOG_PERIOD` | `time.Duration`<br>`1h0m0s` | The period between verbose signing rate data dumps. If zero, then verbose signing rate logging is disabled. |
+| $${\color{red}\texttt{StartEjectionThrottleFull}}$$<br>`EJECTOR_START_EJECTION_THROTTLE_FULL` | `bool`<br>`false` | If true, then the ejection manager will immediately be able to eject ejectionRateLimit fraction of stake when it starts up. If false, then the ejection manager will need to wait before it has this capacity. |
 

@@ -129,6 +129,13 @@ func (em *ejectionManager) BeginEjection(
 	stakeFractions map[core.QuorumID]float64,
 ) {
 
+	// Check if ejections are disabled by configuration.
+	if em.config.DisableEjections {
+		em.logger.Infof("ejections are currently disabled by configuration, will not begin ejection for validator %s",
+			validatorAddress.Hex())
+		return
+	}
+
 	// Sanity check stake fractions.
 	if !em.areStakeFractionsValid(validatorAddress, stakeFractions) {
 		return
