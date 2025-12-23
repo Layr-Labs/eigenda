@@ -12,7 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/api/hashing"
+	hashingv2 "github.com/Layr-Labs/eigenda/api/hashing/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/replay"
@@ -195,13 +195,14 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
 	}
 
-	blobHeadersAndTimestamps, err := hashing.HashBlobHeadersAndTimestamps(in)
+	// Hash each blob header and verify the replay guardian.
+	blobHeaders, err := hashingv2.BlobHeadersHashesAndTimestamps(in)
 	if err != nil {
 		//nolint:wrapcheck
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers and timestamps: %v", err))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers: %v", err))
 	}
 
-	for i, blobHeader := range blobHeadersAndTimestamps {
+	for i, blobHeader := range blobHeaders {
 		err = s.replayGuardian.VerifyRequest(blobHeader.Hash, blobHeader.Timestamp)
 		if err != nil {
 			//nolint:wrapcheck
