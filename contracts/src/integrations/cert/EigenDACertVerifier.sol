@@ -29,6 +29,13 @@ contract EigenDACertVerifier is
     /// @notice The maximum gas spent on abi decode
     uint256 internal constant MAX_ABI_DECODE_GAS = 2_097_152;
 
+    /// @notice The maximum number of quorums this contract supports
+    uint256 internal constant MAX_QUORUM_COUNT = 5;
+
+    /// @notice The maximum number of non-signers this contract supports. This count may include duplicates when
+    ///         an operator belongs to multiple quorums
+    uint256 internal constant MAX_NONSIGNER_COUNT_ALL_QUORUM = 415;
+
     error InvalidSecurityThresholds();
     error InvalidQuorumNumbersRequired(uint256 length);
 
@@ -112,7 +119,7 @@ contract EigenDACertVerifier is
         // The number is chosen such that it
         // 1. should not prevent valid use case that there is a valid cert more than this size
         // 2. should prevent a malicious abiEncodedCert that contains too much data that triggers out of gas for
-        //    abi.encode.
+        //    abi.decode.
         if (abiEncodedCert.length > MAX_CALLDATA_BYTES_LENGTH) {
             return uint8(StatusCode.INVALID_CERT);
         }
@@ -170,7 +177,9 @@ contract EigenDACertVerifier is
             daCert,
             _securityThresholds,
             _quorumNumbersRequired,
-            _offchainDerivationVersion
+            _offchainDerivationVersion,
+            MAX_QUORUM_COUNT,
+            MAX_NONSIGNER_COUNT_ALL_QUORUM
         );
     }
 
