@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/Layr-Labs/eigenda/node/grpc/middleware"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -59,7 +60,13 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 		listener := serverV2.dispersalListener
 
 		opt := grpc.MaxRecvMsgSize(config.GRPCMsgSizeLimitV2)
-		gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption())
+		gs := grpc.NewServer(
+			opt,
+			grpc.ChainUnaryInterceptor(
+				serverV2.metrics.GetGRPCUnaryInterceptor(),
+				middleware.StoreChunksDisperserAuthAndRateLimitInterceptor(serverV2.rateLimiter, serverV2.chunkAuthenticator),
+			),
+		)
 
 		// Register reflection service on gRPC server
 		// This makes "grpcurl -plaintext localhost:9000 list" command work
@@ -110,7 +117,13 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 		listener := serverV2.retrievalListener
 
 		opt := grpc.MaxRecvMsgSize(config.GRPCMsgSizeLimitV2)
-		gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption())
+		gs := grpc.NewServer(
+			opt,
+			grpc.ChainUnaryInterceptor(
+				serverV2.metrics.GetGRPCUnaryInterceptor(),
+				middleware.StoreChunksDisperserAuthAndRateLimitInterceptor(serverV2.rateLimiter, serverV2.chunkAuthenticator),
+			),
+		)
 
 		// Register reflection service on gRPC server
 		// This makes "grpcurl -plaintext localhost:9000 list" command work

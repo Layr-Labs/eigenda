@@ -1,10 +1,13 @@
 package node
 
 import (
+	"os"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/node/flags"
 	"github.com/stretchr/testify/assert"
+	"github.com/urfave/cli"
 )
 
 // TestECDSAKeyRequirementLogic tests the logic for determining when ECDSA keys are required.
@@ -202,4 +205,62 @@ func TestECDSAKeyValidationSuccess(t *testing.T) {
 			assert.True(t, ejectionDefenseValid, "Ejection defense validation should pass")
 		})
 	}
+}
+
+func TestNewConfig_RateLimitConfigFromEnv(t *testing.T) {
+	t.Setenv("NODE_HOSTNAME", "localhost")
+	t.Setenv("NODE_DISPERSAL_PORT", "9000")
+	t.Setenv("NODE_RETRIEVAL_PORT", "9001")
+	t.Setenv("NODE_ENABLE_NODE_API", "true")
+	t.Setenv("NODE_ENABLE_METRICS", "true")
+	t.Setenv("NODE_TIMEOUT", "1s")
+	t.Setenv("NODE_QUORUM_ID_LIST", "0")
+	t.Setenv("NODE_DB_PATH", "/tmp/eigenda-node-test")
+	t.Setenv("NODE_EIGENDA_DIRECTORY", "0x0000000000000000000000000000000000000000")
+	t.Setenv("NODE_CHURNER_URL", "http://localhost:1234")
+	t.Setenv("NODE_PUBLIC_IP_PROVIDER", "ipify")
+	t.Setenv("NODE_PUBLIC_IP_CHECK_INTERVAL", "0s")
+
+	// Minimal eth config required by common/geth flags (still required in test mode).
+	t.Setenv("NODE_CHAIN_RPC", "http://localhost:8545")
+	t.Setenv("NODE_PRIVATE_KEY", "0x00")
+
+	// Required KZG flags (the config reader doesn't validate paths here, but the CLI marks them required).
+	t.Setenv("NODE_G1_PATH", "/tmp/g1.point")
+	t.Setenv("NODE_CACHE_PATH", "/tmp/eigenda-srs-cache")
+	t.Setenv("NODE_SRS_ORDER", "1")
+	t.Setenv("NODE_SRS_LOAD", "1")
+
+	// Avoid v2 port requirements in this config parsing test.
+	t.Setenv("NODE_RUNTIME_MODE", flags.ModeV1Only)
+
+	// Avoid BLS key file requirements by enabling test mode and providing a test private key.
+	t.Setenv("NODE_ENABLE_TEST_MODE", "true")
+	t.Setenv("NODE_TEST_PRIVATE_BLS", "deadbeef")
+
+	// The config under test.
+	t.Setenv("NODE_DISPERSER_RATE_LIMIT_PER_SECOND", "0.5")
+	t.Setenv("NODE_DISPERSER_RATE_LIMIT_BURST", "10")
+
+	app := cli.NewApp()
+	app.Flags = flags.Flags
+
+	var cfg *Config
+	app.Action = func(ctx *cli.Context) error {
+		c, err := NewConfig(ctx)
+		if err != nil {
+			return err
+		}
+		cfg = c
+		return nil
+	}
+
+	// Ensure we don't inherit CLI args from the test runner.
+	err := app.Run([]string{os.Args[0]})
+	assert.NoError(t, err)
+	if !assert.NotNil(t, cfg) {
+		return
+	}
+	assert.InDelta(t, 0.5, cfg.DisperserRateLimitPerSecond, 1e-9)
+	assert.Equal(t, 10, cfg.DisperserRateLimitBurst)
 }

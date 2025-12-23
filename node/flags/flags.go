@@ -392,6 +392,20 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 	}
+	DisperserRateLimitPerSecondFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-rate-limit-per-second"),
+		Usage:    "Rate limit for StoreChunks requests per disperser (requests per second). If <=0, rate limiting is disabled.",
+		Required: false,
+		Value:    0.025, // ~1.5 requests per minute (similar to prior strike threshold)
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_RATE_LIMIT_PER_SECOND"),
+	}
+	DisperserRateLimitBurstFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-rate-limit-burst"),
+		Usage:    "Burst capacity for per-disperser StoreChunks rate limit. If <=0, rate limiting is disabled.",
+		Required: false,
+		Value:    3,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_RATE_LIMIT_BURST"),
+	}
 	LevelDBDisableSeeksCompactionV1Flag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "leveldb-disable-seeks-compaction-v1"),
 		Usage:    "Disable seeks compaction for LevelDB for v1",
@@ -717,6 +731,8 @@ var optionalFlags = []cli.Flag{
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
+	DisperserRateLimitPerSecondFlag,
+	DisperserRateLimitBurstFlag,
 	LevelDBDisableSeeksCompactionV1Flag,
 	LevelDBEnableSyncWritesV1Flag,
 	DownloadPoolSizeFlag,
