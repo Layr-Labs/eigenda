@@ -214,7 +214,7 @@ library EigenDACertVerificationLib {
             revert QuorumCountExceedsMaximum(signedQuorumNumbers.length);
         }
 
-        // if an nonsigning operator belongs to multiple quorums, the totalNonsignersCount counts it multiple times
+        // if a nonsigning operator belongs to multiple quorums, the totalNonsignersCount counts it multiple times
         uint256 totalNonsignersCount = 0;
         for (uint256 i = 0; i < nonSignerStakesAndSignature.nonSignerStakeIndices.length; i++) {
             totalNonsignersCount += nonSignerStakesAndSignature.nonSignerStakeIndices[i].length;

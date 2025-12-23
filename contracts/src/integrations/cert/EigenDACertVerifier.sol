@@ -23,7 +23,7 @@ contract EigenDACertVerifier is
     IVersionedEigenDACertVerifier,
     IEigenDASemVer
 {
-    /// @notice The maximum calldata bytes length this contracts supports
+    /// @notice The maximum calldata bytes length for a cert to be considered valid
     uint256 internal constant MAX_CALLDATA_BYTES_LENGTH = 262_144;
 
     /// @notice The maximum gas spent on abi decode
