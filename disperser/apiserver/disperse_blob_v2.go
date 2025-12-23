@@ -10,6 +10,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -17,7 +19,7 @@ import (
 	blobstore "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
-	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -58,22 +60,13 @@ func (s *DispersalServerV2) disperseBlob(
 		return nil, st
 	}
 
-	if s.useControllerMediatedPayments {
-		// Use the new controller-based payment system
-		authorizePaymentRequest := &controller.AuthorizePaymentRequest{
-			BlobHeader:      req.GetBlobHeader(),
-			ClientSignature: req.GetSignature(),
-		}
-		_, err := s.controllerClient.AuthorizePayment(ctx, authorizePaymentRequest)
-		if err != nil {
-			return nil, status.Convert(err)
-		}
-	} else {
-		// Use the legacy payment metering system
-		// Check against payment meter to make sure there is quota remaining
-		if st := s.checkPaymentMeter(ctx, req, start); st != nil && st.Code() != codes.OK {
-			return nil, st
-		}
+	authorizePaymentRequest := &controller.AuthorizePaymentRequest{
+		BlobHeader:      req.GetBlobHeader(),
+		ClientSignature: req.GetSignature(),
+	}
+	_, err = s.controllerClient.AuthorizePayment(ctx, authorizePaymentRequest)
+	if err != nil {
+		return nil, status.Convert(err)
 	}
 
 	finishedValidation := time.Now()
@@ -160,47 +153,6 @@ func (s *DispersalServerV2) StoreBlob(
 		return corev2.BlobKey{}, status.Newf(codes.Internal, "failed to store blob metadata: %v", err)
 	}
 	return blobKey, status.New(codes.OK, "blob stored successfully")
-}
-
-func (s *DispersalServerV2) checkPaymentMeter(
-	ctx context.Context,
-	req *pb.DisperseBlobRequest,
-	receivedAt time.Time,
-) *status.Status {
-	blobHeaderProto := req.GetBlobHeader()
-	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
-	if err != nil {
-		return status.Newf(codes.InvalidArgument, "invalid blob header: %s", err.Error())
-	}
-	blobLength := encoding.GetBlobLengthPowerOf2(uint32(len(req.GetBlob())))
-
-	// handle payments and check rate limits
-	timestamp := blobHeaderProto.GetPaymentHeader().GetTimestamp()
-	cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
-	accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
-	if !gethcommon.IsHexAddress(accountID) {
-		return status.Newf(codes.InvalidArgument, "invalid account ID: %s", accountID)
-	}
-
-	paymentHeader := core.PaymentMetadata{
-		AccountID:         gethcommon.HexToAddress(accountID),
-		Timestamp:         timestamp,
-		CumulativePayment: cumulativePayment,
-	}
-
-	symbolsCharged, err := s.meterer.MeterRequest(
-		ctx,
-		paymentHeader,
-		uint64(blobLength),
-		blobHeader.QuorumNumbers,
-		receivedAt,
-	)
-	if err != nil {
-		return status.New(codes.ResourceExhausted, err.Error())
-	}
-	s.metrics.reportDisperseMeteredBytes(int(symbolsCharged) * encoding.BYTES_PER_SYMBOL)
-
-	return status.New(codes.OK, "payment meter check passed")
 }
 
 func (s *DispersalServerV2) validateDispersalRequest(
@@ -298,6 +250,10 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
+	if err = s.validateAnchorSignature(req, blobHeader); err != nil {
+		return nil, fmt.Errorf("validate anchor signature: %w", err)
+	}
+
 	commitments, err := s.committer.GetCommitmentsForPaddedLength(blob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commitments: %w", err)
@@ -308,6 +264,80 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	}
 
 	return blobHeader, nil
+}
+
+// Validates the anchor signature included in the DisperseBlobRequest.
+//
+// If DisableAnchorSignatureVerification is true, then this method will skip all validation and return nil.
+//
+// If TolerateMissingAnchorSignature is true, then this method will pass validation even if no anchor signature is
+// provided in the request.
+//
+// If an anchor signature is provided, it will be validated whether or not TolerateMissingAnchorSignature is true.
+// While validating the anchor signature, this method will also verify that the disperser ID and chain ID in the request
+// match the expected values.
+func (s *DispersalServerV2) validateAnchorSignature(
+	req *pb.DisperseBlobRequest,
+	blobHeader *corev2.BlobHeader,
+) error {
+	if s.serverConfig.DisableAnchorSignatureVerification {
+		return nil
+	}
+
+	anchorSignature := req.GetAnchorSignature()
+
+	if len(anchorSignature) == 0 {
+		if s.serverConfig.TolerateMissingAnchorSignature {
+			return nil
+		}
+
+		return errors.New("anchor signature is required but not provided")
+	}
+
+	if len(anchorSignature) != 65 {
+		return fmt.Errorf("anchor signature length is unexpected: %d", len(anchorSignature))
+	}
+
+	if req.GetDisperserId() != s.serverConfig.DisperserId {
+		return fmt.Errorf(
+			"disperser ID mismatch: request specifies %d but this disperser is %d",
+			req.GetDisperserId(),
+			s.serverConfig.DisperserId,
+		)
+	}
+
+	reqChainId, err := common.ChainIdFromBytes(req.GetChainId())
+	if err != nil {
+		return fmt.Errorf("invalid chain ID: %w", err)
+	}
+	if s.chainId.Cmp(reqChainId) != 0 {
+		return fmt.Errorf(
+			"chain ID mismatch: request specifies %s but this disperser is on chain %s",
+			reqChainId.String(),
+			s.chainId.String(),
+		)
+	}
+
+	blobKey, err := blobHeader.BlobKey()
+	if err != nil {
+		return fmt.Errorf("compute blob key: %w", err)
+	}
+
+	anchorHash, err := hashing.ComputeDispersalAnchorHash(reqChainId, req.GetDisperserId(), blobKey)
+	if err != nil {
+		return fmt.Errorf("compute anchor hash: %w", err)
+	}
+
+	anchorSigPubKey, err := crypto.SigToPub(anchorHash, anchorSignature)
+	if err != nil {
+		return fmt.Errorf("recover public key from anchor signature: %w", err)
+	}
+
+	if blobHeader.PaymentMetadata.AccountID.Cmp(crypto.PubkeyToAddress(*anchorSigPubKey)) != 0 {
+		return errors.New("anchor signature doesn't match account ID")
+	}
+
+	return nil
 }
 
 // Validates that the dispersal timestamp in the blob header is neither too old, nor too far in the future.

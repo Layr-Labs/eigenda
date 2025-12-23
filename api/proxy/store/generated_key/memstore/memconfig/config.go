@@ -27,6 +27,10 @@ type Config struct {
 	// TODO we use Put in the name to be consistent to the name "PutReturnsFailoverError",
 	// but they should have been named as Post from HTTP verb
 	OverwritePutWithDerivationError error
+	// CertVersion specifies which certificate version to generate and expect.
+	// Valid values are coretypes.VersionThreeCert (0x3) or coretypes.VersionFourCert (0x4).
+	// Defaults to VersionFourCert if not specified.
+	CertVersion coretypes.CertificateVersion
 }
 
 // MarshalJSON implements custom JSON marshaling for Config.
@@ -43,6 +47,7 @@ func (c Config) MarshalJSON() ([]byte, error) {
 		GetLatency                      string
 		PutReturnsFailoverError         bool
 		OverwritePutWithDerivationError error
+		CertVersion                     coretypes.CertificateVersion
 	}{
 		MaxBlobSizeBytes:                c.MaxBlobSizeBytes,
 		BlobExpiration:                  c.BlobExpiration.String(),
@@ -50,6 +55,7 @@ func (c Config) MarshalJSON() ([]byte, error) {
 		GetLatency:                      c.GetLatency.String(),
 		PutReturnsFailoverError:         c.PutReturnsFailoverError,
 		OverwritePutWithDerivationError: c.OverwritePutWithDerivationError,
+		CertVersion:                     c.CertVersion,
 	})
 }
 
@@ -157,6 +163,28 @@ func (sc *SafeConfig) SetOverwritePutWithDerivationError(inputError error) error
 
 	sc.config.OverwritePutWithDerivationError = derivationError
 
+	return nil
+}
+
+func (sc *SafeConfig) CertVersion() coretypes.CertificateVersion {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	// Default to V4 if not set
+	if sc.config.CertVersion == 0 {
+		return coretypes.VersionFourCert
+	}
+	return sc.config.CertVersion
+}
+
+func (sc *SafeConfig) SetCertVersion(version coretypes.CertificateVersion) error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	// Validate the version
+	if version != coretypes.VersionThreeCert && version != coretypes.VersionFourCert {
+		return fmt.Errorf("unsupported certificate version: %d (must be %d or %d)",
+			version, coretypes.VersionThreeCert, coretypes.VersionFourCert)
+	}
+	sc.config.CertVersion = version
 	return nil
 }
 

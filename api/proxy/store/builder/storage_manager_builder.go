@@ -390,7 +390,6 @@ func buildEigenDAV2Backend(
 		payloadDisperser,
 		config.ClientConfigV2.PutTries,
 		certVerifier,
-		config.ClientConfigV2.RBNRecencyWindowSize,
 		retrievers,
 		// PayloadDisperserCfg.ContractCallTimeout is set by the --eigenda.v2.contract-call-timeout flag, the value
 		// is not read into any other configs. For simplicity the PayloadDisperserCfg value is reused here.
@@ -583,9 +582,15 @@ func buildPayloadDisperser(
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
+	chainID, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get chain ID: %w", err)
+	}
+
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
 	multiplexerConfig.UseSecureGrpcFlag = clientConfigV2.DisperserClientCfg.UseSecureGrpcFlag
 	multiplexerConfig.DisperserConnectionCount = clientConfigV2.DisperserClientCfg.DisperserConnectionCount
+	multiplexerConfig.ChainID = chainID
 
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(
 		clientConfigV2.DisperserClientCfg.GrpcUri)

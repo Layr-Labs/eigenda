@@ -160,6 +160,7 @@ func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort stri
 		DISPERSER_SERVER_CHAIN_RPC:              "",
 		DISPERSER_SERVER_PRIVATE_KEY:            "123",
 		DISPERSER_SERVER_NUM_CONFIRMATIONS:      "0",
+		DISPERSER_SERVER_DISPERSER_ID:           fmt.Sprintf("%d", ind),
 
 		DISPERSER_SERVER_REGISTERED_QUORUM_ID:      "0,1",
 		DISPERSER_SERVER_TOTAL_UNAUTH_BYTE_RATE:    "10000000,10000000",
@@ -199,6 +200,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_CHAIN_RPC:              "",
 		DISPERSER_SERVER_PRIVATE_KEY:            "123",
 		DISPERSER_SERVER_NUM_CONFIRMATIONS:      "0",
+		DISPERSER_SERVER_DISPERSER_ID:           fmt.Sprintf("%d", ind),
 
 		DISPERSER_SERVER_REGISTERED_QUORUM_ID:      "0,1",
 		DISPERSER_SERVER_TOTAL_UNAUTH_BYTE_RATE:    "10000000,10000000",
@@ -230,12 +232,6 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		// So it needs the trailing g2 points to generate correct length commitments.
 		DISPERSER_SERVER_G2_TRAILING_PATH:               "../resources/srs/g2.trailing.point",
 		DISPERSER_SERVER_ONCHAIN_STATE_REFRESH_INTERVAL: "1s",
-	}
-
-	if env.UseNewPayments {
-		v.DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS = "true"
-	} else {
-		v.DISPERSER_SERVER_USE_CONTROLLER_MEDIATED_PAYMENTS = "false"
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -367,16 +363,10 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_DISPERSER_ID:                            "0",
 	}
 
-	if env.UseNewPayments {
-		v.CONTROLLER_GRPC_SERVER_ENABLE = "true"
-		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "true"
-		v.CONTROLLER_GRPC_PORT = fmt.Sprintf("%d", controllerGrpcPort)
-		v.CONTROLLER_ON_DEMAND_PAYMENTS_TABLE_NAME = "e2e_v2_ondemand"
-		v.CONTROLLER_PAYMENT_VAULT_UPDATE_INTERVAL = "1s"
-	} else {
-		v.CONTROLLER_GRPC_SERVER_ENABLE = "false"
-		v.CONTROLLER_GRPC_PAYMENT_AUTHENTICATION = "false"
-	}
+	v.CONTROLLER_GRPC_PORT = fmt.Sprintf("%d", controllerGrpcPort)
+	v.CONTROLLER_ON_DEMAND_PAYMENTS_TABLE_NAME = "e2e_v2_ondemand"
+	v.CONTROLLER_PAYMENT_VAULT_UPDATE_INTERVAL = "1s"
+
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
 	return v

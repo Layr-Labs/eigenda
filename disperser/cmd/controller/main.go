@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -28,7 +27,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
@@ -66,7 +64,7 @@ func RunController(cliCtx *cli.Context) error {
 		return err
 	}
 
-	logger, err := common.NewLogger(&config.LoggerConfig)
+	logger, err := common.NewLogger(&config.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -76,7 +74,7 @@ func RunController(cliCtx *cli.Context) error {
 		logger.Warn("Failed to clean up readiness file", "error", err, "path", config.ControllerReadinessProbePath)
 	}
 
-	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
+	dynamoClient, err := dynamodb.NewClient(config.AwsClient, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create DynamoDB client: %w", err)
 	}
@@ -176,14 +174,24 @@ func RunController(cliCtx *cli.Context) error {
 		}
 	}
 
-	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
+	metrics, err := controller.NewControllerMetrics(
+		metricsRegistry,
+		config.SignificantSigningThresholdFraction,
+		config.CollectDetailedValidatorSigningMetrics,
+		config.EnablePerAccountBlobStatusMetrics,
+		userAccountRemapping,
+		validatorIdRemapping)
+	if err != nil {
+		return fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
+	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManager.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
-	encodingPool := workerpool.New(config.EncodingManagerConfig.NumConcurrentRequests)
-	encodingManagerBlobSet := controller.NewBlobSet()
+	encodingPool := workerpool.New(config.EncodingManager.NumConcurrentRequests)
 	encodingManager, err := controller.NewEncodingManager(
-		&config.EncodingManagerConfig,
+		&config.EncodingManager,
 		time.Now,
 		blobMetadataStore,
 		encodingPool,
@@ -191,9 +199,11 @@ func RunController(cliCtx *cli.Context) error {
 		chainReader,
 		logger,
 		metricsRegistry,
-		encodingManagerBlobSet,
 		controllerLivenessChan,
 		userAccountRemapping,
+		config.MaxDispersalFutureAge,
+		config.MaxDispersalAge,
+		metrics,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -203,14 +213,14 @@ func RunController(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create signature aggregator: %v", err)
 	}
-	dispatcherPool := workerpool.New(config.DispatcherConfig.NumConcurrentRequests)
+	dispatcherPool := workerpool.New(config.NumConcurrentRequests)
 	chainState := eth.NewChainState(chainReader, gethClient)
 	var ics core.IndexedChainState
 	if config.UseGraph {
 		logger.Info("Using graph node")
 
-		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
-		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+		logger.Info("Connecting to subgraph", "url", config.ChainState.Endpoint)
+		ics = thegraph.MakeIndexedChainState(config.ChainState, chainState, logger)
 	} else {
 		return fmt.Errorf("built-in indexer is deprecated and will be removed soon, please use UseGraph=true")
 	}
@@ -221,7 +231,7 @@ func RunController(cliCtx *cli.Context) error {
 	} else {
 		requestSigner, err = clients.NewDispersalRequestSigner(
 			ctx,
-			config.DispersalRequestSignerConfig,
+			config.DispersalRequestSigner,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create request signer: %v", err)
@@ -229,18 +239,13 @@ func RunController(cliCtx *cli.Context) error {
 	}
 
 	nodeClientManager, err := controller.NewNodeClientManager(
-		config.DispatcherConfig.NodeClientCacheSize,
+		config.NodeClientCacheSize,
 		requestSigner,
-		config.DispatcherConfig.DisperserID,
+		config.DisperserID,
 		logger)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
-	beforeDispatch := func(blobKey corev2.BlobKey) error {
-		encodingManagerBlobSet.RemoveBlob(blobKey)
-		return nil
-	}
-	dispatcherBlobSet := controller.NewBlobSet()
 
 	batchMetadataManager, err := metadata.NewBatchMetadataManager(
 		ctx,
@@ -248,29 +253,56 @@ func RunController(cliCtx *cli.Context) error {
 		gethClient,
 		ics,
 		registryCoordinatorAddress,
-		config.DispatcherConfig.BatchMetadataUpdatePeriod,
-		config.DispatcherConfig.FinalizationBlockDelay,
+		config.BatchMetadataUpdatePeriod,
+		config.FinalizationBlockDelay,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
-	// TODO(cody.littley):
-	// 1. wire up signing rate tracker to answer gRPC signing rate queries
-	// 2. set up background goroutine to periodically flush signing rate data to persistent storage
-	// 3. load signing rate data from persistent storage on startup
 	signingRateTracker, err := signingrate.NewSigningRateTracker(
 		logger,
-		config.DispatcherConfig.SigningRateRetentionPeriod,
-		config.DispatcherConfig.SigningRateBucketSpan,
+		config.SigningRateRetentionPeriod,
+		config.SigningRateBucketSpan,
 		time.Now)
 	if err != nil {
 		return fmt.Errorf("failed to create signing rate tracker: %w", err)
 	}
 	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
 
+	signingRateStorage, err := signingrate.NewDynamoSigningRateStorage(
+		ctx,
+		logger,
+		dynamoClient.GetAwsClient(),
+		config.SigningRateDynamoDbTableName)
+	if err != nil {
+		return fmt.Errorf("failed to create signing rate storage: %w", err)
+	}
+
+	// Load existing signing rate data from persistent storage.
+	err = signingrate.LoadSigningRateDataFromStorage(
+		ctx,
+		logger,
+		signingRateTracker,
+		signingRateStorage,
+		config.SigningRateRetentionPeriod,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load signing rate data from storage: %w", err)
+	}
+
+	// Periodically flush signing rate data to persistent storage.
+	go signingrate.SigningRateStorageFlusher(
+		ctx,
+		logger,
+		signingRateTracker,
+		signingRateStorage,
+		config.SigningRateFlushPeriod,
+	)
+
 	dispatcher, err := controller.NewController(
-		&config.DispatcherConfig,
+		ctx,
+		config,
 		time.Now,
 		blobMetadataStore,
 		dispatcherPool,
@@ -279,9 +311,7 @@ func RunController(cliCtx *cli.Context) error {
 		sigAgg,
 		nodeClientManager,
 		logger,
-		metricsRegistry,
-		beforeDispatch,
-		dispatcherBlobSet,
+		metrics,
 		controllerLivenessChan,
 		signingRateTracker,
 		userAccountRemapping,
@@ -306,56 +336,43 @@ func RunController(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
 
-	if config.ServerConfig.EnableServer {
-		logger.Info("Controller gRPC server ENABLED", "port", config.ServerConfig.GrpcPort)
-		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
-		if config.ServerConfig.EnablePaymentAuthentication {
-			logger.Info("Payment authentication ENABLED - building payment authorization handler")
-			paymentAuthorizationHandler, err = controller.BuildPaymentAuthorizationHandler(
-				ctx,
-				logger,
-				config.PaymentAuthorizationConfig,
-				contractDirectory,
-				gethClient,
-				dynamoClient.GetAwsClient(),
-				metricsRegistry,
-				userAccountRemapping,
-			)
-			if err != nil {
-				return fmt.Errorf("build payment authorization handler: %w", err)
-			}
-		} else {
-			logger.Warn("Payment authentication DISABLED - payment requests will fail")
-		}
-
-		// Create listener for the gRPC server
-		addr := fmt.Sprintf("0.0.0.0:%d", config.ServerConfig.GrpcPort)
-		listener, err := net.Listen("tcp", addr)
-		if err != nil {
-			return fmt.Errorf("failed to create listener: %w", err)
-		}
-
-		grpcServer, err := server.NewServer(
-			ctx,
-			config.ServerConfig,
-			logger,
-			metricsRegistry,
-			paymentAuthorizationHandler,
-			listener,
-			signingRateTracker)
-		if err != nil {
-			return fmt.Errorf("create gRPC server: %w", err)
-		}
-
-		go func() {
-			logger.Info("Starting controller gRPC server", "address", listener.Addr().String())
-			if err := grpcServer.Start(); err != nil {
-				panic(fmt.Sprintf("gRPC server failed: %v", err))
-			}
-		}()
-	} else {
-		logger.Info("Controller gRPC server disabled")
+	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
+		ctx,
+		logger,
+		config.PaymentAuthorization,
+		contractDirectory,
+		gethClient,
+		dynamoClient.GetAwsClient(),
+		metricsRegistry,
+		userAccountRemapping,
+	)
+	if err != nil {
+		return fmt.Errorf("build payment authorization handler: %w", err)
 	}
+
+	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", config.Server.GrpcPort))
+	if err != nil {
+		return fmt.Errorf("create listener: %w", err)
+	}
+
+	grpcServer, err := server.NewServer(
+		ctx,
+		config.Server,
+		logger,
+		metricsRegistry,
+		paymentAuthorizationHandler,
+		listener,
+		signingRateTracker)
+	if err != nil {
+		return fmt.Errorf("create gRPC server: %w", err)
+	}
+
+	go func() {
+		logger.Info("Starting controller gRPC server", "address", listener.Addr().String())
+		if err := grpcServer.Start(); err != nil {
+			panic(fmt.Sprintf("gRPC server failed: %v", err))
+		}
+	}()
 
 	go func() {
 		err := metricsServer.ListenAndServe()
@@ -374,7 +391,7 @@ func RunController(cliCtx *cli.Context) error {
 		err := healthcheck.NewHeartbeatMonitor(
 			logger,
 			controllerLivenessChan,
-			config.HeartbeatMonitorConfig,
+			config.HeartbeatMonitor,
 		)
 		if err != nil {
 			logger.Warn("Heartbeat monitor failed", "err", err)

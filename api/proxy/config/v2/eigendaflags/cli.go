@@ -37,7 +37,6 @@ var (
 	EthRPCRetryDelayIncrementFlagName = withFlagPrefix("eth-rpc-retry-delay-increment")
 	MaxBlobLengthFlagName             = withFlagPrefix("max-blob-length")
 	NetworkFlagName                   = withFlagPrefix("network")
-	RBNRecencyWindowSizeFlagName      = withFlagPrefix("rbn-recency-window-size")
 	RelayConnectionPoolSizeFlagName   = withFlagPrefix("relay-connection-pool-size")
 
 	ClientLedgerModeFlagName            = withFlagPrefix("client-ledger-mode")
@@ -219,17 +218,6 @@ Permitted EigenDANetwork values include %s, %s, & %s.`,
 			Category: category,
 		},
 		&cli.Uint64Flag{
-			Name: RBNRecencyWindowSizeFlagName,
-			Usage: `Allowed distance (in L1 blocks) between the eigenDA cert's reference 
-block number (RBN) and the L1 block number at which the cert was included 
-in the rollup's batch inbox. A cert is valid when cert.RBN < certL1InclusionBlock <= cert.RBN + rbnRecencyWindowSize, 
-and otherwise is considered stale and verification will fail, and a 418 HTTP error will be returned.
-This check is optional and will be skipped when set to 0.`,
-			Value:    0,
-			EnvVars:  []string{withEnvPrefix(envPrefix, "RBN_RECENCY_WINDOW_SIZE")},
-			Category: category,
-		},
-		&cli.Uint64Flag{
 			Name:     RelayConnectionPoolSizeFlagName,
 			Usage:    "Number of gRPC connections to maintain to each relay.",
 			Value:    1,
@@ -310,7 +298,6 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		},
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
 		EigenDADirectory:                   eigenDADirectory,
-		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,
 		RelayConnectionPoolSize:            ctx.Uint(RelayConnectionPoolSizeFlagName),
 		ClientLedgerMode:                   clientledger.ParseClientLedgerMode(ctx.String(ClientLedgerModeFlagName)),

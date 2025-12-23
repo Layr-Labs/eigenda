@@ -195,8 +195,6 @@ type Config struct {
 
 	// DisperserKMSKeyID is the KMS key ID used to encrypt disperser data
 	DisperserKMSKeyID string
-
-	UseNewPayments bool
 }
 
 func (env *Config) IsEigenDADeployed() bool {

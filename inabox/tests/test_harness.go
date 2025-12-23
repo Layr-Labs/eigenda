@@ -284,6 +284,7 @@ func (tc *TestHarness) CreatePayloadDisperser(
 
 	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
 	multiplexerConfig.UseSecureGrpcFlag = false
+	multiplexerConfig.ChainID = tc.ChainID
 	disperserRegistry := disperser.NewLegacyDisperserRegistry(tc.APIServerAddress)
 
 	disperserClientMultiplexer, err := dispersal.NewDisperserClientMultiplexer(
