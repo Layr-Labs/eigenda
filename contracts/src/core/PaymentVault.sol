@@ -29,7 +29,7 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         uint64 _globalSymbolsPerPeriod,
         uint64 _reservationPeriodInterval,
         uint64 _globalRatePeriodInterval
-    ) public initializer {
+    ) public reinitializer(2) {
         _transferOwnership(_initialOwner);
 
         minNumSymbols = _minNumSymbols;
