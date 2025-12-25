@@ -103,6 +103,7 @@ type EigenDAContract struct {
 	CertVerifierLegacy     string `json:"eigenDALegacyCertVerifier"`
 	CertVerifier           string `json:"eigenDACertVerifier"`
 	CertVerifierRouter     string `json:"eigenDACertVerifierRouter"`
+	ArbitrumProofValidator string `json:"arbitrumEigenDAProofValidator"`
 }
 
 type Stakes struct {

@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
+	proofvalidatorbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAProofValidator"
 	paymentvaultbindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
@@ -105,6 +106,13 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 		testCtx.EthClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create router caller: %w", err)
+	}
+
+	testCtx.ArbitrumEigenDAProofValidator, err = proofvalidatorbindings.NewContractEigenDAProofValidatorCaller(
+		gethcommon.HexToAddress(infra.TestConfig.EigenDA.ArbitrumProofValidator),
+		testCtx.EthClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create arb proof validator caller: %w", err)
 	}
 
 	eigenDADirectoryAddr := gethcommon.HexToAddress(infra.TestConfig.EigenDA.EigenDADirectory)

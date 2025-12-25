@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
+	proofvalidatorbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAProofValidator"
 	paymentvaultbindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -82,6 +83,7 @@ type TestHarness struct {
 	EigenDACertVerifierRouter       *routerbindings.ContractEigenDACertVerifierRouterTransactor
 	EigenDACertVerifierRouterCaller *routerbindings.ContractEigenDACertVerifierRouterCaller
 	EigenDACertVerifierV1           *verifierv1bindings.ContractEigenDACertVerifierV1
+	ArbitrumEigenDAProofValidator   *proofvalidatorbindings.ContractEigenDAProofValidatorCaller
 
 	// Retrieval clients
 	RetrievalClient            clients.RetrievalClient

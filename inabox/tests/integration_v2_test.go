@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	integration "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -182,6 +185,15 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert4)
 	require.NoError(t, err)
 
+	// for brevity, test the ARB proof validator contract which wraps around
+	// the CertVerifierRouter to validate a Custom DA Proof for happy && unhappy path
+
+	arbCertOneStepProof, err := serializeARBVerifyCertProof(cert4)
+	require.NoError(t, err)
+
+	passed, err := testHarness.ArbitrumEigenDAProofValidator.ValidateCertificate(&bind.CallOpts{}, arbCertOneStepProof)
+	require.NoError(t, err)
+	require.True(t, passed)
 	// now force verification to fail by modifying the cert contents
 	eigenDAV4Cert4, ok := cert4.(*coretypes.EigenDACertV4)
 	require.True(t, ok)
@@ -204,6 +216,40 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
 	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
+
+	// ensure ARB proof validator contract returns false for an invalid cert
+	arbCertOneStepProof, err = serializeARBVerifyCertProof(cert4)
+	require.NoError(t, err)
+
+	passed, err = testHarness.ArbitrumEigenDAProofValidator.ValidateCertificate(&bind.CallOpts{}, arbCertOneStepProof)
+	require.NoError(t, err)
+	require.False(t, passed)
+}
+
+// serializeARBVerifyCertProof returns the proof bytes used for resolving a
+// VerifyDACert opcode dispute.
+//
+// the proof composition is [8-byte big-endian length] + ARB DA Commitment bytes
+func serializeARBVerifyCertProof(cert coretypes.EigenDACert) ([]byte, error) {
+	abiCertBytes, err := cert.Serialize(coretypes.CertSerializationABI)
+	if err != nil {
+		return nil, fmt.Errorf("abi encode cert: %w", err)
+	}
+
+	// 8-byte big-endian length prefix
+	prefix := make([]byte, 8)
+	binary.BigEndian.PutUint64(prefix, uint64(len(abiCertBytes)))
+
+	// Arb DA Commitment
+	arbCommit := commitments.NewArbCommitment(
+		certs.NewVersionedCert(
+			abiCertBytes,
+			certs.V2VersionByte,
+		),
+	)
+
+	arbCertOneStepProof := append(prefix, arbCommit.Encode()...)
+	return arbCertOneStepProof, nil
 }
 
 func validateTxReceipt(ctx context.Context, testHarness *integration.TestHarness, txHash gethcommon.Hash) error {
