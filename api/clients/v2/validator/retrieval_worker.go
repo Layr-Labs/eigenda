@@ -280,7 +280,8 @@ func newRetrievalWorker(
 
 	// Randomly shuffle download order. Golang map iteration is random(ish), but not completely random.
 	// Map iteration order behaves like a random fixed ordering where you start in a random place and wrap around.
-	rand.Shuffle(len(downloadOrder), func(i, j int) {
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rnd.Shuffle(len(downloadOrder), func(i, j int) {
 		downloadOrder[i], downloadOrder[j] = downloadOrder[j], downloadOrder[i]
 	})
 
