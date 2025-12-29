@@ -30,7 +30,7 @@ type IEigenDAClient interface {
 	GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 	PutBlob(ctx context.Context, txData []byte) (*grpcdisperser.BlobInfo, error)
 	GetCodec() codecs.BlobCodec
-	CheckConnectivity(ctx context.Context) error // <--- ДОБАВИТЬ ЭТУ СТРОКУ
+	CheckConnectivity(ctx context.Context) error
 	Close() error
 }
 
