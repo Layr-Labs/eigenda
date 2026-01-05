@@ -139,11 +139,11 @@ impl EigenDaCertVerifierRouter {
     pub fn storage_keys(abns: &[u32]) -> Vec<StorageKey> {
         // The cert verifier router's storage key for the cert verifier address is derived from the reference block number
         // Here we assume a hypothetical extractor exists for this purpose
-        let abns_len = CertVerifierABNsLenExtractor::new().storage_keys();
+        let abns_len_key = CertVerifierABNsLenExtractor::new().storage_keys();
         let abn_keys = CertVerifierABNsExtractor::new(abns.len()).storage_keys();
-        let cert_verifiers = CertVerifiersExtractor::new(abns).storage_keys();
+        let cert_verifiers_keys = CertVerifiersExtractor::new(abns).storage_keys();
 
-        [abns_len, abn_keys, cert_verifiers]
+        [abns_len_key, abn_keys, cert_verifiers_keys]
             .into_iter()
             .flatten()
             .collect()
