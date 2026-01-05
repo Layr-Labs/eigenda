@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"golang.org/x/time/rate"
 )
 
 // DisperserRateLimiter applies a token-bucket rate limit per disperser ID.
@@ -12,71 +13,43 @@ import (
 type DisperserRateLimiter struct {
 	logger logging.Logger
 
-	limitPerSecond float64
-	burst          int
+	limit rate.Limit
+	burst int
 
 	mu    sync.Mutex
-	state map[uint32]*disperserLimiterState
-}
-
-type disperserLimiterState struct {
-	tokens     float64
-	lastRefill time.Time
+	state map[uint32]*rate.Limiter
 }
 
 // NewDisperserRateLimiter creates a per-disperser rate limiter. If limitPerSecond <= 0 or
 // burst <= 0, rate limiting is disabled.
 func NewDisperserRateLimiter(logger logging.Logger, limitPerSecond float64, burst int) *DisperserRateLimiter {
 	return &DisperserRateLimiter{
-		logger:         logger,
-		limitPerSecond: limitPerSecond,
-		burst:          burst,
-		state:          make(map[uint32]*disperserLimiterState),
+		logger: logger,
+		limit:  rate.Limit(limitPerSecond),
+		burst:  burst,
+		state:  make(map[uint32]*rate.Limiter),
 	}
 }
 
 // Allow returns true if a request for the disperser is permitted at time now.
 // Each call consumes one token; tokens are replenished over time up to burst.
 func (l *DisperserRateLimiter) Allow(disperserID uint32, now time.Time) bool {
-	if l == nil || l.limitPerSecond <= 0 || l.burst <= 0 {
+	if l == nil || l.limit <= 0 || l.burst <= 0 {
 		return true
 	}
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	st := l.getOrCreateStateLocked(disperserID, now)
-
-	// Refill based on elapsed time.
-	elapsed := now.Sub(st.lastRefill).Seconds()
-	if elapsed > 0 {
-		st.tokens = minFloat(float64(l.burst), st.tokens+elapsed*l.limitPerSecond)
-		st.lastRefill = now
-	}
-
-	if st.tokens < 1 {
-		return false
-	}
-
-	st.tokens -= 1
-	return true
+	limiter := l.getOrCreateLimiterLocked(disperserID)
+	return limiter.AllowN(now, 1)
 }
 
-func (l *DisperserRateLimiter) getOrCreateStateLocked(disperserID uint32, now time.Time) *disperserLimiterState {
-	st, ok := l.state[disperserID]
-	if !ok || st == nil {
-		st = &disperserLimiterState{
-			tokens:     float64(l.burst),
-			lastRefill: now,
-		}
-		l.state[disperserID] = st
+func (l *DisperserRateLimiter) getOrCreateLimiterLocked(disperserID uint32) *rate.Limiter {
+	limiter, ok := l.state[disperserID]
+	if !ok || limiter == nil {
+		limiter = rate.NewLimiter(l.limit, l.burst)
+		l.state[disperserID] = limiter
 	}
-	return st
-}
-
-func minFloat(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-	return b
+	return limiter
 }

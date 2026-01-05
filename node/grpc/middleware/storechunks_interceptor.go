@@ -35,8 +35,8 @@ func AuthenticatedDisperserIDFromContext(ctx context.Context) (uint32, bool) {
 // StoreChunksDisperserAuthAndRateLimitInterceptor authenticates StoreChunks requests and rejects any requests from
 // rate-limited dispersers before entering the handler.
 //
-// IMPORTANT: blacklisting is only enforced after request authentication. This prevents an attacker from spoofing
-// a disperser ID and causing an honest disperser to be blacklisted.
+// IMPORTANT: rate limiting is only enforced after request authentication. This prevents an attacker from spoofing
+// a disperser ID and causing an honest disperser to be rate limited.
 func StoreChunksDisperserAuthAndRateLimitInterceptor(
 	rateLimiter *DisperserRateLimiter,
 	requestAuthenticator auth.RequestAuthenticator,
@@ -59,7 +59,7 @@ func StoreChunksDisperserAuthAndRateLimitInterceptor(
 		now := time.Now()
 		_, err := requestAuthenticator.AuthenticateStoreChunksRequest(ctx, storeReq, now)
 		if err != nil {
-			// Do NOT blacklist here; the disperser identity is not proven if auth fails.
+			// Do NOT rate limit here; the disperser identity is not proven if auth fails.
 			return nil, status.Errorf(codes.InvalidArgument, "failed to authenticate request: %v", err)
 		}
 
