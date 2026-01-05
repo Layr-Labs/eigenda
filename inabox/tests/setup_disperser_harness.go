@@ -806,6 +806,7 @@ func startController(
 	dispatcherConfig.SigningRateDynamoDbTableName = "validator-signing-rates"
 	dispatcherConfig.DispersalRequestSigner.PrivateKey = "this is just a placeholder"
 	dispatcherConfig.Encoder = encodingManagerConfig
+	dispatcherConfig.DynamoDBTableName = "this-is-a-placeholder"
 
 	// Chain state config
 	chainStateConfig := thegraph.Config{
