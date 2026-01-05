@@ -808,6 +808,11 @@ func startController(
 	dispatcherConfig.Encoder = encodingManagerConfig
 	dispatcherConfig.DynamoDBTableName = "this-is-a-placeholder"
 	dispatcherConfig.ContractDirectoryAddress = "this-is-a-placeholder"
+	dispatcherConfig.ChainState.Endpoint = "this-is-a-placeholder"
+	dispatcherConfig.EthClient.RPCURLs = []string{"this-is-a-placeholder"}
+	dispatcherConfig.AwsClient.Region = "this-is-a-placeholder"
+	dispatcherConfig.AwsClient.AccessKey = "this-is-a-placeholder"
+	dispatcherConfig.AwsClient.SecretAccessKey = "this-is-a-placeholder"
 
 	// Chain state config
 	chainStateConfig := thegraph.Config{
