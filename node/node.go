@@ -298,42 +298,37 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create operator state cache: %w", err)
 	}
 
-	var reservationPaymentValidator *reservationvalidation.ReservationPaymentValidator
-	if config.EnablePaymentValidation {
-		paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
-		if err != nil {
-			return nil, fmt.Errorf("get PaymentVault address: %w", err)
-		}
-
-		paymentVault, err := vault.NewPaymentVault(logger, client, paymentVaultAddress)
-		if err != nil {
-			return nil, fmt.Errorf("create payment vault: %w", err)
-		}
-
-		reservationPaymentValidator, err = reservationvalidation.NewReservationPaymentValidator(
-			ctx,
-			logger,
-			config.ReservationLedgerCacheConfig,
-			paymentVault,
-			time.Now,
-			reservationvalidation.NewReservationValidatorMetrics(
-				reg,
-				Namespace,
-				PaymentsSubsystem,
-				config.EnablePerAccountPaymentMetrics,
-				nil, // userAccountRemapping - not yet supported in validator
-			),
-			reservationvalidation.NewReservationCacheMetrics(reg, Namespace, PaymentsSubsystem),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("create reservation payment validator: %w", err)
-		}
-		logger.Info("Payment validation ENABLED",
-			"paymentVaultAddress", paymentVaultAddress.Hex(),
-			"updateInterval", config.ReservationLedgerCacheConfig.UpdateInterval)
-	} else {
-		logger.Info("Payment validation DISABLED")
+	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
 	}
+
+	paymentVault, err := vault.NewPaymentVault(logger, client, paymentVaultAddress)
+	if err != nil {
+		return nil, fmt.Errorf("create payment vault: %w", err)
+	}
+
+	reservationPaymentValidator, err := reservationvalidation.NewReservationPaymentValidator(
+		ctx,
+		logger,
+		config.ReservationLedgerCacheConfig,
+		paymentVault,
+		time.Now,
+		reservationvalidation.NewReservationValidatorMetrics(
+			reg,
+			Namespace,
+			PaymentsSubsystem,
+			config.EnablePerAccountPaymentMetrics,
+			nil, // userAccountRemapping - not yet supported in validator
+		),
+		reservationvalidation.NewReservationCacheMetrics(reg, Namespace, PaymentsSubsystem),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create reservation payment validator: %w", err)
+	}
+	logger.Info("Payment validation configured",
+		"paymentVaultAddress", paymentVaultAddress.Hex(),
+		"updateInterval", config.ReservationLedgerCacheConfig.UpdateInterval)
 
 	n := &Node{
 		CTX:                         ctx,
@@ -444,7 +439,7 @@ func NewNode(
 
 // Validates reservation payments for all blobs in a batch.
 //
-// Returns nil if validation passes or if payment validation is disabled.
+// Returns nil if validation passes.
 //
 // TODO(litt3): With the current multi-blob batch implementation, the logic in this method suffers from the "batch
 // poison pill" problem: if a single payment fails within a batch, then the entire batch is invalid. Therefore, payment
@@ -453,11 +448,6 @@ func NewNode(
 //
 // This method is goroutine safe
 func (n *Node) ValidateReservationPayment(ctx context.Context, batch *corev2.Batch, probe *common.SequenceProbe) error {
-	// TODO(litt3): remove this case once payment validation is no longer optional
-	if n.reservationPaymentValidator == nil {
-		return nil
-	}
-
 	probe.SetStage("payment_validation")
 	for _, blobCert := range batch.BlobCertificates {
 		if blobCert.BlobHeader.PaymentMetadata.IsOnDemand() {
