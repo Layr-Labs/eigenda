@@ -26,7 +26,7 @@ type EthClientConfig struct {
 	PrivateKeyString string
 	// Number of block confirmations to wait for.
 	NumConfirmations int
-	// Number of maximal retry for each rpc call after failure/
+	// Max number of retries for each RPC call after failure.
 	NumRetries int
 	// Time duration for linear retry delay increment.
 	RetryDelay time.Duration

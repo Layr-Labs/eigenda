@@ -117,7 +117,7 @@ func (c *EncodingManagerConfig) Verify() error {
 		return fmt.Errorf("MaxNumBlobsPerIteration must be at least 1, got %d", c.MaxNumBlobsPerIteration)
 	}
 	if c.StateRefreshInterval <= 0 {
-		return fmt.Errorf("OnchainStateRefreshInterval must be positive, got %v", c.StateRefreshInterval)
+		return fmt.Errorf("StateRefreshInterval must be positive, got %v", c.StateRefreshInterval)
 	}
 	if c.NumConcurrentRequests < 1 {
 		return fmt.Errorf("NumConcurrentRequests must be at least 1, got %d", c.NumConcurrentRequests)

@@ -19,7 +19,7 @@ import (
 
 // PaymentAuthorizationConfig contains configuration for building a payment authorization handler
 type PaymentAuthorizationConfig struct {
-	// Connfiguration for on-demand payment validation.
+	// Configuration for on-demand payment validation.
 	OnDemand ondemandvalidation.OnDemandLedgerCacheConfig
 	// Configuration for reservation payment validation.
 	Reservation reservationvalidation.ReservationLedgerCacheConfig
