@@ -270,10 +270,10 @@ func (s *DispersalServerV2) validateDispersalRequest(
 //
 // If DisableAnchorSignatureVerification is true, then this method will skip all validation and return nil.
 //
-// If TolerateMissingAnchorSignature is true, then this method will pass validation even if no anchor signature is
-// provided in the request.
+// Anchor signatures are required for blob version > 0. For blob version 0, missing anchor signatures are tolerated
+// for backward compatibility with legacy clients.
 //
-// If an anchor signature is provided, it will be validated whether or not TolerateMissingAnchorSignature is true.
+// If an anchor signature is provided, it will be validated regardless of blob version.
 // While validating the anchor signature, this method will also verify that the disperser ID and chain ID in the request
 // match the expected values.
 func (s *DispersalServerV2) validateAnchorSignature(
@@ -287,11 +287,13 @@ func (s *DispersalServerV2) validateAnchorSignature(
 	anchorSignature := req.GetAnchorSignature()
 
 	if len(anchorSignature) == 0 {
-		if s.serverConfig.TolerateMissingAnchorSignature {
-			return nil
+		if blobHeader.BlobVersion > 0 {
+			return fmt.Errorf("anchor signature is required for blob version > 0 (got version %d)",
+				blobHeader.BlobVersion)
 		}
 
-		return errors.New("anchor signature is required but not provided")
+		// Version 0: allow missing anchor signature for backward compatibility
+		return nil
 	}
 
 	if len(anchorSignature) != 65 {

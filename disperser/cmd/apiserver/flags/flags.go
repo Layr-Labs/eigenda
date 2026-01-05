@@ -287,15 +287,9 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_ID"),
 	}
-	TolerateMissingAnchorSignatureFlag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "tolerate-missing-anchor-signature"),
-		Usage:    "Whether to accept DisperseBlob requests without an anchor signature. Ignored if disable-anchor-signature-verification is true.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TOLERATE_MISSING_ANCHOR_SIGNATURE"),
-	}
 	DisableAnchorSignatureVerificationFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disable-anchor-signature-verification"),
-		Usage:    "If true, anchor signature verification is skipped entirely. Takes precedence over tolerate-missing-anchor-signature.",
+		Usage:    "If true, anchor signature verification is skipped entirely, regardless of blob version.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISABLE_ANCHOR_SIGNATURE_VERIFICATION"),
 	}
@@ -371,7 +365,6 @@ var optionalFlags = []cli.Flag{
 	DisablePerAccountMetricsFlag,
 	SigningRateRetentionPeriodFlag,
 	SigningRatePollIntervalFlag,
-	TolerateMissingAnchorSignatureFlag,
 	DisableAnchorSignatureVerificationFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,

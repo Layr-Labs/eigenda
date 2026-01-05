@@ -33,6 +33,6 @@ type PayloadClientConfig struct {
 func GetDefaultPayloadClientConfig() *PayloadClientConfig {
 	return &PayloadClientConfig{
 		PayloadPolynomialForm: codecs.PolynomialFormEval,
-		BlobVersion:           0,
+		BlobVersion:           1,
 	}
 }

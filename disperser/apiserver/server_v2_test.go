@@ -584,7 +584,6 @@ func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment b
 			GrpcTimeout:                        1 * time.Second,
 			DisableGetBlobCommitment:           disableGetBlobCommitment,
 			DisperserId:                        0,
-			TolerateMissingAnchorSignature:     false,
 			DisableAnchorSignatureVerification: false,
 		},
 		time.Now,
