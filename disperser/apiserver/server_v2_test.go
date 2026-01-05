@@ -563,6 +563,11 @@ func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment b
 			CodingRate:      8,
 			MaxNumOperators: 2048,
 		},
+		1: {
+			NumChunks:       8192,
+			CodingRate:      8,
+			MaxNumOperators: 2048,
+		},
 	}, nil)
 
 	// Create listener for test server

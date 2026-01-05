@@ -384,7 +384,6 @@ func (env *Config) generateProxyVars(ind int) ProxyVars {
 		EIGENDA_PROXY_EIGENDA_V2_ETH_RPC:                                         "http://localhost:8545",
 		EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH:                                 "16MiB",
 		EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR: env.EigenDA.CertVerifierRouter,
-		EIGENDA_PROXY_EIGENDA_V2_RBN_RECENCY_WINDOW_SIZE:                         "0",
 		// TODO(samlaf): this should not be hardcoded
 		EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC:     "localhost:32005",
 		EIGENDA_PROXY_EIGENDA_V2_EIGENDA_DIRECTORY: env.EigenDA.EigenDADirectory,
