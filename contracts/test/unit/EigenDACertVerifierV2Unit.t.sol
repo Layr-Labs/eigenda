@@ -57,6 +57,43 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         assertEq(res, 1);
     }
 
+    function test_verifyDACert_revert_calldata_size() public view {
+        // MAX_CALLDATA_BYTES_LENGTH is 262_144, so test with slightly over the limit
+        bytes memory large_bytes = new bytes(262_145);
+        uint8 res = eigenDACertVerifier.checkDACert(large_bytes);
+
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
+    }
+
+    function test_verifyDACert_revert_exceeding_maximal_quorum_count(uint256 pseudoRandomNumber) public {
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
+
+        // MAX_QUORUM_COUNT is 5, so test with slightly over the limit
+        cert.signedQuorumNumbers = new bytes(6);
+
+        uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
+
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
+    }
+
+    function test_verifyDACert_revert_exceeding_maximal_non_signers_across_all_quorums(uint256 pseudoRandomNumber)
+        public
+    {
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
+
+        // MAX_NONSIGNER_COUNT_ALL_QUORUM is 415, so test with 416 total non-signers
+        // Distribute across 2 quorums: 208 + 208 = 416 total
+        uint32[][] memory largeNonSignerStakeIndices = new uint32[][](2);
+        largeNonSignerStakeIndices[0] = new uint32[](208);
+        largeNonSignerStakeIndices[1] = new uint32[](208);
+
+        cert.nonSignerStakesAndSignature.nonSignerStakeIndices = largeNonSignerStakeIndices;
+
+        uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
+
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
+    }
+
     function test_verifyDACert_revert_InclusionProofInvalid(uint256 pseudoRandomNumber) public {
         EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
 
@@ -171,6 +208,36 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
             )
         );
         certLibHarness.checkSecurityParams(eigenDAThresholdRegistry, blobVersion, insecureThresholds);
+    }
+
+    function test_verifyDACert_revert_exceeding_maximal_quorum_count_exact_error(uint256 pseudoRandomNumber) public {
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
+
+        // MAX_QUORUM_COUNT is 5, so test with 6
+        cert.signedQuorumNumbers = new bytes(6);
+
+        // Expect QuorumCountExceedsMaximum error with count = 6
+        vm.expectRevert(abi.encodeWithSelector(CertLib.QuorumCountExceedsMaximum.selector, 6, 5));
+
+        // Test via the public checkDACertReverts function
+        eigenDACertVerifier.checkDACertReverts(cert);
+    }
+
+    function test_verifyDACert_revert_exceeding_maximal_nonsigner_exact_error(uint256 pseudoRandomNumber) public {
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
+
+        // MAX_NONSIGNER_COUNT_ALL_QUORUM is 415, so test with 416
+        uint32[][] memory largeNonSignerStakeIndices = new uint32[][](2);
+        largeNonSignerStakeIndices[0] = new uint32[](208);
+        largeNonSignerStakeIndices[1] = new uint32[](208);
+
+        cert.nonSignerStakesAndSignature.nonSignerStakeIndices = largeNonSignerStakeIndices;
+
+        // Expect NonSignerCountExceedsMaximum error with count = 416
+        vm.expectRevert(abi.encodeWithSelector(CertLib.NonSignerCountExceedsMaximum.selector, 416, 415));
+
+        // Test via the public checkDACertReverts function
+        eigenDACertVerifier.checkDACertReverts(cert);
     }
 
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version)
