@@ -563,12 +563,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "IGNORE_VERSION_FOR_EJECTION_DEFENSE"),
 	}
-	EnablePaymentValidationFlag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "enable-payment-validation"),
-		Usage:    "Whether the validator should perform payment validation. Temporary flag that will be removed once the new payments system is fully in place. default: true.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PAYMENT_VALIDATION"),
-	}
 	ReservationMaxLedgersFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "reservation-max-ledgers"),
 		Usage:    "Initial size for the reservation ledger LRU cache. This increases dynamically if premature evictions are detected.",
@@ -741,7 +735,6 @@ var optionalFlags = []cli.Flag{
 	EjectionSentinelPeriodFlag,
 	EjectionDefenseEnabledFlag,
 	IgnoreVersionForEjectionDefenseFlag,
-	EnablePaymentValidationFlag,
 	ReservationMaxLedgersFlag,
 	PaymentVaultUpdateIntervalFlag,
 	EnablePerAccountPaymentMetricsFlag,
