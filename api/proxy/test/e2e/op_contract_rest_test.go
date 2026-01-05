@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	_ "github.com/Layr-Labs/eigenda/api/clients/v2/verification" // imported for docstring link
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/consts"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
@@ -17,26 +18,26 @@ import (
 
 // TODO: update this to test all 4 derivation error cases.
 //
-// RBN Recency Check is only available for V2
+// RBN Recency Check is part of the derivation versioning introduced with V4 certificates.
 // Contract Test here refers to https://pactflow.io/blog/what-is-contract-testing/, not evm contracts.
-func TestOPContractTestRBNRecentyCheck(t *testing.T) {
+func TestOPContractTestRBNRecencyCheck(t *testing.T) {
+	// TODO(iquidus): Remove skip when V4 certs are deployed to testnets
+	t.Skip("Skipping RBN recency check test until V4 certs are deployed to testnets")
 	t.Parallel()
 	if testutils.GetBackend() == testutils.MemstoreBackend {
 		t.Skip("Don't run for memstore backend, since rbn recency check is only implemented for eigenda v2 backend")
 	}
 
 	var testTable = []struct {
-		name                 string
-		RBNRecencyWindowSize uint64
-		certRBN              uint32
-		certL1IBN            uint64
-		requireErrorFn       func(t *testing.T, err error)
+		name           string
+		certRBN        uint32
+		certL1IBN      uint64
+		requireErrorFn func(t *testing.T, err error)
 	}{
 		{
-			name:                 "RBN recency check failed",
-			RBNRecencyWindowSize: 100,
-			certRBN:              100,
-			certL1IBN:            201,
+			name:      "RBN recency check failed",
+			certRBN:   100,
+			certL1IBN: 100 + consts.RBNRecencyWindowSizeV0 + 1,
 			requireErrorFn: func(t *testing.T, err error) {
 				// expect proxy to return a 418 error which the client converts to this structured error
 				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
@@ -47,10 +48,9 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 			},
 		},
 		{
-			name:                 "RBN recency check passed",
-			RBNRecencyWindowSize: 100,
-			certRBN:              100,
-			certL1IBN:            199,
+			name:      "RBN recency check passed",
+			certRBN:   100,
+			certL1IBN: 199,
 			requireErrorFn: func(t *testing.T, err error) {
 				// After RBN check succeeds, CertVerifier.checkDACert contract call is made,
 				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
@@ -62,25 +62,9 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 			},
 		},
 		{
-			name:                 "RBN recency check skipped - Proxy set window size 0",
-			RBNRecencyWindowSize: 0,
-			certRBN:              100,
-			certL1IBN:            201,
-			requireErrorFn: func(t *testing.T, err error) {
-				// After RBN check succeeds, CertVerifier.checkDACert contract call is made,
-				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
-				// invalid). This gets converted to a [eigendav2store.ErrInvalidCertDerivationError] which gets marshalled
-				// and returned as the body of a 418 response by the proxy.
-				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
-				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
-				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
-			},
-		},
-		{
-			name:                 "RBN recency check skipped - client set IBN to 0",
-			RBNRecencyWindowSize: 100,
-			certRBN:              100,
-			certL1IBN:            0,
+			name:      "RBN recency check skipped - client set IBN to 0",
+			certRBN:   100,
+			certL1IBN: 0,
 			requireErrorFn: func(t *testing.T, err error) {
 				// After RBN check succeeds, CertVerifier.checkDACert contract call is made,
 				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
@@ -102,21 +86,20 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				common.V2EigenDABackend,
 				[]common.EigenDABackend{common.V2EigenDABackend})
 			tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-			tsConfig.StoreBuilderConfig.ClientConfigV2.RBNRecencyWindowSize = tt.RBNRecencyWindowSize
 			ts, kill := testutils.CreateTestSuite(tsConfig)
 			t.Cleanup(kill)
 
 			// Build + Serialize (empty) cert with the given RBN
-			certV3 := coretypes.EigenDACertV3{
+			certV4 := coretypes.EigenDACertV4{
 				BatchHeader: bindings.EigenDATypesV2BatchHeaderV2{
 					ReferenceBlockNumber: tt.certRBN,
 				},
 			}
-			serializedCertV3, err := rlp.EncodeToBytes(certV3)
+			serializedCertV4, err := rlp.EncodeToBytes(certV4)
 			require.NoError(t, err)
 			// altdaCommitment is what is returned by the proxy
 			altdaCommitment, err := commitments.EncodeCommitment(
-				certs.NewVersionedCert(serializedCertV3, certs.V2VersionByte),
+				certs.NewVersionedCert(serializedCertV4, certs.V3VersionByte),
 				commitments.OptimismGenericCommitmentMode)
 			require.NoError(t, err)
 			// the op client expects a typed commitment, so we have to decode the altdaCommitment
