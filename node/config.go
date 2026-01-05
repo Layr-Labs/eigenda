@@ -210,12 +210,6 @@ type Config struct {
 	// claimed minimum version number.
 	IgnoreVersionForEjectionDefense bool
 
-	// Whether the validator should perform payment validation.
-	//
-	// TODO(litt3): This is a temporary field, which will be removed once the new payments system is fully in place.
-	// Payment validation is currently optional to make implementation and testing possible before actually shipping
-	// the new payments system.
-	EnablePaymentValidation        bool
 	ReservationLedgerCacheConfig   reservationvalidation.ReservationLedgerCacheConfig
 	EnablePerAccountPaymentMetrics bool
 }
@@ -400,22 +394,18 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		}
 	}
 
-	paymentValidationEnabled := ctx.GlobalBool(flags.EnablePaymentValidationFlag.Name)
-	var reservationLedgerCacheConfig reservationvalidation.ReservationLedgerCacheConfig
-	if paymentValidationEnabled {
-		reservationLedgerCacheConfig, err = reservationvalidation.NewReservationLedgerCacheConfig(
-			ctx.GlobalInt(flags.ReservationMaxLedgersFlag.Name),
-			// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
-			// instead of hardcoding. At that point, this field will be removed from the config struct
-			// entirely, and the value will be fetched dynamically at runtime.
-			120*time.Second,
-			// this is hardcoded: it's a parameter just in case, but it's never expected to change
-			ratelimit.OverfillOncePermitted,
-			ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("new reservation ledger cache config: %w", err)
-		}
+	reservationLedgerCacheConfig, err := reservationvalidation.NewReservationLedgerCacheConfig(
+		ctx.GlobalInt(flags.ReservationMaxLedgersFlag.Name),
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		120*time.Second,
+		// this is hardcoded: it's a parameter just in case, but it's never expected to change
+		ratelimit.OverfillOncePermitted,
+		ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger cache config: %w", err)
 	}
 
 	return &Config{
@@ -499,7 +489,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EjectionSentinelPeriod:          ctx.GlobalDuration(flags.EjectionSentinelPeriodFlag.Name),
 		EjectionDefenseEnabled:          ctx.GlobalBool(flags.EjectionDefenseEnabledFlag.Name),
 		IgnoreVersionForEjectionDefense: ctx.GlobalBool(flags.IgnoreVersionForEjectionDefenseFlag.Name),
-		EnablePaymentValidation:         paymentValidationEnabled,
 		ReservationLedgerCacheConfig:    reservationLedgerCacheConfig,
 		EnablePerAccountPaymentMetrics:  ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
 	}, nil
