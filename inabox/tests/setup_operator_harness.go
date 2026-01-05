@@ -295,7 +295,6 @@ func (oh *OperatorHarness) startOperator(
 		GetChunksColdCacheReadLimitMB:       1 * units.GiB / units.MiB,
 		GetChunksColdBurstLimitMB:           1 * units.GiB / units.MiB,
 		GRPCMsgSizeLimitV2:                  1024 * 1024 * 300,
-		EnablePaymentValidation:             true,
 		ReservationLedgerCacheConfig:        reservationLedgerCacheConfig,
 		EnablePerAccountPaymentMetrics:      false,
 	}
