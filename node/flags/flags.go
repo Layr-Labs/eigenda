@@ -396,14 +396,14 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-rate-limit-per-second"),
 		Usage:    "Rate limit for StoreChunks requests per disperser (requests per second). If <=0, rate limiting is disabled.",
 		Required: false,
-		Value:    0.025, // ~1.5 requests per minute (similar to prior strike threshold)
+		Value:    1000, // allow stress tests with small blobs
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_RATE_LIMIT_PER_SECOND"),
 	}
 	DisperserRateLimitBurstFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-rate-limit-burst"),
 		Usage:    "Burst capacity for per-disperser StoreChunks rate limit. If <=0, rate limiting is disabled.",
 		Required: false,
-		Value:    3,
+		Value:    10000,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_RATE_LIMIT_BURST"),
 	}
 	LevelDBDisableSeeksCompactionV1Flag = cli.BoolTFlag{
