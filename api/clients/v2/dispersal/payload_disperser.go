@@ -138,13 +138,9 @@ func (pd *PayloadDisperser) SendPayload(
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
 
-	// TODO (litt3): DisperseBlob should accept an actual blob object, instead of the
-	//  serialized bytes. The operations taking place in DisperseBlob require the bytes to be converted into field
-	//  elements anyway, so serializing the blob here is unnecessary work. This will be a larger change that affects
-	//  many areas of code, though.
 	blobHeader, reply, err := disperserClient.DisperseBlob(
 		timeoutCtx,
-		blob.Serialize(),
+		blob,
 		pd.config.BlobVersion,
 		requiredQuorums,
 		probe,

@@ -61,6 +61,12 @@ func (b *Blob) LenSymbols() uint32 {
 	return uint32(len(b.coeffPolynomial))
 }
 
+// Returns the blob's coefficient polynomial.
+// The returned slice should not be modified by the caller.
+func (b *Blob) GetCoefficients() []fr.Element {
+	return b.coeffPolynomial
+}
+
 // LenBytes returns the number of bytes in the Blob.
 func (b *Blob) LenBytes() uint32 {
 	return uint32(len(b.coeffPolynomial) * encoding.BYTES_PER_SYMBOL)

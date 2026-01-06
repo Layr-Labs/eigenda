@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/api/hashing"
@@ -17,7 +18,6 @@ import (
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
-	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 )
@@ -133,18 +133,22 @@ func (c *DisperserClient) Close() error {
 	return nil
 }
 
-// Disperses a blob with the given data, blob version, and quorums.
+// Disperses a blob with the given blob version and quorums.
 //
 // Returns the BlobHeader of the blob that was dispersed, and the DisperseBlobReply that was received from the
 // disperser, if the dispersal was successful. Otherwise returns an error
 func (c *DisperserClient) DisperseBlob(
 	ctx context.Context,
-	data []byte,
+	blob *coretypes.Blob,
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
 	probe *common.SequenceProbe,
 	paymentMetadata *core.PaymentMetadata,
 ) (*corev2.BlobHeader, *disperser_rpc.DisperseBlobReply, error) {
+	if blob == nil {
+		//nolint:wrapcheck
+		return nil, nil, api.NewErrorInvalidArg("blob must not be nil")
+	}
 	if len(quorums) == 0 {
 		//nolint:wrapcheck
 		return nil, nil, api.NewErrorInvalidArg("quorum numbers must be provided")
@@ -165,22 +169,11 @@ func (c *DisperserClient) DisperseBlob(
 		return nil, nil, api.NewErrorInvalidArg("payment metadata must be provided")
 	}
 
-	probe.SetStage("verify_field_element")
-
-	// check every 32 bytes of data are within the valid range for a bn254 field element
-	_, err := rs.ToFrArray(data)
-	if err != nil {
-		return nil, nil, fmt.Errorf(
-			"encountered an error to convert a 32-bytes into a valid field element, "+
-				"please use the correct format where every 32bytes(big-endian) is less than "+
-				"21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
-	}
-
 	probe.SetStage("get_commitments")
 
-	blobCommitments, err := c.committer.GetCommitmentsForPaddedLength(data)
+	blobCommitments, err := c.committer.GetCommitmentsFromFieldElements(blob.GetCoefficients())
 	if err != nil {
-		return nil, nil, fmt.Errorf("get commitments for padded length: %w", err)
+		return nil, nil, fmt.Errorf("get commitments from field elements: %w", err)
 	}
 
 	blobHeader := &corev2.BlobHeader{
@@ -215,8 +208,10 @@ func (c *DisperserClient) DisperseBlob(
 		return nil, nil, fmt.Errorf("error converting blob header to protobuf: %w", err)
 	}
 
+	blobBytes := blob.Serialize()
+
 	request := &disperser_rpc.DisperseBlobRequest{
-		Blob:            data,
+		Blob:            blobBytes,
 		Signature:       blobKeySignature,
 		AnchorSignature: anchorSignature,
 		BlobHeader:      blobHeaderProto,
@@ -236,7 +231,7 @@ func (c *DisperserClient) DisperseBlob(
 		return nil, nil, api.NewErrorFailover(fmt.Errorf("DisperseBlob rpc: %w", err))
 	}
 
-	c.metrics.RecordBlobSizeBytes(len(data))
+	c.metrics.RecordBlobSizeBytes(len(blobBytes))
 
 	return blobHeader, reply, nil
 }

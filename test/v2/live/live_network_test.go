@@ -51,45 +51,6 @@ func testBasicDispersal(t *testing.T, c *client.TestClient, payload []byte) erro
 	return nil
 }
 
-// Disperse a 0 byte blob.
-// Empty blobs are not allowed by the disperser
-func emptyBlobDispersalTest(t *testing.T, environment string) {
-	var blobBytes []byte
-	quorums := []core.QuorumID{0, 1}
-
-	c := client.GetTestClient(t, common.TestLogger(t), environment)
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
-	defer cancel()
-
-	signer, err := auth.NewLocalBlobRequestSigner(c.GetPrivateKey())
-	require.NoError(t, err)
-	accountId, err := signer.GetAccountID()
-	require.NoError(t, err)
-
-	paymentMetadata, err := core.NewPaymentMetadata(accountId, time.Now(), nil)
-	require.NoError(t, err)
-
-	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
-	// attempt dispersal of an empty blob
-	// This should fail with "data is empty" error
-	disperserClient, err := c.GetDisperserClientMultiplexer().GetDisperserClient(
-		ctx, time.Now(), paymentMetadata.IsOnDemand())
-	require.NoError(t, err)
-	_, _, err = disperserClient.DisperseBlob(ctx, blobBytes, 0, quorums, nil, paymentMetadata)
-	require.Error(t, err)
-}
-
-func TestEmptyBlobDispersal(t *testing.T) {
-	environments, err := client.GetEnvironmentConfigPaths()
-	require.NoError(t, err)
-
-	for _, environment := range environments {
-		t.Run(getEnvironmentName(environment), func(t *testing.T) {
-			emptyBlobDispersalTest(t, environment)
-		})
-	}
-}
-
 // Disperse an empty payload. Blob will not be empty, since payload encoding entails adding bytes
 func emptyPayloadDispersalTest(t *testing.T, environment string) {
 	var payload []byte
@@ -135,7 +96,11 @@ func TestZeroPayloadDispersal(t *testing.T) {
 // Disperse a blob that consists only of 0 bytes. This should be permitted by eigenDA, even
 // though it's not permitted by the default payload -> blob encoding scheme
 func zeroBlobDispersalTest(t *testing.T, environment string) {
-	blobBytes := make([]byte, 1000)
+	blobBytes := make([]byte, 1024)
+	blobLengthSymbols := uint32(len(blobBytes) / encoding.BYTES_PER_SYMBOL)
+	blob, err := coretypes.DeserializeBlob(blobBytes, blobLengthSymbols)
+	require.NoError(t, err)
+
 	quorums := []core.QuorumID{0, 1}
 
 	c := client.GetTestClient(t, common.TestLogger(t), environment)
@@ -155,7 +120,7 @@ func zeroBlobDispersalTest(t *testing.T, environment string) {
 	disperserClient, err := c.GetDisperserClientMultiplexer().GetDisperserClient(
 		ctx, time.Now(), paymentMetadata.IsOnDemand())
 	require.NoError(t, err)
-	_, _, err = disperserClient.DisperseBlob(ctx, blobBytes, 0, quorums, nil, paymentMetadata)
+	_, _, err = disperserClient.DisperseBlob(ctx, blob, 0, quorums, nil, paymentMetadata)
 	require.NoError(t, err)
 }
 
@@ -521,7 +486,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	_, _, err = disperserClient.DisperseBlob(ctx, blob.Serialize(), 0, quorums, nil, paymentMetadata)
+	_, _, err = disperserClient.DisperseBlob(ctx, blob, 0, quorums, nil, paymentMetadata)
 	require.Error(t, err)
 }
 
