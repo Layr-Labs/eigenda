@@ -10,6 +10,7 @@
     - [Security Parameters](./protocol/architecture/security-parameters.md)
     - [Write and Read Workflow](./protocol/architecture/write-and-read-workflow.md)
   - [Contracts](./protocol/contracts.md)
+  - [Validator Set Governance](./protocol/validator-set-governance.md)
   - [EigenDA V1 (Deprecated)](./v1.md)
 - [Integrations](./integration.md)
   - [Spec](./integration/spec.md)
