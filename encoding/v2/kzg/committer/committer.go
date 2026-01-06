@@ -141,6 +141,27 @@ func (c *Committer) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCom
 	return commitments, nil
 }
 
+// Computes BlobCommitments directly from field elements.
+//
+// TODO(litt3): Ideally, this would accept a blob directly instead of field elements. Once V1 is removed, we'll
+// have more freedom to reorganize the Committer utility, but for now there are input cycles preventing using this blob
+// type directly.
+func (c *Committer) GetCommitmentsFromFieldElements(symbols []fr.Element) (encoding.BlobCommitments, error) {
+	commit, lengthCommit, lengthProof, err := c.GetCommitments(symbols)
+	if err != nil {
+		return encoding.BlobCommitments{}, fmt.Errorf("get commitments: %w", err)
+	}
+
+	commitments := encoding.BlobCommitments{
+		Commitment:       (*encoding.G1Commitment)(commit),
+		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
+		LengthProof:      (*encoding.G2Commitment)(lengthProof),
+		Length:           math.NextPowOf2u32(uint32(len(symbols))),
+	}
+
+	return commitments, nil
+}
+
 func (c *Committer) GetCommitments(
 	inputFr []fr.Element,
 ) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, error) {
