@@ -128,11 +128,11 @@ If the cancellation is received within the `RESPONSE_TIME` window and the signat
 If no valid cancellation is received before the `RESPONSE_TIME` window expires, any disperser can finalize the ejection by submitting a finalizing transaction to the contract. Upon finalization, the validator is deregistered from the EigenDA validator set via a call to [`EigenDARegistryCoordinator`](../contracts.md#eigendaregistrycoordinator).
 
 
-### 1.7 Rejoining After Ejection
+### 1.6 Rejoining After Ejection
 
 Validators that have been ejected are subject to a cool-down period of **1 day** before they can rejoin the validator set.
 
-### 1.8 Protocol Parameters
+### 1.7 Protocol Parameters
 
 | Parameter | Value | Description | Implementation |
 |-----------|-------|-------------|----------------|
