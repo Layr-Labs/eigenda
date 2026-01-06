@@ -276,6 +276,13 @@ func (s *DispersalServerV2) validateDispersalRequest(
 // If an anchor signature is provided, it will be validated regardless of blob version.
 // While validating the anchor signature, this method will also verify that the disperser ID and chain ID in the request
 // match the expected values.
+//
+// Version-based enforcement rationale:
+// We co-opt the BlobVersion field to signal client capability. Without this, an attacker could strip the anchor
+// signature from a request and replay it, since we can't reject unsigned requests outright (that would break legacy
+// clients). By requiring anchor signatures for version > 0, the blob key hash changes, making it impossible to forge
+// a valid version=0 signature from a version=1 request. This workaround is necessary since there isn't a "proper" blob
+// version field included in the hash, so there are limited options available to communicate version compatibility.
 func (s *DispersalServerV2) validateAnchorSignature(
 	req *pb.DisperseBlobRequest,
 	blobHeader *corev2.BlobHeader,

@@ -26,6 +26,10 @@ type PayloadClientConfig struct {
 	//
 	// BlobVersion needs to point to a version defined in the threshold registry contract.
 	// https://github.com/Layr-Labs/eigenda/blob/3ed9ef6ed3eb72c46ce3050eb84af28f0afdfae2/contracts/src/interfaces/IEigenDAThresholdRegistry.sol#L6
+	//
+	// Version > 0 signals to the disperser that anchor signatures are required, preventing replay attacks.
+	// Since the blob key includes the version, an attacker cannot strip the anchor signature and replay
+	// the request as version=0.
 	BlobVersion v2.BlobVersion
 }
 
