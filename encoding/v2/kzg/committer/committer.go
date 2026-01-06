@@ -126,6 +126,11 @@ func (c *Committer) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCom
 		return encoding.BlobCommitments{}, fmt.Errorf("ToFrArray: %w", err)
 	}
 
+	return c.GetCommitmentsFromFieldElements(symbols)
+}
+
+// Computes BlobCommitments directly from field elements.
+func (c *Committer) GetCommitmentsFromFieldElements(symbols []fr.Element) (encoding.BlobCommitments, error) {
 	commit, lengthCommit, lengthProof, err := c.GetCommitments(symbols)
 	if err != nil {
 		return encoding.BlobCommitments{}, fmt.Errorf("get commitments: %w", err)
