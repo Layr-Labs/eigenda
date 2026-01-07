@@ -61,7 +61,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 	pb, err := batch.ToProtobuf()
 	assert.NoError(t, err)
 
-	newBatch, err := v2.BatchFromProtobuf(pb)
+	newBatch, err := v2.BatchFromProtobuf(pb, false)
 	assert.NoError(t, err)
 
 	assert.Equal(t, batch, newBatch)

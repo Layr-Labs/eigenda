@@ -288,9 +288,13 @@ func (b *Batch) ToProtobuf() (*commonpb.Batch, error) {
 	}, nil
 }
 
-func BatchFromProtobuf(proto *commonpb.Batch) (*Batch, error) {
+func BatchFromProtobuf(proto *commonpb.Batch, enforceSingleBlob bool) (*Batch, error) {
 	if len(proto.GetBlobCertificates()) == 0 {
 		return nil, errors.New("missing blob certificates in batch")
+	}
+
+	if enforceSingleBlob && len(proto.GetBlobCertificates()) != 1 {
+		return nil, fmt.Errorf("batch must contain exactly 1 blob, got %d", len(proto.GetBlobCertificates()))
 	}
 
 	if proto.GetHeader() == nil {

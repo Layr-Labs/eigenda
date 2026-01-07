@@ -94,6 +94,9 @@ type Config struct {
 	EnableV1 bool
 	EnableV2 bool
 
+	// If true, reject batch dispersal requests containing more than one blob
+	EnforceSingleBlobBatches bool
+
 	OnchainStateRefreshInterval time.Duration
 	ChunkDownloadTimeout        time.Duration
 	GRPCMsgSizeLimitV2          int
@@ -455,6 +458,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            v2Enabled,
 		EnableV1:                            v1Enabled,
+		EnforceSingleBlobBatches:            ctx.GlobalBool(flags.EnforceSingleBlobBatchesFlag.Name),
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
 		GRPCMsgSizeLimitV2:                  ctx.GlobalInt(flags.GRPCMsgSizeLimitV2Flag.Name),
