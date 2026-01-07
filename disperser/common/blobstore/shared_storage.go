@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/s3"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -42,14 +42,26 @@ var errProcessingToDispersing = errors.New("blob transit to dispersing from non 
 // See blob_metadata_store.go for more details on BlobMetadataStore.
 type SharedBlobStore struct {
 	bucketName        string
-	s3Client          s3.Client
+	s3Client          s3.S3Client
 	blobMetadataStore *BlobMetadataStore
 	logger            logging.Logger
 }
 
+type ObjectStorageBackend string
+
+const (
+	S3Backend  ObjectStorageBackend = "s3"
+	OCIBackend ObjectStorageBackend = "oci"
+)
+
 type Config struct {
 	BucketName string
 	TableName  string
+	Backend    ObjectStorageBackend
+	// OCI-specific configuration
+	OCINamespace     string
+	OCIRegion        string
+	OCICompartmentID string
 }
 
 // This represents the s3 fetch result for a blob.
@@ -65,7 +77,12 @@ type blobResultOrError struct {
 
 var _ disperser.BlobStore = (*SharedBlobStore)(nil)
 
-func NewSharedStorage(bucketName string, s3Client s3.Client, blobMetadataStore *BlobMetadataStore, logger logging.Logger) *SharedBlobStore {
+func NewSharedStorage(
+	bucketName string,
+	s3Client s3.S3Client,
+	blobMetadataStore *BlobMetadataStore,
+	logger logging.Logger,
+) *SharedBlobStore {
 	return &SharedBlobStore{
 		bucketName:        bucketName,
 		s3Client:          s3Client,
@@ -129,11 +146,21 @@ func (s *SharedBlobStore) StoreBlob(ctx context.Context, blob *core.Blob, reques
 
 // GetBlobContent retrieves blob content by the blob key.
 func (s *SharedBlobStore) GetBlobContent(ctx context.Context, blobHash disperser.BlobHash) ([]byte, error) {
-	return s.s3Client.DownloadObject(ctx, s.bucketName, blobObjectKey(blobHash))
+	data, found, err := s.s3Client.DownloadObject(ctx, s.bucketName, blobObjectKey(blobHash))
+	if err != nil {
+		return nil, fmt.Errorf("error downloading blob content: %w", err)
+	}
+	if !found {
+		return nil, fmt.Errorf("blob not found for blob hash: %s", blobHash)
+	}
+	return data, nil
 }
 
 func (s *SharedBlobStore) getBlobContentParallel(ctx context.Context, blobKey disperser.BlobKey, blobRequestHeader core.BlobRequestHeader, resultChan chan<- blobResultOrError) {
-	blob, err := s.s3Client.DownloadObject(ctx, s.bucketName, blobObjectKey(blobKey.BlobHash))
+	blob, found, err := s.s3Client.DownloadObject(ctx, s.bucketName, blobObjectKey(blobKey.BlobHash))
+	if !found {
+		err = fmt.Errorf("blob not found for blob key: %s", blobKey.String())
+	}
 	if err != nil {
 		resultChan <- blobResultOrError{err: err}
 		return

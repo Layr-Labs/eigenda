@@ -42,10 +42,10 @@ type ChunkEncodingFormat = uint8
 type BundleEncodingFormat = uint8
 
 const (
-	// We use uint8 to count the number of quorums, so we can have at most 255 quorums,
-	// which means the max ID can not be larger than 254 (from 0 to 254, there are 255
-	// different IDs).
-	MaxQuorumID = 254
+	// This value should always match the onchain MAX_QUORUM_COUNT value in the EigenDARegistryCoordinator.
+	// https://github.com/Layr-Labs/eigenda/blob/00cc8868b7e2d742fc6584dc1dea312193c8d4c2/contracts/src/core/EigenDARegistryCoordinatorStorage.sol#L36
+	// There are at most 192 quorum numbers, meaning the allowed IDs are [0,191].
+	MaxQuorumID = 191
 
 	// How many bits for the bundle's header.
 	NumBundleHeaderBits = 64
@@ -118,7 +118,7 @@ func (cd *ChunksData) ToFrames() ([]*encoding.Frame, error) {
 	switch cd.Format {
 	case GobChunkEncodingFormat:
 		for _, data := range cd.Chunks {
-			fr, err := new(encoding.Frame).Deserialize(data)
+			fr, err := new(encoding.Frame).DeserializeGob(data)
 			if err != nil {
 				return nil, err
 			}
@@ -172,7 +172,7 @@ func (cd *ChunksData) ToGobFormat() (*ChunksData, error) {
 		if err != nil {
 			return nil, err
 		}
-		gob, err := c.Serialize()
+		gob, err := c.SerializeGob()
 		if err != nil {
 			return nil, err
 		}
@@ -194,7 +194,7 @@ func (cd *ChunksData) ToGnarkFormat() (*ChunksData, error) {
 	}
 	gnarkChunks := make([][]byte, 0, len(cd.Chunks))
 	for _, chunk := range cd.Chunks {
-		c, err := new(encoding.Frame).Deserialize(chunk)
+		c, err := new(encoding.Frame).DeserializeGob(chunk)
 		if err != nil {
 			return nil, err
 		}
@@ -307,7 +307,8 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(RoundUpDivide(b.Length*PercentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
+		size += int64(RoundUpDivide(b.Length*PercentMultiplier*encoding.BYTES_PER_SYMBOL,
+			uint32(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }
@@ -451,7 +452,7 @@ func (cb Bundles) Serialize() (map[uint32][][]byte, error) {
 	data := make(map[uint32][][]byte, len(cb))
 	for quorumID, bundle := range cb {
 		for _, chunk := range bundle {
-			chunkData, err := chunk.Serialize()
+			chunkData, err := chunk.SerializeGob()
 			if err != nil {
 				return nil, err
 			}

@@ -4,19 +4,18 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	s3common "github.com/Layr-Labs/eigenda/common/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/pkg/errors"
 )
 
 type BlobStore struct {
 	bucketName string
-	s3Client   s3.Client
+	s3Client   s3common.S3Client
 	logger     logging.Logger
 }
 
-func NewBlobStore(s3BucketName string, s3Client s3.Client, logger logging.Logger) *BlobStore {
+func NewBlobStore(s3BucketName string, s3Client s3common.S3Client, logger logging.Logger) *BlobStore {
 	return &BlobStore{
 		bucketName: s3BucketName,
 		s3Client:   s3Client,
@@ -26,15 +25,15 @@ func NewBlobStore(s3BucketName string, s3Client s3.Client, logger logging.Logger
 
 // StoreBlob adds a blob to the blob store
 func (b *BlobStore) StoreBlob(ctx context.Context, key corev2.BlobKey, data []byte) error {
-	_, err := b.s3Client.HeadObject(ctx, b.bucketName, s3.ScopedBlobKey(key))
+	_, err := b.s3Client.HeadObject(ctx, b.bucketName, s3common.ScopedBlobKey(key))
 	if err == nil {
 		b.logger.Warnf("blob already exists in bucket %s: %s", b.bucketName, key)
 		return ErrAlreadyExists
 	}
 
-	err = b.s3Client.UploadObject(ctx, b.bucketName, s3.ScopedBlobKey(key), data)
+	err = b.s3Client.UploadObject(ctx, b.bucketName, s3common.ScopedBlobKey(key), data)
 	if err != nil {
-		b.logger.Errorf("failed to upload blob in bucket %s: %v", b.bucketName, err)
+		b.logger.Errorf("failed to upload blob in bucket %s: %w", b.bucketName, err)
 		return err
 	}
 	return nil
@@ -42,14 +41,12 @@ func (b *BlobStore) StoreBlob(ctx context.Context, key corev2.BlobKey, data []by
 
 // GetBlob retrieves a blob from the blob store
 func (b *BlobStore) GetBlob(ctx context.Context, key corev2.BlobKey) ([]byte, error) {
-	data, err := b.s3Client.DownloadObject(ctx, b.bucketName, s3.ScopedBlobKey(key))
-	if errors.Is(err, s3.ErrObjectNotFound) {
-		b.logger.Warnf("blob not found in bucket %s: %s", b.bucketName, key)
-		return nil, ErrBlobNotFound
-	}
-
+	data, found, err := b.s3Client.DownloadObject(ctx, b.bucketName, s3common.ScopedBlobKey(key))
 	if err != nil {
-		return nil, fmt.Errorf("failed to download blob from bucket %s: %v", b.bucketName, err)
+		return nil, fmt.Errorf("%s, bucket: %s,: %w", ErrBlobNotFound.Error(), b.bucketName, err)
+	}
+	if !found {
+		return nil, ErrBlobNotFound
 	}
 	return data, nil
 }

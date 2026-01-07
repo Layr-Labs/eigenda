@@ -10,6 +10,7 @@ import (
 	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
@@ -35,8 +36,21 @@ func NewProxyWrapper(
 		return nil, fmt.Errorf("check proxy config: %w", err)
 	}
 
+	gethCfg := geth.EthClientConfig{
+		RPCURLs: []string{proxyConfig.SecretConfig.EthRPCURL},
+	}
+
 	registry := prometheus.NewRegistry()
 	proxyMetrics := proxymetrics.NewMetrics(registry)
+	ethClient, _, err := proxycommon.BuildEthClient(
+		ctx,
+		logger,
+		gethCfg,
+		proxyConfig.StoreBuilderConfig.ClientConfigV2.EigenDANetwork,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build eth client: %w", err)
+	}
 
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
@@ -45,6 +59,7 @@ func NewProxyWrapper(
 		proxyConfig.StoreBuilderConfig,
 		proxyConfig.SecretConfig,
 		registry,
+		ethClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build store manager: %w", err)

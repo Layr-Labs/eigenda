@@ -3,14 +3,11 @@ pragma solidity ^0.8.9;
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
-import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {Merkle} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
-import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
@@ -29,10 +26,18 @@ library EigenDACertVerificationLib {
     error InvalidInclusionProof(uint32 blobIndex, bytes32 blobHash, bytes32 rootHash);
 
     /// @notice Thrown when security assumptions are not met
-    /// @param gamma The difference between confirmation and adversary thresholds
-    /// @param n The calculated security parameter
-    /// @param minRequired The minimum required value for n
-    error SecurityAssumptionsNotMet(uint256 gamma, uint256 n, uint256 minRequired);
+    /// @param confirmationThreshold The confirmation threshold percentage
+    /// @param adversaryThreshold The safety threshold percentage
+    /// @param codingRate The coding rate for the blob
+    /// @param numChunks The number of chunks in the blob
+    /// @param maxNumOperators The maximum number of operators
+    error SecurityAssumptionsNotMet(
+        uint8 confirmationThreshold,
+        uint8 adversaryThreshold,
+        uint8 codingRate,
+        uint32 numChunks,
+        uint32 maxNumOperators
+    );
 
     /// @notice Thrown when blob quorums are not a subset of confirmed quorums
     /// @param blobQuorumsBitmap The bitmap of blob quorums
@@ -49,82 +54,76 @@ library EigenDACertVerificationLib {
     /// @param nextBlobVersion The next blob version (valid versions need to be less than this number)
     error InvalidBlobVersion(uint16 blobVersion, uint16 nextBlobVersion);
 
+    /// @notice Thrown when the offchain derivation version is invalid
+    /// @param certDerivationVer The offchain derivation version in the certificate
+    /// @param requiredDerivationVer The required offchain derivation version
+    error InvalidOffchainDerivationVersion(uint16 certDerivationVer, uint16 requiredDerivationVer);
+
+    /// @notice Thrown when the number of signed quorums exceeds the maximum allowed
+    /// @param count The actual number of signed quorums provided
+    /// @param maximum The maximal number of quorums
+    error QuorumCountExceedsMaximum(uint256 count, uint256 maximum);
+
+    /// @notice Thrown when the total number of non-signers across all quorums exceeds the maximum allowed
+    /// @param count The total count of non-signers across all quorums
+    /// @param maximum The maximal number of non-signers allowed
+    error NonSignerCountExceedsMaximum(uint256 count, uint256 maximum);
+
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
-    /// @dev Uses the same verification logic as verifyDACertV2. The only difference is that the certificate is ABI encoded bytes.
     /// @param eigenDAThresholdRegistry The threshold registry contract
     /// @param eigenDASignatureVerifier The signature verifier contract
     /// @param daCert The EigenDA certificate
     /// @param securityThresholds The security thresholds to verify against
     /// Callers should ensure that the requiredQuorumNumbers passed are non-empty if needed.
     /// @param requiredQuorumNumbers The required quorum numbers. Can be empty if not required.
+    /// @param offchainDerivationVersion The offchain derivation version to verify against
+    /// @param max_quorum_count The maximal number of quorums.
+    /// @param max_nonsigner_count_all_quorum The maximal number of non-signers across all quorums.
     function checkDACert(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier eigenDASignatureVerifier,
-        CT.EigenDACertV3 memory daCert,
-        DATypesV1.SecurityThresholds memory securityThresholds,
-        bytes memory requiredQuorumNumbers
-    ) internal view {
-        checkDACertV2(
-            eigenDAThresholdRegistry,
-            eigenDASignatureVerifier,
-            daCert.batchHeader,
-            daCert.blobInclusionInfo,
-            daCert.nonSignerStakesAndSignature,
-            securityThresholds,
-            requiredQuorumNumbers,
-            daCert.signedQuorumNumbers
-        );
-    }
-
-    /**
-     * @notice Checks a complete blob certificate for V2 in a single call
-     * @param eigenDAThresholdRegistry The threshold registry contract
-     * @param signatureVerifier The signature verifier contract
-     * @param batchHeader The batch header
-     * @param blobInclusionInfo The blob inclusion info
-     * @param nonSignerStakesAndSignature The non-signer stakes and signature
-     * @param securityThresholds The security thresholds to verify against
-     * @param requiredQuorumNumbers The required quorum numbers
-     * @param signedQuorumNumbers The signed quorum numbers
-     */
-    function checkDACertV2(
-        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
-        IEigenDASignatureVerifier signatureVerifier,
-        DATypesV2.BatchHeaderV2 memory batchHeader,
-        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
-        DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        CT.EigenDACertV4 memory daCert,
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers,
-        bytes memory signedQuorumNumbers
+        uint16 offchainDerivationVersion,
+        uint256 max_quorum_count,
+        uint256 max_nonsigner_count_all_quorum
     ) internal view {
-        checkBlobInclusion(batchHeader, blobInclusionInfo);
+        checkOffchainDerivationVersion(daCert.offchainDerivationVersion, offchainDerivationVersion);
+
+        // verifying merkle inclusion proof is very efficient, even assuming the worst depth 256.
+        // A single depth verification takes about 300 gas for KECCAK256 and CALLDATALOAD
+        // so at worst 80K Gas.
+        checkBlobInclusion(daCert.batchHeader, daCert.blobInclusionInfo);
 
         checkSecurityParams(
-            eigenDAThresholdRegistry, blobInclusionInfo.blobCertificate.blobHeader.version, securityThresholds
+            eigenDAThresholdRegistry, daCert.blobInclusionInfo.blobCertificate.blobHeader.version, securityThresholds
         );
 
         // Verify signatures and build confirmed quorums bitmap
         uint256 confirmedQuorumsBitmap = checkSignaturesAndBuildConfirmedQuorums(
-            signatureVerifier,
-            hashBatchHeaderV2(batchHeader),
-            signedQuorumNumbers,
-            batchHeader.referenceBlockNumber,
-            nonSignerStakesAndSignature,
-            securityThresholds
+            eigenDASignatureVerifier,
+            hashBatchHeaderV2(daCert.batchHeader),
+            daCert.signedQuorumNumbers,
+            daCert.batchHeader.referenceBlockNumber,
+            daCert.nonSignerStakesAndSignature,
+            securityThresholds,
+            max_quorum_count,
+            max_nonsigner_count_all_quorum
         );
 
         // The different quorums are related by: requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums ⊆ signedQuorums
         // checkSignaturesAndBuildConfirmedQuorums checked the last inequality. We now verify the other two.
         checkQuorumSubsets(
-            requiredQuorumNumbers, blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap
+            requiredQuorumNumbers,
+            daCert.blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
+            confirmedQuorumsBitmap
         );
     }
 
-    /**
-     * @notice Checks blob inclusion in the batch using Merkle proof
-     * @param batchHeader The batch header
-     * @param blobInclusionInfo The blob inclusion info
-     */
+    /// @notice Checks blob inclusion in the batch using Merkle proof
+    /// @param batchHeader The batch header
+    /// @param blobInclusionInfo The blob inclusion info
     function checkBlobInclusion(
         DATypesV2.BatchHeaderV2 memory batchHeader,
         DATypesV2.BlobInclusionInfo memory blobInclusionInfo
@@ -142,17 +141,14 @@ library EigenDACertVerificationLib {
         }
     }
 
-    /**
-     * @notice Checks the security parameters for a blob cert
-     * @dev Verifies that the security condition
-     *      (confirmationThreshold - adversaryThreshold > reconstructionThreshold)
-     *      holds, by checking the invariant
-     *      `numChunks * (1 - 100/gamma/codingRate) >= maxNumOperators`
-     *      If the inequality fails, the blob is considered insecure.
-     * @param eigenDAThresholdRegistry The threshold registry contract
-     * @param blobVersion The blob version to verify
-     * @param securityThresholds The security thresholds to verify against
-     */
+    /// @notice Checks the security parameters for a blob cert
+    /// @dev Verifies that the security condition
+    ///      (confirmationThreshold - adversaryThreshold > reconstructionThreshold)
+    ///      holds, by checking an invariant.
+    ///      If the inequality fails, the blob is considered insecure.
+    /// @param eigenDAThresholdRegistry The threshold registry contract
+    /// @param blobVersion The blob version to verify
+    /// @param securityThresholds The security thresholds to verify against
     function checkSecurityParams(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         uint16 blobVersion,
@@ -166,39 +162,73 @@ library EigenDACertVerificationLib {
         }
         DATypesV1.VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobVersion);
 
-        // In order to prevent divide by 0 panic, we need gamma > 0 and codingRate > 0.
-        // We assume here that the CertVerifier constructor checked that confirmationThreshold > adversaryThreshold.
-        // We also checked above that the blobParams are from a valid version.
-        // Thus, dividing by codingRate below will only panic if codingRate of a proper initialized version is 0,
-        // which is either a configuration bug, or a malicious attack. In both cases, we cannot tell whether the
-        // cert is valid or invalid, so it is ok to panic and let social consensus intervene (put a human debugger in the loop).
-        uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
-        uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
-        uint256 minRequired = blobParams.maxNumOperators * 10000;
+        // Check for potential underflow:
+        // maxNumOperators must not exceed numChunks
+        //
+        if (
+            blobParams.maxNumOperators > blobParams.numChunks
+                || securityThresholds.confirmationThreshold < securityThresholds.adversaryThreshold
+        ) {
+            revert SecurityAssumptionsNotMet(
+                securityThresholds.confirmationThreshold,
+                securityThresholds.adversaryThreshold,
+                blobParams.codingRate,
+                blobParams.numChunks,
+                blobParams.maxNumOperators
+            );
+        }
 
-        if (!(n >= minRequired)) {
-            revert SecurityAssumptionsNotMet(gamma, n, minRequired);
+        uint256 lhs = blobParams.codingRate * (blobParams.numChunks - blobParams.maxNumOperators)
+            * (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold);
+        uint256 rhs = 100 * blobParams.numChunks;
+
+        if (!(lhs >= rhs)) {
+            revert SecurityAssumptionsNotMet(
+                securityThresholds.confirmationThreshold,
+                securityThresholds.adversaryThreshold,
+                blobParams.codingRate,
+                blobParams.numChunks,
+                blobParams.maxNumOperators
+            );
         }
     }
 
-    /**
-     * @notice Checks quorum signatures and builds a bitmap of confirmed quorums
-     * @param signatureVerifier The signature verifier contract
-     * @param batchHashRoot The hash of the batch header
-     * @param signedQuorumNumbers The signed quorum numbers
-     * @param referenceBlockNumber The reference block number
-     * @param nonSignerStakesAndSignature The non-signer stakes and signature
-     * @param securityThresholds The security thresholds to verify against
-     * @return confirmedQuorumsBitmap The bitmap of confirmed quorums
-     */
+    /// @notice Checks quorum signatures and builds a bitmap of confirmed quorums
+    /// @param signatureVerifier The signature verifier contract
+    /// @param batchHashRoot The hash of the batch header
+    /// @param signedQuorumNumbers The signed quorum numbers
+    /// @param referenceBlockNumber The reference block number
+    /// @param nonSignerStakesAndSignature The non-signer stakes and signature
+    /// @param securityThresholds The security thresholds to verify against
+    /// @param max_quorum_count The maximal number of quorums
+    /// @param max_nonsigner_count_all_quorum The maximal number of non-signers across all quorums
+    /// @return confirmedQuorumsBitmap The bitmap of confirmed quorums
     function checkSignaturesAndBuildConfirmedQuorums(
         IEigenDASignatureVerifier signatureVerifier,
         bytes32 batchHashRoot,
         bytes memory signedQuorumNumbers,
         uint32 referenceBlockNumber,
         DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
-        DATypesV1.SecurityThresholds memory securityThresholds
+        DATypesV1.SecurityThresholds memory securityThresholds,
+        uint256 max_quorum_count,
+        uint256 max_nonsigner_count_all_quorum
     ) internal view returns (uint256 confirmedQuorumsBitmap) {
+        // The maximal supported number of quorums from the local contracts. This number must be smaller than or
+        // equal to the value set in the RegistryCoordinator contract.
+        // https://github.com/Layr-Labs/eigenda/blob/00cc8868b7e2d742fc6584dc1dea312193c8d4c2/contracts/src/core/EigenDARegistryCoordinatorStorage.sol#L36
+        if (signedQuorumNumbers.length > max_quorum_count) {
+            revert QuorumCountExceedsMaximum(signedQuorumNumbers.length, max_quorum_count);
+        }
+
+        // if a nonsigning operator belongs to multiple quorums, the totalNonsignersCount counts it multiple times
+        uint256 totalNonsignersCount = 0;
+        for (uint256 i = 0; i < nonSignerStakesAndSignature.nonSignerStakeIndices.length; i++) {
+            totalNonsignersCount += nonSignerStakesAndSignature.nonSignerStakeIndices[i].length;
+        }
+        if (totalNonsignersCount > max_nonsigner_count_all_quorum) {
+            revert NonSignerCountExceedsMaximum(totalNonsignersCount, max_nonsigner_count_all_quorum);
+        }
+
         (DATypesV1.QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
             batchHashRoot, signedQuorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature
         );
@@ -218,12 +248,10 @@ library EigenDACertVerificationLib {
         return confirmedQuorumsBitmap;
     }
 
-    /**
-     * @notice Checks that requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums
-     * @param requiredQuorumNumbers The required quorum numbers
-     * @param blobQuorumNumbers The blob quorum numbers, which are the quorums requested in the blobHeader part of the dispersal
-     * @param confirmedQuorumsBitmap The bitmap of confirmed quorums, which are signed quorums that meet the confirmationThreshold
-     */
+    /// @notice Checks that requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums
+    /// @param requiredQuorumNumbers The required quorum numbers
+    /// @param blobQuorumNumbers The blob quorum numbers, which are the quorums requested in the blobHeader part of the dispersal
+    /// @param confirmedQuorumsBitmap The bitmap of confirmed quorums, which are signed quorums that meet the confirmationThreshold
     function checkQuorumSubsets(
         bytes memory requiredQuorumNumbers,
         bytes memory blobQuorumNumbers,
@@ -240,14 +268,21 @@ library EigenDACertVerificationLib {
         }
     }
 
-    /**
-     * @notice Gets nonSignerStakesAndSignature for a given signed batch
-     * @param operatorStateRetriever The operator state retriever contract
-     * @param registryCoordinator The registry coordinator contract
-     * @param signedBatch The signed batch
-     * @return nonSignerStakesAndSignature The non-signer stakes and signature
-     * @return signedQuorumNumbers The signed quorum numbers
-     */
+    /// @notice Checks that the offchain derivation version matches the required version
+    /// @param certDerivationVer The offchain derivation version in the certificate
+    /// @param requiredDerivationVer The required offchain derivation version
+    function checkOffchainDerivationVersion(uint16 certDerivationVer, uint16 requiredDerivationVer) internal pure {
+        if (certDerivationVer != requiredDerivationVer) {
+            revert InvalidOffchainDerivationVersion(certDerivationVer, requiredDerivationVer);
+        }
+    }
+
+    /// @notice Gets nonSignerStakesAndSignature for a given signed batch
+    /// @param operatorStateRetriever The operator state retriever contract
+    /// @param registryCoordinator The registry coordinator contract
+    /// @param signedBatch The signed batch
+    /// @return nonSignerStakesAndSignature The non-signer stakes and signature
+    /// @return signedQuorumNumbers The signed quorum numbers
     function getNonSignerStakesAndSignature(
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
@@ -269,10 +304,13 @@ library EigenDACertVerificationLib {
             signedQuorumNumbers = abi.encodePacked(signedQuorumNumbers, uint8(signedBatch.attestation.quorumNumbers[i]));
         }
 
-        OperatorStateRetriever.CheckSignaturesIndices memory checkSignaturesIndices = operatorStateRetriever
-            .getCheckSignaturesIndices(
-            registryCoordinator, signedBatch.batchHeader.referenceBlockNumber, signedQuorumNumbers, nonSignerOperatorIds
-        );
+        OperatorStateRetriever.CheckSignaturesIndices memory checkSignaturesIndices =
+            operatorStateRetriever.getCheckSignaturesIndices(
+                registryCoordinator,
+                signedBatch.batchHeader.referenceBlockNumber,
+                signedQuorumNumbers,
+                nonSignerOperatorIds
+            );
 
         nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = checkSignaturesIndices.nonSignerQuorumBitmapIndices;
         nonSignerStakesAndSignature.nonSignerPubkeys = signedBatch.attestation.nonSignerPubkeys;
@@ -286,18 +324,14 @@ library EigenDACertVerificationLib {
         return (nonSignerStakesAndSignature, signedQuorumNumbers);
     }
 
-    /**
-     * @notice hashes the given V2 batch header
-     * @param batchHeader the V2 batch header to hash
-     */
+    /// @notice hashes the given V2 batch header
+    /// @param batchHeader the V2 batch header to hash
     function hashBatchHeaderV2(DATypesV2.BatchHeaderV2 memory batchHeader) internal pure returns (bytes32) {
         return keccak256(abi.encode(batchHeader));
     }
 
-    /**
-     * @notice hashes the given V2 blob header
-     * @param blobHeader the V2 blob header to hash
-     */
+    /// @notice hashes the given V2 blob header
+    /// @param blobHeader the V2 blob header to hash
     function hashBlobHeaderV2(DATypesV2.BlobHeaderV2 memory blobHeader) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
@@ -307,10 +341,8 @@ library EigenDACertVerificationLib {
         );
     }
 
-    /**
-     * @notice hashes the given V2 blob certificate
-     * @param blobCertificate the V2 blob certificate to hash
-     */
+    /// @notice hashes the given V2 blob certificate
+    /// @param blobCertificate the V2 blob certificate to hash
     function hashBlobCertificate(DATypesV2.BlobCertificate memory blobCertificate) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(

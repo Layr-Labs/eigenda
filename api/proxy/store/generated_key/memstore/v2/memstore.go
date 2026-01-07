@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
@@ -63,6 +62,8 @@ type MemStore struct {
 	g1SRS []bn254.G1Affine
 
 	polyForm codecs.PolynomialForm
+
+	config *memconfig.SafeConfig
 }
 
 var _ common.EigenDAV2Store = (*MemStore)(nil)
@@ -71,16 +72,33 @@ var _ common.EigenDAV2Store = (*MemStore)(nil)
 func New(
 	ctx context.Context, log logging.Logger, config *memconfig.SafeConfig,
 	g1SRS []bn254.G1Affine,
-) (*MemStore, error) {
+) *MemStore {
 	return &MemStore{
-		ephemeraldb.New(ctx, config, log),
-		log,
-		g1SRS,
-		codecs.PolynomialFormEval,
+		DB:       ephemeraldb.New(ctx, config, log),
+		log:      log,
+		g1SRS:    g1SRS,
+		polyForm: codecs.PolynomialFormEval,
+		config:   config,
+	}
+}
+
+// generateRandomV4Cert ... generates a pseudo random EigenDA V4 certificate with a offchain derivation version of 0
+func (e *MemStore) generateRandomV4Cert(blobContents []byte) (*coretypes.EigenDACertV4, error) {
+	v3Cert, err := e.generateRandomV3Cert(blobContents)
+	if err != nil {
+		return nil, err
+	}
+
+	return &coretypes.EigenDACertV4{
+		BlobInclusionInfo:           v3Cert.BlobInclusionInfo,
+		BatchHeader:                 v3Cert.BatchHeader,
+		NonSignerStakesAndSignature: v3Cert.NonSignerStakesAndSignature,
+		SignedQuorumNumbers:         v3Cert.SignedQuorumNumbers,
+		OffchainDerivationVersion:   0,
 	}, nil
 }
 
-// generateRandomCert ... generates a pseudo random EigenDA V3 certificate
+// generateRandomV3Cert ... generates a pseudo random EigenDA V3 certificate
 func (e *MemStore) generateRandomV3Cert(blobContents []byte) (*coretypes.EigenDACertV3, error) {
 	// compute kzg data commitment. this is useful for testing
 	// READPREIMAGE functionality in the arbitrum x eigenda integration since
@@ -179,22 +197,52 @@ func (e *MemStore) generateRandomV3Cert(blobContents []byte) (*coretypes.EigenDA
 // Get fetches a value from the store.
 // If returnEncodedPayload is true, it returns the encoded blob without decoding.
 func (e *MemStore) Get(
-	_ context.Context, versionedCert certs.VersionedCert, returnEncodedPayload bool,
+	_ context.Context,
+	versionedCert *certs.VersionedCert,
+	serializationType coretypes.CertSerializationType,
+	returnEncodedPayload bool,
 ) ([]byte, error) {
 	blobSerialized, err := e.FetchEntry(crypto.Keccak256Hash(versionedCert.SerializedCert).Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("fetching entry via memstore: %w", err)
 	}
 
-	var v3cert coretypes.EigenDACertV3
-	err = rlp.DecodeBytes(versionedCert.SerializedCert, &v3cert)
+	// Convert version byte to certificate version
+	certVersion, err := versionedCert.Version.IntoCertVersion()
 	if err != nil {
-		return nil, coretypes.ErrCertParsingFailedDerivationError
+		return nil, fmt.Errorf("convert version byte to cert version: %w", err)
+	}
+
+	// Deserialize the certificate based on its version to extract blob length
+	var blobLength uint32
+	switch certVersion {
+	case coretypes.VersionThreeCert:
+		v3cert, err := coretypes.DeserializeEigenDACertV3(
+			versionedCert.SerializedCert,
+			serializationType,
+		)
+		if err != nil {
+			return nil, coretypes.ErrCertParsingFailedDerivationError
+		}
+		blobLength = v3cert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+
+	case coretypes.VersionFourCert:
+		v4cert, err := coretypes.DeserializeEigenDACertV4(
+			versionedCert.SerializedCert,
+			serializationType,
+		)
+		if err != nil {
+			return nil, coretypes.ErrCertParsingFailedDerivationError
+		}
+		blobLength = v4cert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+
+	default:
+		return nil, fmt.Errorf("unsupported certificate version: %d", certVersion)
 	}
 
 	blob, err := coretypes.DeserializeBlob(
 		blobSerialized,
-		v3cert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
+		blobLength,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize blob: %w", err)
@@ -216,7 +264,9 @@ func (e *MemStore) Get(
 // ephemeral db key = keccak256(pseudo_random_cert)
 // this is done to verify that a rollup must be able to provide
 // the same certificate used in dispersal for retrieval
-func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
+func (e *MemStore) Put(
+	_ context.Context, value []byte, serializationType coretypes.CertSerializationType,
+) (*certs.VersionedCert, error) {
 	payload := coretypes.Payload(value)
 
 	blob, err := payload.ToBlob(e.polyForm)
@@ -226,15 +276,39 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 
 	blobSerialized := blob.Serialize()
 
-	// generateRandomV3Cert produces valid blob commitment on G1
-	artificialV3Cert, err := e.generateRandomV3Cert(blobSerialized)
-	if err != nil {
-		return nil, fmt.Errorf("generating random cert: %w", err)
-	}
+	// Get configured cert version
+	certVersion := e.config.CertVersion()
 
-	certBytes, err := artificialV3Cert.Serialize(coretypes.CertSerializationRLP)
-	if err != nil {
-		return nil, fmt.Errorf("rlp decode v3 cert: %w", err)
+	var certBytes []byte
+	var versionByte certs.VersionByte
+
+	switch certVersion {
+	case coretypes.VersionThreeCert:
+		// Generate V3 cert
+		artificialV3Cert, err := e.generateRandomV3Cert(blobSerialized)
+		if err != nil {
+			return nil, fmt.Errorf("generating random v3 cert: %w", err)
+		}
+		certBytes, err = artificialV3Cert.Serialize(serializationType)
+		if err != nil {
+			return nil, fmt.Errorf("serialize v3 cert: %w", err)
+		}
+		versionByte = certs.V2VersionByte
+
+	case coretypes.VersionFourCert:
+		// Generate V4 cert (produces valid blob commitment on G1)
+		artificialV4Cert, err := e.generateRandomV4Cert(blobSerialized)
+		if err != nil {
+			return nil, fmt.Errorf("generating random v4 cert: %w", err)
+		}
+		certBytes, err = artificialV4Cert.Serialize(serializationType)
+		if err != nil {
+			return nil, fmt.Errorf("serialize v4 cert: %w", err)
+		}
+		versionByte = certs.V3VersionByte
+
+	default:
+		return nil, fmt.Errorf("unsupported certificate version: %d", certVersion)
 	}
 
 	err = e.InsertEntry(crypto.Keccak256Hash(certBytes).Bytes(), blobSerialized)
@@ -242,11 +316,11 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return certBytes, nil
+	return certs.NewVersionedCert(certBytes, versionByte), nil
 }
 
 func (e *MemStore) VerifyCert(
-	_ context.Context, _ certs.VersionedCert, _ uint64,
+	_ context.Context, _ *certs.VersionedCert, _ coretypes.CertSerializationType, _ uint64,
 ) error {
 	return nil
 }

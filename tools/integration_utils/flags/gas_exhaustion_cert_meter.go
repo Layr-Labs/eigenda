@@ -20,11 +20,10 @@ var (
 		Usage: fmt.Sprintf(`The EigenDA network that is being used. 
 See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/common/eigenda_network.go
 for the exact values getting set by this flag. Permitted EigenDANetwork values include 
-%s, %s, %s, & %s.`,
+%s, %s, & %s.`,
 			proxycommon.MainnetEigenDANetwork,
-			proxycommon.HoleskyTestnetEigenDANetwork,
-			proxycommon.HoleskyPreprodEigenDANetwork,
 			proxycommon.SepoliaTestnetEigenDANetwork,
+			proxycommon.HoodiTestnetEigenDANetwork,
 		),
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_NETWORK"),
@@ -35,12 +34,20 @@ for the exact values getting set by this flag. Permitted EigenDANetwork values i
 		EnvVar:   common.PrefixEnvVar(envPrefix, "ETH_RPC_URL"),
 		Required: true,
 	}
+
+	CertVerifierAddrFlag = &cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "cert-verifier-addr"),
+		Usage:    "immutable cert verifier address",
+		EnvVar:   common.PrefixEnvVar(envPrefix, "CERT_VERIFIER_ADDR"),
+		Required: true,
+	}
 )
 
 var requiredFlags = []cli.Flag{
 	NetworkFlag,
 	EthRpcUrlFlag,
 	CertHexFlag,
+	CertVerifierAddrFlag,
 }
 
 var optionalFlags = []cli.Flag{}

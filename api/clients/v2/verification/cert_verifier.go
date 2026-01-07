@@ -2,6 +2,7 @@ package verification
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"sync"
 
@@ -34,6 +35,8 @@ type CertVerifier struct {
 	confirmationThresholds sync.Map
 	// maps contract address to the cert version specified in the contract at that address
 	versions sync.Map
+	// maps contract address to the offchain derivation version specified in the contract at that address
+	offchainDerivationVersions sync.Map
 }
 
 // NewCertVerifier constructs a new CertVerifier instance
@@ -57,23 +60,16 @@ func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) error {
-	// 1 - Normalize cert to V3
-	certV3 := NormalizeCertV3(cert)
+	// 1 - Serialize the certificate to bytes
+	certBytes, err := SerializeCert(cert)
+	if err != nil {
+		return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
+	}
 
 	// 2 - Call the contract method CheckDACert to verify the certificate
 	// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
 	//       with future reference timestamp change which deprecates the reference block number
 	//       used for quorum stake check-pointing.
-	certVerifierAddr, err := cv.addressProvider.GetCertVerifierAddress(ctx, certV3.ReferenceBlockNumber())
-	if err != nil {
-		return &CertVerifierInternalError{Msg: "get verifier address", Err: err}
-	}
-
-	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
-	if err != nil {
-		return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
-	}
-
 	// TODO(ethenotethan): determine if there's any merit in passing call context
 	// options (e.g, block number) to impose better determinism and safety on the simulation
 	// call
@@ -87,6 +83,14 @@ func (cv *CertVerifier) CheckDACert(
 		return &CertVerifierInternalError{Msg: "pack checkDACert call", Err: err}
 	}
 
+	certVerifierAddr, err := cv.addressProvider.GetCertVerifierAddress(
+		ctx,
+		cert.ReferenceBlockNumber(),
+	)
+	if err != nil {
+		return &CertVerifierInternalError{Msg: "get verifier address", Err: err}
+	}
+
 	// TODO(ethenoethan): understand the best mechanisms for determining if the call ran into an
 	// out-of-gas exception. Furthermore it's worth exploring whether an eth_simulateV1 rpc call
 	// would provide better granularity and coverage while ensuring existing performance guarantees
@@ -96,6 +100,8 @@ func (cv *CertVerifier) CheckDACert(
 		Data: callMsgBytes,
 	}, nil)
 	if err != nil {
+		cv.logger.Error("certVerifier checkDACert call failed", "to", certVerifierAddr,
+			"calldata", hex.EncodeToString(callMsgBytes), "abi-encoded-cert", hex.EncodeToString(certBytes))
 		return &CertVerifierInternalError{Msg: "checkDACert eth call", Err: err}
 	}
 
@@ -122,20 +128,18 @@ func (cv *CertVerifier) EstimateGasCheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) (uint64, error) {
-	// Normalize cert to V3
-	certV3 := NormalizeCertV3(cert)
+	// Serialize the certificate to bytes
+	certBytes, err := SerializeCert(cert)
+	if err != nil {
+		return 0, fmt.Errorf("serialize cert: %w", err)
+	}
 
 	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(
 		ctx,
-		certV3.ReferenceBlockNumber(),
+		cert.ReferenceBlockNumber(),
 	)
 	if err != nil {
 		return 0, fmt.Errorf("get cert verifier address: %w", err)
-	}
-
-	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
-	if err != nil {
-		return 0, fmt.Errorf("serialize cert: %w", err)
 	}
 
 	// Pack the checkDACert method call data
@@ -293,7 +297,7 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 	if ok {
 		castVersion, ok := cachedVersion.(uint8)
 		if !ok {
-			return 0, fmt.Errorf("expected version to be uint64")
+			return 0, fmt.Errorf("expected version to be uint8")
 		}
 		return castVersion, nil
 	}
@@ -314,27 +318,64 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 	return version, nil
 }
 
-// NormalizeCertV3 returns a EigenDACertV3 for a given EigenDACert
+// GetOffchainDerivationVersion returns the OffchainDerivationVersion that corresponds to the input RBN.
 //
-// This method normalizes a given EigenDACert (V2 or V3) to V3. If a V2 cert is given
-// it is converted to V3 then returned, otherwise the given V3 cert is returned. All
-// other versions will result in a panic.
-func NormalizeCertV3(cert coretypes.EigenDACert) *coretypes.EigenDACertV3 {
-	// switch on the certificate type to determine which contract to call
-	var certV3 *coretypes.EigenDACertV3
-	switch cert := cert.(type) {
-	case *coretypes.EigenDACertV3:
-		certV3 = cert
-	case *coretypes.EigenDACertV2:
-		// EigenDACertV3 is the only version that is supported by the CheckDACert function
-		// but the V2 cert is a simple permutation of the V3 cert fields, so we convert it.
-		certV3 = cert.ToV3()
-	default:
-		// If golang had enums the world would be a better place.
-		panic(fmt.Sprintf("unsupported cert version: %T. All cert versions that we can "+
-			"construct offchain should have a CertVerifier contract which we can call to "+
-			"verify the certificate", cert))
+// This method will return the offchain derivation version from an internal cache if it is already known for the cert
+// verifier which corresponds to the input reference block number. Otherwise, this method will query the offchain
+// derivation version and cache the result for future use. The offchain derivation version was introduced in cert
+// verifier v4. This method should only be called with certs of version 4 or higher.
+func (cv *CertVerifier) GetOffchainDerivationVersion(ctx context.Context, referenceBlockNumber uint64) (uint16, error) {
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
+	if err != nil {
+		return 0, fmt.Errorf("get cert verifier address: %w", err)
 	}
 
-	return certV3
+	// if the offchain derivation version for the active cert verifier address has already been cached, return it
+	// immediately
+	cachedVersion, ok := cv.offchainDerivationVersions.Load(certVerifierAddress)
+	if ok {
+		castVersion, ok := cachedVersion.(uint16)
+		if !ok {
+			return 0, fmt.Errorf("expected version to be uint16")
+		}
+		return castVersion, nil
+	}
+
+	// version wasn't cached, so proceed to fetch it
+	certVerifierCaller, err := cv.getVerifierCallerFromAddress(certVerifierAddress)
+	if err != nil {
+		return 0, fmt.Errorf("get verifier caller from address: %w", err)
+	}
+
+	offchainDerivationVersion, err := certVerifierCaller.OffchainDerivationVersion(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return 0, fmt.Errorf("get offchain derivation version via contract call: %w", err)
+	}
+
+	cv.offchainDerivationVersions.Store(certVerifierAddress, offchainDerivationVersion)
+
+	return offchainDerivationVersion, nil
+}
+
+// SerializeCert serializes the input EigenDACert into its ABI-encoded byte representation.
+// V2 certs are first converted to V3 before serialization.
+func SerializeCert(cert coretypes.EigenDACert) ([]byte, error) {
+	var certBytes []byte
+	var err error
+
+	switch cert := cert.(type) {
+	case *coretypes.EigenDACertV2:
+		certV3 := cert.ToV3()
+		certBytes, err = certV3.Serialize(coretypes.CertSerializationABI)
+	case *coretypes.EigenDACertV3, *coretypes.EigenDACertV4:
+		certBytes, err = cert.Serialize(coretypes.CertSerializationABI)
+	default:
+		return nil, fmt.Errorf("unsupported cert version: %T", cert)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("serialize: %w", err)
+	}
+
+	return certBytes, nil
 }

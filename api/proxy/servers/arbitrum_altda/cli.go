@@ -5,9 +5,10 @@ import (
 )
 
 const (
-	ListenAddrFlagName = "arbitrum-da.addr"
-	PortFlagName       = "arbitrum-da.port"
-	Enabled            = "arbitrum-da.enabled"
+	ListenAddrFlagName           = "arbitrum-da.addr"
+	PortFlagName                 = "arbitrum-da.port"
+	JwtSecretFlagName            = "arbitrum-da.jwtsecret"
+	ReturnInvalidCertErrFlagName = "arbitrum-da.return-invalid-cert-error"
 )
 
 func withEnvPrefix(prefix, s string) []string {
@@ -30,11 +31,20 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "PORT"),
 			Category: category,
 		},
+		&cli.StringFlag{
+			Name:     JwtSecretFlagName,
+			Usage:    "Path to shared JWT token (i.e, HS256 private key) used for secure communication with arbitrum nitro",
+			Value:    "",
+			EnvVars:  withEnvPrefix(envPrefix, "JWT_SECRET"),
+			Category: category,
+		},
 		&cli.BoolFlag{
-			Name:     Enabled,
-			Usage:    "Whether or not to enable Arbitrum Custom DA JSON RPC API",
+			Name: ReturnInvalidCertErrFlagName,
+			Usage: "Whether or not the CustomDA server should return a `CertificateValidationError` to the arbitrum nitro derivation pipeline which \"drops\" the DA " +
+				"Cert by treating it as an empty batch. When disabled or set to false, an invalid DA Cert would cause the derivation pipeline to halt where the nitro software " +
+				"would enter an infinite loop on calls to daprovider_RecoverPayload",
 			Value:    false,
-			EnvVars:  withEnvPrefix(envPrefix, "ENABLED"),
+			EnvVars:  withEnvPrefix(envPrefix, "PROCESS_INVALID_CERT"),
 			Category: category,
 		},
 	}
@@ -44,8 +54,9 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 
 func ReadConfig(ctx *cli.Context) Config {
 	return Config{
-		Host:   ctx.String(ListenAddrFlagName),
-		Port:   ctx.Int(PortFlagName),
-		Enable: ctx.Bool(Enabled),
+		Host:               ctx.String(ListenAddrFlagName),
+		Port:               ctx.Int(PortFlagName),
+		JWTSecret:          ctx.String(JwtSecretFlagName),
+		ProcessInvalidCert: ctx.Bool(ReturnInvalidCertErrFlagName),
 	}
 }

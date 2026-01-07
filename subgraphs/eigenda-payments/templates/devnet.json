@@ -1,0 +1,5 @@
+{
+  "network": "devnet",
+  "PaymentVault_address": "0x0000000000000000000000000000000000000000",
+  "PaymentVault_startBlock": 0
+}

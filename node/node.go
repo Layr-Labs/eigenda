@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -22,9 +23,12 @@ import (
 	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/node/ejection"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
 
@@ -36,6 +40,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -66,6 +72,7 @@ var (
 //  is mediated by methods.
 
 type Node struct {
+	CTX                     context.Context
 	Config                  *Config
 	Logger                  logging.Logger
 	KeyPair                 *core.KeyPair
@@ -105,10 +112,18 @@ type Node struct {
 
 	// Looks up operator state and maintains a cache of recently used operator states.
 	OperatorStateCache operatorstate.OperatorStateCache
+
+	// Used to look up contract addresses by name.
+	contractDirectory *directory.ContractDirectory
+
+	// A handle for sending Ethereum RPC requests.
+	client *geth.InstrumentedEthClient
+
+	// Validates reservation payments for blob dispersals
+	reservationPaymentValidator *reservationvalidation.ReservationPaymentValidator
 }
 
 // NewNode creates a new Node with the provided config.
-// TODO: better context management, don't just use context.Background() everywhere in here.
 func NewNode(
 	ctx context.Context,
 	reg *prometheus.Registry,
@@ -117,6 +132,7 @@ func NewNode(
 	pubIPProvider pubip.Provider,
 	client *geth.InstrumentedEthClient,
 	logger logging.Logger,
+	softwareVersion *version.Semver,
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
@@ -178,7 +194,8 @@ func NewNode(
 	}
 
 	// Setup Node Api
-	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
+	nodeApi := nodeapi.NewNodeApi(
+		AppName, softwareVersion.String(), ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
 	metrics := NewMetrics(eigenMetrics, reg, logger, socketAddr, config.ID, config.OnchainMetricsInterval, tx, cst)
 
@@ -190,7 +207,13 @@ func NewNode(
 	}
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
-	validatorV2 := corev2.NewShardValidator(v, config.ID, logger)
+
+	verifierV2Config := verifierv2.ConfigFromV1KzgConfig(&config.EncoderConfig)
+	verifierV2, err := verifierv2.NewVerifier(verifierV2Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create verifier: %w", err)
+	}
+	validatorV2 := corev2.NewShardValidator(verifierV2, config.ID, logger)
 
 	// Resolve the BLOCK_STALE_MEASURE and STORE_DURATION_BLOCKS.
 	var blockStaleMeasure, storeDurationBlocks uint32
@@ -270,39 +293,78 @@ func NewNode(
 		client,
 		cst,
 		registryCoordinatorAddress,
-		config.operatorStateCacheSize)
+		config.OperatorStateCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create operator state cache: %w", err)
 	}
 
+	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	paymentVault, err := vault.NewPaymentVault(logger, client, paymentVaultAddress)
+	if err != nil {
+		return nil, fmt.Errorf("create payment vault: %w", err)
+	}
+
+	reservationPaymentValidator, err := reservationvalidation.NewReservationPaymentValidator(
+		ctx,
+		logger,
+		config.ReservationLedgerCacheConfig,
+		paymentVault,
+		time.Now,
+		reservationvalidation.NewReservationValidatorMetrics(
+			reg,
+			Namespace,
+			PaymentsSubsystem,
+			config.EnablePerAccountPaymentMetrics,
+			nil, // userAccountRemapping - not yet supported in validator
+		),
+		reservationvalidation.NewReservationCacheMetrics(reg, Namespace, PaymentsSubsystem),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create reservation payment validator: %w", err)
+	}
+	logger.Info("Payment validation configured",
+		"paymentVaultAddress", paymentVaultAddress.Hex(),
+		"updateInterval", config.ReservationLedgerCacheConfig.UpdateInterval)
+
 	n := &Node{
-		Config:                  config,
-		Logger:                  nodeLogger,
-		Metrics:                 metrics,
-		NodeApi:                 nodeApi,
-		Store:                   store,
-		ChainState:              cst,
-		Transactor:              tx,
-		Validator:               validator,
-		ValidatorV2:             validatorV2,
-		PubIPProvider:           pubIPProvider,
-		OperatorSocketsFilterer: socketsFilterer,
-		ChainID:                 chainID,
-		BLSSigner:               blsSigner,
-		DownloadPool:            downloadPool,
-		ValidationPool:          validationPool,
-		StoreChunksSemaphore:    storeChunksSemaphore,
-		OperatorStateCache:      operatorStateCache,
+		CTX:                         ctx,
+		Config:                      config,
+		Logger:                      nodeLogger,
+		Metrics:                     metrics,
+		NodeApi:                     nodeApi,
+		Store:                       store,
+		ChainState:                  cst,
+		Transactor:                  tx,
+		Validator:                   validator,
+		ValidatorV2:                 validatorV2,
+		PubIPProvider:               pubIPProvider,
+		OperatorSocketsFilterer:     socketsFilterer,
+		ChainID:                     chainID,
+		BLSSigner:                   blsSigner,
+		DownloadPool:                downloadPool,
+		ValidationPool:              validationPool,
+		StoreChunksSemaphore:        storeChunksSemaphore,
+		OperatorStateCache:          operatorStateCache,
+		contractDirectory:           contractDirectory,
+		client:                      client,
+		reservationPaymentValidator: reservationPaymentValidator,
 	}
 
-	if !config.EnableV2 {
-		return n, nil
-	}
-
-	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
-		// 12s per block
-		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
+		var blobVersionParams *corev2.BlobVersionParameterMap
+
+		var ttl time.Duration
+		if config.OverrideV2Ttl == 0 {
+			// 12s per block
+			ttl = time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
+		} else {
+			ttl = config.OverrideV2Ttl
+		}
+
 		n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new store v2: %w", err)
@@ -334,19 +396,278 @@ func NewNode(
 
 		n.RelayClient.Store(relayClient)
 
-		blockNumber, err := tx.GetCurrentBlockNumber(context.Background())
+		blockNumber, err := tx.GetCurrentBlockNumber(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block number: %w", err)
 		}
-		quorumCount, err := tx.GetQuorumCount(context.Background(), blockNumber)
+		quorumCount, err := tx.GetQuorumCount(ctx, blockNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get quorum count: %w", err)
 		}
 		n.QuorumCount.Store(uint32(quorumCount))
+
+		n.BlobVersionParams.Store(blobVersionParams)
 	}
 
-	n.BlobVersionParams.Store(blobVersionParams)
+	n.startPprof()
+	n.startMetrics()
+	n.startNodeAPI()
+	n.startV1()
+	n.startV2()
+
+	n.CurrentSocket = n.buildSocket()
+	if n.Config.RegisterNodeAtStart {
+		err = n.registerValidator(n.CurrentSocket)
+		if err != nil {
+			return nil, fmt.Errorf("failed to register validator: %w", err)
+		}
+	} else {
+		n.checkValidatorRegistration(n.CurrentSocket)
+	}
+
+	// Note: it is important to start the ejection sentinel after n.registerValidator(), since the ejection
+	// sentinel requires the validator to be registered onchain in order to properly function.
+	err = n.startEjectionSentinel()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start ejection sentinel: %w", err)
+	}
+
+	n.startNodeIPUpdater()
+
 	return n, nil
+}
+
+// Validates reservation payments for all blobs in a batch.
+//
+// Returns nil if validation passes.
+//
+// TODO(litt3): With the current multi-blob batch implementation, the logic in this method suffers from the "batch
+// poison pill" problem: if a single payment fails within a batch, then the entire batch is invalid. Therefore, payment
+// validation shouldn't be enabled until the single-blob-batch effort has been completed. Then, poisoning a batch will
+// only affect the malicious user.
+//
+// This method is goroutine safe
+func (n *Node) ValidateReservationPayment(ctx context.Context, batch *corev2.Batch, probe *common.SequenceProbe) error {
+	probe.SetStage("payment_validation")
+	for _, blobCert := range batch.BlobCertificates {
+		if blobCert.BlobHeader.PaymentMetadata.IsOnDemand() {
+			// Validators don't check on-demand payments. The EigenDA disperser is the source of truth for on-demand,
+			// and will only forward dispersals to validators if on-demand payment was successful.
+			continue
+		}
+
+		success, err := n.reservationPaymentValidator.Debit(
+			ctx,
+			blobCert.BlobHeader.PaymentMetadata.AccountID,
+			blobCert.BlobHeader.BlobCommitments.Length,
+			blobCert.BlobHeader.QuorumNumbers,
+			time.Unix(0, blobCert.BlobHeader.PaymentMetadata.Timestamp),
+		)
+
+		if err != nil {
+			return fmt.Errorf("debit: %w", err)
+		}
+
+		if !success {
+			return fmt.Errorf(
+				"debit for account %s: insufficient bandwidth for %d symbols",
+				blobCert.BlobHeader.PaymentMetadata.AccountID.Hex(), blobCert.BlobHeader.BlobCommitments.Length)
+		}
+	}
+
+	return nil
+}
+
+// Start the ejection sentinel, which is responsible for preventing this validator from being improperly ejected.
+func (n *Node) startEjectionSentinel() error {
+	ejectionContractAddress, err := n.contractDirectory.GetContractAddress(n.CTX, directory.EigenDAEjectionManager)
+	if err != nil {
+		n.Logger.Error("Failed to get ejection contract address, ejection defense will be disabled. " +
+			"If the new ejection contracts have not yet been deployed to this environment, " +
+			"then this is expected and this error can be ignored.")
+		return nil
+
+		// TODO(cody.littley): this should return a fatal error once we've
+		//  deployed the new ejection contracts to mainnet.
+		//return fmt.Errorf("failed to get ejection contract address: %w", err)
+	}
+
+	var privateKey *ecdsa.PrivateKey
+	if n.Config.EthClientConfig.PrivateKeyString != "" {
+		privateKey, err = crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
+		if err != nil {
+			return fmt.Errorf("failed to parse private key: %w", err)
+		}
+	}
+
+	registryCoordinatorAddress, err := n.contractDirectory.GetContractAddress(n.CTX, directory.RegistryCoordinator)
+	if err != nil {
+		return fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
+	}
+
+	validatorIdToAddress, err := eth.NewValidatorIDToAddressConverter(n.client, registryCoordinatorAddress)
+	if err != nil {
+		return fmt.Errorf("failed to create ValidatorIDToAddressConverter: %w", err)
+	}
+
+	validatorAddress, err := validatorIdToAddress.ValidatorIDToAddress(n.CTX, n.Config.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get validator address from ID: %w", err)
+	}
+
+	n.Logger.Infof("Starting ejection sentinel, monitoring validator ID: 0x%s (address: %s)",
+		n.Config.ID.Hex(), validatorAddress.Hex())
+
+	// Start the ejection sentinel in a background goroutine.
+	_, err = ejection.NewEjectionSentinel(
+		n.CTX,
+		n.Logger,
+		ejectionContractAddress,
+		n.client,
+		privateKey,
+		validatorAddress,
+		n.Config.EjectionSentinelPeriod,
+		n.Config.EjectionDefenseEnabled,
+		n.Config.IgnoreVersionForEjectionDefense)
+	if err != nil {
+		return fmt.Errorf("failed to create ejection sentinel: %w", err)
+	}
+
+	return nil
+}
+
+// Start goroutines that periodically check and update the node's public IP address on-chain.
+func (n *Node) startNodeIPUpdater() {
+	// Start the Node IP updater only if the PUBLIC_IP_PROVIDER is greater than 0.
+	if n.Config.PubIPCheckInterval > 0 && n.Config.EnableV1 && n.Config.EnableV2 {
+		go n.checkRegisteredNodeIpOnChain(n.CTX)
+		go n.checkCurrentNodeIp(n.CTX)
+	}
+}
+
+// start goroutines that need to run for the v1 API.
+func (n *Node) startV1() {
+	if n.Config.EnableV1 {
+		go n.expireLoop()
+		go n.checkNodeReachability(v1CheckPath)
+	}
+}
+
+// start goroutines that need to run for the v2 API.
+func (n *Node) startV2() {
+	if n.Config.EnableV2 {
+		go func() {
+			_ = n.RefreshOnchainState()
+		}()
+		go n.checkNodeReachability(v2CheckPath)
+	}
+}
+
+// Start the Node API if enabled.
+func (n *Node) startNodeAPI() {
+	if n.Config.EnableNodeApi {
+		n.NodeApi.Start()
+		n.Logger.Info("Enabled node api", "port", n.Config.NodeApiPort)
+	}
+}
+
+// start metrics if enabled.
+func (n *Node) startMetrics() {
+	if n.Config.EnableMetrics {
+		n.Metrics.Start()
+		n.Logger.Info("Enabled metrics", "socket", n.Metrics.socketAddr)
+	}
+}
+
+// buildSocket builds the socket string based on the current config.
+func (n *Node) buildSocket() string {
+	return string(core.MakeOperatorSocket(
+		n.Config.Hostname,
+		n.Config.DispersalPort,
+		n.Config.RetrievalPort,
+		n.Config.V2DispersalPort,
+		n.Config.V2RetrievalPort))
+}
+
+// Start the go profiler.
+func (n *Node) startPprof() {
+	pprofProfiler := pprof.NewPprofProfiler(n.Config.PprofHttpPort, n.Logger)
+	if n.Config.EnablePprof {
+		go pprofProfiler.Start()
+		n.Logger.Info("Enabled pprof for Node", "port", n.Config.PprofHttpPort)
+	}
+}
+
+// Register the validator onchain.
+func (n *Node) registerValidator(socket string) error {
+	n.Logger.Info("Registering node on chain with the following parameters:",
+		"operatorId", n.Config.ID.Hex(),
+		"hostname", n.Config.Hostname,
+		"dispersalPort", n.Config.DispersalPort,
+		"v2DispersalPort", n.Config.V2DispersalPort,
+		"retrievalPort", n.Config.RetrievalPort,
+		"v2RetrievalPort", n.Config.V2RetrievalPort,
+		"churnerUrl", n.Config.ChurnerUrl,
+		"quorumIds", fmt.Sprintf("%v", n.Config.QuorumIDList))
+	privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
+	if err != nil {
+		return fmt.Errorf("NewClient: cannot parse private key: %w", err)
+	}
+	operator := &Operator{
+		Address:             crypto.PubkeyToAddress(privateKey.PublicKey).Hex(),
+		Socket:              socket,
+		Timeout:             10 * time.Second,
+		PrivKey:             privateKey,
+		Signer:              n.BLSSigner,
+		OperatorId:          n.Config.ID,
+		QuorumIDs:           n.Config.QuorumIDList,
+		RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
+	}
+	churnerClient := NewChurnerClient(
+		n.Config.ChurnerUrl,
+		n.Config.ChurnerUseSecureGrpc,
+		n.Config.Timeout,
+		n.Logger)
+	err = RegisterOperator(n.CTX, operator, n.Transactor, churnerClient, n.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to register the operator: %w", err)
+	}
+
+	if operator.Address != "" {
+		operatorID, err := n.Transactor.OperatorAddressToID(n.CTX, gethcommon.HexToAddress(operator.Address))
+		if err != nil {
+			return fmt.Errorf("failed to get operator ID: %w", err)
+		}
+		if operatorID != operator.OperatorId {
+			return fmt.Errorf("operator ID mismatch: expected %s, got %s",
+				operator.OperatorId.Hex(), operatorID.Hex())
+		}
+	}
+
+	return nil
+}
+
+// Check to see if the validator is registered onchain, and log a warning if not.
+func (n *Node) checkValidatorRegistration(socket string) {
+	registeredSocket, err := n.Transactor.GetOperatorSocket(n.CTX, n.Config.ID)
+	// Error out if registration on-chain is a requirement
+	if err != nil {
+		n.Logger.Warnf("failed to get operator socket: %v", err)
+	}
+	if registeredSocket != socket {
+		n.Logger.Warnf("registered socket %s does not match expected socket %s", registeredSocket, socket)
+	}
+
+	eigenDAUrl, ok := eigenDAUIMap[n.ChainID.String()]
+	if ok {
+		n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, "+
+			"then please follow the EigenDA operator guide section in "+
+			"https://docs.eigencloud.xyz/products/eigenda/operator-guides/run-a-node/registration to register",
+			eigenDAUrl)
+	} else {
+		n.Logger.Infof("The node has started but the network with chainID %s is not supported yet",
+			n.ChainID.String())
+	}
 }
 
 // configureMemoryLimits configures the memory limits for the Node. Updates derived values in the Config struct,
@@ -450,113 +771,6 @@ func computeMemoryPoolSize(
 	return poolSize, nil
 }
 
-// Start starts the Node. If the node is not registered, register it on chain, otherwise just
-// update its socket on chain.
-func (n *Node) Start(ctx context.Context) error {
-	pprofProfiler := pprof.NewPprofProfiler(n.Config.PprofHttpPort, n.Logger)
-	if n.Config.EnablePprof {
-		go pprofProfiler.Start()
-		n.Logger.Info("Enabled pprof for Node", "port", n.Config.PprofHttpPort)
-	}
-	if n.Config.EnableMetrics {
-		n.Metrics.Start()
-		n.Logger.Info("Enabled metrics", "socket", n.Metrics.socketAddr)
-	}
-	if n.Config.EnableNodeApi {
-		n.NodeApi.Start()
-		n.Logger.Info("Enabled node api", "port", n.Config.NodeApiPort)
-	}
-
-	if n.Config.EnableV1 {
-		go n.expireLoop()
-		go n.checkNodeReachability(v1CheckPath)
-	}
-
-	if n.Config.EnableV2 {
-		go func() {
-			_ = n.RefreshOnchainState(ctx)
-		}()
-		go n.checkNodeReachability(v2CheckPath)
-	}
-
-	// Build the socket based on the hostname/IP provided in the CLI
-	socket := string(core.MakeOperatorSocket(
-		n.Config.Hostname,
-		n.Config.DispersalPort,
-		n.Config.RetrievalPort,
-		n.Config.V2DispersalPort,
-		n.Config.V2RetrievalPort))
-	var operator *Operator
-	if n.Config.RegisterNodeAtStart {
-		n.Logger.Info("Registering node on chain with the following parameters:",
-			"operatorId", n.Config.ID.Hex(),
-			"hostname", n.Config.Hostname,
-			"dispersalPort", n.Config.DispersalPort,
-			"v2DispersalPort", n.Config.V2DispersalPort,
-			"retrievalPort", n.Config.RetrievalPort,
-			"v2RetrievalPort", n.Config.V2RetrievalPort,
-			"churnerUrl", n.Config.ChurnerUrl,
-			"quorumIds", fmt.Sprintf("%v", n.Config.QuorumIDList))
-		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
-		if err != nil {
-			return fmt.Errorf("NewClient: cannot parse private key: %w", err)
-		}
-		operator = &Operator{
-			Address:             crypto.PubkeyToAddress(privateKey.PublicKey).Hex(),
-			Socket:              socket,
-			Timeout:             10 * time.Second,
-			PrivKey:             privateKey,
-			Signer:              n.BLSSigner,
-			OperatorId:          n.Config.ID,
-			QuorumIDs:           n.Config.QuorumIDList,
-			RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
-		}
-		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.ChurnerUseSecureGrpc, n.Config.Timeout, n.Logger)
-		err = RegisterOperator(ctx, operator, n.Transactor, churnerClient, n.Logger)
-		if err != nil {
-			return fmt.Errorf("failed to register the operator: %w", err)
-		}
-	} else {
-		registeredSocket, err := n.Transactor.GetOperatorSocket(ctx, n.Config.ID)
-		// Error out if registration on-chain is a requirement
-		if err != nil {
-			n.Logger.Warnf("failed to get operator socket: %w", err)
-		}
-		if registeredSocket != socket {
-			n.Logger.Warnf("registered socket %s does not match expected socket %s", registeredSocket, socket)
-		}
-
-		eigenDAUrl, ok := eigenDAUIMap[n.ChainID.String()]
-		if ok {
-			n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, "+
-				"then please follow the EigenDA operator guide section in https://docs.eigencloud.xyz/products/eigenda/operator-guides/run-a-node/registration to register", eigenDAUrl)
-		} else {
-			n.Logger.Infof("The node has started but the network with chainID %s is not supported yet",
-				n.ChainID.String())
-		}
-	}
-
-	if operator != nil && operator.Address != "" {
-		operatorID, err := n.Transactor.OperatorAddressToID(ctx, gethcommon.HexToAddress(operator.Address))
-		if err != nil {
-			return fmt.Errorf("failed to get operator ID: %w", err)
-		}
-		if operatorID != operator.OperatorId {
-			return fmt.Errorf("operator ID mismatch: expected %s, got %s",
-				operator.OperatorId.Hex(), operatorID.Hex())
-		}
-	}
-
-	n.CurrentSocket = socket
-	// Start the Node IP updater only if the PUBLIC_IP_PROVIDER is greater than 0.
-	if n.Config.PubIPCheckInterval > 0 && n.Config.EnableV1 && n.Config.EnableV2 {
-		go n.checkRegisteredNodeIpOnChain(ctx)
-		go n.checkCurrentNodeIp(ctx)
-	}
-
-	return nil
-}
-
 // The expireLoop is a loop that is run once per configured second(s) while the node
 // is running. It scans for expired batches and removes them from the local database.
 func (n *Node) expireLoop() {
@@ -595,7 +809,7 @@ func (n *Node) expireLoop() {
 // It fetches the latest blob parameters from the chain and updates the BlobVersionParams.
 // It runs periodically based on the OnchainStateRefreshInterval.
 // WARNING: this method is not thread-safe and should not be called concurrently.
-func (n *Node) RefreshOnchainState(ctx context.Context) error {
+func (n *Node) RefreshOnchainState() error {
 	if !n.Config.EnableV2 || n.Config.OnchainStateRefreshInterval <= 0 {
 		return nil
 	}
@@ -607,7 +821,7 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 		case <-ticker.C:
 			n.Logger.Info("Refreshing onchain state")
 			existingBlobParams := n.BlobVersionParams.Load()
-			blobParams, err := n.Transactor.GetAllVersionedBlobParams(ctx)
+			blobParams, err := n.Transactor.GetAllVersionedBlobParams(n.CTX)
 			if err == nil {
 				if existingBlobParams == nil || !existingBlobParams.Equal(blobParams) {
 					n.BlobVersionParams.Store(corev2.NewBlobVersionParameterMap(blobParams))
@@ -615,9 +829,9 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
 			}
-			blockNumber, err := n.Transactor.GetCurrentBlockNumber(ctx)
+			blockNumber, err := n.Transactor.GetCurrentBlockNumber(n.CTX)
 			if err == nil {
-				quorumCount, err := n.Transactor.GetQuorumCount(ctx, blockNumber)
+				quorumCount, err := n.Transactor.GetQuorumCount(n.CTX, blockNumber)
 				if err == nil {
 					n.QuorumCount.Store(uint32(quorumCount))
 				} else {
@@ -626,8 +840,8 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			} else {
 				n.Logger.Error("error fetching block number", "err", err)
 			}
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-n.CTX.Done():
+			return fmt.Errorf("ctx done: %w", n.CTX.Err())
 		}
 	}
 }

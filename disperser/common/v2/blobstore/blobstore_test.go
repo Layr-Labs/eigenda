@@ -12,24 +12,25 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/common/s3"
+	awss3 "github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
 )
 
 var (
-	logger = testutils.GetLogger()
+	logger = test.GetLogger()
 
 	deployLocalStack    bool
 	localstackPort      = "4571"
 	localstackContainer *testbed.LocalStackContainer
 
-	s3Client                s3.Client
+	s3Client                s3.S3Client
 	dynamoClient            dynamodb.Client
 	mockDynamoClient        *mock.MockDynamoDBClient
 	blobStore               *blobstore.BlobStore
@@ -94,7 +95,16 @@ func setup(_ *testing.M) {
 	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
 	mockedBlobMetadataStore = blobstore.NewBlobMetadataStore(mockDynamoClient, logger, metadataTableName)
 
-	s3Client, err = s3.NewClient(ctx, cfg, logger)
+	s3Client, err = awss3.NewAwsS3Client(
+		ctx,
+		logger,
+		cfg.EndpointURL,
+		cfg.Region,
+		cfg.FragmentParallelismFactor,
+		cfg.FragmentParallelismConstant,
+		cfg.AccessKey,
+		cfg.SecretAccessKey,
+	)
 	if err != nil {
 		teardown()
 		logger.Fatal("failed to create s3 client:", err)

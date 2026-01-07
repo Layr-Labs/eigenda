@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"sync/atomic"
 	"time"
@@ -16,17 +17,20 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 type OnchainState struct {
@@ -45,19 +49,35 @@ type DispersalServerV2 struct {
 	pb.UnimplementedDisperserServer
 
 	serverConfig      disperser.ServerConfig
+	chainId           *big.Int
 	blobStore         *blobstore.BlobStore
 	blobMetadataStore blobstore.MetadataStore
 	meterer           *meterer.Meterer
 
 	chainReader              core.Reader
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator
-	prover                   encoding.Prover
+	committer                *committer.Committer
 	logger                   logging.Logger
 
 	// state
 	onchainState                atomic.Pointer[OnchainState]
-	maxNumSymbolsPerBlob        uint64
+	maxNumSymbolsPerBlob        uint32
 	onchainStateRefreshInterval time.Duration
+
+	// MaxDispersalAge is the maximum age a dispersal request can be before it is rejected.
+	// Dispersals older than this duration are rejected by the API server at ingest.
+	//
+	// Age is determined by the BlobHeader.PaymentMetadata.Timestamp field, which is set by the
+	// client at dispersal request creation time (in nanoseconds since Unix epoch).
+	MaxDispersalAge time.Duration
+
+	// MaxFutureDispersalTime is the maximum amount of time into the future a dispersal request can be
+	// before it is rejected. Dispersals with timestamps more than this duration in the future are rejected
+	// by the API server at ingest.
+	MaxFutureDispersalTime time.Duration
+
+	// getNow returns the current time
+	getNow func() time.Time
 
 	metricsConfig disperser.MetricsConfig
 	metrics       *metricsV2
@@ -66,38 +86,60 @@ type DispersalServerV2 struct {
 	// This would be removed with decentralized ratelimiting
 	ReservedOnly bool
 
-	// Determines which payment system to use. If true, use the new payments system running on the controller.
-	// If false, use the legacy payments system which executes on the API server.
-	//
-	// TODO(litt3): this field should be removed once the migration to the new payments system is complete
-	useControllerMediatedPayments bool
-
-	// Controller gRPC client connection and service client
+	// Exists as a member variable so that the connection can be closed inside Stop().
 	controllerConnection *grpc.ClientConn
-	controllerClient     controller.ControllerServiceClient
+
+	// Client for making gRPC calls to the controller for payment authorization.
+	controllerClient controller.ControllerServiceClient
+
+	// Pre-created listener for the gRPC server
+	listener   net.Listener
+	grpcServer *grpc.Server
+
+	// DisableGetBlobCommitment, if true, causes the GetBlobCommitment gRPC endpoint to return
+	// a deprecation error. This endpoint is deprecated and will be removed in a future release.
+	disableGetBlobCommitment bool
+
+	// Tracks signing rates for validators. This data is mirrored from the controller's signing rate tracker,
+	// so that external requests can be serviced without involving the controller.
+	signingRateTracker signingrate.SigningRateTracker
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
+	getNow func() time.Time,
+	chainId *big.Int,
 	blobStore *blobstore.BlobStore,
 	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
-	prover encoding.Prover,
-	maxNumSymbolsPerBlob uint64,
+	committer *committer.Committer,
+	maxNumSymbolsPerBlob uint32,
 	onchainStateRefreshInterval time.Duration,
+	maxDispersalAge time.Duration,
+	maxFutureDispersalTime time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
-	useControllerMediatedPayments bool,
-	// must be non-empty if useControllerMediatedPayments is true
-	controllerAddress string,
+	controllerConnection *grpc.ClientConn,
+	controllerClient controller.ControllerServiceClient,
+	listener net.Listener,
+	signingRateTracker signingrate.SigningRateTracker,
 ) (*DispersalServerV2, error) {
+	if listener == nil {
+		return nil, errors.New("listener is required")
+	}
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
+	}
+	if getNow == nil {
+		return nil, errors.New("getNow is required")
+	}
+	if chainId == nil {
+		return nil, errors.New("chainId is required")
 	}
 	if blobStore == nil {
 		return nil, errors.New("blob store is required")
@@ -111,8 +153,11 @@ func NewDispersalServerV2(
 	if blobRequestAuthenticator == nil {
 		return nil, errors.New("blobRequestAuthenticator is required")
 	}
-	if prover == nil {
-		return nil, errors.New("prover is required")
+	if committer == nil {
+		return nil, errors.New("committer is required")
+	}
+	if signingRateTracker == nil {
+		return nil, errors.New("signingRateTracker is required")
 	}
 	if maxNumSymbolsPerBlob == 0 {
 		return nil, errors.New("maxNumSymbolsPerBlob is required")
@@ -120,52 +165,46 @@ func NewDispersalServerV2(
 	if _logger == nil {
 		return nil, errors.New("logger is required")
 	}
+	if maxDispersalAge <= 0 {
+		return nil, fmt.Errorf("maxDispersalAge must be positive (got: %v)", maxDispersalAge)
+	}
+	if maxFutureDispersalTime <= 0 {
+		return nil, fmt.Errorf("maxFutureDispersalTime must be positive (got: %v)", maxFutureDispersalTime)
+	}
 
 	logger := _logger.With("component", "DispersalServerV2")
 
-	var controllerConnection *grpc.ClientConn
-	var controllerClient controller.ControllerServiceClient
-	if useControllerMediatedPayments {
-		if controllerAddress == "" {
-			return nil, errors.New("controller address is required to use new payment system")
-		}
-
-		connection, err := grpc.NewClient(
-			controllerAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("create controller connection: %w", err)
-		}
-		controllerConnection = connection
-		controllerClient = controller.NewControllerServiceClient(connection)
-
-		logger.Info("Using controller-based payment system")
-	} else {
-		logger.Info("Using legacy payment metering system")
+	if controllerClient == nil {
+		return nil, errors.New("controller client is required")
 	}
 
 	return &DispersalServerV2{
 		serverConfig:      serverConfig,
+		chainId:           chainId,
 		blobStore:         blobStore,
 		blobMetadataStore: blobMetadataStore,
 
 		chainReader:              chainReader,
 		blobRequestAuthenticator: blobRequestAuthenticator,
 		meterer:                  meterer,
-		prover:                   prover,
+		committer:                committer,
 		logger:                   logger,
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
+		MaxDispersalAge:             maxDispersalAge,
+		MaxFutureDispersalTime:      maxFutureDispersalTime,
+		getNow:                      getNow,
 
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 
-		ReservedOnly:                  ReservedOnly,
-		useControllerMediatedPayments: useControllerMediatedPayments,
-		controllerConnection:          controllerConnection,
-		controllerClient:              controllerClient,
+		ReservedOnly:             ReservedOnly,
+		controllerConnection:     controllerConnection,
+		controllerClient:         controllerClient,
+		listener:                 listener,
+		disableGetBlobCommitment: serverConfig.DisableGetBlobCommitment,
+		signingRateTracker:       signingRateTracker,
 	}, nil
 }
 
@@ -173,6 +212,11 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	// Start the metrics server
 	if s.metricsConfig.EnableMetrics {
 		s.metrics.Start(context.Background())
+		// Set configuration gauges
+		s.metrics.setDispersalTimestampConfig(
+			s.MaxDispersalAge.Seconds(),
+			s.MaxFutureDispersalTime.Seconds(),
+		)
 	}
 
 	// Serve grpc requests
@@ -182,26 +226,20 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		MaxConnectionAgeGrace: s.serverConfig.MaxConnectionAgeGrace,
 	})
 
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return errors.New("could not start tcp listener")
-	}
-
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(
+	s.grpcServer = grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			s.metrics.grpcMetrics.UnaryServerInterceptor(),
 		), opt, keepAliveConfig)
-	reflection.Register(gs)
-	pb.RegisterDisperserServer(gs, s)
+	reflection.Register(s.grpcServer)
+	pb.RegisterDisperserServer(s.grpcServer, s)
 
 	// Unimplemented v1 server for grpcurl/reflection support
-	pbv1.RegisterDisperserServer(gs, &DispersalServerV1{})
+	pbv1.RegisterDisperserServer(s.grpcServer, &DispersalServerV1{})
 
 	// Register Server for Health Checks
 	name := pb.Disperser_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, gs)
+	healthcheck.RegisterHealthServer(name, s.grpcServer)
 
 	if err := s.RefreshOnchainState(ctx); err != nil {
 		return fmt.Errorf("failed to refresh onchain quorum state: %w", err)
@@ -223,47 +261,66 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", listener.Addr().String())
+	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", s.listener.Addr().String())
 
-	if err := gs.Serve(listener); err != nil {
-		return errors.New("could not start GRPC server")
+	if err := s.grpcServer.Serve(s.listener); err != nil {
+		return fmt.Errorf("could not start GRPC server: %w", err)
 	}
 
 	return nil
 }
 
-func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobCommitmentRequest) (*pb.BlobCommitmentReply, error) {
+func (s *DispersalServerV2) GetBlobCommitment(
+	ctx context.Context,
+	req *pb.BlobCommitmentRequest,
+) (*pb.BlobCommitmentReply, error) {
+	reply, st := s.getBlobCommitment(req)
+	api.LogResponseStatus(s.logger, st)
+	if st != nil {
+		// nolint:wrapcheck
+		return reply, st.Err()
+	}
+	return reply, nil
+}
+
+func (s *DispersalServerV2) getBlobCommitment(
+	req *pb.BlobCommitmentRequest,
+) (*pb.BlobCommitmentReply, *status.Status) {
 	start := time.Now()
 	defer func() {
 		s.metrics.reportGetBlobCommitmentLatency(time.Since(start))
 	}()
 
-	if s.prover == nil {
-		return nil, api.NewErrorUnimplemented()
+	if s.disableGetBlobCommitment {
+		return nil, status.New(codes.Unimplemented, "GetBlobCommitment is deprecated and has been disabled. This service will be removed in a future release. Please compute blob commitments locally.")
 	}
-	blobSize := uint(len(req.GetBlob()))
+
+	if s.committer == nil {
+		return nil, status.New(codes.Internal, "committer is not configured")
+	}
+	blobSize := uint32(len(req.GetBlob()))
 	if blobSize == 0 {
-		return nil, api.NewErrorInvalidArg("data is empty")
+		return nil, status.New(codes.InvalidArgument, "blob cannot be empty")
 	}
-	if uint64(encoding.GetBlobLengthPowerOf2(blobSize)) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes",
-			s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
+	if encoding.GetBlobLengthPowerOf2(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
+		return nil, status.Newf(codes.InvalidArgument, "blob size cannot exceed %v bytes",
+			s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL)
 	}
-	c, err := s.prover.GetCommitmentsForPaddedLength(req.GetBlob())
+	c, err := s.committer.GetCommitmentsForPaddedLength(req.GetBlob())
 	if err != nil {
-		return nil, api.NewErrorInternal("failed to get commitments")
+		return nil, status.Newf(codes.Internal, "failed to compute commitments: %v", err)
 	}
 	commitment, err := c.Commitment.Serialize()
 	if err != nil {
-		return nil, api.NewErrorInternal("failed to serialize commitment")
+		return nil, status.Newf(codes.Internal, "failed to serialize commitment: %v", err)
 	}
 	lengthCommitment, err := c.LengthCommitment.Serialize()
 	if err != nil {
-		return nil, api.NewErrorInternal("failed to serialize length commitment")
+		return nil, status.Newf(codes.Internal, "failed to serialize length commitment: %v", err)
 	}
 	lengthProof, err := c.LengthProof.Serialize()
 	if err != nil {
-		return nil, api.NewErrorInternal("failed to serialize length proof")
+		return nil, status.Newf(codes.Internal, "failed to serialize length proof: %v", err)
 	}
 
 	return &pb.BlobCommitmentReply{
@@ -272,7 +329,7 @@ func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobC
 			LengthCommitment: lengthCommitment,
 			LengthProof:      lengthProof,
 			Length:           uint32(c.Length),
-		}}, nil
+		}}, status.New(codes.OK, "")
 }
 
 // refreshOnchainState refreshes the onchain quorum state.
@@ -319,9 +376,25 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	return nil
 }
 
-func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
+func (s *DispersalServerV2) GetPaymentState(
+	ctx context.Context,
+	req *pb.GetPaymentStateRequest,
+) (*pb.GetPaymentStateReply, error) {
+	reply, st := s.getPaymentState(ctx, req)
+	api.LogResponseStatus(s.logger, st)
+	if st != nil {
+		// nolint:wrapcheck
+		return reply, st.Err()
+	}
+	return reply, nil
+}
+
+func (s *DispersalServerV2) getPaymentState(
+	ctx context.Context,
+	req *pb.GetPaymentStateRequest,
+) (*pb.GetPaymentStateReply, *status.Status) {
 	if s.meterer == nil {
-		return nil, errors.New("payment meterer is not enabled")
+		return nil, status.New(codes.Internal, "meterer is not configured")
 	}
 	start := time.Now()
 	defer func() {
@@ -329,7 +402,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	}()
 
 	if !gethcommon.IsHexAddress(req.GetAccountId()) {
-		return nil, api.NewErrorInvalidArg("invalid account ID")
+		return nil, status.New(codes.InvalidArgument, "invalid account ID")
 	}
 
 	accountID := gethcommon.HexToAddress(req.GetAccountId())
@@ -337,7 +410,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// validate the signature
 	if err := s.blobRequestAuthenticator.AuthenticatePaymentStateRequest(accountID, req); err != nil {
 		s.logger.Debug("failed to validate signature", "err", err, "accountID", accountID)
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
+		return nil, status.Newf(codes.Unauthenticated, "failed to validate signature: %s", err.Error())
 	}
 	// on-chain global payment parameters
 	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
@@ -407,14 +480,41 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		CumulativePayment:        largestCumulativePaymentBytes,
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
-	return reply, nil
+	return reply, status.New(codes.OK, "")
+}
+
+func (s *DispersalServerV2) GetValidatorSigningRate(
+	ctx context.Context,
+	request *pb.GetValidatorSigningRateRequest,
+) (*pb.GetValidatorSigningRateReply, error) {
+
+	validatorId := core.OperatorID(request.GetValidatorId())
+
+	signingRate, err := s.signingRateTracker.GetValidatorSigningRate(
+		core.QuorumID(request.GetQuorum()),
+		validatorId,
+		time.Unix(int64(request.GetStartTimestamp()), 0),
+		time.Unix(int64(request.GetEndTimestamp()), 0))
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing rate for validator %s: %w", validatorId.Hex(), err)
+	}
+
+	return &pb.GetValidatorSigningRateReply{
+		ValidatorSigningRate: signingRate,
+	}, nil
 }
 
 // Gracefully shuts down the server and closes any open connections
 func (s *DispersalServerV2) Stop() error {
+	if s.grpcServer != nil {
+		// GracefulStop will close the listener that was passed to Serve()
+		s.grpcServer.GracefulStop()
+	}
+
 	if s.controllerConnection != nil {
 		if err := s.controllerConnection.Close(); err != nil {
-			s.logger.Error("failed to close controller connection", "error", err)
+			return fmt.Errorf("failed to close controller connection: %w", err)
 		}
 	}
 	return nil

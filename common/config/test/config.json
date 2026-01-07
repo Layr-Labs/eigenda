@@ -1,0 +1,33 @@
+{
+  "String": "this value came from config.json",
+  "Int": 100,
+  "Int64": 101,
+  "Int32": 103,
+  "Int16": 104,
+  "Int8": 105,
+  "Uint": 106,
+  "Uint64": 107,
+  "Uint32": 108,
+  "Uint16": 109,
+  "Uint8": 110,
+  "Float64": 111.11,
+  "Float32": 112.12,
+  "Duration": "1h",
+  "Bool": true,
+  "Bar": {
+    "A": "json bar A",
+    "B": 125,
+    "C": false,
+    "Baz": {
+      "X": "json barD baz X",
+      "Y": 126,
+      "Z": true
+    }
+  },
+  "Baz": {
+    "X": "json baz X",
+    "Y": 127,
+    "Z": false
+  },
+  "ThisIsASecretField": "A full commitment's what I'm thinking of. You wouldn't get this from any other guy."
+}

@@ -22,6 +22,7 @@ func FuzzProxyClientServerV2(f *testing.F) {
 	fuzzProxyClientServer(f, common.V2EigenDABackend)
 }
 
+// Very simple fuzzer which generates random bytes arrays and sends them to the proxy using the standard client.
 func fuzzProxyClientServer(f *testing.F, dispersalBackend common.EigenDABackend) {
 	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, dispersalBackend, nil)
 	testCfg.MaxBlobLength = "16mib"
@@ -39,7 +40,7 @@ func fuzzProxyClientServer(f *testing.F, dispersalBackend common.EigenDABackend)
 	f.Add(b)
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 
 	daClient := standard_client.New(cfg)

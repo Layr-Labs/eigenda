@@ -1,17 +1,19 @@
 package builder
 
 import (
+	"math/big"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
-	v2_clients "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,6 +22,7 @@ func validCfg() Config {
 	if err != nil {
 		panic(err)
 	}
+
 	proxyCfg := Config{
 		StoreConfig: store.Config{
 			BackendsToEnable: []common.EigenDABackend{common.V1EigenDABackend, common.V2EigenDABackend},
@@ -60,10 +63,11 @@ func validCfg() Config {
 			}),
 		MemstoreEnabled: false,
 		ClientConfigV2: common.ClientConfigV2{
-			DisperserClientCfg: v2_clients.DisperserClientConfig{
-				Hostname:          "http://localhost",
-				Port:              "9999",
+			DisperserClientCfg: dispersal.DisperserClientConfig{
+				GrpcUri:           "localhost:9999",
 				UseSecureGrpcFlag: true,
+				DisperserID:       0,
+				ChainID:           big.NewInt(1),
 			},
 			EigenDACertVerifierOrRouterAddress: "0x0000000000032443134",
 			MaxBlobSizeBytes:                   maxBlobLengthBytes,
@@ -72,7 +76,8 @@ func validCfg() Config {
 				common.RelayRetrieverType,
 				common.ValidatorRetrieverType,
 			},
-			PutTries: 3,
+			PutTries:         3,
+			ClientLedgerMode: clientledger.ClientLedgerModeReservationOnly,
 		},
 		S3Config: s3.Config{
 			Bucket:          "test-bucket",
@@ -161,7 +166,7 @@ func TestConfigVerification(t *testing.T) {
 			t.Run(
 				"FailWhenRequiredEigenDAV2FieldsAreUnset", func(t *testing.T) {
 					cfg := validCfg()
-					cfg.ClientConfigV2.DisperserClientCfg.Hostname = ""
+					cfg.ClientConfigV2.DisperserClientCfg.GrpcUri = ""
 					require.Error(t, cfg.Check())
 				})
 		})

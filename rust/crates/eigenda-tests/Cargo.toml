@@ -1,0 +1,25 @@
+[package]
+name = "eigenda-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false        # keep private
+
+[dev-dependencies]
+eigenda-proxy = { path = "../eigenda-proxy" }
+eigenda-ethereum = { path = "../eigenda-ethereum" }
+eigenda-verification = { path = "../eigenda-verification" }
+
+testcontainers = { workspace = true }
+tokio = { workspace = true, features = ["full", "test-util"] }
+anyhow.workspace = true
+bytes.workspace = true
+rand.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = [
+    "env-filter",
+    "local-time",
+] }
+tracing-tree.workspace = true
+alloy-signer-local.workspace = true
+alloy-primitives.workspace = true
+dotenvy = "0.15.7"

@@ -5,8 +5,8 @@ import (
 	"runtime"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/urfave/cli/v2"
 )
 
@@ -65,7 +65,7 @@ func KZGCLIFlags(envPrefix, category string) []cli.Flag {
 		// the container
 		&cli.StringFlag{
 			Name:     G1PathFlagName,
-			Usage:    "path to g1.point file.",
+			Usage:    "Path to g1.point file. Only needed for V1 backend. Points are embedded into the binary for V2 backend.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "TARGET_KZG_G1_PATH")},
 			Value:    "resources/g1.point",
 			Category: category,
@@ -83,21 +83,15 @@ func KZGCLIFlags(envPrefix, category string) []cli.Flag {
 			Hidden:   true,
 		},
 		&cli.StringFlag{
-			Name: G2PathFlagName,
-			Usage: fmt.Sprintf("Path to g2.point file, which is needed to generate and verify blob length proofs. "+
-				"If this flag doesn't point to a complete 16GiB G2 SRS file, "+
-				"then the --%s flag must be used to specify a trailing segment of that file, of equivalent length "+
-				"to the initial segment pointed to by this flag.", G2TrailingPathFlagName),
+			Name:     G2PathFlagName,
+			Usage:    "[Deprecated] SRS points are embedded in the binary, so this flag is no longer needed.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "TARGET_KZG_G2_PATH")},
 			Value:    "resources/g2.point",
 			Category: category,
 		},
 		&cli.StringFlag{
-			Name: G2TrailingPathFlagName,
-			Usage: fmt.Sprintf("Path to g2.trailing.point file, which is needed to generate and verify blob length proofs. "+
-				"If --%s is pointing to the entire 16GiB G2 SRS file which contains 268435456 G2 points, this flag is not needed. "+
-				"Otherwise, users can truncate the G2 file by taking an initial segment, and a trailing segment (both of the same size).",
-				G2PathFlagName),
+			Name:     G2TrailingPathFlagName,
+			Usage:    "[Deprecated] SRS points are embedded in the binary, so this flag is no longer needed.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "TARGET_KZG_G2_TRAILING_PATH")},
 			Value:    "resources/g2.trailing.point",
 			Category: category,
@@ -118,7 +112,7 @@ func ReadKzgConfig(ctx *cli.Context, maxBlobSizeBytes uint64) kzg.KzgConfig {
 		G2Path:          ctx.String(G2PathFlagName),
 		G2TrailingPath:  ctx.String(G2TrailingPathFlagName),
 		CacheDir:        ctx.String(CachePathFlagName),
-		SRSOrder:        eigendaflags.SrsOrder,
+		SRSOrder:        encoding.SRSOrder,
 		SRSNumberToLoad: maxBlobSizeBytes / 32,         // # of fr.Elements
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 		// we are intentionally not setting the `LoadG2Points` field here. `LoadG2Points` has different requirements

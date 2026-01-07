@@ -31,8 +31,9 @@ Secure interaction between a rollup and EigenDA is composed of three distinct sy
 
 7. *[EigenDA Client](../../glossary.md#eigenda-client)* then passes ABI encoded cert bytes via a call to the `verifier`'s `checkDACert` function which performs onchain cert verification [logic](./6-secure-integration.md#2-cert-validation) and returns a uint `verification_status_code`
 
-8. Using the `verification_status_code`, *[EigenDA Client](../../glossary.md#eigenda-client)* determines whether to return the certificate (`CertV2Lib.StatusCode.SUCCESS`) to the *Rollup Batcher* or retry a subsequent dispersal attempt
-
+8. Using the `verification_status_code`, the *[EigenDA Client](../../glossary.md#eigenda-client)* determines whether to:
+   - Return the certificate (i.e., `CertV2Lib.StatusCode.SUCCESS`) to the *Rollup Batcher*, or
+   - [Failover](#failover-to-native-rollup-da) if any other status code is returned.
 
 ### Payload to Blob Encoding
 
@@ -43,7 +44,7 @@ A `payload` consists of an arbitrary byte array. The DisperseBlob endpoint accep
 
 ### Disperser polling
 
-The [`DisperseBlob`](../../protobufs/generated/eigenda-protos.md#disperser) method takes a `blob` and `blob_header` as input. Under the hood, the disperser performs the following steps:
+The [`DisperseBlob`](../../protobufs/generated/eigenda-protos.md#disperser) method takes a `blob` and `blob_header` as input. The hash of the `blob_header` (known as the [`blobKey`](./3-data-structs.md#blobkey-blob-header-hash)) serves as a unique identifier for tracking the dispersal status. Under the hood, the disperser performs the following steps:
 
 1. **Batching**: The blob is aggregated into a Merkle tree along with other blobs.
 2. **Reed-Solomon Encoding**: The blob is erasure-coded into chunks for fault tolerance.
@@ -82,7 +83,12 @@ Any other terminal status indicates failure, and a new blob dispersal will need 
 
 #### Failover to Native Rollup DA
 
-*Proxy* can be configured to retry `BlobStatus.UNKNOWN`, `BlobStatus.FAILED`, & `BlobStatus.COMPLETE` (if threshold check failed) dispersal `n` times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA or native rollup DA offerings (e.g, arbitrum anytrust). See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info on the OP implementation and [here](https://hackmd.io/@epociask/SJUyIZlZkx) for Arbitrum. 
+*Proxy* can be configured to retry `BlobStatus.UNKNOWN`, `BlobStatus.FAILED`, & `BlobStatus.COMPLETE` (if threshold check failed) dispersal `n` times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA or native rollup DA offerings (e.g, arbitrum anytrust).
+
+The *Proxy* will return a `503 Service Unavailable` status code in cases where a dispersal succeeds against the *Disperser* but verification fails against the `EigenDACertVerifier` contract (i.e, any status code != `SUCCESS`).
+
+
+*See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info on the OP implementation and [here](https://hackmd.io/@epociask/SJUyIZlZkx) for Arbitrum.*
 
 ### BlobStatusReply → Cert
 
@@ -172,7 +178,7 @@ There are two main blob retrieval paths:
 1. **decentralized retrieval:** retrieve erasure coded chunks from Validators and recreate the `blob` from them.
 2. **centralized retrieval:** the same [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) that Validators use to download chunks, can also be used to retrieve full blobs.
 
-EigenDA V2 has a new [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) for retrieving blobs from the disperser. The `GetBlob` method takes a `blob_key` as input, which is a synonym for `blob_header_hash`. Note that `BlobCertificate` (different from `DACert`!) contains an array of `relay_keys`, which are the relays that can serve that specific blob. A relay’s URL can be retrieved from the [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/9a4bdc099b98f6e5116b11778f0cf1466f13779c/contracts/src/core/EigenDARelayRegistry.sol#L35) function on the EigenDARelayRegistry.sol contract.
+EigenDA V2 has a new [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) for retrieving blobs from the disperser. The `GetBlob` method takes a `blob_key` as input, which is the [`blobKey`](./3-data-structs.md#blobkey-blob-header-hash) (also known as `blob_header_hash`) computed from the `BlobHeader`. Note that `BlobCertificate` (**different** from `DACert`) contains an array of `relay_keys`, which are the relays that can serve that specific blob. A relay's URL can be retrieved from the [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/9a4bdc099b98f6e5116b11778f0cf1466f13779c/contracts/src/core/EigenDARelayRegistry.sol#L35) function on the EigenDARelayRegistry.sol contract.
 
 ### Decoding
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgflags"
 	"github.com/urfave/cli"
 )
 
@@ -270,12 +270,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GRPC_MSG_SIZE_LIMIT_V2"),
 		Value:    units.MiB,
-	}
-	DisableDispersalAuthenticationFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "disable-dispersal-authentication"),
-		Usage:    "Disable authentication for StoreChunks() calls from the disperser",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISABLE_DISPERSAL_AUTHENTICATION"),
 	}
 	DispersalAuthenticationKeyCacheSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "dispersal-authentication-key-cache-size"),
@@ -548,6 +542,47 @@ var (
 		Value:    64,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OPERATOR_STATE_CACHE_SIZE"),
 	}
+	EjectionSentinelPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ejection-sentinel-period"),
+		Usage:    "The period at which the ejection sentinel runs to check for ejection conditions.",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EJECTION_SENTINEL_PERIOD"),
+	}
+	// TODO(cody.littley): this needs to be enabled by default prior to allowing third parties to eject.
+	//  In the immediate term, leave it disabled by default to give operators time to adjust to the idea.
+	EjectionDefenseEnabledFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ejection-defense-enabled"),
+		Usage:    "Whether to enable the ejection defense mechanism.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EJECTION_DEFENSE_ENABLED"),
+	}
+	IgnoreVersionForEjectionDefenseFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ignore-version-for-ejection-defense"),
+		Usage:    "Whether to ignore the version check for ejection defense.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "IGNORE_VERSION_FOR_EJECTION_DEFENSE"),
+	}
+	ReservationMaxLedgersFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "reservation-max-ledgers"),
+		Usage:    "Initial size for the reservation ledger LRU cache. This increases dynamically if premature evictions are detected.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RESERVATION_MAX_LEDGERS"),
+	}
+	PaymentVaultUpdateIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "payment-vault-update-interval"),
+		Usage:    "Interval for checking for payment vault updates.",
+		Required: false,
+		Value:    30 * time.Second,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
+	}
+	EnablePerAccountPaymentMetricsFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-payment-metrics"),
+		Usage:    "Whether to report per-account payment metrics. If false, all metrics will be aggregated under account 0x0.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PER_ACCOUNT_PAYMENT_METRICS"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -588,6 +623,13 @@ var (
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_STORE_DURATION_BLOCKS"),
+	}
+	OverrideV2TtlFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "override-v2-ttl"),
+		Usage:    "Override the TTL for v2 chunks. 0 means no override.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_V2_TTL"),
 	}
 	// DO NOT set plain private key in flag in production.
 	// When test mode is enabled, the DA Node will take private BLS key from this flag.
@@ -661,7 +703,6 @@ var optionalFlags = []cli.Flag{
 	GRPCMsgSizeLimitV2Flag,
 	PprofHttpPort,
 	EnablePprof,
-	DisableDispersalAuthenticationFlag,
 	DispersalAuthenticationKeyCacheSizeFlag,
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
@@ -691,11 +732,18 @@ var optionalFlags = []cli.Flag{
 	StoreChunksBufferSizeFractionFlag,
 	OperatorStateCacheSizeFlag,
 	LittSnapshotDirectoryFlag,
+	EjectionSentinelPeriodFlag,
+	EjectionDefenseEnabledFlag,
+	IgnoreVersionForEjectionDefenseFlag,
+	ReservationMaxLedgersFlag,
+	PaymentVaultUpdateIntervalFlag,
+	EnablePerAccountPaymentMetricsFlag,
+	OverrideV2TtlFlag,
 }
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
-	Flags = append(Flags, kzg.CLIFlags(EnvVarPrefix)...)
+	Flags = append(Flags, kzgflags.CLIFlags(EnvVarPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(EnvVarPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(EnvVarPrefix, FlagPrefix)...)
 }

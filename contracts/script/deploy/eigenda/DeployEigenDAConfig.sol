@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {IRegistryCoordinator, EigenDARegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-import {IPauserRegistry} from
-    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
+import {
+    IPauserRegistry
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {IEjectionManager} from "lib/eigenlayer-middleware/src/interfaces/IEjectionManager.sol";
 import "forge-std/StdToml.sol";
 import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
 library InitParamsLib {
     function initialOwner(string memory configData) internal pure returns (address) {
@@ -63,11 +65,7 @@ library InitParamsLib {
         }
     }
 
-    function strategyParams(string memory configData)
-        internal
-        pure
-        returns (IStakeRegistry.StrategyParams[][] memory)
-    {
+    function strategyParams(string memory configData) internal pure returns (IStakeRegistry.StrategyParams[][] memory) {
         bytes memory strategyConfigsRaw =
             stdToml.parseRaw(configData, ".initParams.middleware.registryCoordinator.strategyParams");
         return abi.decode(strategyConfigsRaw, (IStakeRegistry.StrategyParams[][]));
@@ -79,13 +77,18 @@ library InitParamsLib {
     }
 
     function quorumConfirmationThresholdPercentages(string memory configData) internal pure returns (bytes memory) {
-        return stdToml.readBytes(
-            configData, ".initParams.eigenDA.thresholdRegistry.quorumConfirmationThresholdPercentages"
-        );
+        return
+            stdToml.readBytes(
+                configData, ".initParams.eigenDA.thresholdRegistry.quorumConfirmationThresholdPercentages"
+            );
     }
 
     function quorumNumbersRequired(string memory configData) internal pure returns (bytes memory) {
         return stdToml.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumNumbersRequired");
+    }
+
+    function offchainDerivationVersion(string memory configData) internal pure returns (uint16) {
+        return uint16(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.offchainDerivationVersion"));
     }
 
     function versionedBlobParams(string memory configData)
@@ -165,5 +168,14 @@ library InitParamsLib {
             quorumNumbersRequiredBytes[i] = bytes1(uint8(certQuorumNumbersRequired[i]));
         }
         return quorumNumbersRequiredBytes;
+    }
+
+    function dispersers(string memory configData) internal pure returns (address[] memory) {
+        return stdToml.readAddressArray(configData, ".initParams.eigenDA.disperser.dispersers");
+    }
+
+    function relayInfos(string memory configData) internal pure returns (EigenDATypesV2.RelayInfo[] memory) {
+        bytes memory relayInfosRaw = stdToml.parseRaw(configData, ".initParams.eigenDA.relay.relays");
+        return abi.decode(relayInfosRaw, (EigenDATypesV2.RelayInfo[]));
     }
 }

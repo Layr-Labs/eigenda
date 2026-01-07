@@ -6,17 +6,20 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"runtime"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/replay"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -37,6 +40,13 @@ type ServerV2 struct {
 	chunkAuthenticator auth.RequestAuthenticator
 	blobAuthenticator  corev2.BlobRequestAuthenticator
 	replayGuardian     replay.ReplayGuardian
+
+	// The current software version.
+	softwareVersion *version.Semver
+
+	// Pre-created listeners for the gRPC servers
+	dispersalListener net.Listener
+	retrievalListener net.Listener
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -47,34 +57,37 @@ func NewServerV2(
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
 	registry *prometheus.Registry,
-	reader core.Reader) (*ServerV2, error) {
+	reader core.Reader,
+	softwareVersion *version.Semver,
+	dispersalListener net.Listener,
+	retrievalListener net.Listener) (*ServerV2, error) {
 
 	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
 		return nil, err
 	}
 
-	var chunkAuthenticator auth.RequestAuthenticator
-	var blobAuthenticator corev2.BlobRequestAuthenticator
-	if !config.DisableDispersalAuthentication {
-		chunkAuthenticator, err = auth.NewRequestAuthenticator(
-			ctx,
-			reader,
-			config.DispersalAuthenticationKeyCacheSize,
-			config.DisperserKeyTimeout,
-			func(id uint32) bool {
-				return id == api.EigenLabsDisperserID
-			},
-			time.Now())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create authenticator: %w", err)
-		}
-		blobAuthenticator = coreauthv2.NewBlobRequestAuthenticator()
+	chunkAuthenticator, err := auth.NewRequestAuthenticator(
+		ctx,
+		reader,
+		logger,
+		config.DispersalAuthenticationKeyCacheSize,
+		config.DisperserKeyTimeout,
+		// TODO(litt3): once the checkpointed onchain config registry is ready, the authorized
+		// on-demand dispersers should be read from there instead of being hardcoded.
+		[]uint32{0}, // Default to disperser ID 0 for on-demand payments
+		time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authenticator: %w", err)
 	}
-	replayGuardian := replay.NewReplayGuardian(
+	blobAuthenticator := coreauthv2.NewBlobRequestAuthenticator()
+	replayGuardian, err := replay.NewReplayGuardian(
 		time.Now,
 		config.StoreChunksRequestMaxPastAge,
 		config.StoreChunksRequestMaxFutureAge)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replay guardian: %w", err)
+	}
 
 	return &ServerV2{
 		config:             config,
@@ -85,12 +98,48 @@ func NewServerV2(
 		chunkAuthenticator: chunkAuthenticator,
 		blobAuthenticator:  blobAuthenticator,
 		replayGuardian:     replayGuardian,
+		softwareVersion:    softwareVersion,
+		dispersalListener:  dispersalListener,
+		retrievalListener:  retrievalListener,
 	}, nil
+}
+
+// GetDispersalPort returns the port number the dispersal listener is bound to.
+func (s *ServerV2) GetDispersalPort() int {
+	if s.dispersalListener == nil {
+		return 0
+	}
+	return s.dispersalListener.Addr().(*net.TCPAddr).Port
+}
+
+// GetRetrievalPort returns the port number the retrieval listener is bound to.
+func (s *ServerV2) GetRetrievalPort() int {
+	if s.retrievalListener == nil {
+		return 0
+	}
+	return s.retrievalListener.Addr().(*net.TCPAddr).Port
+}
+
+// Stop shuts down the listeners
+func (s *ServerV2) Stop() {
+	s.logger.Info("ServerV2 stop requested")
+
+	if s.dispersalListener != nil {
+		if err := s.dispersalListener.Close(); err != nil {
+			s.logger.Warn("Failed to close dispersal listener", "error", err)
+		}
+	}
+
+	if s.retrievalListener != nil {
+		if err := s.retrievalListener.Close(); err != nil {
+			s.logger.Warn("Failed to close retrieval listener", "error", err)
+		}
+	}
 }
 
 func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (*pb.GetNodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
-		return &pb.GetNodeInfoReply{Semver: node.SemVer}, nil
+		return &pb.GetNodeInfoReply{Semver: s.softwareVersion.String()}, nil
 	}
 
 	memBytes := uint64(0)
@@ -100,7 +149,7 @@ func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (
 	}
 
 	return &pb.GetNodeInfoReply{
-		Semver:   node.SemVer,
+		Semver:   s.softwareVersion.String(),
 		Os:       runtime.GOOS,
 		Arch:     runtime.GOARCH,
 		NumCpu:   uint32(runtime.GOMAXPROCS(0)),
@@ -134,28 +183,59 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	if s.chunkAuthenticator != nil {
-		hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
-		if err != nil {
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
-		}
+	_, err = s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
+	if err != nil {
+		//nolint:wrapcheck
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
+	}
 
-		timestamp := time.Unix(int64(in.GetTimestamp()), 0)
-		err = s.replayGuardian.VerifyRequest(hash, timestamp)
+	if !s.chunkAuthenticator.IsDisperserAuthorized(in.GetDisperserID(), batch) {
+		//nolint:wrapcheck
+		return nil, api.NewErrorPermissionDenied(
+			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
+	}
+
+	blobHeadersAndTimestamps, err := hashing.HashBlobHeadersAndTimestamps(in)
+	if err != nil {
+		//nolint:wrapcheck
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers and timestamps: %v", err))
+	}
+
+	for i, blobHeader := range blobHeadersAndTimestamps {
+		err = s.replayGuardian.VerifyRequest(blobHeader.Hash, blobHeader.Timestamp)
 		if err != nil {
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
+			//nolint:wrapcheck
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify blob header hash at index %d: %v", i, err))
 		}
 	}
-	if s.blobAuthenticator != nil {
-		// TODO: check the latency of request validation later; could be parallelized to avoid significant
-		// impact to the request latency
-		for _, blobCert := range batch.BlobCertificates {
-			_, err = s.validateDispersalRequest(blobCert)
-			if err != nil {
-				return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
-			}
+
+	for _, blobCert := range batch.BlobCertificates {
+		_, err = s.validateDispersalRequest(blobCert)
+		if err != nil {
+			//nolint:wrapcheck
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 		}
 	}
+
+	// Validate reservation payments (on-demand payments are validated on the the disperser's controller service)
+	//
+	// Note: the payment processing that occurs within this method is NOT reverted, even if something fails further
+	// along. There are a couple reasons for this:
+	// 1. At this stage, the dispersal request has already been sent to other validators. Even if this individual
+	// validator were to revert the payment after some type of failure, there's no way to make sure that all other
+	// validators would experience the same failure and revert. It is important to keep validator payment state in
+	// sync, so the safest behavior is to just treat this as the point-of-no-return, from a payments perspective.
+	// 2. Even if there were a way for all validators to agree on what payments to revert, non-trivial amounts of work
+	// are being done shortly after this payment validation completes, for which the validators should be compensated.
+	//
+	// This accounting logic relies on each dispersal only arriving at this stage *once*. That is currently guaranteed
+	// based on the replay guardian above. If the replay guardian were ever to be removed (for example, to enable
+	// retried dispersals) then the accounting logic here would need to be revisited, and made retry tolerant.
+	err = s.node.ValidateReservationPayment(ctx, batch, probe)
+	if err != nil {
+		return nil, fmt.Errorf("validate reservation payment: %w", err)
+	}
+
 	probe.SetStage("get_operator_state")
 	s.logger.Info("new StoreChunks request",
 		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
@@ -328,7 +408,9 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 	}
 
 	if corev2.MaxQuorumID < in.GetQuorumId() {
-		return nil, api.NewErrorInvalidArg("invalid quorum ID")
+		//nolint: wrapcheck
+		return nil, api.NewErrorInvalidArg(
+			fmt.Sprintf("quorumID %d must be <= maxQuorumID %d", in.GetQuorumId(), corev2.MaxQuorumID))
 	}
 
 	// The current sampling scheme will store the same chunks for all quorums, so we always use quorum 0 as the quorum key in storage.
@@ -382,11 +464,11 @@ func (s *ServerV2) validateDispersalRequest(
 	}
 
 	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
-	commitedBlobLength := blobCert.BlobHeader.BlobCommitments.Length
-	if commitedBlobLength == 0 {
+	committedBlobLength := blobCert.BlobHeader.BlobCommitments.Length
+	if committedBlobLength == 0 {
 		return nil, errors.New("blob size must be greater than 0")
 	}
-	if commitedBlobLength != encoding.NextPowerOf2(commitedBlobLength) {
+	if uint64(committedBlobLength) != math.NextPowOf2u64(uint64(committedBlobLength)) {
 		return nil, errors.New("invalid commitment length, must be a power of 2")
 	}
 

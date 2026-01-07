@@ -4,24 +4,22 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	commonpprof "github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/prover"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
-)
-
-const (
-	// DefaultFragmentSizeBytes represents the size of each fragment in bytes (4MB)
-	DefaultFragmentSizeBytes = 4 * 1024 * 1024
 )
 
 var (
@@ -70,6 +68,13 @@ func RunEncoderServer(ctx *cli.Context) error {
 		reg.MustRegister(grpcMetrics)
 	}
 
+	// Start pprof server if enabled (works for both v1 and v2)
+	pprofProfiler := commonpprof.NewPprofProfiler(config.ServerConfig.PprofHttpPort, logger)
+	if config.ServerConfig.EnablePprof {
+		go pprofProfiler.Start()
+		logger.Info("Enabled pprof for encoder server", "port", config.ServerConfig.PprofHttpPort)
+	}
+
 	backendType, err := encoding.ParseBackendType(config.ServerConfig.Backend)
 	if err != nil {
 		return err
@@ -77,21 +82,39 @@ func RunEncoderServer(ctx *cli.Context) error {
 
 	// Set the encoding config
 	encodingConfig := &encoding.Config{
-		BackendType: backendType,
-		GPUEnable:   config.ServerConfig.GPUEnable,
-		NumWorker:   config.EncoderConfig.NumWorker,
+		BackendType:                           backendType,
+		GPUEnable:                             config.ServerConfig.GPUEnable,
+		GPUConcurrentFrameGenerationDangerous: int64(config.ServerConfig.MaxConcurrentRequestsDangerous),
+		NumWorker:                             config.EncoderConfig.NumWorker,
 	}
+
+	// Read the GRPC port from flags
+	grpcPort := ctx.GlobalString(flags.GrpcPortFlag.Name)
+
+	// Create listener
+	addr := fmt.Sprintf("0.0.0.0:%s", grpcPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("failed to create listener on %s: %w", addr, err)
+	}
+	defer func() {
+		if err := listener.Close(); err != nil {
+			logger.Error("Failed to close listener", "error", err)
+		}
+	}()
 
 	if config.EncoderVersion == V2 {
 		// We no longer load the G2 points in V2 because the KZG commitments are computed
 		// on the API server side.
 		config.EncoderConfig.LoadG2Points = false
-		prover, err := prover.NewProver(&config.EncoderConfig, encodingConfig)
+		prover, err := proverv2.NewProver(logger, proverv2.KzgConfigFromV1Config(&config.EncoderConfig), encodingConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
 
-		s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
+		// Create object storage client (supports both S3 and OCI)
+		objectStorageClient, err := blobstore.CreateObjectStorageClient(
+			context.Background(), config.BlobStoreConfig, config.AwsClientConfig, logger)
 		if err != nil {
 			return err
 		}
@@ -101,12 +124,14 @@ func RunEncoderServer(ctx *cli.Context) error {
 			return fmt.Errorf("blob store bucket name is required")
 		}
 
-		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, s3Client, logger)
-		logger.Info("Blob store", "bucket", blobStoreBucketName)
+		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, objectStorageClient, logger)
+		logger.Info("Blob store", "bucket", blobStoreBucketName, "backend", config.BlobStoreConfig.Backend)
 
 		chunkStoreBucketName := config.ChunkStoreConfig.BucketName
-		chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, DefaultFragmentSizeBytes)
-		logger.Info("Chunk store writer", "bucket", blobStoreBucketName)
+		chunkWriter := chunkstore.NewChunkWriter(
+			objectStorageClient,
+			chunkStoreBucketName)
+		logger.Info("Chunk store writer", "bucket", chunkStoreBucketName, "backend", config.ChunkStoreConfig.Backend)
 
 		server := encoder.NewEncoderServerV2(
 			*config.ServerConfig,
@@ -118,7 +143,10 @@ func RunEncoderServer(ctx *cli.Context) error {
 			grpcMetrics,
 		)
 
-		return server.Start()
+		logger.Info("Starting encoder v2 server", "address", listener.Addr().String())
+
+		//nolint:wrapcheck
+		return server.StartWithListener(listener)
 	}
 
 	config.EncoderConfig.LoadG2Points = true
@@ -129,5 +157,8 @@ func RunEncoderServer(ctx *cli.Context) error {
 
 	server := encoder.NewEncoderServer(*config.ServerConfig, logger, prover, metrics, grpcMetrics)
 
-	return server.Start()
+	logger.Info("Starting encoder v1 server", "address", listener.Addr().String())
+
+	//nolint:wrapcheck
+	return server.StartWithListener(listener)
 }

@@ -10,8 +10,11 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/replay"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -25,46 +28,47 @@ import (
 type Server struct {
 	controller.UnimplementedControllerServiceServer
 
-	config                      Config
+	config                      common.GRPCServerConfig
 	logger                      logging.Logger
 	server                      *grpc.Server
 	listener                    net.Listener
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
 	metrics                     *metrics.ServerMetrics
 	replayGuardian              replay.ReplayGuardian
+	signingRateTracker          signingrate.SigningRateTracker
 }
 
 func NewServer(
 	ctx context.Context,
-	config Config,
+	config common.GRPCServerConfig,
 	logger logging.Logger,
 	metricsRegistry *prometheus.Registry,
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler,
+	listener net.Listener,
+	signingRateTracker signingrate.SigningRateTracker,
 ) (*Server, error) {
-	replayGuardian := replay.NewReplayGuardian(time.Now, config.RequestMaxPastAge, config.RequestMaxFutureAge)
+	if listener == nil {
+		return nil, fmt.Errorf("listener is required")
+	}
+
+	replayGuardian, err := replay.NewReplayGuardian(time.Now, config.RequestMaxPastAge, config.RequestMaxFutureAge)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replay guardian: %w", err)
+	}
 
 	return &Server{
 		config:                      config,
 		logger:                      logger,
+		listener:                    listener,
 		metrics:                     metrics.NewServerMetrics(metricsRegistry, logger),
 		paymentAuthorizationHandler: paymentAuthorizationHandler,
 		replayGuardian:              replayGuardian,
+		signingRateTracker:          signingRateTracker,
 	}, nil
 }
 
 // Start the server. Blocks until the server is stopped.
 func (s *Server) Start() error {
-	if !s.config.EnableServer {
-		return fmt.Errorf("controller gRPC server is disabled")
-	}
-
-	addr := fmt.Sprintf("0.0.0.0:%d", s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("start tcp listener: %w", err)
-	}
-	s.listener = listener
-
 	var opts []grpc.ServerOption
 	opts = append(opts, s.metrics.GetGRPCServerOption())
 
@@ -83,9 +87,9 @@ func (s *Server) Start() error {
 	controller.RegisterControllerServiceServer(s.server, s)
 	healthcheck.RegisterHealthServer(controller.ControllerService_ServiceDesc.ServiceName, s.server)
 
-	s.logger.Infof("gRPC server listening at %v", listener.Addr().String())
+	s.logger.Infof("gRPC server listening at %v", s.listener.Addr().String())
 
-	err = s.server.Serve(listener)
+	err := s.server.Serve(s.listener)
 	if err != nil {
 		return fmt.Errorf("serve: %w", err)
 	}
@@ -110,37 +114,82 @@ func (s *Server) AuthorizePayment(
 	ctx context.Context,
 	request *controller.AuthorizePaymentRequest,
 ) (*controller.AuthorizePaymentResponse, error) {
-	start := time.Now()
+	if s.paymentAuthorizationHandler == nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf(
+			"payment authorization handler not configured, request=%s", request.String()))
+	}
+
+	probe := s.metrics.NewPaymentAuthorizationProbe()
 	success := false
 	defer func() {
-		if success {
-			s.metrics.ReportAuthorizePaymentLatency(time.Since(start))
-		} else {
-			s.metrics.ReportAuthorizePaymentAuthFailure()
+		probe.End()
+		if !success {
+			s.metrics.ReportAuthorizePaymentFailure()
 		}
 	}()
 
-	if s.paymentAuthorizationHandler == nil {
-		return nil, api.NewErrorInternal("payment authorization handler not configured")
-	}
+	probe.SetStage("hash_authorize_payment_request")
 
 	requestHash, err := hashing.HashAuthorizePaymentRequest(request)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to hash request: %v", err))
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to hash request: %v, request=%s", err, request.String()))
 	}
+
+	probe.SetStage("replay_protection")
 
 	timestamp := time.Unix(0, request.GetBlobHeader().GetPaymentHeader().GetTimestamp())
 	err = s.replayGuardian.VerifyRequest(requestHash, timestamp)
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("replay protection check failed: %v", err))
+		s.metrics.ReportPaymentAuthReplayProtectionFailure()
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf(
+			"replay protection check failed: %v, request=%s", err, request.String()))
 	}
 
 	response, err := s.paymentAuthorizationHandler.AuthorizePayment(
-		ctx, request.GetBlobHeader(), request.GetClientSignature())
+		ctx, request.GetBlobHeader(), request.GetClientSignature(), probe)
 	if err != nil {
 		return nil, err
 	}
 
 	success = true
 	return response, nil
+}
+
+// GetValidatorSigningRate returns the signing rate of a validator during a time range
+func (s *Server) GetValidatorSigningRate(
+	ctx context.Context,
+	request *controller.GetValidatorSigningRateRequest,
+) (*controller.GetValidatorSigningRateReply, error) {
+
+	validatorId := core.OperatorID(request.GetValidatorId())
+
+	signingRate, err := s.signingRateTracker.GetValidatorSigningRate(
+		core.QuorumID(request.GetQuorum()),
+		validatorId,
+		time.Unix(int64(request.GetStartTimestamp()), 0),
+		time.Unix(int64(request.GetEndTimestamp()), 0))
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing rate for validator %s: %w", validatorId.Hex(), err)
+	}
+
+	return &controller.GetValidatorSigningRateReply{
+		ValidatorSigningRate: signingRate,
+	}, nil
+}
+
+// GetValidatorSigningRateDump returns a dump of signing rate data for all validators after a specified start time
+func (s *Server) GetValidatorSigningRateDump(
+	ctx context.Context,
+	request *controller.GetValidatorSigningRateDumpRequest,
+) (*controller.GetValidatorSigningRateDumpReply, error) {
+
+	dump, err := s.signingRateTracker.GetSigningRateDump(time.Unix(int64(request.GetStartTimestamp()), 0))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing rate dump: %w", err)
+	}
+
+	return &controller.GetValidatorSigningRateDumpReply{
+		SigningRateBuckets: dump,
+	}, nil
 }

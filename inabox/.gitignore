@@ -1,1 +1,4 @@
 data/
+# Proxy run as part of inabox outputs SRSTables to resources/SRSTables.
+# It shouldn't but for now we just ignore it.
+resources/

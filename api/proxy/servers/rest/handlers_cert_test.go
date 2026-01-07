@@ -15,6 +15,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
+	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/mocks"
@@ -28,10 +30,16 @@ import (
 
 var (
 	testLogger = logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
-	testCfg    = Config{
-		Host:        "localhost",
-		Port:        0,
-		EnabledAPIs: []string{AdminAPIType}, // Enable admin API for testing
+
+	testCfg = Config{
+		Host: "localhost",
+		Port: 0,
+		APIsEnabled: &enabled_apis.RestApisEnabled{
+			Admin:               true,
+			OpGenericCommitment: true,
+			OpKeccakCommitment:  true,
+			StandardCommitment:  true,
+		},
 	}
 )
 
@@ -82,7 +90,7 @@ func TestHandlerGet(t *testing.T) {
 			url:  fmt.Sprintf("/get/0x010000%s", testCommitStr),
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().
-					Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, fmt.Errorf("internal error"))
 			},
 			expectedCode: http.StatusInternalServerError,
@@ -93,7 +101,7 @@ func TestHandlerGet(t *testing.T) {
 			url:  fmt.Sprintf("/get/0x010000%s", testCommitStr),
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().
-					Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return([]byte(testCommitStr), nil)
 			},
 			expectedCode: http.StatusOK,
@@ -106,7 +114,7 @@ func TestHandlerGet(t *testing.T) {
 			url:  fmt.Sprintf("/get/0x010000%s?l1_inclusion_block_number=100", testCommitStr),
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().
-					Get(gomock.Any(), gomock.Any(), gomock.Eq(common.GETOpts{L1InclusionBlockNum: 100})).
+					Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(common.GETOpts{L1InclusionBlockNum: 100})).
 					Return([]byte(testCommitStr), nil)
 			},
 			expectedCode: http.StatusOK,
@@ -163,7 +171,8 @@ func TestHandlerPutSuccess(t *testing.T) {
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().Put(
 					gomock.Any(),
-					gomock.Any()).Return([]byte(testCommitStr), nil)
+					gomock.Any(),
+					gomock.Any()).Return(certs.NewVersionedCert([]byte(testCommitStr), certs.V0VersionByte), nil)
 			},
 			expectedCode: http.StatusOK,
 			expectedBody: opGenericPrefixStr + testCommitStr,
@@ -187,7 +196,8 @@ func TestHandlerPutSuccess(t *testing.T) {
 			mockBehavior: func() {
 				mockEigenDAManager.EXPECT().Put(
 					gomock.Any(),
-					gomock.Any()).Return([]byte(testCommitStr), nil)
+					gomock.Any(),
+					gomock.Any()).Return(certs.NewVersionedCert([]byte(testCommitStr), certs.V0VersionByte), nil)
 			},
 			expectedCode: http.StatusOK,
 			expectedBody: stdCommitmentPrefix + testCommitStr,
@@ -283,8 +293,8 @@ func TestHandlerPutErrors(t *testing.T) {
 			t.Run(tt.name+" / "+mode.name, func(t *testing.T) {
 				t.Log(tt.name + " / " + mode.name)
 				mockEigenDAManager.EXPECT().
-					Put(gomock.Any(), gomock.Any()).
-					Return(nil, tt.mockEigenDAManagerPutReturnedErr)
+					Put(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(certs.NewVersionedCert([]byte{0x0}, certs.V0VersionByte), tt.mockEigenDAManagerPutReturnedErr)
 
 				req := httptest.NewRequest(
 					http.MethodPost,
@@ -363,5 +373,77 @@ func TestHandlerPutKeccakErrors(t *testing.T) {
 
 				require.Equal(t, tt.expectedHTTPCode, rec.Code)
 			})
+	}
+}
+func TestHandlersReturn403WhenAPIDisabled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
+	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
+
+	type tc struct {
+		name    string
+		method  string
+		url     string
+		enabled *enabled_apis.RestApisEnabled
+	}
+	cases := []tc{
+		{
+			name:   "GET keccak: 403 when OpKeccakCommitment disabled",
+			method: http.MethodGet,
+			url:    fmt.Sprintf("/get/0x00%s", testCommitStr),
+			// enable other REST APIs but explicitly ignore OpKeccakCommitment
+			enabled: &enabled_apis.RestApisEnabled{
+				OpGenericCommitment: true,
+				StandardCommitment:  true,
+			},
+		},
+		{
+			name:   "GET op-generic: 403 when OpGenericCommitment disabled",
+			method: http.MethodGet,
+			url:    fmt.Sprintf("/get/0x010000%s", testCommitStr),
+			enabled: &enabled_apis.RestApisEnabled{
+				OpKeccakCommitment: true,
+				StandardCommitment: true,
+			},
+		},
+		{
+			name:   "POST /put (op-generic default): 403 when OpGenericCommitment disabled",
+			method: http.MethodPost,
+			url:    "/put",
+			enabled: &enabled_apis.RestApisEnabled{
+				OpKeccakCommitment: true,
+				StandardCommitment: true,
+			},
+		},
+		{
+			name:   "POST /put?commitment_mode=standard: 403 when StandardCommitment disabled",
+			method: http.MethodPost,
+			url:    "/put?commitment_mode=standard",
+			enabled: &enabled_apis.RestApisEnabled{
+				OpKeccakCommitment:  true,
+				OpGenericCommitment: true,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.url, strings.NewReader("body"))
+			rec := httptest.NewRecorder()
+
+			r := mux.NewRouter()
+			cfg := Config{
+				Host:        "localhost",
+				Port:        0,
+				APIsEnabled: tc.enabled,
+			}
+			server := NewServer(cfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+			server.RegisterRoutes(r)
+
+			r.ServeHTTP(rec, req)
+			require.Equal(t, http.StatusForbidden, rec.Code)
+		})
 	}
 }

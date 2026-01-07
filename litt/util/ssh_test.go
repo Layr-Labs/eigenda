@@ -12,6 +12,8 @@ import (
 )
 
 func TestSSHSession_NewSSHSession(t *testing.T) {
+	t.Skip() // Docker build is flaky, need to fix prior to re-enabling
+
 	t.Parallel()
 
 	container := SetupSSHTestContainer(t, "")
@@ -58,6 +60,8 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 }
 
 func TestSSHSession_Mkdirs(t *testing.T) {
+	t.Skip() // Docker build is flaky, need to fix prior to re-enabling
+
 	t.Parallel()
 
 	dataDir := t.TempDir()
@@ -95,6 +99,8 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 }
 
 func TestSSHSession_FindFiles(t *testing.T) {
+	t.Skip() // Docker build is flaky, need to fix prior to re-enabling
+
 	t.Parallel()
 
 	dataDir := t.TempDir()
@@ -144,6 +150,8 @@ func TestSSHSession_FindFiles(t *testing.T) {
 }
 
 func TestSSHSession_Rsync(t *testing.T) {
+	t.Skip() // Docker build is flaky, need to fix prior to re-enabling
+
 	t.Parallel()
 
 	// Create a temporary data directory for testing

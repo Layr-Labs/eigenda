@@ -18,10 +18,7 @@ contract GenerateHashes is Script {
         DATypesV1.QuorumBlobParam[] memory quorumBlobParam = new DATypesV1.QuorumBlobParam[](1);
 
         quorumBlobParam[0] = DATypesV1.QuorumBlobParam({
-            quorumNumber: 0,
-            adversaryThresholdPercentage: 80,
-            confirmationThresholdPercentage: 100,
-            chunkLength: 10
+            quorumNumber: 0, adversaryThresholdPercentage: 80, confirmationThresholdPercentage: 100, chunkLength: 10
         });
 
         bytes32 quorumBlobParamsHash = keccak256(abi.encode(quorumBlobParam));
@@ -30,10 +27,7 @@ contract GenerateHashes is Script {
         BN254.G1Point memory commitment = BN254.G1Point({X: 1, Y: 2});
 
         quorumBlobParam[0] = DATypesV1.QuorumBlobParam({
-            quorumNumber: 1,
-            adversaryThresholdPercentage: 80,
-            confirmationThresholdPercentage: 100,
-            chunkLength: 10
+            quorumNumber: 1, adversaryThresholdPercentage: 80, confirmationThresholdPercentage: 100, chunkLength: 10
         });
 
         DATypesV1.BlobHeader memory header =

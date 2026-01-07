@@ -5,16 +5,15 @@ import (
 	"slices"
 	"time"
 
-	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 )
 
 // ClientConfigV2 contains all non-sensitive configuration to construct V2 clients
 type ClientConfigV2 struct {
-	DisperserClientCfg           clients_v2.DisperserClientConfig
-	PayloadDisperserCfg          payloaddispersal.PayloadDisperserConfig
+	DisperserClientCfg           dispersal.DisperserClientConfig
+	PayloadDisperserCfg          dispersal.PayloadDisperserConfig
 	RelayPayloadRetrieverCfg     payloadretrieval.RelayPayloadRetrieverConfig
 	ValidatorPayloadRetrieverCfg payloadretrieval.ValidatorPayloadRetrieverConfig
 
@@ -42,15 +41,6 @@ type ClientConfigV2 struct {
 	// EigenDADirectory address is used to get addresses for all EigenDA contracts needed.
 	EigenDADirectory string
 
-	// Allowed distance (in L1 blocks) between the eigenDA cert's reference block number (RBN)
-	// and the L1 block number at which the cert was included in the rollup's batch inbox.
-	// A cert is valid if cert.L1InclusionBlock <= cert.RBN + RBNRecencyWindowSize, otherwise it
-	// is considered stale and should be discarded from rollups' derivation pipelines.
-	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation
-	//
-	// This check is optional and will be skipped when RBNRecencyWindowSize is set to 0.
-	RBNRecencyWindowSize uint64
-
 	// The EigenDA network that is being used.
 	// It is optional, and when set will be used for validating that the eth-rpc chain ID matches the network.
 	EigenDANetwork EigenDANetwork
@@ -64,12 +54,8 @@ type ClientConfigV2 struct {
 
 // Check checks config invariants, and returns an error if there is a problem with the config struct
 func (cfg *ClientConfigV2) Check() error {
-	if cfg.DisperserClientCfg.Hostname == "" {
-		return fmt.Errorf("EigenDA disperser hostname is required for using EigenDA V2 backend")
-	}
-
-	if cfg.DisperserClientCfg.Port == "" {
-		return fmt.Errorf("EigenDA disperser port is required for using EigenDA V2 backend")
+	if cfg.DisperserClientCfg.GrpcUri == "" {
+		return fmt.Errorf("EigenDA disperser gRPC URI is required for using EigenDA V2 backend")
 	}
 
 	if cfg.EigenDACertVerifierOrRouterAddress == "" {
@@ -86,6 +72,13 @@ func (cfg *ClientConfigV2) Check() error {
 		return fmt.Errorf("at least one retriever type must be enabled for using EigenDA V2 backend")
 	}
 
+	// Check that relay retriever is not the only retriever enabled
+	if slices.Contains(cfg.RetrieversToEnable, RelayRetrieverType) {
+		if !slices.Contains(cfg.RetrieversToEnable, ValidatorRetrieverType) {
+			return fmt.Errorf("relay retriever cannot be the only retriever enabled in EigenDA V2 backend")
+		}
+	}
+
 	if slices.Contains(cfg.RetrieversToEnable, ValidatorRetrieverType) {
 		if cfg.EigenDADirectory == "" {
 			return fmt.Errorf("EigenDA directory is required for validator retrieval in EigenDA V2 backend")
@@ -94,6 +87,10 @@ func (cfg *ClientConfigV2) Check() error {
 
 	if cfg.PutTries == 0 {
 		return fmt.Errorf("PutTries==0 is not permitted. >0 means 'try N times', <0 means 'retry indefinitely'")
+	}
+
+	if cfg.ClientLedgerMode == "" {
+		return fmt.Errorf("client ledger mode must be specified")
 	}
 
 	if cfg.VaultMonitorInterval < 0 {

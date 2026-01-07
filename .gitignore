@@ -1,9 +1,15 @@
+# Fuzz inputs and outputs are written to disk under these dirs.
+# See https://pkg.go.dev/testing#hdr-Fuzzing
+**/testdata/fuzz
+
 inabox/testdata/*
 inabox/anvil.pid
 
 test/v1/testdata/*
-encoding/kzgrs/prover/data/SRSTable/*
 resources/srs/SRSTables/*
+# resources/srs/SRSTables should be the main place where they are written to,
+# but when running tests locally from other dirs they might write them locally.
+**/SRSTable
 
 dist
 **/bin/*
@@ -23,3 +29,8 @@ icicle/*
 
 # OSX specific
 .DS_Store
+
+**/logs/**
+
+# Rust
+**/target/

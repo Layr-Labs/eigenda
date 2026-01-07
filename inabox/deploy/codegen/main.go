@@ -7,6 +7,7 @@ import (
 	"os"
 	"text/template"
 
+	proxy "github.com/Layr-Labs/eigenda/api/proxy/config"
 	dis "github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	bat "github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	controller "github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
@@ -17,6 +18,7 @@ import (
 	retriever "github.com/Layr-Labs/eigenda/retriever/flags"
 
 	"github.com/urfave/cli"
+	cliv2 "github.com/urfave/cli/v2"
 )
 
 var myTemplate = `
@@ -94,20 +96,79 @@ func getFlag(flag cli.Flag) Flag {
 	return Flag{}
 }
 
-func genVars(name string, flags []cli.Flag) string {
+func getFlags(flags []cli.Flag) []Flag {
+	vars := make([]Flag, 0)
+	for _, flag := range flags {
+		vars = append(vars, getFlag(flag))
+	}
+	return vars
+}
 
+func getFlagV2(flag cliv2.Flag) Flag {
+	strFlag, ok := flag.(*cliv2.StringFlag)
+	if ok {
+		return Flag{strFlag.Name, strFlag.EnvVars[0]}
+	}
+	boolTFlag, ok := flag.(*cliv2.BoolFlag)
+	if ok {
+		return Flag{boolTFlag.Name, boolTFlag.EnvVars[0]}
+	}
+	intFlag, ok := flag.(*cliv2.IntFlag)
+	if ok {
+		return Flag{intFlag.Name, intFlag.EnvVars[0]}
+	}
+	int64Flag, ok := flag.(*cliv2.Int64Flag)
+	if ok {
+		return Flag{int64Flag.Name, int64Flag.EnvVars[0]}
+	}
+	float64Flag, ok := flag.(*cliv2.Float64Flag)
+	if ok {
+		return Flag{float64Flag.Name, float64Flag.EnvVars[0]}
+	}
+	uint64Flag, ok := flag.(*cliv2.Uint64Flag)
+	if ok {
+		return Flag{uint64Flag.Name, uint64Flag.EnvVars[0]}
+	}
+	uintFlag, ok := flag.(*cliv2.UintFlag)
+	if ok {
+		return Flag{uintFlag.Name, uintFlag.EnvVars[0]}
+	}
+	durationFlag, ok := flag.(*cliv2.DurationFlag)
+	if ok {
+		return Flag{durationFlag.Name, durationFlag.EnvVars[0]}
+	}
+	stringSliceFlag, ok := flag.(*cliv2.StringSliceFlag)
+	if ok {
+		return Flag{stringSliceFlag.Name, stringSliceFlag.EnvVars[0]}
+	}
+	intSliceFlag, ok := flag.(*cliv2.IntSliceFlag)
+	if ok {
+		return Flag{intSliceFlag.Name, intSliceFlag.EnvVars[0]}
+	}
+	uintSliceFlag, ok := flag.(*cliv2.UintSliceFlag)
+	if ok {
+		return Flag{uintSliceFlag.Name, uintSliceFlag.EnvVars[0]}
+	}
+	log.Fatalln("Type not found", flag)
+	return Flag{}
+}
+
+func getFlagsV2(flags []cliv2.Flag) []Flag {
+	vars := make([]Flag, 0)
+	for _, flag := range flags {
+		vars = append(vars, getFlagV2(flag))
+	}
+	return vars
+}
+
+func genVars(name string, flags []Flag) string {
 	t, err := template.New("vars").Parse(myTemplate)
 	if err != nil {
 		panic(err)
 	}
 
-	vars := make([]Flag, 0)
-	for _, flag := range flags {
-		vars = append(vars, getFlag(flag))
-	}
-
 	var doc bytes.Buffer
-	err = t.Execute(&doc, ServiceConfig{name, vars})
+	err = t.Execute(&doc, ServiceConfig{name, flags})
 	if err != nil {
 		panic(err)
 	}
@@ -118,19 +179,22 @@ func genVars(name string, flags []cli.Flag) string {
 
 func main() {
 
-	configs := `package deploy
+	configs := `// THIS FILE IS AUTO-GENERATED. DO NOT EDIT.
+	// TO REGENERATE RUN inabox/deploy/codegen/gen.sh.
+	package deploy
 
 	import "reflect"
 	`
 
-	configs += genVars("DisperserVars", dis.Flags)
-	configs += genVars("BatcherVars", bat.Flags)
-	configs += genVars("EncoderVars", enc.Flags)
-	configs += genVars("OperatorVars", opr.Flags)
-	configs += genVars("RetrieverVars", retriever.Flags)
-	configs += genVars("ChurnerVars", churner.Flags)
-	configs += genVars("ControllerVars", controller.Flags)
-	configs += genVars("RelayVars", relay.Flags)
+	configs += genVars("DisperserVars", getFlags(dis.Flags))
+	configs += genVars("BatcherVars", getFlags(bat.Flags))
+	configs += genVars("EncoderVars", getFlags(enc.Flags))
+	configs += genVars("OperatorVars", getFlags(opr.Flags))
+	configs += genVars("RetrieverVars", getFlags(retriever.Flags))
+	configs += genVars("ChurnerVars", getFlags(churner.Flags))
+	configs += genVars("ControllerVars", getFlags(controller.Flags))
+	configs += genVars("RelayVars", getFlags(relay.Flags))
+	configs += genVars("ProxyVars", getFlagsV2(proxy.Flags))
 
 	fmt.Println(configs)
 

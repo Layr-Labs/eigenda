@@ -4,8 +4,9 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -26,7 +27,7 @@ type Blob struct {
 func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
 	// we check that length of bytes is <= blob length, rather than checking for equality, because it's possible
 	// that the bytes being deserialized have had trailing 0s truncated.
-	if !encoding.IsPowerOfTwo(blobLengthSymbols) {
+	if !math.IsPowerOfTwo(blobLengthSymbols) {
 		return nil, ErrBlobLengthSymbolsNotPowerOf2
 	}
 
@@ -58,6 +59,12 @@ func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
 // LenSymbols returns the number of coefficient symbols in the Blob.
 func (b *Blob) LenSymbols() uint32 {
 	return uint32(len(b.coeffPolynomial))
+}
+
+// Returns the blob's coefficient polynomial.
+// The returned slice should not be modified by the caller.
+func (b *Blob) GetCoefficients() []fr.Element {
+	return b.coeffPolynomial
 }
 
 // LenBytes returns the number of bytes in the Blob.
@@ -132,7 +139,7 @@ func (b *Blob) toEvalPoly() []fr.Element {
 // The passed coefficients slice will be used as is (no copying), and should have a power of 2 len,
 // otherwise an error will be returned.
 func blobFromCoefficients(coefficients []fr.Element) (*Blob, error) {
-	if !encoding.IsPowerOfTwo(len(coefficients)) {
+	if !math.IsPowerOfTwo(len(coefficients)) {
 		return nil, fmt.Errorf("blob must have a power of 2 coefficients, but got %d coefficients", len(coefficients))
 	}
 	return &Blob{

@@ -11,11 +11,11 @@ import (
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	logger                   = testutils.GetLogger()
+	logger                   = test.GetLogger()
 	localstackContainer      *testbed.LocalStackContainer
 	dynamoClient             commondynamodb.Client
 	clientConfig             commonaws.ClientConfig
@@ -106,7 +106,7 @@ func setup(_ *testing.M) {
 		logger.Fatal("Failed to generate private key:", err)
 	}
 
-	logger = testutils.GetLogger()
+	logger = test.GetLogger()
 	config := meterer.Config{
 		ChainReadTimeout: 3 * time.Second,
 		UpdateInterval:   1 * time.Second,
@@ -178,6 +178,7 @@ func teardown() {
 
 func TestMetererReservations(t *testing.T) {
 	ctx := t.Context()
+
 	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint64(5), nil)
 	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
 	paymentChainState.On("GetGlobalRatePeriodInterval", testifymock.Anything).Return(uint64(1), nil)

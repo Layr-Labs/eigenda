@@ -41,12 +41,7 @@ sequenceDiagram
   %% Blob Creation and Dispersal Flow
   B->>SP: Send payload
   Note over SP: Encode payload into blob
-  alt
-          SP->>D: GetBlobCommitment(blob)
-          D-->>SP: blob_commitment
-    else
-            SP->>SP: Compute commitment locally
-    end
+  Note over SP: Compute commitment locally using SRS points
   Note over SP: Create blob_header including payment_header
   SP->>D: DisperseBlob(blob, blob_header)
   D-->>SP: QUEUED status + blob_header_hash

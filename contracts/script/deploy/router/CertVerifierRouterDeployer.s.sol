@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
+import {IEigenDACertVerifier} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
+import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
@@ -12,27 +15,29 @@ struct ABNConfig {
     address certVerifier;
 }
 
-/**
- * @title CertVerifierRouterDeployer
- * @notice Deployment script for upgradable EigenDACertVerifierRouter
- * @dev This script deploys the EigenDACertVerifierRouter contract and initializes it through the proxy
- *      with the initial owner and cert verifier.
- * @dev Run with:
- *      forge script script/deploy/router/CertVerifierRouterDeployer.s.sol:CertVerifierRouterDeployer \
- *      --sig "run(string, string)" <config.json> <output.json> \
- *      --rpc-url $RPC \
- *      --private-key $PRIVATE_KEY \
- *      -vvvv \
- *      --etherscan-api-key $ETHERSCAN_API_KEY \
- *      --verify \
- *      --broadcast
- */
+/// @title CertVerifierRouterDeployer
+/// @notice Deployment script for upgradable EigenDACertVerifierRouter
+/// @dev This script deploys the EigenDACertVerifierRouter contract and initializes it through the proxy
+///      with the initial owner and cert verifier.
+/// @dev Run with:
+///      forge script script/deploy/router/CertVerifierRouterDeployer.s.sol:CertVerifierRouterDeployer \
+///      --sig "run(string, string)" <config.json> <output.json> \
+///      --rpc-url $RPC \
+///      --private-key $PRIVATE_KEY \
+///      -vvvv \
+///      --etherscan-api-key $ETHERSCAN_API_KEY \
+///      --verify \
+///      --broadcast
 contract CertVerifierRouterDeployer is Script, Test {
     // Configuration parameters
     address initialOwner;
     address proxyAdmin;
     uint32[] initABNs;
     address[] initCertVerifiers;
+
+    // Mappings for efficient duplicate detection
+    mapping(uint32 => bool) private seenBlockNumbers;
+    mapping(address => bool) private seenCertVerifiers;
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
         // 1. Read the configuration from the JSON input file
@@ -73,8 +78,29 @@ contract CertVerifierRouterDeployer is Script, Test {
         bytes memory raw = stdJson.parseRaw(configData, ".initABNConfigs");
         ABNConfig[] memory configs = abi.decode(raw, (ABNConfig[]));
         for (uint256 i; i < configs.length; i++) {
-            initABNs[i] = configs[i].blockNumber;
-            initCertVerifiers[i] = configs[i].certVerifier;
+            uint32 blockNumber = configs[i].blockNumber;
+            address certVerifier = configs[i].certVerifier;
+
+            // run user input safety checks
+            //
+            // 1) the cert verifier's dependencies appear correctly initialized
+            address thresholdRegistry = address(IEigenDACertVerifier(certVerifier).eigenDAThresholdRegistry());
+            IEigenDAThresholdRegistry(thresholdRegistry).nextBlobVersion();
+
+            address serviceManager = address(IEigenDACertVerifier(certVerifier).eigenDASignatureVerifier());
+            // 2) the signature verifier address can be cast to IServiceManager
+            IEigenDAServiceManager(serviceManager).taskNumber();
+
+            // 3) ensure no duplicate block numbers
+            assertFalse(seenBlockNumbers[blockNumber], "Duplicate block number detected");
+            seenBlockNumbers[blockNumber] = true;
+
+            // 4) ensure no duplicate cert verifiers
+            assertFalse(seenCertVerifiers[certVerifier], "Duplicate cert verifier detected");
+            seenCertVerifiers[certVerifier] = true;
+
+            initABNs.push(blockNumber);
+            initCertVerifiers.push(certVerifier);
         }
     }
 }

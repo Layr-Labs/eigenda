@@ -1,0 +1,87 @@
+### CORE ###
+
+# This address gets all privileges at the end of the deployment.
+initialOwner = "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
+
+# Parameters shared across various deployed contracts
+[initParams.shared]
+rewardsCoordinator = "0x29e8572678e0c272350aa0b4B8f304E47EBcd5e7"
+avsDirectory = "0xD58f6844f79eB1fbd9f7091d05f7cb30d3363926"
+delegationManager = "0x867837a9722C512e0862d8c2E15b8bE220E8b87d"
+initialPausedStatus = 0
+
+# Parameters for the pauser registry contract
+[initParams.core.pauserRegistry]
+pausers = []
+unpauser = "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
+
+### MIDDLEWARE ###
+
+# Parameters for the registry coordinator contract. Copied from mainnet.
+[initParams.middleware.registryCoordinator]
+churnApprover = "0x10089a1ae8fcaa528646fe8808b6e52078dbc164"
+minimumStakes = ["32000000000000000000","32000000000000000000"] # Strings for toml address parser compatibility reasons
+strategyParams = [
+    [
+        { 0_strategy = "0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0", 1_multiplier = 1000000000000000000 },
+        { 0_strategy = "0xF8a1a66130D614c7360e868576D5E59203475FE0", 1_multiplier = 1000000000000000000 },
+        { 0_strategy = "0x24579aD4fe83aC53546E5c2D3dF5F85D6383420d", 1_multiplier = 1000000000000000000 }
+    ],
+    [
+        { 0_strategy = "0xB27b10291DBFE6576d17afF3e251c954Ae14f1D3", 1_multiplier = 1000000000000000000 }
+    ]
+]
+operatorSetParams = [
+    { 0_maxOperatorCount = 200, 1_kickBIPsOfOperatorStake = 11000, 2_kickBIPsOfTotalStake = 50 },
+    { 0_maxOperatorCount = 200, 1_kickBIPsOfOperatorStake = 11000, 2_kickBIPsOfTotalStake = 50 }
+]
+
+[initParams.middleware.ejectionManager]
+ejectors = ["0x7aae084624a4a1e4b38531cd45c82da8c2fd4be0"]
+quorumEjectionParams = [
+    { 0_rateLimitWindow = 259200, 1_ejectableStakePercent = 3333 },
+    { 0_rateLimitWindow = 259200, 1_ejectableStakePercent = 3333 }
+]
+
+### EIGEN DA ###
+
+# Parameters for the Threshold Registry contract
+[initParams.eigenDA.thresholdRegistry]
+# Hex format to match current on-chain format
+quorumAdversaryThresholdPercentages = "0x2121"
+# Hex format to match current on-chain format
+quorumConfirmationThresholdPercentages = "0x3737"
+quorumNumbersRequired = "0x0001"
+offchainDerivationVersion = 0
+versionedBlobParams = [
+    { 0_maxNumOperators = 3537, 1_numChunks = 8192, 2_codingRate = 8 }
+]
+
+# Parameters for the payment vault contract
+[initParams.eigenDA.paymentVault]
+minNumSymbols = 4096
+pricePerSymbol = 447000000
+priceUpdateCooldown = 1
+globalSymbolsPerPeriod = 131072
+reservationPeriodInterval = 300
+globalRatePeriodInterval = 30
+
+# Parameters for the rewards initiator contract
+[initParams.eigenDA.serviceManager]
+rewardsInitiator = "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
+batchConfirmers = ["0x3aaabc5361fa6fcd4ac4623253a709a2e476577b"]
+
+# Parameters for the cert verifier
+[initParams.eigenDA.certVerifier]
+confirmationThreshold = 55
+adversaryThreshold = 33
+quorumNumbersRequired = [0, 1]
+offchainDerivationVersion = 0
+
+[initParams.eigenDA.disperser]
+dispersers = ["0x34200f3326bfa13df47fdbe39e51a0df5512aa22"]
+
+[initParams.eigenDA.relay]
+relays = [
+    { relayAddress = "0xa3f41f215e06de8439e9f8b767976647de8c44cc" , relayURL = "relay-0-testnet-hoodi.eigenda.xyz"}
+]

@@ -8,14 +8,14 @@ LDFLAGSSTRING +=-X main.Version=$(GIT_TAG)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
 build:
-	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
+	env GOOS=$(GOOS) GOARCH=$(GOARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
 
 clean:
-	rm bin/eigenda-proxy
+	rm -rf bin/eigenda-proxy
 
 docker-build:
 	# we only use this to build the docker image locally, so we give it the dev tag as a reminder
-	cd ../.. && docker buildx bake proxy --load
+	cd ../.. && SEMVER=$(GIT_TAG) GIT_SHORT_SHA=$(GIT_COMMIT) GITDATE=$(BUILD_TIME) docker buildx bake proxy --load
 
 run-memstore-server: build
 	./bin/eigenda-proxy --memstore.enabled --metrics.enabled  --storage.backends-to-enable v2
@@ -27,24 +27,27 @@ disperse-test-blob:
 test-unit:
 	gotestsum --format pkgname-and-test-fails -- -short -parallel 4 ./...
 
-# E2E tests using local memstore, leveraging op-e2e framework. Also tests the standard client against the proxy.
+# TODO: Add support for E2E network tests with a `hoodi` testnet backend.
+
+# E2E tests using local memstore. Also tests the standard client against the proxy.
 test-e2e-local:
 	BACKEND=memstore gotestsum --format testname -- -v -timeout 10m ./test/e2e -parallel 8
 
-# E2E tests using holesky testnet backend, leveraging op-e2e framework. Also tests the standard client against the proxy.
-# If holesky tests are failing, consider checking https://dora.holesky.ethpandaops.io/epochs for block production status.
-test-e2e-testnet:
-	BACKEND=testnet gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
+# E2E tests using hoodi testnet backend.
+test-e2e-hoodi-testnet:
+	BACKEND=hoodi-testnet gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
-## Equivalent to `test-e2e-testnet`, but against preprod instead of testnet
-test-e2e-preprod:
-	BACKEND=preprod gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
+# E2E tests using hoodi preprod backend. this is expected to fail since retrieval ingress is turned off.
+# this is useful for testing CertVerifier deployments in the hoodi-preprod and serves utility as a validation
+# tool which is why it will never be ran in monorepo CI.
+test-e2e-hoodi-preprod:
+	BACKEND=hoodi-preprod gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
-## Equivalent to `test-e2e-testnet`, bug against sepolia network instead of holesky
+# E2E tests using sepolia testnet backend. Also tests the standard client against the proxy.
+# If sepolia tests are failing, consider checking https://sepolia.etherscan.io/ for block production status.
 test-e2e-sepolia:
 	BACKEND=sepolia gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
-# Very simple fuzzer which generates random bytes arrays and sends them to the proxy using the standard client.
 # To clean the cached corpus, run `go clean -fuzzcache` before running this.
 test-fuzz:
 	go test ./test/fuzz -fuzz=FuzzProxyClientServerV1 -fuzztime=1m

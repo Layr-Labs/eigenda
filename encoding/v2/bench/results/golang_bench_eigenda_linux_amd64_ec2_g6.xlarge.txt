@@ -1,0 +1,30 @@
+2025/12/11 18:46:04 maxprocs: Leaving GOMAXPROCS=4: CPU quota undefined
+goos: linux
+goarch: amd64
+cpu: AMD EPYC 7R13 Processor
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^17_bytes-4         	     394	   2979124 ns/op	 1720456 B/op	      10 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^20_bytes-4         	      44	  26778092 ns/op	13648060 B/op	      12 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^21_bytes-4         	      19	  52666287 ns/op	27279545 B/op	      12 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^24_bytes-4         	       2	 636299766 ns/op	218120544 B/op	      15 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^17_bytes-4             	      13	  86425360 ns/op	  764819 B/op	     222 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^20_bytes-4             	       3	 386400024 ns/op	42896384 B/op	     289 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^21_bytes-4             	       2	 710828570 ns/op	82608152 B/op	     287 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^24_bytes-4             	       1	4716600425 ns/op	537946160 B/op	     249 allocs/op
+BenchmarkRSBackendIcicle/2^15_Frs-4                                      	    2167	    479736 ns/op	 1049072 B/op	      13 allocs/op
+BenchmarkRSBackendIcicle/2^18_Frs-4                                      	     500	   2212759 ns/op	 8389107 B/op	      13 allocs/op
+BenchmarkRSBackendIcicle/2^19_Frs-4                                      	     258	   4454670 ns/op	16777719 B/op	      13 allocs/op
+BenchmarkRSBackendIcicle/2^22_Frs-4                                      	      28	  49790924 ns/op	134218270 B/op	      14 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^17_bytes-4                   	      82	  14243066 ns/op	 4560379 B/op	   16438 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^20_bytes-4                   	      21	  53607366 ns/op	34694805 B/op	   16441 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^21_bytes-4                   	      10	 111008909 ns/op	70806735 B/op	   16442 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^24_bytes-4                   	       1	1161719044 ns/op	805666024 B/op	   16476 allocs/op
+BenchmarkMultiproofGenerationIcicle/Multiproof_size_2^17_bytes-4         	      18	  61864593 ns/op	 3967032 B/op	   24637 allocs/op
+BenchmarkMultiproofGenerationIcicle/Multiproof_size_2^20_bytes-4         	      16	  67923052 ns/op	12224407 B/op	   24721 allocs/op
+BenchmarkMultiproofGenerationIcicle/Multiproof_size_2^21_bytes-4         	      14	  89145573 ns/op	21661581 B/op	   24817 allocs/op
+BenchmarkMultiproofGenerationIcicle/Multiproof_size_2^24_bytes-4         	       4	 268642522 ns/op	153782200 B/op	   26163 allocs/op
+BenchmarkFrameGenerationIcicle/Multiproof_size_2^17_bytes-4              	      20	  55552193 ns/op	11294856 B/op	   49384 allocs/op
+BenchmarkFrameGenerationIcicle/Multiproof_size_2^20_bytes-4              	      15	  74381950 ns/op	52006542 B/op	   49503 allocs/op
+BenchmarkFrameGenerationIcicle/Multiproof_size_2^21_bytes-4              	       9	 117601538 ns/op	103015183 B/op	   49692 allocs/op
+BenchmarkFrameGenerationIcicle/Multiproof_size_2^24_bytes-4              	       1	1267413298 ns/op	1396524456 B/op	   52914 allocs/op
+PASS
+ok  	command-line-arguments	199.526s

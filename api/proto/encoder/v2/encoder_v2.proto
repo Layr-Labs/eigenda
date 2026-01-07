@@ -15,6 +15,9 @@ service Encoder {
 message EncodeBlobRequest {
   bytes blob_key = 1;
   EncodingParams encoding_params = 2;
+  // TODO(samlaf): we should change this to uint32, since blobLengths are uint32 everywhere.
+  // However this is a minor breaking change and would require some coordination for our
+  // deployments (encoder client/server), so leaving as is for now.
   uint64 blob_size = 3;
 }
 
@@ -24,10 +27,11 @@ message EncodingParams {
   uint64 num_chunks = 2;
 }
 
-// FragmentInfo contains metadata about the encoded fragments
+// FragmentInfo contains metadata about the encoded chunks. This name is misleading, but since it shows up in many
+// places, it is best not to attempt to rename it for now.
 message FragmentInfo {
-  uint32 total_chunk_size_bytes = 1;
-  uint32 fragment_size_bytes = 2;
+  // The number of symbols in each frame.
+  uint32 symbols_per_frame = 1;
 }
 
 // EncodeBlobReply contains metadata about the encoded chunks

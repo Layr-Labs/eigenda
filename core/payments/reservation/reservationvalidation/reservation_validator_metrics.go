@@ -1,0 +1,181 @@
+package reservationvalidation
+
+import (
+	"github.com/Layr-Labs/eigenda/common/nameremapping"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/docker/go-units"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+// Tracks metrics for the [ReservationPaymentValidator]
+type ReservationValidatorMetrics struct {
+	// Although payments internally tracks things in symbols, the consumer of metrics wants to see things in bytes.
+	// For a histogram, it's actually not possible to automatically rename bucket labels in grafana, so using
+	// symbols here causes dashboards to be less intuitive.
+	reservationBytes                 prometheus.Histogram
+	reservationSymbolsTotal          *prometheus.CounterVec
+	reservationDispersalsTotal       *prometheus.CounterVec
+	reservationInsufficientBandwidth prometheus.Counter
+	reservationQuorumNotPermitted    prometheus.Counter
+	reservationTimeOutOfRange        prometheus.Counter
+	reservationTimeMovedBackward     prometheus.Counter
+	reservationUnexpectedErrors      prometheus.Counter
+	enablePerAccountMetrics          bool
+	userAccountRemapping             map[string]string
+}
+
+func NewReservationValidatorMetrics(
+	registry *prometheus.Registry,
+	namespace string,
+	subsystem string,
+	enablePerAccountMetrics bool,
+	userAccountRemapping map[string]string,
+) *ReservationValidatorMetrics {
+	if registry == nil {
+		return nil
+	}
+
+	bytes := promauto.With(registry).NewHistogram(
+		prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "reservation_bytes",
+			Subsystem: subsystem,
+			Help: "Distribution of byte counts for successful reservation payments. " +
+				"Counts reflect actual dispersed bytes, not billed bytes (which may be higher due to min size).",
+			// Buckets chosen to go from min to max blob sizes (128KiB -> 16MiB)
+			Buckets: prometheus.ExponentialBuckets(128*units.KiB, 2, 8),
+		},
+	)
+
+	symbolsTotal := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "reservation_symbols_total",
+			Subsystem: subsystem,
+			Help: "Total number of symbols validated for successful reservation payments. " +
+				"Counts reflect actual dispersed symbols, not billed symbols (which may be higher due to min size).",
+		},
+		[]string{"account_id"},
+	)
+
+	dispersalsTotal := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "reservation_dispersals_total",
+			Subsystem: subsystem,
+			Help:      "Total number of dispersals successfully paid for by reservation.",
+		},
+		[]string{"account_id"},
+	)
+
+	insufficientBandwidth := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "reservation_insufficient_bandwidth_count",
+			Subsystem: subsystem,
+			Help:      "Total number of reservation payments rejected due to insufficient bandwidth",
+		},
+	)
+
+	quorumNotPermitted := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "reservation_quorum_not_permitted_count",
+			Subsystem: subsystem,
+			Help:      "Total number of reservation payments rejected due to unpermitted quorums",
+		},
+	)
+
+	timeOutOfRange := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "reservation_time_out_of_range_count",
+			Subsystem: subsystem,
+			Help:      "Total number of reservation payments rejected due to time out of range",
+		},
+	)
+
+	timeMovedBackward := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "reservation_time_moved_backward_count",
+			Subsystem: subsystem,
+			Help:      "Total number of reservation payments rejected due to time moving backwards",
+		},
+	)
+
+	unexpectedErrors := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "reservation_unexpected_errors_count",
+			Subsystem: subsystem,
+			Help:      "Total number of unexpected errors during reservation payment authorization",
+		},
+	)
+
+	return &ReservationValidatorMetrics{
+		reservationBytes:                 bytes,
+		reservationSymbolsTotal:          symbolsTotal,
+		reservationDispersalsTotal:       dispersalsTotal,
+		reservationInsufficientBandwidth: insufficientBandwidth,
+		reservationQuorumNotPermitted:    quorumNotPermitted,
+		reservationTimeOutOfRange:        timeOutOfRange,
+		reservationTimeMovedBackward:     timeMovedBackward,
+		reservationUnexpectedErrors:      unexpectedErrors,
+		enablePerAccountMetrics:          enablePerAccountMetrics,
+		userAccountRemapping:             userAccountRemapping,
+	}
+}
+
+// Records a successful reservation payment
+func (m *ReservationValidatorMetrics) RecordSuccess(accountID string, symbolCount uint32) {
+	if m == nil {
+		return
+	}
+	m.reservationBytes.Observe(float64(symbolCount) * encoding.BYTES_PER_SYMBOL)
+
+	labelValue := nameremapping.GetAccountLabel(accountID, m.userAccountRemapping, m.enablePerAccountMetrics)
+	m.reservationSymbolsTotal.WithLabelValues(labelValue).Add(float64(symbolCount))
+	m.reservationDispersalsTotal.WithLabelValues(labelValue).Inc()
+}
+
+// Increments the counter for when the holder of a reservation lacks bandwidth to perform the dispersal
+func (m *ReservationValidatorMetrics) IncrementInsufficientBandwidth() {
+	if m == nil {
+		return
+	}
+	m.reservationInsufficientBandwidth.Inc()
+}
+
+// Increments the counter for quorum not permitted errors
+func (m *ReservationValidatorMetrics) IncrementQuorumNotPermitted() {
+	if m == nil {
+		return
+	}
+	m.reservationQuorumNotPermitted.Inc()
+}
+
+// Increments the counter for time out of range errors
+func (m *ReservationValidatorMetrics) IncrementTimeOutOfRange() {
+	if m == nil {
+		return
+	}
+	m.reservationTimeOutOfRange.Inc()
+}
+
+// Increments the counter for time moved backward errors
+func (m *ReservationValidatorMetrics) IncrementTimeMovedBackward() {
+	if m == nil {
+		return
+	}
+	m.reservationTimeMovedBackward.Inc()
+}
+
+// Increments the counter for unexpected errors
+func (m *ReservationValidatorMetrics) IncrementUnexpectedErrors() {
+	if m == nil {
+		return
+	}
+	m.reservationUnexpectedErrors.Inc()
+}

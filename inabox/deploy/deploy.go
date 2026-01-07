@@ -10,29 +10,17 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-)
-
-const (
-	churnerImage   = "ghcr.io/layr-labs/eigenda/churner:local"
-	disImage       = "ghcr.io/layr-labs/eigenda/disperser:local"
-	encoderImage   = "ghcr.io/layr-labs/eigenda/encoder:local"
-	batcherImage   = "ghcr.io/layr-labs/eigenda/batcher:local"
-	nodeImage      = "ghcr.io/layr-labs/eigenda/node:local"
-	retrieverImage = "ghcr.io/layr-labs/eigenda/retriever:local"
-	relayImage     = "ghcr.io/layr-labs/eigenda/relay:local"
 )
 
 // convertToTestbedPrivateKeys converts the current PkConfig to testbed.PrivateKeyMaps
@@ -120,7 +108,6 @@ func (env *Config) deployEigenDAContracts() error {
 }
 
 // Deploys a EigenDA experiment
-// TODO: Figure out what necessitates experiment nomenclature
 func (env *Config) DeployExperiment() error {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
 		return fmt.Errorf("error changing directories: %w", err)
@@ -156,7 +143,15 @@ func (env *Config) DeployExperiment() error {
 			return fmt.Errorf("error getting latest block number: %w", err)
 		}
 
-		err = env.deploySubgraphs(startBlock)
+		config := testbed.SubgraphDeploymentConfig{
+			RootPath:            env.rootPath,
+			RegistryCoordinator: env.EigenDA.RegistryCoordinator,
+			BlsApkRegistry:      env.EigenDA.BlsApkRegistry,
+			ServiceManager:      env.EigenDA.ServiceManager,
+			Logger:              logger,
+		}
+
+		err = testbed.DeploySubgraphs(config, startBlock)
 		if err != nil {
 			return fmt.Errorf("error deploying subgraphs: %w", err)
 		}
@@ -167,55 +162,17 @@ func (env *Config) DeployExperiment() error {
 	env.localstackEndpoint = "http://localhost:4570"
 	env.localstackRegion = "us-east-1"
 
-	logger.Info("Generating disperser keypair")
-	err = env.GenerateDisperserKeypair()
-	if err != nil {
-		logger.Errorf("could not generate disperser keypair: %v", err)
-		panic(err)
-	}
-
-	logger.Info("Generating variables")
-	env.GenerateAllVariables()
-
-	// Register blob versions, relays, and disperser keypair
-	if env.EigenDA.Deployer != "" && env.IsEigenDADeployed() {
-		env.performRegistrations()
-	}
-
 	logger.Info("Test environment has successfully deployed!")
 	return nil
 }
 
-// performRegistrations handles blob version, relay, and disperser keypair registrations.
-func (env *Config) performRegistrations() {
-	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{env.Deployers[0].RPC},
-		PrivateKeyString: env.Pks.EcdsaMap[env.EigenDA.Deployer].PrivateKey[2:],
-		NumConfirmations: 0,
-		NumRetries:       3,
-	}, gcommon.Address{}, logger)
-	if err != nil {
-		logger.Errorf("could not create eth client for registration: %v", err)
-		return
-	}
-
-	logger.Info("Registering blob versions and relays")
-	env.RegisterBlobVersionAndRelays(ethClient)
-
-	// Only register disperser keypair if we have a valid address (i.e., localstack was available)
-	if env.DisperserAddress != (gcommon.Address{}) {
-		logger.Info("Registering disperser keypair")
-		err = env.RegisterDisperserKeypair(ethClient)
-		if err != nil {
-			logger.Errorf("could not register disperser keypair: %v", err)
-		}
-	} else {
-		logger.Info("Skipping disperser keypair registration (localstack not available)")
-	}
-}
-
 // GenerateDisperserKeypair generates a disperser keypair using AWS KMS.
 func (env *Config) GenerateDisperserKeypair() error {
+	// Skip if we already have a disperser key
+	if env.DisperserKMSKeyID != "" {
+		logger.Info("Disperser keypair already exists, skipping generation")
+		return nil
+	}
 
 	// Generate a keypair in AWS KMS
 
@@ -252,8 +209,22 @@ func (env *Config) GenerateDisperserKeypair() error {
 	return nil
 }
 
+// PerformDisperserRegistrations registers the disperser keypair onchain.
+func (env *Config) PerformDisperserRegistrations(ethClient common.EthClient) {
+	// Only register disperser keypair if we have a valid address
+	if env.DisperserAddress != (gcommon.Address{}) {
+		logger.Info("Registering disperser keypair")
+		err := env.registerDisperserKeypair(ethClient)
+		if err != nil {
+			logger.Errorf("could not register disperser keypair: %v", err)
+		}
+	} else {
+		logger.Info("Skipping disperser keypair registration")
+	}
+}
+
 // RegisterDisperserKeypair registers the disperser's public key on-chain.
-func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
+func (env *Config) registerDisperserKeypair(ethClient common.EthClient) error {
 	// Write the disperser's public key to on-chain storage
 	writer, err := eth.NewWriter(
 		logger,
@@ -265,7 +236,7 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 		return fmt.Errorf("could not create writer: %v", err)
 	}
 
-	err = writer.SetDisperserAddress(context.Background(), env.DisperserAddress)
+	err = writer.SetDisperserAddress(context.Background(), 0, env.DisperserAddress)
 	if err != nil {
 		return fmt.Errorf("could not set disperser address: %v", err)
 	}
@@ -292,10 +263,12 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	return fmt.Errorf("timed out waiting for disperser address to be set")
 }
 
-// RegisterBlobVersionAndRelays initializes blob versions in ThresholdRegistry contract
-// and relays in RelayRegistry contract
-func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
+// RegisterBlobVersions initializes blob versions in ThresholdRegistry contract
+func (env *Config) RegisterBlobVersions(ethClient common.EthClient) {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
+	if (dasmAddr == gcommon.Address{}) {
+		logger.Fatal("Service Manager address is nil")
+	}
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
 	if err != nil {
 		logger.Fatal("Error creating EigenDAServiceManager contract", "error", err)
@@ -326,7 +299,18 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 			logger.Fatal("Error sending blob version transaction", "error", err)
 		}
 	}
+}
 
+// RegisterRelays initializes relays in RelayRegistry contract
+func (env *Config) RegisterRelays(ethClient common.EthClient, relayURLs []string, relayAddress gcommon.Address) {
+	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
+	if (dasmAddr == gcommon.Address{}) {
+		logger.Fatal("Service Manager address is nil")
+	}
+	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
+	if err != nil {
+		logger.Fatal("Error creating EigenDAServiceManager contract", "error", err)
+	}
 	relayAddr, err := contractEigenDAServiceManager.EigenDARelayRegistry(&bind.CallOpts{})
 	if err != nil {
 		logger.Fatal("Error getting relay registry address", "error", err)
@@ -335,12 +319,13 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	if err != nil {
 		logger.Fatal("Error creating relay registry contract", "error", err)
 	}
-
-	ethAddr := ethClient.GetAccountAddress()
-	for _, relayVars := range env.Relays {
-		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
+	opts, err := ethClient.GetNoSendTransactOpts()
+	if err != nil {
+		logger.Fatal("Error getting transaction opts", "error", err)
+	}
+	for _, url := range relayURLs {
 		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.EigenDATypesV2RelayInfo{
-			RelayAddress: ethAddr,
+			RelayAddress: relayAddress,
 			RelayURL:     url,
 		})
 		if err != nil {
@@ -353,8 +338,9 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	}
 }
 
-// TODO: Supply the test path to the runner utility
-func (env *Config) StartBinaries() {
+// StartBinaries starts the EigenDA binaries
+// forTests: if true, skips churner (which runs as goroutine in tests)
+func (env *Config) StartBinaries(forTests bool) {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
 		logger.Fatal("Error changing directories", "error", err)
 	}
@@ -364,8 +350,16 @@ func (env *Config) StartBinaries() {
 		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	logger.Info("Starting binaries")
-	err := execCmd("./bin.sh", []string{"start-detached"}, []string{}, true)
+	var command string
+	if forTests {
+		logger.Info("Starting binaries for tests (without churner)")
+		command = "start-detached-for-tests"
+	} else {
+		logger.Info("Starting binaries for devnet")
+		command = "start-detached"
+	}
+
+	err := execCmd("./bin.sh", []string{command}, []string{}, true)
 	if err != nil {
 		logger.Fatal("Failed to start binaries, check testdata directory for more information", "error", err)
 	}
@@ -373,7 +367,7 @@ func (env *Config) StartBinaries() {
 	logger.Info("Binaries started successfully!")
 }
 
-// TODO: Supply the test path to the runner utility
+// StopBinaries stops all running binaries
 func (env *Config) StopBinaries() {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
 		logger.Fatal("Error changing directories", "error", err)
@@ -387,40 +381,5 @@ func (env *Config) StopBinaries() {
 	err := execCmd("./bin.sh", []string{"stop-detached"}, []string{}, true)
 	if err != nil {
 		logger.Fatal("Failed to stop binaries", "error", err)
-	}
-}
-
-func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) {
-	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
-		logger.Fatal("Error changing directories", "error", err)
-	}
-
-	// Log the current working directory (absolute path)
-	if cwd, err := os.Getwd(); err == nil {
-		logger.Info("Successfully changed to absolute path", "path", cwd)
-	}
-
-	socket := string(core.MakeOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT, operator.NODE_V2_DISPERSAL_PORT, operator.NODE_V2_RETRIEVAL_PORT))
-
-	envVars := []string{
-		"NODE_OPERATION=" + operation,
-		"NODE_ECDSA_KEY_FILE=" + operator.NODE_ECDSA_KEY_FILE,
-		"NODE_BLS_KEY_FILE=" + operator.NODE_BLS_KEY_FILE,
-		"NODE_ECDSA_KEY_PASSWORD=" + operator.NODE_ECDSA_KEY_PASSWORD,
-		"NODE_BLS_KEY_PASSWORD=" + operator.NODE_BLS_KEY_PASSWORD,
-		"NODE_SOCKET=" + socket,
-		"NODE_QUORUM_ID_LIST=" + operator.NODE_QUORUM_ID_LIST,
-		"NODE_CHAIN_RPC=" + operator.NODE_CHAIN_RPC,
-		"NODE_EIGENDA_DIRECTORY=" + operator.NODE_EIGENDA_DIRECTORY,
-		"NODE_BLS_OPERATOR_STATE_RETRIVER=" + operator.NODE_BLS_OPERATOR_STATE_RETRIVER,
-		"NODE_EIGENDA_SERVICE_MANAGER=" + operator.NODE_EIGENDA_SERVICE_MANAGER,
-		"NODE_CHURNER_URL=" + operator.NODE_CHURNER_URL,
-		"NODE_NUM_CONFIRMATIONS=0",
-	}
-
-	err := execCmd("./node-plugin.sh", []string{}, envVars, true)
-
-	if err != nil {
-		logger.Fatal("Failed to run node plugin", "error", err)
 	}
 }

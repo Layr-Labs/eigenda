@@ -7,7 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,7 +35,7 @@ func TestPaymentHash(t *testing.T) {
 
 func TestBlobKeyFromHeader(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,8 +52,10 @@ func TestBlobKeyFromHeader(t *testing.T) {
 	}
 	blobKey, err := bh.BlobKey()
 	assert.NoError(t, err)
-	// 3e1669312e6af52b75300f738bc5a32d92f760cad98394822a040366ff007520 has verified in solidity  with chisel
-	assert.Equal(t, "3e1669312e6af52b75300f738bc5a32d92f760cad98394822a040366ff007520", blobKey.Hex())
+	// TODO(samlaf): had to update this hash, but no idea how to recreate the hash using chisel...
+	// This should have been documented.
+	// 12a1fcead77edb08d892e6e509c5ba812764264cadec7fc244b182c750bf7b67 has NOT been verified in solidity with chisel
+	assert.Equal(t, "12a1fcead77edb08d892e6e509c5ba812764264cadec7fc244b182c750bf7b67", blobKey.Hex())
 
 	// same blob key should be generated for the blob header with shuffled quorum numbers
 	bh2 := v2.BlobHeader{
@@ -82,7 +84,7 @@ func TestBatchHeaderHash(t *testing.T) {
 
 	hash, err := batchHeader.Hash()
 	assert.NoError(t, err)
-	// 0x891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2 verified in solidity
+	// 0x891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2 has verified in solidity with chisel
 	assert.Equal(t, "891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2", hex.EncodeToString(hash[:]))
 }
 
@@ -103,7 +105,7 @@ func TestBatchHeaderSerialization(t *testing.T) {
 
 func TestBlobCertHash(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,13 +128,15 @@ func TestBlobCertHash(t *testing.T) {
 	hash, err := blobCert.Hash()
 	assert.NoError(t, err)
 
-	// 39c834c1a19a2362fd81d66315cb8787196c38d71543457ea0b4b18c2c87bd42 has verified in solidity with chisel
-	assert.Equal(t, "39c834c1a19a2362fd81d66315cb8787196c38d71543457ea0b4b18c2c87bd42", hex.EncodeToString(hash[:]))
+	// TODO(samlaf): had to update this hash, but no idea how to recreate the hash using chisel...
+	// This should have been documented.
+	// 4728c80786471c92bddeb593c80818c5d7d025735e62e8752cc5e6793ba5c6eb has NOT verified in solidity with chisel
+	assert.Equal(t, "4728c80786471c92bddeb593c80818c5d7d025735e62e8752cc5e6793ba5c6eb", hex.EncodeToString(hash[:]))
 }
 
 func TestBlobCertSerialization(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}

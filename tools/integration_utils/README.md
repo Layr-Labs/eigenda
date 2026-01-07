@@ -10,6 +10,9 @@ Parse and display EigenDA certificates from hex-encoded RLP strings. Hex strings
 ### `gas-exhaustion-cert-meter` 
 Estimates gas costs for verifying EigenDA certificates when all operators are non-signers (worst case scenario).
 
+### `validate-cert-verifier`
+Validates the CertVerifier contract by dispersing a test blob to EigenDA, constructing a `DA Cert` from the disperser's reply, and verifying that the CertVerifier contract correctly verifies the returned certificate using `checkDACert`. This is useful for integration testing and validating CertVerifier deployments.
+
 ## Usage
 
 ```bash
@@ -24,4 +27,11 @@ make build
 
 # Estimate gas costs
 ./bin/integration_utils gas-exhaustion-cert-meter --help
+
+# Validate CertVerifier contract
+./bin/integration_utils validate-cert-verifier \
+  --eigenda-network hoodi_testnet \
+  --json-rpc-url <RPC_URL> \
+  --signer-auth-key <PRIVATE_KEY> \
+  --cert-verifier-address <CONTRACT_ADDRESS>
 ```

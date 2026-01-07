@@ -15,19 +15,20 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	awss3 "github.com/Layr-Labs/eigenda/common/s3/aws"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	p "github.com/Layr-Labs/eigenda/encoding/v1/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
@@ -36,7 +37,7 @@ import (
 )
 
 var (
-	logger              = tu.GetLogger()
+	logger              = test.GetLogger()
 	localstackContainer *testbed.LocalStackContainer
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
@@ -155,7 +156,16 @@ func buildBlobStore(t *testing.T, logger logging.Logger) *blobstore.BlobStore {
 	cfg.SecretAccessKey = "localstack"
 	cfg.EndpointURL = localstackHost
 
-	client, err := s3.NewClient(ctx, *cfg, logger)
+	client, err := awss3.NewAwsS3Client(
+		ctx,
+		logger,
+		cfg.EndpointURL,
+		cfg.Region,
+		cfg.FragmentParallelismFactor,
+		cfg.FragmentParallelismConstant,
+		cfg.AccessKey,
+		cfg.SecretAccessKey,
+	)
 	require.NoError(t, err)
 
 	err = client.CreateBucket(ctx, bucketName)
@@ -175,15 +185,24 @@ func buildChunkStore(t *testing.T, logger logging.Logger) (chunkstore.ChunkReade
 		EndpointURL:     localstackHost,
 	}
 
-	client, err := s3.NewClient(ctx, cfg, logger)
+	client, err := awss3.NewAwsS3Client(
+		ctx,
+		logger,
+		cfg.EndpointURL,
+		cfg.Region,
+		cfg.FragmentParallelismFactor,
+		cfg.FragmentParallelismConstant,
+		cfg.AccessKey,
+		cfg.SecretAccessKey,
+	)
 	require.NoError(t, err)
 
 	err = client.CreateBucket(ctx, bucketName)
 	require.NoError(t, err)
 
 	// intentionally use very small fragment size
-	chunkWriter := chunkstore.NewChunkWriter(logger, client, bucketName, 32)
-	chunkReader := chunkstore.NewChunkReader(logger, client, bucketName)
+	chunkWriter := chunkstore.NewChunkWriter(client, bucketName)
+	chunkReader := chunkstore.NewChunkReader(client, bucketName)
 
 	return chunkReader, chunkWriter
 }
@@ -211,7 +230,7 @@ func mockBlobParamsMap(t *testing.T) map[v2.BlobVersion]*core.BlobVersionParamet
 func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 	t.Helper()
 
-	data := tu.RandomBytes(225)
+	data := random.RandomBytes(225)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 	commitments, err := prover.GetCommitmentsForPaddedLength(data)
@@ -225,7 +244,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         gethcommon.BytesToAddress(tu.RandomBytes(20)).Hex(),
+			AccountId:         gethcommon.BytesToAddress(random.RandomBytes(20)).Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},

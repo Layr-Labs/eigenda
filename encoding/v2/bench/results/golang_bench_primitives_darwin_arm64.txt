@@ -1,0 +1,20 @@
+2025/12/11 12:22:19 maxprocs: Leaving GOMAXPROCS=12: CPU quota undefined
+goos: darwin
+goarch: arm64
+cpu: Apple M4 Pro
+BenchmarkFFTFr/2^9_elements-12     	   23896	     51410 ns/op	   32769 B/op	       2 allocs/op
+BenchmarkFFTFr/2^14_elements-12    	     360	   3462381 ns/op	 1048588 B/op	       2 allocs/op
+BenchmarkFFTFr/2^19_elements-12    	       6	 175619694 ns/op	33554488 B/op	       3 allocs/op
+BenchmarkFFTFr/2^22_elements-12    	       1	1704412041 ns/op	268435696 B/op	       6 allocs/op
+BenchmarkFFTG1/2^13_Points-12      	       2	 588340479 ns/op	34463064 B/op	  430732 allocs/op
+BenchmarkFFTG1/2^14_Points-12      	       1	1210468541 ns/op	72731472 B/op	  909930 allocs/op
+BenchmarkGnarkParallelIFFTG1/2^13_G1Points-12         	       4	 273163031 ns/op	23984666 B/op	  276102 allocs/op
+BenchmarkGnarkParallelIFFTG1/2^14_G1Points-12         	       2	 644395688 ns/op	51307132 B/op	  592514 allocs/op
+BenchmarkMSMG1/2^12_Points-12                         	     406	   3225973 ns/op	  271474 B/op	     155 allocs/op
+BenchmarkMSMG1/2^15_Points-12                         	      72	  15772374 ns/op	 6957318 B/op	      98 allocs/op
+BenchmarkMSMG1/2^19_Points-12                         	       7	 170650137 ns/op	114302765 B/op	      97 allocs/op
+BenchmarkMSMG2/2^12_Points-12                         	     123	   9602570 ns/op	  279706 B/op	     155 allocs/op
+BenchmarkMSMG2/2^15_Points-12                         	      27	  41354985 ns/op	17970551 B/op	     120 allocs/op
+BenchmarkMSMG2/2^19_Points-12                         	       3	 437840528 ns/op	211822672 B/op	      98 allocs/op
+PASS
+ok  	command-line-arguments	78.924s

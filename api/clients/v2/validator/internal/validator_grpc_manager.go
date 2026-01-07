@@ -75,15 +75,15 @@ func (m *validatorGRPCManager) DownloadChunks(
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMessageSize)),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection to operator %s: %w", operatorID.Hex(), err)
+	}
 	defer func() {
 		err := conn.Close()
 		if err != nil {
 			m.logger.Error("validator retriever failed to close connection", "err", err)
 		}
 	}()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection to operator %s: %w", operatorID.Hex(), err)
-	}
 
 	client := grpcnode.NewRetrievalClient(conn)
 	request := &grpcnode.GetChunksRequest{

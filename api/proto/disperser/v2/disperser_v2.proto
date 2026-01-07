@@ -3,6 +3,7 @@ package disperser.v2;
 
 import "common/common.proto";
 import "common/v2/common_v2.proto";
+import "validator/signing_rate.proto";
 
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2";
 
@@ -21,8 +22,7 @@ service Disperser {
   // It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
   // and don't have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
   //
-  // For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
-  // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
+  // DEPRECATED: This method is deprecated and will be removed in a future release.
   rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
 
   // GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
@@ -34,6 +34,9 @@ service Disperser {
   // For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
+
+  // GetValidatorSigningRate returns the signing rate of a validator during a time range.
+  rpc GetValidatorSigningRate(GetValidatorSigningRateRequest) returns (GetValidatorSigningRateReply) {}
 }
 
 // Requests and Replies
@@ -61,6 +64,21 @@ message DisperseBlobRequest {
   common.v2.BlobHeader blob_header = 2;
   // signature over keccak hash of the blob_header that can be verified by blob_header.payment_header.account_id
   bytes signature = 3;
+
+  // Signature to anchor the request to a specific domain, chainID, and disperserID.
+  // Signature is produced over Keccak256(domain || chainID || disperserID || blobKey).
+  // When present, the disperser will validate this signature against blob_header.payment_header.account_id.
+  bytes anchor_signature = 5;
+
+  // The disperser ID that this request is intended for.
+  // The disperser will reject requests where this doesn't match the expected value, if anchor_signature is present.
+  uint32 disperser_id = 6;
+
+  // The chain ID that this request is valid for.
+  // Represented as bytes to accommodate uint256 values (32 bytes, big-endian).
+  // Should match the Ethereum chain ID where the EigenDA contracts are deployed.
+  // The disperser will reject requests where this doesn't match the expected value, if anchor_signature is present.
+  bytes chain_id = 7;
 }
 
 // A reply to a DisperseBlob request.
@@ -258,4 +276,28 @@ message PeriodRecord {
   uint32 index = 1;
   // symbol usage recorded
   uint64 usage = 2;
+}
+
+// A request to get the signing rate of a validator during a time range. The time range of the returned data may not
+// exactly match the requested time range, as the data is aggregated into fixed size buckets.
+message GetValidatorSigningRateRequest {
+  // The unique identifier of the validator (i.e. the operator ID).
+  bytes validator_id = 1;
+  // The quorum to fetch signing rate data for.
+  uint32 quorum = 2;
+  // The start of the time range to query the signing rate for, in seconds since Unix epoch. If there is a bucket that
+  // starts before but ends after this timestamp, that bucket will be included in the response, even though
+  // some of its data is before the requested start time.
+  uint64 start_timestamp = 3;
+  // The end time of the range, in seconds since Unix epoch (exclusive). If a bucket's start time is greater than
+  // or equal to this timestamp, it will not be included in the response. If a bucket's start time is before this 
+  // timestamp and its end time is after or equal to this timestamp, it will be included in the response, even though
+  // some of its data is after the requested end time.
+  uint64 end_timestamp = 4;
+}
+
+// A reply containing the signing rate of a validator during a time range.
+message GetValidatorSigningRateReply {
+  // The signing rate of the validator during the time range.
+  validator.ValidatorSigningRate validator_signing_rate = 1;
 }

@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import "../MockEigenDADeployer.sol";
 import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
-import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDACertTypes} from "src/integrations/cert/EigenDACertTypes.sol";
-import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
-import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
-import {console2} from "forge-std/console2.sol";
 
 contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
     using stdStorage for StdStorage;
@@ -28,15 +24,19 @@ contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
         eigenDACertVerifierRouter.initialize(address(this), rbns, certVerifiers); // adding a default cert verifier that should fail.
     }
 
-    function _getDACert(uint256 seed) internal returns (EigenDACertTypes.EigenDACertV3 memory) {
+    function _getDACert(uint256 seed) internal returns (EigenDACertTypes.EigenDACertV4 memory) {
         (EigenDATypesV2.SignedBatch memory signedBatch, EigenDATypesV2.BlobInclusionInfo memory blobInclusionInfo,) =
             _getSignedBatchAndBlobVerificationProof(seed, 0);
 
         (DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertLib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
 
-        return EigenDACertTypes.EigenDACertV3(
-            signedBatch.batchHeader, blobInclusionInfo, nonSignerStakesAndSignature, signedQuorumNumbers
+        return EigenDACertTypes.EigenDACertV4(
+            signedBatch.batchHeader,
+            blobInclusionInfo,
+            nonSignerStakesAndSignature,
+            signedQuorumNumbers,
+            offchainDerivationVersion
         );
     }
 
@@ -90,7 +90,7 @@ contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
     }
 
     function test_verifyDACert(uint256 seed1, uint256 seed2, uint256 seed3) public {
-        EigenDACertTypes.EigenDACertV3 memory cert = _getDACert(seed1);
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(seed1);
         uint32 rbn = cert.batchHeader.referenceBlockNumber;
         vm.expectRevert();
         eigenDACertVerifierRouter.checkDACert(abi.encode(cert));

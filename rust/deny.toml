@@ -1,0 +1,49 @@
+[advisories]
+ignore = [
+  { id = "RUSTSEC-2025-0055", reason = "tracing-subscriber vulnerability only affects dev dependencies through arkworks/risc0-zkvm" },
+  { id = "RUSTSEC-2024-0388", reason = "derivative is unmaintained proc-macro (compile-time only, no runtime security risk) used via arkworks dev dependencies" },
+  { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained proc-macro (compile-time only, no runtime security risk) used by alloy ecosystem" },
+  { id = "RUSTSEC-2025-0134", reason = "temporary ignore while waiting for testcontainers->bollard->rustls-pemfile dependency chain update." },
+]
+
+[licenses]
+allow = [
+  "Apache-2.0",
+  "MIT",
+  "0BSD",
+  "Unicode-3.0",
+  "Zlib",
+  "BSD-3-Clause",
+  "CC0-1.0",
+  "ISC",
+  "Unlicense",
+  "OpenSSL",
+  "CDLA-Permissive-2.0",
+]
+
+[licenses.private]
+ignore = true
+
+[[licenses.clarify]]
+crate = "eigenda-srs-data"
+expression = "MIT"
+license-files = []
+
+[[licenses.clarify]]
+crate = "eigenda-ethereum"
+expression = "MIT"
+license-files = []
+
+[[licenses.clarify]]
+crate = "eigenda-proxy"
+expression = "MIT"
+license-files = []
+
+[[licenses.clarify]]
+crate = "eigenda-verification"
+expression = "MIT"
+license-files = []
+
+[sources]
+allow-git = ["https://github.com/paradigmxyz/reth.git"]
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

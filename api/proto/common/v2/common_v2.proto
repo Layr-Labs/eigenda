@@ -38,7 +38,6 @@ message BlobHeader {
   // Users can check their reserved quorum numbers on the IPaymentVault's reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10
   repeated uint32 quorum_numbers = 2;
   // commitment is the KZG commitment to the blob.
-  // This commitment can either be constructed locally, or obtained by using the disperser's GetBlobCommitment RPC (see disperser_v2.proto).
   common.BlobCommitment commitment = 3;
   // payment_header contains payment information for the blob
   PaymentHeader payment_header = 4;

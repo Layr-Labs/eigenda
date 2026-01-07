@@ -2,14 +2,12 @@
 pragma solidity ^0.8.9;
 
 import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
-import {IPauserRegistry} from
-    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {
-    ServiceManagerBase,
-    IAVSDirectory,
-    IRewardsCoordinator,
-    IServiceManager
-} from "lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
+    IPauserRegistry
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
+import {ServiceManagerBase, IAVSDirectory, IRewardsCoordinator} from 
+
+"lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
 import {BLSSignatureChecker} from "lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
@@ -18,17 +16,14 @@ import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.s
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 
-/**
- * @title Primary entrypoint for procuring services from EigenDA.
- * @author Layr Labs, Inc.
- * @notice This contract is used for:
- * - initializing the data store by the disperser
- * - confirming the data store by the disperser with inferred aggregated signatures of the quorum
- * - freezing operators as the result of various "challenges"
- */
+/// @title Primary entrypoint for procuring services from EigenDA.
+/// @author Layr Labs, Inc.
+/// @notice This contract is used for:
+/// - initializing the data store by the disperser
+/// - confirming the data store by the disperser with inferred aggregated signatures of the quorum
+/// - freezing operators as the result of various "challenges"
 contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBase, BLSSignatureChecker, Pausable {
     uint8 internal constant PAUSED_CONFIRM_BATCH = 0;
 
@@ -51,10 +46,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__avsDirectory, __rewardsCoordinator, __registryCoordinator, __stakeRegistry)
         EigenDAServiceManagerStorage(
-            __eigenDAThresholdRegistry,
-            __eigenDARelayRegistry,
-            __paymentVault,
-            __eigenDADisperserRegistry
+            __eigenDAThresholdRegistry, __eigenDARelayRegistry, __paymentVault, __eigenDADisperserRegistry
         )
     {
         _disableInitializers();
@@ -75,12 +67,10 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         }
     }
 
-    /**
-     * @notice This function is used for
-     * - submitting data availabilty certificates for EigenDA V1,
-     * - check that the aggregate signature is valid,
-     * - and check whether quorum has been achieved or not.
-     */
+    /// @notice This function is used for
+    /// - submitting data availability certificates for EigenDA V1,
+    /// - check that the aggregate signature is valid,
+    /// - and check whether quorum has been achieved or not.
     function confirmBatch(
         DATypesV1.BatchHeader calldata batchHeader,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature
@@ -105,8 +95,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         bytes32 reducedBatchHeaderHash = keccak256(
             abi.encode(
                 DATypesV1.ReducedBatchHeader({
-                    blobHeadersRoot: batchHeader.blobHeadersRoot,
-                    referenceBlockNumber: batchHeader.referenceBlockNumber
+                    blobHeadersRoot: batchHeader.blobHeadersRoot, referenceBlockNumber: batchHeader.referenceBlockNumber
                 })
             )
         );

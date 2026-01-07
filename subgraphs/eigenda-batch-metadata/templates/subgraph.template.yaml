@@ -1,0 +1,28 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: EigenDAServiceManager
+    network: {{network}}
+    source:
+      address: "{{EigenDAServiceManager_address}}"
+      abi: EigenDAServiceManager
+      startBlock: {{EigenDAServiceManager_startBlock}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - ExampleEntity
+      abis:
+        - name: EigenDAServiceManager
+          file: ./abis/EigenDAServiceManager.json
+      callHandlers:
+        - function: confirmBatch((bytes32,bytes,bytes,uint32),(uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]))
+          handler: handleConfirmBatchCall
+      eventHandlers:
+        - event: BatchConfirmed(indexed bytes32,uint32)
+          handler: handleBatchConfirmed
+          receipt: true
+      file: ./src/edasm.ts

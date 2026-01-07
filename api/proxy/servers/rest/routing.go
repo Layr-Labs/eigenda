@@ -34,7 +34,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		"/"+
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
-			"{"+routingVarNameKeccakCommitmentHex+"}",
+			"{"+routingVarNameKeccakCommitmentHex+":[0-9a-fA-F]{64}}", // 32 byte hex string
 		middleware.WithCertMiddlewares(
 			svr.handleGetOPKeccakCommitment,
 			svr.log,
@@ -48,7 +48,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":01}"+ // 01 for generic commitments
 			"{da_layer_byte:[0-9a-fA-F]{2}}"+ // should always be 0x00 for eigenDA but we let others through to return a 404
-			"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
+			"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // Should be either 0x00 (v1), 0x01 (v2), 0x02 (v3) but we let others through to return a 404
 			"{"+routingVarNamePayloadHex+"}",
 		middleware.WithCertMiddlewares(
 			svr.handleGetOPGenericCommitment,
@@ -82,7 +82,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		"/"+
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
-			"{"+routingVarNameKeccakCommitmentHex+"}",
+			"{"+routingVarNameKeccakCommitmentHex+":[0-9a-fA-F]{64}}", // 32 byte hex string
 		middleware.WithCertMiddlewares(
 			svr.handlePostOPKeccakCommitment,
 			svr.log,
@@ -122,12 +122,15 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 	// Note: A common pattern for admin endpoints is to generate a random API key on startup for authentication.
 	// Since the proxy isn't meant to be exposed publicly, we haven't implemented this here, but it's something
 	// that might be done in the future.
-	if svr.config.IsAPIEnabled(AdminAPIType) {
+	if svr.config.APIsEnabled.Admin {
 		svr.log.Warn("Admin API endpoints are enabled")
 		// Admin endpoints to check and set EigenDA backend used for dispersal
 		r.HandleFunc("/admin/eigenda-dispersal-backend", svr.handleGetEigenDADispersalBackend).Methods("GET")
 		r.HandleFunc("/admin/eigenda-dispersal-backend", svr.handleSetEigenDADispersalBackend).Methods("PUT")
 	}
+
+	// proxy compatibility config endpoint
+	r.HandleFunc("/config", svr.handleGetCompatibilityConfig).Methods("GET")
 }
 
 func notCommitmentModeStandard(r *http.Request, _ *mux.RouteMatch) bool {
@@ -167,7 +170,6 @@ func parseReturnEncodedPayloadQueryParam(r *http.Request) bool {
 	if !exists || len(returnEncodedPayloadValues) == 0 {
 		return false
 	}
-	fmt.Println("returnEncodedPayloadValues:", returnEncodedPayloadValues)
 	returnEncodedPayload := strings.ToLower(returnEncodedPayloadValues[0])
 	if returnEncodedPayload == "" || returnEncodedPayload == "true" || returnEncodedPayload == "1" {
 		return true

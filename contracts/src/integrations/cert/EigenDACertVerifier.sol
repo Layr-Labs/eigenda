@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {
-    IEigenDACertVerifier,
-    IEigenDACertVerifierBase,
-    IVersionedEigenDACertVerifier
-} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
+import {IEigenDACertVerifier} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
+import {IEigenDACertVerifierBase} from "src/integrations/cert/interfaces/IEigenDACertVerifierBase.sol";
+import {IVersionedEigenDACertVerifier} from "src/integrations/cert/interfaces/IVersionedEigenDACertVerifier.sol";
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
 
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
 import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
 
@@ -26,6 +23,19 @@ contract EigenDACertVerifier is
     IVersionedEigenDACertVerifier,
     IEigenDASemVer
 {
+    /// @notice The maximum calldata bytes length for a cert to be considered valid
+    uint256 internal constant MAX_CALLDATA_BYTES_LENGTH = 262_144;
+
+    /// @notice The maximum gas spent on abi decode
+    uint256 internal constant MAX_ABI_DECODE_GAS = 2_097_152;
+
+    /// @notice The maximum number of quorums this contract supports
+    uint256 internal constant MAX_QUORUM_COUNT = 5;
+
+    /// @notice The maximum number of non-signers this contract supports. This count may include duplicates when
+    ///         an operator belongs to multiple quorums
+    uint256 internal constant MAX_NONSIGNER_COUNT_ALL_QUORUM = 415;
+
     error InvalidSecurityThresholds();
     error InvalidQuorumNumbersRequired(uint256 length);
 
@@ -42,9 +52,12 @@ contract EigenDACertVerifier is
     DATypesV1.SecurityThresholds internal _securityThresholds;
 
     bytes internal _quorumNumbersRequired;
+    uint16 internal _offchainDerivationVersion;
 
-    uint8 internal constant MAJOR_VERSION = 3;
-    uint8 internal constant MINOR_VERSION = 1;
+    uint8 internal constant CERT_VERSION = 4;
+
+    uint8 internal constant MAJOR_VERSION = 4;
+    uint8 internal constant MINOR_VERSION = 0;
     uint8 internal constant PATCH_VERSION = 0;
 
     /// @notice Status codes for certificate verification results
@@ -55,21 +68,20 @@ contract EigenDACertVerifier is
         // The below 4 status codes are kept for backwards compatibility, but are no longer used.
         // We previously had plans to have more granular error codes, but decided this was not necessary,
         // and the only signal useful to offchain is to separate certs into: success, invalid (400), and bugs (500).
-        // TODO(4.0.0): get rid of these
         UNUSED_HISTORICAL_INVALID_INCLUSION_PROOF,
         UNUSED_HISTORICAL_SECURITY_ASSUMPTIONS_NOT_MET,
         UNUSED_HISTORICAL_BLOB_QUORUMS_NOT_SUBSET,
         UNUSED_HISTORICAL_REQUIRED_QUORUMS_NOT_SUBSET,
         INVALID_CERT, // 400: Certificate is invalid due to some revert from the verification library
         INTERNAL_ERROR // 500: Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
-
     }
 
     constructor(
         IEigenDAThresholdRegistry initEigenDAThresholdRegistry,
         IEigenDASignatureVerifier initEigenDASignatureVerifier,
         DATypesV1.SecurityThresholds memory initSecurityThresholds,
-        bytes memory initQuorumNumbersRequired
+        bytes memory initQuorumNumbersRequired,
+        uint16 initOffchainDerivationVersion
     ) {
         if (initSecurityThresholds.confirmationThreshold <= initSecurityThresholds.adversaryThreshold) {
             revert InvalidSecurityThresholds();
@@ -81,14 +93,15 @@ contract EigenDACertVerifier is
         _eigenDASignatureVerifier = initEigenDASignatureVerifier;
         _securityThresholds = initSecurityThresholds;
         _quorumNumbersRequired = initQuorumNumbersRequired;
+        _offchainDerivationVersion = initOffchainDerivationVersion;
     }
 
-    /// @notice Decodes a certificate from bytes to an EigenDACertV3
+    /// @notice Decodes a certificate from bytes to an EigenDACertV4
     /// @dev This function is external for the purpose of try/catch'ing it inside checkDACert,
     /// and should be considered an implementation detail. Do not rely on this function being
     /// part of the public interface of this contract.
-    function _decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
-        return abi.decode(data, (CT.EigenDACertV3));
+    function _decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV4 memory cert) {
+        return abi.decode(data, (CT.EigenDACertV4));
     }
 
     /// @inheritdoc IEigenDACertVerifierBase
@@ -99,12 +112,22 @@ contract EigenDACertVerifier is
     /// which is also useful for optimistic rollup one step prover contracts.
     /// @dev Make sure to call this at a block number that is > RBN, otherwise this function will
     /// return an INVALID_CERT status code because of a require in the BLSSignatureChecker library that we use.
-    /// TODO(4.0.0): return (uint8, bytes) instead to include the revert reason.
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
-        CT.EigenDACertV3 memory daCert;
+        // This is a coarse bound on maximal input size
+        // if calldata size is larger than MAX_CALLDATA_BYTES_LENGTH, the system treats the input as invalid.
+        // Thus prevents abi decode from having out of gas issue, making honest party unable to invoke this function.
+        // The number is chosen such that it
+        // 1. should not prevent valid use case that there is a valid cert more than this size
+        // 2. should prevent a malicious abiEncodedCert that contains too much data that triggers out of gas for
+        //    abi.decode.
+        if (abiEncodedCert.length > MAX_CALLDATA_BYTES_LENGTH) {
+            return uint8(StatusCode.INVALID_CERT);
+        }
+
+        CT.EigenDACertV4 memory daCert;
         // We try catch this here because decoding error would appear as a Panic,
         // which we consider bugs in the try/catch for the checkDACertReverts call below.
-        try this._decodeCert(abiEncodedCert) returns (CT.EigenDACertV3 memory _daCert) {
+        try this._decodeCert{gas: MAX_ABI_DECODE_GAS}(abiEncodedCert) returns (CT.EigenDACertV4 memory _daCert) {
             daCert = _daCert;
         } catch {
             return uint8(StatusCode.INVALID_CERT);
@@ -118,12 +141,14 @@ contract EigenDACertVerifier is
         // between different execution environments: EVM running onchain during optimistic rollup fraud proofs, zkVM, eth-call with higher gas limit.
         try this.checkDACertReverts(daCert) {
             return uint8(StatusCode.SUCCESS);
-        } catch Error(string memory) /*reason*/ {
+        } catch Error(string memory) {
+            /*reason*/
             // This matches any require(..., "string reason") revert that is pre custom errors,
             // which many of our current eigenlayer-middleware dependencies like the BLSSignatureChecker still use. See:
             // https://github.com/Layr-Labs/eigenlayer-middleware/blob/fe5834371caed60c1d26ab62b5519b0cbdcb42fa/src/BLSSignatureChecker.sol#L96
             return uint8(StatusCode.INVALID_CERT);
-        } catch Panic(uint256) /*errorCode*/ {
+        } catch Panic(uint256) {
+            /*errorCode*/
             // This matches any panic (e.g. arithmetic overflow, division by zero, invalid array access, etc.),
             // which means a bug or misconfiguration of the CertVerifier contract itself.
             return uint8(StatusCode.INTERNAL_ERROR);
@@ -145,9 +170,16 @@ contract EigenDACertVerifier is
     /// @notice Check a DA cert's validity
     /// @param daCert The EigenDA certificate
     /// @dev This function will revert if the certificate is invalid.
-    function checkDACertReverts(CT.EigenDACertV3 calldata daCert) external view {
+    function checkDACertReverts(CT.EigenDACertV4 calldata daCert) external view {
         CertLib.checkDACert(
-            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, daCert, _securityThresholds, _quorumNumbersRequired
+            _eigenDAThresholdRegistry,
+            _eigenDASignatureVerifier,
+            daCert,
+            _securityThresholds,
+            _quorumNumbersRequired,
+            _offchainDerivationVersion,
+            MAX_QUORUM_COUNT,
+            MAX_NONSIGNER_COUNT_ALL_QUORUM
         );
     }
 
@@ -171,9 +203,14 @@ contract EigenDACertVerifier is
         return _quorumNumbersRequired;
     }
 
+    /// @inheritdoc IEigenDACertVerifier
+    function offchainDerivationVersion() external view returns (uint16) {
+        return _offchainDerivationVersion;
+    }
+
     /// @inheritdoc IVersionedEigenDACertVerifier
     function certVersion() external pure returns (uint8) {
-        return MAJOR_VERSION;
+        return CERT_VERSION;
     }
 
     /// @inheritdoc IEigenDASemVer

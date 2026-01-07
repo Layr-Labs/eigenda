@@ -4,11 +4,11 @@ import (
 	"path"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,9 +20,8 @@ func rebaseTest(
 	preserveOriginal bool,
 	verbose bool,
 ) {
-
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
+	t.Helper()
+	logger := test.GetLogger()
 
 	if overlap > 0 && preserveOriginal {
 		require.Fail(t, "Invalid test configuration, cannot preserve original when there is overlap")
@@ -297,9 +296,7 @@ func TestRebaseNtoNOverlap(t *testing.T) {
 func TestRebaseSnapshot(t *testing.T) {
 	t.Parallel()
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	rand := random.NewTestRandom()
 	testDir := t.TempDir()
 

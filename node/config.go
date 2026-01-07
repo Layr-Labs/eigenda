@@ -10,8 +10,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
+	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
 	"github.com/docker/go-units"
 
@@ -54,22 +56,24 @@ type Config struct {
 	EnableTestMode                  bool
 	OverrideBlockStaleMeasure       uint64
 	OverrideStoreDurationBlocks     uint64
-	QuorumIDList                    []core.QuorumID
-	DbPath                          string
-	LogPath                         string
-	ID                              core.OperatorID
-	EigenDADirectory                string
-	PubIPProviders                  []string
-	PubIPCheckInterval              time.Duration
-	ChurnerUrl                      string
-	DataApiUrl                      string
-	NumBatchValidators              int
-	NumBatchDeserializationWorkers  int
-	EnableGnarkBundleEncoding       bool
-	ClientIPHeader                  string
-	ChurnerUseSecureGrpc            bool
-	RelayUseSecureGrpc              bool
-	RelayMaxMessageSize             uint
+	// If set, overrides the default TTL for v2 chunks
+	OverrideV2Ttl                  time.Duration
+	QuorumIDList                   []core.QuorumID
+	DbPath                         string
+	LogPath                        string
+	ID                             core.OperatorID
+	EigenDADirectory               string
+	PubIPProviders                 []string
+	PubIPCheckInterval             time.Duration
+	ChurnerUrl                     string
+	DataApiUrl                     string
+	NumBatchValidators             int
+	NumBatchDeserializationWorkers int
+	EnableGnarkBundleEncoding      bool
+	ClientIPHeader                 string
+	ChurnerUseSecureGrpc           bool
+	RelayUseSecureGrpc             bool
+	RelayMaxMessageSize            uint
 	// The number of connections to establish with each relay node.
 	RelayConnectionPoolSize        uint
 	ReachabilityPollIntervalSec    uint64
@@ -93,8 +97,6 @@ type Config struct {
 	PprofHttpPort string
 	EnablePprof   bool
 
-	// if true then the node will not authenticate StoreChunks requests from dispersers (v2 only)
-	DisableDispersalAuthentication bool
 	// the size of the cache for storing public keys of dispersers
 	DispersalAuthenticationKeyCacheSize int
 	// the timeout for disperser keys (after which the disperser key is reloaded from the chain)
@@ -189,7 +191,23 @@ type Config struct {
 	StoreChunksBufferSizeBytes uint64
 
 	// The size of the cache for operator states. Cache will remember operator states for this number of unique blocks.
-	operatorStateCacheSize uint64
+	OperatorStateCacheSize uint64
+
+	// Controls how often the ejection sentinel checks to see if the node is being ejected. This should be configured
+	// to be smaller than the onchain ejection period.
+	EjectionSentinelPeriod time.Duration
+
+	// If true, the ejection sentinel will attempt to contest ejection by sending a transaction to cancel the ejection.
+	EjectionDefenseEnabled bool
+
+	// Under normal circumstances, honest validators should not contest an ejection if they are running software that
+	// does not meet the minimum version number as defined onchain. However, if the governing body in control of
+	// setting the minimum version number goes rogue, honest validators may want to contest ejection regardless of the
+	// claimed minimum version number.
+	IgnoreVersionForEjectionDefense bool
+
+	ReservationLedgerCacheConfig   reservationvalidation.ReservationLedgerCacheConfig
+	EnablePerAccountPaymentMetrics bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -228,12 +246,19 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	// Configuration options that require the Node Operator ECDSA key at runtime
 	registerNodeAtStart := ctx.GlobalBool(flags.RegisterAtNodeStartFlag.Name)
 	pubIPCheckInterval := ctx.GlobalDuration(flags.PubIPCheckIntervalFlag.Name)
-	needECDSAKey := registerNodeAtStart || pubIPCheckInterval > 0
+	ejectionDefenseEnabled := ctx.GlobalBool(flags.EjectionDefenseEnabledFlag.Name)
+	needECDSAKey := registerNodeAtStart || pubIPCheckInterval > 0 || ejectionDefenseEnabled
 	if registerNodeAtStart && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" || ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
 		return nil, fmt.Errorf("%s and %s are required if %s is enabled", flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name, flags.RegisterAtNodeStartFlag.Name)
 	}
 	if pubIPCheckInterval > 0 && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" || ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
 		return nil, fmt.Errorf("%s and %s are required if %s is > 0", flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name, flags.PubIPCheckIntervalFlag.Name)
+	}
+	if ejectionDefenseEnabled && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" ||
+		ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
+		return nil, fmt.Errorf("%s and %s are required if %s is enabled",
+			flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name,
+			flags.EjectionDefenseEnabledFlag.Name)
 	}
 
 	var ethClientConfig geth.EthClientConfig
@@ -365,6 +390,20 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		}
 	}
 
+	reservationLedgerCacheConfig, err := reservationvalidation.NewReservationLedgerCacheConfig(
+		ctx.GlobalInt(flags.ReservationMaxLedgersFlag.Name),
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		120*time.Second,
+		// this is hardcoded: it's a parameter just in case, but it's never expected to change
+		ratelimit.OverfillOncePermitted,
+		ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger cache config: %w", err)
+	}
+
 	return &Config{
 		Hostname:                            ctx.GlobalString(flags.HostnameFlag.Name),
 		DispersalPort:                       dispersalPort,
@@ -389,6 +428,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LevelDBDisableSeeksCompactionV1:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV1Flag.Name),
 		LevelDBSyncWritesV1:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV1Flag.Name),
 		OverrideStoreDurationBlocks:         ctx.GlobalUint64(flags.OverrideStoreDurationBlocksFlag.Name),
+		OverrideV2Ttl:                       ctx.GlobalDuration(flags.OverrideV2TtlFlag.Name),
 		QuorumIDList:                        ids,
 		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),
 		EthClientConfig:                     ethClientConfig,
@@ -416,30 +456,34 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		GRPCMsgSizeLimitV2:                  ctx.GlobalInt(flags.GRPCMsgSizeLimitV2Flag.Name),
 		PprofHttpPort:                       ctx.GlobalString(flags.PprofHttpPort.Name),
 		EnablePprof:                         ctx.GlobalBool(flags.EnablePprof.Name),
-		DisableDispersalAuthentication:      ctx.GlobalBool(flags.DisableDispersalAuthenticationFlag.Name),
 		DispersalAuthenticationKeyCacheSize: ctx.GlobalInt(flags.DispersalAuthenticationKeyCacheSizeFlag.Name),
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
 		LittDBWriteCacheSizeBytes: uint64(ctx.GlobalFloat64(
 			flags.LittDBWriteCacheSizeGBFlag.Name) * units.GiB),
-		LittDBWriteCacheSizeFraction:  ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),
-		LittDBReadCacheSizeBytes:      uint64(ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name) * units.GiB),
-		LittDBReadCacheSizeFraction:   ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
-		LittDBStoragePaths:            ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
-		LittRespectLocks:              ctx.GlobalBool(flags.LittRespectLocksFlag.Name),
-		LittMinimumFlushInterval:      ctx.GlobalDuration(flags.LittMinimumFlushIntervalFlag.Name),
-		LittSnapshotDirectory:         ctx.GlobalString(flags.LittSnapshotDirectoryFlag.Name),
-		DownloadPoolSize:              ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
-		GetChunksHotCacheReadLimitMB:  ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
-		GetChunksHotBurstLimitMB:      ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
-		GetChunksColdCacheReadLimitMB: ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
-		GetChunksColdBurstLimitMB:     ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
-		GCSafetyBufferSizeBytes:       uint64(ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name) * units.GiB),
-		GCSafetyBufferSizeFraction:    ctx.GlobalFloat64(flags.GCSafetyBufferSizeFractionFlag.Name),
-		StoreChunksBufferTimeout:      ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
-		StoreChunksBufferSizeFraction: ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
-		StoreChunksBufferSizeBytes:    uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
-		operatorStateCacheSize:        ctx.GlobalUint64(flags.OperatorStateCacheSizeFlag.Name),
+		LittDBWriteCacheSizeFraction:    ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),
+		LittDBReadCacheSizeBytes:        uint64(ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name) * units.GiB),
+		LittDBReadCacheSizeFraction:     ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
+		LittDBStoragePaths:              ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
+		LittRespectLocks:                ctx.GlobalBool(flags.LittRespectLocksFlag.Name),
+		LittMinimumFlushInterval:        ctx.GlobalDuration(flags.LittMinimumFlushIntervalFlag.Name),
+		LittSnapshotDirectory:           ctx.GlobalString(flags.LittSnapshotDirectoryFlag.Name),
+		DownloadPoolSize:                ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
+		GetChunksHotCacheReadLimitMB:    ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
+		GetChunksHotBurstLimitMB:        ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
+		GetChunksColdCacheReadLimitMB:   ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
+		GetChunksColdBurstLimitMB:       ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
+		GCSafetyBufferSizeBytes:         uint64(ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name) * units.GiB),
+		GCSafetyBufferSizeFraction:      ctx.GlobalFloat64(flags.GCSafetyBufferSizeFractionFlag.Name),
+		StoreChunksBufferTimeout:        ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
+		StoreChunksBufferSizeFraction:   ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
+		StoreChunksBufferSizeBytes:      uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
+		OperatorStateCacheSize:          ctx.GlobalUint64(flags.OperatorStateCacheSizeFlag.Name),
+		EjectionSentinelPeriod:          ctx.GlobalDuration(flags.EjectionSentinelPeriodFlag.Name),
+		EjectionDefenseEnabled:          ctx.GlobalBool(flags.EjectionDefenseEnabledFlag.Name),
+		IgnoreVersionForEjectionDefense: ctx.GlobalBool(flags.IgnoreVersionForEjectionDefenseFlag.Name),
+		ReservationLedgerCacheConfig:    reservationLedgerCacheConfig,
+		EnablePerAccountPaymentMetrics:  ctx.GlobalBool(flags.EnablePerAccountPaymentMetricsFlag.Name),
 	}, nil
 }

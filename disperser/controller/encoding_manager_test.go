@@ -5,12 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/encoding"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -18,6 +15,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	dispmock "github.com/Layr-Labs/eigenda/disperser/mock"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/gammazero/workerpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +34,6 @@ type testComponents struct {
 	EncodingClient  *dispmock.MockEncoderClientV2
 	ChainReader     *coremock.MockWriter
 	MockPool        *commonmock.MockWorkerpool
-	BlobSet         *controller.MockBlobSet
 	LivenessChan    chan healthcheck.HeartbeatMessage
 }
 
@@ -111,7 +109,7 @@ func TestGetRelayKeys(t *testing.T) {
 }
 
 func TestEncodingManagerHandleBatch(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
@@ -125,11 +123,8 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	c := newTestComponents(t, false)
-	c.BlobSet.On("Contains", mock.Anything).Return(false)
-	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
-		TotalChunkSizeBytes: 100,
-		FragmentSizeBytes:   1024 * 1024 * 4,
+		SymbolsPerFrame: 8,
 	}, nil)
 
 	// start a goroutine to collect heartbeats
@@ -145,8 +140,6 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
 	c.Pool.StopWait()
-	c.BlobSet.AssertCalled(t, "Contains", blobKey1)
-	c.BlobSet.AssertCalled(t, "AddBlob", blobKey1)
 
 	// give the signals a moment to be sent
 	time.Sleep(10 * time.Millisecond)
@@ -176,71 +169,13 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 	for _, relayKey := range fetchedCert.RelayKeys {
 		require.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
-	require.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
-	require.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
-
-	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
-}
-
-func TestEncodingManagerHandleBatchDedup(t *testing.T) {
-	ctx := context.Background()
-	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
-	now := time.Now()
-	metadata1 := &commonv2.BlobMetadata{
-		BlobHeader: blobHeader1,
-		BlobStatus: commonv2.Queued,
-		Expiry:     uint64(now.Add(time.Hour).Unix()),
-		NumRetries: 0,
-		UpdatedAt:  uint64(now.UnixNano()),
-	}
-	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
-	require.NoError(t, err)
-
-	c := newTestComponents(t, false)
-	c.BlobSet.On("Contains", blobKey1).Return(true).Once()
-	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
-		TotalChunkSizeBytes: 100,
-		FragmentSizeBytes:   1024 * 1024 * 4,
-	}, nil)
-
-	// start a goroutine to collect heartbeats
-	var seen []healthcheck.HeartbeatMessage
-	done := make(chan struct{})
-	go func() {
-		for hb := range c.LivenessChan {
-			seen = append(seen, hb)
-		}
-		close(done)
-	}()
-
-	err = c.EncodingManager.HandleBatch(ctx)
-	require.ErrorContains(t, err, "no blobs to encode")
-	c.Pool.StopWait()
-	c.BlobSet.AssertCalled(t, "Contains", blobKey1)
-	c.BlobSet.AssertNotCalled(t, "AddBlob", blobKey1)
-
-	// give the signals a moment to be sent
-	time.Sleep(10 * time.Millisecond)
-	// signal that we're done listening
-	close(c.LivenessChan)
-	<-done
-
-	// now assert on what we saw
-	require.NotEmpty(t, seen, "expected at least one heartbeat")
-	for _, hb := range seen {
-		require.Equal(t, "encodingManager", hb.Component)
-	}
-	// timestamps are non‐decreasing
-	for i := 1; i < len(seen); i++ {
-		prev, curr := seen[i-1].Timestamp, seen[i].Timestamp
-		require.True(t, !curr.Before(prev), "timestamps should not decrease")
-	}
+	require.Equal(t, fetchedFragmentInfo.SymbolsPerFrame, uint32(8))
 
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
 
 func TestEncodingManagerHandleManyBatches(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	numBlobs := 12
 	keys := make([]corev2.BlobKey, 0)
 	headers := make([]*corev2.BlobHeader, 0)
@@ -262,8 +197,6 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 	}
 
 	c := newTestComponents(t, true)
-	c.BlobSet.On("Contains", mock.Anything).Return(false)
-	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	numIterations := (numBlobs + int(c.EncodingManager.MaxNumBlobsPerIteration) - 1) / int(c.EncodingManager.MaxNumBlobsPerIteration)
 	c.MockPool.On("Submit", mock.Anything).Return(nil).Times(numBlobs + numIterations)
 
@@ -344,7 +277,7 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 }
 
 func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	c := newTestComponents(t, false)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
@@ -380,7 +313,7 @@ func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
 }
 
 func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
@@ -394,12 +327,9 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	c := newTestComponents(t, false)
-	c.BlobSet.On("Contains", mock.Anything).Return(false)
-	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Once()
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
-		TotalChunkSizeBytes: 100,
-		FragmentSizeBytes:   1024 * 1024 * 4,
+		SymbolsPerFrame: 8,
 	}, nil)
 
 	// start a goroutine to collect heartbeats
@@ -427,8 +357,7 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	for _, relayKey := range fetchedCert.RelayKeys {
 		require.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
-	require.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
-	require.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
+	require.Equal(t, fetchedFragmentInfo.SymbolsPerFrame, uint32(8))
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
 
 	// give the signals a moment to be sent
@@ -452,7 +381,7 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 }
 
 func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
@@ -466,8 +395,6 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	c := newTestComponents(t, false)
-	c.BlobSet.On("Contains", mock.Anything).Return(false)
-	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Twice()
 
 	// start a goroutine to collect heartbeats
@@ -516,10 +443,59 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
 
+func TestEncodingManagerFilterStaleBlobs(t *testing.T) {
+	ctx := t.Context()
+	now := time.Now()
+
+	staleBlobKey, staleBlobHeader := newBlobWithDispersalTime(t, now.Add(-time.Hour).UnixNano(), []core.QuorumID{0, 1})
+	freshBlobKey, freshBlobHeader := newBlobWithDispersalTime(t, now.UnixNano(), []core.QuorumID{0, 1})
+
+	staleMetadata := &commonv2.BlobMetadata{
+		BlobHeader: staleBlobHeader,
+		BlobStatus: commonv2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+	freshMetadata := &commonv2.BlobMetadata{
+		BlobHeader: freshBlobHeader,
+		BlobStatus: commonv2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+
+	err := blobMetadataStore.PutBlobMetadata(ctx, staleMetadata)
+	require.NoError(t, err)
+	err = blobMetadataStore.PutBlobMetadata(ctx, freshMetadata)
+	require.NoError(t, err)
+
+	c := newTestComponents(t, false)
+	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
+		SymbolsPerFrame: 8,
+	}, nil)
+
+	err = c.EncodingManager.HandleBatch(ctx)
+	require.NoError(t, err)
+	c.Pool.StopWait()
+
+	fetchedStaleMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, staleBlobKey)
+	require.NoError(t, err)
+	require.Equal(t, commonv2.Failed, fetchedStaleMetadata.BlobStatus)
+
+	fetchedFreshMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, freshBlobKey)
+	require.NoError(t, err)
+	require.Equal(t, commonv2.Encoded, fetchedFreshMetadata.BlobStatus)
+
+	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 1)
+
+	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{staleBlobKey, freshBlobKey}, nil)
+}
+
 func newTestComponents(t *testing.T, mockPool bool) *testComponents {
-	logger := testutils.GetLogger()
-	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	// require.NoError(t, err)
+	t.Helper()
+	ctx := t.Context()
+	logger := test.GetLogger()
 	var pool common.WorkerPool
 	var mockP *commonmock.MockWorkerpool
 	if mockPool {
@@ -539,24 +515,38 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		},
 	}, nil)
 	onchainRefreshInterval := 1 * time.Millisecond
-	blobSet := &controller.MockBlobSet{}
-	blobSet.On("Size", mock.Anything).Return(0)
 
 	livenessChan := make(chan healthcheck.HeartbeatMessage, 100)
 
-	em, err := controller.NewEncodingManager(&controller.EncodingManagerConfig{
-		PullInterval:                1 * time.Second,
-		EncodingRequestTimeout:      5 * time.Second,
-		StoreTimeout:                5 * time.Second,
-		NumEncodingRetries:          1,
-		NumRelayAssignment:          2,
-		AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
-		MaxNumBlobsPerIteration:     5,
-		OnchainStateRefreshInterval: onchainRefreshInterval,
-	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry(), blobSet, livenessChan)
+	em, err := controller.NewEncodingManager(
+		&controller.EncodingManagerConfig{
+			PullInterval:                1 * time.Second,
+			EncodingRequestTimeout:      5 * time.Second,
+			StoreTimeout:                5 * time.Second,
+			NumEncodingRetries:          1,
+			NumRelayAssignment:          2,
+			AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
+			MaxNumBlobsPerIteration:     5,
+			OnchainStateRefreshInterval: onchainRefreshInterval,
+			NumConcurrentRequests:       5,
+			EncoderAddress:              "localhost:50051",
+		},
+		time.Now,
+		blobMetadataStore,
+		pool,
+		encodingClient,
+		chainReader,
+		logger,
+		prometheus.NewRegistry(),
+		livenessChan,
+		nil, // userAccountRemapping,
+		10*time.Minute,
+		10*time.Minute,
+		nil, // metrics, ignored if nil
+	)
 	assert.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*onchainRefreshInterval)
+	ctx, cancel := context.WithTimeout(ctx, 2*onchainRefreshInterval)
 	defer cancel()
 	// Start the encoding manager to fetch the onchain state
 	_ = em.Start(ctx)
@@ -566,7 +556,6 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		EncodingClient:  encodingClient,
 		ChainReader:     chainReader,
 		MockPool:        mockP,
-		BlobSet:         blobSet,
 		LivenessChan:    livenessChan,
 	}
 }

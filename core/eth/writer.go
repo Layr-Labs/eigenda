@@ -9,7 +9,6 @@ import (
 	"log"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/api"
 	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
@@ -331,16 +330,15 @@ func (t *Writer) ConfirmBatch(ctx context.Context, batchHeader *core.BatchHeader
 	return receipt, nil
 }
 
-// SetDisperserAddress sets the address of the disperser. Since there is currently only one disperser, this function
-// can only be used to set the address of that disperser.
-func (t *Writer) SetDisperserAddress(ctx context.Context, address gethcommon.Address) error {
+// SetDisperserAddress sets the address of the disperser.
+func (t *Writer) SetDisperserAddress(ctx context.Context, disperserID uint32, address gethcommon.Address) error {
 	registry := t.bindings.DisperserRegistry
 	if registry == nil {
 		log.Printf("disperser registry not deployed")
 		return errors.New("disperser registry not deployed")
 	}
 
-	log.Printf("Setting disperser %d address to %s", api.EigenLabsDisperserID, address.String())
+	log.Printf("Setting disperser %d address to %s", disperserID, address.String())
 
 	options, err := t.ethClient.GetNoSendTransactOpts()
 	if err != nil {
@@ -351,7 +349,7 @@ func (t *Writer) SetDisperserAddress(ctx context.Context, address gethcommon.Add
 
 	transaction, err := registry.SetDisperserInfo(
 		options,
-		api.EigenLabsDisperserID,
+		disperserID,
 		dreg.EigenDATypesV2DisperserInfo{
 			DisperserAddress: address,
 		})

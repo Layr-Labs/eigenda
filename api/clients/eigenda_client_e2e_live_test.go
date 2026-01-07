@@ -1,28 +1,30 @@
 package clients
 
 import (
-	"context"
 	"flag"
 	"math/big"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/stretchr/testify/assert"
 )
 
-var runTestnetLiveTests bool
-
 const (
 	// Test configuration constants
-	testRPC = "disperser-holesky.eigenda.xyz:443"
+	testRPC = "disperser-testnet-sepolia.eigenda.xyz:443"
 	// TODO: we should use a more reliable RPC provider, injected via secrets
-	testEthRpcUrl                = "https://ethereum-holesky-rpc.publicnode.com"
+	testEthRpcUrl                = "https://ethereum-sepolia-rpc.publicnode.com"
 	testSignerPrivateKeyHex      = "2d23e142a9e86a9175b9dfa213f20ea01f6c1731e09fa6edf895f70fe279cbb1"
-	testSvcManagerAddr           = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
+	testSvcManagerAddr           = "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764"
 	testStatusQueryTimeout       = 20 * time.Minute
 	testStatusQueryRetryInterval = 5 * time.Second
+)
+
+var (
+	runTestnetLiveTests bool
+	logger              = test.GetLogger()
 )
 
 func init() {
@@ -35,6 +37,8 @@ func init() {
 // We don't test waiting for finality because that adds 12 minutes to the test, and is not necessary
 // because we already test for this in the unit tests using a mock disperser which is much faster.
 func TestClientUsingTestnet(t *testing.T) {
+	ctx := t.Context()
+
 	if !runTestnetLiveTests {
 		t.Skip("Skipping testnet live test")
 	}
@@ -43,7 +47,7 @@ func TestClientUsingTestnet(t *testing.T) {
 		t.Parallel()
 		confDepth := uint64(0)
 
-		client, err := NewEigenDAClient(testutils.GetLogger(), EigenDAClientConfig{
+		client, err := NewEigenDAClient(logger, EigenDAClientConfig{
 			RPC: testRPC,
 			// Should need way less than 20 minutes, but we set it to 20 minutes to be safe
 			// In worst case we had 10 min batching interval + some time for the tx to land onchain,
@@ -60,11 +64,11 @@ func TestClientUsingTestnet(t *testing.T) {
 		assert.NoError(t, err)
 
 		testData := "hello world!"
-		blobInfo, err := client.PutBlob(context.Background(), []byte(testData))
+		blobInfo, err := client.PutBlob(ctx, []byte(testData))
 		assert.NoError(t, err)
 		batchHeaderHash := blobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()
 		blobIndex := blobInfo.GetBlobVerificationProof().GetBlobIndex()
-		blob, err := client.GetBlob(context.Background(), batchHeaderHash, blobIndex)
+		blob, err := client.GetBlob(ctx, batchHeaderHash, blobIndex)
 		assert.NoError(t, err)
 		assert.Equal(t, testData, string(blob))
 	})
@@ -73,7 +77,7 @@ func TestClientUsingTestnet(t *testing.T) {
 		t.Parallel()
 		confDepth := uint64(3)
 
-		client, err := NewEigenDAClient(testutils.GetLogger(), EigenDAClientConfig{
+		client, err := NewEigenDAClient(logger, EigenDAClientConfig{
 			RPC: testRPC,
 			// Should need way less than 20 minutes, but we set it to 20 minutes to be safe
 			// In worst case we had 10 min batching interval + some time for the tx to land onchain,
@@ -89,17 +93,17 @@ func TestClientUsingTestnet(t *testing.T) {
 		})
 		data := "hello world!"
 		assert.NoError(t, err)
-		blobInfo, err := client.PutBlob(context.Background(), []byte(data))
+		blobInfo, err := client.PutBlob(ctx, []byte(data))
 		assert.NoError(t, err)
 		batchHeaderHash := blobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()
 		blobIndex := blobInfo.GetBlobVerificationProof().GetBlobIndex()
-		blob, err := client.GetBlob(context.Background(), batchHeaderHash, blobIndex)
+		blob, err := client.GetBlob(ctx, batchHeaderHash, blobIndex)
 		assert.NoError(t, err)
 		assert.Equal(t, data, string(blob))
 
 		// assert confirmation depth by making sure the batch metadata hash was registered onchain
 		// at least confDepth blocks ago
-		blockNumCur, err := client.ethClient.BlockNumber(context.Background())
+		blockNumCur, err := client.ethClient.BlockNumber(ctx)
 		assert.NoError(t, err)
 		blockNumAtDepth := new(big.Int).SetUint64(blockNumCur - confDepth)
 		batchId := blobInfo.GetBlobVerificationProof().GetBatchId()

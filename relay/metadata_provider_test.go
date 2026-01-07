@@ -3,20 +3,19 @@ package relay
 import (
 	"math/rand"
 	"testing"
-
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetNonExistentBlob(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
@@ -36,24 +35,21 @@ func TestGetNonExistentBlob(t *testing.T) {
 
 	// Try to fetch a non-existent blobs
 	for i := 0; i < 10; i++ {
-		_, err := server.GetMetadataForBlobs(ctx, []v2.BlobKey{v2.BlobKey(tu.RandomBytes(32))})
+		_, err := server.GetMetadataForBlobs(ctx, []v2.BlobKey{v2.BlobKey(random.RandomBytes(32))})
 		require.Error(t, err)
 	}
 }
 
 func TestFetchingIndividualMetadata(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	setup(t)
 	defer teardown(t)
 	metadataStore := buildMetadataStore(t)
 
-	totalChunkSizeMap := make(map[v2.BlobKey]uint32)
-	fragmentSizeMap := make(map[v2.BlobKey]uint32)
+	symbolsPerFrameMap := make(map[v2.BlobKey]uint32)
 
 	// Write some metadata
 	blobCount := 10
@@ -62,11 +58,8 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 		blobKey, err := header.BlobKey()
 		require.NoError(t, err)
 
-		totalChunkSizeBytes := uint32(rand.Intn(1024 * 1024 * 1024))
-		fragmentSizeBytes := uint32(rand.Intn(1024 * 1024))
-
-		totalChunkSizeMap[blobKey] = totalChunkSizeBytes
-		fragmentSizeMap[blobKey] = fragmentSizeBytes
+		symbolsPerFrame := uint32(rand.Intn(1024) + 1)
+		symbolsPerFrameMap[blobKey] = symbolsPerFrame
 
 		err = metadataStore.PutBlobCertificate(
 			ctx,
@@ -74,20 +67,18 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 				BlobHeader: header,
 			},
 			&encoding.FragmentInfo{
-				TotalChunkSizeBytes: totalChunkSizeBytes,
-				FragmentSizeBytes:   fragmentSizeBytes,
+				SymbolsPerFrame: symbolsPerFrame,
 			})
 		require.NoError(t, err)
 	}
 
 	// Sanity check, make sure the metadata is in the low level store
-	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+	for blobKey, symbolsPerFrame := range symbolsPerFrameMap {
 		cert, fragmentInfo, err := metadataStore.GetBlobCertificate(ctx, blobKey)
 		require.NoError(t, err)
 		require.NotNil(t, cert)
 		require.NotNil(t, fragmentInfo)
-		require.Equal(t, totalChunkSizeBytes, fragmentInfo.TotalChunkSizeBytes)
-		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
+		require.Equal(t, symbolsPerFrame, fragmentInfo.SymbolsPerFrame)
 	}
 
 	server, err := newMetadataProvider(
@@ -104,41 +95,36 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 	require.NoError(t, err)
 
 	// Fetch the metadata from the server.
-	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+	for blobKey, symbolsPerFrame := range symbolsPerFrameMap {
 		mMap, err := server.GetMetadataForBlobs(ctx, []v2.BlobKey{blobKey})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(mMap))
 		metadata := mMap[blobKey]
 		require.NotNil(t, metadata)
-		require.Equal(t, totalChunkSizeBytes, metadata.totalChunkSizeBytes)
-		require.Equal(t, fragmentSizeMap[blobKey], metadata.fragmentSizeBytes)
+		require.Equal(t, symbolsPerFrame, metadata.symbolsPerFrame)
 	}
 
 	// Read it back again. This uses a different code pathway due to the cache.
-	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+	for blobKey, symbolsPerFrame := range symbolsPerFrameMap {
 		mMap, err := server.GetMetadataForBlobs(ctx, []v2.BlobKey{blobKey})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(mMap))
 		metadata := mMap[blobKey]
 		require.NotNil(t, metadata)
-		require.Equal(t, totalChunkSizeBytes, metadata.totalChunkSizeBytes)
-		require.Equal(t, fragmentSizeMap[blobKey], metadata.fragmentSizeBytes)
+		require.Equal(t, symbolsPerFrame, metadata.symbolsPerFrame)
 	}
 }
 
 func TestBatchedFetch(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
 	metadataStore := buildMetadataStore(t)
 
-	totalChunkSizeMap := make(map[v2.BlobKey]uint32)
-	fragmentSizeMap := make(map[v2.BlobKey]uint32)
+	symbolsPerFrameMap := make(map[v2.BlobKey]uint32)
 
 	// Write some metadata
 	blobCount := 10
@@ -149,11 +135,8 @@ func TestBatchedFetch(t *testing.T) {
 		require.NoError(t, err)
 		blobKeys[i] = blobKey
 
-		totalChunkSizeBytes := uint32(rand.Intn(1024 * 1024 * 1024))
-		fragmentSizeBytes := uint32(rand.Intn(1024 * 1024))
-
-		totalChunkSizeMap[blobKey] = totalChunkSizeBytes
-		fragmentSizeMap[blobKey] = fragmentSizeBytes
+		symbolsPerFrame := uint32(rand.Intn(1024) + 1)
+		symbolsPerFrameMap[blobKey] = symbolsPerFrame
 
 		err = metadataStore.PutBlobCertificate(
 			ctx,
@@ -161,20 +144,18 @@ func TestBatchedFetch(t *testing.T) {
 				BlobHeader: header,
 			},
 			&encoding.FragmentInfo{
-				TotalChunkSizeBytes: totalChunkSizeBytes,
-				FragmentSizeBytes:   fragmentSizeBytes,
+				SymbolsPerFrame: symbolsPerFrame,
 			})
 		require.NoError(t, err)
 	}
 
 	// Sanity check, make sure the metadata is in the low level store
-	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+	for blobKey, symbolsPerFrame := range symbolsPerFrameMap {
 		cert, fragmentInfo, err := metadataStore.GetBlobCertificate(ctx, blobKey)
 		require.NoError(t, err)
 		require.NotNil(t, cert)
 		require.NotNil(t, fragmentInfo)
-		require.Equal(t, totalChunkSizeBytes, fragmentInfo.TotalChunkSizeBytes)
-		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
+		require.Equal(t, symbolsPerFrame, fragmentInfo.SymbolsPerFrame)
 	}
 
 	server, err := newMetadataProvider(
@@ -193,7 +174,7 @@ func TestBatchedFetch(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		keyCount := rand.Intn(blobCount) + 1
 		keys := make([]v2.BlobKey, 0, keyCount)
-		for key := range totalChunkSizeMap {
+		for key := range symbolsPerFrameMap {
 			keys = append(keys, key)
 			if len(keys) == keyCount {
 				break
@@ -207,8 +188,7 @@ func TestBatchedFetch(t *testing.T) {
 		for _, key := range keys {
 			metadata := mMap[key]
 			require.NotNil(t, metadata)
-			require.Equal(t, totalChunkSizeMap[key], metadata.totalChunkSizeBytes)
-			require.Equal(t, fragmentSizeMap[key], metadata.fragmentSizeBytes)
+			require.Equal(t, symbolsPerFrameMap[key], metadata.symbolsPerFrame)
 		}
 	}
 
@@ -220,17 +200,14 @@ func TestBatchedFetch(t *testing.T) {
 
 func TestIndividualFetchWithSharding(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
 	metadataStore := buildMetadataStore(t)
 
-	totalChunkSizeMap := make(map[v2.BlobKey]uint32)
-	fragmentSizeMap := make(map[v2.BlobKey]uint32)
+	symbolsPerFrameMap := make(map[v2.BlobKey]uint32)
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
 
 	shardCount := rand.Intn(10) + 10
@@ -250,11 +227,9 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 		blobKey, err := header.BlobKey()
 		require.NoError(t, err)
 
-		totalChunkSizeBytes := uint32(rand.Intn(1024 * 1024 * 1024))
-		fragmentSizeBytes := uint32(rand.Intn(1024 * 1024))
+		symbolsPerFrame := uint32(rand.Intn(1024) + 1)
 
-		totalChunkSizeMap[blobKey] = totalChunkSizeBytes
-		fragmentSizeMap[blobKey] = fragmentSizeBytes
+		symbolsPerFrameMap[blobKey] = symbolsPerFrame
 
 		// Assign two shards to each blob.
 		shard1 := v2.RelayKey(rand.Intn(shardCount))
@@ -269,20 +244,18 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 				RelayKeys:  shards,
 			},
 			&encoding.FragmentInfo{
-				TotalChunkSizeBytes: totalChunkSizeBytes,
-				FragmentSizeBytes:   fragmentSizeBytes,
+				SymbolsPerFrame: symbolsPerFrame,
 			})
 		require.NoError(t, err)
 	}
 
 	// Sanity check, make sure the metadata is in the low level store
-	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+	for blobKey, symbolsPerFrame := range symbolsPerFrameMap {
 		cert, fragmentInfo, err := metadataStore.GetBlobCertificate(ctx, blobKey)
 		require.NoError(t, err)
 		require.NotNil(t, cert)
 		require.NotNil(t, fragmentInfo)
-		require.Equal(t, totalChunkSizeBytes, fragmentInfo.TotalChunkSizeBytes)
-		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
+		require.Equal(t, symbolsPerFrame, fragmentInfo.SymbolsPerFrame)
 	}
 
 	server, err := newMetadataProvider(
@@ -298,7 +271,7 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 	require.NoError(t, err)
 
 	// Fetch the metadata from the server.
-	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+	for blobKey, symbolsPerFrame := range symbolsPerFrameMap {
 		isBlobInCorrectShard := false
 		blobShards := shardMap[blobKey]
 		for _, shard := range blobShards {
@@ -316,8 +289,7 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 			require.Equal(t, 1, len(mMap))
 			metadata := mMap[blobKey]
 			require.NotNil(t, metadata)
-			require.Equal(t, totalChunkSizeBytes, metadata.totalChunkSizeBytes)
-			require.Equal(t, fragmentSizeMap[blobKey], metadata.fragmentSizeBytes)
+			require.Equal(t, symbolsPerFrame, metadata.symbolsPerFrame)
 		} else {
 			// the blob is not in the relay's shard, should return an error
 			require.Error(t, err)
@@ -325,7 +297,7 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 	}
 
 	// Read it back again. This uses a different code pathway due to the cache.
-	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+	for blobKey, symbolsPerFrame := range symbolsPerFrameMap {
 		isBlobInCorrectShard := false
 		blobShards := shardMap[blobKey]
 		for _, shard := range blobShards {
@@ -343,8 +315,7 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 			require.Equal(t, 1, len(mMap))
 			metadata := mMap[blobKey]
 			require.NotNil(t, metadata)
-			require.Equal(t, totalChunkSizeBytes, metadata.totalChunkSizeBytes)
-			require.Equal(t, fragmentSizeMap[blobKey], metadata.fragmentSizeBytes)
+			require.Equal(t, symbolsPerFrame, metadata.symbolsPerFrame)
 		} else {
 			// the blob is not in the relay's shard, should return an error
 			require.Error(t, err)
@@ -354,14 +325,13 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 
 func TestBatchedFetchWithSharding(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
 	metadataStore := buildMetadataStore(t)
 
-	totalChunkSizeMap := make(map[v2.BlobKey]uint32)
-	fragmentSizeMap := make(map[v2.BlobKey]uint32)
+	symbolsPerFrameMap := make(map[v2.BlobKey]uint32)
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
 
 	shardCount := rand.Intn(10) + 10
@@ -381,11 +351,8 @@ func TestBatchedFetchWithSharding(t *testing.T) {
 		blobKey, err := header.BlobKey()
 		require.NoError(t, err)
 
-		totalChunkSizeBytes := uint32(rand.Intn(1024 * 1024 * 1024))
-		fragmentSizeBytes := uint32(rand.Intn(1024 * 1024))
-
-		totalChunkSizeMap[blobKey] = totalChunkSizeBytes
-		fragmentSizeMap[blobKey] = fragmentSizeBytes
+		symbolsPerFrame := uint32(rand.Intn(1024) + 1)
+		symbolsPerFrameMap[blobKey] = symbolsPerFrame
 
 		// Assign two shards to each blob.
 		shard1 := v2.RelayKey(rand.Intn(shardCount))
@@ -400,20 +367,18 @@ func TestBatchedFetchWithSharding(t *testing.T) {
 				RelayKeys:  shards,
 			},
 			&encoding.FragmentInfo{
-				TotalChunkSizeBytes: totalChunkSizeBytes,
-				FragmentSizeBytes:   fragmentSizeBytes,
+				SymbolsPerFrame: symbolsPerFrame,
 			})
 		require.NoError(t, err)
 	}
 
 	// Sanity check, make sure the metadata is in the low level store
-	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+	for blobKey, symbolsPerFrame := range symbolsPerFrameMap {
 		cert, fragmentInfo, err := metadataStore.GetBlobCertificate(ctx, blobKey)
 		require.NoError(t, err)
 		require.NotNil(t, cert)
 		require.NotNil(t, fragmentInfo)
-		require.Equal(t, totalChunkSizeBytes, fragmentInfo.TotalChunkSizeBytes)
-		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
+		require.Equal(t, symbolsPerFrame, fragmentInfo.SymbolsPerFrame)
 	}
 
 	server, err := newMetadataProvider(
@@ -434,7 +399,7 @@ func TestBatchedFetchWithSharding(t *testing.T) {
 		keyCount := 2
 		keys := make([]v2.BlobKey, 0, keyCount)
 		areKeysInCorrectShard := true
-		for key := range totalChunkSizeMap {
+		for key := range symbolsPerFrameMap {
 			keys = append(keys, key)
 
 			keyShards := shardMap[key]
@@ -462,8 +427,7 @@ func TestBatchedFetchWithSharding(t *testing.T) {
 			for _, key := range keys {
 				metadata := mMap[key]
 				require.NotNil(t, metadata)
-				require.Equal(t, totalChunkSizeMap[key], metadata.totalChunkSizeBytes)
-				require.Equal(t, fragmentSizeMap[key], metadata.fragmentSizeBytes)
+				require.Equal(t, symbolsPerFrameMap[key], metadata.symbolsPerFrame)
 			}
 		} else {
 			require.Error(t, err)

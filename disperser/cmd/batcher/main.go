@@ -9,11 +9,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
@@ -27,7 +25,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli"
 )
 
@@ -85,7 +82,12 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 
 	bucketName := config.BlobstoreConfig.BucketName
-	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
+	s3Client, err := blobstore.CreateObjectStorageClient(
+		context.Background(),
+		config.BlobstoreConfig,
+		config.AwsClientConfig,
+		logger,
+	)
 	if err != nil {
 		return err
 	}
@@ -175,10 +177,11 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 
 	// used by non graph indexer
-	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
+	ethClient, err := geth.SafeDial(context.Background(), config.EthClientConfig.RPCURLs[0])
 	if err != nil {
 		return err
 	}
+	rpcClient := ethClient.Client()
 	tx, err := coreeth.NewWriter(logger, client, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
@@ -207,22 +210,7 @@ func RunBatcher(ctx *cli.Context) error {
 		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
 		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 	} else {
-		logger.Info("Using built-in indexer")
-
-		indexer, err := coreindexer.CreateNewIndexer(
-			&config.IndexerConfig,
-			client,
-			rpcClient,
-			config.EigenDADirectory,
-			logger,
-		)
-		if err != nil {
-			return err
-		}
-		ics, err = coreindexer.NewIndexedChainState(cs, indexer)
-		if err != nil {
-			return err
-		}
+		return fmt.Errorf("built-in indexer is deprecated and will be removed soon, please use UseGraph=true")
 	}
 
 	if len(config.BatcherConfig.EncoderSocket) == 0 {

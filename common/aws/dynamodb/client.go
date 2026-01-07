@@ -47,6 +47,7 @@ type QueryResult struct {
 }
 
 type Client interface {
+	GetAwsClient() *dynamodb.Client
 	DeleteTable(ctx context.Context, tableName string) error
 	PutItem(ctx context.Context, tableName string, item Item) error
 	PutItemWithCondition(ctx context.Context, tableName string, item Item, condition string, expressionAttributeNames map[string]string, expressionAttributeValues map[string]types.AttributeValue) error
@@ -111,6 +112,11 @@ func NewClient(cfg commonaws.ClientConfig, logger logging.Logger) (*client, erro
 		clientRef = &client{dynamoClient: dynamoClient, logger: logger.With("component", "DynamodbClient")}
 	})
 	return clientRef, err
+}
+
+// Returns the underlying AWS SDK DynamoDB client
+func (c *client) GetAwsClient() *dynamodb.Client {
+	return c.dynamoClient
 }
 
 func (c *client) DeleteTable(ctx context.Context, tableName string) error {
@@ -470,7 +476,13 @@ func (c *client) writeItems(ctx context.Context, tableName string, requestItems 
 		// check for unprocessed items
 		if len(output.UnprocessedItems) > 0 {
 			for _, req := range output.UnprocessedItems[tableName] {
-				failedItems = append(failedItems, req.DeleteRequest.Key)
+				if operation == update && req.PutRequest != nil {
+					failedItems = append(failedItems, req.PutRequest.Item)
+				} else if operation == delete && req.DeleteRequest != nil {
+					failedItems = append(failedItems, req.DeleteRequest.Key)
+				} else {
+					return nil, fmt.Errorf("unexpected batch operation: %d", operation)
+				}
 			}
 		}
 

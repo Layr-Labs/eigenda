@@ -9,12 +9,15 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/testbed"
-	"gopkg.in/yaml.v3"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 )
 
-var logger = testutils.GetLogger()
+const (
+	controllerGrpcPort = uint16(30000)
+)
+
+var logger = test.GetLogger()
 
 func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
 	for _, deployer := range env.Deployers {
@@ -157,6 +160,7 @@ func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort stri
 		DISPERSER_SERVER_CHAIN_RPC:              "",
 		DISPERSER_SERVER_PRIVATE_KEY:            "123",
 		DISPERSER_SERVER_NUM_CONFIRMATIONS:      "0",
+		DISPERSER_SERVER_DISPERSER_ID:           fmt.Sprintf("%d", ind),
 
 		DISPERSER_SERVER_REGISTERED_QUORUM_ID:      "0,1",
 		DISPERSER_SERVER_TOTAL_UNAUTH_BYTE_RATE:    "10000000,10000000",
@@ -196,6 +200,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_CHAIN_RPC:              "",
 		DISPERSER_SERVER_PRIVATE_KEY:            "123",
 		DISPERSER_SERVER_NUM_CONFIRMATIONS:      "0",
+		DISPERSER_SERVER_DISPERSER_ID:           fmt.Sprintf("%d", ind),
 
 		DISPERSER_SERVER_REGISTERED_QUORUM_ID:      "0,1",
 		DISPERSER_SERVER_TOTAL_UNAUTH_BYTE_RATE:    "10000000,10000000",
@@ -221,6 +226,12 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e_v2_reservation",
 		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e_v2_ondemand",
 		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
+		DISPERSER_SERVER_CONTROLLER_ADDRESS:      fmt.Sprintf("localhost:%d", controllerGrpcPort),
+
+		// DisperserV2 uses the V2 prover which always uses SRSOrder=2^28.
+		// So it needs the trailing g2 points to generate correct length commitments.
+		DISPERSER_SERVER_G2_TRAILING_PATH:               "../resources/srs/g2.trailing.point",
+		DISPERSER_SERVER_ONCHAIN_STATE_REFRESH_INTERVAL: "1s",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -234,6 +245,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_LOG_FORMAT:                    "text",
 		BATCHER_S3_BUCKET_NAME:                "test-eigenda-blobstore",
 		BATCHER_DYNAMODB_TABLE_NAME:           "test-BlobMetadata",
+		BATCHER_OBJECT_STORAGE_BACKEND:        "s3",
 		BATCHER_ENABLE_METRICS:                "true",
 		BATCHER_METRICS_HTTP_PORT:             "9094",
 		BATCHER_PULL_INTERVAL:                 "5s",
@@ -348,9 +360,40 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "5",
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
+		CONTROLLER_DISPERSER_ID:                            "0",
 	}
+
+	v.CONTROLLER_GRPC_PORT = fmt.Sprintf("%d", controllerGrpcPort)
+	v.CONTROLLER_ON_DEMAND_PAYMENTS_TABLE_NAME = "e2e_v2_ondemand"
+	v.CONTROLLER_PAYMENT_VAULT_UPDATE_INTERVAL = "1s"
+
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
+	return v
+}
+
+func (env *Config) generateProxyVars(ind int) ProxyVars {
+	v := ProxyVars{
+		EIGENDA_PROXY_APIS_TO_ENABLE:             "op-generic,standard,metrics",
+		EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE: "V2", // we only enable V2
+		EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND:  "V2",
+		// V2 Variables
+		// TODO(samlaf): this private key should be read from the output config file instead of hardcoded.
+		EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded",
+		// TODO(samlaf): this should not be hardcoded
+		EIGENDA_PROXY_EIGENDA_V2_ETH_RPC:                                         "http://localhost:8545",
+		EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH:                                 "16MiB",
+		EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR: env.EigenDA.CertVerifierRouter,
+		// TODO(samlaf): this should not be hardcoded
+		EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC:     "localhost:32005",
+		EIGENDA_PROXY_EIGENDA_V2_EIGENDA_DIRECTORY: env.EigenDA.EigenDADirectory,
+		EIGENDA_PROXY_EIGENDA_V2_GRPC_DISABLE_TLS:  "true",
+		// SRS paths
+		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH:          "../resources/srs/g1.point",
+		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH:          "../resources/srs/g2.point",
+		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH: "../resources/srs/g2.trailing.point",
+	}
+	env.applyDefaults(&v, "EIGENDA_PROXY", "proxy", ind)
 	return v
 }
 
@@ -398,53 +441,50 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	ecdsaPassword := env.Pks.EcdsaMap[name].Password
 
 	v := OperatorVars{
-		NODE_LOG_FORMAT:                       "text",
-		NODE_HOSTNAME:                         "",
-		NODE_DISPERSAL_PORT:                   dispersalPort,
-		NODE_RETRIEVAL_PORT:                   retrievalPort,
-		NODE_INTERNAL_DISPERSAL_PORT:          dispersalPort,
-		NODE_INTERNAL_RETRIEVAL_PORT:          retrievalPort,
-		NODE_V2_DISPERSAL_PORT:                v2DispersalPort,
-		NODE_V2_RETRIEVAL_PORT:                v2RetrievalPort,
-		NODE_ENABLE_METRICS:                   "true",
-		NODE_METRICS_PORT:                     metricsPort,
-		NODE_ENABLE_NODE_API:                  "true",
-		NODE_API_PORT:                         nodeApiPort,
-		NODE_TIMEOUT:                          "10s",
-		NODE_QUORUM_ID_LIST:                   "0,1",
-		NODE_DB_PATH:                          dbPath,
-		NODE_LITT_DB_STORAGE_PATHS:            dbPath,
-		NODE_ENABLE_TEST_MODE:                 "false", // using encrypted key in inabox
-		NODE_TEST_PRIVATE_BLS:                 blsKey,
-		NODE_BLS_KEY_FILE:                     blsKeyFile,
-		NODE_ECDSA_KEY_FILE:                   ecdsaKeyFile,
-		NODE_BLS_KEY_PASSWORD:                 blsPassword,
-		NODE_ECDSA_KEY_PASSWORD:               ecdsaPassword,
-		NODE_EIGENDA_DIRECTORY:                env.EigenDA.EigenDADirectory,
-		NODE_BLS_OPERATOR_STATE_RETRIVER:      env.EigenDA.OperatorStateRetriever,
-		NODE_EIGENDA_SERVICE_MANAGER:          env.EigenDA.ServiceManager,
-		NODE_REGISTER_AT_NODE_START:           "true",
-		NODE_CHURNER_URL:                      churnerUrl,
-		NODE_CHURNER_USE_SECURE_GRPC:          "false",
-		NODE_RELAY_USE_SECURE_GRPC:            "false",
-		NODE_EXPIRATION_POLL_INTERVAL:         "10",
-		NODE_G1_PATH:                          "",
-		NODE_G2_PATH:                          "",
-		NODE_G2_POWER_OF_2_PATH:               "",
-		NODE_CACHE_PATH:                       "",
-		NODE_SRS_ORDER:                        "",
-		NODE_SRS_LOAD:                         "",
-		NODE_NUM_WORKERS:                      fmt.Sprint(runtime.GOMAXPROCS(0)),
-		NODE_VERBOSE:                          "true",
-		NODE_CHAIN_RPC:                        "",
-		NODE_PRIVATE_KEY:                      key[2:],
-		NODE_NUM_BATCH_VALIDATORS:             "128",
-		NODE_PUBLIC_IP_PROVIDER:               "mockip",
-		NODE_PUBLIC_IP_CHECK_INTERVAL:         "10s",
-		NODE_NUM_CONFIRMATIONS:                "0",
-		NODE_ONCHAIN_METRICS_INTERVAL:         "-1",
-		NODE_RUNTIME_MODE:                     "v1-and-v2",
-		NODE_DISABLE_DISPERSAL_AUTHENTICATION: "false",
+		NODE_LOG_FORMAT:               "text",
+		NODE_HOSTNAME:                 "",
+		NODE_DISPERSAL_PORT:           dispersalPort,
+		NODE_RETRIEVAL_PORT:           retrievalPort,
+		NODE_INTERNAL_DISPERSAL_PORT:  dispersalPort,
+		NODE_INTERNAL_RETRIEVAL_PORT:  retrievalPort,
+		NODE_V2_DISPERSAL_PORT:        v2DispersalPort,
+		NODE_V2_RETRIEVAL_PORT:        v2RetrievalPort,
+		NODE_ENABLE_METRICS:           "true",
+		NODE_METRICS_PORT:             metricsPort,
+		NODE_ENABLE_NODE_API:          "true",
+		NODE_API_PORT:                 nodeApiPort,
+		NODE_TIMEOUT:                  "10s",
+		NODE_QUORUM_ID_LIST:           "0,1",
+		NODE_DB_PATH:                  dbPath,
+		NODE_LITT_DB_STORAGE_PATHS:    dbPath,
+		NODE_ENABLE_TEST_MODE:         "false", // using encrypted key in inabox
+		NODE_TEST_PRIVATE_BLS:         blsKey,
+		NODE_BLS_KEY_FILE:             blsKeyFile,
+		NODE_ECDSA_KEY_FILE:           ecdsaKeyFile,
+		NODE_BLS_KEY_PASSWORD:         blsPassword,
+		NODE_ECDSA_KEY_PASSWORD:       ecdsaPassword,
+		NODE_EIGENDA_DIRECTORY:        env.EigenDA.EigenDADirectory,
+		NODE_REGISTER_AT_NODE_START:   "true",
+		NODE_CHURNER_URL:              churnerUrl,
+		NODE_CHURNER_USE_SECURE_GRPC:  "false",
+		NODE_RELAY_USE_SECURE_GRPC:    "false",
+		NODE_EXPIRATION_POLL_INTERVAL: "10",
+		NODE_G1_PATH:                  "",
+		NODE_G2_PATH:                  "",
+		NODE_G2_POWER_OF_2_PATH:       "",
+		NODE_CACHE_PATH:               "",
+		NODE_SRS_ORDER:                "",
+		NODE_SRS_LOAD:                 "",
+		NODE_NUM_WORKERS:              fmt.Sprint(runtime.GOMAXPROCS(0)),
+		NODE_VERBOSE:                  "true",
+		NODE_CHAIN_RPC:                "",
+		NODE_PRIVATE_KEY:              key[2:],
+		NODE_NUM_BATCH_VALIDATORS:     "128",
+		NODE_PUBLIC_IP_PROVIDER:       "mockip",
+		NODE_PUBLIC_IP_CHECK_INTERVAL: "10s",
+		NODE_NUM_CONFIRMATIONS:        "0",
+		NODE_ONCHAIN_METRICS_INTERVAL: "-1",
+		NODE_RUNTIME_MODE:             "v1-and-v2",
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
@@ -482,75 +522,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 	env.applyDefaults(&v, "RETRIEVER", "retriever", ind)
 
 	return v
-}
-
-// Used to generate a docker compose file corresponding to the test environment
-func (env *Config) genService(compose DockerCompose, name, image, envFile string, ports []string) {
-
-	for i, port := range ports {
-		ports[i] = port + ":" + port
-	}
-
-	compose.Services[name] = map[string]interface{}{
-		"image":    image,
-		"env_file": []string{envFile},
-		"ports":    ports,
-		"volumes": []string{
-			env.Path + ":/data",
-			env.rootPath + "/testbed/secrets:/secrets",
-			env.rootPath + "/resources/srs:/resources",
-		},
-		"extra_hosts": []string{
-			"host.docker.internal:host-gateway",
-		},
-	}
-}
-
-// Used to generate a docker compose file corresponding to the test environment
-func (env *Config) genNodeService(compose DockerCompose, name, image, envFile string, ports []string) {
-
-	for i, port := range ports {
-		ports[i] = port + ":" + port
-	}
-
-	compose.Services[name] = map[string]interface{}{
-		"image":    image,
-		"env_file": []string{envFile},
-		"volumes": []string{
-			env.Path + ":/data",
-			env.rootPath + "/testbed/secrets:/secrets",
-			env.rootPath + "/resources/srs:/resources",
-		},
-		"extra_hosts": []string{
-			"host.docker.internal:host-gateway",
-		},
-		// "environment": []string{
-		// 	"NODE_HOSTNAME=" + name,
-		// },
-	}
-
-	nginxService := name + "_nginx"
-	compose.Services[nginxService] = map[string]interface{}{
-		"image":    "nginx:latest",
-		"env_file": []string{envFile},
-		"environment": []string{
-			"REQUEST_LIMIT=1r/s",
-			"BURST_LIMIT=2",
-			"NODE_HOST=" + name,
-		},
-		"depends_on": []string{name},
-		"ports":      ports,
-		"volumes": []string{
-			env.rootPath + "/node/cmd/resources/nginx-local.conf:/etc/nginx/templates/default.conf.template:ro",
-		},
-	}
-}
-
-func genTelemetryServices(compose DockerCompose, name, image string, volumes []string) {
-	compose.Services[name] = map[string]interface{}{
-		"image":  image,
-		"volume": volumes,
-	}
 }
 
 func (env *Config) getPaths(name string) (logPath, dbPath, envFilename, envFile string) {
@@ -604,29 +575,18 @@ func (env *Config) GenerateAllVariables() error {
 		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	// Create compose file
-	composeFile := env.Path + "/docker-compose.yml"
-	servicesMap := make(map[string]map[string]interface{})
-	compose := DockerCompose{
-		Services: servicesMap,
-	}
-
 	// Create participants
 	port := env.Services.BasePort
 
 	// Generate churners
 	name := "churner"
 	port += 2
-	logPath, _, filename, envFile := env.getPaths(name)
+	logPath, _, _, envFile := env.getPaths(name)
 	churnerConfig := env.generateChurnerVars(0, graphUrl, logPath, fmt.Sprint(port))
 	if err := writeEnv(churnerConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Churner = churnerConfig
-	env.genService(
-		compose, name, churnerImage,
-		filename, []string{fmt.Sprint(port)})
-
 	churnerUrl := fmt.Sprintf("%s:%s", churnerConfig.CHURNER_HOSTNAME, churnerConfig.CHURNER_GRPC_PORT)
 
 	// Generate disperser nodes
@@ -635,22 +595,19 @@ func (env *Config) GenerateAllVariables() error {
 	port += 2
 
 	name = "dis0"
-	logPath, dbPath, filename, envFile := env.getPaths(name)
+	logPath, dbPath, _, envFile := env.getPaths(name)
 	disperserConfig := env.generateDisperserVars(0, logPath, dbPath, grpcPort)
 	if err := writeEnv(disperserConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Dispersers = append(env.Dispersers, disperserConfig)
-	env.genService(
-		compose, name, disImage,
-		filename, []string{grpcPort})
 
 	// v2 disperser
 	grpcPort = fmt.Sprint(port + 1)
 	port += 2
 
 	name = "dis1"
-	logPath, dbPath, filename, envFile = env.getPaths(name)
+	logPath, dbPath, _, envFile = env.getPaths(name)
 
 	// Convert key to address
 	disperserConfig = env.generateDisperserV2Vars(0, logPath, dbPath, grpcPort)
@@ -658,10 +615,6 @@ func (env *Config) GenerateAllVariables() error {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Dispersers = append(env.Dispersers, disperserConfig)
-
-	env.genService(
-		compose, name, disImage,
-		filename, []string{grpcPort})
 
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
 		metricsPort := fmt.Sprint(port + 1) // port
@@ -673,7 +626,7 @@ func (env *Config) GenerateAllVariables() error {
 		port += 7
 
 		name := fmt.Sprintf("opr%v", i)
-		logPath, dbPath, filename, envFile := env.getPaths(name)
+		logPath, dbPath, _, envFile := env.getPaths(name)
 		key, _, err := env.getKey(name)
 		if err != nil {
 			return fmt.Errorf("failed to get key for %s: %w", name, err)
@@ -686,15 +639,11 @@ func (env *Config) GenerateAllVariables() error {
 			return fmt.Errorf("failed to write env file: %w", err)
 		}
 		env.Operators = append(env.Operators, operatorConfig)
-
-		env.genNodeService(
-			compose, name, nodeImage,
-			filename, []string{dispersalPort, retrievalPort})
 	}
 
 	// Batcher
 	name = "batcher0"
-	logPath, _, filename, envFile = env.getPaths(name)
+	logPath, _, _, envFile = env.getPaths(name)
 	key, _, err := env.getKey(name)
 	if err != nil {
 		return fmt.Errorf("failed to get key for %s: %w", name, err)
@@ -705,34 +654,25 @@ func (env *Config) GenerateAllVariables() error {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Batcher = append(env.Batcher, batcherConfig)
-	env.genService(
-		compose, name, batcherImage,
-		filename, []string{})
 
 	// Encoders
 	// TODO: Add more encoders
 	name = "enc0"
-	_, _, filename, envFile = env.getPaths(name)
+	_, _, _, envFile = env.getPaths(name)
 	encoderConfig := env.generateEncoderVars(0, "34000")
 	if err := writeEnv(encoderConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Encoder = append(env.Encoder, encoderConfig)
-	env.genService(
-		compose, name, encoderImage,
-		filename, []string{"34000"})
 
 	// v2 encoder
 	name = "enc1"
-	_, _, filename, envFile = env.getPaths(name)
+	_, _, _, envFile = env.getPaths(name)
 	encoderConfig = env.generateEncoderV2Vars(0, "34001")
 	if err := writeEnv(encoderConfig.getEnvMap(), envFile); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 	env.Encoder = append(env.Encoder, encoderConfig)
-	env.genService(
-		compose, name, encoderImage,
-		filename, []string{"34001"})
 
 	// Stakers
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
@@ -756,15 +696,12 @@ func (env *Config) GenerateAllVariables() error {
 		name := fmt.Sprintf("relay%v", i)
 		grpcPort := fmt.Sprint(port + 1)
 		port += 2
-		_, _, filename, envFile := env.getPaths(name)
+		_, _, _, envFile := env.getPaths(name)
 		relayConfig := env.generateRelayVars(i, graphUrl, grpcPort)
 		if err := writeEnv(relayConfig.getEnvMap(), envFile); err != nil {
 			return fmt.Errorf("failed to write env file: %w", err)
 		}
 		env.Relays = append(env.Relays, relayConfig)
-		env.genService(
-			compose, name, relayImage,
-			filename, []string{grpcPort})
 	}
 
 	name = "retriever0"
@@ -789,32 +726,14 @@ func (env *Config) GenerateAllVariables() error {
 	}
 	env.Controller = controllerConfig
 
-	if env.Environment.IsLocal() {
-
-		if env.Telemetry.IsNeeded {
-			// sd is required for accessing docker daemon
-			// agent.yaml configures the grafana agent
-			agentVolumes := append(
-				env.Telemetry.DockerSd,
-				env.Telemetry.ConfigPath+":/etc/agent/agent.yaml",
-			)
-
-			// run grafana agent
-			genTelemetryServices(compose, "grafana-agent", "grafana/agent", agentVolumes)
-			// run node exporter
-			genTelemetryServices(compose, "node-exporter", "prom/node-exporter", nil)
-		}
-
-		// Write to compose file
-		composeYaml, err := yaml.Marshal(&compose)
-		if err != nil {
-			return fmt.Errorf("error marshalling compose file: %w", err)
-		}
-
-		if err := writeFile(composeFile, composeYaml); err != nil {
-			return fmt.Errorf("error writing compose file: %w", err)
-		}
+	// Proxy
+	name = "proxy0"
+	_, _, _, envFile = env.getPaths(name)
+	proxyConfig := env.generateProxyVars(0)
+	if err := writeEnv(proxyConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
 	}
+	env.Proxy = proxyConfig
 
 	return nil
 }

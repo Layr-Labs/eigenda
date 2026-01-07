@@ -5,9 +5,8 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -35,27 +34,127 @@ func TestGetSet(t *testing.T) {
 
 	require.NoError(t, err)
 
-	msV2, err := New(
+	msV2 := New(
 		t.Context(),
 		testLogger,
 		getDefaultMemStoreTestConfig(),
 		g1Srs,
 	)
 
-	require.NoError(t, err)
-
 	expected := []byte(testPreimage)
-	key, err := msV2.Put(t.Context(), expected)
+	versionedCert, err := msV2.Put(t.Context(), expected, coretypes.CertSerializationRLP)
 	require.NoError(t, err)
 
-	cert := certs.NewVersionedCert(key, coretypes.VersionThreeCert)
-
-	actual, err := msV2.Get(t.Context(), cert, false)
+	actual, err := msV2.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
 
 	// Test getting the encoded payload
-	encodedPayload, err := msV2.Get(t.Context(), cert, true)
+	encodedPayload, err := msV2.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, true)
 	require.NoError(t, err)
 	require.NotEqual(t, expected, encodedPayload)
+}
+
+func TestGetSetV3Cert(t *testing.T) {
+	g1Srs, err := kzg.ReadG1Points("../../../../resources/g1.point", 3000, 2)
+	require.NoError(t, err)
+
+	config := getDefaultMemStoreTestConfig()
+	// Configure to use V3 certs
+	err = config.SetCertVersion(coretypes.VersionThreeCert)
+	require.NoError(t, err)
+
+	msV3 := New(
+		t.Context(),
+		testLogger,
+		config,
+		g1Srs,
+	)
+
+	expected := []byte(testPreimage)
+	versionedCert, err := msV3.Put(t.Context(), expected, coretypes.CertSerializationRLP)
+	require.NoError(t, err)
+
+	// Verify the version byte is correct for V3
+	require.Equal(t, byte(0x2), byte(versionedCert.Version), "V3 cert should use V2VersionByte (0x2)")
+
+	actual, err := msV3.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, false)
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
+
+	// Test getting the encoded payload
+	encodedPayload, err := msV3.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, true)
+	require.NoError(t, err)
+	require.NotEqual(t, expected, encodedPayload)
+}
+
+func TestGetSetV4Cert(t *testing.T) {
+	g1Srs, err := kzg.ReadG1Points("../../../../resources/g1.point", 3000, 2)
+	require.NoError(t, err)
+
+	config := getDefaultMemStoreTestConfig()
+	// Explicitly configure to use V4 certs
+	err = config.SetCertVersion(coretypes.VersionFourCert)
+	require.NoError(t, err)
+
+	msV4 := New(
+		t.Context(),
+		testLogger,
+		config,
+		g1Srs,
+	)
+
+	expected := []byte(testPreimage)
+	versionedCert, err := msV4.Put(t.Context(), expected, coretypes.CertSerializationRLP)
+	require.NoError(t, err)
+
+	// Verify the version byte is correct for V4
+	require.Equal(t, byte(0x3), byte(versionedCert.Version), "V4 cert should use V3VersionByte (0x3)")
+
+	actual, err := msV4.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, false)
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
+
+	// Test getting the encoded payload
+	encodedPayload, err := msV4.Get(t.Context(), versionedCert, coretypes.CertSerializationRLP, true)
+	require.NoError(t, err)
+	require.NotEqual(t, expected, encodedPayload)
+}
+
+func TestSwitchCertVersion(t *testing.T) {
+	g1Srs, err := kzg.ReadG1Points("../../../../resources/g1.point", 3000, 2)
+	require.NoError(t, err)
+
+	config := getDefaultMemStoreTestConfig()
+	ms := New(
+		t.Context(),
+		testLogger,
+		config,
+		g1Srs,
+	)
+
+	expected := []byte(testPreimage)
+
+	// Store with V4 (default)
+	versionedCertV4, err := ms.Put(t.Context(), expected, coretypes.CertSerializationRLP)
+	require.NoError(t, err)
+	require.Equal(t, byte(0x3), byte(versionedCertV4.Version), "Should use V3VersionByte for V4 cert")
+
+	// Switch to V3
+	err = config.SetCertVersion(coretypes.VersionThreeCert)
+	require.NoError(t, err)
+
+	// Store with V3
+	versionedCertV3, err := ms.Put(t.Context(), expected, coretypes.CertSerializationRLP)
+	require.NoError(t, err)
+	require.Equal(t, byte(0x2), byte(versionedCertV3.Version), "Should use V2VersionByte for V3 cert")
+
+	// Verify both can be retrieved correctly regardless of current config
+	actualV4, err := ms.Get(t.Context(), versionedCertV4, coretypes.CertSerializationRLP, false)
+	require.NoError(t, err)
+	require.Equal(t, expected, actualV4)
+
+	actualV3, err := ms.Get(t.Context(), versionedCertV3, coretypes.CertSerializationRLP, false)
+	require.NoError(t, err)
+	require.Equal(t, expected, actualV3)
 }

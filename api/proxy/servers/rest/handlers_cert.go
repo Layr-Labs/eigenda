@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
@@ -17,17 +18,17 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const (
-	// limit requests to only 32 MiB to mitigate potential DoS attacks
-	maxPOSTRequestBodySize int64 = 1024 * 1024 * 32
-)
-
 // =================================================================================================
 // GET ROUTES
 // =================================================================================================
 
 // handleGetOPKeccakCommitment handles GET requests for optimism keccak commitments.
 func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.APIsEnabled.OpKeccakCommitment {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("op-keccak DA Commitment type detected but `op-keccak` API is not enabled")
+	}
+
 	keccakCommitmentHex, ok := mux.Vars(r)[routingVarNameKeccakCommitmentHex]
 	if !ok {
 		return proxyerrors.NewParsingError(fmt.Errorf("keccak commitment not found in path: %s", r.URL.Path))
@@ -56,11 +57,21 @@ func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Re
 
 // handleGetOPGenericCommitment handles the GET request for optimism generic commitments.
 func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.APIsEnabled.OpGenericCommitment {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("op-generic DA Commitment type detected but `op-generic` API is not enabled")
+	}
+
 	return svr.handleGetShared(w, r)
 }
 
 // handleGetStdCommitment handles the GET request for std commitments.
 func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.APIsEnabled.StandardCommitment {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
+	}
+
 	return svr.handleGetShared(w, r)
 }
 
@@ -97,6 +108,7 @@ func (svr *Server) handleGetShared(
 	payloadOrEncodedPayload, err := svr.certMgr.Get(
 		r.Context(),
 		versionedCert,
+		coretypes.CertSerializationRLP,
 		common.GETOpts{
 			L1InclusionBlockNum:  l1InclusionBlockNum,
 			ReturnEncodedPayload: returnEncodedPayload,
@@ -135,9 +147,10 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 		return proxyerrors.NewParsingError(
 			fmt.Errorf("failed to decode hex keccak commitment %s: %w", keccakCommitmentHex, err))
 	}
-	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
+
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, common.MaxServerPOSTRequestBodySize))
 	if err != nil {
-		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)
+		return proxyerrors.NewReadRequestBodyError(err, common.MaxServerPOSTRequestBodySize)
 	}
 
 	err = svr.keccakMgr.PutOPKeccakPairInS3(r.Context(), keccakCommitment, payload)
@@ -153,11 +166,21 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 
 // handlePostStdCommitment handles the POST request for std commitments.
 func (svr *Server) handlePostStdCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.APIsEnabled.StandardCommitment {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
+	}
+
 	return svr.handlePostShared(w, r, commitments.StandardCommitmentMode)
 }
 
 // handlePostOPGenericCommitment handles the POST request for optimism generic commitments.
 func (svr *Server) handlePostOPGenericCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.APIsEnabled.OpGenericCommitment {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("op-generic DA Commitment type detected but `op-generic` API is not enabled")
+	}
+
 	return svr.handlePostShared(w, r, commitments.OptimismGenericCommitmentMode)
 }
 
@@ -167,35 +190,29 @@ func (svr *Server) handlePostShared(
 	r *http.Request,
 	mode commitments.CommitmentMode,
 ) error {
-	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
-	if err != nil {
-		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)
+	if !svr.config.APIsEnabled.StandardCommitment && mode == commitments.StandardCommitmentMode {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
 	}
 
-	serializedCert, err := svr.certMgr.Put(r.Context(), payload)
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, common.MaxServerPOSTRequestBodySize))
+	if err != nil {
+		return proxyerrors.NewReadRequestBodyError(err, common.MaxServerPOSTRequestBodySize)
+	}
+
+	versionedCert, err := svr.certMgr.Put(r.Context(), payload, coretypes.CertSerializationRLP)
 	if err != nil {
 		return fmt.Errorf("post request failed: %w", err)
 	}
 
-	var certVersion certs.VersionByte
-	switch svr.certMgr.GetDispersalBackend() {
-	case common.V1EigenDABackend:
-		certVersion = certs.V0VersionByte
-	case common.V2EigenDABackend:
-		certVersion = certs.V2VersionByte
-	default:
-		return fmt.Errorf("unknown dispersal backend: %v", svr.certMgr.GetDispersalBackend())
-	}
-	versionedCert := certs.NewVersionedCert(serializedCert, certVersion)
-
 	responseCommit, err := commitments.EncodeCommitment(versionedCert, mode)
 	if err != nil {
 		// This error is only possible if we have a bug in the code.
-		return fmt.Errorf("failed to encode serializedCert %v: %w", serializedCert, err)
+		return fmt.Errorf("failed to encode DA Commitment %v: %w", versionedCert.SerializedCert, err)
 	}
 
 	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path, "commitmentMode", mode,
-		"certVersion", versionedCert.Version, "cert", hex.EncodeToString(serializedCert))
+		"certVersion", versionedCert.Version, "cert", hex.EncodeToString(versionedCert.SerializedCert))
 
 	// We write the commitment as bytes directly instead of hex encoded.
 	// The spec https://specs.optimism.io/experimental/alt-da.html#da-server says it should be hex-encoded,
@@ -207,7 +224,7 @@ func (svr *Server) handlePostShared(
 		// If the write fails, we will already have sent a 200 header. But we still return an error
 		// here so that the logging middleware can log it.
 		return fmt.Errorf("failed to write response for POST serializedCert (version %v) %x: %w",
-			versionedCert.Version, serializedCert, err)
+			versionedCert.Version, versionedCert.SerializedCert, err)
 	}
 	return nil
 }

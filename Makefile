@@ -21,11 +21,46 @@ endif
 
 RELEASE_TAG := $(or $(RELEASE_TAG),latest)
 
-contract-bindings:
-	$(MAKE) -C contracts bindings
+# Go's VCS stamping logic assumes .git is always a directory, but in worktrees it's a file.
+# This causes "error obtaining VCS status" when building because Go can't parse the file format.
+# See https://github.com/golang/go/issues/58218#issuecomment-1471302281
+#
+# So we detect if we're in a git worktree (where .git is a file, not a directory)
+# and set GOFLAGS to disable VCS stamping to avoid build errors if so.
+# This is a temporary workaround until Go's VCS handling is fixed.
+ifeq ($(shell test -f .git && echo "true"),true)
+export GOFLAGS := -buildvcs=false
+$(warning Detected git worktree - disabling VCS stamping)
+endif
+build: protoc contract-bindings
+	$(MAKE) -C operators/churner build
+	$(MAKE) -C disperser build
+	$(MAKE) -C node build
+	$(MAKE) -C retriever build
+	$(MAKE) -C tools/traffic build
+	$(MAKE) -C tools/kzgpad build
+	$(MAKE) -C relay build
+	$(MAKE) -C litt build
+	$(MAKE) -C api/proxy build
+	$(MAKE) -C ejector build
 
 clean:
 	$(MAKE) -C api clean
+	$(MAKE) -C operators/churner clean
+	$(MAKE) -C disperser clean
+	$(MAKE) -C node clean
+	$(MAKE) -C retriever clean
+	$(MAKE) -C tools/traffic clean
+	$(MAKE) -C tools/kzgpad clean
+	$(MAKE) -C relay clean
+	$(MAKE) -C litt clean
+	$(MAKE) -C api/proxy clean
+	$(MAKE) -C ejector clean
+	$(MAKE) -C contracts clean
+
+# Compiles the contracts and builds the golang bindings.
+contract-bindings:
+	$(MAKE) -C contracts bindings
 
 # Builds the protobuf files
 protoc:
@@ -53,27 +88,6 @@ fmt-check:
 		exit 1; \
 	fi
 
-# Go's VCS stamping logic assumes .git is always a directory, but in worktrees it's a file.
-# This causes "error obtaining VCS status" when building because Go can't parse the file format.
-# See https://github.com/golang/go/issues/58218#issuecomment-1471302281
-#
-# So we detect if we're in a git worktree (where .git is a file, not a directory)
-# and set GOFLAGS to disable VCS stamping to avoid build errors if so.
-# This is a temporary workaround until Go's VCS handling is fixed.
-ifeq ($(shell test -f .git && echo "true"),true)
-export GOFLAGS := -buildvcs=false
-$(warning Detected git worktree - disabling VCS stamping)
-endif
-build:
-	cd operators/churner && make build
-	cd disperser && make build
-	cd node && make build
-	cd retriever && make build
-	cd tools/traffic && make build
-	cd tools/kzgpad && make build
-	cd relay && make build
-	cd litt && make build
-
 # builds all services and loads them into dockerd (such that they are available via `docker images`).
 # The images will be tagged with :dev, which is the default BUILD_TAG in docker-bake.hcl.
 # This can be changed by running for example `BUILD_TAG=master make docker-build`.
@@ -92,15 +106,20 @@ docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
 	docker buildx bake proxy-release ${PUSH_FLAG}
 
-# Some of the unit test suites take > 1 min to run (e.g. relay and littdb tests).
-# TODO: we should break these up into short and long unit-tests.
+# Run all tests that don't have their own panel.
 unit-tests:
 	go clean -testcache
-	CI=true go test -short ./... -coverprofile=coverage.out
+	./test/scripts/test-with-blacklist.sh . ./litt
+
+# Run the unit tests in litt/ only.
+litt-unit-tests:
+	go clean -testcache
+	./test/scripts/test-with-whitelist.sh . ./litt
 
 fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=1m ./common
 	go test --fuzz=FuzzBlobConversion -fuzztime=1m ./api/clients/v2/coretypes
+	go test --fuzz=FuzzOnlySystematic -fuzztime=1m ./encoding/v2/kzg/prover
 
 # Integration tests use mocks
 integration-tests:
@@ -113,7 +132,7 @@ integration-tests:
 # either chain, subgraph, or localstack.
 integration-tests-inabox: build
 	go test -v ./core/thegraph
-	cd inabox && make run-e2e
+	cd inabox && make run-e2e-tests
 
 # These are e2e tests that run against live environments (preprod and holesky currently).
 live-tests:
@@ -130,3 +149,7 @@ release-build:
 ##### Proxies to other local Makefiles #####
 mdbook-serve:
 	$(MAKE) -C docs/spec serve
+
+# Generates documentation for configuration files.
+document-config:
+	cd common/config/doc_generator && go run .

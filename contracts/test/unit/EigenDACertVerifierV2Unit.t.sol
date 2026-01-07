@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import "../MockEigenDADeployer.sol";
 import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
@@ -7,6 +7,18 @@ import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDACertTypes} from "src/integrations/cert/EigenDACertTypes.sol";
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+
+// Test harness to expose internal library functions
+contract CertLibTestHarness {
+    function checkSecurityParams(
+        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
+        uint16 blobVersion,
+        EigenDATypesV1.SecurityThresholds memory securityThresholds
+    ) external view {
+        CertLib.checkSecurityParams(eigenDAThresholdRegistry, blobVersion, securityThresholds);
+    }
+}
 
 contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     using stdStorage for StdStorage;
@@ -15,31 +27,75 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     address relay0 = address(uint160(uint256(keccak256(abi.encodePacked("relay0")))));
     address relay1 = address(uint160(uint256(keccak256(abi.encodePacked("relay1")))));
 
+    CertLibTestHarness certLibHarness;
+
     function setUp() public virtual {
         quorumNumbersRequired = hex"00";
         _deployDA();
+        certLibHarness = new CertLibTestHarness();
     }
 
-    function _getDACert(uint256 seed) internal returns (EigenDACertTypes.EigenDACertV3 memory) {
+    function _getDACert(uint256 seed) internal returns (EigenDACertTypes.EigenDACertV4 memory) {
         (EigenDATypesV2.SignedBatch memory signedBatch, EigenDATypesV2.BlobInclusionInfo memory blobInclusionInfo,) =
             _getSignedBatchAndBlobVerificationProof(seed, 0);
 
         (DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertLib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
 
-        return EigenDACertTypes.EigenDACertV3(
-            signedBatch.batchHeader, blobInclusionInfo, nonSignerStakesAndSignature, signedQuorumNumbers
+        return EigenDACertTypes.EigenDACertV4(
+            signedBatch.batchHeader,
+            blobInclusionInfo,
+            nonSignerStakesAndSignature,
+            signedQuorumNumbers,
+            offchainDerivationVersion
         );
     }
 
     function test_verifyDACert(uint256 pseudoRandomNumber) public {
-        EigenDACertTypes.EigenDACertV3 memory cert = _getDACert(pseudoRandomNumber);
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
         uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
         assertEq(res, 1);
     }
 
+    function test_verifyDACert_revert_calldata_size() public view {
+        // MAX_CALLDATA_BYTES_LENGTH is 262_144, so test with slightly over the limit
+        bytes memory large_bytes = new bytes(262_145);
+        uint8 res = eigenDACertVerifier.checkDACert(large_bytes);
+
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
+    }
+
+    function test_verifyDACert_revert_exceeding_maximal_quorum_count(uint256 pseudoRandomNumber) public {
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
+
+        // MAX_QUORUM_COUNT is 5, so test with slightly over the limit
+        cert.signedQuorumNumbers = new bytes(6);
+
+        uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
+
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
+    }
+
+    function test_verifyDACert_revert_exceeding_maximal_non_signers_across_all_quorums(uint256 pseudoRandomNumber)
+        public
+    {
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
+
+        // MAX_NONSIGNER_COUNT_ALL_QUORUM is 415, so test with 416 total non-signers
+        // Distribute across 2 quorums: 208 + 208 = 416 total
+        uint32[][] memory largeNonSignerStakeIndices = new uint32[][](2);
+        largeNonSignerStakeIndices[0] = new uint32[](208);
+        largeNonSignerStakeIndices[1] = new uint32[](208);
+
+        cert.nonSignerStakesAndSignature.nonSignerStakeIndices = largeNonSignerStakeIndices;
+
+        uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
+
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
+    }
+
     function test_verifyDACert_revert_InclusionProofInvalid(uint256 pseudoRandomNumber) public {
-        EigenDACertTypes.EigenDACertV3 memory cert = _getDACert(pseudoRandomNumber);
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
 
         cert.blobInclusionInfo.inclusionProof =
             abi.encodePacked(keccak256(abi.encode(pseudoRandomNumber, "inclusion proof")));
@@ -47,6 +103,141 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         // TODO: after we modify checkDACert to return bytes, check that accompanying bytes are error signature
         // for InvalidInclusionProof error.
         assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
+    }
+
+    function test_verifyDACert_revert_OffchainDerivationVersionInvalid(uint256 pseudoRandomNumber) public {
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
+        cert.offchainDerivationVersion = cert.offchainDerivationVersion + 1;
+        uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
+    }
+
+    function test_checkSecurityParams_ValidParams() public view {
+        // Uses the default blob params from MockEigenDADeployer:
+        // maxNumOperators: 3537, numChunks: 8192, codingRate: 8
+        // and default security thresholds: confirmationThreshold: 55, adversaryThreshold: 33
+
+        uint16 blobVersion = 0;
+        EigenDATypesV1.SecurityThresholds memory securityThresholds =
+            EigenDATypesV1.SecurityThresholds({confirmationThreshold: 55, adversaryThreshold: 33});
+
+        // This should not revert
+        certLibHarness.checkSecurityParams(eigenDAThresholdRegistry, blobVersion, securityThresholds);
+    }
+
+    function test_checkSecurityParams_revert_MaxNumOperatorsExceedsNumChunks() public {
+        // Create blob params where maxNumOperators > numChunks (underflow condition)
+        EigenDATypesV1.VersionedBlobParams memory invalidBlobParams = EigenDATypesV1.VersionedBlobParams({
+            maxNumOperators: 100,
+            numChunks: 50, // maxNumOperators > numChunks
+            codingRate: 8
+        });
+
+        // Add this as blob version 1
+        vm.prank(registryCoordinatorOwner);
+        eigenDAThresholdRegistry.addVersionedBlobParams(invalidBlobParams);
+
+        uint16 blobVersion = 1;
+        EigenDATypesV1.SecurityThresholds memory securityThresholds =
+            EigenDATypesV1.SecurityThresholds({confirmationThreshold: 55, adversaryThreshold: 33});
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CertLib.SecurityAssumptionsNotMet.selector,
+                securityThresholds.confirmationThreshold,
+                securityThresholds.adversaryThreshold,
+                invalidBlobParams.codingRate,
+                invalidBlobParams.numChunks,
+                invalidBlobParams.maxNumOperators
+            )
+        );
+        certLibHarness.checkSecurityParams(eigenDAThresholdRegistry, blobVersion, securityThresholds);
+    }
+
+    function test_checkSecurityParams_revert_ConfirmationLessThanAdversary() public {
+        uint16 blobVersion = 0;
+        // Create security thresholds where confirmationThreshold < adversaryThreshold (underflow condition)
+        EigenDATypesV1.SecurityThresholds memory invalidSecurityThresholds = EigenDATypesV1.SecurityThresholds({
+            confirmationThreshold: 30,
+            adversaryThreshold: 50 // confirmationThreshold < adversaryThreshold
+        });
+
+        EigenDATypesV1.VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobVersion);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CertLib.SecurityAssumptionsNotMet.selector,
+                invalidSecurityThresholds.confirmationThreshold,
+                invalidSecurityThresholds.adversaryThreshold,
+                blobParams.codingRate,
+                blobParams.numChunks,
+                blobParams.maxNumOperators
+            )
+        );
+        certLibHarness.checkSecurityParams(eigenDAThresholdRegistry, blobVersion, invalidSecurityThresholds);
+    }
+
+    function test_checkSecurityParams_revert_SecurityInequalityFails() public {
+        // Create parameters that fail the security inequality:
+        // codingRate * (numChunks - maxNumOperators) * (confirmationThreshold - adversaryThreshold) >= 100 * numChunks
+
+        // Create blob params with tight constraints
+        EigenDATypesV1.VersionedBlobParams memory tightBlobParams =
+            EigenDATypesV1.VersionedBlobParams({maxNumOperators: 3, numChunks: 16, codingRate: 2});
+
+        vm.prank(registryCoordinatorOwner);
+        eigenDAThresholdRegistry.addVersionedBlobParams(tightBlobParams);
+
+        uint16 blobVersion = 1;
+
+        // Use thresholds that will fail the inequality
+        // LHS = 2 * (16 - 3) * (55 - 33) = 572
+        // RHS = 100 * 16 = 1600
+        // 572 < 1600, so this should fail
+        EigenDATypesV1.SecurityThresholds memory insecureThresholds =
+            EigenDATypesV1.SecurityThresholds({confirmationThreshold: 55, adversaryThreshold: 33});
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CertLib.SecurityAssumptionsNotMet.selector,
+                insecureThresholds.confirmationThreshold,
+                insecureThresholds.adversaryThreshold,
+                tightBlobParams.codingRate,
+                tightBlobParams.numChunks,
+                tightBlobParams.maxNumOperators
+            )
+        );
+        certLibHarness.checkSecurityParams(eigenDAThresholdRegistry, blobVersion, insecureThresholds);
+    }
+
+    function test_verifyDACert_revert_exceeding_maximal_quorum_count_exact_error(uint256 pseudoRandomNumber) public {
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
+
+        // MAX_QUORUM_COUNT is 5, so test with 6
+        cert.signedQuorumNumbers = new bytes(6);
+
+        // Expect QuorumCountExceedsMaximum error with count = 6
+        vm.expectRevert(abi.encodeWithSelector(CertLib.QuorumCountExceedsMaximum.selector, 6, 5));
+
+        // Test via the public checkDACertReverts function
+        eigenDACertVerifier.checkDACertReverts(cert);
+    }
+
+    function test_verifyDACert_revert_exceeding_maximal_nonsigner_exact_error(uint256 pseudoRandomNumber) public {
+        EigenDACertTypes.EigenDACertV4 memory cert = _getDACert(pseudoRandomNumber);
+
+        // MAX_NONSIGNER_COUNT_ALL_QUORUM is 415, so test with 416
+        uint32[][] memory largeNonSignerStakeIndices = new uint32[][](2);
+        largeNonSignerStakeIndices[0] = new uint32[](208);
+        largeNonSignerStakeIndices[1] = new uint32[](208);
+
+        cert.nonSignerStakesAndSignature.nonSignerStakeIndices = largeNonSignerStakeIndices;
+
+        // Expect NonSignerCountExceedsMaximum error with count = 416
+        vm.expectRevert(abi.encodeWithSelector(CertLib.NonSignerCountExceedsMaximum.selector, 416, 415));
+
+        // Test via the public checkDACertReverts function
+        eigenDACertVerifier.checkDACertReverts(cert);
     }
 
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version)

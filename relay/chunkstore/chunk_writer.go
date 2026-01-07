@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 )
 
 // ChunkWriter writes chunks that can be read by ChunkReader.
@@ -24,30 +23,25 @@ type ChunkWriter interface {
 	ProofExists(ctx context.Context, blobKey corev2.BlobKey) bool
 	// CoefficientsExists checks if the coefficients for the blob key exist in the chunk store.
 	// Returns a bool indicating if the coefficients exist and fragment info.
-	CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey) (bool, *encoding.FragmentInfo)
+	CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey) bool
 }
 
 var _ ChunkWriter = (*chunkWriter)(nil)
 
 type chunkWriter struct {
-	logger       logging.Logger
-	s3Client     s3.Client
-	bucketName   string
-	fragmentSize int
+	s3Client   s3.S3Client
+	bucketName string
 }
 
 // NewChunkWriter creates a new ChunkWriter.
 func NewChunkWriter(
-	logger logging.Logger,
-	s3Client s3.Client,
+	s3Client s3.S3Client,
 	bucketName string,
-	fragmentSize int) ChunkWriter {
+) ChunkWriter {
 
 	return &chunkWriter{
-		logger:       logger,
-		s3Client:     s3Client,
-		bucketName:   bucketName,
-		fragmentSize: fragmentSize,
+		s3Client:   s3Client,
+		bucketName: bucketName,
 	}
 }
 
@@ -56,14 +50,12 @@ func (c *chunkWriter) PutFrameProofs(ctx context.Context, blobKey corev2.BlobKey
 		return fmt.Errorf("no proofs to upload")
 	}
 
-	bytes, err := rs.SerializeFrameProofs(proofs)
+	bytes, err := encoding.SerializeFrameProofs(proofs)
 	if err != nil {
-		c.logger.Error("Failed to encode proofs", "err", err)
 		return fmt.Errorf("failed to encode proofs: %v", err)
 	}
 	err = c.s3Client.UploadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey), bytes)
 	if err != nil {
-		c.logger.Errorf("Failed to upload chunk proofs to S3: %v", err)
 		return fmt.Errorf("failed to upload chunk proofs to S3: %v", err)
 	}
 
@@ -79,19 +71,16 @@ func (c *chunkWriter) PutFrameCoefficients(
 	}
 	bytes, err := rs.SerializeFrameCoeffsSlice(frames)
 	if err != nil {
-		c.logger.Error("Failed to encode frames", "err", err)
 		return nil, fmt.Errorf("failed to encode frames: %v", err)
 	}
 
-	err = c.s3Client.FragmentedUploadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey), bytes, c.fragmentSize)
+	err = c.s3Client.UploadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey), bytes)
 	if err != nil {
-		c.logger.Errorf("Failed to upload chunk coefficients to S3: %v", err)
 		return nil, fmt.Errorf("failed to upload chunk coefficients to S3: %v", err)
 	}
 
 	return &encoding.FragmentInfo{
-		TotalChunkSizeBytes: uint32(len(bytes)),
-		FragmentSizeBytes:   uint32(c.fragmentSize),
+		SymbolsPerFrame: uint32(len(frames[0])),
 	}, nil
 }
 
@@ -104,22 +93,11 @@ func (c *chunkWriter) ProofExists(ctx context.Context, blobKey corev2.BlobKey) b
 	return false
 }
 
-func (c *chunkWriter) CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey) (bool, *encoding.FragmentInfo) {
-	// TODO(ian-shim): check latency
-	objs, err := c.s3Client.ListObjects(ctx, c.bucketName, s3.ScopedChunkKey(blobKey))
-	if err != nil {
-		return false, nil
+func (c *chunkWriter) CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey) bool {
+	size, err := c.s3Client.HeadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey))
+	if err == nil && size != nil && *size > 0 {
+		return true
 	}
 
-	keys := make([]string, len(objs))
-	totalSize := int64(0)
-	for i, obj := range objs {
-		keys[i] = obj.Key
-		totalSize += int64(obj.Size)
-	}
-
-	return s3.SortAndCheckAllFragmentsExist(keys), &encoding.FragmentInfo{
-		TotalChunkSizeBytes: uint32(totalSize),
-		FragmentSizeBytes:   uint32(c.fragmentSize),
-	}
+	return false
 }

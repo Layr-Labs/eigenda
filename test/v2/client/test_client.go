@@ -5,43 +5,51 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
 
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	metricsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
-	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
-	"github.com/Layr-Labs/eigenda/core/eth/directory"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/litt/util"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
+	common_eigenda "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/disperser"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	kzgv1 "github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -56,9 +64,10 @@ type TestClient struct {
 	config                      *TestClientConfig
 	payloadClientConfig         *clientsv2.PayloadClientConfig
 	logger                      logging.Logger
-	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
-	disperserClient             *clientsv2.DisperserClient
-	payloadDisperser            *payloaddispersal.PayloadDisperser
+	chainID                     *big.Int
+	certVerifierAddressProvider clientsv2.CertVerifierAddressProvider
+	disperserClientMultiplexer  *dispersal.DisperserClientMultiplexer
+	payloadDisperser            *dispersal.PayloadDisperser
 	relayClient                 relay.RelayClient
 	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
 	indexedChainState           core.IndexedChainState
@@ -72,14 +81,14 @@ type TestClient struct {
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
-	metrics                     *testClientMetrics
+	metrics                     *TestClientMetrics
 }
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(
 	ctx context.Context,
 	logger logging.Logger,
-	metrics *testClientMetrics,
+	metrics *TestClientMetrics,
 	config *TestClientConfig) (*TestClient, error) {
 
 	if config.SRSNumberToLoad == 0 {
@@ -88,12 +97,7 @@ func NewTestClient(
 
 	// Construct the disperser client
 
-	privateKey, err := loadPrivateKey(config.KeyPath, config.KeyVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load private key: %w", err)
-	}
-
-	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
+	signer, err := auth.NewLocalBlobRequestSigner(config.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
@@ -129,60 +133,56 @@ func NewTestClient(
 		g2TrailingPath = ""
 	}
 
-	kzgConfig := &kzg.KzgConfig{
-		LoadG2Points:    true,
-		G1Path:          g1Path,
-		G2Path:          g2Path,
-		G2TrailingPath:  g2TrailingPath,
-		CacheDir:        srsTablesPath,
-		SRSOrder:        config.SRSOrder,
-		SRSNumberToLoad: config.SRSNumberToLoad,
-		NumWorker:       32,
-	}
-
-	kzgProver, err := prover.NewProver(kzgConfig, nil)
+	kzgCommitter, err := committer.NewFromConfig(committer.Config{
+		G1SRSPath:         g1Path,
+		G2SRSPath:         g2Path,
+		G2TrailingSRSPath: g2TrailingPath,
+		SRSNumberToLoad:   config.SRSNumberToLoad,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create KZG prover: %w", err)
+		return nil, fmt.Errorf("new committer: %w", err)
 	}
 
-	disperserConfig := &clientsv2.DisperserClientConfig{
-		Hostname:                 config.DisperserHostname,
-		Port:                     fmt.Sprintf("%d", config.DisperserPort),
-		UseSecureGrpcFlag:        true,
-		DisperserConnectionCount: config.DisperserConnectionCount,
+	var registry *prometheus.Registry
+	if metrics != nil {
+		registry = metrics.registry
 	}
 
-	accountant := clientsv2.NewUnpopulatedAccountant(accountId, metricsv2.NoopAccountantMetrics)
-	disperserClient, err := clientsv2.NewDisperserClient(
-		logger,
-		disperserConfig,
-		signer,
-		kzgProver,
-		accountant,
-		metricsv2.NoopDispersalMetrics,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create disperser client: %w", err)
-	}
-	err = disperserClient.PopulateAccountant(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to populate accountant: %w", err)
-	}
-
-	ethRPCUrls, err := loadEthRPCURLs(config.EthRPCURLs, config.EthRPCUrlsVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load Ethereum RPC URLs: %w", err)
-	}
-
+	accountantMetrics := metricsv2.NewAccountantMetrics(registry)
+	dispersalMetrics := metricsv2.NewDispersalMetrics(registry)
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          ethRPCUrls,
-		PrivateKeyString: privateKey,
+		RPCURLs:          config.EthRpcUrls,
+		PrivateKeyString: config.PrivateKey,
 		NumConfirmations: 0,
 		NumRetries:       3,
 	}
 	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, accountId, logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Ethereum client: %w", err)
+		return nil, fmt.Errorf("create Ethereum client: %w", err)
+	}
+
+	chainId, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get chain ID: %w", err)
+	}
+
+	multiplexerConfig := dispersal.DefaultDisperserClientMultiplexerConfig()
+	multiplexerConfig.DisperserConnectionCount = config.DisperserConnectionCount
+	multiplexerConfig.ChainID = chainId
+	disperserRegistry := disperser.NewLegacyDisperserRegistry(
+		fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort))
+
+	disperserClientMultiplexer, err := dispersal.NewDisperserClientMultiplexer(
+		logger,
+		multiplexerConfig,
+		disperserRegistry,
+		signer,
+		kzgCommitter,
+		dispersalMetrics,
+		rand.New(rand.NewSource(time.Now().UnixNano())),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create disperser client multiplexer: %w", err)
 	}
 
 	contractDirectoryAddress := gethcommon.HexToAddress(config.ContractDirectoryAddress)
@@ -210,7 +210,15 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}
 
-	certVerifierAddressProvider := &test.TestCertVerifierAddressProvider{}
+	routerAddress, err := contractDirectory.GetContractAddress(ctx, directory.CertVerifierRouter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CertVerifierRouter address from contract directory: %w", err)
+	}
+
+	certVerifierAddressProvider, err := verification.BuildRouterAddressProvider(routerAddress, ethClient, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cert verifier address provider: %w", err)
+	}
 
 	certVerifier, err := verification.NewCertVerifier(logger, ethClient, certVerifierAddressProvider)
 	if err != nil {
@@ -222,16 +230,11 @@ func NewTestClient(
 	//  options.
 	payloadClientConfig := clientsv2.GetDefaultPayloadClientConfig()
 
-	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
+	payloadDisperserConfig := dispersal.PayloadDisperserConfig{
 		PayloadClientConfig: *payloadClientConfig,
 		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 		BlobCompleteTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 		ContractCallTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
-	}
-
-	var registry *prometheus.Registry
-	if metrics != nil {
-		registry = metrics.registry
 	}
 
 	certBuilder, err := clientsv2.NewCertBuilder(logger,
@@ -251,14 +254,33 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
 	}
 
-	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
+	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	clientLedger, err := buildClientLedger(
+		ctx,
+		logger,
+		ethClient,
+		paymentVaultAddr,
+		accountId,
+		clientledger.ClientLedgerMode(config.ClientLedgerPaymentMode),
+		disperserClientMultiplexer,
+		accountantMetrics,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build client ledger: %w", err)
+	}
+
+	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
-		disperserClient,
+		disperserClientMultiplexer,
 		blockMon,
 		certBuilder,
 		certVerifier,
-		nil,
+		clientLedger,
 		registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
@@ -296,9 +318,22 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
-	verifierKzgConfig := kzgConfig
-	verifierKzgConfig.LoadG2Points = false
-	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig, nil)
+	kzgConfig := &kzgv1.KzgConfig{
+		LoadG2Points:    true,
+		G1Path:          g1Path,
+		G2Path:          g2Path,
+		G2TrailingPath:  g2TrailingPath,
+		CacheDir:        srsTablesPath,
+		SRSOrder:        config.SrsOrder,
+		SRSNumberToLoad: config.SRSNumberToLoad,
+		NumWorker:       32,
+	}
+	verifierKzgConfig := verifier.ConfigFromV1KzgConfig(kzgConfig)
+	encoder, err := rs.NewEncoder(logger, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create encoder: %w", err)
+	}
+	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
 	}
@@ -323,7 +358,7 @@ func NewTestClient(
 
 	chainState := eth.NewChainState(ethReader, ethClient)
 	icsConfig := thegraph.Config{
-		Endpoint:     config.SubgraphURL,
+		Endpoint:     config.SubgraphUrl,
 		PullInterval: 100 * time.Millisecond,
 		MaxRetries:   5,
 	}
@@ -343,6 +378,7 @@ func NewTestClient(
 		logger,
 		ethReader,
 		indexedChainState,
+		encoder,
 		blobVerifier,
 		clientConfig,
 		validatorClientMetrics)
@@ -371,23 +407,37 @@ func NewTestClient(
 		logger,
 		ethReader,
 		indexedChainState,
+		encoder,
 		blobVerifier,
 		onlyDownloadClientConfig,
 		validatorClientMetrics)
 
-	proxyWrapper, err := NewProxyWrapper(context.Background(), logger,
+	proxyWrapper, err := NewProxyWrapper(ctx, logger,
 		&proxyconfig.AppConfig{
 			SecretConfig: proxycommon.SecretConfigV2{
-				SignerPaymentKey: privateKey,
-				EthRPCURL:        ethRPCUrls[0],
+				SignerPaymentKey: config.PrivateKey,
+				EthRPCURL:        config.EthRpcUrls[0],
+			},
+			EnabledServersConfig: &enablement.EnabledServersConfig{
+				Metric:      false,
+				ArbCustomDA: false,
+				RestAPIConfig: enablement.RestApisEnabled{
+					Admin:               false,
+					OpGenericCommitment: true,
+					OpKeccakCommitment:  true,
+					StandardCommitment:  true,
+				},
 			},
 			RestSvrCfg: proxyserver.Config{
-				Host:        "localhost",
-				Port:        config.ProxyPort,
-				EnabledAPIs: []string{"admin"},
-			},
-			MetricsSvrConfig: proxymetrics.Config{
-				Enabled: false, // TODO (cody.littley) enable proxy metrics
+				Host: "localhost",
+				Port: config.ProxyPort,
+				// TODO (cody.littley) enable proxy metrics
+				APIsEnabled: &enablement.RestApisEnabled{
+					Admin:               false,
+					OpGenericCommitment: true,
+					OpKeccakCommitment:  true,
+					StandardCommitment:  true,
+				},
 			},
 			StoreBuilderConfig: builder.Config{
 				StoreConfig: store.Config{
@@ -396,12 +446,13 @@ func NewTestClient(
 					AsyncPutWorkers:  32,
 				},
 				ClientConfigV2: proxycommon.ClientConfigV2{
-					DisperserClientCfg: clientsv2.DisperserClientConfig{
-						Hostname:          config.DisperserHostname,
-						Port:              fmt.Sprintf("%d", config.DisperserPort),
+					DisperserClientCfg: dispersal.DisperserClientConfig{
+						GrpcUri:           fmt.Sprintf("%s:%d", config.DisperserHostname, config.DisperserPort),
 						UseSecureGrpcFlag: true,
+						DisperserID:       0,
+						ChainID:           chainId,
 					},
-					PayloadDisperserCfg: payloaddispersal.PayloadDisperserConfig{
+					PayloadDisperserCfg: dispersal.PayloadDisperserConfig{
 						PayloadClientConfig:    *payloadClientConfig,
 						DisperseBlobTimeout:    5 * time.Minute,
 						BlobCompleteTimeout:    5 * time.Minute,
@@ -412,9 +463,11 @@ func NewTestClient(
 						PayloadClientConfig: *payloadClientConfig,
 						RelayTimeout:        5 * time.Second,
 					},
+					ClientLedgerMode:                   clientledger.ParseClientLedgerMode(config.ClientLedgerPaymentMode),
+					VaultMonitorInterval:               time.Second * 30,
 					PutTries:                           3,
 					MaxBlobSizeBytes:                   16 * units.MiB,
-					EigenDACertVerifierOrRouterAddress: config.EigenDACertVerifierAddressQuorums0_1,
+					EigenDACertVerifierOrRouterAddress: routerAddress.Hex(),
 					EigenDADirectory:                   contractDirectoryAddress.Hex(),
 					RetrieversToEnable: []proxycommon.RetrieverType{
 						proxycommon.RelayRetrieverType,
@@ -432,8 +485,9 @@ func NewTestClient(
 		config:                      config,
 		payloadClientConfig:         payloadClientConfig,
 		logger:                      logger,
+		chainID:                     chainId,
 		certVerifierAddressProvider: certVerifierAddressProvider,
-		disperserClient:             disperserClient,
+		disperserClientMultiplexer:  disperserClientMultiplexer,
 		payloadDisperser:            payloadDisperser,
 		relayClient:                 relayClient,
 		relayPayloadRetriever:       relayPayloadRetriever,
@@ -443,64 +497,11 @@ func NewTestClient(
 		certBuilder:                 certBuilder,
 		onlyDownloadValidatorClient: onlyDownloadValidatorClient,
 		certVerifier:                certVerifier,
-		privateKey:                  privateKey,
+		privateKey:                  config.PrivateKey,
 		metricsRegistry:             registry,
 		metrics:                     metrics,
 		proxyWrapper:                proxyWrapper,
 	}, nil
-}
-
-// loadPrivateKey loads the private key from the file/env var specified in the config.
-func loadPrivateKey(keyPath string, keyVar string) (string, error) {
-	var privateKey string
-	if keyPath != "" {
-		privateKeyFile, err := util.SanitizePath(keyPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to sanitize path: %w", err)
-		}
-
-		exists, err := util.Exists(privateKeyFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to check if private key file exists: %w", err)
-		}
-		if exists {
-			privateKeyBytes, err := os.ReadFile(privateKeyFile)
-			if err != nil {
-				return "", fmt.Errorf("failed to read private key file: %w", err)
-			}
-			privateKey = string(privateKeyBytes)
-		}
-	}
-
-	if privateKey == "" {
-		if keyVar == "" {
-			return "", fmt.Errorf("either KeyPath must reference a valid key file or KeyVar must be set")
-		}
-		privateKey = os.Getenv(keyVar)
-		if privateKey == "" {
-			return "", fmt.Errorf("key not found in environment variable %s", keyVar)
-		}
-	}
-
-	return formatPrivateKey(privateKey), nil
-}
-
-// loadEthRPCURLs loads the Ethereum RPC URLs from the file/env var specified in the config.
-func loadEthRPCURLs(urls []string, urlsVar string) ([]string, error) {
-	if len(urls) > 0 {
-		return urls, nil
-	}
-
-	if urlsVar == "" {
-		return nil, fmt.Errorf("either EthRPCURLs or EthRPCUrlsVar must be set")
-	}
-
-	ethRPCURLs := os.Getenv(urlsVar)
-	if ethRPCURLs == "" {
-		return nil, fmt.Errorf("URLs not found in environment variable %s", urlsVar)
-	}
-
-	return strings.Split(ethRPCURLs, ","), nil
 }
 
 // formatPrivateKey formats the private key by removing leading/trailing whitespace and "0x" prefix.
@@ -520,19 +521,18 @@ func (c *TestClient) GetLogger() logging.Logger {
 	return c.logger
 }
 
-// SetCertVerifierAddress sets the address string which will be returned by the cert verifier address to all users of
-// the provider
-func (c *TestClient) SetCertVerifierAddress(certVerifierAddress string) {
-	c.certVerifierAddressProvider.SetCertVerifierAddress(gethcommon.HexToAddress(certVerifierAddress))
+// GetChainID returns the chain ID.
+func (c *TestClient) GetChainID() *big.Int {
+	return c.chainID
 }
 
-// GetDisperserClient returns the test client's disperser client.
-func (c *TestClient) GetDisperserClient() *clientsv2.DisperserClient {
-	return c.disperserClient
+// GetDisperserClient returns the test client's disperser client multiplexer.
+func (c *TestClient) GetDisperserClientMultiplexer() *dispersal.DisperserClientMultiplexer {
+	return c.disperserClientMultiplexer
 }
 
 // GetPayloadDisperser returns the test client's payload disperser.
-func (c *TestClient) GetPayloadDisperser() *payloaddispersal.PayloadDisperser {
+func (c *TestClient) GetPayloadDisperser() *dispersal.PayloadDisperser {
 	return c.payloadDisperser
 }
 
@@ -640,7 +640,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		blobKey,
 		eigenDAV3Cert.RelayKeys(),
 		payload,
-		uint32(blobLengthSymbols),
+		blobLengthSymbols,
 		0)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
@@ -862,7 +862,7 @@ func (c *TestClient) ReadBlobFromValidators(
 			return fmt.Errorf("failed to read blob from validators, %s", err)
 		}
 
-		blobLengthSymbols := uint32(header.BlobCommitments.Length)
+		blobLengthSymbols := header.BlobCommitments.Length
 		var blob *coretypes.Blob
 		blob, err = coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
 		if err != nil {
@@ -957,4 +957,172 @@ func (c *TestClient) EstimateGasAndReportCheckDACert(
 
 	c.metrics.reportEstimateGasCheckDACert(gas)
 	return gas, nil
+}
+
+func buildClientLedger(
+	ctx context.Context,
+	logger logging.Logger,
+	ethClient common_eigenda.EthClient,
+	paymentVaultAddr gethcommon.Address,
+	accountID gethcommon.Address,
+	mode clientledger.ClientLedgerMode,
+	disperserClientMultiplexer *dispersal.DisperserClientMultiplexer,
+	accountantMetrics metricsv2.AccountantMetricer,
+) (*clientledger.ClientLedger, error) {
+	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddr)
+	if err != nil {
+		return nil, fmt.Errorf("new payment vault: %w", err)
+	}
+
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get min num symbols: %w", err)
+	}
+
+	var reservationLedger *reservation.ReservationLedger
+	var onDemandLedger *ondemand.OnDemandLedger
+	switch mode {
+	case clientledger.ClientLedgerModeReservationOnly:
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
+		if err != nil {
+			return nil, fmt.Errorf("build reservation ledger: %w", err)
+		}
+	case clientledger.ClientLedgerModeOnDemandOnly:
+		cumulativePayment, err := getCumulativePayment(ctx, disperserClientMultiplexer)
+		if err != nil {
+			return nil, fmt.Errorf("get cumulative payment: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, cumulativePayment)
+		if err != nil {
+			return nil, fmt.Errorf("build on-demand ledger: %w", err)
+		}
+
+	case clientledger.ClientLedgerModeReservationAndOnDemand:
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, minNumSymbols)
+		if err != nil {
+			return nil, fmt.Errorf("build reservation ledger: %w", err)
+		}
+		cumulativePayment, err := getCumulativePayment(ctx, disperserClientMultiplexer)
+		if err != nil {
+			return nil, fmt.Errorf("get cumulative payment: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, cumulativePayment)
+		if err != nil {
+			return nil, fmt.Errorf("build on-demand ledger: %w", err)
+		}
+
+	default:
+		return nil, fmt.Errorf("unexpected client ledger mode: %s", mode)
+	}
+
+	ledger := clientledger.NewClientLedger(
+		ctx,
+		logger,
+		accountantMetrics,
+		accountID,
+		mode,
+		reservationLedger,
+		onDemandLedger,
+		time.Now,
+		paymentVault,
+		30*time.Second,
+	)
+
+	return ledger, nil
+}
+
+func buildReservationLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID gethcommon.Address,
+	minNumSymbols uint32,
+) (*reservation.ReservationLedger, error) {
+	reservationData, err := paymentVault.GetReservation(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation: %w", err)
+	}
+	if reservationData == nil {
+		return nil, fmt.Errorf("no reservation found for account %s", accountID.Hex())
+	}
+
+	clientReservation, err := reservation.NewReservation(
+		reservationData.SymbolsPerSecond,
+		time.Unix(int64(reservationData.StartTimestamp), 0),
+		time.Unix(int64(reservationData.EndTimestamp), 0),
+		reservationData.QuorumNumbers,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation: %w", err)
+	}
+
+	reservationConfig, err := reservation.NewReservationLedgerConfig(
+		*clientReservation,
+		minNumSymbols,
+		true,
+		ratelimit.OverfillOncePermitted,
+		// TODO(litt3): once the checkpointed onchain config registry is ready, that should be used
+		// instead of hardcoding. At that point, this field will be removed from the config struct
+		// entirely, and the value will be fetched dynamically at runtime.
+		60*time.Second,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger config: %w", err)
+	}
+
+	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, time.Now)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger: %w", err)
+	}
+
+	return reservationLedger, nil
+}
+
+func buildOnDemandLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID gethcommon.Address,
+	minNumSymbols uint32,
+	cumulativePayment *big.Int,
+) (*ondemand.OnDemandLedger, error) {
+	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get price per symbol: %w", err)
+	}
+
+	totalDeposits, err := paymentVault.GetTotalDeposit(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get total deposit from vault: %w", err)
+	}
+
+	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
+		totalDeposits,
+		new(big.Int).SetUint64(pricePerSymbol),
+		minNumSymbols,
+		cumulativePayment,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("on-demand ledger from value: %w", err)
+	}
+
+	return onDemandLedger, nil
+}
+
+func getCumulativePayment(
+	ctx context.Context,
+	disperserClientMultiplexer *dispersal.DisperserClientMultiplexer,
+) (*big.Int, error) {
+	disperserClient, err := disperserClientMultiplexer.GetDisperserClient(ctx, time.Now(), true)
+	if err != nil {
+		return nil, fmt.Errorf("get disperser client: %w", err)
+	}
+
+	paymentState, err := disperserClient.GetPaymentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get payment state: %w", err)
+	}
+
+	if paymentState.GetCumulativePayment() == nil {
+		return big.NewInt(0), nil
+	}
+	return new(big.Int).SetBytes(paymentState.GetCumulativePayment()), nil
 }

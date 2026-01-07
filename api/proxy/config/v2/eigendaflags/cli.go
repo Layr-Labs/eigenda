@@ -2,12 +2,11 @@ package eigendaflags
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
@@ -28,16 +27,17 @@ var (
 	CertVerifierRouterOrImmutableVerifierAddrFlagName = withFlagPrefix(
 		"cert-verifier-router-or-immutable-verifier-addr",
 	)
-	EigenDADirectoryFlagName        = withFlagPrefix("eigenda-directory")
-	RelayTimeoutFlagName            = withFlagPrefix("relay-timeout")
-	ValidatorTimeoutFlagName        = withFlagPrefix("validator-timeout")
-	ContractCallTimeoutFlagName     = withFlagPrefix("contract-call-timeout")
-	BlobParamsVersionFlagName       = withFlagPrefix("blob-version")
-	EthRPCURLFlagName               = withFlagPrefix("eth-rpc")
-	MaxBlobLengthFlagName           = withFlagPrefix("max-blob-length")
-	NetworkFlagName                 = withFlagPrefix("network")
-	RBNRecencyWindowSizeFlagName    = withFlagPrefix("rbn-recency-window-size")
-	RelayConnectionPoolSizeFlagName = withFlagPrefix("relay-connection-pool-size")
+	EigenDADirectoryFlagName          = withFlagPrefix("eigenda-directory")
+	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
+	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
+	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")
+	BlobParamsVersionFlagName         = withFlagPrefix("blob-version")
+	EthRPCURLFlagName                 = withFlagPrefix("eth-rpc")
+	EthRPCRetryCountFlagName          = withFlagPrefix("eth-rpc-retry-count")
+	EthRPCRetryDelayIncrementFlagName = withFlagPrefix("eth-rpc-retry-delay-increment")
+	MaxBlobLengthFlagName             = withFlagPrefix("max-blob-length")
+	NetworkFlagName                   = withFlagPrefix("network")
+	RelayConnectionPoolSizeFlagName   = withFlagPrefix("relay-connection-pool-size")
 
 	ClientLedgerModeFlagName            = withFlagPrefix("client-ledger-mode")
 	PaymentVaultMonitorIntervalFlagName = withFlagPrefix("payment-vault-monitor-interval")
@@ -68,8 +68,10 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 		},
 		&cli.StringFlag{
-			Name:     SignerPaymentKeyHexFlagName,
-			Usage:    "Hex-encoded signer private key. Used for authorizing payments with EigenDA disperser. Should not be associated with an Ethereum address holding any funds.",
+			Name: SignerPaymentKeyHexFlagName,
+			Usage: "Optional hex-encoded signer private key. Used for authorizing payments with EigenDA disperser in PUT routes. " +
+				"If not provided, proxy will be started in read-only mode, and will not be able to submit blobs to EigenDA. " +
+				"Should not be associated with an Ethereum address holding any funds.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "SIGNER_PRIVATE_KEY_HEX")},
 			Category: category,
 		},
@@ -87,6 +89,27 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC")},
 			Category: category,
 			Required: false,
+		},
+		&cli.IntFlag{
+			Name: EthRPCRetryCountFlagName,
+			Usage: "The retry count for the Ethereum RPC request after the initial call fails. Please see " +
+				"EIGENDA_PROXY_EIGENDA_V2_ETH_RPC_RETRY_DELAY for the linear retry backoff strategy.",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC_RETRY_COUNT")},
+			Value:    1,
+			Category: category,
+			Required: false,
+		},
+		&cli.DurationFlag{
+			Name: EthRPCRetryDelayIncrementFlagName,
+			Usage: "Time unit for linear retry delay. For instance, if the retries count is 2 and retry delay is " +
+				"1 second, then 0 second is waited for the first call; 1 seconds are waited before the next retry; " +
+				"2 seconds are waited for the second retry; if the call failed, the total waited time for retry is " +
+				"3 seconds. If the retry delay is 0 second, the total waited time for retry is 0 second, " +
+				"which is useful when there are multiple rpc providers.",
+			Required: false,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC_RETRY_DELAY_INCREMENT")},
+			Value:    1 * time.Second,
+			Category: category,
 		},
 		&cli.IntFlag{
 			Name: PutRetriesFlagName,
@@ -186,24 +209,12 @@ See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/common/eigenda_ne
 for the exact values getting set by this flag. All of those values can also be manually
 set via their respective flags, and take precedence over the default values set by the network flag.
 If all of those other flags are manually configured, the network flag may be omitted. 
-Permitted EigenDANetwork values include %s, %s, %s, & %s.`,
+Permitted EigenDANetwork values include %s, %s, & %s.`,
 				common.MainnetEigenDANetwork,
-				common.HoleskyTestnetEigenDANetwork,
-				common.HoleskyPreprodEigenDANetwork,
+				common.HoodiTestnetEigenDANetwork,
 				common.SepoliaTestnetEigenDANetwork,
 			),
 			EnvVars:  []string{withEnvPrefix(envPrefix, "NETWORK")},
-			Category: category,
-		},
-		&cli.Uint64Flag{
-			Name: RBNRecencyWindowSizeFlagName,
-			Usage: `Allowed distance (in L1 blocks) between the eigenDA cert's reference 
-block number (RBN) and the L1 block number at which the cert was included 
-in the rollup's batch inbox. A cert is valid when cert.RBN < certL1InclusionBlock <= cert.RBN + rbnRecencyWindowSize, 
-and otherwise is considered stale and verification will fail, and a 418 HTTP error will be returned.
-This check is optional and will be skipped when set to 0.`,
-			Value:    0,
-			EnvVars:  []string{withEnvPrefix(envPrefix, "RBN_RECENCY_WINDOW_SIZE")},
 			Category: category,
 		},
 		&cli.Uint64Flag{
@@ -216,11 +227,9 @@ This check is optional and will be skipped when set to 0.`,
 		},
 		&cli.StringFlag{
 			Name: ClientLedgerModeFlagName,
-			Usage: "Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', " +
-				"'reservation-and-on-demand'. The current default is 'legacy', which means that payments will be tracked " +
-				"via the bin-based model, which is in the process of being deprecated. Eventually, the 'legacy' option " +
-				"will be removed, once the migration to the new leaky bucket payment model is complete.",
-			Value:    "legacy",
+			Usage: "Payment mode for the client. Options: 'legacy' (old bin-based payment logic, slated for " +
+				"deprecation), 'reservation-only', 'on-demand-only', 'reservation-and-on-demand'.",
+			Value:    "reservation-only",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CLIENT_LEDGER_MODE")},
 			Category: category,
 			Required: false,
@@ -289,7 +298,6 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		},
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
 		EigenDADirectory:                   eigenDADirectory,
-		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,
 		RelayConnectionPoolSize:            ctx.Uint(RelayConnectionPoolSizeFlagName),
 		ClientLedgerMode:                   clientledger.ParseClientLedgerMode(ctx.String(ClientLedgerModeFlagName)),
@@ -320,10 +328,10 @@ func readPayloadClientConfig(ctx *cli.Context) clients_v2.PayloadClientConfig {
 	}
 }
 
-func readPayloadDisperserCfg(ctx *cli.Context) payloaddispersal.PayloadDisperserConfig {
+func readPayloadDisperserCfg(ctx *cli.Context) dispersal.PayloadDisperserConfig {
 	payCfg := readPayloadClientConfig(ctx)
 
-	return payloaddispersal.PayloadDisperserConfig{
+	return dispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    payCfg,
 		DisperseBlobTimeout:    ctx.Duration(DisperseBlobTimeoutFlagName),
 		BlobCompleteTimeout:    ctx.Duration(BlobCertifiedTimeoutFlagName),
@@ -332,32 +340,25 @@ func readPayloadDisperserCfg(ctx *cli.Context) payloaddispersal.PayloadDisperser
 	}
 }
 
-func readDisperserCfg(ctx *cli.Context) (clients_v2.DisperserClientConfig, error) {
-	disperserAddressString := ctx.String(DisperserFlagName)
-	if disperserAddressString == "" {
+func readDisperserCfg(ctx *cli.Context) (dispersal.DisperserClientConfig, error) {
+	grpcUri := ctx.String(DisperserFlagName)
+	if grpcUri == "" {
 		networkString := ctx.String(NetworkFlagName)
 		if networkString == "" {
-			return clients_v2.DisperserClientConfig{},
+			return dispersal.DisperserClientConfig{},
 				fmt.Errorf("either disperser address or EigenDANetwork must be specified")
 		}
 
 		eigenDANetwork, err := common.EigenDANetworkFromString(networkString)
 		if err != nil {
-			return clients_v2.DisperserClientConfig{}, fmt.Errorf("parse eigenDANetwork: %w", err)
+			return dispersal.DisperserClientConfig{}, fmt.Errorf("parse eigenDANetwork: %w", err)
 		}
 
-		disperserAddressString = eigenDANetwork.GetDisperserAddress()
+		grpcUri = eigenDANetwork.GetDisperserGrpcUri()
 	}
 
-	hostStr, portStr, err := net.SplitHostPort(disperserAddressString)
-	if err != nil {
-		return clients_v2.DisperserClientConfig{},
-			fmt.Errorf("split host port '%s': %w", disperserAddressString, err)
-	}
-
-	return clients_v2.DisperserClientConfig{
-		Hostname:          hostStr,
-		Port:              portStr,
+	return dispersal.DisperserClientConfig{
+		GrpcUri:           grpcUri,
 		UseSecureGrpcFlag: !ctx.Bool(DisableTLSFlagName),
 	}, nil
 }

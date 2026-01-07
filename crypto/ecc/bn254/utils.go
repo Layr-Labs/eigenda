@@ -1,6 +1,9 @@
 package bn254
 
 import (
+	"crypto/rand"
+	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -9,6 +12,24 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
+
+func PairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, b2 *bn254.G2Affine) error {
+	var negB1 bn254.G1Affine
+	negB1.Neg(b1)
+
+	P := [2]bn254.G1Affine{*a1, negB1}
+	Q := [2]bn254.G2Affine{*a2, *b2}
+
+	ok, err := bn254.PairingCheck(P[:], Q[:])
+	if err != nil {
+		return fmt.Errorf("PairingCheck: %w", err)
+	}
+	if !ok {
+		return errors.New("PairingCheck pairing not ok.")
+	}
+
+	return nil
+}
 
 func VerifySig(sig *bn254.G1Affine, pubkey *bn254.G2Affine, msgBytes [32]byte) (bool, error) {
 
@@ -107,4 +128,37 @@ func MakePubkeyRegistrationData(privKey *fr.Element, operatorAddress common.Addr
 	hashToSign := MapToCurve(msgHash32)
 
 	return new(bn254.G1Affine).ScalarMultiplication(hashToSign, privKey.BigInt(new(big.Int)))
+}
+
+func RandomFrs(n int) ([]fr.Element, error) {
+	if n <= 0 {
+		return nil, errors.New("the length of vector must be positive")
+	}
+	r, err := randomFr()
+	if err != nil {
+		return nil, err
+	}
+
+	randomsFr := make([]fr.Element, n)
+
+	randomsFr[0].Set(&r)
+
+	// power of r
+	for j := 0; j < n-1; j++ {
+		randomsFr[j+1].Mul(&randomsFr[j], &r)
+	}
+
+	return randomsFr, nil
+}
+
+// Create a random number with crypto/rand.
+// Gnark provides SetRandom() function, but the implementation below is for explicitness
+func randomFr() (fr.Element, error) {
+	r, err := rand.Int(rand.Reader, fr.Modulus())
+	if err != nil {
+		return fr.Element{}, fmt.Errorf("get random int: %w", err)
+	}
+	var rElement fr.Element
+	rElement.SetBigInt(r)
+	return rElement, nil
 }

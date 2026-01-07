@@ -22,14 +22,19 @@ const namespace = "eigenda_disperser_api"
 type metricsV2 struct {
 	grpcMetrics *grpcprom.ServerMetrics
 
-	getBlobCommitmentLatency        *prometheus.SummaryVec
-	getPaymentStateLatency          *prometheus.SummaryVec
-	disperseBlobLatency             *prometheus.SummaryVec
-	disperseBlobSize                *prometheus.CounterVec
-	disperseBlobMeteredBytes        *prometheus.CounterVec
-	validateDispersalRequestLatency *prometheus.SummaryVec
-	storeBlobLatency                *prometheus.SummaryVec
-	getBlobStatusLatency            *prometheus.SummaryVec
+	getBlobCommitmentLatency          *prometheus.SummaryVec
+	getPaymentStateLatency            *prometheus.SummaryVec
+	disperseBlobLatency               *prometheus.SummaryVec
+	disperseBlobSize                  *prometheus.CounterVec
+	validateDispersalRequestLatency   *prometheus.SummaryVec
+	storeBlobLatency                  *prometheus.SummaryVec
+	getBlobStatusLatency              *prometheus.SummaryVec
+	dispersalTimestampRejected        *prometheus.CounterVec
+	dispersalTimestampDrift           *prometheus.HistogramVec
+	dispersalTimestampConfigMaxAge    prometheus.Gauge
+	dispersalTimestampConfigMaxFuture prometheus.Gauge
+
+	enablePerAccountMetrics bool
 
 	registry *prometheus.Registry
 	httpPort string
@@ -84,15 +89,6 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 		[]string{},
 	)
 
-	disperseBlobMeteredBytes := promauto.With(registry).NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "disperse_blob_metered_bytes",
-			Help:      "The number of bytes charged for the blob.",
-		},
-		[]string{},
-	)
-
 	validateDispersalRequestLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
@@ -123,19 +119,58 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 		[]string{},
 	)
 
+	dispersalTimestampRejected := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "dispersal_timestamp_rejections_total",
+			Help:      "Total number of dispersal requests rejected due to invalid timestamps (too old or too far in the future).",
+		},
+		[]string{"reason"},
+	)
+
+	dispersalTimestampDrift := promauto.With(registry).NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "dispersal_timestamp_drift_seconds",
+			Help:      "Distribution of timestamp drift for dispersal requests. Negative values indicate timestamps in the future, positive values indicate timestamps in the past.",
+			Buckets:   []float64{-60, -30, -10, -5, -1, -0.5, 0, 0.5, 1, 2, 5, 10, 30, 60, 120, 300},
+		},
+		[]string{"status", "account_id"}, // "accepted" or "rejected", account address
+	)
+
+	dispersalTimestampConfigMaxAge := promauto.With(registry).NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "dispersal_timestamp_max_age_seconds",
+			Help:      "Configured maximum age (in seconds) for dispersal timestamps. Requests older than this are rejected.",
+		},
+	)
+
+	dispersalTimestampConfigMaxFuture := promauto.With(registry).NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "dispersal_timestamp_max_future_seconds",
+			Help:      "Configured maximum future offset (in seconds) for dispersal timestamps. Requests with timestamps further in the future are rejected.",
+		},
+	)
+
 	return &metricsV2{
-		grpcMetrics:                     grpcMetrics,
-		getBlobCommitmentLatency:        getBlobCommitmentLatency,
-		getPaymentStateLatency:          getPaymentStateLatency,
-		disperseBlobLatency:             disperseBlobLatency,
-		disperseBlobSize:                disperseBlobSize,
-		disperseBlobMeteredBytes:        disperseBlobMeteredBytes,
-		validateDispersalRequestLatency: validateDispersalRequestLatency,
-		storeBlobLatency:                storeBlobLatency,
-		getBlobStatusLatency:            getBlobStatusLatency,
-		registry:                        registry,
-		httpPort:                        metricsConfig.HTTPPort,
-		logger:                          logger.With("component", "DisperserV2Metrics"),
+		grpcMetrics:                       grpcMetrics,
+		getBlobCommitmentLatency:          getBlobCommitmentLatency,
+		getPaymentStateLatency:            getPaymentStateLatency,
+		disperseBlobLatency:               disperseBlobLatency,
+		disperseBlobSize:                  disperseBlobSize,
+		validateDispersalRequestLatency:   validateDispersalRequestLatency,
+		storeBlobLatency:                  storeBlobLatency,
+		getBlobStatusLatency:              getBlobStatusLatency,
+		dispersalTimestampRejected:        dispersalTimestampRejected,
+		dispersalTimestampDrift:           dispersalTimestampDrift,
+		dispersalTimestampConfigMaxAge:    dispersalTimestampConfigMaxAge,
+		dispersalTimestampConfigMaxFuture: dispersalTimestampConfigMaxFuture,
+		enablePerAccountMetrics:           !metricsConfig.DisablePerAccountMetrics,
+		registry:                          registry,
+		httpPort:                          metricsConfig.HTTPPort,
+		logger:                            logger.With("component", "DisperserV2Metrics"),
 	}
 }
 
@@ -171,10 +206,6 @@ func (m *metricsV2) reportDisperseBlobSize(size int) {
 	m.disperseBlobSize.WithLabelValues().Add(float64(size))
 }
 
-func (m *metricsV2) reportDisperseMeteredBytes(usageInBytes int) {
-	m.disperseBlobMeteredBytes.WithLabelValues().Add(float64(usageInBytes))
-}
-
 func (m *metricsV2) reportValidateDispersalRequestLatency(duration time.Duration) {
 	m.validateDispersalRequestLatency.WithLabelValues().Observe(
 		common.ToMilliseconds(duration))
@@ -186,4 +217,22 @@ func (m *metricsV2) reportStoreBlobLatency(duration time.Duration) {
 
 func (m *metricsV2) reportGetBlobStatusLatency(duration time.Duration) {
 	m.getBlobStatusLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *metricsV2) reportDispersalTimestampRejected(reason string) {
+	m.dispersalTimestampRejected.WithLabelValues(reason).Inc()
+}
+
+func (m *metricsV2) reportDispersalTimestampDrift(driftSeconds float64, status string, accountID string) {
+	// If per-account metrics are disabled, aggregate under "0x0"
+	labelValue := accountID
+	if !m.enablePerAccountMetrics {
+		labelValue = "0x0"
+	}
+	m.dispersalTimestampDrift.WithLabelValues(status, labelValue).Observe(driftSeconds)
+}
+
+func (m *metricsV2) setDispersalTimestampConfig(maxAgeSeconds, maxFutureSeconds float64) {
+	m.dispersalTimestampConfigMaxAge.Set(maxAgeSeconds)
+	m.dispersalTimestampConfigMaxFuture.Set(maxFutureSeconds)
 }

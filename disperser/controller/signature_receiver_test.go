@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/test"
+	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,12 +40,10 @@ func createSigningMessage(
 	}
 
 	return core.SigningMessage{
-		Signature:            keypair.SignMessage(headerHash),
-		Operator:             operatorID,
-		BatchHeaderHash:      headerHash,
-		AttestationLatencyMs: 10.0,
-		TimeReceived:         time.Now(),
-		Err:                  err,
+		Signature:       keypair.SignMessage(headerHash),
+		ValidatorId:     operatorID,
+		BatchHeaderHash: headerHash,
+		Err:             err,
 	}
 }
 
@@ -142,7 +141,7 @@ func assertAttestationCorrectness(
 				expectedQuorumPubkeyAggregate.Add(operatorKeys[operatorID].GetPubKeyG1())
 			}
 
-			if !attestationToVerify.SignerMap[operatorID] {
+			if _, exists := attestationToVerify.SignerMap[operatorID]; !exists {
 				// the rest of the aggregates are only for signers
 				continue
 			}
@@ -177,6 +176,8 @@ func assertAttestationCorrectness(
 
 // Test basic signature receiving functionality without concurrency
 func TestReceiveSignatures_Basic(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	testRandom := testrandom.NewTestRandom()
 
 	operatorCount := 3
@@ -188,14 +189,16 @@ func TestReceiveSignatures_Basic(t *testing.T) {
 	signingMessageChan := make(chan core.SigningMessage, 3)
 
 	attestationChan, err := controller.ReceiveSignatures(
-		context.Background(),
-		testutils.GetLogger(),
+		ctx,
+		logger,
 		nil,
+		signingrate.NewNoOpSigningRateTracker(),
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
 		50*time.Millisecond,
-		55)
+		55,
+		0 /* metrics only */)
 	require.NoError(t, err)
 
 	// send signing messages from each operator
@@ -213,6 +216,8 @@ func TestReceiveSignatures_Basic(t *testing.T) {
 
 // Test receiving signatures with an error in one of the signing messages
 func TestReceiveSignatures_WithError(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	testRandom := testrandom.NewTestRandom()
 
 	operatorCount := 3
@@ -224,14 +229,16 @@ func TestReceiveSignatures_WithError(t *testing.T) {
 	signingMessageChan := make(chan core.SigningMessage, operatorCount)
 
 	attestationChan, err := controller.ReceiveSignatures(
-		context.Background(),
-		testutils.GetLogger(),
+		ctx,
+		logger,
 		nil,
+		signingrate.NewNoOpSigningRateTracker(),
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
 		50*time.Millisecond,
-		55)
+		55,
+		0 /* metrics only */)
 	require.NoError(t, err)
 
 	// Send signing messages with one error
@@ -252,6 +259,8 @@ func TestReceiveSignatures_WithError(t *testing.T) {
 
 // Test behavior when receiving duplicate signing messages
 func TestReceiveSignatures_DuplicateMessage(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	testRandom := testrandom.NewTestRandom()
 
 	operatorCount := 3
@@ -263,14 +272,16 @@ func TestReceiveSignatures_DuplicateMessage(t *testing.T) {
 	signingMessageChan := make(chan core.SigningMessage, operatorCount+1) // One extra for duplicate
 
 	attestationChan, err := controller.ReceiveSignatures(
-		context.Background(),
-		testutils.GetLogger(),
+		ctx,
+		logger,
 		nil,
+		signingrate.NewNoOpSigningRateTracker(),
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
 		50*time.Millisecond,
-		55)
+		55,
+		0 /* metrics only */)
 	require.NoError(t, err)
 
 	// Send signing messages from each operator
@@ -294,6 +305,8 @@ func TestReceiveSignatures_DuplicateMessage(t *testing.T) {
 
 // Test context cancellation behavior
 func TestReceiveSignatures_ContextCancellation(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	testRandom := testrandom.NewTestRandom()
 
 	operatorCount := 3
@@ -304,16 +317,18 @@ func TestReceiveSignatures_ContextCancellation(t *testing.T) {
 	batchHeaderHash := createBatchHeaderHash(testRandom)
 	signingMessageChan := make(chan core.SigningMessage, operatorCount)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	attestationChan, err := controller.ReceiveSignatures(
 		ctx,
-		testutils.GetLogger(),
+		logger,
 		nil,
+		signingrate.NewNoOpSigningRateTracker(),
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
 		50*time.Millisecond,
-		55)
+		55,
+		0 /* metrics only */)
 	require.NoError(t, err)
 
 	// Send only 1 signing message
@@ -332,6 +347,8 @@ func TestReceiveSignatures_ContextCancellation(t *testing.T) {
 
 // Test concurrent signature receiving with a large number of operators
 func TestReceiveSignatures_Concurrency(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	testRandom := testrandom.NewTestRandom()
 
 	const operatorCount = 100
@@ -345,14 +362,16 @@ func TestReceiveSignatures_Concurrency(t *testing.T) {
 	signingMessageChan := make(chan core.SigningMessage, operatorCount)
 
 	attestationChan, err := controller.ReceiveSignatures(
-		context.Background(),
-		testutils.GetLogger(),
+		ctx,
+		logger,
 		nil,
+		signingrate.NewNoOpSigningRateTracker(),
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
 		1*time.Millisecond,
-		55)
+		55,
+		0 /* metrics only */)
 	require.NoError(t, err)
 
 	attestationCount := atomic.Int32{}

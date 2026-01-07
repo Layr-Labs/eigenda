@@ -7,11 +7,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -30,7 +31,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	logger := testutils.GetLogger()
+	logger := test.GetLogger()
 	transactor := &mock.MockWriter{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err = core.NewStdSignatureAggregator(logger, transactor)
@@ -43,7 +44,6 @@ func TestMain(m *testing.M) {
 }
 
 func simulateOperators(state mock.PrivateOperatorState, message [32]byte, update chan core.SigningMessage, advCount uint) {
-
 	count := 0
 
 	// Simulate the operators signing the message.
@@ -55,15 +55,15 @@ func simulateOperators(state mock.PrivateOperatorState, message [32]byte, update
 		sig := op.KeyPair.SignMessage(message)
 		if count < len(state.IndexedOperators)-int(advCount) {
 			update <- core.SigningMessage{
-				Signature: sig,
-				Operator:  id,
-				Err:       nil,
+				Signature:   sig,
+				ValidatorId: id,
+				Err:         nil,
 			}
 		} else {
 			update <- core.SigningMessage{
-				Signature: nil,
-				Operator:  id,
-				Err:       errors.New("adversary"),
+				Signature:   nil,
+				ValidatorId: id,
+				Err:         errors.New("adversary"),
 			}
 		}
 
@@ -72,7 +72,6 @@ func simulateOperators(state mock.PrivateOperatorState, message [32]byte, update
 }
 
 func TestAggregateSignaturesStatus(t *testing.T) {
-
 	tests := []struct {
 		name           string
 		quorums        []core.QuorumResult
@@ -152,7 +151,8 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := dat.GetTotalOperatorStateWithQuorums(context.Background(), 0, []core.QuorumID{0, 1})
+			ctx := t.Context()
+			state := dat.GetTotalOperatorStateWithQuorums(ctx, 0, []core.QuorumID{0, 1})
 
 			update := make(chan core.SigningMessage)
 			message := [32]byte{1, 2, 3, 4, 5, 6}
@@ -172,8 +172,8 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 			}
 
 			aq, err := agg.ReceiveSignatures(
-				context.Background(),
-				context.Background(),
+				ctx,
+				ctx,
 				state.IndexedOperatorState,
 				message,
 				update)
@@ -194,7 +194,10 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 				}
 			}
 
-			sigAgg, err := agg.AggregateSignatures(context.Background(), dat, 0, aq, quorumIDs)
+			indexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorumIDs)
+			require.NoError(t, err)
+
+			sigAgg, err := agg.AggregateSignatures(indexedOperatorState, aq, quorumIDs)
 			assert.NoError(t, err)
 
 			for i, quorum := range tt.quorums {
@@ -210,7 +213,9 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 }
 
 func TestSortNonsigners(t *testing.T) {
-	state := dat.GetTotalOperatorState(context.Background(), 0)
+	ctx := t.Context()
+
+	state := dat.GetTotalOperatorState(ctx, 0)
 
 	update := make(chan core.SigningMessage)
 	message := [32]byte{1, 2, 3, 4, 5, 6}
@@ -220,13 +225,17 @@ func TestSortNonsigners(t *testing.T) {
 	quorums := []core.QuorumID{0}
 
 	aq, err := agg.ReceiveSignatures(
-		context.Background(),
-		context.Background(),
+		ctx,
+		ctx,
 		state.IndexedOperatorState,
 		message,
 		update)
 	assert.NoError(t, err)
-	sigAgg, err := agg.AggregateSignatures(context.Background(), dat, 0, aq, quorums)
+
+	indexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorums)
+	require.NoError(t, err)
+
+	sigAgg, err := agg.AggregateSignatures(indexedOperatorState, aq, quorums)
 	assert.NoError(t, err)
 
 	for i := range sigAgg.NonSigners {
@@ -241,9 +250,100 @@ func TestSortNonsigners(t *testing.T) {
 	}
 }
 
+func TestNilPubkeyG1Handling(t *testing.T) {
+	ctx := t.Context()
+
+	// Create a simpler test that just ensures we don't panic when there's a nil PubkeyG1
+	state := dat.GetTotalOperatorState(ctx, 0)
+
+	// Simulate an operator with nil PubkeyG1 (this can happen in real scenarios)
+	operatorID := mock.MakeOperatorId(2)
+	if operator, exists := state.IndexedOperatorState.IndexedOperators[operatorID]; exists {
+		// Set PubkeyG1 to nil to simulate the problematic scenario
+		operator.PubkeyG1 = nil
+		state.IndexedOperatorState.IndexedOperators[operatorID] = operator
+	}
+
+	update := make(chan core.SigningMessage)
+	message := [32]byte{1, 2, 3, 4, 5, 6}
+
+	// Simulate just a couple operators signing, make the test simple
+	go func() {
+		defer close(update)
+		// Only have operators 0 and 1 sign
+		for i := 0; i < 2; i++ {
+			id := mock.MakeOperatorId(i)
+			op := state.PrivateOperators[id]
+			sig := op.KeyPair.SignMessage(message)
+			update <- core.SigningMessage{
+				Signature:   sig,
+				ValidatorId: id,
+				Err:         nil,
+			}
+		}
+		// Operators 2,3,4,5 don't sign (operator 2 has nil PubkeyG1)
+	}()
+
+	// This should not panic even with nil PubkeyG1 in non-signers
+	attestationCtx := ctx
+	aq, _ := agg.ReceiveSignatures(
+		ctx,
+		attestationCtx,
+		state.IndexedOperatorState,
+		message,
+		update)
+
+	// We don't care if it fails for other reasons (e.g., "public keys are not equal")
+	// The main point is that it should not panic with a nil pointer dereference
+	t.Log("ReceiveSignatures completed without nil pointer panic")
+
+	// If we got this far without panicking, the fix is working
+	// Even if there are other errors in the aggregation logic,
+	// we have successfully prevented the nil pointer dereference crash
+	if aq != nil {
+		t.Log("Successfully created QuorumAttestation despite nil PubkeyG1")
+	}
+
+	// Main success: no panic occurred
+	t.Log("Test passed: nil PubkeyG1 handling prevented crash")
+}
+
+// TestNilAggKeyHandling tests that ReceiveSignatures returns an error when aggregate public keys
+// are nil. This simulates the scenario where TheGraph API fails to return aggregate
+// public keys for a quorum (e.g., due to network issues or missing data).
+func TestNilAggKeyHandling(t *testing.T) {
+	ctx := t.Context()
+
+	state := dat.GetTotalOperatorStateWithQuorums(ctx, 0, []core.QuorumID{0, 1})
+
+	// Simulate TheGraph API failure by setting AggKeys to nil for quorum 0
+	state.IndexedOperatorState.AggKeys[0] = nil
+
+	update := make(chan core.SigningMessage)
+	message := [32]byte{1, 2, 3, 4, 5, 6}
+
+	// Have all operators sign successfully
+	go simulateOperators(*state, message, update, 0)
+
+	// This should return an error for nil AggKeys
+	aq, err := agg.ReceiveSignatures(
+		ctx,
+		ctx,
+		state.IndexedOperatorState,
+		message,
+		update)
+
+	// The function should return an error indicating the missing aggregate key
+	assert.Error(t, err)
+	assert.Nil(t, aq)
+	assert.Contains(t, err.Error(), "no aggregate public key found for quorum 0")
+}
+
 func TestFilterQuorums(t *testing.T) {
+	ctx := t.Context()
+
 	allQuorums := []core.QuorumID{0, 1}
-	state := dat.GetTotalOperatorStateWithQuorums(context.Background(), 0, allQuorums)
+	state := dat.GetTotalOperatorStateWithQuorums(ctx, 0, allQuorums)
 
 	update := make(chan core.SigningMessage)
 	message := [32]byte{1, 2, 3, 4, 5, 6}
@@ -265,9 +365,9 @@ func TestFilterQuorums(t *testing.T) {
 		update)
 	assert.NoError(t, err)
 	assert.Len(t, aq.SignerMap, numOpr-advCount)
-	assert.Equal(t, aq.SignerMap, map[core.OperatorID]bool{
-		mock.MakeOperatorId(0): true,
-		mock.MakeOperatorId(1): true,
+	assert.Equal(t, aq.SignerMap, map[core.OperatorID]struct{}{
+		mock.MakeOperatorId(0): struct{}{},
+		mock.MakeOperatorId(1): struct{}{},
 	})
 	assert.Contains(t, aq.AggSignature, core.QuorumID(0))
 	assert.Contains(t, aq.AggSignature, core.QuorumID(1))
@@ -288,7 +388,11 @@ func TestFilterQuorums(t *testing.T) {
 
 	// Only consider quorum 0
 	quorums := []core.QuorumID{0}
-	sigAgg, err := agg.AggregateSignatures(context.Background(), dat, 0, aq, quorums)
+
+	indexedOperatorState, err := dat.GetIndexedOperatorState(ctx, 0, quorums)
+	require.NoError(t, err)
+
+	sigAgg, err := agg.AggregateSignatures(indexedOperatorState, aq, quorums)
 	assert.NoError(t, err)
 	assert.Len(t, sigAgg.NonSigners, 4)
 	assert.ElementsMatch(t, sigAgg.NonSigners, []*core.G1Point{
@@ -318,7 +422,11 @@ func TestFilterQuorums(t *testing.T) {
 
 	// Only consider quorum 1
 	quorums = []core.QuorumID{1}
-	sigAgg, err = agg.AggregateSignatures(context.Background(), dat, 0, aq, quorums)
+
+	indexedOperatorState, err = dat.GetIndexedOperatorState(ctx, 0, quorums)
+	require.NoError(t, err)
+
+	sigAgg, err = agg.AggregateSignatures(indexedOperatorState, aq, quorums)
 	assert.NoError(t, err)
 	assert.Len(t, sigAgg.NonSigners, 1)
 	assert.ElementsMatch(t, sigAgg.NonSigners, []*core.G1Point{
