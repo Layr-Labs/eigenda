@@ -59,7 +59,7 @@ testcontainers = "0.26.0"
 thiserror = { version = "2.0.12", default-features = false }
 tokio = { version = "1.47.1" }
 tracing = { version = "0.1.41" }
-tracing-subscriber = { version = "0.3.20" }
+tracing-subscriber = { version = "0.3.22" }
 tracing-tree = { version = "0.4" }
 url = { version = "2.5.4" }
 wiremock = "0.6.0"
