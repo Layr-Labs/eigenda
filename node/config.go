@@ -80,6 +80,10 @@ type Config struct {
 	DisableNodeInfoResources       bool
 	StoreChunksRequestMaxPastAge   time.Duration
 	StoreChunksRequestMaxFutureAge time.Duration
+	// Rate limiting for StoreChunks requests per disperser.
+	// limit expressed as requests per second; disabled if <=0 or burst <=0.
+	DisperserRateLimitPerSecond float64
+	DisperserRateLimitBurst     int
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -460,6 +464,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
+		DisperserRateLimitPerSecond:         ctx.GlobalFloat64(flags.DisperserRateLimitPerSecondFlag.Name),
+		DisperserRateLimitBurst:             ctx.GlobalInt(flags.DisperserRateLimitBurstFlag.Name),
 		LittDBWriteCacheSizeBytes: uint64(ctx.GlobalFloat64(
 			flags.LittDBWriteCacheSizeGBFlag.Name) * units.GiB),
 		LittDBWriteCacheSizeFraction:    ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),
