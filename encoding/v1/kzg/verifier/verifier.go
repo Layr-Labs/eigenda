@@ -21,7 +21,7 @@ type Verifier struct {
 	kzgConfig *kzg.KzgConfig
 	encoder   *rs.Encoder
 
-	G1SRS kzg.G1SRS
+	G1SRS []bn254.G1Affine
 
 	// mu protects access to ParametrizedVerifiers
 	mu                    sync.Mutex

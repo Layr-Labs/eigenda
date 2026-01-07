@@ -92,7 +92,7 @@ type Prover struct {
 	logger logging.Logger
 
 	KzgConfig *KzgConfig
-	G1SRS     kzg.G1SRS
+	G1SRS     []bn254.G1Affine
 
 	encoder *rs.Encoder
 	Config  *encoding.Config
