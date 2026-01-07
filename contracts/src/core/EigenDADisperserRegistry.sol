@@ -13,7 +13,7 @@ contract EigenDADisperserRegistry is OwnableUpgradeable, EigenDADisperserRegistr
         _disableInitializers();
     }
 
-    function initialize(address _initialOwner) external initializer {
+    function initialize(address _initialOwner) external reinitializer(2) {
         _transferOwnership(_initialOwner);
     }
 

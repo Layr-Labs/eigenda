@@ -13,7 +13,7 @@ contract EigenDARelayRegistry is OwnableUpgradeable, EigenDARelayRegistryStorage
         _disableInitializers();
     }
 
-    function initialize(address _initialOwner) external initializer {
+    function initialize(address _initialOwner) external reinitializer(2) {
         _transferOwnership(_initialOwner);
     }
 
