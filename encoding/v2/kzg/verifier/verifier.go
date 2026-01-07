@@ -22,14 +22,14 @@ import (
 )
 
 type Verifier struct {
-	G1SRS kzg.G1SRS
+	G1SRS []bn254.G1Affine
 
 	// mu protects access to ParametrizedVerifiers
 	mu                    sync.Mutex
 	ParametrizedVerifiers map[encoding.EncodingParams]*ParametrizedVerifier
 }
 
-func NewVerifierWithSRS(g1SRS kzg.G1SRS) *Verifier {
+func NewVerifierWithSRS(g1SRS []bn254.G1Affine) *Verifier {
 	return &Verifier{
 		G1SRS:                 g1SRS,
 		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
@@ -172,7 +172,7 @@ type Sample struct {
 // https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
 func genRhsG1(
 	samples []Sample, randomsFr []fr.Element, m int,
-	params encoding.EncodingParams, fftSettings *fft.FFTSettings, g1SRS kzg.G1SRS, proofs []bn254.G1Affine,
+	params encoding.EncodingParams, fftSettings *fft.FFTSettings, g1SRS []bn254.G1Affine, proofs []bn254.G1Affine,
 ) (*bn254.G1Affine, error) {
 	n := len(samples)
 	commits := make([]bn254.G1Affine, m)

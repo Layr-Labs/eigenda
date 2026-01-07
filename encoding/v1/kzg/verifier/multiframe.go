@@ -30,7 +30,7 @@ type Sample struct {
 // the rhsG1 consists of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
 func genRhsG1(
 	samples []Sample, randomsFr []fr.Element, m int,
-	params encoding.EncodingParams, fftSettings *fft.FFTSettings, g1SRS kzg.G1SRS, proofs []bn254.G1Affine,
+	params encoding.EncodingParams, fftSettings *fft.FFTSettings, g1SRS []bn254.G1Affine, proofs []bn254.G1Affine,
 ) (*bn254.G1Affine, error) {
 	n := len(samples)
 	commits := make([]bn254.G1Affine, m)
