@@ -583,6 +583,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PER_ACCOUNT_PAYMENT_METRICS"),
 	}
+	EnforceSingleBlobBatchesFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enforce-single-blob-batches"),
+		Usage:    "If enabled, reject batch dispersal requests containing more than one blob",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENFORCE_SINGLE_BLOB_BATCHES"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -739,6 +745,7 @@ var optionalFlags = []cli.Flag{
 	PaymentVaultUpdateIntervalFlag,
 	EnablePerAccountPaymentMetricsFlag,
 	OverrideV2TtlFlag,
+	EnforceSingleBlobBatchesFlag,
 }
 
 func init() {

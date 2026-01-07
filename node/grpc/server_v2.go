@@ -387,7 +387,7 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 	}
 
 	// BatchFromProtobuf internally validates the Batch while deserializing
-	batch, err := corev2.BatchFromProtobuf(req.GetBatch())
+	batch, err := corev2.BatchFromProtobuf(req.GetBatch(), s.config.EnforceSingleBlobBatches)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize batch: %v", err)
 	}
