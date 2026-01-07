@@ -27,7 +27,7 @@ type ClientConfig struct {
 	AccessKey string `docs:"required"`
 	// SecretAccessKey to use when interacting with S3.
 	SecretAccessKey string `docs:"required"` // TODO (cody.littley): Change to *secret.Secret
-	// EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used.
+	// EndpointURL of the S3 endpoint to use. If set to "", the AWS library will use the default AWS S3 endpoint.
 	EndpointURL string
 
 	// This is a deprecated setting and can be ignored.

@@ -455,7 +455,7 @@ func generateMarkdownDoc(
 			sb.WriteString(fmt.Sprintf("| $${\\color{red}\\texttt{%s}}$$<br>`%s`<br><br>type: `%s` | %s |\n",
 				escapeMarkdown(f.TOML),
 				escapeMarkdown(f.EnvVar),
-				escapeMarkdown(stripTypePrefixes(f.FieldType)),
+				escapeMarkdown(f.FieldType),
 				escapeMarkdown(reformatGodoc(f.Godoc))))
 		}
 		sb.WriteString("\n")
@@ -475,7 +475,7 @@ func generateMarkdownDoc(
 				"| $${\\color{red}\\texttt{%s}}$$<br>`%s`<br><br>type: `%s`<br>default: `%s` | %s |\n",
 				escapeMarkdown(f.TOML),
 				escapeMarkdown(f.EnvVar),
-				escapeMarkdown(stripTypePrefixes(f.FieldType)),
+				escapeMarkdown(f.FieldType),
 				escapeMarkdown(defaultString),
 				escapeMarkdown(reformatGodoc(f.Godoc))))
 		}
@@ -498,19 +498,13 @@ func generateMarkdownDoc(
 				"| $${\\color{red}\\texttt{%s}}$$<br>`%s`<br><br>type: `%s`<br>default: `%s` | %s |\n",
 				escapeMarkdown(f.TOML),
 				escapeMarkdown(f.EnvVar),
-				escapeMarkdown(stripTypePrefixes(f.FieldType)),
+				escapeMarkdown(f.FieldType),
 				escapeMarkdown(defaultString),
 				escapeMarkdown(f.Godoc)))
 		}
 	}
 
 	return sb.String()
-}
-
-// stripTypePrefixes removes package prefixes from a type string.
-func stripTypePrefixes(typeStr string) string {
-	parts := strings.Split(typeStr, ".")
-	return parts[len(parts)-1]
 }
 
 // reformatGodoc reformats godoc strings by replacing single newlines with spaces,
