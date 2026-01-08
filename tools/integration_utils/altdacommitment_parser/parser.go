@@ -36,13 +36,10 @@ func DisplayAltDACommitmentFromHex(ctx *cli.Context) error {
 	// Display the parsed prefix information
 	DisplayPrefixInfo(prefix)
 
-	certV3, err := ParseCertificateData(versionedCert)
-	if err != nil {
-		return fmt.Errorf("failed to parse certificate data: %w", err)
+	// Display the certificate data (handles V2, V3, and V4)
+	if err := DisplayCertData(versionedCert.SerializedCert); err != nil {
+		return fmt.Errorf("failed to display certificate data: %w", err)
 	}
-
-	// Display the certificate data
-	DisplayCertV3Data(certV3)
 	return nil
 }
 
@@ -164,7 +161,12 @@ func isValidRLP(data []byte) bool {
 		return false
 	}
 
-	// Try to decode as both V2 and V3 certificates to validate RLP structure
+	// Try to decode as both V2, V3 and V4 certificates to validate RLP structure
+	var certV4 coretypes.EigenDACertV4
+	if err := rlp.DecodeBytes(data, &certV4); err == nil {
+		return true
+	}
+
 	var certV3 coretypes.EigenDACertV3
 	if err := rlp.DecodeBytes(data, &certV3); err == nil {
 		return true
@@ -178,26 +180,3 @@ func isValidRLP(data []byte) bool {
 	return false
 }
 
-// ParseCertificateData attempts to parse the certificate data as V2 or V3 and returns V3
-func ParseCertificateData(cert *certs.VersionedCert) (*coretypes.EigenDACertV3, error) {
-	if len(cert.SerializedCert) == 0 {
-		return nil, fmt.Errorf("no certificate data to parse")
-	}
-
-	// Try to parse as V3 cert first
-	var certV3 coretypes.EigenDACertV3
-	err := rlp.DecodeBytes(cert.SerializedCert, &certV3)
-	if err == nil {
-		return &certV3, nil
-	}
-
-	// Try to parse as V2 cert and convert to V3
-	var certV2 coretypes.EigenDACertV2
-	err = rlp.DecodeBytes(cert.SerializedCert, &certV2)
-	if err == nil {
-		// Convert V2 to V3
-		return certV2.ToV3(), nil
-	}
-
-	return nil, fmt.Errorf("failed to parse certificate as V2 or V3: %w", err)
-}

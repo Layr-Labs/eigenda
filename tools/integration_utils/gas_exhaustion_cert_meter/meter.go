@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/urfave/cli"
 
 	gnarkbn254 "github.com/consensys/gnark-crypto/ecc/bn254"
@@ -36,28 +37,120 @@ func RunMeterer(ctx *cli.Context) error {
 
 	altdacommitment_parser.DisplayPrefixInfo(prefix)
 
-	cert, err := altdacommitment_parser.ParseCertificateData(versionedCert)
-	if err != nil {
-		return fmt.Errorf("failed to parse versioned cert: %w", err)
-	}
-
-	if err = EstimateGas(config, *cert); err != nil {
+	if err = EstimateGas(config, versionedCert.SerializedCert); err != nil {
 		return fmt.Errorf("gas estimation failed: %w", err)
 	}
 
 	return nil
 }
 
-// EstimateGas calculates the worst-case gas cost for verifying an EigenDA V3 certificate.
+// extractBlockNumberAndQuorum extracts block number and quorum bytes from a cert for eth calls
+func extractBlockNumberAndQuorum(certBytes []byte) (blockNumber uint32, quorumBytes []byte, err error) {
+	// Try V4
+	var certV4 coretypes.EigenDACertV4
+	if err = rlp.DecodeBytes(certBytes, &certV4); err == nil {
+		return certV4.BatchHeader.ReferenceBlockNumber, certV4.SignedQuorumNumbers, nil
+	}
+
+	// Try V3
+	var certV3 coretypes.EigenDACertV3
+	if err = rlp.DecodeBytes(certBytes, &certV3); err == nil {
+		return certV3.BatchHeader.ReferenceBlockNumber, certV3.SignedQuorumNumbers, nil
+	}
+
+	// Try V2
+	var certV2 coretypes.EigenDACertV2
+	if err = rlp.DecodeBytes(certBytes, &certV2); err == nil {
+		certV3Converted := certV2.ToV3()
+		return certV3Converted.BatchHeader.ReferenceBlockNumber, certV3Converted.SignedQuorumNumbers, nil
+	}
+
+	return 0, nil, fmt.Errorf("failed to parse certificate as V2, V3, or V4")
+}
+
+// extractQuorumApks extracts QuorumApks from the cert's NonSignerStakesAndSignature
+func extractQuorumApks(certBytes []byte) ([]certTypesBinding.BN254G1Point, error) {
+	// Try V4
+	var certV4 coretypes.EigenDACertV4
+	if err := rlp.DecodeBytes(certBytes, &certV4); err == nil {
+		return certV4.NonSignerStakesAndSignature.QuorumApks, nil
+	}
+
+	// Try V3
+	var certV3 coretypes.EigenDACertV3
+	if err := rlp.DecodeBytes(certBytes, &certV3); err == nil {
+		return certV3.NonSignerStakesAndSignature.QuorumApks, nil
+	}
+
+	// Try V2
+	var certV2 coretypes.EigenDACertV2
+	if err := rlp.DecodeBytes(certBytes, &certV2); err == nil {
+		certV3Converted := certV2.ToV3()
+		return certV3Converted.NonSignerStakesAndSignature.QuorumApks, nil
+	}
+
+	return nil, fmt.Errorf("failed to parse certificate as V2, V3, or V4")
+}
+
+// buildWorstCaseCert reconstructs the cert with worst-case NonSignerStakesAndSignature
+func buildWorstCaseCert(
+	certBytes []byte,
+	worstCaseSignature certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature,
+) ([]byte, error) {
+	// Try V4
+	var certV4 coretypes.EigenDACertV4
+	if err := rlp.DecodeBytes(certBytes, &certV4); err == nil {
+		certV4.NonSignerStakesAndSignature = worstCaseSignature
+		serialized, err := certV4.Serialize(coretypes.CertSerializationABI)
+		if err != nil {
+			return nil, fmt.Errorf("serialize v4 cert: %w", err)
+		}
+		return serialized, nil
+	}
+
+	// Try V3
+	var certV3 coretypes.EigenDACertV3
+	if err := rlp.DecodeBytes(certBytes, &certV3); err == nil {
+		certV3.NonSignerStakesAndSignature = worstCaseSignature
+		serialized, err := certV3.Serialize(coretypes.CertSerializationABI)
+		if err != nil {
+			return nil, fmt.Errorf("serialize v3 cert: %w", err)
+		}
+		return serialized, nil
+	}
+
+	// Try V2 and convert to V3
+	var certV2 coretypes.EigenDACertV2
+	if err := rlp.DecodeBytes(certBytes, &certV2); err == nil {
+		certV3Converted := certV2.ToV3()
+		certV3Converted.NonSignerStakesAndSignature = worstCaseSignature
+		serialized, err := certV3Converted.Serialize(coretypes.CertSerializationABI)
+		if err != nil {
+			return nil, fmt.Errorf("serialize v3 cert from v2: %w", err)
+		}
+		return serialized, nil
+	}
+
+	return nil, fmt.Errorf("failed to parse certificate as V2, V3, or V4")
+}
+
+// EstimateGas calculates the worst-case gas cost for verifying an EigenDA V2, V3, or V4 certificate.
 // It simulates a scenario where all operators are non-signers, requiring maximum verification work.
-// Returns the list of all operator IDs and any error encountered during estimation.
 func EstimateGas(
 	config *Config,
-	certV3 coretypes.EigenDACertV3,
+	certBytes []byte,
 ) error {
+	// Extract block number and quorum for eth calls
+	blockNumber, quorumBytes, err := extractBlockNumberAndQuorum(certBytes)
+	if err != nil {
+		return fmt.Errorf("extract block number and quorum: %w", err)
+	}
 
-	blockNumber := certV3.BatchHeader.ReferenceBlockNumber
-	quorumBytes := certV3.SignedQuorumNumbers
+	// Extract QuorumApks from original cert
+	quorumApks, err := extractQuorumApks(certBytes)
+	if err != nil {
+		return fmt.Errorf("extract quorum apks: %w", err)
+	}
 
 	allOperatorIDs, err := GetAllOperatorID(config, quorumBytes, blockNumber)
 	if err != nil {
@@ -116,7 +209,7 @@ func EstimateGas(
 	worstCaseSignature := certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature{
 		NonSignerQuorumBitmapIndices: checkSigIndices.NonSignerQuorumBitmapIndices,
 		NonSignerPubkeys:             nonSignerPubKeys,
-		QuorumApks:                   certV3.NonSignerStakesAndSignature.QuorumApks,
+		QuorumApks:                   quorumApks,
 		ApkG2:                        apkG2, // Set to infinity (worst case)
 		Sigma:                        sigma, // Set to infinity (worst case)
 		QuorumApkIndices:             checkSigIndices.QuorumApkIndices,
@@ -124,14 +217,13 @@ func EstimateGas(
 		NonSignerStakeIndices:        checkSigIndices.NonSignerStakeIndices,
 	}
 
-	certV3.NonSignerStakesAndSignature = worstCaseSignature
-
-	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
+	// Build worst-case cert with same type as input cert
+	worstCaseCertBytes, err := buildWorstCaseCert(certBytes, worstCaseSignature)
 	if err != nil {
-		return fmt.Errorf("serialize cert %w", err)
+		return fmt.Errorf("build worst case cert: %w", err)
 	}
 
-	input, err := BuildCallInput(certBytes)
+	input, err := BuildCallInput(worstCaseCertBytes)
 	if err != nil {
 		return fmt.Errorf("BuildCallInput %w", err)
 	}
