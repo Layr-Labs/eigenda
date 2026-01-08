@@ -11,9 +11,16 @@ type OnDemandLedgerCacheConfig struct {
 	// The maximum number of OnDemandLedger entries to be kept in the LRU cache
 	MaxLedgers int
 	// The name of the dynamo table where on-demand payment information is stored
-	OnDemandTableName string
+	OnDemandTableName string `docs:"required"`
 	// Interval for checking for payment updates
 	UpdateInterval time.Duration
+}
+
+func DefaultOnDemandLedgerCacheConfig() OnDemandLedgerCacheConfig {
+	return OnDemandLedgerCacheConfig{
+		MaxLedgers:     1024,
+		UpdateInterval: 30 * time.Second,
+	}
 }
 
 // Verify validates the OnDemandLedgerCacheConfig

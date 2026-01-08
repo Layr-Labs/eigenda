@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
@@ -20,41 +19,32 @@ import (
 
 // PaymentAuthorizationConfig contains configuration for building a payment authorization handler
 type PaymentAuthorizationConfig struct {
-	OnDemandConfig                 ondemandvalidation.OnDemandLedgerCacheConfig
-	ReservationConfig              reservationvalidation.ReservationLedgerCacheConfig
-	EnablePerAccountPaymentMetrics bool
+	// Configuration for on-demand payment validation.
+	OnDemand ondemandvalidation.OnDemandLedgerCacheConfig
+	// Configuration for reservation payment validation.
+	Reservation reservationvalidation.ReservationLedgerCacheConfig
+	// If true, enable a metric per user account for payment validation and authorization.
+	// Resulting metric may potentially have high cardinality.
+	PerAccountMetrics bool
 }
 
 // Verify validates the PaymentAuthorizationConfig
 func (c *PaymentAuthorizationConfig) Verify() error {
-	if err := c.OnDemandConfig.Verify(); err != nil {
+	if err := c.OnDemand.Verify(); err != nil {
 		return fmt.Errorf("on-demand config: %w", err)
 	}
-	if err := c.ReservationConfig.Verify(); err != nil {
+	if err := c.Reservation.Verify(); err != nil {
 		return fmt.Errorf("reservation config: %w", err)
 	}
 	return nil
 }
 
 // DefaultPaymentAuthorizationConfig returns a new PaymentAuthorizationConfig with default values
-func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
-	onDemandConfig := ondemandvalidation.OnDemandLedgerCacheConfig{
-		MaxLedgers:        1024,
-		OnDemandTableName: "",
-		UpdateInterval:    30 * time.Second,
-	}
-
-	reservationConfig := reservationvalidation.ReservationLedgerCacheConfig{
-		MaxLedgers:           1024,
-		BucketCapacityPeriod: 90 * time.Second,
-		OverfillBehavior:     ratelimit.OverfillOncePermitted,
-		UpdateInterval:       30 * time.Second,
-	}
-
-	return &PaymentAuthorizationConfig{
-		OnDemandConfig:                 onDemandConfig,
-		ReservationConfig:              reservationConfig,
-		EnablePerAccountPaymentMetrics: true,
+func DefaultPaymentAuthorizationConfig() PaymentAuthorizationConfig {
+	return PaymentAuthorizationConfig{
+		OnDemand:          ondemandvalidation.DefaultOnDemandLedgerCacheConfig(),
+		Reservation:       reservationvalidation.DefaultReservationLedgerCacheConfig(),
+		PerAccountMetrics: true,
 	}
 }
 
@@ -108,7 +98,7 @@ func BuildPaymentAuthorizationHandler(
 			metricsRegistry,
 			"eigenda_controller",
 			"authorize_payments",
-			config.EnablePerAccountPaymentMetrics,
+			config.PerAccountMetrics,
 			userAccountRemapping,
 		)
 		onDemandCacheMetrics = ondemandvalidation.NewOnDemandCacheMetrics(
@@ -121,7 +111,7 @@ func BuildPaymentAuthorizationHandler(
 	onDemandValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
 		ctx,
 		logger,
-		config.OnDemandConfig,
+		config.OnDemand,
 		paymentVault,
 		awsDynamoClient,
 		onDemandValidatorMetrics,
@@ -139,7 +129,7 @@ func BuildPaymentAuthorizationHandler(
 			metricsRegistry,
 			"eigenda_controller",
 			"authorize_payments",
-			config.EnablePerAccountPaymentMetrics,
+			config.PerAccountMetrics,
 			userAccountRemapping,
 		)
 		reservationCacheMetrics = reservationvalidation.NewReservationCacheMetrics(
@@ -152,7 +142,7 @@ func BuildPaymentAuthorizationHandler(
 	reservationValidator, err := reservationvalidation.NewReservationPaymentValidator(
 		ctx,
 		logger,
-		config.ReservationConfig,
+		config.Reservation,
 		paymentVault,
 		time.Now,
 		reservationValidatorMetrics,
