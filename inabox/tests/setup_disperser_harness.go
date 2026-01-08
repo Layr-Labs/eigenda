@@ -805,7 +805,14 @@ func startController(
 	dispatcherConfig.BatchMetadataUpdatePeriod = 100 * time.Millisecond
 	dispatcherConfig.SigningRateDynamoDbTableName = "validator-signing-rates"
 	dispatcherConfig.DispersalRequestSigner.PrivateKey = "this is just a placeholder"
-	dispatcherConfig.EncodingManager = *encodingManagerConfig
+	dispatcherConfig.Encoder = encodingManagerConfig
+	dispatcherConfig.DynamoDBTableName = "this-is-a-placeholder"
+	dispatcherConfig.ContractDirectoryAddress = "this-is-a-placeholder"
+	dispatcherConfig.ChainState.Endpoint = "this-is-a-placeholder"
+	dispatcherConfig.EthClient.RPCURLs = []string{"this-is-a-placeholder"}
+	dispatcherConfig.AwsClient.Region = "this-is-a-placeholder"
+	dispatcherConfig.AwsClient.AccessKey = "this-is-a-placeholder"
+	dispatcherConfig.AwsClient.SecretAccessKey = "this-is-a-placeholder"
 
 	// Chain state config
 	chainStateConfig := thegraph.Config{
@@ -844,7 +851,7 @@ func startController(
 	// Create encoding manager with workerpool and blob set
 	encodingPool := workerpool.New(encodingManagerConfig.NumConcurrentRequests)
 	encodingManager, err := controller.NewEncodingManager(
-		encodingManagerConfig,
+		&encodingManagerConfig,
 		time.Now,
 		metadataStore,
 		encodingPool,
@@ -908,11 +915,11 @@ func startController(
 	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(ctx, signingRateTracker)
 
 	paymentAuthConfig := controller.DefaultPaymentAuthorizationConfig()
-	paymentAuthConfig.OnDemandConfig.OnDemandTableName = config.OnDemandTableName
-	paymentAuthConfig.OnDemandConfig.UpdateInterval = 1 * time.Second
-	paymentAuthConfig.OnDemandConfig.MaxLedgers = 1000
-	paymentAuthConfig.ReservationConfig.UpdateInterval = 1 * time.Second
-	dispatcherConfig.PaymentAuthorization = *paymentAuthConfig
+	paymentAuthConfig.OnDemand.OnDemandTableName = config.OnDemandTableName
+	paymentAuthConfig.OnDemand.UpdateInterval = 1 * time.Second
+	paymentAuthConfig.OnDemand.MaxLedgers = 1000
+	paymentAuthConfig.Reservation.UpdateInterval = 1 * time.Second
+	dispatcherConfig.Payment = paymentAuthConfig
 
 	// Create controller
 	dispatcher, err := controller.NewController(
@@ -964,7 +971,7 @@ func startController(
 	paymentAuthorizationHandler, err := controller.BuildPaymentAuthorizationHandler(
 		ctx,
 		controllerLogger,
-		*paymentAuthConfig,
+		paymentAuthConfig,
 		contractDirectory,
 		ethClient,
 		dynamoClient.GetAwsClient(),
