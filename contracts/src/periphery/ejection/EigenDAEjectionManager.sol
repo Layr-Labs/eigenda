@@ -89,6 +89,7 @@ contract EigenDAEjectionManager is ImmutableEigenDAEjectionsStorage, IEigenDASem
 
     /// @inheritdoc IEigenDAEjectionManager
     function cancelEjectionByEjector(address operator) external onlyEjector(msg.sender) {
+        require(EigenDAEjectionLib.getEjectionRecord(operator).ejector == msg.sender, "only ejector that issued ejection can cancel");
         operator.cancelEjection();
     }
 
