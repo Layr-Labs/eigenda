@@ -179,4 +179,3 @@ func isValidRLP(data []byte) bool {
 
 	return false
 }
-
