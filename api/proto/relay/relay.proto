@@ -112,8 +112,11 @@ message GetValidatorChunksRequest {
   // The ID of the validator requesting chunks.
   bytes validator_id = 1;
 
+  // The key of the blob to retrieve chunks for.
+  bytes blob_key = 2;
+
   // Timestamp of the request in seconds since the Unix epoch.
-  uint32 timestamp = 2;
+  uint32 timestamp = 3;
 
   // BLS signature by the requester on the hash of this request.
   //
@@ -122,6 +125,8 @@ message GetValidatorChunksRequest {
   // 1. the domain separator string "relay.GetValidatorChunksRequest"
   // 2. the length of the validator ID in bytes (4 byte big endian)
   // 3. the validator ID bytes
-  // 4. the timestamp (4 byte big endian)
-  bytes validator_signature = 3;
+  // 4. the length of the blob key in bytes (4 byte big endian)
+  // 5. the blob key bytes
+  // 6. the timestamp (4 byte big endian)
+  bytes validator_signature = 4;
 }

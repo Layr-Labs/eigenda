@@ -68,6 +68,10 @@ func HashGetValidatorChunksRequest(request *pb.GetValidatorChunksRequest) ([]byt
 	if err != nil {
 		return nil, fmt.Errorf("hash validator ID: %w", err)
 	}
+	err = hashByteArray(hasher, request.GetBlobKey())
+	if err != nil {
+		return nil, fmt.Errorf("hash blob key: %w", err)
+	}
 	hashUint32(hasher, request.GetTimestamp())
 
 	return hasher.Sum(nil), nil
