@@ -108,9 +108,11 @@ func Bootstrap[T DocumentedConfig](
 		return cfg, nil
 	default:
 		// Help was shown, return zero value
-		var zero T
-		return zero, nil
+		os.Exit(0)
 	}
+	// This is a workaround to make the compiler happy.
+	var zero T
+	return zero, nil
 }
 
 func buildHandler[T DocumentedConfig](

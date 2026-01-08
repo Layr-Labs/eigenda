@@ -278,54 +278,56 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 
 func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
-		DISPERSER_ENCODER_LOG_FORMAT:              "text",
-		DISPERSER_ENCODER_AWS_REGION:              "",
-		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:       "",
-		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:   "",
-		DISPERSER_ENCODER_AWS_ENDPOINT_URL:        "",
-		DISPERSER_ENCODER_GRPC_PORT:               grpcPort,
-		DISPERSER_ENCODER_ENABLE_METRICS:          "true",
-		DISPERSER_ENCODER_G1_PATH:                 "",
-		DISPERSER_ENCODER_G2_PATH:                 "",
-		DISPERSER_ENCODER_SRS_ORDER:               "",
-		DISPERSER_ENCODER_SRS_LOAD:                "",
-		DISPERSER_ENCODER_CACHE_PATH:              "",
-		DISPERSER_ENCODER_VERBOSE:                 "",
-		DISPERSER_ENCODER_NUM_WORKERS:             fmt.Sprint(runtime.GOMAXPROCS(0)),
-		DISPERSER_ENCODER_MAX_CONCURRENT_REQUESTS: "16",
-		DISPERSER_ENCODER_REQUEST_POOL_SIZE:       "32",
-		DISPERSER_ENCODER_REQUEST_QUEUE_SIZE:      "32",
+		ENCODER_VERSION:                                  "1",
+		ENCODER_LOG_FORMAT:                               "text",
+		ENCODER_AWS_REGION:                               "",
+		ENCODER_AWS_ACCESS_KEY:                           "",
+		ENCODER_AWS_SECRET_ACCESS_KEY:                    "",
+		ENCODER_AWS_ENDPOINT_URL:                         "",
+		ENCODER_GRPC_PORT:                                grpcPort,
+		ENCODER_ENABLE_METRICS:                           "true",
+		ENCODER_KZG_G1_PATH:                              "",
+		ENCODER_KZG_G2_PATH:                              "",
+		ENCODER_KZG_SRS_ORDER:                            "",
+		ENCODER_KZG_SRS_NUMBER_TO_LOAD:                   "",
+		ENCODER_KZG_CACHE_DIR:                            "",
+		ENCODER_KZG_VERBOSE:                              "",
+		ENCODER_KZG_NUM_WORKER:                           fmt.Sprint(runtime.GOMAXPROCS(0)),
+		ENCODER_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS: "16",
+		ENCODER_SERVER_REQUEST_POOL_SIZE:                 "32",
+		ENCODER_SERVER_REQUEST_QUEUE_SIZE:                "32",
 	}
 
-	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
+	env.applyDefaults(&v, "ENCODER", "enc", ind)
 
 	return v
 }
 
 func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
-		DISPERSER_ENCODER_LOG_FORMAT:              "text",
-		DISPERSER_ENCODER_AWS_REGION:              "",
-		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:       "",
-		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:   "",
-		DISPERSER_ENCODER_AWS_ENDPOINT_URL:        "",
-		DISPERSER_ENCODER_GRPC_PORT:               grpcPort,
-		DISPERSER_ENCODER_ENABLE_METRICS:          "true",
-		DISPERSER_ENCODER_G1_PATH:                 "",
-		DISPERSER_ENCODER_G2_PATH:                 "",
-		DISPERSER_ENCODER_SRS_ORDER:               "",
-		DISPERSER_ENCODER_SRS_LOAD:                "",
-		DISPERSER_ENCODER_CACHE_PATH:              "",
-		DISPERSER_ENCODER_VERBOSE:                 "",
-		DISPERSER_ENCODER_NUM_WORKERS:             fmt.Sprint(runtime.GOMAXPROCS(0)),
-		DISPERSER_ENCODER_MAX_CONCURRENT_REQUESTS: "16",
-		DISPERSER_ENCODER_REQUEST_POOL_SIZE:       "32",
-		DISPERSER_ENCODER_ENCODER_VERSION:         "2",
-		DISPERSER_ENCODER_S3_BUCKET_NAME:          "test-eigenda-blobstore",
-		DISPERSER_ENCODER_REQUEST_QUEUE_SIZE:      "32",
+		ENCODER_VERSION:                                  "2",
+		ENCODER_LOG_FORMAT:                               "text",
+		ENCODER_AWS_REGION:                               "",
+		ENCODER_AWS_ACCESS_KEY:                           "",
+		ENCODER_AWS_SECRET_ACCESS_KEY:                    "",
+		ENCODER_AWS_ENDPOINT_URL:                         "",
+		ENCODER_GRPC_PORT:                                grpcPort,
+		ENCODER_ENABLE_METRICS:                           "true",
+		ENCODER_KZG_G1_PATH:                              "",
+		ENCODER_KZG_G2_PATH:                              "",
+		ENCODER_KZG_SRS_ORDER:                            "",
+		ENCODER_KZG_SRS_NUMBER_TO_LOAD:                   "",
+		ENCODER_KZG_CACHE_DIR:                            "",
+		ENCODER_KZG_VERBOSE:                              "",
+		ENCODER_KZG_NUM_WORKER:                           fmt.Sprint(runtime.GOMAXPROCS(0)),
+		ENCODER_SERVER_MAX_CONCURRENT_REQUESTS_DANGEROUS: "16",
+		ENCODER_SERVER_REQUEST_POOL_SIZE:                 "32",
+		ENCODER_BLOB_STORE_BUCKET_NAME:                   "test-eigenda-blobstore",
+		ENCODER_CHUNK_STORE_BUCKET_NAME:                  "test-eigenda-blobstore",
+		ENCODER_SERVER_REQUEST_QUEUE_SIZE:                "32",
 	}
 
-	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
+	env.applyDefaults(&v, "ENCODER", "enc", ind)
 
 	return v
 }
