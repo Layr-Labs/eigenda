@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Relay_GetBlob_FullMethodName   = "/relay.Relay/GetBlob"
-	Relay_GetChunks_FullMethodName = "/relay.Relay/GetChunks"
+	Relay_GetBlob_FullMethodName            = "/relay.Relay/GetBlob"
+	Relay_GetChunks_FullMethodName          = "/relay.Relay/GetChunks"
+	Relay_GetValidatorChunks_FullMethodName = "/relay.Relay/GetValidatorChunks"
 )
 
 // RelayClient is the client API for Relay service.
@@ -31,6 +32,9 @@ type RelayClient interface {
 	GetBlob(ctx context.Context, in *GetBlobRequest, opts ...grpc.CallOption) (*GetBlobReply, error)
 	// GetChunks retrieves chunks from blobs stored by the relay.
 	GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
+	// GetValidatorChunks retrieves all chunks allocated to a validator.
+	// The relay computes which chunks to return based on the deterministic chunk allocation algorithm.
+	GetValidatorChunks(ctx context.Context, in *GetValidatorChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
 }
 
 type relayClient struct {
@@ -59,6 +63,15 @@ func (c *relayClient) GetChunks(ctx context.Context, in *GetChunksRequest, opts 
 	return out, nil
 }
 
+func (c *relayClient) GetValidatorChunks(ctx context.Context, in *GetValidatorChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error) {
+	out := new(GetChunksReply)
+	err := c.cc.Invoke(ctx, Relay_GetValidatorChunks_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RelayServer is the server API for Relay service.
 // All implementations must embed UnimplementedRelayServer
 // for forward compatibility
@@ -67,6 +80,9 @@ type RelayServer interface {
 	GetBlob(context.Context, *GetBlobRequest) (*GetBlobReply, error)
 	// GetChunks retrieves chunks from blobs stored by the relay.
 	GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error)
+	// GetValidatorChunks retrieves all chunks allocated to a validator.
+	// The relay computes which chunks to return based on the deterministic chunk allocation algorithm.
+	GetValidatorChunks(context.Context, *GetValidatorChunksRequest) (*GetChunksReply, error)
 	mustEmbedUnimplementedRelayServer()
 }
 
@@ -79,6 +95,9 @@ func (UnimplementedRelayServer) GetBlob(context.Context, *GetBlobRequest) (*GetB
 }
 func (UnimplementedRelayServer) GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunks not implemented")
+}
+func (UnimplementedRelayServer) GetValidatorChunks(context.Context, *GetValidatorChunksRequest) (*GetChunksReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetValidatorChunks not implemented")
 }
 func (UnimplementedRelayServer) mustEmbedUnimplementedRelayServer() {}
 
@@ -129,6 +148,24 @@ func _Relay_GetChunks_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Relay_GetValidatorChunks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetValidatorChunksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RelayServer).GetValidatorChunks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Relay_GetValidatorChunks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RelayServer).GetValidatorChunks(ctx, req.(*GetValidatorChunksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Relay_ServiceDesc is the grpc.ServiceDesc for Relay service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -143,6 +180,10 @@ var Relay_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetChunks",
 			Handler:    _Relay_GetChunks_Handler,
+		},
+		{
+			MethodName: "GetValidatorChunks",
+			Handler:    _Relay_GetValidatorChunks_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
