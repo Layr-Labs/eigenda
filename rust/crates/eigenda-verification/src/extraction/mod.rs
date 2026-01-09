@@ -1,4 +1,4 @@
-use alloy_primitives::B256;
+use alloy_primitives::{Address, B256};
 use reth_trie_common::AccountProof;
 use reth_trie_common::proof::ProofVerificationError;
 use serde::{Deserialize, Serialize};
@@ -7,9 +7,10 @@ use tracing::instrument;
 
 use crate::cert::StandardCommitment;
 use crate::extraction::extractor::{
-    ApkHistoryExtractor, DataDecoder, MinWithdrawalDelayBlocksExtractor, NextBlobVersionExtractor,
-    OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor, QuorumCountExtractor,
-    QuorumNumbersRequiredV2Extractor, QuorumUpdateBlockNumberExtractor,
+    ApkHistoryExtractor, CertVerifierABNsExtractor, CertVerifierABNsLenExtractor,
+    CertVerifiersExtractor, DataDecoder, MinWithdrawalDelayBlocksExtractor,
+    NextBlobVersionExtractor, OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor,
+    QuorumCountExtractor, QuorumNumbersRequiredV2Extractor, QuorumUpdateBlockNumberExtractor,
     SecurityThresholdsV2Extractor, StaleStakesForbiddenExtractor, TotalStakeHistoryExtractor,
     VersionedBlobParamsExtractor,
 };
@@ -47,6 +48,43 @@ pub enum CertExtractionError {
     /// Error for when Ethereum Bytes are expected to be encoded in short form but long form is found instead
     #[error("Unexpected ethereum bytes long form")]
     UnexpectedEthereumBytesLongForm,
+
+    /// Length mismatch between ABNs and storage keys when extracting cert verifiers
+    #[error(
+        "Length mismatch: ABNs length {abns} does not match storage keys length {storage_keys}"
+    )]
+    LengthMismatch {
+        /// Length of the ABNs slice
+        abns: usize,
+        /// Length of the storage keys slice
+        storage_keys: usize,
+    },
+
+    /// certVerifierABNs in the router should always be strictly increasing.
+    /// See https://github.com/Layr-Labs/eigenda/blob/86fa3b3ee2a52ec7865804766506f6c6be53962b/contracts/src/integrations/cert/router/EigenDACertVerifierRouter.sol#L13
+    #[error("ABNs extracted from Router are not strictly increasing: {0:?}")]
+    CertVerifierABNsNotStrictlyIncreasing(Vec<u32>),
+
+    /// Likely a configuration error in the contract itself. Are there any CertVerifiers registered in the router?
+    #[error("No active block number found at reference block {rbn}")]
+    NoActiveCertVerifierAtRBN {
+        /// The reference block number at which no active cert verifier was found.
+        rbn: u64,
+    },
+
+    /// The provided off-chain active cert verifier does not match the on-chain active cert verifier at the given reference block number.
+    #[error(
+        "Wrong Cert Verifier. Proofs of storage provided for {offchain:?}, which doesn't match onchain router's active cert verifier {onchain:?} at RBN {rbn}"
+    )]
+    WrongActiveCertVerifier {
+        /// The reference block number at which the mismatch was detected.
+        rbn: u64,
+        /// The address of the active certificate verifier as reported off-chain,
+        /// for which we received proofs of storage.
+        offchain: Address,
+        /// The address of the active certificate verifier as reported on-chain in the router.
+        onchain: Address,
+    },
 }
 
 /// Contains data needed to validate the certificate. It also contains proofs
@@ -158,6 +196,32 @@ impl CertStateData {
                 quorum_update_block_number,
             }
         };
+
+        let num_abns = CertVerifierABNsLenExtractor::new()
+            .decode_data(&self.cert_verifier_router.storage_proofs)?;
+
+        let abns = CertVerifierABNsExtractor::new(num_abns.try_into().unwrap())
+            .decode_data(&self.cert_verifier_router.storage_proofs)?;
+
+        let cert_verifiers = CertVerifiersExtractor::new(&abns)
+            .decode_data(&self.cert_verifier_router.storage_proofs)?;
+
+        let rbn = cert.reference_block();
+        let abn = abns
+            .iter()
+            .rev()
+            .find(|abn| **abn as u64 <= rbn)
+            .ok_or_else(|| CertExtractionError::NoActiveCertVerifierAtRBN { rbn })?;
+        let cert_verifier_address = cert_verifiers
+            .get(abn)
+            .ok_or_else(|| CertExtractionError::NoActiveCertVerifierAtRBN { rbn })?;
+        if !cert_verifier_address.eq(&self.cert_verifier.address) {
+            return Err(CertExtractionError::WrongActiveCertVerifier {
+                rbn,
+                offchain: self.cert_verifier.address,
+                onchain: *cert_verifier_address,
+            });
+        }
 
         let security_thresholds =
             SecurityThresholdsV2Extractor::new().decode_data(&self.cert_verifier.storage_proofs)?;

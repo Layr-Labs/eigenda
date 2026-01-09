@@ -217,18 +217,6 @@ GLOBAL OPTIONS:
           = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted
           (causes startup error).
    
-    --eigenda.v2.rbn-recency-window-size value (default: 0)                       ($EIGENDA_PROXY_EIGENDA_V2_RBN_RECENCY_WINDOW_SIZE)
-          Allowed distance (in L1 blocks) between the eigenDA cert's reference 
-          block
-          number (RBN) and the L1 block number at which the cert was included 
-          in the
-          rollup's batch inbox. A cert is valid when cert.RBN < certL1InclusionBlock <=
-          cert.RBN + rbnRecencyWindowSize, 
-          and otherwise is considered stale and
-          verification will fail, and a 418 HTTP error will be returned.
-          This check is
-          optional and will be skipped when set to 0.
-   
     --eigenda.v2.relay-connection-pool-size value (default: 1)                       ($EIGENDA_PROXY_EIGENDA_V2_RELAY_CONNECTION_POOL_SIZE)
           Number of gRPC connections to maintain to each relay.
    

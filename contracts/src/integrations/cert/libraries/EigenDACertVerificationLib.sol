@@ -59,6 +59,16 @@ library EigenDACertVerificationLib {
     /// @param requiredDerivationVer The required offchain derivation version
     error InvalidOffchainDerivationVersion(uint16 certDerivationVer, uint16 requiredDerivationVer);
 
+    /// @notice Thrown when the number of signed quorums exceeds the maximum allowed
+    /// @param count The actual number of signed quorums provided
+    /// @param maximum The maximal number of quorums
+    error QuorumCountExceedsMaximum(uint256 count, uint256 maximum);
+
+    /// @notice Thrown when the total number of non-signers across all quorums exceeds the maximum allowed
+    /// @param count The total count of non-signers across all quorums
+    /// @param maximum The maximal number of non-signers allowed
+    error NonSignerCountExceedsMaximum(uint256 count, uint256 maximum);
+
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
     /// @param eigenDAThresholdRegistry The threshold registry contract
     /// @param eigenDASignatureVerifier The signature verifier contract
@@ -67,16 +77,23 @@ library EigenDACertVerificationLib {
     /// Callers should ensure that the requiredQuorumNumbers passed are non-empty if needed.
     /// @param requiredQuorumNumbers The required quorum numbers. Can be empty if not required.
     /// @param offchainDerivationVersion The offchain derivation version to verify against
+    /// @param max_quorum_count The maximal number of quorums.
+    /// @param max_nonsigner_count_all_quorum The maximal number of non-signers across all quorums.
     function checkDACert(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier eigenDASignatureVerifier,
         CT.EigenDACertV4 memory daCert,
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers,
-        uint16 offchainDerivationVersion
+        uint16 offchainDerivationVersion,
+        uint256 max_quorum_count,
+        uint256 max_nonsigner_count_all_quorum
     ) internal view {
         checkOffchainDerivationVersion(daCert.offchainDerivationVersion, offchainDerivationVersion);
 
+        // verifying merkle inclusion proof is very efficient, even assuming the worst depth 256.
+        // A single depth verification takes about 300 gas for KECCAK256 and CALLDATALOAD
+        // so at worst 80K Gas.
         checkBlobInclusion(daCert.batchHeader, daCert.blobInclusionInfo);
 
         checkSecurityParams(
@@ -90,7 +107,9 @@ library EigenDACertVerificationLib {
             daCert.signedQuorumNumbers,
             daCert.batchHeader.referenceBlockNumber,
             daCert.nonSignerStakesAndSignature,
-            securityThresholds
+            securityThresholds,
+            max_quorum_count,
+            max_nonsigner_count_all_quorum
         );
 
         // The different quorums are related by: requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums ⊆ signedQuorums
@@ -181,6 +200,8 @@ library EigenDACertVerificationLib {
     /// @param referenceBlockNumber The reference block number
     /// @param nonSignerStakesAndSignature The non-signer stakes and signature
     /// @param securityThresholds The security thresholds to verify against
+    /// @param max_quorum_count The maximal number of quorums
+    /// @param max_nonsigner_count_all_quorum The maximal number of non-signers across all quorums
     /// @return confirmedQuorumsBitmap The bitmap of confirmed quorums
     function checkSignaturesAndBuildConfirmedQuorums(
         IEigenDASignatureVerifier signatureVerifier,
@@ -188,8 +209,26 @@ library EigenDACertVerificationLib {
         bytes memory signedQuorumNumbers,
         uint32 referenceBlockNumber,
         DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
-        DATypesV1.SecurityThresholds memory securityThresholds
+        DATypesV1.SecurityThresholds memory securityThresholds,
+        uint256 max_quorum_count,
+        uint256 max_nonsigner_count_all_quorum
     ) internal view returns (uint256 confirmedQuorumsBitmap) {
+        // The maximal supported number of quorums from the local contracts. This number must be smaller than or
+        // equal to the value set in the RegistryCoordinator contract.
+        // https://github.com/Layr-Labs/eigenda/blob/00cc8868b7e2d742fc6584dc1dea312193c8d4c2/contracts/src/core/EigenDARegistryCoordinatorStorage.sol#L36
+        if (signedQuorumNumbers.length > max_quorum_count) {
+            revert QuorumCountExceedsMaximum(signedQuorumNumbers.length, max_quorum_count);
+        }
+
+        // if a nonsigning operator belongs to multiple quorums, the totalNonsignersCount counts it multiple times
+        uint256 totalNonsignersCount = 0;
+        for (uint256 i = 0; i < nonSignerStakesAndSignature.nonSignerStakeIndices.length; i++) {
+            totalNonsignersCount += nonSignerStakesAndSignature.nonSignerStakeIndices[i].length;
+        }
+        if (totalNonsignersCount > max_nonsigner_count_all_quorum) {
+            revert NonSignerCountExceedsMaximum(totalNonsignersCount, max_nonsigner_count_all_quorum);
+        }
+
         (DATypesV1.QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
             batchHashRoot, signedQuorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature
         );

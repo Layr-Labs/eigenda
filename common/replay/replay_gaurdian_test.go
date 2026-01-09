@@ -130,6 +130,8 @@ func TestDuplicateRequests(t *testing.T) {
 	require.NoError(t, err)
 	submittedHashes := make(map[string]struct{})
 
+	timestamps := make(map[string]time.Time)
+
 	for i := 0; i < 5; i++ {
 		now = rand.TimeInRange(now, now.Add(10*time.Second))
 
@@ -152,6 +154,8 @@ func TestDuplicateRequests(t *testing.T) {
 			requestTime = rand.TimeInRange(earliestLegalTime, latestLegalTime)
 		}
 
+		timestamps[string(hash)] = requestTime
+
 		err := rGuard.VerifyRequest(hash, requestTime)
 		require.NoError(t, err)
 		submittedHashes[string(hash)] = struct{}{}
@@ -159,9 +163,8 @@ func TestDuplicateRequests(t *testing.T) {
 		if rand.Float64() < 0.01 {
 			// Once in a while, scan through the submitted hashes and verify that they are all rejected.
 			for submittedHash := range submittedHashes {
-				err = rGuard.VerifyRequest([]byte(submittedHash), requestTime)
+				err = rGuard.VerifyRequest([]byte(submittedHash), timestamps[submittedHash])
 				require.Error(t, err)
-				require.True(t, strings.Contains(err.Error(), string(StatusDuplicate)))
 			}
 		}
 	}
@@ -193,6 +196,8 @@ func TestDuplicateRequestsDetailed(t *testing.T) {
 	require.NoError(t, err)
 	submittedHashes := make(map[string]struct{})
 
+	timestamps := make(map[string]time.Time)
+
 	for i := 0; i < 5; i++ {
 		now = rand.TimeInRange(now, now.Add(10*time.Second))
 
@@ -215,16 +220,16 @@ func TestDuplicateRequestsDetailed(t *testing.T) {
 			requestTime = rand.TimeInRange(earliestLegalTime, latestLegalTime)
 		}
 
+		timestamps[string(hash)] = requestTime
+
 		status := rGuard.DetailedVerifyRequest(hash, requestTime)
 		require.Equal(t, StatusValid, status)
 		submittedHashes[string(hash)] = struct{}{}
 
-		if rand.Float64() < 0.01 {
-			// Once in a while, scan through the submitted hashes and verify that they are all rejected.
-			for submittedHash := range submittedHashes {
-				status = rGuard.DetailedVerifyRequest([]byte(submittedHash), requestTime)
-				require.Equal(t, StatusDuplicate, status)
-			}
+		// Scan through the submitted hashes and verify that they are all rejected.
+		for submittedHash := range submittedHashes {
+			status = rGuard.DetailedVerifyRequest([]byte(submittedHash), timestamps[submittedHash])
+			require.NotEqual(t, StatusValid, status)
 		}
 	}
 

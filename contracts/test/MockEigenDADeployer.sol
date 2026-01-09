@@ -16,6 +16,9 @@ import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
+import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
+import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import "forge-std/StdStorage.sol";
 
 contract MockEigenDADeployer is BLSMockAVSDeployer {
@@ -37,6 +40,9 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     PaymentVault paymentVault;
     PaymentVault paymentVaultImplementation;
     EigenDACertVerifier eigenDACertVerifier;
+    EigenDAAccessControl eigenDAAccessControl;
+    EigenDAEjectionManager eigenDAEjectionManager;
+    EigenDAEjectionManager eigenDAEjectionManagerImplementation;
 
     ERC20 mockToken;
 
@@ -176,6 +182,29 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             defaultSecurityThresholds,
             quorumNumbersRequired,
             offchainDerivationVersion
+        );
+
+        // Deploy EigenDAAccessControl
+        eigenDAAccessControl = new EigenDAAccessControl(registryCoordinatorOwner);
+
+        // Deploy EigenDAEjectionManager implementation with typed dependencies
+        eigenDAEjectionManagerImplementation = new EigenDAEjectionManager(
+            IAccessControl(address(eigenDAAccessControl)), blsApkRegistry, eigenDAServiceManager, registryCoordinator
+        );
+
+        // Deploy EigenDAEjectionManager proxy with initialization
+        eigenDAEjectionManager = EigenDAEjectionManager(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(eigenDAEjectionManagerImplementation),
+                    address(proxyAdmin),
+                    abi.encodeWithSelector(
+                        EigenDAEjectionManager.initialize.selector,
+                        0, // delay
+                        0 // cooldown
+                    )
+                )
+            )
         );
     }
 
