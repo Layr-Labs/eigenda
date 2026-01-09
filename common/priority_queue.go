@@ -46,6 +46,9 @@ func (pq *PriorityQueue[T]) Push(item T) {
 //
 // This method will panic if the priority queue is empty.
 func (pq *PriorityQueue[T]) Pop() T {
+	if pq.Size() == 0 {
+		panic("pop from empty priority queue")
+	}
 	return heap.Pop(pq.heap).(T)
 }
 
@@ -63,6 +66,9 @@ func (pq *PriorityQueue[T]) TryPop() (value T, ok bool) {
 //
 // This method will panic if the priority queue is empty.
 func (pq *PriorityQueue[T]) Peek() T {
+	if pq.Size() == 0 {
+		panic("peek from empty priority queue")
+	}
 	return pq.heap.items[0]
 }
 
