@@ -21,6 +21,7 @@ import (
 // PaymentAuthorizationConfig contains configuration for building a payment authorization handler
 type PaymentAuthorizationConfig struct {
 	OnDemandConfig                 ondemandvalidation.OnDemandLedgerCacheConfig
+	OnDemandMetererConfig          meterer.OnDemandMetererConfig
 	ReservationConfig              reservationvalidation.ReservationLedgerCacheConfig
 	EnablePerAccountPaymentMetrics bool
 }
@@ -29,6 +30,9 @@ type PaymentAuthorizationConfig struct {
 func (c *PaymentAuthorizationConfig) Verify() error {
 	if err := c.OnDemandConfig.Verify(); err != nil {
 		return fmt.Errorf("on-demand config: %w", err)
+	}
+	if err := c.OnDemandMetererConfig.Verify(); err != nil {
+		return fmt.Errorf("on-demand meterer config: %w", err)
 	}
 	if err := c.ReservationConfig.Verify(); err != nil {
 		return fmt.Errorf("reservation config: %w", err)
@@ -44,6 +48,11 @@ func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
 		UpdateInterval:    30 * time.Second,
 	}
 
+	onDemandMetererConfig := meterer.OnDemandMetererConfig{
+		RefreshInterval: meterer.DefaultOnDemandMetererRefreshInterval,
+		FuzzFactor:      meterer.DefaultOnDemandMetererFuzzFactor,
+	}
+
 	reservationConfig := reservationvalidation.ReservationLedgerCacheConfig{
 		MaxLedgers:           1024,
 		BucketCapacityPeriod: 90 * time.Second,
@@ -53,6 +62,7 @@ func DefaultPaymentAuthorizationConfig() *PaymentAuthorizationConfig {
 
 	return &PaymentAuthorizationConfig{
 		OnDemandConfig:                 onDemandConfig,
+		OnDemandMetererConfig:          onDemandMetererConfig,
 		ReservationConfig:              reservationConfig,
 		EnablePerAccountPaymentMetrics: true,
 	}
@@ -95,6 +105,7 @@ func BuildPaymentAuthorizationHandler(
 		paymentVault,
 		time.Now,
 		onDemandMetererMetrics,
+		config.OnDemandMetererConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create on-demand meterer: %w", err)
