@@ -14,14 +14,20 @@ import (
 	"github.com/Layr-Labs/eigenda/indexer"
 )
 
+var _ config.DocumentedConfig = &ControllerConfig{}
+
 // ControllerConfig contains configuration parameters for the controller.
 type ControllerConfig struct {
+	// Configuration for logging.
+	// TODO(cody.littley): not yet wired into flags but will be soon. Ok for now since we use the defaults everywhere.
+	Log config.SimpleLoggerConfig
+
 	// PullInterval is how frequently the Dispatcher polls for new encoded blobs to batch and dispatch.
 	// Must be positive.
 	PullInterval time.Duration
 
 	// DisperserID is the unique identifier for this disperser instance.
-	DisperserID uint32
+	DisperserID uint32 `docs:"required"`
 
 	// FinalizationBlockDelay is the number of blocks to wait before using operator state.
 	// This provides a hedge against chain reorganizations.
@@ -122,13 +128,13 @@ type ControllerConfig struct {
 	SigningRateDynamoDbTableName string `docs:"required"`
 
 	// The name of the DynamoDB table used to store "core" metadata (i.e. blob statuses, signatures, etc.).
-	DynamoDBTableName string
+	DynamoDBTableName string `docs:"required"`
 
 	// Whether or not to use subgraph.
 	UseGraph bool
 
 	// The contract directory contract address, which is used to derive other EigenDA contract addresses.
-	EigenDAContractDirectoryAddress string `docs:"required"`
+	ContractDirectoryAddress string `docs:"required"`
 
 	// The port on which to expose prometheus metrics.
 	MetricsPort int
@@ -147,7 +153,7 @@ type ControllerConfig struct {
 	Server common.GRPCServerConfig
 
 	// Configures the encoding manager (i.e. the interface used to send work to encoders).
-	EncodingManager EncodingManagerConfig
+	Encoder EncodingManagerConfig
 
 	// Configures the indexer.
 	Indexer indexer.Config
@@ -156,7 +162,7 @@ type ControllerConfig struct {
 	ChainState thegraph.Config
 
 	// Configures the Ethereum client, which is used for talking to the EigenDA contracts.
-	EthClientConfig geth.EthClientConfig
+	EthClient geth.EthClientConfig
 
 	// Configures AWS clients used by the controller.
 	AwsClient aws.ClientConfig
@@ -167,38 +173,51 @@ type ControllerConfig struct {
 	// Configures the dispersal request signer used to sign requests to validators.
 	DispersalRequestSigner clients.DispersalRequestSignerConfig
 
-	// Configures logging for the controller.
-	Logger common.LoggerConfig
-
 	// Configures healthchecks and heartbeat monitoring for the controller.
 	HeartbeatMonitor healthcheck.HeartbeatMonitorConfig
 
 	// Configures the payment authorization system.
-	PaymentAuthorization PaymentAuthorizationConfig
+	Payment PaymentAuthorizationConfig
 }
 
 var _ config.VerifiableConfig = &ControllerConfig{}
 
 func DefaultControllerConfig() *ControllerConfig {
 	return &ControllerConfig{
-		PullInterval:                        1 * time.Second,
-		FinalizationBlockDelay:              75,
-		AttestationTimeout:                  45 * time.Second,
-		BatchMetadataUpdatePeriod:           time.Minute,
-		BatchAttestationTimeout:             55 * time.Second,
-		SignatureTickInterval:               50 * time.Millisecond,
-		MaxBatchSize:                        32,
-		SignificantSigningThresholdFraction: 0.55,
-		NumConcurrentRequests:               600,
-		NodeClientCacheSize:                 400,
-		MaxDispersalAge:                     45 * time.Second,
-		MaxDispersalFutureAge:               45 * time.Second,
-		SigningRateRetentionPeriod:          14 * 24 * time.Hour, // 2 weeks
-		SigningRateBucketSpan:               10 * time.Minute,
-		BlobDispersalQueueSize:              1024,
-		BlobDispersalRequestBatchSize:       32,
-		BlobDispersalRequestBackoffPeriod:   50 * time.Millisecond,
-		SigningRateFlushPeriod:              1 * time.Minute,
+		Log:                                    config.DefaultSimpleLoggerConfig(),
+		Server:                                 common.DefaultGRPCServerConfig(),
+		Encoder:                                DefaultEncodingManagerConfig(),
+		Indexer:                                indexer.DefaultIndexerConfig(),
+		ChainState:                             thegraph.DefaultTheGraphConfig(),
+		EthClient:                              geth.DefaultEthClientConfig(),
+		AwsClient:                              aws.DefaultClientConfig(),
+		HeartbeatMonitor:                       healthcheck.DefaultHeartbeatMonitorConfig(),
+		DispersalRequestSigner:                 clients.DefaultDispersalRequestSignerConfig(),
+		Payment:                                DefaultPaymentAuthorizationConfig(),
+		PullInterval:                           1 * time.Second,
+		FinalizationBlockDelay:                 75,
+		AttestationTimeout:                     45 * time.Second,
+		BatchMetadataUpdatePeriod:              time.Minute,
+		BatchAttestationTimeout:                55 * time.Second,
+		SignatureTickInterval:                  50 * time.Millisecond,
+		MaxBatchSize:                           32,
+		SignificantSigningThresholdFraction:    0.55,
+		NumConcurrentRequests:                  600,
+		NodeClientCacheSize:                    400,
+		MaxDispersalAge:                        45 * time.Second,
+		MaxDispersalFutureAge:                  45 * time.Second,
+		SigningRateRetentionPeriod:             14 * 24 * time.Hour, // 2 weeks
+		SigningRateBucketSpan:                  10 * time.Minute,
+		BlobDispersalQueueSize:                 1024,
+		BlobDispersalRequestBatchSize:          32,
+		BlobDispersalRequestBackoffPeriod:      50 * time.Millisecond,
+		SigningRateFlushPeriod:                 1 * time.Minute,
+		UseGraph:                               true,
+		MetricsPort:                            9101,
+		ControllerReadinessProbePath:           "/tmp/controller-ready",
+		CollectDetailedValidatorSigningMetrics: true,
+		EnablePerAccountBlobStatusMetrics:      true,
+		DisperserStoreChunksSigningDisabled:    false,
 	}
 }
 
@@ -264,14 +283,75 @@ func (c *ControllerConfig) Verify() error {
 	if c.SigningRateDynamoDbTableName == "" {
 		return fmt.Errorf("SigningRateDynamoDbTableName must not be empty")
 	}
+	if c.DynamoDBTableName == "" {
+		return fmt.Errorf("DynamoDBTableName must not be empty")
+	}
+	if c.ContractDirectoryAddress == "" {
+		return fmt.Errorf("ContractDirectoryAddress must not be empty")
+	}
+	if c.MetricsPort < 1 || c.MetricsPort > 65535 {
+		return fmt.Errorf("MetricsPort must be between 1 and 65535, got %d", c.MetricsPort)
+	}
+	if c.ControllerReadinessProbePath == "" {
+		return fmt.Errorf("ControllerReadinessProbePath must not be empty")
+	}
+	if c.SigningRateBucketSpan > c.SigningRateRetentionPeriod {
+		return fmt.Errorf("SigningRateBucketSpan must not be greater than SigningRateRetentionPeriod, got %v > %v",
+			c.SigningRateBucketSpan, c.SigningRateRetentionPeriod)
+	}
 	if err := c.DispersalRequestSigner.Verify(); err != nil {
 		return fmt.Errorf("invalid dispersal request signer config: %w", err)
 	}
-	if err := c.EncodingManager.Verify(); err != nil {
+	if err := c.Encoder.Verify(); err != nil {
 		return fmt.Errorf("invalid encoding manager config: %w", err)
 	}
-	if err := c.PaymentAuthorization.Verify(); err != nil {
+	if err := c.Payment.Verify(); err != nil {
 		return fmt.Errorf("invalid payment authorization config: %w", err)
 	}
+	if err := c.Log.Verify(); err != nil {
+		return fmt.Errorf("invalid logger config: %w", err)
+	}
+	if err := c.Server.Verify(); err != nil {
+		return fmt.Errorf("invalid gRPC server config: %w", err)
+	}
+	if err := c.Indexer.Verify(); err != nil {
+		return fmt.Errorf("invalid indexer config: %w", err)
+	}
+	if err := c.ChainState.Verify(); err != nil {
+		return fmt.Errorf("invalid chain state (The Graph) config: %w", err)
+	}
+	if err := c.EthClient.Verify(); err != nil {
+		return fmt.Errorf("invalid Ethereum client config: %w", err)
+	}
+	if err := c.AwsClient.Verify(); err != nil {
+		return fmt.Errorf("invalid AWS client config: %w", err)
+	}
+	if err := c.HeartbeatMonitor.Verify(); err != nil {
+		return fmt.Errorf("invalid heartbeat monitor config: %w", err)
+	}
 	return nil
+}
+
+func (c *ControllerConfig) GetEnvVarPrefix() string {
+	return "CONTROLLER"
+}
+
+func (c *ControllerConfig) GetName() string {
+	return "Controller"
+}
+
+func (c *ControllerConfig) GetPackagePaths() []string {
+	return []string{
+		"github.com/Layr-Labs/eigenda/disperser/controller",
+		"github.com/Layr-Labs/eigenda/common/config",
+		"github.com/Layr-Labs/eigenda/common",
+		"github.com/Layr-Labs/eigenda/indexer",
+		"github.com/Layr-Labs/eigenda/core/thegraph",
+		"github.com/Layr-Labs/eigenda/common/geth",
+		"github.com/Layr-Labs/eigenda/common/aws",
+		"github.com/Layr-Labs/eigenda/common/healthcheck",
+		"github.com/Layr-Labs/eigenda/api/clients/v2",
+		"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation",
+		"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation",
+	}
 }

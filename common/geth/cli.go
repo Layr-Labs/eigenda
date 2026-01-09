@@ -1,6 +1,7 @@
 package geth
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -16,12 +17,19 @@ var (
 	retryDelayIncrementFlagName = "chain.retry-delay-increment"
 )
 
+// TODO(cody.littley): RPCURLs and PrivateKeyString should be converted to *secret.Secret types.
+
 type EthClientConfig struct {
-	RPCURLs          []string
+	// A list of RPC URL endpoints to connect to the Ethereum chain.
+	RPCURLs []string `docs:"required"`
+	// Ethereum private key in hex string format.
 	PrivateKeyString string
+	// Number of block confirmations to wait for.
 	NumConfirmations int
-	NumRetries       int
-	RetryDelay       time.Duration
+	// Max number of retries for each RPC call after failure.
+	NumRetries int
+	// Time duration for linear retry delay increment.
+	RetryDelay time.Duration
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {
@@ -102,4 +110,35 @@ func ReadEthClientConfigRPCOnly(ctx *cli.Context) EthClientConfig {
 	}
 
 	return cfg
+}
+
+// DefaultEthClientConfig returns the default Ethereum client configuration.
+func DefaultEthClientConfig() EthClientConfig {
+	return EthClientConfig{
+		NumConfirmations: 0,
+		NumRetries:       2,
+		RetryDelay:       0 * time.Second,
+	}
+}
+
+// Verify validates the Ethereum client configuration.
+func (c *EthClientConfig) Verify() error {
+	if len(c.RPCURLs) == 0 {
+		return fmt.Errorf("at least one RPC URL must be provided")
+	}
+	for _, url := range c.RPCURLs {
+		if url == "" {
+			return fmt.Errorf("RPC URL cannot be empty")
+		}
+	}
+	if c.NumConfirmations < 0 {
+		return fmt.Errorf("number of confirmations cannot be negative")
+	}
+	if c.NumRetries < 0 {
+		return fmt.Errorf("number of retries cannot be negative")
+	}
+	if c.RetryDelay < 0 {
+		return fmt.Errorf("retry delay cannot be negative")
+	}
+	return nil
 }

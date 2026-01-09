@@ -298,9 +298,9 @@ func buildEigenDAV2Backend(
 		// Note that we also support certV2s, just not V2 CertVerifiers.
 		// This is because we transform certV2s into certV3s and verified using the CertVerifierV3 contract.
 		// However, the serialization logic, as well as some functions needed during the dispersal path (eg. requiredQuorums),
-		// are only compatible/available with CertVerifier V3, hence the requirement here.
-		if certVersion != 3 {
-			return nil, fmt.Errorf("this version of proxy is only compatible with CertVerifier V3 : cert verifier at address %s is version %d",
+		// are compatible/available with CertVerifier V3 and V4, hence the requirement here.
+		if certVersion != 3 && certVersion != 4 {
+			return nil, fmt.Errorf("this version of proxy is only compatible with CertVerifier V3 or V4 : cert verifier at address %s is version %d",
 				routerOrImmutableVerifierAddr.Hex(), certVersion)
 		}
 	}
