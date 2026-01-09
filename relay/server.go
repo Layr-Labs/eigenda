@@ -25,9 +25,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 var _ pb.RelayServer = &Server{}
@@ -833,6 +835,19 @@ func buildInsufficientGetChunksBandwidthError(
 
 	return api.NewErrorResourceExhausted(fmt.Sprintf("unable to serve data (%d blobs, %d chunks, %d bytes): %v",
 		blobCount, chunkCount, requiredBandwidth, originalError))
+}
+
+// Retrieves all chunks allocated to a validator.
+// The relay computes which chunks to return based on the deterministic chunk allocation algorithm.
+//
+// This endpoint will eventually replace `GetChunks`. It is being added as a separate endpoint for the sake of
+// backwards compatibility
+func (s *Server) GetValidatorChunks(
+	ctx context.Context,
+	request *pb.GetValidatorChunksRequest,
+) (*pb.GetChunksReply, error) {
+	// TODO(litt3): this logic will be implemented in a future PR.
+	return nil, status.Errorf(codes.Unimplemented, "method GetValidatorChunks not implemented")
 }
 
 // Start starts the server using the listener provided in the constructor.

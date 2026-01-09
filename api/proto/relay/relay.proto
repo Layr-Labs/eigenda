@@ -10,6 +10,10 @@ service Relay {
 
   // GetChunks retrieves chunks from blobs stored by the relay.
   rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
+
+  // GetValidatorChunks retrieves all chunks allocated to a validator.
+  // The relay computes which chunks to return based on the deterministic chunk allocation algorithm.
+  rpc GetValidatorChunks(GetValidatorChunksRequest) returns (GetChunksReply) {}
 }
 
 // A request to fetch one or more blobs.
@@ -100,4 +104,29 @@ message GetChunksReply {
   // The chunks requested. The order of these chunks will be the same as the order of the requested chunks.
   // data is the raw data of the bundle (i.e. serialized byte array of the frames)
   repeated bytes data = 1;
+}
+
+// Request all chunks allocated to a specific validator.
+// The relay determines which chunks to return based on deterministic allocation.
+message GetValidatorChunksRequest {
+  // The ID of the validator requesting chunks.
+  bytes validator_id = 1;
+
+  // The key of the blob to retrieve chunks for.
+  bytes blob_key = 2;
+
+  // Timestamp of the request in seconds since the Unix epoch.
+  uint32 timestamp = 3;
+
+  // BLS signature by the requester on the hash of this request.
+  //
+  // Signing algorithm:
+  // Perform a keccak256 hash on the following data in order:
+  // 1. the domain separator string "relay.GetValidatorChunksRequest"
+  // 2. the length of the validator ID in bytes (4 byte big endian)
+  // 3. the validator ID bytes
+  // 4. the length of the blob key in bytes (4 byte big endian)
+  // 5. the blob key bytes
+  // 6. the timestamp (4 byte big endian)
+  bytes validator_signature = 4;
 }
