@@ -26,6 +26,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/mem"
+	"golang.org/x/time/rate"
 )
 
 // ServerV2 implements the Node v2 proto APIs.
@@ -179,6 +180,16 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 	probe.SetStage("validate")
 
+	onDemandReservations := make([]*rate.Reservation, 0)
+	success := false
+	defer func() {
+		if !success {
+			for _, reservation := range onDemandReservations {
+				s.node.CancelOnDemandDispersal(reservation)
+			}
+		}
+	}()
+
 	// Validate the request parameters (which is cheap) before starting any further
 	// processing of the request.
 	batch, err := s.validateStoreChunksRequest(in)
@@ -239,6 +250,17 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		if err != nil {
 			//nolint:wrapcheck
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify blob header hash at index %d: %v", i, err))
+		}
+	}
+
+	for _, blobCert := range batch.BlobCertificates {
+		if blobCert.BlobHeader.PaymentMetadata.IsOnDemand() {
+			length := blobCert.BlobHeader.BlobCommitments.Length
+			reservation, meterErr := s.node.MeterOnDemandDispersal(length)
+			if meterErr != nil {
+				return nil, fmt.Errorf("global on-demand rate limit exceeded: %w", meterErr)
+			}
+			onDemandReservations = append(onDemandReservations, reservation)
 		}
 	}
 
@@ -324,6 +346,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
 	}
+
+	success = true
 
 	return &pb.StoreChunksReply{
 		Signature: sig,
