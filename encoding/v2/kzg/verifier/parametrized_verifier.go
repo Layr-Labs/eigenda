@@ -17,7 +17,7 @@ import (
 )
 
 type ParametrizedVerifier struct {
-	g1SRS kzg.G1SRS
+	g1SRS []bn254.G1Affine
 	Fs    *fft.FFTSettings
 }
 
@@ -43,7 +43,7 @@ func (v *ParametrizedVerifier) verifyFrame(
 
 // Verify function assumes the Data stored is coefficients of coset's interpolating poly
 func verifyFrame(
-	frame *encoding.Frame, g1SRS kzg.G1SRS, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine,
+	frame *encoding.Frame, g1SRS []bn254.G1Affine, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine,
 ) error {
 	var xPow fr.Element
 	xPow.SetOne()

@@ -8,7 +8,7 @@ import (
 // Contains configuration for a gRPC server
 type GRPCServerConfig struct {
 	// Port that the gRPC server listens on
-	GrpcPort uint16
+	GrpcPort uint16 `docs:"required"`
 
 	// Maximum size of a gRPC message that the server will accept (in bytes)
 	MaxGRPCMessageSize int
@@ -23,6 +23,32 @@ type GRPCServerConfig struct {
 	// Maximum age of a request in the future that the server will accept.
 	// Requests with timestamps too far in the future will be rejected.
 	RequestMaxFutureAge time.Duration
+}
+
+// DefaultGRPCServerConfig returns the default gRPC server configuration.
+func DefaultGRPCServerConfig() GRPCServerConfig {
+	return GRPCServerConfig{
+		MaxGRPCMessageSize:   1024 * 1024, // 1 MB
+		MaxIdleConnectionAge: 5 * time.Minute,
+		RequestMaxPastAge:    5 * time.Minute,
+		RequestMaxFutureAge:  3 * time.Minute,
+	}
+}
+
+func (c *GRPCServerConfig) Verify() error {
+	if c.MaxGRPCMessageSize < 0 {
+		return fmt.Errorf("max gRPC message size must be positive, got %d", c.MaxGRPCMessageSize)
+	}
+	if c.MaxIdleConnectionAge < 0 {
+		return fmt.Errorf("max idle connection age must be positive, got %v", c.MaxIdleConnectionAge)
+	}
+	if c.RequestMaxPastAge < 0 {
+		return fmt.Errorf("request max past age must be positive, got %v", c.RequestMaxPastAge)
+	}
+	if c.RequestMaxFutureAge < 0 {
+		return fmt.Errorf("request max future age must be positive, got %v", c.RequestMaxFutureAge)
+	}
+	return nil
 }
 
 // NewGRPCServerConfig creates a new gRPC server config with validation

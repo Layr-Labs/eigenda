@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -21,22 +22,18 @@ var (
 
 type ClientConfig struct {
 	// Region is the region to use when interacting with S3. Default is "us-east-2".
-	Region string
+	Region string `docs:"required"`
 	// AccessKey to use when interacting with S3.
-	AccessKey string
+	AccessKey string `docs:"required"`
 	// SecretAccessKey to use when interacting with S3.
-	SecretAccessKey string
-	// EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used.
+	SecretAccessKey string `docs:"required"` // TODO (cody.littley): Change to *secret.Secret
+	// EndpointURL of the S3 endpoint to use. If set to "", the AWS library will use the default AWS S3 endpoint.
 	EndpointURL string
 
-	// FragmentParallelismFactor helps determine the size of the pool of workers to help upload/download files.
-	// A non-zero value for this parameter adds a number of workers equal to the number of cores times this value.
-	// Default is 8. In general, the number of workers here can be a lot larger than the number of cores because the
-	// workers will be blocked on I/O most of the time.
-	FragmentParallelismFactor int
-	// FragmentParallelismConstant helps determine the size of the pool of workers to help upload/download files.
-	// A non-zero value for this parameter adds a constant number of workers. Default is 0.
-	FragmentParallelismConstant int
+	// This is a deprecated setting and can be ignored.
+	FragmentParallelismFactor int // TODO (cody.littley): Remove
+	// This is a deprecated setting and can be ignored.
+	FragmentParallelismConstant int // TODO (cody.littley): Remove
 }
 
 func ClientFlags(envPrefix string, flagPrefix string) []cli.Flag {
@@ -118,10 +115,29 @@ func ReadClientConfig(ctx *cli.Context, flagPrefix string) ClientConfig {
 }
 
 // DefaultClientConfig returns a new ClientConfig with default values.
-func DefaultClientConfig() *ClientConfig {
-	return &ClientConfig{
-		Region:                      "us-east-2",
+func DefaultClientConfig() ClientConfig {
+	return ClientConfig{
 		FragmentParallelismFactor:   8,
 		FragmentParallelismConstant: 0,
 	}
+}
+
+// Verify validates the AWS client configuration.
+func (c *ClientConfig) Verify() error {
+	if c.Region == "" {
+		return fmt.Errorf("aws region is required")
+	}
+	if c.AccessKey == "" {
+		return fmt.Errorf("aws access key id is required")
+	}
+	if c.SecretAccessKey == "" {
+		return fmt.Errorf("aws secret access key is required")
+	}
+	if c.FragmentParallelismFactor < 0 {
+		return fmt.Errorf("fragment parallelism factor cannot be negative")
+	}
+	if c.FragmentParallelismConstant < 0 {
+		return fmt.Errorf("fragment parallelism constant cannot be negative")
+	}
+	return nil
 }

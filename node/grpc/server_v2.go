@@ -22,6 +22,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
+	"github.com/Layr-Labs/eigenda/node/grpc/middleware"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/mem"
@@ -47,6 +48,8 @@ type ServerV2 struct {
 	// Pre-created listeners for the gRPC servers
 	dispersalListener net.Listener
 	retrievalListener net.Listener
+
+	rateLimiter *middleware.DisperserRateLimiter
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -101,6 +104,11 @@ func NewServerV2(
 		softwareVersion:    softwareVersion,
 		dispersalListener:  dispersalListener,
 		retrievalListener:  retrievalListener,
+		rateLimiter: middleware.NewDisperserRateLimiter(
+			logger,
+			config.DisperserRateLimitPerSecond,
+			config.DisperserRateLimitBurst,
+		),
 	}, nil
 }
 
@@ -183,16 +191,41 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	_, err = s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
-	if err != nil {
-		//nolint:wrapcheck
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
+	now := time.Now()
+	if authenticatedID, ok := middleware.AuthenticatedDisperserIDFromContext(ctx); ok {
+		// Defensive check: the interceptor should only set an ID that matches the request.
+		if authenticatedID != in.GetDisperserID() {
+			//nolint:wrapcheck
+			return nil, api.NewErrorInvalidArg("authenticated disperser ID does not match request disperser ID")
+		}
+	} else {
+		// Defense-in-depth: normally the gRPC interceptor authenticates StoreChunks and rate limits dispersers.
+		// This fallback exists for direct calls (e.g. tests) or alternate wiring where the interceptor isn't installed.
+		_, err = s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, now)
+		if err != nil {
+			//nolint:wrapcheck
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
+		}
+
+		if s.rateLimiter != nil && !s.rateLimiter.Allow(in.GetDisperserID(), now) {
+			//nolint:wrapcheck
+			return nil, api.NewErrorResourceExhausted(
+				fmt.Sprintf("disperser %d is rate limited", in.GetDisperserID()))
+		}
 	}
 
 	if !s.chunkAuthenticator.IsDisperserAuthorized(in.GetDisperserID(), batch) {
 		//nolint:wrapcheck
 		return nil, api.NewErrorPermissionDenied(
 			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
+	}
+
+	for _, blobCert := range batch.BlobCertificates {
+		_, err = s.validateDispersalRequest(blobCert)
+		if err != nil {
+			//nolint:wrapcheck
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
+		}
 	}
 
 	blobHeadersAndTimestamps, err := hashing.HashBlobHeadersAndTimestamps(in)
@@ -206,14 +239,6 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		if err != nil {
 			//nolint:wrapcheck
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify blob header hash at index %d: %v", i, err))
-		}
-	}
-
-	for _, blobCert := range batch.BlobCertificates {
-		_, err = s.validateDispersalRequest(blobCert)
-		if err != nil {
-			//nolint:wrapcheck
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 		}
 	}
 
@@ -387,7 +412,7 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 	}
 
 	// BatchFromProtobuf internally validates the Batch while deserializing
-	batch, err := corev2.BatchFromProtobuf(req.GetBatch())
+	batch, err := corev2.BatchFromProtobuf(req.GetBatch(), s.config.EnforceSingleBlobBatches)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize batch: %v", err)
 	}

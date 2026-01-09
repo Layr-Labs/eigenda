@@ -80,6 +80,10 @@ type Config struct {
 	DisableNodeInfoResources       bool
 	StoreChunksRequestMaxPastAge   time.Duration
 	StoreChunksRequestMaxFutureAge time.Duration
+	// Rate limiting for StoreChunks requests per disperser.
+	// limit expressed as requests per second; disabled if <=0 or burst <=0.
+	DisperserRateLimitPerSecond float64
+	DisperserRateLimitBurst     int
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -89,6 +93,9 @@ type Config struct {
 
 	EnableV1 bool
 	EnableV2 bool
+
+	// If true, reject batch dispersal requests containing more than one blob
+	EnforceSingleBlobBatches bool
 
 	OnchainStateRefreshInterval time.Duration
 	ChunkDownloadTimeout        time.Duration
@@ -451,6 +458,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            v2Enabled,
 		EnableV1:                            v1Enabled,
+		EnforceSingleBlobBatches:            ctx.GlobalBool(flags.EnforceSingleBlobBatchesFlag.Name),
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
 		GRPCMsgSizeLimitV2:                  ctx.GlobalInt(flags.GRPCMsgSizeLimitV2Flag.Name),
@@ -460,6 +468,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
+		DisperserRateLimitPerSecond:         ctx.GlobalFloat64(flags.DisperserRateLimitPerSecondFlag.Name),
+		DisperserRateLimitBurst:             ctx.GlobalInt(flags.DisperserRateLimitBurstFlag.Name),
 		LittDBWriteCacheSizeBytes: uint64(ctx.GlobalFloat64(
 			flags.LittDBWriteCacheSizeGBFlag.Name) * units.GiB),
 		LittDBWriteCacheSizeFraction:    ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),

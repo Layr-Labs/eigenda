@@ -392,6 +392,20 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 	}
+	DisperserRateLimitPerSecondFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-rate-limit-per-second"),
+		Usage:    "Rate limit for StoreChunks requests per disperser (requests per second). If <=0, rate limiting is disabled.",
+		Required: false,
+		Value:    1000, // allow stress tests with small blobs
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_RATE_LIMIT_PER_SECOND"),
+	}
+	DisperserRateLimitBurstFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-rate-limit-burst"),
+		Usage:    "Burst capacity for per-disperser StoreChunks rate limit. If <=0, rate limiting is disabled.",
+		Required: false,
+		Value:    10000,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_RATE_LIMIT_BURST"),
+	}
 	LevelDBDisableSeeksCompactionV1Flag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "leveldb-disable-seeks-compaction-v1"),
 		Usage:    "Disable seeks compaction for LevelDB for v1",
@@ -583,6 +597,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PER_ACCOUNT_PAYMENT_METRICS"),
 	}
+	EnforceSingleBlobBatchesFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enforce-single-blob-batches"),
+		Usage:    "If enabled, reject batch dispersal requests containing more than one blob",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENFORCE_SINGLE_BLOB_BATCHES"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -711,6 +731,8 @@ var optionalFlags = []cli.Flag{
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
+	DisperserRateLimitPerSecondFlag,
+	DisperserRateLimitBurstFlag,
 	LevelDBDisableSeeksCompactionV1Flag,
 	LevelDBEnableSyncWritesV1Flag,
 	DownloadPoolSizeFlag,
@@ -739,6 +761,7 @@ var optionalFlags = []cli.Flag{
 	PaymentVaultUpdateIntervalFlag,
 	EnablePerAccountPaymentMetricsFlag,
 	OverrideV2TtlFlag,
+	EnforceSingleBlobBatchesFlag,
 }
 
 func init() {

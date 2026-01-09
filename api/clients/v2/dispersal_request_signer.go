@@ -25,11 +25,11 @@ type DispersalRequestSigner interface {
 
 type DispersalRequestSignerConfig struct {
 	// KeyID is the AWS KMS key identifier used for signing requests. Optional if PrivateKey is provided.
-	KeyID string
+	KeyID string `docs:"required"`
 	// PrivateKey is a hex-encoded private key for local signing (without 0x prefix). Optional if KeyID is provided.
-	PrivateKey string
+	PrivateKey string `docs:"required"`
 	// Region is the AWS region where the KMS key is located (e.g., "us-east-1"). Required if using KMS.
-	Region string
+	Region string `docs:"required"`
 	// Endpoint is an optional custom AWS KMS endpoint URL. If empty, the standard AWS KMS endpoint is used.
 	// This is primarily useful for testing with LocalStack or other custom KMS implementations. Default is empty.
 	Endpoint string
@@ -38,10 +38,7 @@ type DispersalRequestSignerConfig struct {
 var _ config.VerifiableConfig = &DispersalRequestSignerConfig{}
 
 func DefaultDispersalRequestSignerConfig() DispersalRequestSignerConfig {
-	return DispersalRequestSignerConfig{
-		Region:   "us-east-1",
-		Endpoint: "",
-	}
+	return DispersalRequestSignerConfig{}
 }
 
 // Verify checks that the configuration is valid, returning an error if it is not.

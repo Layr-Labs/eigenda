@@ -1,6 +1,7 @@
 package thegraph
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -14,9 +15,12 @@ const (
 )
 
 type Config struct {
-	Endpoint     string        // The Graph endpoint
-	PullInterval time.Duration // The interval to pull data from The Graph
-	MaxRetries   int           // The maximum number of retries to pull data from The Graph
+	// The Graph endpoint
+	Endpoint string `docs:"required"`
+	// The interval to pull data from The Graph
+	PullInterval time.Duration
+	// The maximum number of retries to pull data from The Graph
+	MaxRetries int
 }
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -49,5 +53,24 @@ func ReadCLIConfig(ctx *cli.Context) Config {
 		PullInterval: ctx.Duration(BackoffFlagName),
 		MaxRetries:   ctx.Int(MaxRetriesFlagName),
 	}
+}
 
+func DefaultTheGraphConfig() Config {
+	return Config{
+		PullInterval: 100 * time.Millisecond,
+		MaxRetries:   5,
+	}
+}
+
+func (c *Config) Verify() error {
+	if c.Endpoint == "" {
+		return fmt.Errorf("thegraph endpoint is required")
+	}
+	if c.PullInterval <= 0 {
+		return fmt.Errorf("pull interval must be positive, got %v", c.PullInterval)
+	}
+	if c.MaxRetries < 0 {
+		return fmt.Errorf("max retries cannot be negative, got %d", c.MaxRetries)
+	}
+	return nil
 }

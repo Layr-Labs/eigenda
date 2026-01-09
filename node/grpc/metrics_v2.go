@@ -17,8 +17,8 @@ const namespace = "eigenda_node"
 type MetricsV2 struct {
 	logger logging.Logger
 
-	registry         *prometheus.Registry
-	grpcServerOption grpc.ServerOption
+	registry             *prometheus.Registry
+	grpcUnaryInterceptor grpc.UnaryServerInterceptor
 
 	storeChunksRequestSize *prometheus.GaugeVec
 
@@ -38,9 +38,7 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 
 	grpcMetrics := grpcprom.NewServerMetrics()
 	registry.MustRegister(grpcMetrics)
-	grpcServerOption := grpc.UnaryInterceptor(
-		grpcMetrics.UnaryServerInterceptor(),
-	)
+	grpcUnaryInterceptor := grpcMetrics.UnaryServerInterceptor()
 
 	storeChunksRequestSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -75,7 +73,7 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 	return &MetricsV2{
 		logger:                 logger,
 		registry:               registry,
-		grpcServerOption:       grpcServerOption,
+		grpcUnaryInterceptor:   grpcUnaryInterceptor,
 		storeChunksRequestSize: storeChunksRequestSize,
 		getChunksLatency:       getChunksLatency,
 		getChunksDataSize:      getChunksDataSize,
@@ -83,9 +81,9 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 	}, nil
 }
 
-// GetGRPCServerOption returns the gRPC server option that enables automatic GRPC metrics collection.
-func (m *MetricsV2) GetGRPCServerOption() grpc.ServerOption {
-	return m.grpcServerOption
+// GetGRPCUnaryInterceptor returns the unary interceptor that enables automatic GRPC metrics collection.
+func (m *MetricsV2) GetGRPCUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return m.grpcUnaryInterceptor
 }
 
 // GetStoreChunksProbe returns a probe for measuring the latency of the StoreChunks() RPC call.
