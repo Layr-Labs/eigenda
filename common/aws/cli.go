@@ -23,10 +23,10 @@ var (
 type ClientConfig struct {
 	// Region is the region to use when interacting with S3. Default is "us-east-2".
 	Region string `docs:"required"`
-	// AccessKey to use when interacting with S3. Optional.
+	// AccessKey to use when interacting with S3.
 	AccessKey string
 	// SecretAccessKey to use when interacting with S3.
-	SecretAccessKey string `docs:"required"` // TODO (cody.littley): Change to *secret.Secret
+	SecretAccessKey string // TODO (cody.littley): Change to *secret.Secret
 	// EndpointURL of the S3 endpoint to use. If set to "", the AWS library will use the default AWS S3 endpoint.
 	EndpointURL string
 
@@ -126,9 +126,6 @@ func DefaultClientConfig() ClientConfig {
 func (c *ClientConfig) Verify() error {
 	if c.Region == "" {
 		return fmt.Errorf("aws region is required")
-	}
-	if c.SecretAccessKey == "" {
-		return fmt.Errorf("aws secret access key is required")
 	}
 	if c.FragmentParallelismFactor < 0 {
 		return fmt.Errorf("fragment parallelism factor cannot be negative")
