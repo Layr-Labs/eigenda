@@ -3,6 +3,7 @@ package arbitrum_altda
 import (
 	"context"
 	"errors"
+	"math/big"
 	"os"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -40,6 +42,14 @@ func createSequencerMsg(cert *certs.VersionedCert) hexutil.Bytes {
 	return hexutil.Bytes(fullMsg)
 }
 
+// createMockBlock creates a mock Ethereum block for testing
+func createMockBlock() *types.Block {
+	header := &types.Header{
+		Number: big.NewInt(12345),
+	}
+	return types.NewBlockWithHeader(header)
+}
+
 // TestMethod_GetMaxMessageSize verifies that the handler returns the correct max message size
 func TestMethod_GetMaxMessageSize(t *testing.T) {
 	testMaxPayloadSize := uint32(500)
@@ -52,7 +62,7 @@ func TestMethod_GetMaxMessageSize(t *testing.T) {
 		Version:             "1.0.0",
 		MaxPayloadSizeBytes: testMaxPayloadSize,
 	}
-	handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg)
+	handlers := NewHandlers(mockEigenDAManager, testLogger, false, nil, compatCfg)
 
 	result, err := handlers.GetMaxMessageSize(context.Background())
 	require.NoError(t, err)
@@ -68,7 +78,7 @@ func TestMethod_GetSupportedHeaderBytes(t *testing.T) {
 
 	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0", MaxPayloadSizeBytes: 100_000_000}
-	handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg)
+	handlers := NewHandlers(mockEigenDAManager, testLogger, false, nil, compatCfg)
 
 	result, err := handlers.GetSupportedHeaderBytes(context.Background())
 	require.NoError(t, err)
@@ -172,7 +182,7 @@ func TestMethod_Store(t *testing.T) {
 				maxPayloadSize = 10
 			}
 			compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0", MaxPayloadSizeBytes: maxPayloadSize}
-			handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg)
+			handlers := NewHandlers(mockEigenDAManager, testLogger, false, nil, compatCfg)
 
 			mockEigenDAManager.EXPECT().
 				GetDispersalBackend().
@@ -279,8 +289,15 @@ func TestRecoverPayload(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
+			mockEthClient := mocks.NewMockIEthClient(ctrl)
 			compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0"}
-			handlers := NewHandlers(mockEigenDAManager, testLogger, tt.processInvalidCert, compatCfg)
+			handlers := NewHandlers(mockEigenDAManager, testLogger, tt.processInvalidCert, mockEthClient, compatCfg)
+
+			// Mock eth client to return a valid block
+			mockEthClient.EXPECT().
+				BlockByHash(gomock.Any(), gomock.Any()).
+				Return(createMockBlock(), nil).
+				AnyTimes()
 
 			// Only expect Get call if sequencer message is valid
 			if len(tt.sequencerMsg) > DACertOffset &&
@@ -375,8 +392,15 @@ func TestCollectPreimages(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
+			mockEthClient := mocks.NewMockIEthClient(ctrl)
 			compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0"}
-			handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg)
+			handlers := NewHandlers(mockEigenDAManager, testLogger, false, mockEthClient, compatCfg)
+
+			// Mock eth client to return a valid block
+			mockEthClient.EXPECT().
+				BlockByHash(gomock.Any(), gomock.Any()).
+				Return(createMockBlock(), nil).
+				AnyTimes()
 
 			// Only expect Get call if sequencer message is valid
 			if len(tt.sequencerMsg) > DACertOffset &&
@@ -416,7 +440,7 @@ func TestGenerateCertificateValidityProof(t *testing.T) {
 
 	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0"}
-	handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg)
+	handlers := NewHandlers(mockEigenDAManager, testLogger, false, nil, compatCfg)
 
 	certificate := hexutil.Bytes([]byte("some certificate"))
 
@@ -442,7 +466,7 @@ func TestCompatibilityConfig(t *testing.T) {
 		APIsEnabled:         []string{"api1", "api2"},
 	}
 
-	handlers := NewHandlers(mockEigenDAManager, testLogger, false, expectedConfig)
+	handlers := NewHandlers(mockEigenDAManager, testLogger, false, nil, expectedConfig)
 
 	result, err := handlers.CompatibilityConfig(context.Background())
 	require.NoError(t, err)
@@ -513,7 +537,7 @@ func TestDeserializeCertFromSequencerMsg(t *testing.T) {
 
 			mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 			compatCfg := proxy_common.CompatibilityConfig{Version: "1.0.0"}
-			handlers := NewHandlers(mockEigenDAManager, testLogger, false, compatCfg).(*Handlers)
+			handlers := NewHandlers(mockEigenDAManager, testLogger, false, nil, compatCfg).(*Handlers)
 
 			cert, err := handlers.deserializeCertFromSequencerMsg(tt.sequencerMsg)
 
