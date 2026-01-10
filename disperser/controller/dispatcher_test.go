@@ -451,11 +451,18 @@ func newControllerComponents(t *testing.T) *controllerComponents {
 	controllerConfig.SigningRateBucketSpan = 30 * time.Second
 	controllerConfig.SigningRateDynamoDbTableName = "validator-signing-rates"
 	controllerConfig.DispersalRequestSigner.PrivateKey = "this is just a placeholder"
-	controllerConfig.EncodingManager = *controller.DefaultEncodingManagerConfig()
-	controllerConfig.EncodingManager.AvailableRelays = []corev2.RelayKey{0}
-	controllerConfig.EncodingManager.EncoderAddress = "placeholder"
-	controllerConfig.PaymentAuthorization = *controller.DefaultPaymentAuthorizationConfig()
-	controllerConfig.PaymentAuthorization.OnDemandConfig.OnDemandTableName = "on-demand-payments"
+	controllerConfig.Encoder = controller.DefaultEncodingManagerConfig()
+	controllerConfig.Encoder.AvailableRelays = []corev2.RelayKey{0}
+	controllerConfig.Encoder.EncoderAddress = "placeholder"
+	controllerConfig.Payment = controller.DefaultPaymentAuthorizationConfig()
+	controllerConfig.Payment.OnDemand.OnDemandTableName = "on-demand-payments"
+	controllerConfig.DynamoDBTableName = "this-is-a-placeholder"
+	controllerConfig.ContractDirectoryAddress = "this-is-a-placeholder"
+	controllerConfig.ChainState.Endpoint = "this-is-a-placeholder"
+	controllerConfig.EthClient.RPCURLs = []string{"this-is-a-placeholder"}
+	controllerConfig.AwsClient.Region = "this-is-a-placeholder"
+	controllerConfig.AwsClient.AccessKey = "this-is-a-placeholder"
+	controllerConfig.AwsClient.SecretAccessKey = "this-is-a-placeholder"
 
 	d, err := controller.NewController(
 		t.Context(),

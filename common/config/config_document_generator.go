@@ -448,11 +448,11 @@ func generateMarkdownDoc(
 
 	if len(requiredFields) > 0 {
 		sb.WriteString("## Required Fields\n\n")
-		sb.WriteString("| Name | Type | Description |\n")
-		sb.WriteString("|------|------|-------------|\n")
+		sb.WriteString("| Config | Description |\n")
+		sb.WriteString("|--------|-------------|\n")
 
 		for _, f := range requiredFields {
-			sb.WriteString(fmt.Sprintf("| $${\\color{red}\\texttt{%s}}$$<br>`%s` | `%s` | %s |\n",
+			sb.WriteString(fmt.Sprintf("| $${\\color{red}\\texttt{%s}}$$<br>`%s`<br><br>type: `%s` | %s |\n",
 				escapeMarkdown(f.TOML),
 				escapeMarkdown(f.EnvVar),
 				escapeMarkdown(f.FieldType),
@@ -463,15 +463,16 @@ func generateMarkdownDoc(
 
 	if len(optionalFields) > 0 {
 		sb.WriteString("## Optional Fields\n\n")
-		sb.WriteString("| Name | Type<br>Default | Description |\n")
-		sb.WriteString("|------|--------------|-------------|\n")
+		sb.WriteString("| Config | Description |\n")
+		sb.WriteString("|--------|-------------|\n")
 
 		for _, f := range optionalFields {
 			defaultString := f.DefaultValue
 			if f.FieldType == "string" {
 				defaultString = fmt.Sprintf(`"%s"`, f.DefaultValue)
 			}
-			sb.WriteString(fmt.Sprintf("| $${\\color{red}\\texttt{%s}}$$<br>`%s` | `%s`<br>`%s` | %s |\n",
+			sb.WriteString(fmt.Sprintf(
+				"| $${\\color{red}\\texttt{%s}}$$<br>`%s`<br><br>type: `%s`<br>default: `%s` | %s |\n",
 				escapeMarkdown(f.TOML),
 				escapeMarkdown(f.EnvVar),
 				escapeMarkdown(f.FieldType),
@@ -484,8 +485,8 @@ func generateMarkdownDoc(
 	if len(unsafeFields) > 0 {
 		sb.WriteString("## Unsafe Fields\n\n")
 		sb.WriteString("These fields are generally unsafe to modify unless you know what you are doing.\n\n")
-		sb.WriteString("| Name | Type<br>Default | Description |\n")
-		sb.WriteString("|------|--------------|-------------|\n")
+		sb.WriteString("| Config | Description |\n")
+		sb.WriteString("|--------|-------------|\n")
 
 		for _, f := range unsafeFields {
 			defaultString := f.DefaultValue
@@ -493,7 +494,8 @@ func generateMarkdownDoc(
 				defaultString = fmt.Sprintf(`"%s"`, f.DefaultValue)
 			}
 
-			sb.WriteString(fmt.Sprintf("| $${\\color{red}\\texttt{%s}}$$<br>`%s` | `%s`<br>`%s` | %s |\n",
+			sb.WriteString(fmt.Sprintf(
+				"| $${\\color{red}\\texttt{%s}}$$<br>`%s`<br><br>type: `%s`<br>default: `%s` | %s |\n",
 				escapeMarkdown(f.TOML),
 				escapeMarkdown(f.EnvVar),
 				escapeMarkdown(f.FieldType),

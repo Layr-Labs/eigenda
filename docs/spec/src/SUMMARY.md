@@ -11,6 +11,8 @@
     - [Write and Read Workflow](./protocol/architecture/write-and-read-workflow.md)
   - [Contracts](./protocol/contracts.md)
   - [Validator Set Governance](./protocol/validator-set-governance.md)
+  - [Payments](./protocol/payments/payment_system.md)
+    - [Payment System Migration](./protocol/payments/payment_system_migration.md)
   - [EigenDA V1 (Deprecated)](./v1.md)
 - [Integrations](./integration.md)
   - [Spec](./integration/spec.md)

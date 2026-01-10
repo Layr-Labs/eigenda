@@ -417,7 +417,6 @@ func TestNewLocalDispersalRequestSignerErrors(t *testing.T) {
 func TestDefaultDispersalRequestSignerConfig(t *testing.T) {
 	config := DefaultDispersalRequestSignerConfig()
 
-	require.Equal(t, "us-east-1", config.Region, "default region should be us-east-1")
 	require.Equal(t, "", config.Endpoint, "default endpoint should be empty")
 	require.Equal(t, "", config.KeyID, "default KeyID should be empty")
 	require.Equal(t, "", config.PrivateKey, "default PrivateKey should be empty")
