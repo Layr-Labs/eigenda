@@ -95,12 +95,9 @@ func CreateTestSuite(
 		if err != nil {
 			panic(fmt.Sprintf("build eth client: %v", err.Error()))
 		}
-		// Use the real eth client for arb handlers as well
-		arbEthClient = ethClient
 	}
 
 	arbEthClient = NewMockEthClient()
-
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
 		logger,
