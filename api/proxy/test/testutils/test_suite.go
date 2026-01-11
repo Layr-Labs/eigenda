@@ -76,6 +76,7 @@ func CreateTestSuite(
 		restServer   *rest.Server
 		arbServer    *arbitrum_altda.Server
 		ethClient    common_eigenda.EthClient
+		arbEthClient arbitrum_altda.IEthClient
 		readOnlyMode = false
 		chainID      = ""
 	)
@@ -94,7 +95,11 @@ func CreateTestSuite(
 		if err != nil {
 			panic(fmt.Sprintf("build eth client: %v", err.Error()))
 		}
+		// Use the real eth client for arb handlers as well
+		arbEthClient = ethClient
 	}
+
+	arbEthClient = NewMockEthClient()
 
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
@@ -140,7 +145,7 @@ func CreateTestSuite(
 
 	if appConfig.EnabledServersConfig.ArbCustomDA {
 		appConfig.ArbCustomDASvrCfg.CompatibilityCfg = compatibilityCfg
-		arbHandlers := arbitrum_altda.NewHandlers(certMgr, logger, true, ethClient, compatibilityCfg)
+		arbHandlers := arbitrum_altda.NewHandlers(certMgr, logger, true, arbEthClient, compatibilityCfg)
 		arbServer, err = arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
 		if err != nil {
 			panic(fmt.Sprintf("create arbitrum server: %v", err.Error()))
