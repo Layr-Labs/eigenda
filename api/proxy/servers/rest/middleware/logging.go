@@ -29,18 +29,17 @@ func withLogging(
 			"status", scw.status, "duration", time.Since(start),
 		}
 
-		if err != nil {
-			args = append(args, "error", err.Error())
-			if scw.status >= 400 && scw.status < 500 {
-				log.Warn("request completed with 4xx error", args...)
-			} else {
-				log.Error("request completed with error", args...)
-			}
+		// Success-path logging is handled by the handlers (e.g. "Processed request").
+		// Keeping middleware logging only for error paths avoids duplicate log lines.
+		if err == nil {
+			return
+		}
+
+		args = append(args, "error", err.Error())
+		if scw.status >= 400 && scw.status < 500 {
+			log.Warn("request completed with 4xx error", args...)
 		} else {
-			// This log line largely duplicates the logging in the handlers.
-			// Only difference being that we have duration here, whereas the handlers log the cert.
-			// TODO: should we also pass the cert via the requestContext to rid of the log lines in the handlers?
-			log.Info("request completed", args...)
+			log.Error("request completed with error", args...)
 		}
 	}
 }
