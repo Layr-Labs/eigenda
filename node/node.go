@@ -503,6 +503,11 @@ func (n *Node) CancelOnDemandDispersal(reservation *meterer.OnDemandReservation)
 	n.onDemandMeterer.CancelDispersal(reservation)
 }
 
+// SetOnDemandMeterer allows tests to inject an on-demand meterer.
+func (n *Node) SetOnDemandMeterer(m *meterer.OnDemandMeterer) {
+	n.onDemandMeterer = m
+}
+
 // Validates reservation payments for all blobs in a batch.
 //
 // Returns nil if validation passes.
