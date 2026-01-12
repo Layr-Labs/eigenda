@@ -3,6 +3,7 @@ package testutils
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"os"
 	"runtime"
 	"strings"
@@ -27,6 +28,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -426,4 +429,25 @@ func createS3Bucket(bucketName string) {
 	} else {
 		log.Info(fmt.Sprintf("Successfully created %s\n", bucketName))
 	}
+}
+
+// mockEthClient is a simple mock implementation of the IEthClient interface
+// for use in tests. It returns deterministic mock blocks for any block hash.
+type mockEthClient struct{}
+
+// NewMockEthClient creates a new mock ETH client for testing.
+// This client returns deterministic mock blocks with reasonable defaults.
+func NewMockEthClient() arbitrum_altda.IEthClient {
+	return &mockEthClient{}
+}
+
+// BlockByHash returns a mock block with a deterministic block number.
+// This implementation always succeeds and returns 0 which is mapped to the
+// L1 Inbox Submission block number which forces the verifyCertRBNRecencyCheck call to
+// fail
+func (m *mockEthClient) BlockByHash(ctx context.Context, hash gethcommon.Hash) (*types.Block, error) {
+	header := &types.Header{
+		Number: big.NewInt(0),
+	}
+	return types.NewBlockWithHeader(header), nil
 }

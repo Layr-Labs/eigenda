@@ -15,8 +15,15 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 )
+
+// IEthClient defines the interface for Ethereum client operations needed by the handlers.
+// This interface allows for mocking in tests.
+type IEthClient interface {
+	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
+}
 
 /*
 	This is a (hopefully) comprehensive handlers blue print for introducing a new ALT DA server type
@@ -106,17 +113,23 @@ type Handlers struct {
 	processInvalidCert bool
 	log                logging.Logger
 	eigenDAManager     store.IEigenDAManager
+	ethClient          IEthClient
 	compatibilityCfg   proxy_common.CompatibilityConfig
 }
 
 // NewHandlers is a constructor
 func NewHandlers(
-	m store.IEigenDAManager, l logging.Logger, processInvalidCert bool, compatCfg proxy_common.CompatibilityConfig,
+	m store.IEigenDAManager,
+	l logging.Logger,
+	processInvalidCert bool,
+	ethClient IEthClient,
+	compatCfg proxy_common.CompatibilityConfig,
 ) IHandlers {
 	return &Handlers{
 		log:                l,
 		processInvalidCert: processInvalidCert,
 		eigenDAManager:     m,
+		ethClient:          ethClient,
 		compatibilityCfg:   compatCfg,
 	}
 }
@@ -188,6 +201,15 @@ func (h *Handlers) logMethodCall(method string, logValue ...any) func() {
 	}
 }
 
+func (h *Handlers) getL1InclusionBlockNumber(ctx context.Context, batchBlockHash common.Hash) (uint64, error) {
+	l1InclusionBlock, err := h.ethClient.BlockByHash(ctx, batchBlockHash)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get L1 inclusion block header for hash %x: %w", batchBlockHash, err)
+	}
+
+	return l1InclusionBlock.Number().Uint64(), nil
+}
+
 // RecoverPayload is used to fetch the rollup payload of
 // of the dispersed batch provided the DA Cert bytes.
 //
@@ -216,7 +238,16 @@ func (h *Handlers) RecoverPayload(
 		return nil, fmt.Errorf("deserialize DA Cert from message: %w", err)
 	}
 
-	payload, err := h.eigenDAManager.Get(ctx, daCert, coretypes.CertSerializationABI, proxy_common.GETOpts{})
+	// fetch the L1 inclusion block number from the L1 block hash
+	// for performing the recency check
+	l1InclusionBlockNum, err := h.getL1InclusionBlockNumber(ctx, batchBlockHash)
+	if err != nil {
+		return nil, fmt.Errorf("could not read l1 inclusion block number: %w", err)
+	}
+
+	payload, err := h.eigenDAManager.Get(ctx, daCert, coretypes.CertSerializationABI, proxy_common.GETOpts{
+		L1InclusionBlockNum: l1InclusionBlockNum,
+	})
 	if err != nil {
 		var dpError *coretypes.DerivationError
 		if errors.As(err, &dpError) && h.processInvalidCert {
