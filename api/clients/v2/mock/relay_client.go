@@ -42,6 +42,18 @@ func (c *MockRelayClient) GetChunksByIndex(ctx context.Context, relayKey corev2.
 	return args.Get(0).([][]byte), args.Error(1)
 }
 
+func (c *MockRelayClient) GetValidatorChunks(
+	ctx context.Context,
+	relayKey corev2.RelayKey,
+	blobKey corev2.BlobKey,
+) ([][]byte, error) {
+	args := c.Called(ctx, relayKey, blobKey)
+	if args.Get(0) == nil {
+		return nil, args.Error(1) //nolint:wrapcheck
+	}
+	return args.Get(0).([][]byte), args.Error(1) //nolint:wrapcheck
+}
+
 func (c *MockRelayClient) GetSockets() map[corev2.RelayKey]string {
 	args := c.Called()
 	if args.Get(0) == nil {

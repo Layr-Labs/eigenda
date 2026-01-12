@@ -54,6 +54,9 @@ type RelayClient interface {
 	// The returned slice has the same length and ordering as the input slice, and the i-th element is the bundle for the i-th request.
 	// Each bundle is a sequence of frames in raw form (i.e., serialized core.Bundle bytearray).
 	GetChunksByIndex(ctx context.Context, relayKey corev2.RelayKey, requests []*ChunkRequestByIndex) ([][]byte, error)
+	// Retrieves all chunks allocated to this validator for a given blob.
+	// The relay computes which chunks to return based on the deterministic chunk allocation algorithm.
+	GetValidatorChunks(ctx context.Context, relayKey corev2.RelayKey, blobKey corev2.BlobKey) ([][]byte, error)
 	Close() error
 }
 
@@ -153,6 +156,64 @@ func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygr
 	sig := signature.SerializeCompressed()
 	request.OperatorSignature = sig[:]
 	return nil
+}
+
+func (c *relayClient) signGetValidatorChunksRequest(
+	ctx context.Context,
+	request *relaygrpc.GetValidatorChunksRequest,
+) error {
+	if c.config.OperatorID == nil {
+		return errors.New("no operator ID provided in config, cannot sign request")
+	}
+	if c.config.MessageSigner == nil {
+		return errors.New("no message signer provided in config, cannot sign request")
+	}
+
+	hash, err := hashing.HashGetValidatorChunksRequest(request)
+	if err != nil {
+		return fmt.Errorf("hash get validator chunks request: %w", err)
+	}
+	hashArray := [32]byte{}
+	copy(hashArray[:], hash)
+	signature, err := c.config.MessageSigner(ctx, hashArray)
+	if err != nil {
+		return fmt.Errorf("sign get validator chunks request: %w", err)
+	}
+	sig := signature.SerializeCompressed()
+	request.ValidatorSignature = sig[:]
+	return nil
+}
+
+func (c *relayClient) GetValidatorChunks(
+	ctx context.Context,
+	relayKey corev2.RelayKey,
+	blobKey corev2.BlobKey) ([][]byte, error) {
+
+	if c.config.OperatorID == nil {
+		return nil, errors.New("no operator ID provided in config, cannot use GetValidatorChunks")
+	}
+
+	client, err := c.getClient(ctx, relayKey)
+	if err != nil {
+		return nil, fmt.Errorf("get grpc relay client for key %d: %w", relayKey, err)
+	}
+
+	request := &relaygrpc.GetValidatorChunksRequest{
+		ValidatorId: c.config.OperatorID[:],
+		BlobKey:     blobKey[:],
+		Timestamp:   uint32(time.Now().Unix()),
+	}
+	err = c.signGetValidatorChunksRequest(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := client.GetValidatorChunks(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("get validator chunks RPC: %w", err)
+	}
+
+	return res.GetData(), nil
 }
 
 func (c *relayClient) GetChunksByRange(

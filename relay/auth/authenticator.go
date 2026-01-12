@@ -17,6 +17,8 @@ type RequestAuthenticator interface {
 	// AuthenticateGetChunksRequest authenticates a GetChunksRequest, returning an error if the request is invalid.
 	// Returns the hash of the request if the request is valid.
 	AuthenticateGetChunksRequest(ctx context.Context, request *pb.GetChunksRequest) ([]byte, error)
+	// Authenticates a GetValidatorChunksRequest, returning the hash of the request if valid.
+	AuthenticateGetValidatorChunksRequest(ctx context.Context, request *pb.GetValidatorChunksRequest) ([]byte, error)
 }
 
 var _ RequestAuthenticator = &requestAuthenticator{}
@@ -98,6 +100,40 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	isValid := signature.Verify(key, ([32]byte)(hash))
 
 	if !isValid {
+		return nil, errors.New("signature verification failed")
+	}
+
+	return hash, nil
+}
+
+func (a *requestAuthenticator) AuthenticateGetValidatorChunksRequest(
+	ctx context.Context,
+	request *pb.GetValidatorChunksRequest,
+) ([]byte, error) {
+	if request.GetValidatorId() == nil || len(request.GetValidatorId()) != 32 {
+		return nil, errors.New("invalid validator ID")
+	}
+
+	key, err := a.getOperatorKey(ctx, core.OperatorID(request.GetValidatorId()))
+	if err != nil {
+		return nil, fmt.Errorf("get operator key: %w", err)
+	}
+
+	g1Point, err := (&core.G1Point{}).Deserialize(request.GetValidatorSignature())
+	if err != nil {
+		return nil, fmt.Errorf("deserialize signature: %w", err)
+	}
+
+	signature := core.Signature{
+		G1Point: g1Point,
+	}
+
+	hash, err := hashing.HashGetValidatorChunksRequest(request)
+	if err != nil {
+		return nil, fmt.Errorf("hash request: %w", err)
+	}
+
+	if !signature.Verify(key, ([32]byte)(hash)) {
 		return nil, errors.New("signature verification failed")
 	}
 

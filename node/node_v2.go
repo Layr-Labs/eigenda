@@ -34,6 +34,40 @@ type RawBundle struct {
 	Bundle          []byte
 }
 
+// downloadValidatorChunks fetches chunks for all blobs in a relay request using the GetValidatorChunks API.
+// The relay computes chunk assignment server-side based on the validator ID.
+func (n *Node) downloadValidatorChunks(
+	ctx context.Context,
+	relayClient relay.RelayClient,
+	relayKey corev2.RelayKey,
+	req *RelayRequest,
+	certs []*corev2.BlobCertificate,
+) ([][]byte, error) {
+	bundles := make([][]byte, len(req.Metadata))
+	for i, metadata := range req.Metadata {
+		cert := certs[metadata.blobShardIndex]
+		blobKey, err := cert.BlobHeader.BlobKey()
+		if err != nil {
+			return nil, fmt.Errorf("get blob key: %w", err)
+		}
+
+		ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
+		chunkData, err := relayClient.GetValidatorChunks(ctxTimeout, relayKey, blobKey)
+		cancel()
+		if err != nil {
+			return nil, fmt.Errorf("get validator chunks for blob %s: %w", blobKey.Hex(), err)
+		}
+
+		// GetValidatorChunks returns a slice of chunk data; concatenate into a single bundle
+		var bundleBytes []byte
+		for _, chunk := range chunkData {
+			bundleBytes = append(bundleBytes, chunk...)
+		}
+		bundles[i] = bundleBytes
+	}
+	return bundles, nil
+}
+
 // Determines where to find the chunks we need to download for a given batch. For each chunk in a batch, there will
 // be one or more relays that are responsible for serving that chunk. This function determines which relays to contact
 // for each chunk, and sorts the requests by relayID to support batching. Additionally, this method also calculates
@@ -184,27 +218,47 @@ func (n *Node) DownloadChunksFromRelays(
 	probe.SetStage("download")
 
 	bundleChan := make(chan response, len(relayRequests))
-	for relayKey := range relayRequests {
-		req := relayRequests[relayKey]
-		n.DownloadPool.Submit(func() {
-			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
-			defer cancel()
-			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.ChunkRequests)
-			if err != nil {
-				n.Logger.Errorf("failed to get chunks from relays: %v", err)
-				bundleChan <- response{
-					metadata: nil,
-					bundles:  nil,
-					err:      err,
+	if n.Config.UseLegacyGetChunksRequest {
+		// Legacy path: use GetChunksByRange with pre-computed range requests
+		for relayKey := range relayRequests {
+			req := relayRequests[relayKey]
+			n.DownloadPool.Submit(func() {
+				ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
+				defer cancel()
+				bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.ChunkRequests)
+				if err != nil {
+					n.Logger.Errorf("get chunks from relays: %v", err)
+					bundleChan <- response{
+						metadata: nil,
+						bundles:  nil,
+						err:      err,
+					}
+					return
 				}
-				return
-			}
-			bundleChan <- response{
-				metadata: req.Metadata,
-				bundles:  bundles,
-				err:      nil,
-			}
-		})
+				bundleChan <- response{
+					metadata: req.Metadata,
+					bundles:  bundles,
+					err:      nil,
+				}
+			})
+		}
+	} else {
+		// New path: use GetValidatorChunks, which lets the relay compute chunk assignment
+		for relayKey := range relayRequests {
+			req := relayRequests[relayKey]
+			n.DownloadPool.Submit(func() {
+				bundles, err := n.downloadValidatorChunks(ctx, relayClient, relayKey, req, batch.BlobCertificates)
+				if err != nil {
+					n.Logger.Errorf("download validator chunks: %v", err)
+					bundleChan <- response{err: err}
+					return
+				}
+				bundleChan <- response{
+					metadata: req.Metadata,
+					bundles:  bundles,
+				}
+			})
+		}
 	}
 
 	responses := make([]response, len(relayRequests))

@@ -603,6 +603,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENFORCE_SINGLE_BLOB_BATCHES"),
 	}
+	// TODO(litt3): Temporary flag during migration. Remove once migration is complete.
+	UseLegacyGetChunksRequestFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "use-legacy-get-chunks-request"),
+		Usage:    "Use legacy GetChunks RPC instead of new GetValidatorChunks",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "USE_LEGACY_GET_CHUNKS_REQUEST"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -728,6 +735,7 @@ var optionalFlags = []cli.Flag{
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,
 	RelayConnectionPoolSizeFlag,
+	UseLegacyGetChunksRequestFlag,
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,

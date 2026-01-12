@@ -25,11 +25,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
 )
 
 var _ pb.RelayServer = &Server{}
@@ -76,6 +74,12 @@ type Server struct {
 
 	// chainReader is the core.Reader used to fetch blob parameters.
 	chainReader core.Reader
+
+	// Used to get operator state for chunk assignment computation.
+	ics core.IndexedChainState
+
+	// Direct access to metadata store for GetBlobAttestationInfo.
+	metadataStore blobstore.MetadataStore
 
 	// metrics encapsulates the metrics for the relay server.
 	metrics *metrics.RelayMetrics
@@ -177,6 +181,8 @@ func NewServer(
 		replayGuardian:      replayGuardian,
 		metrics:             relayMetrics,
 		chainReader:         chainReader,
+		ics:                 ics,
+		metadataStore:       metadataStore,
 		listener:            listener,
 	}
 
@@ -287,6 +293,51 @@ func (s *Server) validateGetChunksRequest(request *pb.GetChunksRequest) error {
 	}
 
 	return nil
+}
+
+func (s *Server) validateGetValidatorChunksRequest(request *pb.GetValidatorChunksRequest) error {
+	if request == nil {
+		return api.NewErrorInvalidArg("request is nil") //nolint:wrapcheck
+	}
+	if request.GetValidatorId() == nil || len(request.GetValidatorId()) != 32 {
+		return api.NewErrorInvalidArg("invalid validator ID") //nolint:wrapcheck
+	}
+	if request.GetBlobKey() == nil || len(request.GetBlobKey()) != 32 {
+		return api.NewErrorInvalidArg("invalid blob key") //nolint:wrapcheck
+	}
+	return nil
+}
+
+// Converts chunk indices into contiguous range requests. Consecutive indices are collapsed into single ranges.
+func convertIndicesToRangeRequests(blobKey v2.BlobKey, indices []uint32) []*pb.ChunkRequestByRange {
+	requests := make([]*pb.ChunkRequestByRange, 0)
+	if len(indices) == 0 {
+		return requests
+	}
+
+	startIndex := indices[0]
+	for i := 1; i < len(indices); i++ {
+		if indices[i] != indices[i-1]+1 {
+			// Break in continuity, create a request for the previous range
+			request := &pb.ChunkRequestByRange{
+				BlobKey:    blobKey[:],
+				StartIndex: startIndex,
+				EndIndex:   indices[i-1] + 1, // exclusive
+			}
+			requests = append(requests, request)
+			startIndex = indices[i]
+		}
+	}
+
+	// Add the last range
+	request := &pb.ChunkRequestByRange{
+		BlobKey:    blobKey[:],
+		StartIndex: startIndex,
+		EndIndex:   indices[len(indices)-1] + 1, // exclusive
+	}
+	requests = append(requests, request)
+
+	return requests
 }
 
 // GetChunks retrieves chunks from blobs stored by the relay.
@@ -841,13 +892,174 @@ func buildInsufficientGetChunksBandwidthError(
 // The relay computes which chunks to return based on the deterministic chunk allocation algorithm.
 //
 // This endpoint will eventually replace `GetChunks`. It is being added as a separate endpoint for the sake of
-// backwards compatibility
+// backwards compatibility.
 func (s *Server) GetValidatorChunks(
 	ctx context.Context,
 	request *pb.GetValidatorChunksRequest,
 ) (*pb.GetChunksReply, error) {
-	// TODO(litt3): this logic will be implemented in a future PR.
-	return nil, status.Errorf(codes.Unimplemented, "method GetValidatorChunks not implemented")
+	start := time.Now()
+
+	if s.config.Timeouts.GetChunksTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetChunksTimeout)
+		defer cancel()
+	}
+
+	if err := s.validateGetValidatorChunksRequest(request); err != nil {
+		return nil, err
+	}
+
+	// Authenticate request
+	if s.authenticator != nil {
+		client, ok := peer.FromContext(ctx)
+		if !ok {
+			return nil, api.NewErrorInvalidArg("could not get peer information") //nolint:wrapcheck
+		}
+		clientAddress := client.Addr.String()
+
+		hash, err := s.authenticator.AuthenticateGetValidatorChunksRequest(ctx, request)
+		if err != nil {
+			s.metrics.ReportChunkAuthFailure()
+			s.logger.Debug("rejected GetValidatorChunks request", "client", clientAddress)
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("auth failed: %v", err)) //nolint:wrapcheck
+		}
+
+		timestamp := time.Unix(int64(request.GetTimestamp()), 0)
+		err = s.replayGuardian.VerifyRequest(hash, timestamp)
+		if err != nil {
+			s.metrics.ReportChunkAuthFailure()
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("verify request: %v", err)) //nolint:wrapcheck
+		}
+
+		s.logger.Debug("received authenticated GetValidatorChunks request", "client", clientAddress)
+	}
+
+	finishedAuthenticating := time.Now()
+	if s.authenticator != nil {
+		s.metrics.ReportChunkAuthenticationLatency(finishedAuthenticating.Sub(start))
+	}
+
+	// Rate limit by validator ID
+	clientID := string(request.GetValidatorId())
+	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
+	if err != nil {
+		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err)) //nolint:wrapcheck
+	}
+	defer s.chunkRateLimiter.FinishGetChunkOperation(clientID)
+
+	// Get blob key
+	blobKey, err := v2.BytesToBlobKey(request.GetBlobKey())
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid blob key: %v", err)) //nolint:wrapcheck
+	}
+
+	// Get blob certificate for quorums and version
+	cert, _, err := s.metadataStore.GetBlobCertificate(ctx, blobKey)
+	if err != nil {
+		if strings.Contains(err.Error(), blobstore.ErrMetadataNotFound.Error()) {
+			return nil, api.NewErrorNotFound(fmt.Sprintf("blob %s not found", blobKey.Hex())) //nolint:wrapcheck
+		}
+		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching blob certificate: %v", err)) //nolint:wrapcheck
+	}
+
+	// Get blob attestation info for reference block number
+	attestationInfo, err := s.metadataStore.GetBlobAttestationInfo(ctx, blobKey)
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching attestation info: %v", err)) //nolint:wrapcheck
+	}
+	if attestationInfo == nil || attestationInfo.Attestation == nil || attestationInfo.Attestation.BatchHeader == nil {
+		return nil, api.NewErrorInternal("attestation info is incomplete") //nolint:wrapcheck
+	}
+
+	referenceBlockNumber := attestationInfo.Attestation.BatchHeader.ReferenceBlockNumber
+
+	// Get operator state at reference block
+	operatorState, err := s.ics.GetOperatorState(ctx, uint(referenceBlockNumber), cert.BlobHeader.QuorumNumbers)
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching operator state: %v", err)) //nolint:wrapcheck
+	}
+
+	// Get blob version parameters
+	blobParamsMap := s.metadataProvider.GetBlobVersionParameters()
+	if blobParamsMap == nil {
+		return nil, api.NewErrorInternal("blob version parameters not available") //nolint:wrapcheck
+	}
+	blobParams, ok := blobParamsMap.Get(cert.BlobHeader.BlobVersion)
+	if !ok {
+		//nolint:wrapcheck
+		return nil, api.NewErrorInternal(fmt.Sprintf("unknown blob version: %v", cert.BlobHeader.BlobVersion))
+	}
+
+	// Compute chunk assignment for this validator
+	validatorID := core.OperatorID(request.GetValidatorId())
+	assignment, err := v2.GetAssignmentForBlob(operatorState, blobParams, cert.BlobHeader.QuorumNumbers, validatorID)
+	if err != nil {
+		return nil, api.NewErrorNotFound(fmt.Sprintf("validator not assigned to this blob: %v", err)) //nolint:wrapcheck
+	}
+
+	if len(assignment.Indices) == 0 {
+		return &pb.GetChunksReply{Data: [][]byte{}}, nil
+	}
+
+	// Convert indices to range requests
+	rangeRequests := convertIndicesToRangeRequests(blobKey, assignment.Indices)
+
+	// Build a GetChunksRequest to reuse existing chunk fetch logic
+	chunkRequests := make([]*pb.ChunkRequest, len(rangeRequests))
+	for i, rangeReq := range rangeRequests {
+		chunkRequests[i] = &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
+				ByRange: rangeReq,
+			},
+		}
+	}
+
+	syntheticRequest := &pb.GetChunksRequest{
+		ChunkRequests: chunkRequests,
+		OperatorId:    request.GetValidatorId(),
+	}
+
+	// Get metadata for the blob
+	keys := []v2.BlobKey{blobKey}
+	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching metadata: %v", err)) //nolint:wrapcheck
+	}
+
+	finishedFetchingMetadata := time.Now()
+	s.metrics.ReportChunkMetadataLatency(finishedFetchingMetadata.Sub(finishedAuthenticating))
+
+	// Compute bandwidth
+	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(syntheticRequest, mMap)
+	if err != nil {
+		//nolint:wrapcheck
+		return nil, api.NewErrorInternal(fmt.Sprintf("error computing required bandwidth: %v", err))
+	}
+	s.metrics.ReportGetChunksRequestedBandwidthUsage(requiredBandwidth)
+	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
+	if err != nil {
+		if strings.Contains(err.Error(), "internal error") {
+			return nil, api.NewErrorInternal(err.Error()) //nolint:wrapcheck
+		}
+		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("bandwidth limit exceeded: %v", err)) //nolint:wrapcheck
+	}
+	s.metrics.ReportGetChunksBandwidthUsage(requiredBandwidth)
+
+	// Fetch chunks
+	bytesToSend, found, err := s.gatherChunkDataToSend(ctx, mMap, syntheticRequest)
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err)) //nolint:wrapcheck
+	}
+	if !found {
+		return nil, api.NewErrorNotFound("requested chunks not found") //nolint:wrapcheck
+	}
+
+	s.metrics.ReportChunkDataLatency(time.Since(finishedFetchingMetadata))
+	s.metrics.ReportChunkLatency(time.Since(start))
+
+	return &pb.GetChunksReply{
+		Data: bytesToSend,
+	}, nil
 }
 
 // Start starts the server using the listener provided in the constructor.
