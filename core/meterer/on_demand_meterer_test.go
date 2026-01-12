@@ -86,4 +86,8 @@ func TestRefreshUpdatesLimits(t *testing.T) {
 	require.NoError(t, err)
 	_, err = meterer.MeterDispersal(1)
 	require.Error(t, err, "expected exhaustion after consuming expanded capacity")
+
+	// Refresh with unchanged params should be a no-op
+	err = meterer.Refresh(ctx)
+	require.NoError(t, err)
 }
