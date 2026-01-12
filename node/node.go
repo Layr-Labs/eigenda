@@ -313,12 +313,16 @@ func NewNode(
 	}
 
 	onDemandMetererMetrics := meterer.NewOnDemandMetererMetrics(reg, Namespace, PaymentsSubsystem)
+	fuzzFactor := config.OnDemandMeterFuzzFactor
+	if fuzzFactor <= 0 {
+		fuzzFactor = 1.0
+	}
 	onDemandMeterer, err := meterer.NewOnDemandMeterer(
 		ctx,
 		paymentVault,
 		time.Now,
 		onDemandMetererMetrics,
-		config.OnDemandMeterFuzzFactor,
+		fuzzFactor,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create on-demand meterer: %w", err)
