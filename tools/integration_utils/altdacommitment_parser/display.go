@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 )
@@ -32,8 +34,70 @@ func DisplayPrefixInfo(parsed *PrefixMetadata) {
 	fmt.Printf("  Version Byte: 0x%02x (%s)\n", byte(versionByte), versionByte.VersionByteString())
 }
 
-// DisplayCertV3Data creates a nicely formatted table display for V3 certificates
-func DisplayCertV3Data(cert *coretypes.EigenDACertV3) {
+// DisplayCertData creates a nicely formatted table display for V2, V3, or V4 certificates.
+// It takes raw certificate bytes and attempts to parse as V4, then V3, then V2.
+func DisplayCertData(certBytes []byte) error {
+	if len(certBytes) == 0 {
+		return fmt.Errorf("no certificate data to parse")
+	}
+
+	// Try to parse as V4 first
+	var certV4 coretypes.EigenDACertV4
+	err := rlp.DecodeBytes(certBytes, &certV4)
+	if err == nil {
+		displayCert(&certV4)
+		return nil
+	}
+
+	// Try to parse as V3
+	var certV3 coretypes.EigenDACertV3
+	err = rlp.DecodeBytes(certBytes, &certV3)
+	if err == nil {
+		displayCert(&certV3)
+		return nil
+	}
+
+	// Try to parse as V2 and convert to V3 for display
+	var certV2 coretypes.EigenDACertV2
+	err = rlp.DecodeBytes(certBytes, &certV2)
+	if err == nil {
+		certV3 := certV2.ToV3()
+		displayCert(certV3)
+		return nil
+	}
+
+	return fmt.Errorf("failed to parse certificate as V2, V3, or V4: %w", err)
+}
+
+// displayCert creates a nicely formatted table display for V3 or V4 certificates
+func displayCert(cert interface{}) {
+	// Extract common fields using type switch
+	var blobInclusionInfo *certTypesBinding.EigenDATypesV2BlobInclusionInfo
+	var batchHeader *certTypesBinding.EigenDATypesV2BatchHeaderV2
+	var nonSignerStakesAndSignature *certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature
+	var signedQuorumNumbers []byte
+	var offchainDerivationVersion *uint16
+	var title string
+
+	switch c := cert.(type) {
+	case *coretypes.EigenDACertV3:
+		blobInclusionInfo = &c.BlobInclusionInfo
+		batchHeader = &c.BatchHeader
+		nonSignerStakesAndSignature = &c.NonSignerStakesAndSignature
+		signedQuorumNumbers = c.SignedQuorumNumbers
+		title = "EigenDA Certificate V3 Details"
+	case *coretypes.EigenDACertV4:
+		blobInclusionInfo = &c.BlobInclusionInfo
+		batchHeader = &c.BatchHeader
+		nonSignerStakesAndSignature = &c.NonSignerStakesAndSignature
+		signedQuorumNumbers = c.SignedQuorumNumbers
+		offchainDerivationVersion = &c.OffchainDerivationVersion
+		title = "EigenDA Certificate V4 Details"
+	default:
+		fmt.Printf("Unsupported certificate type: %T\n", cert)
+		return
+	}
+
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.SetStyle(table.StyleDefault)
@@ -46,7 +110,7 @@ func DisplayCertV3Data(cert *coretypes.EigenDACertV3) {
 	})
 
 	// Main certificate info
-	t.SetTitle("EigenDA Certificate V3 Details")
+	t.SetTitle(title)
 	t.AppendHeader(table.Row{"Field", "Value"})
 
 	// Blob Inclusion Info
@@ -58,9 +122,9 @@ func DisplayCertV3Data(cert *coretypes.EigenDACertV3) {
 	})
 	t.AppendSeparator()
 
-	blobCert := &cert.BlobInclusionInfo.BlobCertificate
-	t.AppendRow(table.Row{"Blob Index", fmt.Sprintf("%d", cert.BlobInclusionInfo.BlobIndex)})
-	t.AppendRow(table.Row{"Inclusion Proof", formatByteSlice(cert.BlobInclusionInfo.InclusionProof)})
+	blobCert := &blobInclusionInfo.BlobCertificate
+	t.AppendRow(table.Row{"Blob Index", fmt.Sprintf("%d", blobInclusionInfo.BlobIndex)})
+	t.AppendRow(table.Row{"Inclusion Proof", formatByteSlice(blobInclusionInfo.InclusionProof)})
 
 	// Blob Header
 	section = "BLOB HEADER"
@@ -112,28 +176,36 @@ func DisplayCertV3Data(cert *coretypes.EigenDACertV3) {
 		AutoMergeAlign: text.AlignCenter,
 	})
 	t.AppendSeparator()
-	t.AppendRow(table.Row{"Batch Root", formatByteArray32(cert.BatchHeader.BatchRoot)})
-	t.AppendRow(table.Row{"Reference Block Number", fmt.Sprintf("%d", cert.BatchHeader.ReferenceBlockNumber)})
+	t.AppendRow(table.Row{"Batch Root", formatByteArray32(batchHeader.BatchRoot)})
+	t.AppendRow(table.Row{"Reference Block Number", fmt.Sprintf("%d", batchHeader.ReferenceBlockNumber)})
 
 	// Non-Signer Stakes and BLS Signature
 	section = "NON-SIGNER STAKES & BLS SIGNATURE"
-	nonSigner := &cert.NonSignerStakesAndSignature
 	t.AppendSeparator()
 	t.AppendRow(table.Row{section, section}, table.RowConfig{
 		AutoMerge:      true,
 		AutoMergeAlign: text.AlignCenter,
 	})
 	t.AppendSeparator()
-	t.AppendRow(table.Row{"Non-Signer Quorum Bitmap Indices", formatUint32Slice(nonSigner.NonSignerQuorumBitmapIndices)})
-	t.AppendRow(table.Row{"Non-Signer Pubkeys Count", fmt.Sprintf("%d", len(nonSigner.NonSignerPubkeys))})
-	t.AppendRow(table.Row{"Quorum APKs Count", fmt.Sprintf("%d", len(nonSigner.QuorumApks))})
-	t.AppendRow(table.Row{"APK G2 X", formatBigIntArray(nonSigner.ApkG2.X)})
-	t.AppendRow(table.Row{"APK G2 Y", formatBigIntArray(nonSigner.ApkG2.Y)})
-	t.AppendRow(table.Row{"Sigma X", formatBigInt(nonSigner.Sigma.X)})
-	t.AppendRow(table.Row{"Sigma Y", formatBigInt(nonSigner.Sigma.Y)})
-	t.AppendRow(table.Row{"Quorum APK Indices", formatUint32Slice(nonSigner.QuorumApkIndices)})
-	t.AppendRow(table.Row{"Total Stake Indices", formatUint32Slice(nonSigner.TotalStakeIndices)})
-	t.AppendRow(table.Row{"Non-Signer Stake Indices", formatUint32SliceSlice(nonSigner.NonSignerStakeIndices)})
+	t.AppendRow(table.Row{
+		"Non-Signer Quorum Bitmap Indices",
+		formatUint32Slice(nonSignerStakesAndSignature.NonSignerQuorumBitmapIndices),
+	})
+	t.AppendRow(table.Row{
+		"Non-Signer Pubkeys Count",
+		fmt.Sprintf("%d", len(nonSignerStakesAndSignature.NonSignerPubkeys)),
+	})
+	t.AppendRow(table.Row{"Quorum APKs Count", fmt.Sprintf("%d", len(nonSignerStakesAndSignature.QuorumApks))})
+	t.AppendRow(table.Row{"APK G2 X", formatBigIntArray(nonSignerStakesAndSignature.ApkG2.X)})
+	t.AppendRow(table.Row{"APK G2 Y", formatBigIntArray(nonSignerStakesAndSignature.ApkG2.Y)})
+	t.AppendRow(table.Row{"Sigma X", formatBigInt(nonSignerStakesAndSignature.Sigma.X)})
+	t.AppendRow(table.Row{"Sigma Y", formatBigInt(nonSignerStakesAndSignature.Sigma.Y)})
+	t.AppendRow(table.Row{"Quorum APK Indices", formatUint32Slice(nonSignerStakesAndSignature.QuorumApkIndices)})
+	t.AppendRow(table.Row{"Total Stake Indices", formatUint32Slice(nonSignerStakesAndSignature.TotalStakeIndices)})
+	t.AppendRow(table.Row{
+		"Non-Signer Stake Indices",
+		formatUint32SliceSlice(nonSignerStakesAndSignature.NonSignerStakeIndices),
+	})
 
 	// Signed Quorum Numbers
 	section = "SIGNED QUORUM NUMBERS"
@@ -143,7 +215,19 @@ func DisplayCertV3Data(cert *coretypes.EigenDACertV3) {
 		AutoMergeAlign: text.AlignCenter,
 	})
 	t.AppendSeparator()
-	t.AppendRow(table.Row{"Signed Quorum Numbers", formatByteSlice(cert.SignedQuorumNumbers)})
+	t.AppendRow(table.Row{"Signed Quorum Numbers", formatByteSlice(signedQuorumNumbers)})
+
+	// V4-specific fields
+	if offchainDerivationVersion != nil {
+		section = "OFFCHAIN DERIVATION VERSION"
+		t.AppendSeparator()
+		t.AppendRow(table.Row{section, section}, table.RowConfig{
+			AutoMerge:      true,
+			AutoMergeAlign: text.AlignCenter,
+		})
+		t.AppendSeparator()
+		t.AppendRow(table.Row{"Offchain Derivation Version", fmt.Sprintf("%d", *offchainDerivationVersion)})
+	}
 
 	t.Render()
 }

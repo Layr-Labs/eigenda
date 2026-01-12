@@ -14,6 +14,9 @@ import (
 // different type of object that has the same hash as a GetChunksRequest.
 const RelayGetChunksRequestDomain = "relay.GetChunksRequest"
 
+// RelayGetValidatorChunksRequestDomain is the domain for hashing GetValidatorChunksRequest messages.
+const RelayGetValidatorChunksRequestDomain = "relay.GetValidatorChunksRequest"
+
 // HashGetChunksRequest hashes the given GetChunksRequest.
 func HashGetChunksRequest(request *pb.GetChunksRequest) ([]byte, error) {
 	hasher := sha3.NewLegacyKeccak256()
@@ -51,6 +54,25 @@ func HashGetChunksRequest(request *pb.GetChunksRequest) ([]byte, error) {
 			hashUint32(hasher, getByRange.GetEndIndex())
 		}
 	}
+
+	return hasher.Sum(nil), nil
+}
+
+// Hashes the given GetValidatorChunksRequest.
+func HashGetValidatorChunksRequest(request *pb.GetValidatorChunksRequest) ([]byte, error) {
+	hasher := sha3.NewLegacyKeccak256()
+
+	hasher.Write([]byte(RelayGetValidatorChunksRequestDomain))
+
+	err := hashByteArray(hasher, request.GetValidatorId())
+	if err != nil {
+		return nil, fmt.Errorf("hash validator ID: %w", err)
+	}
+	err = hashByteArray(hasher, request.GetBlobKey())
+	if err != nil {
+		return nil, fmt.Errorf("hash blob key: %w", err)
+	}
+	hashUint32(hasher, request.GetTimestamp())
 
 	return hasher.Sum(nil), nil
 }
