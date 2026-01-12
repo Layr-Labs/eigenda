@@ -27,13 +27,11 @@ func TestMeterDispersal(t *testing.T) {
 	reservation, err := meterer.MeterDispersal(850)
 	require.NoError(t, err)
 	require.NotNil(t, reservation)
-	require.True(t, reservation.OK())
 
 	// blob below minNumSymbols - should meter minNumSymbols (100)
 	reservation, err = meterer.MeterDispersal(50)
 	require.NoError(t, err)
 	require.NotNil(t, reservation)
-	require.True(t, reservation.OK())
 
 	// blob below minNumSymbols - should meter minNumSymbols (100), but we've exhausted capacity
 	reservation, err = meterer.MeterDispersal(1)

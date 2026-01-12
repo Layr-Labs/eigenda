@@ -51,7 +51,6 @@ import (
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 
 	"github.com/gammazero/workerpool"
-	"golang.org/x/time/rate"
 )
 
 const (
@@ -485,7 +484,7 @@ func (n *Node) startOnDemandMeterer(ctx context.Context) {
 }
 
 // MeterOnDemandDispersal reserves throughput capacity for an on-demand blob.
-func (n *Node) MeterOnDemandDispersal(symbolCount uint32) (*rate.Reservation, error) {
+func (n *Node) MeterOnDemandDispersal(symbolCount uint32) (*meterer.OnDemandReservation, error) {
 	if n.onDemandMeterer == nil {
 		return nil, fmt.Errorf("on-demand meterer not configured")
 	}
@@ -497,7 +496,7 @@ func (n *Node) MeterOnDemandDispersal(symbolCount uint32) (*rate.Reservation, er
 }
 
 // CancelOnDemandDispersal returns reserved capacity for an on-demand blob.
-func (n *Node) CancelOnDemandDispersal(reservation *rate.Reservation) {
+func (n *Node) CancelOnDemandDispersal(reservation *meterer.OnDemandReservation) {
 	if reservation == nil || n.onDemandMeterer == nil {
 		return
 	}

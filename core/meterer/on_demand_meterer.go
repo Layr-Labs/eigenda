@@ -3,12 +3,11 @@ package meterer
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/payments"
-	"golang.org/x/time/rate"
 )
 
 // OnDemandMeterer handles global throughput rate limiting for on-demand payments.
@@ -17,12 +16,17 @@ import (
 // This struct is safe for use by multiple goroutines.
 type OnDemandMeterer struct {
 	mu            sync.RWMutex
-	limiter       *rate.Limiter
+	bucket        *ratelimit.LeakyBucket
 	getNow        func() time.Time
 	metrics       *OnDemandMetererMetrics
 	minNumSymbols uint32
 	paymentVault  payments.PaymentVault
 	fuzzFactor    float64
+}
+
+// OnDemandReservation captures a bucket fill that can be reverted.
+type OnDemandReservation struct {
+	quantity float64
 }
 
 // Creates a new OnDemandMeterer with the specified rate limiting parameters.
@@ -37,14 +41,25 @@ func NewOnDemandMeterer(
 		return nil, fmt.Errorf("fuzz factor must be > 0: got %f", fuzzFactor)
 	}
 
-	limiter, minNumSymbols, err := buildLimiter(ctx, paymentVault, fuzzFactor)
+	leakRate, capacityDuration, minNumSymbols, err := buildBucket(ctx, paymentVault, fuzzFactor)
 	if err != nil {
 		return nil, err
 	}
 
+	bucket, err := ratelimit.NewLeakyBucket(
+		leakRate,
+		capacityDuration,
+		true, /* startFull to match rate.Limiter initial burst availability */
+		ratelimit.OverfillNotPermitted,
+		time.Now(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create leaky bucket: %w", err)
+	}
+
 	return &OnDemandMeterer{
 		mu:            sync.RWMutex{},
-		limiter:       limiter,
+		bucket:        bucket,
 		getNow:        getNow,
 		metrics:       metrics,
 		minNumSymbols: minNumSymbols,
@@ -63,35 +78,46 @@ func NewOnDemandMeterer(
 //
 // This method only succeeds if tokens are immediately available (no queueing/waiting). If a reservation is returned,
 // it is safe to proceed with dispersal without checking the delay.
-func (m *OnDemandMeterer) MeterDispersal(symbolCount uint32) (*rate.Reservation, error) {
+func (m *OnDemandMeterer) MeterDispersal(symbolCount uint32) (*OnDemandReservation, error) {
 	now := m.getNow()
 
 	m.mu.RLock()
 	billableSymbols := payments.CalculateBillableSymbols(symbolCount, m.minNumSymbols)
-	reservation := m.limiter.ReserveN(now, int(billableSymbols))
+	ok, err := m.bucket.Fill(now, float64(billableSymbols))
 	m.mu.RUnlock()
 
-	if !reservation.OK() || reservation.DelayFrom(now) > 0 {
-		reservation.Cancel()
+	if err != nil {
+		return nil, fmt.Errorf("fill leaky bucket: %w", err)
+	}
+
+	if !ok {
 		m.metrics.RecordGlobalMeterExhaustion(billableSymbols)
 		return nil, fmt.Errorf("global rate limit exceeded: cannot reserve %d symbols", billableSymbols)
 	}
 
 	m.metrics.RecordGlobalMeterThroughput(billableSymbols)
-	return reservation, nil
+	return &OnDemandReservation{quantity: float64(billableSymbols)}, nil
 }
 
 // Cancels a reservation obtained by MeterDispersal, returning tokens to the rate limiter.
 // This should be called when a reserved dispersal will not be performed (e.g., payment verification failed).
 //
 // Input reservation must be non-nil, otherwise this will panic
-func (m *OnDemandMeterer) CancelDispersal(reservation *rate.Reservation) {
-	reservation.Cancel()
+func (m *OnDemandMeterer) CancelDispersal(reservation *OnDemandReservation) {
+	if reservation == nil {
+		return
+	}
+
+	now := m.getNow()
+
+	m.mu.Lock()
+	_ = m.bucket.RevertFill(now, reservation.quantity)
+	m.mu.Unlock()
 }
 
 // Refresh updates the limiter parameters from the PaymentVault to track any on-chain changes.
 func (m *OnDemandMeterer) Refresh(ctx context.Context) error {
-	limiter, minNumSymbols, err := buildLimiter(ctx, m.paymentVault, m.fuzzFactor)
+	leakRate, capacityDuration, minNumSymbols, err := buildBucket(ctx, m.paymentVault, m.fuzzFactor)
 	if err != nil {
 		return err
 	}
@@ -99,29 +125,36 @@ func (m *OnDemandMeterer) Refresh(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.limiter = limiter
+	if err := m.bucket.Reconfigure(
+		leakRate,
+		capacityDuration,
+		ratelimit.OverfillNotPermitted,
+		m.getNow(),
+	); err != nil {
+		return fmt.Errorf("reconfigure leaky bucket: %w", err)
+	}
 	m.minNumSymbols = minNumSymbols
 	return nil
 }
 
-func buildLimiter(
+func buildBucket(
 	ctx context.Context,
 	paymentVault payments.PaymentVault,
 	fuzzFactor float64,
-) (*rate.Limiter, uint32, error) {
+) (float64, time.Duration, uint32, error) {
 	globalSymbolsPerSecond, err := paymentVault.GetGlobalSymbolsPerSecond(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("get global symbols per second: %w", err)
+		return 0, 0, 0, fmt.Errorf("get global symbols per second: %w", err)
 	}
 
 	globalRatePeriodInterval, err := paymentVault.GetGlobalRatePeriodInterval(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("get global rate period interval: %w", err)
+		return 0, 0, 0, fmt.Errorf("get global rate period interval: %w", err)
 	}
 
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("get min num symbols: %w", err)
+		return 0, 0, 0, fmt.Errorf("get min num symbols: %w", err)
 	}
 
 	effectiveSymbolsPerSecond := float64(globalSymbolsPerSecond) * fuzzFactor
@@ -129,11 +162,6 @@ func buildLimiter(
 		effectiveSymbolsPerSecond = 1
 	}
 
-	burstSize := int(math.Ceil(effectiveSymbolsPerSecond * float64(globalRatePeriodInterval)))
-	if burstSize < 1 {
-		burstSize = 1
-	}
-
-	limiter := rate.NewLimiter(rate.Limit(effectiveSymbolsPerSecond), burstSize)
-	return limiter, minNumSymbols, nil
+	capacityDuration := time.Duration(globalRatePeriodInterval) * time.Second
+	return effectiveSymbolsPerSecond, capacityDuration, minNumSymbols, nil
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
@@ -26,7 +27,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/mem"
-	"golang.org/x/time/rate"
 )
 
 // ServerV2 implements the Node v2 proto APIs.
@@ -180,7 +180,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 	probe.SetStage("validate")
 
-	onDemandReservations := make([]*rate.Reservation, 0)
+	onDemandReservations := make([]*meterer.OnDemandReservation, 0)
 	success := false
 	defer func() {
 		if !success {
