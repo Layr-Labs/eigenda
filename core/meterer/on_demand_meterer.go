@@ -46,12 +46,14 @@ func NewOnDemandMeterer(
 		return nil, err
 	}
 
+	startTime := getNow()
+
 	bucket, err := ratelimit.NewLeakyBucket(
 		leakRate,
 		capacityDuration,
-		true, /* startFull to match rate.Limiter initial burst availability */
+		false, /* start empty so capacity represents available tokens */
 		ratelimit.OverfillNotPermitted,
-		time.Now(),
+		startTime,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create leaky bucket: %w", err)
