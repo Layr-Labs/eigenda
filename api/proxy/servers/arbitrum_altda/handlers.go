@@ -201,8 +201,8 @@ func (h *Handlers) logMethodCall(method string, logValue ...any) func() {
 	}
 }
 
-func (h *Handlers) getL1InclusionBlockNumber(batchBlockHash common.Hash) (uint64, error) {
-	l1InclusionBlock, err := h.ethClient.BlockByHash(context.Background(), batchBlockHash)
+func (h *Handlers) getL1InclusionBlockNumber(ctx context.Context, batchBlockHash common.Hash) (uint64, error) {
+	l1InclusionBlock, err := h.ethClient.BlockByHash(ctx, batchBlockHash)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get L1 inclusion block header for hash %x: %w", batchBlockHash, err)
 	}
@@ -240,7 +240,7 @@ func (h *Handlers) RecoverPayload(
 
 	// fetch the L1 inclusion block number from the L1 block hash
 	// for performing the recency check
-	l1InclusionBlockNum, err := h.getL1InclusionBlockNumber(batchBlockHash)
+	l1InclusionBlockNum, err := h.getL1InclusionBlockNumber(ctx, batchBlockHash)
 	if err != nil {
 		return nil, fmt.Errorf("could not read l1 inclusion block number: %w", err)
 	}
