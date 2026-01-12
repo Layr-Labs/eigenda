@@ -22,6 +22,18 @@ type OnDemandMeterer struct {
 	minNumSymbols uint32
 	paymentVault  payments.PaymentVault
 	fuzzFactor    float64
+
+	// cached on-chain params for change detection
+	globalSymbolsPerSecond   uint64
+	globalRatePeriodInterval uint64
+}
+
+type bucketParams struct {
+	leakRate     float64
+	capacity     time.Duration
+	minSymbols   uint32
+	rawSymbolsPS uint64
+	rawPeriod    uint64
 }
 
 // OnDemandReservation captures a bucket fill that can be reverted.
@@ -41,7 +53,7 @@ func NewOnDemandMeterer(
 		return nil, fmt.Errorf("fuzz factor must be > 0: got %f", fuzzFactor)
 	}
 
-	leakRate, capacityDuration, minNumSymbols, err := buildBucket(ctx, paymentVault, fuzzFactor)
+	params, err := buildBucket(ctx, paymentVault, fuzzFactor)
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +61,8 @@ func NewOnDemandMeterer(
 	startTime := getNow()
 
 	bucket, err := ratelimit.NewLeakyBucket(
-		leakRate,
-		capacityDuration,
+		params.leakRate,
+		params.capacity,
 		false, /* start empty so capacity represents available tokens */
 		ratelimit.OverfillNotPermitted,
 		startTime,
@@ -64,9 +76,12 @@ func NewOnDemandMeterer(
 		bucket:        bucket,
 		getNow:        getNow,
 		metrics:       metrics,
-		minNumSymbols: minNumSymbols,
+		minNumSymbols: params.minSymbols,
 		paymentVault:  paymentVault,
 		fuzzFactor:    fuzzFactor,
+
+		globalSymbolsPerSecond:   params.rawSymbolsPS,
+		globalRatePeriodInterval: params.rawPeriod,
 	}, nil
 }
 
@@ -119,7 +134,7 @@ func (m *OnDemandMeterer) CancelDispersal(reservation *OnDemandReservation) {
 
 // Refresh updates the limiter parameters from the PaymentVault to track any on-chain changes.
 func (m *OnDemandMeterer) Refresh(ctx context.Context) error {
-	leakRate, capacityDuration, minNumSymbols, err := buildBucket(ctx, m.paymentVault, m.fuzzFactor)
+	params, err := buildBucket(ctx, m.paymentVault, m.fuzzFactor)
 	if err != nil {
 		return err
 	}
@@ -127,15 +142,23 @@ func (m *OnDemandMeterer) Refresh(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if params.rawSymbolsPS == m.globalSymbolsPerSecond &&
+		params.rawPeriod == m.globalRatePeriodInterval &&
+		params.minSymbols == m.minNumSymbols {
+		return nil
+	}
+
 	if err := m.bucket.Reconfigure(
-		leakRate,
-		capacityDuration,
+		params.leakRate,
+		params.capacity,
 		ratelimit.OverfillNotPermitted,
 		m.getNow(),
 	); err != nil {
 		return fmt.Errorf("reconfigure leaky bucket: %w", err)
 	}
-	m.minNumSymbols = minNumSymbols
+	m.minNumSymbols = params.minSymbols
+	m.globalSymbolsPerSecond = params.rawSymbolsPS
+	m.globalRatePeriodInterval = params.rawPeriod
 	return nil
 }
 
@@ -143,20 +166,20 @@ func buildBucket(
 	ctx context.Context,
 	paymentVault payments.PaymentVault,
 	fuzzFactor float64,
-) (float64, time.Duration, uint32, error) {
+) (*bucketParams, error) {
 	globalSymbolsPerSecond, err := paymentVault.GetGlobalSymbolsPerSecond(ctx)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("get global symbols per second: %w", err)
+		return nil, fmt.Errorf("get global symbols per second: %w", err)
 	}
 
 	globalRatePeriodInterval, err := paymentVault.GetGlobalRatePeriodInterval(ctx)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("get global rate period interval: %w", err)
+		return nil, fmt.Errorf("get global rate period interval: %w", err)
 	}
 
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("get min num symbols: %w", err)
+		return nil, fmt.Errorf("get min num symbols: %w", err)
 	}
 
 	effectiveSymbolsPerSecond := float64(globalSymbolsPerSecond) * fuzzFactor
@@ -165,5 +188,11 @@ func buildBucket(
 	}
 
 	capacityDuration := time.Duration(globalRatePeriodInterval) * time.Second
-	return effectiveSymbolsPerSecond, capacityDuration, minNumSymbols, nil
+	return &bucketParams{
+		leakRate:     effectiveSymbolsPerSecond,
+		capacity:     capacityDuration,
+		minSymbols:   minNumSymbols,
+		rawSymbolsPS: globalSymbolsPerSecond,
+		rawPeriod:    globalRatePeriodInterval,
+	}, nil
 }
