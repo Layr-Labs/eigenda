@@ -3,8 +3,8 @@ package cache
 import (
 	"time"
 
-	"github.com/emirpasic/gods/queues"
-	"github.com/emirpasic/gods/queues/linkedlistqueue"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/enforce"
 )
 
 var _ Cache[string, string] = &FIFOCache[string, string]{}
@@ -17,7 +17,7 @@ type FIFOCache[K comparable, V any] struct {
 	currentWeight uint64
 	maxWeight     uint64
 	data          map[K]V
-	evictionQueue queues.Queue
+	evictionQueue *common.RandomAccessDeque[*insertionRecord]
 	metrics       *CacheMetrics
 }
 
@@ -44,7 +44,7 @@ func NewFIFOCache[K comparable, V any](
 		maxWeight:        maxWeight,
 		data:             make(map[K]V),
 		weightCalculator: calculator,
-		evictionQueue:    linkedlistqueue.New(),
+		evictionQueue:    common.NewRandomAccessDeque[*insertionRecord](1024),
 		metrics:          metrics,
 	}
 }
@@ -68,7 +68,7 @@ func (f *FIFOCache[K, V]) Put(key K, value V) {
 		oldWeight := f.weightCalculator(key, old)
 		f.currentWeight -= oldWeight
 	} else {
-		f.evictionQueue.Enqueue(&insertionRecord{
+		f.evictionQueue.Push(&insertionRecord{
 			key:       key,
 			timestamp: time.Now(),
 		})
@@ -86,13 +86,13 @@ func (f *FIFOCache[K, V]) evict() {
 	now := time.Now()
 
 	for f.currentWeight > f.maxWeight {
-		next, _ := f.evictionQueue.Dequeue()
-		record := next.(*insertionRecord)
-		keyToEvict := record.key.(K)
+		next, err := f.evictionQueue.Pop()
+		enforce.NilError(err, "failed to pop front of eviction queue")
+		keyToEvict := next.key.(K)
 		weightToEvict := f.weightCalculator(keyToEvict, f.data[keyToEvict])
 		delete(f.data, keyToEvict)
 		f.currentWeight -= weightToEvict
-		f.metrics.reportEviction(now.Sub(record.timestamp))
+		f.metrics.reportEviction(now.Sub(next.timestamp))
 	}
 }
 
