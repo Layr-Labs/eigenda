@@ -37,7 +37,7 @@ func TestNodeOnDemandMeteringPaths(t *testing.T) {
 	n.CancelOnDemandDispersal(res)
 
 	// Consume remaining capacity then verify exhaustion
-	res, err = n.MeterOnDemandDispersal(10)
+	_, err = n.MeterOnDemandDispersal(10)
 	require.NoError(t, err)
 
 	_, err = n.MeterOnDemandDispersal(1)
