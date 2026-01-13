@@ -40,6 +40,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -121,6 +122,9 @@ type Node struct {
 
 	// Validates reservation payments for blob dispersals
 	reservationPaymentValidator *reservationvalidation.ReservationPaymentValidator
+
+	// Global on-demand throughput meter (enforced using on-chain PaymentVault params)
+	onDemandMeterer *meterer.OnDemandMeterer
 }
 
 // NewNode creates a new Node with the provided config.
@@ -308,6 +312,22 @@ func NewNode(
 		return nil, fmt.Errorf("create payment vault: %w", err)
 	}
 
+	onDemandMetererMetrics := meterer.NewOnDemandMetererMetrics(reg, Namespace, PaymentsSubsystem)
+	fuzzFactor := config.OnDemandMeterFuzzFactor
+	if fuzzFactor <= 0 {
+		fuzzFactor = 1.0
+	}
+	onDemandMeterer, err := meterer.NewOnDemandMeterer(
+		ctx,
+		paymentVault,
+		time.Now,
+		onDemandMetererMetrics,
+		fuzzFactor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create on-demand meterer: %w", err)
+	}
+
 	reservationPaymentValidator, err := reservationvalidation.NewReservationPaymentValidator(
 		ctx,
 		logger,
@@ -345,6 +365,7 @@ func NewNode(
 		OperatorSocketsFilterer:     socketsFilterer,
 		ChainID:                     chainID,
 		BLSSigner:                   blsSigner,
+		onDemandMeterer:             onDemandMeterer,
 		DownloadPool:                downloadPool,
 		ValidationPool:              validationPool,
 		StoreChunksSemaphore:        storeChunksSemaphore,
@@ -353,6 +374,8 @@ func NewNode(
 		client:                      client,
 		reservationPaymentValidator: reservationPaymentValidator,
 	}
+
+	n.startOnDemandMeterer(ctx)
 
 	if config.EnableV2 {
 		var blobVersionParams *corev2.BlobVersionParameterMap
@@ -435,6 +458,58 @@ func NewNode(
 	n.startNodeIPUpdater()
 
 	return n, nil
+}
+
+func (n *Node) startOnDemandMeterer(ctx context.Context) {
+	if n.onDemandMeterer == nil {
+		return
+	}
+
+	refreshInterval := n.Config.OnDemandMeterRefreshInterval
+	if refreshInterval <= 0 {
+		return
+	}
+
+	go func() {
+		ticker := time.NewTicker(refreshInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := n.onDemandMeterer.Refresh(ctx); err != nil {
+					n.Logger.Error("Failed to refresh on-demand meter limits", "error", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+// MeterOnDemandDispersal reserves throughput capacity for an on-demand blob.
+func (n *Node) MeterOnDemandDispersal(symbolCount uint32) (*meterer.OnDemandReservation, error) {
+	if n.onDemandMeterer == nil {
+		return nil, fmt.Errorf("on-demand meterer not configured")
+	}
+	reservation, err := n.onDemandMeterer.MeterDispersal(symbolCount)
+	if err != nil {
+		return nil, fmt.Errorf("meter on-demand dispersal: %w", err)
+	}
+	return reservation, nil
+}
+
+// CancelOnDemandDispersal returns reserved capacity for an on-demand blob.
+func (n *Node) CancelOnDemandDispersal(reservation *meterer.OnDemandReservation) {
+	if reservation == nil || n.onDemandMeterer == nil {
+		return
+	}
+	n.onDemandMeterer.CancelDispersal(reservation)
+}
+
+// SetOnDemandMeterer allows tests to inject an on-demand meterer.
+func (n *Node) SetOnDemandMeterer(m *meterer.OnDemandMeterer) {
+	n.onDemandMeterer = m
 }
 
 // Validates reservation payments for all blobs in a batch.

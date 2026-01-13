@@ -1,6 +1,7 @@
 package meterer
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -20,20 +21,18 @@ func TestMeterDispersal(t *testing.T) {
 	paymentVault.SetGlobalRatePeriodInterval(10)
 	paymentVault.SetMinNumSymbols(100)
 
-	meterer, err := NewOnDemandMeterer(ctx, paymentVault, timeSource, nil)
+	meterer, err := NewOnDemandMeterer(ctx, paymentVault, timeSource, nil, 1.0)
 	require.NoError(t, err)
 
 	// blob larger than minNumSymbols
 	reservation, err := meterer.MeterDispersal(850)
 	require.NoError(t, err)
 	require.NotNil(t, reservation)
-	require.True(t, reservation.OK())
 
 	// blob below minNumSymbols - should meter minNumSymbols (100)
 	reservation, err = meterer.MeterDispersal(50)
 	require.NoError(t, err)
 	require.NotNil(t, reservation)
-	require.True(t, reservation.OK())
 
 	// blob below minNumSymbols - should meter minNumSymbols (100), but we've exhausted capacity
 	reservation, err = meterer.MeterDispersal(1)
@@ -49,7 +48,7 @@ func TestCancelDispersal(t *testing.T) {
 	paymentVault.SetGlobalRatePeriodInterval(10)
 	paymentVault.SetMinNumSymbols(100)
 
-	meterer, err := NewOnDemandMeterer(ctx, paymentVault, timeSource, nil)
+	meterer, err := NewOnDemandMeterer(ctx, paymentVault, timeSource, nil, 1.0)
 	require.NoError(t, err)
 
 	reservation, err := meterer.MeterDispersal(500)
@@ -58,4 +57,37 @@ func TestCancelDispersal(t *testing.T) {
 
 	// don't panic
 	meterer.CancelDispersal(reservation)
+}
+
+func TestRefreshUpdatesLimits(t *testing.T) {
+	ctx := context.Background()
+	timeSource := func() time.Time { return startTime }
+
+	paymentVault := vault.NewTestPaymentVault()
+	paymentVault.SetGlobalSymbolsPerSecond(100)
+	paymentVault.SetGlobalRatePeriodInterval(10)
+	paymentVault.SetMinNumSymbols(1)
+
+	meterer, err := NewOnDemandMeterer(ctx, paymentVault, timeSource, nil, 1.0)
+	require.NoError(t, err)
+
+	// Exhaust initial capacity (100 * 10 = 1000)
+	_, err = meterer.MeterDispersal(1000)
+	require.NoError(t, err)
+	_, err = meterer.MeterDispersal(1)
+	require.Error(t, err, "expected exhaustion at initial capacity")
+
+	// Increase on-chain limit and refresh; capacity should expand
+	paymentVault.SetGlobalSymbolsPerSecond(200) // new capacity: 2000
+	err = meterer.Refresh(ctx)
+	require.NoError(t, err)
+
+	_, err = meterer.MeterDispersal(1000) // should consume remaining new capacity
+	require.NoError(t, err)
+	_, err = meterer.MeterDispersal(1)
+	require.Error(t, err, "expected exhaustion after consuming expanded capacity")
+
+	// Refresh with unchanged params should be a no-op
+	err = meterer.Refresh(ctx)
+	require.NoError(t, err)
 }

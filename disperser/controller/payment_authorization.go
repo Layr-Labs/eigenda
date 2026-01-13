@@ -85,6 +85,7 @@ func BuildPaymentAuthorizationHandler(
 		paymentVault,
 		time.Now,
 		onDemandMetererMetrics,
+		1.0, // use exact on-chain limit for controller-side validation
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create on-demand meterer: %w", err)

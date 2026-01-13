@@ -25,8 +25,10 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	coremockv2 "github.com/Layr-Labs/eigenda/core/mock/v2"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
@@ -102,6 +104,14 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	require.NoError(t, err)
 	operatorStateCache.SetOperatorState(t.Context(), 100, operatorState)
 
+	// Configure a permissive on-demand meterer for tests
+	testVault := vault.NewTestPaymentVault()
+	testVault.SetGlobalSymbolsPerSecond(1_000_000)
+	testVault.SetGlobalRatePeriodInterval(10)
+	testVault.SetMinNumSymbols(1)
+	onDemandMeterer, err := meterer.NewOnDemandMeterer(context.Background(), testVault, time.Now, nil, 1.0)
+	require.NoError(t, err)
+
 	s := nodemock.NewMockStoreV2()
 	relay := clientsmock.NewRelayClient()
 	var atomicRelayClient atomic.Value
@@ -120,6 +130,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		ValidationPool:     workerpool.New(1),
 		OperatorStateCache: operatorStateCache,
 	}
+	node.SetOnDemandMeterer(onDemandMeterer)
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 	// Set quorum count for validation
 	node.QuorumCount.Store(3)
