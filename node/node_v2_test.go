@@ -235,3 +235,69 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	quorumCount := c.node.QuorumCount.Load()
 	require.Equal(t, quorumCount, uint32(2))
 }
+
+// ----------------------------------------------------------------------------
+// Tests for new GetValidatorChunks path (single-blob batches only)
+// ----------------------------------------------------------------------------
+
+// Creates a single-blob batch from the first blob in MockBatch
+func makeSingleBlobBatch(t *testing.T) (v2.BlobKey, *v2.Batch, []byte) {
+	blobKeys, batch, bundles := nodemock.MockBatch(t)
+
+	singleBlobBatch := &v2.Batch{
+		BatchHeader:      batch.BatchHeader,
+		BlobCertificates: []*v2.BlobCertificate{batch.BlobCertificates[0]},
+	}
+
+	bundleBytes, err := bundles[0][0].Serialize()
+	require.NoError(t, err)
+
+	return blobKeys[0], singleBlobBatch, bundleBytes
+}
+
+func TestDownloadChunksSuccess(t *testing.T) {
+	c := newComponents(t, op0)
+	c.node.RelayClient.Store(c.relayClient)
+	ctx := context.Background()
+	blobKey, batch, bundleBytes := makeSingleBlobBatch(t)
+	blobCert := batch.BlobCertificates[0]
+
+	// Mock GetValidatorChunks
+	c.relayClient.On(
+		"GetValidatorChunks",
+		mock.Anything,
+		mock.Anything,
+		blobKey,
+	).Return(bundleBytes, nil)
+
+	blobShard, rawBundle, err := c.node.DownloadChunks(ctx, blobCert, nil)
+	require.NoError(t, err)
+	require.NotNil(t, blobShard)
+	require.NotNil(t, rawBundle)
+
+	// Verify blob certificate is correctly associated
+	require.Equal(t, blobCert, blobShard.BlobCertificate)
+	require.Equal(t, blobCert, rawBundle.BlobCertificate)
+}
+
+func TestDownloadChunksFail(t *testing.T) {
+	c := newComponents(t, op0)
+	c.node.RelayClient.Store(c.relayClient)
+	ctx := context.Background()
+	blobKey, batch, _ := makeSingleBlobBatch(t)
+
+	// Mock GetValidatorChunks to fail
+	relayServerError := fmt.Errorf("relay server error")
+	c.relayClient.On(
+		"GetValidatorChunks",
+		mock.Anything,
+		mock.Anything,
+		blobKey,
+	).Return(nil, relayServerError)
+
+	blobCert := batch.BlobCertificates[0]
+	blobShard, rawBundle, err := c.node.DownloadChunks(ctx, blobCert, nil)
+	require.Error(t, err)
+	require.Nil(t, blobShard)
+	require.Nil(t, rawBundle)
+}

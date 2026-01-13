@@ -32,9 +32,9 @@ type RelayClient interface {
 	GetBlob(ctx context.Context, in *GetBlobRequest, opts ...grpc.CallOption) (*GetBlobReply, error)
 	// GetChunks retrieves chunks from blobs stored by the relay.
 	GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
-	// GetValidatorChunks retrieves all chunks allocated to a validator.
+	// GetValidatorChunks retrieves all chunks allocated to a validator for a blob.
 	// The relay computes which chunks to return based on the deterministic chunk allocation algorithm.
-	GetValidatorChunks(ctx context.Context, in *GetValidatorChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
+	GetValidatorChunks(ctx context.Context, in *GetValidatorChunksRequest, opts ...grpc.CallOption) (*GetValidatorChunksReply, error)
 }
 
 type relayClient struct {
@@ -63,8 +63,8 @@ func (c *relayClient) GetChunks(ctx context.Context, in *GetChunksRequest, opts 
 	return out, nil
 }
 
-func (c *relayClient) GetValidatorChunks(ctx context.Context, in *GetValidatorChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error) {
-	out := new(GetChunksReply)
+func (c *relayClient) GetValidatorChunks(ctx context.Context, in *GetValidatorChunksRequest, opts ...grpc.CallOption) (*GetValidatorChunksReply, error) {
+	out := new(GetValidatorChunksReply)
 	err := c.cc.Invoke(ctx, Relay_GetValidatorChunks_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -80,9 +80,9 @@ type RelayServer interface {
 	GetBlob(context.Context, *GetBlobRequest) (*GetBlobReply, error)
 	// GetChunks retrieves chunks from blobs stored by the relay.
 	GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error)
-	// GetValidatorChunks retrieves all chunks allocated to a validator.
+	// GetValidatorChunks retrieves all chunks allocated to a validator for a blob.
 	// The relay computes which chunks to return based on the deterministic chunk allocation algorithm.
-	GetValidatorChunks(context.Context, *GetValidatorChunksRequest) (*GetChunksReply, error)
+	GetValidatorChunks(context.Context, *GetValidatorChunksRequest) (*GetValidatorChunksReply, error)
 	mustEmbedUnimplementedRelayServer()
 }
 
@@ -96,7 +96,7 @@ func (UnimplementedRelayServer) GetBlob(context.Context, *GetBlobRequest) (*GetB
 func (UnimplementedRelayServer) GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunks not implemented")
 }
-func (UnimplementedRelayServer) GetValidatorChunks(context.Context, *GetValidatorChunksRequest) (*GetChunksReply, error) {
+func (UnimplementedRelayServer) GetValidatorChunks(context.Context, *GetValidatorChunksRequest) (*GetValidatorChunksReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetValidatorChunks not implemented")
 }
 func (UnimplementedRelayServer) mustEmbedUnimplementedRelayServer() {}

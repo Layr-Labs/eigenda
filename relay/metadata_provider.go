@@ -159,6 +159,11 @@ func (m *metadataProvider) UpdateBlobVersionParameters(blobParamsMap *v2.BlobVer
 	m.blobParamsMap.Store(blobParamsMap)
 }
 
+// Returns the current blob version parameter map.
+func (m *metadataProvider) GetBlobVersionParameters() *v2.BlobVersionParameterMap {
+	return m.blobParamsMap.Load()
+}
+
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
 func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
 	ctx, cancel := context.WithTimeout(m.ctx, m.fetchTimeout)

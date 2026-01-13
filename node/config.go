@@ -75,7 +75,10 @@ type Config struct {
 	RelayUseSecureGrpc             bool
 	RelayMaxMessageSize            uint
 	// The number of connections to establish with each relay node.
-	RelayConnectionPoolSize        uint
+	RelayConnectionPoolSize uint
+	// If true, use the legacy GetChunks RPC instead of the new GetValidatorChunks RPC.
+	// TODO(litt3): Temporary flag during migration. Remove once migration is complete.
+	UseLegacyGetChunksRequest      bool
 	ReachabilityPollIntervalSec    uint64
 	DisableNodeInfoResources       bool
 	StoreChunksRequestMaxPastAge   time.Duration
@@ -454,6 +457,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		RelayUseSecureGrpc:                  ctx.GlobalBoolT(flags.RelayUseSecureGRPC.Name),
 		RelayMaxMessageSize:                 uint(ctx.GlobalInt(flags.RelayMaxGRPCMessageSizeFlag.Name)),
 		RelayConnectionPoolSize:             ctx.GlobalUint(flags.RelayConnectionPoolSizeFlag.Name),
+		UseLegacyGetChunksRequest:           ctx.GlobalBool(flags.UseLegacyGetChunksRequestFlag.Name),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            v2Enabled,

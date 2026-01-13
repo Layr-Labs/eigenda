@@ -292,3 +292,43 @@ func GetAssignmentForBlob(
 
 	return assignment, nil
 }
+
+// IndexRange represents a contiguous range of chunk indices [Start, End).
+type IndexRange struct {
+	Start uint32 // inclusive
+	End   uint32 // exclusive
+}
+
+// CollapseIndicesToRanges converts a list of chunk indices into contiguous ranges.
+// Consecutive indices are collapsed into single ranges for efficient range-based requests.
+//
+// Important: the provided indices MUST be in (mostly) sorted order for optimal range collapsing.
+// Unsorted indices may lead to a very large number of ranges being generated. The current chunk
+// assignment logic produces mostly sorted indices, so this is not an issue at present.
+func CollapseIndicesToRanges(indices []uint32) []IndexRange {
+	if len(indices) == 0 {
+		return nil
+	}
+
+	ranges := make([]IndexRange, 0)
+	startIndex := indices[0]
+
+	for i := 1; i < len(indices); i++ {
+		if indices[i] != indices[i-1]+1 {
+			// Break in continuity, create a range for the previous sequence
+			ranges = append(ranges, IndexRange{
+				Start: startIndex,
+				End:   indices[i-1] + 1,
+			})
+			startIndex = indices[i]
+		}
+	}
+
+	// Add the last range
+	ranges = append(ranges, IndexRange{
+		Start: startIndex,
+		End:   indices[len(indices)-1] + 1,
+	})
+
+	return ranges
+}

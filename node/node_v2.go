@@ -115,44 +115,23 @@ func (n *Node) DetermineChunkLocations(
 	return downloadSizeInBytes, relayRequests, nil
 }
 
-// Given a list of chunk indices we want to download, create a list of relay requests by range.
+// Converts chunk indices into relay range requests using the shared range collapsing utility.
 // Although indices may not be contiguous, it is safe to assume that they will be "mostly contiguous".
 // In practice, we should expect to see at most one continuous range of indices per quorum.
-//
-// Important: the provided indices MUST be in (mostly) sorted order in order to collapse into ranges correctly.
-// Unsorted indices may lead to a very large number of range requests being generated. The current chunk assignment
-// logic produces mostly sorted indices, so this is not an issue at present.
-//
-// Eventually, the assignment logic ought to be refactored to return ranges of chunks instead of individual
-// indices, but the required changes are non-trivial.
 func convertIndicesToRangeRequests(blobKey corev2.BlobKey, indices []uint32) []*relay.ChunkRequestByRange {
-	requests := make([]*relay.ChunkRequestByRange, 0)
-	if len(indices) == 0 {
-		return requests
+	ranges := corev2.CollapseIndicesToRanges(indices)
+	if len(ranges) == 0 {
+		return make([]*relay.ChunkRequestByRange, 0)
 	}
 
-	startIndex := indices[0]
-	for i := 1; i < len(indices); i++ {
-		if indices[i] != indices[i-1]+1 {
-			// break in continuity, create a request for the previous range
-			request := &relay.ChunkRequestByRange{
-				BlobKey: blobKey,
-				Start:   startIndex,       // inclusive
-				End:     indices[i-1] + 1, // exclusive
-			}
-			requests = append(requests, request)
-			startIndex = indices[i]
+	requests := make([]*relay.ChunkRequestByRange, len(ranges))
+	for i, r := range ranges {
+		requests[i] = &relay.ChunkRequestByRange{
+			BlobKey: blobKey,
+			Start:   r.Start,
+			End:     r.End,
 		}
 	}
-
-	// add the last range
-	request := &relay.ChunkRequestByRange{
-		BlobKey: blobKey,
-		Start:   startIndex,                  // inclusive
-		End:     indices[len(indices)-1] + 1, // exclusive
-	}
-	requests = append(requests, request)
-
 	return requests
 }
 
@@ -261,4 +240,61 @@ func (n *Node) ValidateBatchV2(
 	}
 
 	return nil
+}
+
+// Downloads chunks for a single blob using the GetValidatorChunks API.
+func (n *Node) DownloadChunks(
+	ctx context.Context,
+	cert *corev2.BlobCertificate,
+	probe *common.SequenceProbe,
+) (
+	blobShard *corev2.BlobShard,
+	rawBundle *RawBundle,
+	err error,
+) {
+	// relay keys exist in an array for historical reasons, but practically there is only 1 relay key
+	if len(cert.RelayKeys) == 0 {
+		return nil, nil, fmt.Errorf("no relay keys in certificate")
+	}
+	relayKey := cert.RelayKeys[0]
+
+	relayClient, ok := n.RelayClient.Load().(relay.RelayClient)
+	if !ok || relayClient == nil {
+		return nil, nil, fmt.Errorf("relay client is not set")
+	}
+
+	probe.SetStage("download")
+
+	blobKey, err := cert.BlobHeader.BlobKey()
+	if err != nil {
+		return nil, nil, fmt.Errorf("get blob key: %w", err)
+	}
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
+	defer cancel()
+
+	chunks, err := relayClient.GetValidatorChunks(ctxTimeout, relayKey, blobKey)
+	if err != nil {
+		n.Logger.Errorf("get validator chunks from relay %d: %v", relayKey, err)
+		return nil, nil, fmt.Errorf("get validator chunks: %w", err)
+	}
+
+	rawBundle = &RawBundle{
+		BlobCertificate: cert,
+		Bundle:          chunks,
+	}
+
+	probe.SetStage("deserialize")
+
+	bundle, err := new(core.Bundle).Deserialize(chunks)
+	if err != nil {
+		return nil, nil, fmt.Errorf("deserialize chunks: %w", err)
+	}
+
+	blobShard = &corev2.BlobShard{
+		BlobCertificate: cert,
+		Bundle:          bundle,
+	}
+
+	return blobShard, rawBundle, nil
 }
