@@ -20,7 +20,7 @@ func TestMeterDispersal(t *testing.T) {
 	paymentVault.SetGlobalRatePeriodInterval(10)
 	paymentVault.SetMinNumSymbols(100)
 
-	meterer, err := NewOnDemandMeterer(ctx, paymentVault, timeSource, nil, 1.0)
+	meterer, err := NewOnDemandMeterer(ctx, paymentVault, timeSource, nil)
 	require.NoError(t, err)
 
 	// blob larger than minNumSymbols
@@ -49,7 +49,7 @@ func TestCancelDispersal(t *testing.T) {
 	paymentVault.SetGlobalRatePeriodInterval(10)
 	paymentVault.SetMinNumSymbols(100)
 
-	meterer, err := NewOnDemandMeterer(ctx, paymentVault, timeSource, nil, 1.0)
+	meterer, err := NewOnDemandMeterer(ctx, paymentVault, timeSource, nil)
 	require.NoError(t, err)
 
 	reservation, err := meterer.MeterDispersal(500)

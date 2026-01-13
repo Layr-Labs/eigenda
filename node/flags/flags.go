@@ -591,20 +591,6 @@ var (
 		Value:    30 * time.Second,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
 	}
-	OnDemandMeterRefreshIntervalFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "on-demand-meter-refresh-interval"),
-		Usage:    "Interval for refreshing on-demand global rate limit parameters from the payment vault.",
-		Required: false,
-		Value:    5 * time.Minute,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ON_DEMAND_METER_REFRESH_INTERVAL"),
-	}
-	OnDemandMeterFuzzFactorFlag = cli.Float64Flag{
-		Name:     common.PrefixFlag(FlagPrefix, "on-demand-meter-fuzz-factor"),
-		Usage:    "Multiplier applied to on-chain on-demand throughput before enforcement; >1.0 allows a small buffer.",
-		Required: false,
-		Value:    1.1,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ON_DEMAND_METER_FUZZ_FACTOR"),
-	}
 	EnablePerAccountPaymentMetricsFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-per-account-payment-metrics"),
 		Usage:    "Whether to report per-account payment metrics. If false, all metrics will be aggregated under account 0x0.",
@@ -773,8 +759,6 @@ var optionalFlags = []cli.Flag{
 	IgnoreVersionForEjectionDefenseFlag,
 	ReservationMaxLedgersFlag,
 	PaymentVaultUpdateIntervalFlag,
-	OnDemandMeterRefreshIntervalFlag,
-	OnDemandMeterFuzzFactorFlag,
 	EnablePerAccountPaymentMetricsFlag,
 	OverrideV2TtlFlag,
 	EnforceSingleBlobBatchesFlag,

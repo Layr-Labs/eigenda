@@ -101,10 +101,6 @@ type Config struct {
 	ChunkDownloadTimeout        time.Duration
 	GRPCMsgSizeLimitV2          int
 
-	// On-demand payment global metering
-	OnDemandMeterRefreshInterval time.Duration
-	OnDemandMeterFuzzFactor      float64
-
 	PprofHttpPort string
 	EnablePprof   bool
 
@@ -415,16 +411,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, fmt.Errorf("new reservation ledger cache config: %w", err)
 	}
 
-	onDemandMeterRefreshInterval := ctx.GlobalDuration(flags.OnDemandMeterRefreshIntervalFlag.Name)
-	if onDemandMeterRefreshInterval <= 0 {
-		return nil, fmt.Errorf("the %s flag must be > 0", flags.OnDemandMeterRefreshIntervalFlag.Name)
-	}
-
-	onDemandMeterFuzzFactor := ctx.GlobalFloat64(flags.OnDemandMeterFuzzFactorFlag.Name)
-	if onDemandMeterFuzzFactor <= 0 {
-		return nil, errors.New("on-demand-meter-fuzz-factor must be > 0")
-	}
-
 	return &Config{
 		Hostname:                            ctx.GlobalString(flags.HostnameFlag.Name),
 		DispersalPort:                       dispersalPort,
@@ -476,8 +462,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
 		GRPCMsgSizeLimitV2:                  ctx.GlobalInt(flags.GRPCMsgSizeLimitV2Flag.Name),
-		OnDemandMeterRefreshInterval:        onDemandMeterRefreshInterval,
-		OnDemandMeterFuzzFactor:             onDemandMeterFuzzFactor,
 		PprofHttpPort:                       ctx.GlobalString(flags.PprofHttpPort.Name),
 		EnablePprof:                         ctx.GlobalBool(flags.EnablePprof.Name),
 		DispersalAuthenticationKeyCacheSize: ctx.GlobalInt(flags.DispersalAuthenticationKeyCacheSizeFlag.Name),
