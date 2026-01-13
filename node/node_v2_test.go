@@ -255,42 +255,6 @@ func makeSingleBlobBatch(t *testing.T) (v2.BlobKey, *v2.Batch, []byte) {
 	return blobKeys[0], singleBlobBatch, bundleBytes
 }
 
-func TestPlanChunkRetrieval(t *testing.T) {
-	c := newComponents(t, op0)
-	ctx := context.Background()
-	_, batch, _ := makeSingleBlobBatch(t)
-
-	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
-	require.NoError(t, err)
-
-	downloadSize, relayKey, err := c.node.PlanChunkRetrieval(batch, state, nil)
-	require.NoError(t, err)
-	require.Greater(t, downloadSize, uint64(0))
-
-	// RelayKey should be one of the valid relay keys for the blob
-	validRelayKey := false
-	for _, rk := range batch.BlobCertificates[0].RelayKeys {
-		if rk == relayKey {
-			validRelayKey = true
-			break
-		}
-	}
-	require.True(t, validRelayKey, "invalid relay key %d", relayKey)
-}
-
-func TestPlanChunkRetrievalRejectsMultiBlobBatch(t *testing.T) {
-	c := newComponents(t, op0)
-	ctx := context.Background()
-	_, batch, _ := nodemock.MockBatch(t) // 3-blob batch
-
-	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
-	require.NoError(t, err)
-
-	_, _, err = c.node.PlanChunkRetrieval(batch, state, nil)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected single-blob batch")
-}
-
 func TestDownloadChunksSuccess(t *testing.T) {
 	c := newComponents(t, op0)
 	c.node.RelayClient.Store(c.relayClient)
@@ -306,12 +270,7 @@ func TestDownloadChunksSuccess(t *testing.T) {
 		blobKey,
 	).Return(bundleBytes, nil)
 
-	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
-	require.NoError(t, err)
-
-	_, relayKey, err := c.node.PlanChunkRetrieval(batch, state, nil)
-	require.NoError(t, err)
-
+	relayKey := blobCert.RelayKeys[0]
 	blobShard, rawBundle, err := c.node.DownloadChunks(ctx, batch, relayKey, nil)
 	require.NoError(t, err)
 	require.NotNil(t, blobShard)
@@ -337,12 +296,7 @@ func TestDownloadChunksFail(t *testing.T) {
 		blobKey,
 	).Return(nil, relayServerError)
 
-	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
-	require.NoError(t, err)
-
-	_, relayKey, err := c.node.PlanChunkRetrieval(batch, state, nil)
-	require.NoError(t, err)
-
+	relayKey := batch.BlobCertificates[0].RelayKeys[0]
 	blobShard, rawBundle, err := c.node.DownloadChunks(ctx, batch, relayKey, nil)
 	require.Error(t, err)
 	require.Nil(t, blobShard)

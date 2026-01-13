@@ -285,62 +285,20 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
-	var downloadSizeInBytes uint64
 	var blobShards []*corev2.BlobShard
 	var rawBundles []*node.RawBundle
+	var release func()
 
-	//nolint:nestif // intentional branching for feature flag
 	if s.config.UseLegacyGetChunksRequest {
-		// Legacy path: uses GetChunksByRange with batched requests grouped by relay
-		var relayRequests map[corev2.RelayKey]*node.RelayRequest
-		downloadSizeInBytes, relayRequests, err = s.node.DetermineChunkLocations(batch, operatorState, probe)
-		if err != nil {
-			//nolint:wrapcheck
-			return nil, api.NewErrorInternal(fmt.Sprintf("failed to determine chunk locations: %v", err))
-		}
-
-		if s.node.StoreChunksSemaphore != nil {
-			probe.SetStage("acquire_buffer_capacity")
-			semaphoreCtx, cancel := context.WithTimeout(ctx, s.node.Config.StoreChunksBufferTimeout)
-			defer cancel()
-			err = s.node.StoreChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
-			if err != nil {
-				return nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
-			}
-			defer s.node.StoreChunksSemaphore.Release(int64(downloadSizeInBytes))
-		}
-
-		blobShards, rawBundles, err = s.node.DownloadChunksFromRelays(ctx, batch, relayRequests, probe)
+		blobShards, rawBundles, release, err = s.downloadChunksLegacy(ctx, batch, operatorState, probe)
 	} else {
-		// New path: uses GetValidatorChunks (single-blob batches only)
-		var relayKey corev2.RelayKey
-		downloadSizeInBytes, relayKey, err = s.node.PlanChunkRetrieval(batch, operatorState, probe)
-		if err != nil {
-			//nolint:wrapcheck
-			return nil, api.NewErrorInternal(fmt.Sprintf("failed to plan chunk retrieval: %v", err))
-		}
-
-		if s.node.StoreChunksSemaphore != nil {
-			probe.SetStage("acquire_buffer_capacity")
-			semaphoreCtx, cancel := context.WithTimeout(ctx, s.node.Config.StoreChunksBufferTimeout)
-			defer cancel()
-			err = s.node.StoreChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
-			if err != nil {
-				return nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
-			}
-			defer s.node.StoreChunksSemaphore.Release(int64(downloadSizeInBytes))
-		}
-
-		blobShard, rawBundle, err := s.node.DownloadChunks(ctx, batch, relayKey, probe)
-		if err == nil {
-			blobShards = []*corev2.BlobShard{blobShard}
-			rawBundles = []*node.RawBundle{rawBundle}
-		}
+		blobShards, rawBundles, release, err = s.downloadValidatorChunks(ctx, batch, operatorState, probe)
 	}
 	if err != nil {
-		//nolint:wrapcheck
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to download chunks: %v", err))
+		// utility methods have already wrapped errors as api errors
+		return nil, err
 	}
+	defer release()
 
 	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
 	if err != nil {
@@ -356,6 +314,128 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	return &pb.StoreChunksReply{
 		Signature: sig,
 	}, nil
+}
+
+// Acquires semaphore capacity for chunk downloads.
+// Returns a release function that must be deferred by the caller.
+func (s *ServerV2) acquireBufferCapacity(
+	ctx context.Context,
+	probe *common.SequenceProbe,
+	downloadSizeInBytes uint64,
+) (release func(), err error) {
+	if s.node.StoreChunksSemaphore == nil {
+		return func() {}, nil
+	}
+
+	probe.SetStage("acquire_buffer_capacity")
+	semaphoreCtx, cancel := context.WithTimeout(ctx, s.node.Config.StoreChunksBufferTimeout)
+	defer cancel()
+
+	err = s.node.StoreChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
+	if err != nil {
+		return nil, fmt.Errorf("acquire buffer capacity: %w", err)
+	}
+
+	return func() {
+		s.node.StoreChunksSemaphore.Release(int64(downloadSizeInBytes))
+	}, nil
+}
+
+// Legacy path using batched GetChunksByRange requests.
+func (s *ServerV2) downloadChunksLegacy(
+	ctx context.Context,
+	batch *corev2.Batch,
+	operatorState *core.OperatorState,
+	probe *common.SequenceProbe,
+) ([]*corev2.BlobShard, []*node.RawBundle, func(), error) {
+	downloadSizeInBytes, relayRequests, err := s.node.DetermineChunkLocations(batch, operatorState, probe)
+	if err != nil {
+		//nolint:wrapcheck
+		return nil, nil, nil, api.NewErrorInternal(fmt.Sprintf("determine chunk locations: %v", err))
+	}
+
+	release, err := s.acquireBufferCapacity(ctx, probe, downloadSizeInBytes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	blobShards, rawBundles, err := s.node.DownloadChunksFromRelays(ctx, batch, relayRequests, probe)
+	if err != nil {
+		release()
+		return nil, nil, nil, err
+	}
+	return blobShards, rawBundles, release, nil
+}
+
+// New path using GetValidatorChunks for single-blob batches.
+func (s *ServerV2) downloadValidatorChunks(
+	ctx context.Context,
+	batch *corev2.Batch,
+	operatorState *core.OperatorState,
+	probe *common.SequenceProbe,
+) ([]*corev2.BlobShard, []*node.RawBundle, func(), error) {
+	probe.SetStage("plan_chunk_retrieval")
+
+	// this pathway is only compatible with single blob batches
+	if len(batch.BlobCertificates) != 1 {
+		return nil, nil, nil, api.NewErrorInvalidArg(
+			fmt.Sprintf("expected single-blob batch, got %d blobs", len(batch.BlobCertificates)))
+	}
+	cert := batch.BlobCertificates[0]
+
+	// relay keys exist in an array for historical reasons, but practically there is only 1 relay key
+	if len(cert.RelayKeys) == 0 {
+		return nil, nil, nil, api.NewErrorInvalidArg("no relay keys in certificate")
+	}
+	relayKey := cert.RelayKeys[0]
+
+	downloadSizeInBytes, err := s.calculateChunkDownloadSize(operatorState, cert)
+	if err != nil {
+		//nolint:wrapcheck
+		return nil, nil, nil, api.NewErrorInternal(fmt.Sprintf("calculate download size: %v", err))
+	}
+
+	release, err := s.acquireBufferCapacity(ctx, probe, downloadSizeInBytes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	blobShard, rawBundle, err := s.node.DownloadChunks(ctx, batch, relayKey, probe)
+	if err != nil {
+		release()
+		//nolint:wrapcheck
+		return nil, nil, nil, api.NewErrorInternal(fmt.Sprintf("download chunks: %v", err))
+	}
+	return []*corev2.BlobShard{blobShard}, []*node.RawBundle{rawBundle}, release, nil
+}
+
+// Calculates the download size for a blob's chunks based on the operator's assignment.
+func (s *ServerV2) calculateChunkDownloadSize(
+	operatorState *core.OperatorState,
+	cert *corev2.BlobCertificate,
+) (uint64, error) {
+	blobVersionParams := s.node.BlobVersionParams.Load()
+	if blobVersionParams == nil {
+		return 0, fmt.Errorf("blob version params is nil")
+	}
+
+	blobParams, ok := blobVersionParams.Get(cert.BlobHeader.BlobVersion)
+	if !ok {
+		return 0, fmt.Errorf("blob version %d not found", cert.BlobHeader.BlobVersion)
+	}
+
+	assignment, err := corev2.GetAssignmentForBlob(
+		operatorState, blobParams, cert.BlobHeader.QuorumNumbers, s.node.Config.ID)
+	if err != nil {
+		return 0, fmt.Errorf("get assignment: %w", err)
+	}
+
+	chunkLength, err := blobParams.GetChunkLength(cert.BlobHeader.BlobCommitments.Length)
+	if err != nil {
+		return 0, fmt.Errorf("get chunk length: %w", err)
+	}
+
+	return uint64(assignment.NumChunks() * chunkLength), nil
 }
 
 func (s *ServerV2) validateAndStoreChunks(
@@ -408,7 +488,7 @@ func (s *ServerV2) validateAndStoreChunksLittDB(
 	batchHeaderHash [32]byte,
 	probe *common.SequenceProbe,
 ) error {
-	probe.SetStage("validate")
+	probe.SetStage("validate_batch")
 	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
 		return api.NewErrorInternal(

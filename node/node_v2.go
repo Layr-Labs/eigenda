@@ -263,63 +263,7 @@ func (n *Node) ValidateBatchV2(
 	return nil
 }
 
-// ----------------------------------------------------------------------------
-// New GetValidatorChunks path - completely separate from legacy GetChunksByRange
-// Assumes single-blob batches (enforced by EnforceSingleBlobBatches config).
-// ----------------------------------------------------------------------------
-
-// Plans chunk retrieval for the new GetValidatorChunks path.
-// Assumes batch contains exactly one blob.
-func (n *Node) PlanChunkRetrieval(
-	batch *corev2.Batch,
-	operatorState *core.OperatorState,
-	probe *common.SequenceProbe,
-) (
-	downloadSizeInBytes uint64,
-	relayKey corev2.RelayKey,
-	err error,
-) {
-	probe.SetStage("plan_chunk_retrieval")
-
-	if len(batch.BlobCertificates) != 1 {
-		return 0, 0, fmt.Errorf("expected single-blob batch, got %d blobs", len(batch.BlobCertificates))
-	}
-
-	blobVersionParams := n.BlobVersionParams.Load()
-	if blobVersionParams == nil {
-		return 0, 0, fmt.Errorf("blob version params is nil")
-	}
-
-	cert := batch.BlobCertificates[0]
-
-	if len(cert.RelayKeys) == 0 {
-		return 0, 0, fmt.Errorf("no relay keys in certificate")
-	}
-
-	// Use the first relay (in practice, there's only one)
-	relayKey = cert.RelayKeys[0]
-
-	blobParams, ok := blobVersionParams.Get(cert.BlobHeader.BlobVersion)
-	if !ok {
-		return 0, 0, fmt.Errorf("blob version %d not found", cert.BlobHeader.BlobVersion)
-	}
-
-	// Get assignment to calculate download size
-	assignment, err := corev2.GetAssignmentForBlob(operatorState, blobParams, cert.BlobHeader.QuorumNumbers, n.Config.ID)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get assignment: %w", err)
-	}
-
-	chunkLength, err := blobParams.GetChunkLength(cert.BlobHeader.BlobCommitments.Length)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get chunk length: %w", err)
-	}
-	downloadSizeInBytes = uint64(assignment.NumChunks() * chunkLength)
-
-	return downloadSizeInBytes, relayKey, nil
-}
-
-// Downloads chunks using the new GetValidatorChunks API.
+// Downloads chunks using the GetValidatorChunks API.
 // Assumes batch contains exactly one blob.
 func (n *Node) DownloadChunks(
 	ctx context.Context,
