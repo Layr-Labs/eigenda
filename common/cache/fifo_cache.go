@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/enforce"
 )
 
 var _ Cache[string, string] = &FIFOCache[string, string]{}
@@ -17,7 +16,7 @@ type FIFOCache[K comparable, V any] struct {
 	currentWeight uint64
 	maxWeight     uint64
 	data          map[K]V
-	evictionQueue *common.RandomAccessDeque[*insertionRecord]
+	evictionQueue *common.Queue[*insertionRecord]
 	metrics       *CacheMetrics
 }
 
@@ -44,7 +43,7 @@ func NewFIFOCache[K comparable, V any](
 		maxWeight:        maxWeight,
 		data:             make(map[K]V),
 		weightCalculator: calculator,
-		evictionQueue:    common.NewRandomAccessDeque[*insertionRecord](1024),
+		evictionQueue:    common.NewQueue[*insertionRecord](1024),
 		metrics:          metrics,
 	}
 }
@@ -86,8 +85,7 @@ func (f *FIFOCache[K, V]) evict() {
 	now := time.Now()
 
 	for f.currentWeight > f.maxWeight {
-		next, err := f.evictionQueue.Pop()
-		enforce.NilError(err, "failed to pop front of eviction queue")
+		next := f.evictionQueue.Pop()
 		keyToEvict := next.key.(K)
 		weightToEvict := f.weightCalculator(keyToEvict, f.data[keyToEvict])
 		delete(f.data, keyToEvict)

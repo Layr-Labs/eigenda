@@ -186,13 +186,13 @@ type retrievalWorker struct {
 	targetVerifiedCount uint32
 
 	// This queue is used to determine when the pessimistic timeout for a download has been reached.
-	downloadsInProgressQueue *common.RandomAccessDeque[*downloadStarted]
+	downloadsInProgressQueue *common.Queue[*downloadStarted]
 
 	// Contains chunks that have been downloaded but not yet scheduled for verification.
-	downloadedChunksQueue *common.RandomAccessDeque[*downloadCompleted]
+	downloadedChunksQueue *common.Queue[*downloadCompleted]
 
 	// Contains chunks that have been verified.
-	verifiedChunksQueue *common.RandomAccessDeque[*verificationCompleted]
+	verifiedChunksQueue *common.Queue[*verificationCompleted]
 
 	// The status of the chunks from each validator. The key is the validator ID, and the value is the
 	// status for all chunks assigned to that validator.
@@ -336,9 +336,9 @@ func newRetrievalWorker(
 		decodeResponseChan:        make(chan *decodeCompleted, 1),
 		probe:                     probe,
 		minimumChunkCount:         minimumChunkCount,
-		downloadsInProgressQueue:  common.NewRandomAccessDeque[*downloadStarted](1024),
-		downloadedChunksQueue:     common.NewRandomAccessDeque[*downloadCompleted](1024),
-		verifiedChunksQueue:       common.NewRandomAccessDeque[*verificationCompleted](1024),
+		downloadsInProgressQueue:  common.NewQueue[*downloadStarted](1024),
+		downloadedChunksQueue:     common.NewQueue[*downloadCompleted](1024),
+		verifiedChunksQueue:       common.NewQueue[*verificationCompleted](1024),
 		downloadOrder:             downloadOrder,
 		totalChunkCount:           totalChunkCount,
 		validatorStatusMap:        validatorStatusMap,
@@ -473,15 +473,13 @@ func (w *retrievalWorker) retrieveBlobFromValidators() ([]byte, error) {
 // These downloads are not cancelled, but this timeout may result in other chunks being downloaded.
 func (w *retrievalWorker) checkPessimisticTimeout() {
 	for !w.downloadsInProgressQueue.IsEmpty() {
-		next, err := w.downloadsInProgressQueue.Peek()
-		enforce.NilError(err, "failed to peek front of downloadsInProgressQueue")
+		next := w.downloadsInProgressQueue.Peek()
 		operatorID := next.operatorID
 		downloadStart := next.downloadStart
 
 		if w.validatorStatusMap[operatorID] != downloading {
 			// The operator has finished downloading, we can remove it from the queue.
-			_, err = w.downloadsInProgressQueue.Pop()
-			enforce.NilError(err, "failed to pop front of downloadsInProgressQueue")
+			w.downloadsInProgressQueue.Pop()
 			continue
 		}
 
@@ -494,8 +492,7 @@ func (w *retrievalWorker) checkPessimisticTimeout() {
 				w.logger.Debug("soft timeout exceeded for chunk download",
 					"operator", operatorID.Hex())
 			}
-			_, err := w.downloadsInProgressQueue.Pop()
-			enforce.NilError(err, "failed to pop front of downloadsInProgressQueue")
+			w.downloadsInProgressQueue.Pop()
 
 			w.updateValidatorStatus(operatorID, pessimisticTimeout)
 		} else {
@@ -571,8 +568,7 @@ func (w *retrievalWorker) scheduleVerifications() {
 			break
 		}
 
-		next, err := w.downloadedChunksQueue.Pop()
-		enforce.NilError(err, "failed to pop front of downloadedChunksQueue")
+		next := w.downloadedChunksQueue.Pop()
 		reply := next.reply
 		operatorID := next.operatorID
 
@@ -596,8 +592,7 @@ func (w *retrievalWorker) decodeChunks() ([]byte, error) {
 	indices := make([]encoding.ChunkNumber, 0)
 
 	for !w.verifiedChunksQueue.IsEmpty() {
-		next, err := w.verifiedChunksQueue.Pop()
-		enforce.NilError(err, "failed to pop front of verifiedChunksQueue")
+		next := w.verifiedChunksQueue.Pop()
 		operatorID := next.operatorID
 		operatorChunks := next.chunks
 

@@ -298,7 +298,7 @@ func TestRandomDequeOperations(t *testing.T) {
 
 				require.Equal(t, expectedData.Get(int(index)), value)
 			}
-			require.Equal(t, expectedData.Size(), expectedIndex, "forward iteration count mismatch")
+			require.Equal(t, expectedData.Size(), uint64(expectedIndex), "forward iteration count mismatch")
 
 			// Iterate backwards
 			expectedIndex = int(expectedData.Size()) - 1

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/types"
 )
@@ -37,7 +36,7 @@ type memTable struct {
 	data map[string][]byte
 
 	// Keeps track of when data should be deleted.
-	expirationQueue *common.RandomAccessDeque[*expirationRecord]
+	expirationQueue *common.Queue[*expirationRecord]
 
 	// Protects access to data and expirationQueue.
 	//
@@ -57,7 +56,7 @@ func NewMemTable(config *litt.Config, name string) litt.ManagedTable {
 		name:            name,
 		ttl:             config.TTL,
 		data:            make(map[string][]byte),
-		expirationQueue: common.NewRandomAccessDeque[*expirationRecord](1024),
+		expirationQueue: common.NewQueue[*expirationRecord](1024),
 	}
 
 	if config.GCPeriod > 0 {
@@ -206,8 +205,7 @@ func (m *memTable) RunGC() error {
 		if expiration.creationTime.After(earliestPermittedCreationTime) {
 			break
 		}
-		_, err := m.expirationQueue.Pop()
-		enforce.NilError(err, "failed to pop front of expirationQueue")
+		m.expirationQueue.Pop()
 		delete(m.data, expiration.key)
 	}
 

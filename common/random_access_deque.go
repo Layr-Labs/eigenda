@@ -165,13 +165,6 @@ func (s *RandomAccessDeque[T]) PushBack(value T) {
 	s.size++
 }
 
-// An alias for PushBack. Syntactic sugar for when using the deque as a queue.
-//
-// O(1) average, O(n) worst-case (when resizing is needed)
-func (s *RandomAccessDeque[T]) Push(value T) {
-	s.PushBack(value)
-}
-
 // Return the value at the back of the deque without removing it. If the deque is empty, returns an error.
 //
 // O(1)
@@ -200,13 +193,6 @@ func (s *RandomAccessDeque[T]) TryPeekBack() (value T, ok bool) {
 	enforce.NilError(err, "PeekBack failed, this should never happen after IsEmpty check")
 
 	return value, true
-}
-
-// An alias for PeekFront. Syntactic sugar for when using the deque as a queue.
-//
-// O(1)
-func (s *RandomAccessDeque[T]) Peek() (value T, err error) {
-	return s.PeekFront()
 }
 
 // An alias for TryPeekFront. Syntactic sugar for when using the deque as a queue.
@@ -257,13 +243,6 @@ func (s *RandomAccessDeque[T]) TryPopBack() (value T, ok bool) {
 	enforce.NilError(err, "PopBack failed, this should never happen after IsEmpty check")
 
 	return value, true
-}
-
-// An alias for PopFront. Syntactic sugar for when using the deque as a queue.
-//
-// O(1)
-func (s *RandomAccessDeque[T]) Pop() (value T, err error) {
-	return s.PopFront()
 }
 
 // An alias for TryPopFront. Syntactic sugar for when using the deque as a queue.

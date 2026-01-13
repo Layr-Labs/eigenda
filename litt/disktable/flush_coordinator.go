@@ -92,7 +92,7 @@ func (c *flushCoordinator) controlLoop() {
 	defer close(c.requestChan)
 
 	// requests that are waiting for a flush to be performed
-	waitingRequests := common.NewRandomAccessDeque[flushCoordinatorRequest](1024)
+	waitingRequests := common.NewQueue[flushCoordinatorRequest](1024)
 
 	// timer used to wait until the next flush can be performed
 	timer := time.NewTimer(0)
