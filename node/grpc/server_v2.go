@@ -177,95 +177,90 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	probe := s.metrics.GetStoreChunksProbe()
 	defer probe.End()
 
-	probe.SetStage("validate")
-
-	// Validate the request parameters (which is cheap) before starting any further
-	// processing of the request.
-	batch, err := s.validateStoreChunksRequest(in)
+	batch, batchHeaderHash, err := s.validateRequest(ctx, in, probe)
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate store chunk request: %v", err))
+		return nil, err
 	}
 
-	batchHeaderHash, err := batch.BatchHeader.Hash()
-	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
-	}
-
-	now := time.Now()
-	if authenticatedID, ok := middleware.AuthenticatedDisperserIDFromContext(ctx); ok {
-		// Defensive check: the interceptor should only set an ID that matches the request.
-		if authenticatedID != in.GetDisperserID() {
-			//nolint:wrapcheck
-			return nil, api.NewErrorInvalidArg("authenticated disperser ID does not match request disperser ID")
-		}
-	} else {
-		// Defense-in-depth: normally the gRPC interceptor authenticates StoreChunks and rate limits dispersers.
-		// This fallback exists for direct calls (e.g. tests) or alternate wiring where the interceptor isn't installed.
-		_, err = s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, now)
-		if err != nil {
-			//nolint:wrapcheck
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
-		}
-
-		if s.rateLimiter != nil && !s.rateLimiter.Allow(in.GetDisperserID(), now) {
-			//nolint:wrapcheck
-			return nil, api.NewErrorResourceExhausted(
-				fmt.Sprintf("disperser %d is rate limited", in.GetDisperserID()))
-		}
-	}
-
-	if !s.chunkAuthenticator.IsDisperserAuthorized(in.GetDisperserID(), batch) {
-		//nolint:wrapcheck
-		return nil, api.NewErrorPermissionDenied(
-			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
-	}
-
-	for _, blobCert := range batch.BlobCertificates {
-		_, err = s.validateDispersalRequest(blobCert)
-		if err != nil {
-			//nolint:wrapcheck
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
-		}
-	}
-
-	blobHeadersAndTimestamps, err := hashing.HashBlobHeadersAndTimestamps(in)
-	if err != nil {
-		//nolint:wrapcheck
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to hash blob headers and timestamps: %v", err))
-	}
-
-	for i, blobHeader := range blobHeadersAndTimestamps {
-		err = s.replayGuardian.VerifyRequest(blobHeader.Hash, blobHeader.Timestamp)
-		if err != nil {
-			//nolint:wrapcheck
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify blob header hash at index %d: %v", i, err))
-		}
-	}
-
-	// Validate reservation payments (on-demand payments are validated on the the disperser's controller service)
-	//
-	// Note: the payment processing that occurs within this method is NOT reverted, even if something fails further
-	// along. There are a couple reasons for this:
-	// 1. At this stage, the dispersal request has already been sent to other validators. Even if this individual
-	// validator were to revert the payment after some type of failure, there's no way to make sure that all other
-	// validators would experience the same failure and revert. It is important to keep validator payment state in
-	// sync, so the safest behavior is to just treat this as the point-of-no-return, from a payments perspective.
-	// 2. Even if there were a way for all validators to agree on what payments to revert, non-trivial amounts of work
-	// are being done shortly after this payment validation completes, for which the validators should be compensated.
-	//
-	// This accounting logic relies on each dispersal only arriving at this stage *once*. That is currently guaranteed
-	// based on the replay guardian above. If the replay guardian were ever to be removed (for example, to enable
-	// retried dispersals) then the accounting logic here would need to be revisited, and made retry tolerant.
-	err = s.node.ValidateReservationPayment(ctx, batch, probe)
-	if err != nil {
-		return nil, fmt.Errorf("validate reservation payment: %w", err)
-	}
-
-	probe.SetStage("get_operator_state")
 	s.logger.Info("new StoreChunks request",
 		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
 		"numBlobs", len(batch.BlobCertificates),
 		"referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
+
+	operatorState, err := s.getOperatorState(ctx, batch, probe)
+	if err != nil {
+		return nil, err
+	}
+
+	var blobShards []*corev2.BlobShard
+	var rawBundles []*node.RawBundle
+	if s.config.UseLegacyGetChunksRequest {
+		// legacy path using batched GetChunksByRange requests
+		downloadSizeInBytes, relayRequests, err := s.node.DetermineChunkLocations(batch, operatorState, probe)
+		if err != nil {
+			return nil, api.NewErrorInternal(fmt.Sprintf("determine chunk locations: %v", err))
+		}
+
+		release, err := s.acquireBufferCapacity(ctx, probe, downloadSizeInBytes)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
+
+		blobShards, rawBundles, err = s.node.DownloadChunksFromRelays(ctx, batch, relayRequests, probe)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// new path is only compatible with single-blob batches
+		if len(batch.BlobCertificates) != 1 {
+			return nil, api.NewErrorInvalidArg(
+				fmt.Sprintf("expected single-blob batch, got %d blobs", len(batch.BlobCertificates)))
+		}
+		cert := batch.BlobCertificates[0]
+
+		downloadSizeInBytes, err := s.calculateChunkDownloadSize(operatorState, cert)
+		if err != nil {
+			return nil, api.NewErrorInternal(fmt.Sprintf("calculate download size: %v", err))
+		}
+
+		release, err := s.acquireBufferCapacity(ctx, probe, downloadSizeInBytes)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
+
+		blobShard, rawBundle, err := s.node.DownloadChunks(ctx, cert, probe)
+		if err != nil {
+			return nil, api.NewErrorInternal(fmt.Sprintf("download chunks: %v", err))
+		}
+		blobShards = []*corev2.BlobShard{blobShard}
+		rawBundles = []*node.RawBundle{rawBundle}
+	}
+
+	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
+	if err != nil {
+		return nil, err
+	}
+
+	probe.SetStage("sign")
+	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
+	}
+
+	return &pb.StoreChunksReply{
+		Signature: sig,
+	}, nil
+}
+
+// Retrieves the operator state for the quorums referenced by the batch.
+func (s *ServerV2) getOperatorState(
+	ctx context.Context,
+	batch *corev2.Batch,
+	probe *common.SequenceProbe,
+) (*core.OperatorState, error) {
+	probe.SetStage("get_operator_state")
 
 	quorums := make(map[core.QuorumID]struct{}, len(batch.BlobCertificates))
 	for _, blobCert := range batch.BlobCertificates {
@@ -282,38 +277,10 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	operatorState, err := s.node.OperatorStateCache.GetOperatorState(
 		ctx, batch.BatchHeader.ReferenceBlockNumber, quorumList)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
+		return nil, api.NewErrorInternal(fmt.Sprintf("get operator state: %v", err))
 	}
 
-	var blobShards []*corev2.BlobShard
-	var rawBundles []*node.RawBundle
-	var release func()
-
-	if s.config.UseLegacyGetChunksRequest {
-		blobShards, rawBundles, release, err = s.downloadChunksLegacy(ctx, batch, operatorState, probe)
-	} else {
-		blobShards, rawBundles, release, err = s.downloadValidatorChunks(ctx, batch, operatorState, probe)
-	}
-	if err != nil {
-		// utility methods have already wrapped errors as api errors
-		return nil, err
-	}
-	defer release()
-
-	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
-	if err != nil {
-		return nil, err
-	}
-
-	probe.SetStage("sign")
-	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
-	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
-	}
-
-	return &pb.StoreChunksReply{
-		Signature: sig,
-	}, nil
+	return operatorState, nil
 }
 
 // Acquires semaphore capacity for chunk downloads.
@@ -339,74 +306,6 @@ func (s *ServerV2) acquireBufferCapacity(
 	return func() {
 		s.node.StoreChunksSemaphore.Release(int64(downloadSizeInBytes))
 	}, nil
-}
-
-// Legacy path using batched GetChunksByRange requests.
-func (s *ServerV2) downloadChunksLegacy(
-	ctx context.Context,
-	batch *corev2.Batch,
-	operatorState *core.OperatorState,
-	probe *common.SequenceProbe,
-) ([]*corev2.BlobShard, []*node.RawBundle, func(), error) {
-	downloadSizeInBytes, relayRequests, err := s.node.DetermineChunkLocations(batch, operatorState, probe)
-	if err != nil {
-		//nolint:wrapcheck
-		return nil, nil, nil, api.NewErrorInternal(fmt.Sprintf("determine chunk locations: %v", err))
-	}
-
-	release, err := s.acquireBufferCapacity(ctx, probe, downloadSizeInBytes)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	blobShards, rawBundles, err := s.node.DownloadChunksFromRelays(ctx, batch, relayRequests, probe)
-	if err != nil {
-		release()
-		return nil, nil, nil, err
-	}
-	return blobShards, rawBundles, release, nil
-}
-
-// New path using GetValidatorChunks for single-blob batches.
-func (s *ServerV2) downloadValidatorChunks(
-	ctx context.Context,
-	batch *corev2.Batch,
-	operatorState *core.OperatorState,
-	probe *common.SequenceProbe,
-) ([]*corev2.BlobShard, []*node.RawBundle, func(), error) {
-	probe.SetStage("plan_chunk_retrieval")
-
-	// this pathway is only compatible with single blob batches
-	if len(batch.BlobCertificates) != 1 {
-		return nil, nil, nil, api.NewErrorInvalidArg(
-			fmt.Sprintf("expected single-blob batch, got %d blobs", len(batch.BlobCertificates)))
-	}
-	cert := batch.BlobCertificates[0]
-
-	// relay keys exist in an array for historical reasons, but practically there is only 1 relay key
-	if len(cert.RelayKeys) == 0 {
-		return nil, nil, nil, api.NewErrorInvalidArg("no relay keys in certificate")
-	}
-	relayKey := cert.RelayKeys[0]
-
-	downloadSizeInBytes, err := s.calculateChunkDownloadSize(operatorState, cert)
-	if err != nil {
-		//nolint:wrapcheck
-		return nil, nil, nil, api.NewErrorInternal(fmt.Sprintf("calculate download size: %v", err))
-	}
-
-	release, err := s.acquireBufferCapacity(ctx, probe, downloadSizeInBytes)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	blobShard, rawBundle, err := s.node.DownloadChunks(ctx, batch, relayKey, probe)
-	if err != nil {
-		release()
-		//nolint:wrapcheck
-		return nil, nil, nil, api.NewErrorInternal(fmt.Sprintf("download chunks: %v", err))
-	}
-	return []*corev2.BlobShard{blobShard}, []*node.RawBundle{rawBundle}, release, nil
 }
 
 // Calculates the download size for a blob's chunks based on the operator's assignment.
@@ -507,25 +406,99 @@ func (s *ServerV2) validateAndStoreChunksLittDB(
 	return nil
 }
 
-// validateStoreChunksRequest validates the StoreChunksRequest and returns deserialized batch in the request
-func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*corev2.Batch, error) {
-	// The signature is created by go-ethereum library, which contains 1 additional byte (for
-	// recovering the public key from signature), so it's 65 bytes.
-	if len(req.GetSignature()) != 65 {
-		return nil, fmt.Errorf("signature must be 65 bytes, found %d bytes", len(req.GetSignature()))
+// Validates the StoreChunks request: parses the batch, authenticates the disperser,
+// validates blob certificates, verifies replay protection, and processes payments.
+func (s *ServerV2) validateRequest(
+	ctx context.Context,
+	in *pb.StoreChunksRequest,
+	probe *common.SequenceProbe,
+) (*corev2.Batch, [32]byte, error) {
+	probe.SetStage("validate")
+
+	if len(in.GetSignature()) != 65 {
+		return nil, [32]byte{}, api.NewErrorInvalidArg(
+			fmt.Sprintf("signature must be 65 bytes, found %d bytes", len(in.GetSignature())))
+	}
+	if in.GetBatch() == nil {
+		return nil, [32]byte{}, api.NewErrorInvalidArg("missing batch in request")
 	}
 
-	if req.GetBatch() == nil {
-		return nil, errors.New("missing batch in request")
-	}
-
-	// BatchFromProtobuf internally validates the Batch while deserializing
-	batch, err := corev2.BatchFromProtobuf(req.GetBatch(), s.config.EnforceSingleBlobBatches)
+	batch, err := corev2.BatchFromProtobuf(in.GetBatch(), s.config.EnforceSingleBlobBatches)
 	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize batch: %v", err)
+		return nil, [32]byte{}, api.NewErrorInvalidArg(fmt.Sprintf("deserialize batch: %v", err))
 	}
 
-	return batch, nil
+	batchHeaderHash, err := batch.BatchHeader.Hash()
+	if err != nil {
+		return nil, [32]byte{}, api.NewErrorInvalidArg(fmt.Sprintf("hash batch header: %v", err))
+	}
+
+	now := time.Now()
+	if authenticatedID, ok := middleware.AuthenticatedDisperserIDFromContext(ctx); ok {
+		// Defensive check: the interceptor should only set an ID that matches the request.
+		if authenticatedID != in.GetDisperserID() {
+			return nil, [32]byte{}, api.NewErrorInvalidArg(
+				"authenticated disperser ID does not match request disperser ID")
+		}
+	} else {
+		// Defense-in-depth: normally the gRPC interceptor authenticates StoreChunks and rate limits dispersers.
+		// This fallback exists for direct calls (e.g. tests) or alternate wiring where the interceptor isn't installed.
+		_, err = s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, now)
+		if err != nil {
+			return nil, [32]byte{}, api.NewErrorInvalidArg(fmt.Sprintf("authenticate request: %v", err))
+		}
+
+		if s.rateLimiter != nil && !s.rateLimiter.Allow(in.GetDisperserID(), now) {
+			return nil, [32]byte{}, api.NewErrorResourceExhausted(
+				fmt.Sprintf("disperser %d is rate limited", in.GetDisperserID()))
+		}
+	}
+
+	if !s.chunkAuthenticator.IsDisperserAuthorized(in.GetDisperserID(), batch) {
+		return nil, [32]byte{}, api.NewErrorPermissionDenied(
+			fmt.Sprintf("disperser %d not authorized for on-demand payments", in.GetDisperserID()))
+	}
+
+	for _, blobCert := range batch.BlobCertificates {
+		_, err = s.validateDispersalRequest(blobCert)
+		if err != nil {
+			return nil, [32]byte{}, api.NewErrorInvalidArg(fmt.Sprintf("validate blob request: %v", err))
+		}
+	}
+
+	blobHeadersAndTimestamps, err := hashing.HashBlobHeadersAndTimestamps(in)
+	if err != nil {
+		return nil, [32]byte{}, api.NewErrorInvalidArg(
+			fmt.Sprintf("hash blob headers and timestamps: %v", err))
+	}
+	for i, blobHeader := range blobHeadersAndTimestamps {
+		err = s.replayGuardian.VerifyRequest(blobHeader.Hash, blobHeader.Timestamp)
+		if err != nil {
+			return nil, [32]byte{}, api.NewErrorInvalidArg(
+				fmt.Sprintf("verify blob header hash at index %d: %v", i, err))
+		}
+	}
+
+	// Validate reservation payments (on-demand payments are validated on the disperser's controller service)
+	//
+	// Note: the payment processing that occurs within this method is NOT reverted, even if something fails further
+	// along. There are a couple reasons for this:
+	// 1. At this stage, the dispersal request has already been sent to other validators. Even if this individual
+	// validator were to revert the payment after some type of failure, there's no way to make sure that all other
+	// validators would experience the same failure and revert. It is important to keep validator payment state in
+	// sync, so the safest behavior is to just treat this as the point-of-no-return, from a payments perspective.
+	// 2. Even if there were a way for all validators to agree on what payments to revert, non-trivial amounts of work
+	// are being done shortly after this payment validation completes, for which the validators should be compensated.
+	//
+	// This accounting logic relies on each dispersal only arriving at this stage *once*. That is currently guaranteed
+	// based on the replay guardian above. If the replay guardian were ever to be removed (for example, to enable
+	// retried dispersals) then the accounting logic here would need to be revisited, and made retry tolerant.
+	err = s.node.ValidateReservationPayment(ctx, batch, probe)
+	if err != nil {
+		return nil, [32]byte{}, fmt.Errorf("validate reservation payment: %w", err)
+	}
+
+	return batch, batchHeaderHash, nil
 }
 
 func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.GetChunksReply, error) {

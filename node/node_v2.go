@@ -263,23 +263,21 @@ func (n *Node) ValidateBatchV2(
 	return nil
 }
 
-// Downloads chunks using the GetValidatorChunks API.
-// Assumes batch contains exactly one blob.
+// Downloads chunks for a single blob using the GetValidatorChunks API.
 func (n *Node) DownloadChunks(
 	ctx context.Context,
-	batch *corev2.Batch,
-	relayKey corev2.RelayKey,
+	cert *corev2.BlobCertificate,
 	probe *common.SequenceProbe,
 ) (
 	blobShard *corev2.BlobShard,
 	rawBundle *RawBundle,
 	err error,
 ) {
-	if len(batch.BlobCertificates) != 1 {
-		return nil, nil, fmt.Errorf("expected single-blob batch, got %d blobs", len(batch.BlobCertificates))
+	// relay keys exist in an array for historical reasons, but practically there is only 1 relay key
+	if len(cert.RelayKeys) == 0 {
+		return nil, nil, fmt.Errorf("no relay keys in certificate")
 	}
-
-	cert := batch.BlobCertificates[0]
+	relayKey := cert.RelayKeys[0]
 
 	relayClient, ok := n.RelayClient.Load().(relay.RelayClient)
 	if !ok || relayClient == nil {
@@ -298,8 +296,8 @@ func (n *Node) DownloadChunks(
 
 	chunks, err := relayClient.GetValidatorChunks(ctxTimeout, relayKey, blobKey)
 	if err != nil {
-		n.Logger.Errorf("failed to get validator chunks from relay %d: %v", relayKey, err)
-		return nil, nil, fmt.Errorf("failed to get validator chunks: %w", err)
+		n.Logger.Errorf("get validator chunks from relay %d: %v", relayKey, err)
+		return nil, nil, fmt.Errorf("get validator chunks: %w", err)
 	}
 
 	rawBundle = &RawBundle{
@@ -311,7 +309,7 @@ func (n *Node) DownloadChunks(
 
 	bundle, err := new(core.Bundle).Deserialize(chunks)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to deserialize chunks: %w", err)
+		return nil, nil, fmt.Errorf("deserialize chunks: %w", err)
 	}
 
 	blobShard = &corev2.BlobShard{

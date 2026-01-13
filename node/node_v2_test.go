@@ -270,8 +270,7 @@ func TestDownloadChunksSuccess(t *testing.T) {
 		blobKey,
 	).Return(bundleBytes, nil)
 
-	relayKey := blobCert.RelayKeys[0]
-	blobShard, rawBundle, err := c.node.DownloadChunks(ctx, batch, relayKey, nil)
+	blobShard, rawBundle, err := c.node.DownloadChunks(ctx, blobCert, nil)
 	require.NoError(t, err)
 	require.NotNil(t, blobShard)
 	require.NotNil(t, rawBundle)
@@ -296,8 +295,8 @@ func TestDownloadChunksFail(t *testing.T) {
 		blobKey,
 	).Return(nil, relayServerError)
 
-	relayKey := batch.BlobCertificates[0].RelayKeys[0]
-	blobShard, rawBundle, err := c.node.DownloadChunks(ctx, batch, relayKey, nil)
+	blobCert := batch.BlobCertificates[0]
+	blobShard, rawBundle, err := c.node.DownloadChunks(ctx, blobCert, nil)
 	require.Error(t, err)
 	require.Nil(t, blobShard)
 	require.Nil(t, rawBundle)
