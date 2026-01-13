@@ -11,9 +11,9 @@ service Relay {
   // GetChunks retrieves chunks from blobs stored by the relay.
   rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
 
-  // GetValidatorChunks retrieves all chunks allocated to a validator.
+  // GetValidatorChunks retrieves all chunks allocated to a validator for a blob.
   // The relay computes which chunks to return based on the deterministic chunk allocation algorithm.
-  rpc GetValidatorChunks(GetValidatorChunksRequest) returns (GetChunksReply) {}
+  rpc GetValidatorChunks(GetValidatorChunksRequest) returns (GetValidatorChunksReply) {}
 }
 
 // A request to fetch one or more blobs.
@@ -129,4 +129,11 @@ message GetValidatorChunksRequest {
   // 5. the blob key bytes
   // 6. the timestamp (4 byte big endian)
   bytes validator_signature = 4;
+}
+
+// The reply to a GetValidatorChunks request.
+message GetValidatorChunksReply {
+  // The chunks allocated to this validator for the requested blob.
+  // This is the serialized byte array of the frames (core.Bundle).
+  bytes chunks = 1;
 }

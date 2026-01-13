@@ -56,7 +56,8 @@ type RelayClient interface {
 	GetChunksByIndex(ctx context.Context, relayKey corev2.RelayKey, requests []*ChunkRequestByIndex) ([][]byte, error)
 	// Retrieves all chunks allocated to this validator for a given blob.
 	// The relay computes which chunks to return based on the deterministic chunk allocation algorithm.
-	GetValidatorChunks(ctx context.Context, relayKey corev2.RelayKey, blobKey corev2.BlobKey) ([][]byte, error)
+	// Returns serialized chunk data (core.Bundle bytearray).
+	GetValidatorChunks(ctx context.Context, relayKey corev2.RelayKey, blobKey corev2.BlobKey) ([]byte, error)
 	Close() error
 }
 
@@ -187,7 +188,7 @@ func (c *relayClient) signGetValidatorChunksRequest(
 func (c *relayClient) GetValidatorChunks(
 	ctx context.Context,
 	relayKey corev2.RelayKey,
-	blobKey corev2.BlobKey) ([][]byte, error) {
+	blobKey corev2.BlobKey) ([]byte, error) {
 
 	if c.config.OperatorID == nil {
 		return nil, errors.New("no operator ID provided in config, cannot use GetValidatorChunks")
@@ -213,7 +214,7 @@ func (c *relayClient) GetValidatorChunks(
 		return nil, fmt.Errorf("get validator chunks RPC: %w", err)
 	}
 
-	return res.GetData(), nil
+	return res.GetChunks(), nil
 }
 
 func (c *relayClient) GetChunksByRange(

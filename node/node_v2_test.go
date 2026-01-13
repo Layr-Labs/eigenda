@@ -235,3 +235,116 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	quorumCount := c.node.QuorumCount.Load()
 	require.Equal(t, quorumCount, uint32(2))
 }
+
+// ----------------------------------------------------------------------------
+// Tests for new GetValidatorChunks path (single-blob batches only)
+// ----------------------------------------------------------------------------
+
+// Creates a single-blob batch from the first blob in MockBatch
+func makeSingleBlobBatch(t *testing.T) (v2.BlobKey, *v2.Batch, []byte) {
+	blobKeys, batch, bundles := nodemock.MockBatch(t)
+
+	singleBlobBatch := &v2.Batch{
+		BatchHeader:      batch.BatchHeader,
+		BlobCertificates: []*v2.BlobCertificate{batch.BlobCertificates[0]},
+	}
+
+	bundleBytes, err := bundles[0][0].Serialize()
+	require.NoError(t, err)
+
+	return blobKeys[0], singleBlobBatch, bundleBytes
+}
+
+func TestPlanChunkRetrieval(t *testing.T) {
+	c := newComponents(t, op0)
+	ctx := context.Background()
+	_, batch, _ := makeSingleBlobBatch(t)
+
+	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
+	require.NoError(t, err)
+
+	downloadSize, relayKey, err := c.node.PlanChunkRetrieval(batch, state, nil)
+	require.NoError(t, err)
+	require.Greater(t, downloadSize, uint64(0))
+
+	// RelayKey should be one of the valid relay keys for the blob
+	validRelayKey := false
+	for _, rk := range batch.BlobCertificates[0].RelayKeys {
+		if rk == relayKey {
+			validRelayKey = true
+			break
+		}
+	}
+	require.True(t, validRelayKey, "invalid relay key %d", relayKey)
+}
+
+func TestPlanChunkRetrievalRejectsMultiBlobBatch(t *testing.T) {
+	c := newComponents(t, op0)
+	ctx := context.Background()
+	_, batch, _ := nodemock.MockBatch(t) // 3-blob batch
+
+	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
+	require.NoError(t, err)
+
+	_, _, err = c.node.PlanChunkRetrieval(batch, state, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "expected single-blob batch")
+}
+
+func TestDownloadChunksSuccess(t *testing.T) {
+	c := newComponents(t, op0)
+	c.node.RelayClient.Store(c.relayClient)
+	ctx := context.Background()
+	blobKey, batch, bundleBytes := makeSingleBlobBatch(t)
+	blobCert := batch.BlobCertificates[0]
+
+	// Mock GetValidatorChunks
+	c.relayClient.On(
+		"GetValidatorChunks",
+		mock.Anything,
+		mock.Anything,
+		blobKey,
+	).Return(bundleBytes, nil)
+
+	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
+	require.NoError(t, err)
+
+	_, relayKey, err := c.node.PlanChunkRetrieval(batch, state, nil)
+	require.NoError(t, err)
+
+	blobShard, rawBundle, err := c.node.DownloadChunks(ctx, batch, relayKey, nil)
+	require.NoError(t, err)
+	require.NotNil(t, blobShard)
+	require.NotNil(t, rawBundle)
+
+	// Verify blob certificate is correctly associated
+	require.Equal(t, blobCert, blobShard.BlobCertificate)
+	require.Equal(t, blobCert, rawBundle.BlobCertificate)
+}
+
+func TestDownloadChunksFail(t *testing.T) {
+	c := newComponents(t, op0)
+	c.node.RelayClient.Store(c.relayClient)
+	ctx := context.Background()
+	blobKey, batch, _ := makeSingleBlobBatch(t)
+
+	// Mock GetValidatorChunks to fail
+	relayServerError := fmt.Errorf("relay server error")
+	c.relayClient.On(
+		"GetValidatorChunks",
+		mock.Anything,
+		mock.Anything,
+		blobKey,
+	).Return(nil, relayServerError)
+
+	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
+	require.NoError(t, err)
+
+	_, relayKey, err := c.node.PlanChunkRetrieval(batch, state, nil)
+	require.NoError(t, err)
+
+	blobShard, rawBundle, err := c.node.DownloadChunks(ctx, batch, relayKey, nil)
+	require.Error(t, err)
+	require.Nil(t, blobShard)
+	require.Nil(t, rawBundle)
+}

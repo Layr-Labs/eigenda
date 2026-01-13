@@ -285,30 +285,58 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
-	downloadSizeInBytes, relayRequests, err :=
-		s.node.DetermineChunkLocations(batch, operatorState, probe)
-	if err != nil {
-		//nolint:wrapcheck
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to determine chunk locations: %v", err))
-	}
+	var downloadSizeInBytes uint64
+	var blobShards []*corev2.BlobShard
+	var rawBundles []*node.RawBundle
 
-	// storeChunksSemaphore can be nil during unit tests, since there are a bunch of places where the Node struct
-	// is instantiated directly without using the constructor.
-	if s.node.StoreChunksSemaphore != nil {
-		// So far, we've only downloaded metadata for the blob. Before downloading the actual chunks, make sure there
-		// is capacity in the store chunks buffer. This is an OOM safety measure.
-
-		probe.SetStage("acquire_buffer_capacity")
-		semaphoreCtx, cancel := context.WithTimeout(ctx, s.node.Config.StoreChunksBufferTimeout)
-		defer cancel()
-		err = s.node.StoreChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
+	//nolint:nestif // intentional branching for feature flag
+	if s.config.UseLegacyGetChunksRequest {
+		// Legacy path: uses GetChunksByRange with batched requests grouped by relay
+		var relayRequests map[corev2.RelayKey]*node.RelayRequest
+		downloadSizeInBytes, relayRequests, err = s.node.DetermineChunkLocations(batch, operatorState, probe)
 		if err != nil {
-			return nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
+			//nolint:wrapcheck
+			return nil, api.NewErrorInternal(fmt.Sprintf("failed to determine chunk locations: %v", err))
 		}
-		defer s.node.StoreChunksSemaphore.Release(int64(downloadSizeInBytes))
-	}
 
-	blobShards, rawBundles, err := s.node.DownloadChunksFromRelays(ctx, batch, relayRequests, probe)
+		if s.node.StoreChunksSemaphore != nil {
+			probe.SetStage("acquire_buffer_capacity")
+			semaphoreCtx, cancel := context.WithTimeout(ctx, s.node.Config.StoreChunksBufferTimeout)
+			defer cancel()
+			err = s.node.StoreChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
+			if err != nil {
+				return nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
+			}
+			defer s.node.StoreChunksSemaphore.Release(int64(downloadSizeInBytes))
+		}
+
+		blobShards, rawBundles, err = s.node.DownloadChunksFromRelays(ctx, batch, relayRequests, probe)
+	} else {
+		// New path: uses GetValidatorChunks (single-blob batches only)
+		var relayKey corev2.RelayKey
+		downloadSizeInBytes, relayKey, err = s.node.PlanChunkRetrieval(batch, operatorState, probe)
+		if err != nil {
+			//nolint:wrapcheck
+			return nil, api.NewErrorInternal(fmt.Sprintf("failed to plan chunk retrieval: %v", err))
+		}
+
+		if s.node.StoreChunksSemaphore != nil {
+			probe.SetStage("acquire_buffer_capacity")
+			semaphoreCtx, cancel := context.WithTimeout(ctx, s.node.Config.StoreChunksBufferTimeout)
+			defer cancel()
+			err = s.node.StoreChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
+			if err != nil {
+				return nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
+			}
+			defer s.node.StoreChunksSemaphore.Release(int64(downloadSizeInBytes))
+		}
+
+		blobShard, rawBundle, err := s.node.DownloadChunks(ctx, batch, relayKey, probe)
+		if err == nil {
+			blobShards = []*corev2.BlobShard{blobShard}
+			rawBundles = []*node.RawBundle{rawBundle}
+		}
+	}
 	if err != nil {
 		//nolint:wrapcheck
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to download chunks: %v", err))

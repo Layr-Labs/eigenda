@@ -310,33 +310,15 @@ func (s *Server) validateGetValidatorChunksRequest(request *pb.GetValidatorChunk
 
 // Converts chunk indices into contiguous range requests. Consecutive indices are collapsed into single ranges.
 func convertIndicesToRangeRequests(blobKey v2.BlobKey, indices []uint32) []*pb.ChunkRequestByRange {
-	requests := make([]*pb.ChunkRequestByRange, 0)
-	if len(indices) == 0 {
-		return requests
-	}
-
-	startIndex := indices[0]
-	for i := 1; i < len(indices); i++ {
-		if indices[i] != indices[i-1]+1 {
-			// Break in continuity, create a request for the previous range
-			request := &pb.ChunkRequestByRange{
-				BlobKey:    blobKey[:],
-				StartIndex: startIndex,
-				EndIndex:   indices[i-1] + 1, // exclusive
-			}
-			requests = append(requests, request)
-			startIndex = indices[i]
+	ranges := v2.IndicesToRanges(indices)
+	requests := make([]*pb.ChunkRequestByRange, len(ranges))
+	for i, r := range ranges {
+		requests[i] = &pb.ChunkRequestByRange{
+			BlobKey:    blobKey[:],
+			StartIndex: r.Start,
+			EndIndex:   r.End,
 		}
 	}
-
-	// Add the last range
-	request := &pb.ChunkRequestByRange{
-		BlobKey:    blobKey[:],
-		StartIndex: startIndex,
-		EndIndex:   indices[len(indices)-1] + 1, // exclusive
-	}
-	requests = append(requests, request)
-
 	return requests
 }
 
@@ -896,7 +878,7 @@ func buildInsufficientGetChunksBandwidthError(
 func (s *Server) GetValidatorChunks(
 	ctx context.Context,
 	request *pb.GetValidatorChunksRequest,
-) (*pb.GetChunksReply, error) {
+) (*pb.GetValidatorChunksReply, error) {
 	start := time.Now()
 
 	if s.config.Timeouts.GetChunksTimeout > 0 {
@@ -998,7 +980,7 @@ func (s *Server) GetValidatorChunks(
 	}
 
 	if len(assignment.Indices) == 0 {
-		return &pb.GetChunksReply{Data: [][]byte{}}, nil
+		return &pb.GetValidatorChunksReply{Chunks: []byte{}}, nil
 	}
 
 	// Convert indices to range requests
@@ -1054,11 +1036,18 @@ func (s *Server) GetValidatorChunks(
 		return nil, api.NewErrorNotFound("requested chunks not found") //nolint:wrapcheck
 	}
 
+	// bytesToSend contains one entry per unique blob key. Since all our requests are for the same blob,
+	// there should be exactly one entry.
+	if len(bytesToSend) != 1 {
+		return nil, api.NewErrorInternal( //nolint:wrapcheck
+			fmt.Sprintf("expected 1 chunk set for single blob, got %d", len(bytesToSend)))
+	}
+
 	s.metrics.ReportChunkDataLatency(time.Since(finishedFetchingMetadata))
 	s.metrics.ReportChunkLatency(time.Since(start))
 
-	return &pb.GetChunksReply{
-		Data: bytesToSend,
+	return &pb.GetValidatorChunksReply{
+		Chunks: bytesToSend[0],
 	}, nil
 }
 
