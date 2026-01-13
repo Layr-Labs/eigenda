@@ -69,13 +69,14 @@ func NewReplayGuardian(
 		maxTimeInFuture: maxTimeInFuture,
 		maxTimeInPast:   maxTimeInPast,
 		observedHashes:  make(map[string]struct{}),
-		expirationQueue: common.NewPriorityQueue(compareHashWithTimestamp),
+		expirationQueue: common.NewPriorityQueue(isHashWithTimestampLessThan),
 	}, nil
 }
 
-// compareKeyWithExpiration compares two hashWithTimestamp objects by their expiration time. Used to create
-// a priority queue that orders the requests in chronological order (i.e. the order in which they will expire).
-func compareHashWithTimestamp(a *hashWithTimestamp, b *hashWithTimestamp) bool {
+// isHashWithTimestampLessThan compares two hashWithTimestamp objects by their expiration time, returning true if 
+// a is less than b. Used to create a priority queue that orders the requests in chronological order 
+// (i.e. the order in which they will expire).
+func isHashWithTimestampLessThan(a *hashWithTimestamp, b *hashWithTimestamp) bool {
 	if a.timestamp.Before(b.timestamp) {
 		return true
 	}
