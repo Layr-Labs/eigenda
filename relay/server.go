@@ -308,37 +308,21 @@ func (s *Server) validateGetValidatorChunksRequest(request *pb.GetValidatorChunk
 	return nil
 }
 
-// Converts chunk indices into contiguous range requests. Consecutive indices are collapsed into single ranges.
-//
-// Important: the provided indices MUST be in (mostly) sorted order for optimal range collapsing.
-// Unsorted indices may lead to a very large number of ranges being generated.
+// Converts chunk indices into contiguous range requests using the shared range collapsing utility.
 func convertIndicesToRangeRequests(blobKey v2.BlobKey, indices []uint32) []*pb.ChunkRequestByRange {
-	if len(indices) == 0 {
+	ranges := v2.CollapseIndicesToRanges(indices)
+	if ranges == nil {
 		return nil
 	}
 
-	requests := make([]*pb.ChunkRequestByRange, 0)
-	startIndex := indices[0]
-
-	for i := 1; i < len(indices); i++ {
-		if indices[i] != indices[i-1]+1 {
-			// Break in continuity, create a range for the previous sequence
-			requests = append(requests, &pb.ChunkRequestByRange{
-				BlobKey:    blobKey[:],
-				StartIndex: startIndex,
-				EndIndex:   indices[i-1] + 1,
-			})
-			startIndex = indices[i]
+	requests := make([]*pb.ChunkRequestByRange, len(ranges))
+	for i, r := range ranges {
+		requests[i] = &pb.ChunkRequestByRange{
+			BlobKey:    blobKey[:],
+			StartIndex: r.Start,
+			EndIndex:   r.End,
 		}
 	}
-
-	// Add the last range
-	requests = append(requests, &pb.ChunkRequestByRange{
-		BlobKey:    blobKey[:],
-		StartIndex: startIndex,
-		EndIndex:   indices[len(indices)-1] + 1,
-	})
-
 	return requests
 }
 

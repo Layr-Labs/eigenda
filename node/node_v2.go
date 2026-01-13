@@ -115,44 +115,23 @@ func (n *Node) DetermineChunkLocations(
 	return downloadSizeInBytes, relayRequests, nil
 }
 
-// Given a list of chunk indices we want to download, create a list of relay requests by range.
+// Converts chunk indices into relay range requests using the shared range collapsing utility.
 // Although indices may not be contiguous, it is safe to assume that they will be "mostly contiguous".
 // In practice, we should expect to see at most one continuous range of indices per quorum.
-//
-// Important: the provided indices MUST be in (mostly) sorted order in order to collapse into ranges correctly.
-// Unsorted indices may lead to a very large number of range requests being generated. The current chunk assignment
-// logic produces mostly sorted indices, so this is not an issue at present.
-//
-// Eventually, the assignment logic ought to be refactored to return ranges of chunks instead of individual
-// indices, but the required changes are non-trivial.
 func convertIndicesToRangeRequests(blobKey corev2.BlobKey, indices []uint32) []*relay.ChunkRequestByRange {
-	requests := make([]*relay.ChunkRequestByRange, 0)
-	if len(indices) == 0 {
-		return requests
+	ranges := corev2.CollapseIndicesToRanges(indices)
+	if len(ranges) == 0 {
+		return make([]*relay.ChunkRequestByRange, 0)
 	}
 
-	startIndex := indices[0]
-	for i := 1; i < len(indices); i++ {
-		if indices[i] != indices[i-1]+1 {
-			// break in continuity, create a request for the previous range
-			request := &relay.ChunkRequestByRange{
-				BlobKey: blobKey,
-				Start:   startIndex,       // inclusive
-				End:     indices[i-1] + 1, // exclusive
-			}
-			requests = append(requests, request)
-			startIndex = indices[i]
+	requests := make([]*relay.ChunkRequestByRange, len(ranges))
+	for i, r := range ranges {
+		requests[i] = &relay.ChunkRequestByRange{
+			BlobKey: blobKey,
+			Start:   r.Start,
+			End:     r.End,
 		}
 	}
-
-	// add the last range
-	request := &relay.ChunkRequestByRange{
-		BlobKey: blobKey,
-		Start:   startIndex,                  // inclusive
-		End:     indices[len(indices)-1] + 1, // exclusive
-	}
-	requests = append(requests, request)
-
 	return requests
 }
 
