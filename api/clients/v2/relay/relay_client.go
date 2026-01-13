@@ -188,7 +188,8 @@ func (c *relayClient) signGetValidatorChunksRequest(
 func (c *relayClient) GetValidatorChunks(
 	ctx context.Context,
 	relayKey corev2.RelayKey,
-	blobKey corev2.BlobKey) ([]byte, error) {
+	blobKey corev2.BlobKey,
+) ([]byte, error) {
 
 	if c.config.OperatorID == nil {
 		return nil, errors.New("no operator ID provided in config, cannot use GetValidatorChunks")

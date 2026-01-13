@@ -394,7 +394,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	finishedFetchingMetadata := time.Now()
 	s.metrics.ReportChunkMetadataLatency(finishedFetchingMetadata.Sub(finishedAuthenticating))
 
-	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(request, mMap)
+	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(request.GetChunkRequests(), mMap)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("error computing required bandwidth: %v", err))
 	}
@@ -434,7 +434,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		}
 	} else {
 		var found bool
-		bytesToSend, found, err = s.gatherChunkDataToSend(ctx, mMap, request)
+		bytesToSend, found, err = s.gatherChunkDataToSend(ctx, mMap, request.GetChunkRequests())
 		if err != nil {
 			// nolint:wrapcheck
 			return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err))
@@ -488,10 +488,10 @@ type downloadResult struct {
 func (s *Server) gatherChunkDataToSend(
 	ctx context.Context,
 	metadataMap map[v2.BlobKey]*blobMetadata,
-	request *pb.GetChunksRequest,
+	chunkRequests []*pb.ChunkRequest,
 ) ([][]byte, bool, error) {
 
-	coefficients, proofs, found, err := s.downloadDataFromRelays(ctx, metadataMap, request)
+	coefficients, proofs, found, err := s.downloadDataFromRelays(ctx, metadataMap, chunkRequests)
 	if err != nil {
 		return nil, false, fmt.Errorf("error downloading chunk data from relays: %w", err)
 	}
@@ -502,13 +502,13 @@ func (s *Server) gatherChunkDataToSend(
 	chunkDataObjects, err := combineProofsAndCoefficients(
 		proofs,
 		coefficients,
-		request,
+		chunkRequests,
 		metadataMap)
 	if err != nil {
 		return nil, false, fmt.Errorf("error building chunk data: %w", err)
 	}
 
-	bytesToSend, err := buildBinaryChunkData(chunkDataObjects, request)
+	bytesToSend, err := buildBinaryChunkData(chunkDataObjects, chunkRequests)
 	if err != nil {
 		return nil, false, fmt.Errorf("error building binary chunk data: %w", err)
 	}
@@ -516,13 +516,13 @@ func (s *Server) gatherChunkDataToSend(
 	return bytesToSend, true, nil
 }
 
-// Download all data from relays needed to fulfill a GetChunks request.
+// Download all data from relays needed to fulfill chunk requests.
 func (s *Server) downloadDataFromRelays(
 	ctx context.Context,
 	metadataMap map[v2.BlobKey]*blobMetadata,
-	request *pb.GetChunksRequest,
+	chunkRequests []*pb.ChunkRequest,
 ) (coefficients [][][]byte, proofs [][][]byte, allDataFound bool, err error) {
-	requestCount := len(request.GetChunkRequests())
+	requestCount := len(chunkRequests)
 
 	coefficients = make([][][]byte, requestCount)
 	proofs = make([][][]byte, requestCount)
@@ -532,7 +532,7 @@ func (s *Server) downloadDataFromRelays(
 	runner, ctx := errgroup.WithContext(ctx)
 
 	// Fan out and make requests in parallel
-	for i, chunkRequest := range request.GetChunkRequests() {
+	for i, chunkRequest := range chunkRequests {
 		blobKey := v2.BlobKey(chunkRequest.GetByRange().GetBlobKey())
 		metadata := metadataMap[blobKey]
 
@@ -594,15 +594,15 @@ func (s *Server) downloadDataFromRelays(
 func combineProofsAndCoefficients(
 	proofs [][][]byte,
 	coefficients [][][]byte,
-	request *pb.GetChunksRequest,
+	chunkRequests []*pb.ChunkRequest,
 	metadataMap map[v2.BlobKey]*blobMetadata,
 ) ([]*core.ChunksData, error) {
 
-	requestCount := len(request.GetChunkRequests())
+	requestCount := len(chunkRequests)
 
 	chunkDataObjects := make([]*core.ChunksData, requestCount)
 	for i := 0; i < requestCount; i++ {
-		blobKey := v2.BlobKey(request.GetChunkRequests()[i].GetByRange().GetBlobKey())
+		blobKey := v2.BlobKey(chunkRequests[i].GetByRange().GetBlobKey())
 		metadata := metadataMap[blobKey]
 		chunkData, err := buildChunksData(proofs[i], int(metadata.symbolsPerFrame), coefficients[i])
 		if err != nil {
@@ -617,12 +617,12 @@ func combineProofsAndCoefficients(
 // Take the chunk data objects and build the final byte arrays to send back to the client.
 func buildBinaryChunkData(
 	chunkDataObjects []*core.ChunksData,
-	request *pb.GetChunksRequest,
+	chunkRequests []*pb.ChunkRequest,
 ) ([][]byte, error) {
 
-	bytesToSend := make([][]byte, 0, len(request.GetChunkRequests()))
-	for requestIndex := 0; requestIndex < len(request.GetChunkRequests()); requestIndex++ {
-		nextRequest := request.GetChunkRequests()[requestIndex]
+	bytesToSend := make([][]byte, 0, len(chunkRequests))
+	for requestIndex := 0; requestIndex < len(chunkRequests); requestIndex++ {
+		nextRequest := chunkRequests[requestIndex]
 		targetKey := nextRequest.GetByRange().GetBlobKey()
 
 		chunkDataToSend := chunkDataObjects[requestIndex]
@@ -635,8 +635,8 @@ func buildBinaryChunkData(
 		// (aka a binary object that encodes a list of chunks).
 
 		// If there are multiple requests for the same blob, combine them.
-		for i := requestIndex + 1; i < len(request.GetChunkRequests()); i++ {
-			followingRequest := request.GetChunkRequests()[i].GetByRange()
+		for i := requestIndex + 1; i < len(chunkRequests); i++ {
+			followingRequest := chunkRequests[i].GetByRange()
 
 			nextKey := followingRequest.GetBlobKey()
 			if !bytes.Equal(targetKey, nextKey) {
@@ -810,13 +810,13 @@ func selectFrameSubsetByIndex(
 	return framesSubset, nil
 }
 
-// computeChunkRequestRequiredBandwidth computes the bandwidth required to fulfill a GetChunks request.
+// Computes the bandwidth required to fulfill chunk requests.
 func computeChunkRequestRequiredBandwidth(
-	request *pb.GetChunksRequest,
+	chunkRequests []*pb.ChunkRequest,
 	mMap map[v2.BlobKey]*blobMetadata,
 ) (uint32, error) {
 	requiredBandwidth := uint32(0)
-	for _, req := range request.GetChunkRequests() {
+	for _, req := range chunkRequests {
 		var metadata *blobMetadata
 		var key v2.BlobKey
 		var requestedChunks uint32
@@ -888,32 +888,19 @@ func (s *Server) GetValidatorChunks(
 	}
 
 	if err := s.validateGetValidatorChunksRequest(request); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validate get validator chunks request: %w", err)
 	}
 
-	// Authenticate request
-	if s.authenticator != nil {
-		client, ok := peer.FromContext(ctx)
-		if !ok {
-			return nil, api.NewErrorInvalidArg("could not get peer information") //nolint:wrapcheck
-		}
-		clientAddress := client.Addr.String()
+	hash, err := s.authenticator.AuthenticateGetValidatorChunksRequest(ctx, request)
+	if err != nil {
+		s.metrics.ReportChunkAuthFailure()
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authenticate get validator chunks: %v", err)) //nolint:wrapcheck
+	}
 
-		hash, err := s.authenticator.AuthenticateGetValidatorChunksRequest(ctx, request)
-		if err != nil {
-			s.metrics.ReportChunkAuthFailure()
-			s.logger.Debug("rejected GetValidatorChunks request", "client", clientAddress)
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("auth failed: %v", err)) //nolint:wrapcheck
-		}
-
-		timestamp := time.Unix(int64(request.GetTimestamp()), 0)
-		err = s.replayGuardian.VerifyRequest(hash, timestamp)
-		if err != nil {
-			s.metrics.ReportChunkAuthFailure()
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("verify request: %v", err)) //nolint:wrapcheck
-		}
-
-		s.logger.Debug("received authenticated GetValidatorChunks request", "client", clientAddress)
+	err = s.replayGuardian.VerifyRequest(hash, time.Unix(int64(request.GetTimestamp()), 0))
+	if err != nil {
+		s.metrics.ReportChunkAuthFailure()
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("replay guardian verify request: %v", err)) //nolint:wrapcheck
 	}
 
 	finishedAuthenticating := time.Now()
@@ -921,47 +908,40 @@ func (s *Server) GetValidatorChunks(
 		s.metrics.ReportChunkAuthenticationLatency(finishedAuthenticating.Sub(start))
 	}
 
-	// Rate limit by validator ID
 	clientID := string(request.GetValidatorId())
-	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
+	err = s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
 	if err != nil {
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err)) //nolint:wrapcheck
 	}
 	defer s.chunkRateLimiter.FinishGetChunkOperation(clientID)
 
-	// Get blob key
 	blobKey, err := v2.BytesToBlobKey(request.GetBlobKey())
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid blob key: %v", err)) //nolint:wrapcheck
 	}
 
-	// Get blob certificate for quorums and version
 	cert, _, err := s.metadataStore.GetBlobCertificate(ctx, blobKey)
 	if err != nil {
 		if strings.Contains(err.Error(), blobstore.ErrMetadataNotFound.Error()) {
 			return nil, api.NewErrorNotFound(fmt.Sprintf("blob %s not found", blobKey.Hex())) //nolint:wrapcheck
 		}
-		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching blob certificate: %v", err)) //nolint:wrapcheck
+		return nil, api.NewErrorInternal(fmt.Sprintf("fetch blob certificate: %v", err)) //nolint:wrapcheck
 	}
 
-	// Get blob attestation info for reference block number
 	attestationInfo, err := s.metadataStore.GetBlobAttestationInfo(ctx, blobKey)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching attestation info: %v", err)) //nolint:wrapcheck
+		return nil, api.NewErrorInternal(fmt.Sprintf("fetch attestation info: %v", err)) //nolint:wrapcheck
 	}
 	if attestationInfo == nil || attestationInfo.Attestation == nil || attestationInfo.Attestation.BatchHeader == nil {
 		return nil, api.NewErrorInternal("attestation info is incomplete") //nolint:wrapcheck
 	}
 
-	referenceBlockNumber := attestationInfo.Attestation.BatchHeader.ReferenceBlockNumber
-
-	// Get operator state at reference block
-	operatorState, err := s.ics.GetOperatorState(ctx, uint(referenceBlockNumber), cert.BlobHeader.QuorumNumbers)
+	referenceBlockNumber := uint(attestationInfo.Attestation.BatchHeader.ReferenceBlockNumber)
+	operatorState, err := s.ics.GetOperatorState(ctx, referenceBlockNumber, cert.BlobHeader.QuorumNumbers)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching operator state: %v", err)) //nolint:wrapcheck
+		return nil, api.NewErrorInternal(fmt.Sprintf("fetch operator state: %v", err)) //nolint:wrapcheck
 	}
 
-	// Get blob version parameters
 	blobParamsMap := s.metadataProvider.GetBlobVersionParameters()
 	if blobParamsMap == nil {
 		return nil, api.NewErrorInternal("blob version parameters not available") //nolint:wrapcheck
@@ -972,7 +952,6 @@ func (s *Server) GetValidatorChunks(
 		return nil, api.NewErrorInternal(fmt.Sprintf("unknown blob version: %v", cert.BlobHeader.BlobVersion))
 	}
 
-	// Compute chunk assignment for this validator
 	validatorID := core.OperatorID(request.GetValidatorId())
 	assignment, err := v2.GetAssignmentForBlob(operatorState, blobParams, cert.BlobHeader.QuorumNumbers, validatorID)
 	if err != nil {
@@ -983,10 +962,7 @@ func (s *Server) GetValidatorChunks(
 		return &pb.GetValidatorChunksReply{Chunks: []byte{}}, nil
 	}
 
-	// Convert indices to range requests
 	rangeRequests := convertIndicesToRangeRequests(blobKey, assignment.Indices)
-
-	// Build a GetChunksRequest to reuse existing chunk fetch logic
 	chunkRequests := make([]*pb.ChunkRequest, len(rangeRequests))
 	for i, rangeReq := range rangeRequests {
 		chunkRequests[i] = &pb.ChunkRequest{
@@ -996,12 +972,6 @@ func (s *Server) GetValidatorChunks(
 		}
 	}
 
-	syntheticRequest := &pb.GetChunksRequest{
-		ChunkRequests: chunkRequests,
-		OperatorId:    request.GetValidatorId(),
-	}
-
-	// Get metadata for the blob
 	keys := []v2.BlobKey{blobKey}
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
@@ -1011,8 +981,7 @@ func (s *Server) GetValidatorChunks(
 	finishedFetchingMetadata := time.Now()
 	s.metrics.ReportChunkMetadataLatency(finishedFetchingMetadata.Sub(finishedAuthenticating))
 
-	// Compute bandwidth
-	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(syntheticRequest, mMap)
+	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(chunkRequests, mMap)
 	if err != nil {
 		//nolint:wrapcheck
 		return nil, api.NewErrorInternal(fmt.Sprintf("error computing required bandwidth: %v", err))
@@ -1027,8 +996,7 @@ func (s *Server) GetValidatorChunks(
 	}
 	s.metrics.ReportGetChunksBandwidthUsage(requiredBandwidth)
 
-	// Fetch chunks
-	bytesToSend, found, err := s.gatherChunkDataToSend(ctx, mMap, syntheticRequest)
+	bytesToSend, found, err := s.gatherChunkDataToSend(ctx, mMap, chunkRequests)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err)) //nolint:wrapcheck
 	}

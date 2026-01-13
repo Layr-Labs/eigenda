@@ -604,7 +604,7 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENFORCE_SINGLE_BLOB_BATCHES"),
 	}
 	// TODO(litt3): Temporary flag during migration. Remove once migration is complete.
-	UseLegacyGetChunksRequestFlag = cli.BoolFlag{
+	UseLegacyGetChunksRequestFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-legacy-get-chunks-request"),
 		Usage:    "Use legacy GetChunks RPC instead of new GetValidatorChunks",
 		Required: false,
