@@ -1,14 +1,21 @@
-name: docker-publish-internal
+name: docker-publish
 on:
   push:
+    tags:
+      - v*
     branches:
       - master
   pull_request:
   merge_group:
   workflow_dispatch:
+    inputs:
+      push:
+        description: "Force build and push"
+        required: false
+        default: false
+        type: boolean
 
 env:
-  # TODO: Push to AWS CR at a later stage
   REGISTRY: ghcr.io
 
 jobs:
@@ -51,9 +58,19 @@ jobs:
       # Build And Push Images
       - name: Build Docker images
         run: docker buildx bake all
-      - name: Push Docker images
+      - name: Push Docker images (master)
         if: github.ref == 'refs/heads/master'
         run: BUILD_TAG=master make docker-build-push
+      - name: Push Docker images (release tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: BUILD_TAG=${{ github.ref_name }} make docker-build-push
+      - name: Push Docker images (manual)
+        if: github.event_name == 'workflow_dispatch' && inputs.push == true
+        run: |
+          BUILD_TAG="${{ github.ref_name }}"
+          BUILD_TAG="${BUILD_TAG//\//-}"
+          export BUILD_TAG
+          make docker-build-push
 
       - name: Send GitHub Action trigger data to Slack workflow
         if: ${{ failure() }}
