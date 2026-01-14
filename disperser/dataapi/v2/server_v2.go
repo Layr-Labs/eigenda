@@ -21,6 +21,7 @@ import (
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	swaggerfiles "github.com/swaggo/files"
 	ginswagger "github.com/swaggo/gin-swagger"
 )
@@ -69,6 +70,9 @@ const (
 	maxDispersalFeedAge = 5
 	maxSigningInfoAge   = 5
 	maxAccountAge       = 5
+
+	// Account cache TTL - cache entries expire after this duration
+	accountCacheTTL = 1 * time.Minute
 )
 
 type (
@@ -106,8 +110,8 @@ type ServerV2 struct {
 	// KV caches for batches, keyed by batch header hash
 	batchResponseCache *lru.Cache[string, *BatchResponse]
 
-	// Account cache
-	accountCache *lru.Cache[string, *AccountFeedResponse]
+	// Account cache with TTL
+	accountCache *expirable.LRU[string, *AccountFeedResponse]
 }
 
 func NewServerV2(
@@ -165,10 +169,7 @@ func NewServerV2(
 		return nil, fmt.Errorf("failed to create batchResponseCache: %w", err)
 	}
 
-	accountCache, err := lru.New[string, *AccountFeedResponse](100) // Cache up to 100 different limit combinations
-	if err != nil {
-		return nil, fmt.Errorf("failed to create accountCache: %w", err)
-	}
+	accountCache := expirable.NewLRU[string, *AccountFeedResponse](100, nil, accountCacheTTL)
 
 	operatorHandler, err := dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient)
 	if err != nil {
