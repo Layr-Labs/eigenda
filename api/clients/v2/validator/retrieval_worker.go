@@ -11,6 +11,7 @@ import (
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/enforce"
+	"github.com/Layr-Labs/eigenda/common/structures"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -186,13 +187,13 @@ type retrievalWorker struct {
 	targetVerifiedCount uint32
 
 	// This queue is used to determine when the pessimistic timeout for a download has been reached.
-	downloadsInProgressQueue *common.Queue[*downloadStarted]
+	downloadsInProgressQueue *structures.Queue[*downloadStarted]
 
 	// Contains chunks that have been downloaded but not yet scheduled for verification.
-	downloadedChunksQueue *common.Queue[*downloadCompleted]
+	downloadedChunksQueue *structures.Queue[*downloadCompleted]
 
 	// Contains chunks that have been verified.
-	verifiedChunksQueue *common.Queue[*verificationCompleted]
+	verifiedChunksQueue *structures.Queue[*verificationCompleted]
 
 	// The status of the chunks from each validator. The key is the validator ID, and the value is the
 	// status for all chunks assigned to that validator.
@@ -336,9 +337,9 @@ func newRetrievalWorker(
 		decodeResponseChan:        make(chan *decodeCompleted, 1),
 		probe:                     probe,
 		minimumChunkCount:         minimumChunkCount,
-		downloadsInProgressQueue:  common.NewQueue[*downloadStarted](1024),
-		downloadedChunksQueue:     common.NewQueue[*downloadCompleted](1024),
-		verifiedChunksQueue:       common.NewQueue[*verificationCompleted](1024),
+		downloadsInProgressQueue:  structures.NewQueue[*downloadStarted](1024),
+		downloadedChunksQueue:     structures.NewQueue[*downloadCompleted](1024),
+		verifiedChunksQueue:       structures.NewQueue[*verificationCompleted](1024),
 		downloadOrder:             downloadOrder,
 		totalChunkCount:           totalChunkCount,
 		validatorStatusMap:        validatorStatusMap,

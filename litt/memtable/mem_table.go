@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/structures"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/types"
 )
@@ -36,7 +36,7 @@ type memTable struct {
 	data map[string][]byte
 
 	// Keeps track of when data should be deleted.
-	expirationQueue *common.Queue[*expirationRecord]
+	expirationQueue *structures.Queue[*expirationRecord]
 
 	// Protects access to data and expirationQueue.
 	//
@@ -56,7 +56,7 @@ func NewMemTable(config *litt.Config, name string) litt.ManagedTable {
 		name:            name,
 		ttl:             config.TTL,
 		data:            make(map[string][]byte),
-		expirationQueue: common.NewQueue[*expirationRecord](1024),
+		expirationQueue: structures.NewQueue[*expirationRecord](1024),
 	}
 
 	if config.GCPeriod > 0 {

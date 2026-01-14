@@ -1,4 +1,4 @@
-package common
+package structures
 
 import (
 	"math/rand"

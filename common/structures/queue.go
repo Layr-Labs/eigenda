@@ -1,4 +1,4 @@
-package common
+package structures
 
 import "github.com/Layr-Labs/eigenda/common/enforce"
 
