@@ -51,6 +51,13 @@ func (s *RandomAccessDeque[T]) Size() uint64 {
 	return s.size
 }
 
+// Syntactic sugar for Size() == 0
+//
+// O(1)
+func (s *RandomAccessDeque[T]) IsEmpty() bool {
+	return s.size == 0
+}
+
 // Insert a value at the front of the deque. This value will have index 0 after insertion, and all other values will
 // have their indices increased by 1.
 //
@@ -84,6 +91,21 @@ func (s *RandomAccessDeque[T]) PeekFront() (value T, err error) {
 	return value, nil
 }
 
+// Return the value at the front of the deque without removing it. If the deque is empty, returns ok==false.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) TryPeekFront() (value T, ok bool) {
+	if s.IsEmpty() {
+		var zero T
+		return zero, false
+	}
+
+	value, err := s.PeekFront()
+	enforce.NilError(err, "PeekFront failed, this should never happen after IsEmpty check")
+
+	return value, true
+}
+
 // Remove and return the value at the front of the deque. If the deque is empty, returns an error.
 //
 // O(1)
@@ -108,6 +130,21 @@ func (s *RandomAccessDeque[T]) PopFront() (value T, err error) {
 	s.size--
 
 	return value, nil
+}
+
+// Remove and return the value at the front of the deque. If the deque is empty, returns ok==false.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) TryPopFront() (value T, ok bool) {
+	if s.IsEmpty() {
+		var zero T
+		return zero, false
+	}
+
+	value, err := s.PopFront()
+	enforce.NilError(err, "PopFront failed, this should never happen after IsEmpty check")
+
+	return value, true
 }
 
 // Insert a value at the back of the deque. This value will have index Size()-1 after insertion.
@@ -143,6 +180,21 @@ func (s *RandomAccessDeque[T]) PeekBack() (value T, err error) {
 	return value, nil
 }
 
+// Return the value at the back of the deque without removing it. If the deque is empty, returns ok==false.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) TryPeekBack() (value T, ok bool) {
+	if s.IsEmpty() {
+		var zero T
+		return zero, false
+	}
+
+	value, err := s.PeekBack()
+	enforce.NilError(err, "PeekBack failed, this should never happen after IsEmpty check")
+
+	return value, true
+}
+
 // Remove and return the value at the back of the deque. If the deque is empty, returns an error.
 //
 // O(1)
@@ -169,6 +221,21 @@ func (s *RandomAccessDeque[T]) PopBack() (value T, err error) {
 	s.size--
 
 	return value, nil
+}
+
+// Remove and return the value at the back of the deque. If the deque is empty, returns ok==false.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) TryPopBack() (value T, ok bool) {
+	if s.IsEmpty() {
+		var zero T
+		return zero, false
+	}
+
+	value, err := s.PopBack()
+	enforce.NilError(err, "PopBack failed, this should never happen after IsEmpty check")
+
+	return value, true
 }
 
 // Get the value at the specified index. If the index is out of bounds returns an error.

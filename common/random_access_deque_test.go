@@ -1,27 +1,95 @@
 package common_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
-
-	"github.com/emirpasic/gods/lists/doublylinkedlist"
 )
+
+// A simple implementation of a deque for testing purposes. It's slow, but easy to reason about.
+type simpleDeque[T any] struct {
+	data []T
+}
+
+func newSimpleDeque[T any]() *simpleDeque[T] {
+	return &simpleDeque[T]{
+		data: make([]T, 0),
+	}
+}
+
+func (d *simpleDeque[T]) PushFront(item T) {
+	d.data = append([]T{item}, d.data...)
+}
+
+func (d *simpleDeque[T]) PushBack(item T) {
+	d.data = append(d.data, item)
+}
+
+func (d *simpleDeque[T]) PopFront() (T, bool) {
+	if len(d.data) == 0 {
+		var zero T
+		return zero, false
+	}
+	item := d.data[0]
+	d.data = d.data[1:]
+	return item, true
+}
+
+func (d *simpleDeque[T]) PopBack() (T, bool) {
+	if len(d.data) == 0 {
+		var zero T
+		return zero, false
+	}
+	item := d.data[len(d.data)-1]
+	d.data = d.data[:len(d.data)-1]
+	return item, true
+}
+
+func (d *simpleDeque[T]) Size() uint64 {
+	return uint64(len(d.data))
+}
+
+func (d *simpleDeque[T]) PeekFront() (T, bool) {
+	if len(d.data) == 0 {
+		var zero T
+		return zero, false
+	}
+	return d.data[0], true
+}
+
+func (d *simpleDeque[T]) PeekBack() (T, bool) {
+	if len(d.data) == 0 {
+		var zero T
+		return zero, false
+	}
+	return d.data[len(d.data)-1], true
+}
+
+func (d *simpleDeque[T]) Clear() {
+	d.data = make([]T, 0)
+}
+
+func (d *simpleDeque[T]) Get(index int) T {
+	if index < 0 || index >= len(d.data) {
+		panic("index out of bounds")
+	}
+	return d.data[index]
+}
+
+func (d *simpleDeque[T]) Set(index int, value T) (T, bool) {
+	if index < 0 || index >= len(d.data) {
+		var zero T
+		return zero, false
+	}
+	old := d.data[index]
+	d.data[index] = value
+	return old, true
+}
 
 func TestRandomDequeOperations(t *testing.T) {
 	rand := random.NewTestRandom()
-
-	// The gods implementation of a doubly linked has a fmt.Println()... sigh. Squelch standard out during this test.
-	null, _ := os.Open(os.DevNull)
-	old := os.Stdout
-	os.Stdout = null
-	defer func() {
-		_ = null.Close()
-		os.Stdout = old
-	}()
 
 	initialSize := rand.Uint64Range(0, 8)
 
@@ -37,7 +105,7 @@ func TestRandomDequeOperations(t *testing.T) {
 
 	// Use a linked list library we trust to verify correctness. The linked list can't do O(1) index access, but we can
 	// work around that in the test code.
-	expectedData := doublylinkedlist.New()
+	expectedData := newSimpleDeque[int]()
 	expectedSize := uint64(0)
 
 	operationCount := 10_000
@@ -61,7 +129,7 @@ func TestRandomDequeOperations(t *testing.T) {
 
 			value := rand.Int()
 			deque.PushFront(value)
-			expectedData.Insert(0, value)
+			expectedData.PushFront(value)
 
 			expectedSize++
 		} else if choice < 0.5 {
@@ -70,7 +138,7 @@ func TestRandomDequeOperations(t *testing.T) {
 
 			value := rand.Int()
 			deque.PushBack(value)
-			expectedData.Add(value)
+			expectedData.PushBack(value)
 
 			expectedSize++
 		} else if choice < 0.7 {
@@ -84,9 +152,9 @@ func TestRandomDequeOperations(t *testing.T) {
 				value, err := deque.PopFront()
 				require.NoError(t, err)
 
-				expectedValue, ok := expectedData.Get(0)
+				expectedValue, ok := expectedData.PeekFront()
 				require.True(t, ok)
-				expectedData.Remove(0)
+				_, _ = expectedData.PopFront()
 
 				require.Equal(t, expectedValue, value)
 
@@ -103,9 +171,9 @@ func TestRandomDequeOperations(t *testing.T) {
 				value, err := deque.PopBack()
 				require.NoError(t, err)
 
-				expectedValue, ok := expectedData.Get(expectedData.Size() - 1)
+				expectedValue, ok := expectedData.PeekBack()
 				require.True(t, ok)
-				expectedData.Remove(expectedData.Size() - 1)
+				_, _ = expectedData.PopBack()
 
 				require.Equal(t, expectedValue, value)
 
@@ -128,10 +196,7 @@ func TestRandomDequeOperations(t *testing.T) {
 
 				newValue := rand.Int()
 
-				// This is O(2 * n)... hard to test this efficiently without a trusted reference implementation
-				// that supports O(1) index access. ;(
-				expectedOldValue, ok := expectedData.Get(index)
-				require.True(t, ok)
+				expectedOldValue := expectedData.Get(index)
 				expectedData.Set(index, newValue)
 
 				oldValue, err := deque.Set(uint64(index), newValue)
@@ -156,10 +221,7 @@ func TestRandomDequeOperations(t *testing.T) {
 
 				newValue := rand.Int()
 
-				// This is O(2 * n)... hard to test this efficiently without a trusted reference implementation
-				// that supports O(1) index access. ;(
-				expectedOldValue, ok := expectedData.Get(index)
-				require.True(t, ok)
+				expectedOldValue := expectedData.Get(index)
 				expectedData.Set(index, newValue)
 
 				oldValue, err := deque.SetFromBack(expectedSize-uint64(index)-1, newValue)
@@ -193,13 +255,13 @@ func TestRandomDequeOperations(t *testing.T) {
 			_, err = deque.Set(rand.Uint64(), rand.Int())
 			require.Error(t, err)
 		} else {
-			expected, ok := expectedData.Get(0)
+			expected, ok := expectedData.PeekFront()
 			require.True(t, ok)
 			actual, err := deque.PeekFront()
 			require.NoError(t, err)
 			require.Equal(t, expected, actual)
 
-			expected, ok = expectedData.Get(expectedData.Size() - 1)
+			expected, ok = expectedData.PeekBack()
 			require.True(t, ok)
 			actual, err = deque.PeekBack()
 			require.NoError(t, err)
@@ -210,26 +272,20 @@ func TestRandomDequeOperations(t *testing.T) {
 		if i%1000 == 0 {
 			// Once in a while, verify the entire contents of the deque. It's expensive to do this in every iteration.
 
-			// Create a copy of the expected data for efficient verification.
-			expectedArray := make([]int, 0, expectedData.Size())
-			expectedData.Each(func(index int, value interface{}) {
-				expectedArray = append(expectedArray, value.(int))
-			})
-
 			if expectedData.Size() > 0 {
 				// Verify a random index.
 				index := 0
 				if expectedData.Size() > 2 {
-					index = rand.Intn(expectedData.Size() - 1)
+					index = rand.Intn(int(expectedData.Size()) - 1)
 				}
 				value, err := deque.Get(uint64(index))
 				require.NoError(t, err)
-				require.Equal(t, expectedArray[index], value)
+				require.Equal(t, expectedData.Get(index), value)
 
 				// fetch the same value, but indexed from the back
 				valueFromBack, err := deque.GetFromBack(expectedSize - uint64(index) - 1)
 				require.NoError(t, err)
-				require.Equal(t, expectedArray[index], valueFromBack)
+				require.Equal(t, expectedData.Get(index), valueFromBack)
 			}
 
 			// Iterate forwards
@@ -240,17 +296,17 @@ func TestRandomDequeOperations(t *testing.T) {
 
 				require.True(t, index < uint64(expectedData.Size()))
 
-				require.Equal(t, expectedArray[index], value)
+				require.Equal(t, expectedData.Get(int(index)), value)
 			}
-			require.Equal(t, expectedData.Size(), expectedIndex, "forward iteration count mismatch")
+			require.Equal(t, expectedData.Size(), uint64(expectedIndex), "forward iteration count mismatch")
 
 			// Iterate backwards
-			expectedIndex = expectedData.Size() - 1
+			expectedIndex = int(expectedData.Size()) - 1
 			for index, value := range deque.ReverseIterator() {
 				require.Equal(t, uint64(expectedIndex), index)
 				expectedIndex--
 
-				require.Equal(t, expectedArray[index], value)
+				require.Equal(t, expectedData.Get(int(index)), value)
 			}
 			require.Equal(t, -1, expectedIndex, "backward iteration count mismatch")
 
@@ -263,7 +319,7 @@ func TestRandomDequeOperations(t *testing.T) {
 			} else {
 				expectedIndex = 0
 				if expectedData.Size() > 1 {
-					expectedIndex = rand.Intn(expectedData.Size() - 1)
+					expectedIndex = rand.Intn(int(expectedData.Size()) - 1)
 				}
 				iterator, err := deque.IteratorFrom(uint64(expectedIndex))
 				require.NoError(t, err)
@@ -271,7 +327,7 @@ func TestRandomDequeOperations(t *testing.T) {
 					require.Equal(t, uint64(expectedIndex), index)
 					expectedIndex++
 
-					require.Equal(t, expectedArray[index], value)
+					require.Equal(t, expectedData.Get(int(index)), value)
 				}
 				require.Equal(t, expectedSize, uint64(expectedIndex),
 					"forward from-index iteration count mismatch")
@@ -284,9 +340,9 @@ func TestRandomDequeOperations(t *testing.T) {
 				_, err = deque.ReverseIteratorFrom(1234)
 				require.Error(t, err)
 			} else {
-				expectedIndex = expectedData.Size() - 1
+				expectedIndex = int(expectedData.Size()) - 1
 				if expectedData.Size() > 1 {
-					expectedIndex = rand.Intn(expectedData.Size() - 1)
+					expectedIndex = rand.Intn(int(expectedData.Size()) - 1)
 				}
 				iterator, err := deque.ReverseIteratorFrom(uint64(expectedIndex))
 				require.NoError(t, err)
@@ -294,7 +350,7 @@ func TestRandomDequeOperations(t *testing.T) {
 					require.Equal(t, uint64(expectedIndex), index)
 					expectedIndex--
 
-					require.Equal(t, expectedArray[index], value)
+					require.Equal(t, expectedData.Get(int(index)), value)
 				}
 				require.Equal(t, -1, expectedIndex, "backward from-index iteration count mismatch")
 			}

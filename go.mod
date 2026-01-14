@@ -32,7 +32,6 @@ require (
 	github.com/consensys/gnark-crypto v0.18.0
 	github.com/dchest/siphash v1.2.3
 	github.com/docker/go-units v0.5.0
-	github.com/emirpasic/gods v1.18.1
 	github.com/ethereum-optimism/optimism v1.9.5
 	github.com/ethereum/go-ethereum v1.15.3
 	github.com/fxamacker/cbor/v2 v2.5.0

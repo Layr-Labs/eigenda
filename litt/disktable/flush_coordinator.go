@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt/util"
-	"github.com/emirpasic/gods/queues/linkedlistqueue"
 	"golang.org/x/time/rate"
 )
 
@@ -92,7 +92,7 @@ func (c *flushCoordinator) controlLoop() {
 	defer close(c.requestChan)
 
 	// requests that are waiting for a flush to be performed
-	waitingRequests := linkedlistqueue.New()
+	waitingRequests := common.NewQueue[flushCoordinatorRequest](1024)
 
 	// timer used to wait until the next flush can be performed
 	timer := time.NewTimer(0)
@@ -107,14 +107,14 @@ func (c *flushCoordinator) controlLoop() {
 			case <-c.errorMonitor.ImmediateShutdownRequired():
 				return
 			case request := <-c.requestChan:
-				waitingRequests.Enqueue(request)
+				waitingRequests.Push(request.(flushCoordinatorRequest))
 			case <-timer.C:
 
 				// we can now perform a flush
 				err := c.internalFlush()
 				// send a response to each waiting caller
-				for request, ok := waitingRequests.Dequeue(); ok; request, ok = waitingRequests.Dequeue() {
-					request.(flushCoordinatorRequest) <- err
+				for request, ok := waitingRequests.TryPop(); ok; request, ok = waitingRequests.TryPop() {
+					request <- err
 				}
 
 				timerActive = false
@@ -131,7 +131,7 @@ func (c *flushCoordinator) controlLoop() {
 					request.(flushCoordinatorRequest) <- c.internalFlush()
 				} else {
 					// we need to wait before flushing, add the request to the queue
-					waitingRequests.Enqueue(request)
+					waitingRequests.Push(request.(flushCoordinatorRequest))
 
 					timeUntilPermitted := c.rateLimiter.Reserve().Delay()
 					timer.Reset(timeUntilPermitted)

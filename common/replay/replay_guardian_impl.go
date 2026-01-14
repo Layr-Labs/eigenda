@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/emirpasic/gods/queues/priorityqueue"
+	"github.com/Layr-Labs/eigenda/common"
 )
 
 var _ ReplayGuardian = &replayGuardian{}
@@ -25,7 +25,7 @@ type replayGuardian struct {
 	observedHashes map[string]struct{}
 
 	// A queue of observed hashes, ordered by request timestamp. Used to prune old hashes.
-	expirationQueue *priorityqueue.Queue
+	expirationQueue *common.PriorityQueue[*hashWithTimestamp]
 
 	// A mutex to protect the observedHashes and expirationQueue.
 	lock sync.Mutex
@@ -69,23 +69,19 @@ func NewReplayGuardian(
 		maxTimeInFuture: maxTimeInFuture,
 		maxTimeInPast:   maxTimeInPast,
 		observedHashes:  make(map[string]struct{}),
-		expirationQueue: priorityqueue.NewWith(compareHashWithTimestamp),
+		expirationQueue: common.NewPriorityQueue(isHashWithTimestampLessThan),
 	}, nil
 }
 
-// compareKeyWithExpiration compares two hashWithTimestamp objects by their expiration time. Used to create
-// a priority queue that orders the requests in chronological order (i.e. the order in which they will expire).
-func compareHashWithTimestamp(a interface{}, b interface{}) int {
-
-	keyA := a.(*hashWithTimestamp)
-	keyB := b.(*hashWithTimestamp)
-
-	if keyA.timestamp.Before(keyB.timestamp) {
-		return -1
-	} else if keyA.timestamp.After(keyB.timestamp) {
-		return 1
+// isHashWithTimestampLessThan compares two hashWithTimestamp objects by their expiration time, returning true if
+// a is less than b. Used to create a priority queue that orders the requests in chronological order
+// (i.e. the order in which they will expire).
+func isHashWithTimestampLessThan(a *hashWithTimestamp, b *hashWithTimestamp) bool {
+	if a.timestamp.Before(b.timestamp) {
+		return true
 	}
-	return 0
+
+	return false
 }
 
 func (r *replayGuardian) DetailedVerifyRequest(
@@ -113,7 +109,7 @@ func (r *replayGuardian) DetailedVerifyRequest(
 
 	// The request is not a replay. Add the hash to the observedHashes set and the expirationQueue.
 	r.observedHashes[string(requestHash)] = struct{}{}
-	r.expirationQueue.Enqueue(&hashWithTimestamp{
+	r.expirationQueue.Push(&hashWithTimestamp{
 		hash:      string(requestHash),
 		timestamp: requestTimestamp,
 	})
@@ -157,20 +153,20 @@ func (r *replayGuardian) pruneObservedHashes(now time.Time) {
 	oldestNonExpiredTimestamp := now.Add(-r.maxTimeInPast)
 
 	for {
-		next, ok := r.expirationQueue.Peek()
+		next, ok := r.expirationQueue.TryPeek()
 		if !ok {
 			// There are no more things we are tracking.
 			return
 		}
 
-		timestamp := next.(*hashWithTimestamp).timestamp
+		timestamp := next.timestamp
 		if !timestamp.Before(oldestNonExpiredTimestamp) {
 			// It's not yet time to remove this hash.
 			return
 		}
 
 		// Forget about expired hash.
-		r.expirationQueue.Dequeue()
-		delete(r.observedHashes, next.(*hashWithTimestamp).hash)
+		r.expirationQueue.Pop()
+		delete(r.observedHashes, next.hash)
 	}
 }

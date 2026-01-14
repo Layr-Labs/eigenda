@@ -6,10 +6,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/types"
-	"github.com/emirpasic/gods/queues"
-	"github.com/emirpasic/gods/queues/linkedlistqueue"
 )
 
 var _ litt.ManagedTable = &memTable{}
@@ -37,7 +36,7 @@ type memTable struct {
 	data map[string][]byte
 
 	// Keeps track of when data should be deleted.
-	expirationQueue queues.Queue
+	expirationQueue *common.Queue[*expirationRecord]
 
 	// Protects access to data and expirationQueue.
 	//
@@ -57,7 +56,7 @@ func NewMemTable(config *litt.Config, name string) litt.ManagedTable {
 		name:            name,
 		ttl:             config.TTL,
 		data:            make(map[string][]byte),
-		expirationQueue: linkedlistqueue.New(),
+		expirationQueue: common.NewQueue[*expirationRecord](1024),
 	}
 
 	if config.GCPeriod > 0 {
@@ -108,7 +107,7 @@ func (m *memTable) Put(key []byte, value []byte) error {
 		return fmt.Errorf("key %x already exists", key)
 	}
 	m.data[stringKey] = value
-	m.expirationQueue.Enqueue(expiration)
+	m.expirationQueue.Push(expiration)
 
 	return nil
 }
@@ -199,15 +198,14 @@ func (m *memTable) RunGC() error {
 	earliestPermittedCreationTime := now.Add(-m.ttl)
 
 	for {
-		item, ok := m.expirationQueue.Peek()
+		expiration, ok := m.expirationQueue.TryPeek()
 		if !ok {
 			break
 		}
-		expiration := item.(*expirationRecord)
 		if expiration.creationTime.After(earliestPermittedCreationTime) {
 			break
 		}
-		m.expirationQueue.Dequeue()
+		m.expirationQueue.Pop()
 		delete(m.data, expiration.key)
 	}
 
