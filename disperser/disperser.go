@@ -2,13 +2,10 @@ package disperser
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 
@@ -218,18 +215,6 @@ type BlobStore interface {
 
 type Dispatcher interface {
 	DisperseBatch(context.Context, *core.IndexedOperatorState, []core.EncodedBlob, *core.BatchHeader) chan core.SigningMessage
-}
-
-// GenerateReverseIndexKey returns the key used to store the blob key in the reverse index
-func GenerateReverseIndexKey(batchHeaderHash [32]byte, blobIndex uint32) (string, error) {
-	blobIndexHash, err := common.Hash[uint32](blobIndex)
-	if err != nil {
-		return "", err
-	}
-	bytes := make([]byte, 0, len(batchHeaderHash)+len(blobIndexHash))
-	bytes = append(bytes, batchHeaderHash[:]...)
-	bytes = append(bytes, blobIndexHash...)
-	return hex.EncodeToString(sha256.New().Sum(bytes)), nil
 }
 
 func FromBlobStatusProto(status disperser_rpc.BlobStatus) (*BlobStatus, error) {
