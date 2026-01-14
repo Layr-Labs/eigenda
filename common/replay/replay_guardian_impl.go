@@ -73,8 +73,8 @@ func NewReplayGuardian(
 	}, nil
 }
 
-// isHashWithTimestampLessThan compares two hashWithTimestamp objects by their expiration time, returning true if 
-// a is less than b. Used to create a priority queue that orders the requests in chronological order 
+// isHashWithTimestampLessThan compares two hashWithTimestamp objects by their expiration time, returning true if
+// a is less than b. Used to create a priority queue that orders the requests in chronological order
 // (i.e. the order in which they will expire).
 func isHashWithTimestampLessThan(a *hashWithTimestamp, b *hashWithTimestamp) bool {
 	if a.timestamp.Before(b.timestamp) {

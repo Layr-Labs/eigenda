@@ -195,13 +195,6 @@ func (s *RandomAccessDeque[T]) TryPeekBack() (value T, ok bool) {
 	return value, true
 }
 
-// An alias for TryPeekFront. Syntactic sugar for when using the deque as a queue.
-//
-// O(1)
-func (s *RandomAccessDeque[T]) TryPeek() (value T, ok bool) {
-	return s.TryPeekFront()
-}
-
 // Remove and return the value at the back of the deque. If the deque is empty, returns an error.
 //
 // O(1)
@@ -243,13 +236,6 @@ func (s *RandomAccessDeque[T]) TryPopBack() (value T, ok bool) {
 	enforce.NilError(err, "PopBack failed, this should never happen after IsEmpty check")
 
 	return value, true
-}
-
-// An alias for TryPopFront. Syntactic sugar for when using the deque as a queue.
-//
-// O(1)
-func (s *RandomAccessDeque[T]) TryPop() (value T, ok bool) {
-	return s.TryPopFront()
 }
 
 // Get the value at the specified index. If the index is out of bounds returns an error.
