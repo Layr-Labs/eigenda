@@ -48,4 +48,3 @@ func GenericDecodeBlob(data []byte) ([]byte, error) {
 
 	return data, nil
 }
-

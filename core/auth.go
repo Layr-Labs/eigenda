@@ -8,4 +8,3 @@ type BlobRequestSigner interface {
 	SignBlobRequest(header BlobAuthHeader) ([]byte, error)
 	GetAccountID() (string, error)
 }
-
