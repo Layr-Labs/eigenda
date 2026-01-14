@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/structures"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/litt"
@@ -63,7 +63,7 @@ type validatorStore struct {
 	ttl time.Duration
 
 	// A lock used to prevent concurrent requests from storing the same data multiple times.
-	duplicateRequestLock *common.IndexLock
+	duplicateRequestLock *structures.IndexLock
 
 	// The salt used to prevent an attacker from causing hash collisions in the duplicate request lock.
 	duplicateRequestSalt [16]byte
@@ -164,7 +164,7 @@ func NewValidatorStore(
 		littDB:               littDB,
 		chunkTable:           chunkTable,
 		ttl:                  ttl,
-		duplicateRequestLock: common.NewIndexLock(1024),
+		duplicateRequestLock: structures.NewIndexLock(1024),
 		duplicateRequestSalt: salt,
 		hotReadRateLimiter:   hotReadRateLimiter,
 		coldReadRateLimiter:  coldReadRateLimiter,

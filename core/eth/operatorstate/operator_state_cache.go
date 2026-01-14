@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/structures"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -45,7 +45,7 @@ type operatorStateCache struct {
 
 	// Used to prevent simultaneous lookup for a particular reference block number. Not used to protect data
 	// structures against concurrent access.
-	indexLock *common.IndexLock
+	indexLock *structures.IndexLock
 }
 
 // Create a new caching wrapper around ChainState for fetching operator state.
@@ -70,7 +70,7 @@ func NewOperatorStateCache(
 		chainState:    chainState,
 		quorumScanner: qs,
 		cache:         cache,
-		indexLock:     common.NewIndexLock(indexLockSize),
+		indexLock:     structures.NewIndexLock(indexLockSize),
 	}, nil
 }
 

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/structures"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -44,7 +44,7 @@ type OnDemandLedgerCache struct {
 	// is to make sure that only one caller is constructing a new OnDemandLedger at a time for a specific account.
 	// Otherwise, it would be possible for two separate callers to get a cache miss for the same account, create the
 	// new object for the same account key, and try to add them to the cache.
-	ledgerCreationLock *common.IndexLock
+	ledgerCreationLock *structures.IndexLock
 	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
 	vaultMonitor *ondemand.OnDemandVaultMonitor
 	metrics      *OnDemandCacheMetrics
@@ -91,7 +91,7 @@ func NewOnDemandLedgerCache(
 		onDemandTableName:  config.OnDemandTableName,
 		pricePerSymbol:     new(big.Int).SetUint64(pricePerSymbol),
 		minNumSymbols:      minNumSymbols,
-		ledgerCreationLock: common.NewIndexLock(256),
+		ledgerCreationLock: structures.NewIndexLock(256),
 		metrics:            metrics,
 	}
 
