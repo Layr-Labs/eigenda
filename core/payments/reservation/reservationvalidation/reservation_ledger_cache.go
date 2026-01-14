@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
+	"github.com/Layr-Labs/eigenda/common/structures"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -61,7 +61,7 @@ type ReservationLedgerCache struct {
 	// is to make sure that only one caller is constructing a new ReservationLedger at a time for a specific account.
 	// Otherwise, it would be possible for two separate callers to get a cache miss for the same account, create the
 	// new object for the same account key, and try to add them to the cache.
-	ledgerCreationLock *common.IndexLock
+	ledgerCreationLock *structures.IndexLock
 	// protects the cache eviction process, ensures that only one eviction can be processed at a time and preventing
 	// race conditions during cache resizing
 	evictionLock sync.Mutex
@@ -99,7 +99,7 @@ func NewReservationLedgerCache(
 		overfillBehavior:     config.OverfillBehavior,
 		bucketCapacityPeriod: config.BucketCapacityPeriod,
 		minNumSymbols:        minNumSymbols,
-		ledgerCreationLock:   common.NewIndexLock(256),
+		ledgerCreationLock:   structures.NewIndexLock(256),
 		metrics:              metrics,
 	}
 
