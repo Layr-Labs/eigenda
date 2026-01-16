@@ -70,7 +70,7 @@ jobs:
         run: BUILD_TAG=master docker buildx bake encoder-icicle --push
       - name: Push encoder-icicle Docker image (release tag)
         if: startsWith(github.ref, 'refs/tags/v')
-        run: BUILD_TAG=${{ github.ref_name }} docker buildx bake encoder-icicle --push
+        run: BUILD_TAG=${GITHUB_REF_NAME#v} docker buildx bake encoder-icicle --push
       - name: Push encoder-icicle Docker image (manual)
         if: github.event_name == 'workflow_dispatch' && inputs.push == true
         run: |
