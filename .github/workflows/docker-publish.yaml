@@ -63,7 +63,7 @@ jobs:
         run: BUILD_TAG=master make docker-build-push
       - name: Push Docker images (release tag)
         if: startsWith(github.ref, 'refs/tags/v')
-        run: BUILD_TAG=${{ github.ref_name }} make docker-build-push
+        run: BUILD_TAG=${GITHUB_REF_NAME#v} make docker-build-push
       - name: Push Docker images (manual)
         if: github.event_name == 'workflow_dispatch' && inputs.push == true
         run: |
