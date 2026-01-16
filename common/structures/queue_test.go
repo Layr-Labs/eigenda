@@ -1,9 +1,8 @@
-package common_test
+package structures
 
 import (
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
@@ -71,7 +70,7 @@ func TestRandomQueueOperations(t *testing.T) {
 
 	initialSize := rand.Uint64Range(0, 8)
 
-	queue := common.NewQueue[int](initialSize)
+	queue := NewQueue[int](initialSize)
 
 	// Iterating an empty queue should work as expected
 	for range queue.Iterator() {

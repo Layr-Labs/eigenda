@@ -3,7 +3,7 @@ package cache
 import (
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/structures"
 )
 
 var _ Cache[string, string] = &FIFOCache[string, string]{}
@@ -16,7 +16,7 @@ type FIFOCache[K comparable, V any] struct {
 	currentWeight uint64
 	maxWeight     uint64
 	data          map[K]V
-	evictionQueue *common.Queue[*insertionRecord]
+	evictionQueue *structures.Queue[*insertionRecord]
 	metrics       *CacheMetrics
 }
 
@@ -43,7 +43,7 @@ func NewFIFOCache[K comparable, V any](
 		maxWeight:        maxWeight,
 		data:             make(map[K]V),
 		weightCalculator: calculator,
-		evictionQueue:    common.NewQueue[*insertionRecord](1024),
+		evictionQueue:    structures.NewQueue[*insertionRecord](1024),
 		metrics:          metrics,
 	}
 }

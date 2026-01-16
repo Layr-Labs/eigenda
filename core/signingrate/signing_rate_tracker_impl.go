@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/enforce"
+	"github.com/Layr-Labs/eigenda/common/structures"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -19,7 +19,7 @@ type signingRateTracker struct {
 	logger logging.Logger
 
 	// Signing data storage, split up into buckets for each time interval. Buckets are stored in chronological order.
-	buckets *common.RandomAccessDeque[*SigningRateBucket]
+	buckets *structures.RandomAccessDeque[*SigningRateBucket]
 
 	// Buckets that have not yet been flushed to storage. Keyed by the bucket's start time.
 	unflushedBuckets map[time.Time]*SigningRateBucket
@@ -54,7 +54,7 @@ func NewSigningRateTracker(
 
 	store := &signingRateTracker{
 		logger:           logger,
-		buckets:          common.NewRandomAccessDeque[*SigningRateBucket](0),
+		buckets:          structures.NewRandomAccessDeque[*SigningRateBucket](0),
 		timeSpan:         timeSpan,
 		bucketSpan:       bucketSpan,
 		unflushedBuckets: make(map[time.Time]*SigningRateBucket),
@@ -125,7 +125,7 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 		return 0
 	}
 
-	startIndex, exact := common.BinarySearchInOrderedDeque(s.buckets, startTime, comparator)
+	startIndex, exact := structures.BinarySearchInOrderedDeque(s.buckets, startTime, comparator)
 
 	if !exact && startIndex > 0 {
 		// We didn't find the bucket with the exact start time, so round backwards to the previous bucket.

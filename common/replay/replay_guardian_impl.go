@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/structures"
 )
 
 var _ ReplayGuardian = &replayGuardian{}
@@ -25,7 +25,7 @@ type replayGuardian struct {
 	observedHashes map[string]struct{}
 
 	// A queue of observed hashes, ordered by request timestamp. Used to prune old hashes.
-	expirationQueue *common.PriorityQueue[*hashWithTimestamp]
+	expirationQueue *structures.PriorityQueue[*hashWithTimestamp]
 
 	// A mutex to protect the observedHashes and expirationQueue.
 	lock sync.Mutex
@@ -69,7 +69,7 @@ func NewReplayGuardian(
 		maxTimeInFuture: maxTimeInFuture,
 		maxTimeInPast:   maxTimeInPast,
 		observedHashes:  make(map[string]struct{}),
-		expirationQueue: common.NewPriorityQueue(isHashWithTimestampLessThan),
+		expirationQueue: structures.NewPriorityQueue(isHashWithTimestampLessThan),
 	}, nil
 }
 

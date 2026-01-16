@@ -12,11 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type BlobKey struct {
-	BatchHeaderHash []byte
-	BlobIndex       uint32
-}
-
 type MockDisperserClient struct {
 	mock.Mock
 	mockRequestIDStore map[string][]byte

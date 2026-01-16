@@ -1,4 +1,4 @@
-package common
+package structures
 
 import (
 	"fmt"
