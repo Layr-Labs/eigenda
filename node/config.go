@@ -94,6 +94,9 @@ type Config struct {
 	EnableV1 bool
 	EnableV2 bool
 
+	// Prevents v1 mode and triggers deletion of v1 data
+	DeprecateV1 bool
+
 	// If true, reject batch dispersal requests containing more than one blob
 	EnforceSingleBlobBatches bool
 
@@ -365,6 +368,17 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	v1Enabled := runtimeMode == flags.ModeV1Only || runtimeMode == flags.ModeV1AndV2
 	v2Enabled := runtimeMode == flags.ModeV2Only || runtimeMode == flags.ModeV1AndV2
 
+	deprecateV1 := ctx.GlobalBool(flags.DeprecateV1Flag.Name)
+	if deprecateV1 {
+		if runtimeMode == flags.ModeV1Only {
+			return nil, fmt.Errorf("cannot run in %s mode when %s is enabled",
+				flags.ModeV1Only, flags.DeprecateV1Flag.Name)
+		}
+		// When deprecating v1, disable v1 functionality even if the runtime mode includes v1
+		v1Enabled = false
+		v2Enabled = true
+	}
+
 	// v1 ports must be defined and valid even if v1 is disabled
 	dispersalPort := ctx.GlobalString(flags.DispersalPortFlag.Name)
 	err = core.ValidatePort(dispersalPort)
@@ -472,6 +486,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            v2Enabled,
 		EnableV1:                            v1Enabled,
+		DeprecateV1:                         deprecateV1,
 		EnforceSingleBlobBatches:            ctx.GlobalBool(flags.EnforceSingleBlobBatchesFlag.Name),
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),

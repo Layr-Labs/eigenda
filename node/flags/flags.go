@@ -617,6 +617,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENFORCE_SINGLE_BLOB_BATCHES"),
 	}
+	DeprecateV1Flag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "deprecate-v1"),
+		Usage:    "When enabled deletes any existing v1 data, and prevents any v1 logic from executing",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DEPRECATE_V1"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -778,6 +784,7 @@ var optionalFlags = []cli.Flag{
 	EnablePerAccountPaymentMetricsFlag,
 	OverrideV2TtlFlag,
 	EnforceSingleBlobBatchesFlag,
+	DeprecateV1Flag,
 }
 
 func init() {
