@@ -349,7 +349,7 @@ GLOBAL OPTIONS:
    Storage
 
    
-    --storage.backends-to-enable value  (default: "V1")                    ($EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE)
+    --storage.backends-to-enable value  (default: "V2")                    ($EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE)
           Comma separated list of eigenDA backends to enable (e.g. V1,V2)
    
     --storage.cache-targets value                                          ($EIGENDA_PROXY_STORAGE_CACHE_TARGETS)
@@ -359,7 +359,7 @@ GLOBAL OPTIONS:
           Number of threads spun-up for async secondary storage insertions. (<=0) denotes
           single threaded insertions where (>0) indicates decoupled writes.
    
-    --storage.dispersal-backend value   (default: "V1")                    ($EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND)
+    --storage.dispersal-backend value   (default: "V2")                    ($EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND)
           Target EigenDA backend version for blob dispersal (e.g. V1 or V2).
    
     --storage.error-on-secondary-insert-failure (default: false)                   ($EIGENDA_PROXY_STORAGE_ERROR_ON_SECONDARY_INSERT_FAILURE)
