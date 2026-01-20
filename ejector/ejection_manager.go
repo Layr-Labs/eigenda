@@ -156,9 +156,9 @@ func (em *ejectionManager) BeginEjection(
 	}
 
 	// Check to see if there is already an ejection in progress on-chain for this validator.
-	ejectionStartedOnchain, err := em.transactor.IsEjectionInProgress(em.ctx, validatorAddress)
+	ejectionStartedOnchain, err := em.isEjectionInProgressWithRetry(validatorAddress)
 	if err != nil {
-		em.logger.Errorf("failed to check ejection status for validator %s, will not begin ejection: %v",
+		em.logger.Errorf("failed to check ejection status for validator %s after retries, will not begin ejection: %v",
 			validatorAddress.Hex(), err)
 		return
 	}
@@ -350,9 +350,9 @@ func (em *ejectionManager) cleanRecentEjections() {
 // Finalize the ejection for a specific validator. Returns true if the ejection was finalized, false otherwise.
 func (em *ejectionManager) finalizeEjection(address geth.Address) bool {
 	// Check to see if the ejection is still in progress.
-	inProgress, err := em.transactor.IsEjectionInProgress(em.ctx, address)
+	inProgress, err := em.isEjectionInProgressWithRetry(address)
 	if err != nil {
-		em.logger.Errorf("failed to check ejection status for validator %s, will not finalize ejection: %v",
+		em.logger.Errorf("failed to check ejection status for validator %s after retries, will not finalize ejection: %v",
 			address.Hex(), err)
 		return false
 	}
@@ -409,4 +409,38 @@ func (em *ejectionManager) handleAbortedEjection(address geth.Address) {
 	}
 
 	delete(em.ejectionsInProgress, address)
+}
+
+// isEjectionInProgressWithRetry checks if an ejection is in progress for a validator, with retry logic
+// to handle transient RPC errors. This is critical for ejection reliability as temporary network issues
+// should not prevent safety-critical ejections.
+func (em *ejectionManager) isEjectionInProgressWithRetry(address geth.Address) (bool, error) {
+	const (
+		maxRetries    = 3
+		retryInterval = 1 * time.Second
+	)
+
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			em.logger.Debugf("retrying IsEjectionInProgress for validator %s (attempt %d/%d)",
+				address.Hex(), attempt+1, maxRetries)
+			time.Sleep(retryInterval)
+		}
+
+		inProgress, err := em.transactor.IsEjectionInProgress(em.ctx, address)
+		if err == nil {
+			if attempt > 0 {
+				em.logger.Infof("IsEjectionInProgress succeeded for validator %s after %d retries",
+					address.Hex(), attempt)
+			}
+			return inProgress, nil
+		}
+
+		lastErr = err
+		em.logger.Warnf("IsEjectionInProgress failed for validator %s (attempt %d/%d): %v",
+			address.Hex(), attempt+1, maxRetries, err)
+	}
+
+	return false, fmt.Errorf("IsEjectionInProgress failed after %d attempts: %w", maxRetries, lastErr)
 }
