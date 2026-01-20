@@ -39,7 +39,7 @@ type Server struct {
 	pb.UnimplementedRelayServer
 
 	// config is the configuration for the relay Server.
-	config *Config
+	config *RelayConfig
 
 	// the logger for the server
 	logger logging.Logger
@@ -86,7 +86,7 @@ func NewServer(
 	ctx context.Context,
 	metricsRegistry *prometheus.Registry,
 	logger logging.Logger,
-	config *Config,
+	config *RelayConfig,
 	metadataStore blobstore.MetadataStore,
 	blobStore *blobstore.BlobStore,
 	chunkReader chunkstore.ChunkReader,

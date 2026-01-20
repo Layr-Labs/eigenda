@@ -1,13 +1,25 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/Layr-Labs/eigenda/relay/cmd/flags"
-	"github.com/Layr-Labs/eigenda/relay/cmd/lib"
-	"github.com/urfave/cli"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/common/config"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
+	blobstorefactory "github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/relay"
+	"github.com/Layr-Labs/eigenda/relay/chunkstore"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -17,17 +29,139 @@ var (
 )
 
 func main() {
-	app := cli.NewApp()
-	app.Flags = flags.Flags
-	app.Version = fmt.Sprintf("%s-%s-%s", version, gitCommit, gitDate)
-	app.Name = "relay"
-	app.Usage = "EigenDA Relay"
-	app.Description = "EigenDA relay for serving blobs and chunks data"
+	ctx := context.Background()
 
-	app.Action = lib.RunRelay
-	err := app.Run(os.Args)
+	err := run(ctx)
 	if err != nil {
-		log.Fatalf("application failed: %v", err)
+		panic(err)
 	}
-	select {}
+
+	// Block forever, the relay runs in background goroutines.
+	<-ctx.Done()
+}
+
+// Run the relay. This method is split from main() so we only have to use panic() once.
+func run(ctx context.Context) error {
+	config, err := config.Bootstrap(relay.DefaultRelayConfig, nil, nil)
+	if err != nil {
+		return fmt.Errorf("failed to bootstrap config: %w", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	loggerConfig := common.DefaultLoggerConfig()
+	loggerConfig.Format = common.LogFormat(config.LogOutputType)
+	loggerConfig.HandlerOpts.NoColor = !config.LogColor
+
+	logger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	// Create eth client
+	ethClient, err := geth.NewMultiHomingClient(config.EthClient, gethcommon.Address{}, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create eth client: %w", err)
+	}
+
+	// Create DynamoDB client
+	dynamoClient, err := dynamodb.NewClient(config.AWS, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create dynamodb client: %w", err)
+	}
+
+	// Create object storage client (supports both S3 and OCI)
+	blobStoreConfig := blobstorefactory.Config{
+		BucketName:       config.BucketName,
+		Backend:          blobstorefactory.ObjectStorageBackend(config.ObjectStorageBackend),
+		OCIRegion:        config.OCIRegion,
+		OCICompartmentID: config.OCICompartmentID,
+		OCINamespace:     config.OCINamespace,
+	}
+	objectStorageClient, err := blobstorefactory.CreateObjectStorageClient(
+		ctx, blobStoreConfig, config.AWS, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create object storage client: %w", err)
+	}
+
+	// Create metrics registry
+	metricsRegistry := prometheus.NewRegistry()
+
+	// Create metadata store
+	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.MetadataTableName)
+	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+		ServiceName: "relay",
+		Registry:    metricsRegistry,
+		Backend:     blobstore.BackendDynamoDB,
+	})
+
+	// Create blob store and chunk reader
+	blobStore := blobstore.NewBlobStore(config.BucketName, objectStorageClient, logger)
+	chunkReader := chunkstore.NewChunkReader(objectStorageClient, config.BucketName)
+
+	// Create eth writer
+	// TODO(iquidus): use directory contract to fetch contract addresses
+	tx, err := eth.NewWriter(logger, ethClient, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	if err != nil {
+		return fmt.Errorf("failed to create eth writer: %w", err)
+	}
+
+	// Create chain state
+	cs := eth.NewChainState(tx, ethClient)
+	ics := thegraph.MakeIndexedChainState(config.Graph, cs, logger)
+
+	// Create listener
+	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("failed to create listener on %s: %w", addr, err)
+	}
+
+	// Create server
+	server, err := relay.NewServer(
+		ctx,
+		metricsRegistry,
+		logger,
+		config,
+		metadataStore,
+		blobStore,
+		chunkReader,
+		tx,
+		ics,
+		listener,
+	)
+	if err != nil {
+		_ = listener.Close()
+		return fmt.Errorf("failed to create relay server: %w", err)
+	}
+
+	// Start server in background
+	errChan := make(chan error, 1)
+	go func() {
+		logger.Info("Starting relay server", "address", listener.Addr().String())
+		if err := server.Start(ctx); err != nil {
+			errChan <- err
+		}
+	}()
+
+	// Wait for interrupt signal for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case sig := <-sigChan:
+		logger.Info("Received shutdown signal, stopping relay server", "signal", sig)
+	case err := <-errChan:
+		logger.Error("Relay server failed", "error", err)
+		return fmt.Errorf("relay server failed: %w", err)
+	}
+
+	// Gracefully stop the server
+	if err := server.Stop(); err != nil {
+		logger.Warn("Error stopping relay server", "error", err)
+		return fmt.Errorf("error stopping relay server: %w", err)
+	}
+
+	return nil
 }
