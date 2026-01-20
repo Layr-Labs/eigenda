@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
@@ -164,4 +166,79 @@ func ParseSignatureKMS(
 	}
 
 	return signature, nil
+}
+
+// RegionalKMSClient represents a KMS client for a specific region.
+type RegionalKMSClient struct {
+	Client *kms.Client
+	Region string
+}
+
+// MultiRegionKMSSigner manages KMS signing across multiple regions with failover support.
+type MultiRegionKMSSigner struct {
+	clients   []RegionalKMSClient
+	keyID     string
+	publicKey *ecdsa.PublicKey
+	failFast  bool
+}
+
+// NewMultiRegionKMSSigner creates a new multi-region KMS signer.
+// The first client in the slice is considered the primary region.
+func NewMultiRegionKMSSigner(
+	clients []RegionalKMSClient,
+	keyID string,
+	publicKey *ecdsa.PublicKey,
+	failFast bool,
+) *MultiRegionKMSSigner {
+	return &MultiRegionKMSSigner{
+		clients:   clients,
+		keyID:     keyID,
+		publicKey: publicKey,
+		failFast:  failFast,
+	}
+}
+
+// Sign signs a hash using the configured KMS key across multiple regions with automatic failover.
+// If failFast is true, it returns immediately on first failure.
+// Otherwise, it tries all regions before returning an error.
+func (m *MultiRegionKMSSigner) Sign(ctx context.Context, hash []byte) ([]byte, error) {
+	if len(m.clients) == 0 {
+		return nil, errors.New("no KMS clients configured")
+	}
+
+	var lastErr error
+	for i, client := range m.clients {
+		log.Printf("Attempting to sign with KMS in region: %s", client.Region)
+
+		signature, err := SignKMS(ctx, client.Client, m.keyID, m.publicKey, hash)
+		if err != nil {
+			log.Printf("KMS signing failed in region %s: %v", client.Region, err)
+			lastErr = err
+
+			// If fail-fast is enabled and this is not the last region, fail immediately
+			if m.failFast {
+				return nil, fmt.Errorf("KMS signing failed in primary region %s (fail-fast enabled): %w", client.Region, err)
+			}
+
+			// Try next region if available
+			if i < len(m.clients)-1 {
+				log.Printf("Failing over to next region")
+				continue
+			}
+
+			// This was the last region, return the error
+			return nil, fmt.Errorf("KMS signing failed in all regions, last error from %s: %w", client.Region, lastErr)
+		}
+
+		// Success
+		if i > 0 {
+			log.Printf("Successfully signed with KMS after failing over to region: %s", client.Region)
+		} else {
+			log.Printf("Successfully signed with KMS in primary region: %s", client.Region)
+		}
+		return signature, nil
+	}
+
+	// Should never reach here, but return error just in case
+	return nil, fmt.Errorf("unexpected error: no regions attempted")
 }
