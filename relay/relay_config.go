@@ -332,7 +332,7 @@ func (c *RelayConfig) Verify() error {
 // This will be removed once other components have been updated to use the new config type, e.g blobapi
 // which currently uses relay.Config to start a relay server.
 // TODO(iquidus): remove this method once blobapi has been updated to documented config.
-func (c *RelayConfig) PopulateFromLegacy(cfg Config) error {
+func (c *RelayConfig) PopulateFromLegacy(cfg Config) {
 	c.RelayKeys = cfg.RelayKeys
 	c.GRPCPort = cfg.GRPCPort
 	c.MaxGRPCMessageSize = cfg.MaxGRPCMessageSize
@@ -357,5 +357,4 @@ func (c *RelayConfig) PopulateFromLegacy(cfg Config) error {
 	c.MaxConnectionAge = cfg.MaxConnectionAge
 	c.MaxConnectionAgeGrace = cfg.MaxConnectionAgeGrace
 	c.MaxIdleConnectionAge = cfg.MaxIdleConnectionAge
-	return nil
 }
