@@ -140,8 +140,17 @@ func StartProxyService(cliCtx *cli.Context) error {
 	}
 
 	if cfg.EnabledServersConfig.ArbCustomDA {
+		var arbEthClient arbitrum_altda.IEthClient
+
+		if cfg.StoreBuilderConfig.MemstoreEnabled {
+			arbEthClient = arbitrum_altda.NewMockEthClient()
+		} else {
+			arbEthClient = ethClient
+		}
+
 		cfg.ArbCustomDASvrCfg.CompatibilityCfg = compatibilityCfg
-		h := arbitrum_altda.NewHandlers(certMgr, log, cfg.ArbCustomDASvrCfg.ProcessInvalidCert, ethClient, compatibilityCfg)
+		h := arbitrum_altda.NewHandlers(certMgr, log, cfg.ArbCustomDASvrCfg.ProcessInvalidCert,
+			arbEthClient, compatibilityCfg)
 
 		arbitrumRpcServer, err := arbitrum_altda.NewServer(ctx, &cfg.ArbCustomDASvrCfg, h)
 		if err != nil {

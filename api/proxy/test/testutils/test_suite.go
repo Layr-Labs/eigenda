@@ -97,7 +97,7 @@ func CreateTestSuite(
 		}
 	}
 
-	arbEthClient = NewMockEthClient()
+	arbEthClient = arbitrum_altda.NewMockEthClient()
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
 		logger,
