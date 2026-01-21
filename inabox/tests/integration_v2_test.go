@@ -157,6 +157,66 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	latestBlock, err = testHarness.EthClient.BlockNumber(ctx)
 	require.NoError(t, err)
 
+	// Add a valid V3 cert verifier at latestBlock + 2
+	opts, unlock = testHarness.GetDeployerTransactOpts()
+	tx, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
+		opts,
+		uint32(latestBlock)+2,
+		gethcommon.HexToAddress(globalInfra.TestConfig.EigenDA.CertVerifierLegacyV3),
+	)
+	unlock()
+	require.NoError(t, err)
+	integration.MineAnvilBlocks(t, testHarness.RPCClient, 10)
+
+	err = validateTxReceipt(ctx, testHarness, tx.Hash())
+	require.NoError(t, err)
+
+	// create a payload disperser client configured to use the legacy v3 cert verifier
+	pdConfig := integration.GetDefaultTestPayloadDisperserConfig()
+	pdConfig.CertVerifier = testHarness.StaticCertVerifierV3
+
+	payloadDisperserLegacyV3, err := testHarness.CreatePayloadDisperser(ctx, globalInfra.Logger, pdConfig)
+	require.NoError(t, err)
+
+	// ensure that new verifier #3 can be used for successful verification
+	// now disperse blob #4 to trigger the new cert verifier which should pass
+	// ensure that a verifier can be added two blocks in the future
+	payload4 := randomPayload(1234)
+	cert4, err := payloadDisperserLegacyV3.SendPayload(ctx, payload4)
+	require.NoError(t, err)
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert4)
+	require.NoError(t, err)
+
+	err = testHarness.StaticCertVerifierV3.CheckDACert(ctx, cert4)
+	require.NoError(t, err)
+
+	// now force verification to fail by modifying the cert contents
+	eigenDAV3Cert4, ok := cert4.(*coretypes.EigenDACertV3)
+	require.True(t, ok)
+
+	// modify the merkle root of the batch header and ensure verification fails
+	// TODO: Test other cert verification failure cases as well
+	eigenDAV3Cert4.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
+
+	var certErr *verification.CertVerifierInvalidCertError
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
+	require.True(t, errors.As(err, &certErr))
+	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
+	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
+	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
+
+	err = testHarness.StaticCertVerifierV3.CheckDACert(ctx, eigenDAV3Cert4)
+	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
+	require.True(t, errors.As(err, &certErr))
+	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
+	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
+	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
+
+	// upgrade the router to point to the v4 cert verifier again and repeat tests
+	latestBlock, err = testHarness.EthClient.BlockNumber(ctx)
+	require.NoError(t, err)
+
 	opts, unlock = testHarness.GetDeployerTransactOpts()
 	tx, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
 		opts,
@@ -170,39 +230,51 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	err = validateTxReceipt(ctx, testHarness, tx.Hash())
 	require.NoError(t, err)
 
-	// ensure that new verifier #3 can be used for successful verification
-	// now disperse blob #4 to trigger the new cert verifier which should pass
-	// ensure that a verifier can be added two blocks in the future
-	payload4 := randomPayload(1234)
-	cert4, err := testHarness.PayloadDisperser.SendPayload(ctx, payload4)
+	payload5 := randomPayload(1234)
+	cert5, err := testHarness.PayloadDisperser.SendPayload(ctx, payload5)
 	require.NoError(t, err)
-	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert4)
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert5)
 	require.NoError(t, err)
 
-	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert4)
+	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert5)
 	require.NoError(t, err)
+
+	// attempt to cast to v3 cert - should fail
+	_, ok = cert5.(*coretypes.EigenDACertV3)
+	require.False(t, ok)
 
 	// now force verification to fail by modifying the cert contents
-	eigenDAV4Cert4, ok := cert4.(*coretypes.EigenDACertV4)
+	eigenDAV4Cert5, ok := cert5.(*coretypes.EigenDACertV4)
 	require.True(t, ok)
 
 	// modify the merkle root of the batch header and ensure verification fails
 	// TODO: Test other cert verification failure cases as well
-	eigenDAV4Cert4.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
+	eigenDAV4Cert5.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
 
-	var certErr *verification.CertVerifierInvalidCertError
-	err = testHarness.RouterCertVerifier.CheckDACert(ctx, eigenDAV4Cert4)
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, eigenDAV4Cert5)
 	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
 	require.True(t, errors.As(err, &certErr))
-	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
-	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
 
-	err = testHarness.StaticCertVerifier.CheckDACert(ctx, eigenDAV4Cert4)
+	err = testHarness.StaticCertVerifier.CheckDACert(ctx, eigenDAV4Cert5)
 	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
 	require.True(t, errors.As(err, &certErr))
-	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
-	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
+	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
+
+	// submit a v3 cert while the v4 verifier is active to ensure it fails verification
+	payload6 := randomPayload(1234)
+	cert6, err := payloadDisperserLegacyV3.SendPayload(ctx, payload6)
+	require.NoError(t, err)
+
+	// verify using the v4 verifier router and static verifier - both should fail
+	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert6)
+	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
+	require.True(t, errors.As(err, &certErr))
+	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
+
+	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert6)
+	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
+	require.True(t, errors.As(err, &certErr))
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
 }
 

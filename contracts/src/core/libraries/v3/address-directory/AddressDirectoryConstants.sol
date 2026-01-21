@@ -36,4 +36,5 @@ library AddressDirectoryConstants {
 
     string internal constant CERT_VERIFIER_LEGACY_V1_NAME = "CERT_VERIFIER_LEGACY_V1";
     string internal constant CERT_VERIFIER_LEGACY_V2_NAME = "CERT_VERIFIER_LEGACY_V2";
+    string internal constant CERT_VERIFIER_LEGACY_V3_NAME = "CERT_VERIFIER_LEGACY_V3";
 }
