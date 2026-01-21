@@ -514,7 +514,7 @@ func startRelayWithListener(
 	ics := thegraph.MakeIndexedChainState(thegraph.Config{}, cs, logger)
 
 	// Create relay test configuration
-	relayConfig := relay.NewTestConfig(relayIndex)
+	relayConfig := relay.NewTestRelayConfig(relayIndex)
 
 	// Create server
 	server, err := relay.NewServer(
