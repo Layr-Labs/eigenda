@@ -1,7 +1,6 @@
 package structures
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/Layr-Labs/eigenda/common/enforce"
@@ -76,19 +75,13 @@ func (s *RandomAccessDeque[T]) PushFront(value T) {
 	s.size++
 }
 
-// Return the value at the front of the deque without removing it. If the deque is empty, returns an error.
+// Return the value at the front of the deque without removing it. Panics if the deque is empty.
 //
 // O(1)
-func (s *RandomAccessDeque[T]) PeekFront() (value T, err error) {
-	if s.size == 0 {
-		var zero T
-		return zero, fmt.Errorf("cannot peek front: deque is empty")
-	}
-
-	value, err = s.Get(0)
-	enforce.NilError(err, "Get failed, this should never happen if size check passes")
-
-	return value, nil
+func (s *RandomAccessDeque[T]) PeekFront() T {
+	value, ok := s.TryPeekFront()
+	enforce.True(ok, "cannot peek front: deque is empty")
+	return value
 }
 
 // Return the value at the front of the deque without removing it. If the deque is empty, returns ok==false.
@@ -99,20 +92,25 @@ func (s *RandomAccessDeque[T]) TryPeekFront() (value T, ok bool) {
 		var zero T
 		return zero, false
 	}
-
-	value, err := s.PeekFront()
-	enforce.NilError(err, "PeekFront failed, this should never happen after IsEmpty check")
-
-	return value, true
+	return s.Get(0), true
 }
 
-// Remove and return the value at the front of the deque. If the deque is empty, returns an error.
+// Remove and return the value at the front of the deque. Panics if the deque is empty.
 //
 // O(1)
-func (s *RandomAccessDeque[T]) PopFront() (value T, err error) {
-	if s.size == 0 {
+func (s *RandomAccessDeque[T]) PopFront() T {
+	value, ok := s.TryPopFront()
+	enforce.True(ok, "cannot pop front: deque is empty")
+	return value
+}
+
+// Remove and return the value at the front of the deque. If the deque is empty, returns ok==false.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) TryPopFront() (value T, ok bool) {
+	if s.IsEmpty() {
 		var zero T
-		return zero, fmt.Errorf("cannot pop front: deque is empty")
+		return zero, false
 	}
 
 	value = s.data[s.startIndex]
@@ -128,21 +126,6 @@ func (s *RandomAccessDeque[T]) PopFront() (value T, err error) {
 	}
 
 	s.size--
-
-	return value, nil
-}
-
-// Remove and return the value at the front of the deque. If the deque is empty, returns ok==false.
-//
-// O(1)
-func (s *RandomAccessDeque[T]) TryPopFront() (value T, ok bool) {
-	if s.IsEmpty() {
-		var zero T
-		return zero, false
-	}
-
-	value, err := s.PopFront()
-	enforce.NilError(err, "PopFront failed, this should never happen after IsEmpty check")
 
 	return value, true
 }
@@ -165,19 +148,13 @@ func (s *RandomAccessDeque[T]) PushBack(value T) {
 	s.size++
 }
 
-// Return the value at the back of the deque without removing it. If the deque is empty, returns an error.
+// Return the value at the back of the deque without removing it. Panics if the deque is empty.
 //
 // O(1)
-func (s *RandomAccessDeque[T]) PeekBack() (value T, err error) {
-	if s.size == 0 {
-		var zero T
-		return zero, fmt.Errorf("cannot peek back: deque is empty")
-	}
-
-	value, err = s.Get(s.size - 1)
-	enforce.NilError(err, "Get failed, this should never happen if size check passes")
-
-	return value, nil
+func (s *RandomAccessDeque[T]) PeekBack() T {
+	value, ok := s.TryPeekBack()
+	enforce.True(ok, "cannot peek back: deque is empty")
+	return value
 }
 
 // Return the value at the back of the deque without removing it. If the deque is empty, returns ok==false.
@@ -188,20 +165,25 @@ func (s *RandomAccessDeque[T]) TryPeekBack() (value T, ok bool) {
 		var zero T
 		return zero, false
 	}
-
-	value, err := s.PeekBack()
-	enforce.NilError(err, "PeekBack failed, this should never happen after IsEmpty check")
-
-	return value, true
+	return s.Get(s.size - 1), true
 }
 
-// Remove and return the value at the back of the deque. If the deque is empty, returns an error.
+// Remove and return the value at the back of the deque. Panics if the deque is empty.
 //
 // O(1)
-func (s *RandomAccessDeque[T]) PopBack() (value T, err error) {
-	if s.size == 0 {
+func (s *RandomAccessDeque[T]) PopBack() T {
+	value, ok := s.TryPopBack()
+	enforce.True(ok, "cannot pop back: deque is empty")
+	return value
+}
+
+// Remove and return the value at the back of the deque. If the deque is empty, returns ok==false.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) TryPopBack() (value T, ok bool) {
+	if s.IsEmpty() {
 		var zero T
-		return zero, fmt.Errorf("cannot pop back: deque is empty")
+		return zero, false
 	}
 
 	var backIndex uint64
@@ -220,75 +202,101 @@ func (s *RandomAccessDeque[T]) PopBack() (value T, err error) {
 
 	s.size--
 
-	return value, nil
+	return value, true
 }
 
-// Remove and return the value at the back of the deque. If the deque is empty, returns ok==false.
+// Get the value at the specified index. Panics if the index is out of bounds.
 //
 // O(1)
-func (s *RandomAccessDeque[T]) TryPopBack() (value T, ok bool) {
-	if s.IsEmpty() {
+func (s *RandomAccessDeque[T]) Get(index uint64) T {
+	value, ok := s.TryGet(index)
+	enforce.True(ok, "index %d out of bounds (size %d)", index, s.size)
+	return value
+}
+
+// Get the value at the specified index. If the index is out of bounds, returns ok==false.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) TryGet(index uint64) (value T, ok bool) {
+	if index >= s.size {
 		var zero T
 		return zero, false
 	}
 
-	value, err := s.PopBack()
-	enforce.NilError(err, "PopBack failed, this should never happen after IsEmpty check")
-
-	return value, true
-}
-
-// Get the value at the specified index. If the index is out of bounds returns an error.
-func (s *RandomAccessDeque[T]) Get(index uint64) (value T, err error) {
-	if index >= s.size {
-		var zero T
-		return zero, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
-	}
-
 	realIndex := (s.startIndex + index) % uint64(len(s.data))
-	return s.data[realIndex], nil
+	return s.data[realIndex], true
 }
 
 // Get an element indexed from the last thing in the deque. Equivalent to Get(Size() - 1 - index).
-// If the index is out of bounds returns an error.
-func (s *RandomAccessDeque[T]) GetFromBack(index uint64) (value T, err error) {
+// Panics if the index is out of bounds.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) GetFromBack(index uint64) T {
+	value, ok := s.TryGetFromBack(index)
+	enforce.True(ok, "index %d out of bounds (size %d)", index, s.size)
+	return value
+}
+
+// Get an element indexed from the last thing in the deque. Equivalent to TryGet(Size() - 1 - index).
+// If the index is out of bounds, returns ok==false.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) TryGetFromBack(index uint64) (value T, ok bool) {
 	if index >= s.size {
 		var zero T
-		return zero, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
+		return zero, false
 	}
-
-	value, err = s.Get(s.size - 1 - index)
-	enforce.NilError(err, "Get failed, this should never happen if size check passes")
-
-	return value, nil
+	return s.TryGet(s.size - 1 - index)
 }
 
 // Set the value at the specified index, replacing the existing value, which is returned.
-// If the index is out of bounds returns an error.
-func (s *RandomAccessDeque[T]) Set(index uint64, value T) (previousValue T, err error) {
+// Panics if the index is out of bounds.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) Set(index uint64, value T) T {
+	previousValue, ok := s.TrySet(index, value)
+	enforce.True(ok, "index %d out of bounds (size %d)", index, s.size)
+	return previousValue
+}
+
+// Set the value at the specified index, replacing the existing value, which is returned.
+// If the index is out of bounds, returns ok==false.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) TrySet(index uint64, value T) (previousValue T, ok bool) {
 	if index >= s.size {
 		var zero T
-		return zero, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
+		return zero, false
 	}
 
 	realIndex := (s.startIndex + index) % uint64(len(s.data))
 	previousValue = s.data[realIndex]
 	s.data[realIndex] = value
-	return previousValue, nil
+	return previousValue, true
 }
 
 // Set an element indexed from the last thing in the deque, replacing the existing value, which is returned.
 // Equivalent to Set(Size() - 1 - index, value).
-func (s *RandomAccessDeque[T]) SetFromBack(index uint64, value T) (previousValue T, err error) {
+// Panics if the index is out of bounds.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) SetFromBack(index uint64, value T) T {
+	previousValue, ok := s.TrySetFromBack(index, value)
+	enforce.True(ok, "index %d out of bounds (size %d)", index, s.size)
+	return previousValue
+}
+
+// Set an element indexed from the last thing in the deque, replacing the existing value, which is returned.
+// Equivalent to TrySet(Size() - 1 - index, value).
+// If the index is out of bounds, returns ok==false.
+//
+// O(1)
+func (s *RandomAccessDeque[T]) TrySetFromBack(index uint64, value T) (previousValue T, ok bool) {
 	if index >= s.size {
 		var zero T
-		return zero, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
+		return zero, false
 	}
-
-	previousValue, err = s.Set(s.size-1-index, value)
-	enforce.NilError(err, "Set failed, this should never happen if size check passes")
-
-	return previousValue, nil
+	return s.TrySet(s.size-1-index, value)
 }
 
 // Clear all elements from the deque. Reclaims space in the underlying array.
@@ -313,32 +321,42 @@ func (s *RandomAccessDeque[T]) Iterator() func(yield func(uint64, T) bool) {
 		}
 	}
 
-	iterator, err := s.IteratorFrom(0)
-	enforce.NilError(err, "IteratorFrom failed, this should never happen")
+	return s.IteratorFrom(0)
+}
 
+// Get an iterator over the elements in the deque, from the specified index to back. It is not safe to get an iterator,
+// modify the deque, and then use the iterator again.
+// Panics if the index is out of bounds.
+//
+// O(1) to call this method, O(1) per iteration step.
+func (s *RandomAccessDeque[T]) IteratorFrom(index uint64) func(yield func(uint64, T) bool) {
+	iterator, ok := s.TryIteratorFrom(index)
+	enforce.True(ok, "index %d out of bounds (size %d)", index, s.size)
 	return iterator
 }
 
 // Get an iterator over the elements in the deque, from the specified index to back. It is not safe to get an iterator,
 // modify the deque, and then use the iterator again.
+// If the index is out of bounds, returns ok==false.
 //
 // O(1) to call this method, O(1) per iteration step.
-func (s *RandomAccessDeque[T]) IteratorFrom(index uint64) (func(yield func(uint64, T) bool), error) {
-
+func (s *RandomAccessDeque[T]) TryIteratorFrom(index uint64) (func(yield func(uint64, T) bool), bool) {
 	if index >= s.size {
-		return nil, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
+		return nil, false
 	}
 
 	return func(yield func(uint64, T) bool) {
 		for i := index; i < s.size; i++ {
-			value, err := s.Get(i)
-			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
+			// We don't need to check bounds here because we already verified index is valid
+			// and we're iterating within the size. If the deque is modified during iteration,
+			// that's undefined behavior as documented.
+			value := s.Get(i)
 
 			if !yield(i, value) {
 				return
 			}
 		}
-	}, nil
+	}, true
 }
 
 // Get an iterator over the elements in the deque, from back to front. It is not safe to get an iterator,
@@ -352,32 +370,42 @@ func (s *RandomAccessDeque[T]) ReverseIterator() func(yield func(uint64, T) bool
 		}
 	}
 
-	iterator, err := s.ReverseIteratorFrom(s.size - 1)
-	enforce.NilError(err, "ReverseIteratorFrom failed, this should never happen")
+	return s.ReverseIteratorFrom(s.size - 1)
+}
 
+// Get an iterator over the elements in the deque, from the specified index to front. It is not safe to get an iterator,
+// modify the deque, and then use the iterator again.
+// Panics if the index is out of bounds.
+//
+// O(1) to call this method, O(1) per iteration step.
+func (s *RandomAccessDeque[T]) ReverseIteratorFrom(index uint64) func(yield func(uint64, T) bool) {
+	iterator, ok := s.TryReverseIteratorFrom(index)
+	enforce.True(ok, "index %d out of bounds (size %d)", index, s.size)
 	return iterator
 }
 
 // Get an iterator over the elements in the deque, from the specified index to front. It is not safe to get an iterator,
 // modify the deque, and then use the iterator again.
+// If the index is out of bounds, returns ok==false.
 //
 // O(1) to call this method, O(1) per iteration step.
-func (s *RandomAccessDeque[T]) ReverseIteratorFrom(index uint64) (func(yield func(uint64, T) bool), error) {
-
+func (s *RandomAccessDeque[T]) TryReverseIteratorFrom(index uint64) (func(yield func(uint64, T) bool), bool) {
 	if index >= s.size {
-		return nil, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
+		return nil, false
 	}
 
 	return func(yield func(uint64, T) bool) {
 		for i := index; i != math.MaxUint64; i-- {
-			value, err := s.Get(i)
-			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
+			// We don't need to check bounds here because we already verified index is valid
+			// and we're iterating within the size. If the deque is modified during iteration,
+			// that's undefined behavior as documented.
+			value := s.Get(i)
 
 			if !yield(i, value) {
 				return
 			}
 		}
-	}, nil
+	}, true
 }
 
 // Resize the underlying array to accommodate at least one more insertion. Preserves existing elements.
@@ -429,8 +457,7 @@ func BinarySearchInOrderedDeque[V any, T any](
 
 	for left < right {
 		targetIndex = left + (right-left)/2
-		target, err := deque.Get(targetIndex)
-		enforce.NilError(err, "Get failed, this should never happen with valid indices")
+		target := deque.Get(targetIndex)
 
 		cmp := compare(value, target)
 
@@ -458,8 +485,7 @@ func BinarySearchInOrderedDeque[V any, T any](
 		}
 	}
 
-	element, err := deque.Get(left)
-	enforce.NilError(err, "Get failed, this should never happen with valid indices")
+	element := deque.Get(left)
 	cmp := compare(value, element)
 	if cmp == 0 {
 		// We've found an exact match.

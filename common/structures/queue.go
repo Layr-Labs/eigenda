@@ -1,7 +1,5 @@
 package structures
 
-import "github.com/Layr-Labs/eigenda/common/enforce"
-
 // A standard generic queue.
 //
 // This struct is not thread safe.
@@ -24,9 +22,7 @@ func (q *Queue[T]) Push(item T) {
 
 // Pop an item off the queue. Panics if the queue is empty.
 func (q *Queue[T]) Pop() T {
-	item, err := q.data.PopFront()
-	enforce.NilError(err, "cannot pop from empty queue")
-	return item
+	return q.data.PopFront()
 }
 
 // TryPop tries to pop an item off the queue. Returns the item and true if successful, or the zero value
@@ -37,9 +33,7 @@ func (q *Queue[T]) TryPop() (item T, ok bool) {
 
 // Peek at the item at the front of the queue without removing it. Panics if the queue is empty.
 func (q *Queue[T]) Peek() T {
-	item, err := q.data.PeekFront()
-	enforce.NilError(err, "cannot peek from empty queue")
-	return item
+	return q.data.PeekFront()
 }
 
 // TryPeek tries to peek at the item at the front of the queue without removing it. Returns the item and true
@@ -70,14 +64,10 @@ func (q *Queue[T]) Iterator() func(yield func(uint64, T) bool) {
 
 // Get an item at the given index in the queue. Panics if the index is out of bounds.
 func (q *Queue[T]) Get(index uint64) T {
-	item, err := q.data.Get(index)
-	enforce.NilError(err, "index out of bounds")
-	return item
+	return q.data.Get(index)
 }
 
 // Set the item at the given index in the queue. Panics if the index is out of bounds.
 func (q *Queue[T]) Set(index uint64, value T) (previousValue T) {
-	previous, err := q.data.Set(index, value)
-	enforce.NilError(err, "index out of bounds")
-	return previous
+	return q.data.Set(index, value)
 }
