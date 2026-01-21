@@ -88,11 +88,7 @@ func (s *RandomAccessDeque[T]) PeekFront() T {
 //
 // O(1)
 func (s *RandomAccessDeque[T]) TryPeekFront() (value T, ok bool) {
-	if s.IsEmpty() {
-		var zero T
-		return zero, false
-	}
-	return s.Get(0), true
+	return s.TryGet(0)
 }
 
 // Remove and return the value at the front of the deque. Panics if the deque is empty.
@@ -161,11 +157,7 @@ func (s *RandomAccessDeque[T]) PeekBack() T {
 //
 // O(1)
 func (s *RandomAccessDeque[T]) TryPeekBack() (value T, ok bool) {
-	if s.IsEmpty() {
-		var zero T
-		return zero, false
-	}
-	return s.Get(s.size - 1), true
+	return s.TryGet(s.size - 1)
 }
 
 // Remove and return the value at the back of the deque. Panics if the deque is empty.
@@ -347,12 +339,7 @@ func (s *RandomAccessDeque[T]) TryIteratorFrom(index uint64) (func(yield func(ui
 
 	return func(yield func(uint64, T) bool) {
 		for i := index; i < s.size; i++ {
-			// We don't need to check bounds here because we already verified index is valid
-			// and we're iterating within the size. If the deque is modified during iteration,
-			// that's undefined behavior as documented.
-			value := s.Get(i)
-
-			if !yield(i, value) {
+			if !yield(i, s.Get(i)) {
 				return
 			}
 		}
@@ -396,12 +383,7 @@ func (s *RandomAccessDeque[T]) TryReverseIteratorFrom(index uint64) (func(yield 
 
 	return func(yield func(uint64, T) bool) {
 		for i := index; i != math.MaxUint64; i-- {
-			// We don't need to check bounds here because we already verified index is valid
-			// and we're iterating within the size. If the deque is modified during iteration,
-			// that's undefined behavior as documented.
-			value := s.Get(i)
-
-			if !yield(i, value) {
+			if !yield(i, s.Get(i)) {
 				return
 			}
 		}

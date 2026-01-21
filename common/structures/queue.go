@@ -15,7 +15,7 @@ func NewQueue[T any](initialCapacity uint64) *Queue[T] {
 	}
 }
 
-// Push an onto the queue.
+// Push an item onto the queue.
 func (q *Queue[T]) Push(item T) {
 	q.data.PushBack(item)
 }
