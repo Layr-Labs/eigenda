@@ -327,3 +327,35 @@ func (c *RelayConfig) Verify() error {
 
 	return nil
 }
+
+// Temporary method to populate the new config type from a legacy config type.
+// This will be removed once other components have been updated to use the new config type, e.g blobapi
+// which currently uses relay.Config to start a relay server.
+// TODO(iquidus): remove this method once blobapi has been updated to documented config.
+func (c *RelayConfig) PopulateFromLegacy(cfg Config) error {
+	c.RelayKeys = cfg.RelayKeys
+	c.GRPCPort = cfg.GRPCPort
+	c.MaxGRPCMessageSize = cfg.MaxGRPCMessageSize
+	c.MetadataCacheSize = cfg.MetadataCacheSize
+	c.MetadataMaxConcurrency = cfg.MetadataMaxConcurrency
+	c.BlobCacheBytes = cfg.BlobCacheBytes
+	c.BlobMaxConcurrency = cfg.BlobMaxConcurrency
+	c.ChunkCacheBytes = cfg.ChunkCacheBytes
+	c.ChunkMaxConcurrency = cfg.ChunkMaxConcurrency
+	c.MaxKeysPerGetChunksRequest = cfg.MaxKeysPerGetChunksRequest
+	c.RateLimits = cfg.RateLimits
+	c.AuthenticationKeyCacheSize = cfg.AuthenticationKeyCacheSize
+	c.AuthenticationDisabled = cfg.AuthenticationDisabled
+	c.GetChunksRequestMaxPastAge = cfg.GetChunksRequestMaxPastAge
+	c.GetChunksRequestMaxFutureAge = cfg.GetChunksRequestMaxFutureAge
+	c.Timeouts = cfg.Timeouts
+	c.OnchainStateRefreshInterval = cfg.OnchainStateRefreshInterval
+	c.MetricsPort = cfg.MetricsPort
+	c.EnableMetrics = cfg.EnableMetrics
+	c.EnablePprof = cfg.EnablePprof
+	c.PprofHttpPort = cfg.PprofHttpPort
+	c.MaxConnectionAge = cfg.MaxConnectionAge
+	c.MaxConnectionAgeGrace = cfg.MaxConnectionAgeGrace
+	c.MaxIdleConnectionAge = cfg.MaxIdleConnectionAge
+	return nil
+}

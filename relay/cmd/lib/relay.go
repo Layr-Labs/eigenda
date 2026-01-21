@@ -1,4 +1,4 @@
-package main
+package lib
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
@@ -20,48 +19,30 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/urfave/cli"
 )
 
-var (
-	version   string
-	gitCommit string
-	gitDate   string
-)
-
-func main() {
-	ctx := context.Background()
-
-	err := run(ctx)
+// This is the legacy entrypoint for the relay. It is retained for backwards compatibility with the blobapi.
+// Once the blobapi config is updated to the documented/verifiable config framework, this can be removed.
+// TODO(iquidus): remove this function once blobapi is updated to use the documented config framework.
+// RunRelay is the entrypoint for the relay.
+func RunRelay(cliCtx *cli.Context) error {
+	config, err := NewConfig(cliCtx)
 	if err != nil {
-		panic(err)
-	}
-
-	// Block forever, the relay runs in background goroutines.
-	<-ctx.Done()
-}
-
-// Run the relay. This method is split from main() so we only have to use panic() once.
-func run(ctx context.Context) error {
-	config, err := config.Bootstrap(relay.DefaultRelayConfig, nil, nil)
-	if err != nil {
-		return fmt.Errorf("failed to bootstrap config: %w", err)
+		return fmt.Errorf("failed to create relay config: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// TODO(iquidus): handle nil config (help flag was probably provided)
-	loggerConfig := common.DefaultLoggerConfig()
-	loggerConfig.Format = common.LogFormat(config.LogOutputType)
-	loggerConfig.HandlerOpts.NoColor = !config.LogColor
-
-	logger, err := common.NewLogger(loggerConfig)
+	// Create logger
+	logger, err := common.NewLogger(&config.Log)
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Create eth client
-	ethClient, err := geth.NewMultiHomingClient(config.EthClient, gethcommon.Address{}, logger)
+	ethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create eth client: %w", err)
 	}
@@ -102,7 +83,6 @@ func run(ctx context.Context) error {
 	chunkReader := chunkstore.NewChunkReader(objectStorageClient, config.BucketName)
 
 	// Create eth writer
-	// TODO(iquidus): use directory contract to fetch contract addresses
 	tx, err := eth.NewWriter(logger, ethClient, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return fmt.Errorf("failed to create eth writer: %w", err)
@@ -110,21 +90,24 @@ func run(ctx context.Context) error {
 
 	// Create chain state
 	cs := eth.NewChainState(tx, ethClient)
-	ics := thegraph.MakeIndexedChainState(config.Graph, cs, logger)
+	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 
 	// Create listener
-	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
+	addr := fmt.Sprintf("0.0.0.0:%d", config.RelayConfig.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("failed to create listener on %s: %w", addr, err)
 	}
+
+	cfg := relay.DefaultRelayConfig()
+	cfg.PopulateFromLegacy(config.RelayConfig)
 
 	// Create server
 	server, err := relay.NewServer(
 		ctx,
 		metricsRegistry,
 		logger,
-		config,
+		cfg,
 		metadataStore,
 		blobStore,
 		chunkReader,
