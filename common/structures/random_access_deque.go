@@ -157,6 +157,10 @@ func (s *RandomAccessDeque[T]) PeekBack() T {
 //
 // O(1)
 func (s *RandomAccessDeque[T]) TryPeekBack() (value T, ok bool) {
+	if s.IsEmpty() {
+		var zero T
+		return zero, false
+	}
 	return s.TryGet(s.size - 1)
 }
 
