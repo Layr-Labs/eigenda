@@ -170,7 +170,7 @@ func TestRelayCallTimeout(t *testing.T) {
 	_, blobCert := buildBlobAndCert(t, tester)
 
 	// the timeout should occur before the panic has a chance to be triggered
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything).Return(
+	tester.MockRelayClient.On("GetBlob", mock.Anything, blobCert).Return(
 		nil, errors.New("timeout")).Once().Run(
 		func(args mock.Arguments) {
 			ctx := args.Get(0).(context.Context)
@@ -184,7 +184,7 @@ func TestRelayCallTimeout(t *testing.T) {
 		})
 
 	// the panic should be triggered, since it happens faster than the configured timeout
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything).Return(
+	tester.MockRelayClient.On("GetBlob", mock.Anything, blobCert).Return(
 		nil, errors.New("timeout")).Once().Run(
 		func(args mock.Arguments) {
 			ctx := args.Get(0).(context.Context)
@@ -217,7 +217,7 @@ func TestGetBlobReturnsError(t *testing.T) {
 	tester := buildRelayPayloadRetrieverTester(t)
 	_, blobCert := buildBlobAndCert(t, tester)
 
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("relay error"))
+	tester.MockRelayClient.On("GetBlob", mock.Anything, blobCert).Return(nil, fmt.Errorf("relay error"))
 
 	payload, err := tester.RelayPayloadRetriever.GetPayload(ctx, blobCert)
 	require.Nil(t, payload)
@@ -232,13 +232,13 @@ func TestGetBlobReturnsDifferentBlob(t *testing.T) {
 	ctx := t.Context()
 
 	tester := buildRelayPayloadRetrieverTester(t)
-	_, blobCert1 := buildBlobAndCert(t, tester)
+	_, blobCert := buildBlobAndCert(t, tester)
 	wrongBlob, _ := buildBlobAndCert(t, tester)
 
 	// Return a wrong blob that doesn't match the cert commitment
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything).Return(wrongBlob, nil).Once()
+	tester.MockRelayClient.On("GetBlob", mock.Anything, blobCert).Return(wrongBlob, nil).Once()
 
-	payload, err := tester.RelayPayloadRetriever.GetPayload(ctx, blobCert1)
+	payload, err := tester.RelayPayloadRetriever.GetPayload(ctx, blobCert)
 	require.Nil(t, payload)
 	require.Error(t, err)
 
@@ -263,7 +263,7 @@ func TestFailedDecoding(t *testing.T) {
 	require.NoError(t, err)
 
 	// The mock returns this malicious blob, which passes commitment verification but fails decoding
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything).Return(maliciousBlob, nil).Once()
+	tester.MockRelayClient.On("GetBlob", mock.Anything, maliciousCert).Return(maliciousBlob, nil).Once()
 
 	payload, err := tester.RelayPayloadRetriever.GetPayload(ctx, maliciousCert)
 	require.Error(t, err)
@@ -319,7 +319,7 @@ func TestCommitmentVerifiesButBlobToPayloadFails(t *testing.T) {
 	require.NoError(t, err)
 
 	// Mock the relay to return our incorrectly encoded blob
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything).Return(maliciousBlob, nil).Once()
+	tester.MockRelayClient.On("GetBlob", mock.Anything, blobCert).Return(maliciousBlob, nil).Once()
 
 	// Try to get the payload - this should fail during blob to payload conversion
 	payload, err := tester.RelayPayloadRetriever.GetPayload(ctx, blobCert)

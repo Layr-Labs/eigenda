@@ -603,7 +603,6 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		return fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
 	}
 
-	// read blob from a single relay (assuming success, otherwise will retry)
 	payloadFromRelayRetriever, err := c.relayPayloadRetriever.GetPayload(ctx, eigenDAV3Cert)
 	if err != nil {
 		return fmt.Errorf("failed to get payload from relay: %w", err)
