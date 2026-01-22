@@ -241,17 +241,20 @@ func NewNode(
 		}
 		storeDurationBlocks = storeDuration
 	}
-	// Create new chunk store
-	store, err := NewLevelDBStore(
-		config.DbPath+"/chunk",
-		logger,
-		metrics,
-		blockStaleMeasure,
-		config.LevelDBDisableSeeksCompactionV1,
-		config.LevelDBSyncWritesV1,
-		storeDurationBlocks)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new store: %w", err)
+	// Create v1 chunk store only if v1 is enabled
+	var store *Store
+	if config.EnableV1 {
+		store, err = NewLevelDBStore(
+			config.DbPath+"/chunk",
+			logger,
+			metrics,
+			blockStaleMeasure,
+			config.LevelDBDisableSeeksCompactionV1,
+			config.LevelDBSyncWritesV1,
+			storeDurationBlocks)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new store: %w", err)
+		}
 	}
 
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(serviceManagerAddress, client)
