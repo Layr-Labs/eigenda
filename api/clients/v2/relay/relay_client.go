@@ -119,9 +119,11 @@ func (c *relayClient) GetBlob(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) (*coretypes.Blob, error) {
+	// In practice, there will only be one relay key in each certificate, but we don't want to
+	// assert that here in case something changes in the future. We just ensure there is at least one.
 	relayKeys := cert.RelayKeys()
-	if len(relayKeys) != 1 {
-		return nil, fmt.Errorf("cert must contain exactly 1 relay key, got %d", len(relayKeys))
+	if len(relayKeys) == 0 {
+		return nil, errors.New("cert contains no relay keys")
 	}
 	relayKey := relayKeys[0]
 

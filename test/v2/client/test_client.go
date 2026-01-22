@@ -736,8 +736,8 @@ func (c *TestClient) ReadBlobFromRelay(
 	var err error
 
 	relayKeys := cert.RelayKeys()
-	if len(relayKeys) != 1 {
-		return fmt.Errorf("cert must contain exactly 1 relay key, got %d", len(relayKeys))
+	if len(relayKeys) == 0 {
+		return errors.New("cert contains no relay keys")
 	}
 	relayKey := relayKeys[0]
 
