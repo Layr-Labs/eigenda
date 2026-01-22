@@ -152,7 +152,7 @@ func TestGetPayloadSuccess(t *testing.T) {
 	tester := buildRelayPayloadRetrieverTester(t)
 	blob, blobCert := buildBlobAndCert(t, tester)
 
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything).Return(blob, nil).Once()
+	tester.MockRelayClient.On("GetBlob", mock.Anything, blobCert).Return(blob, nil).Once()
 
 	payload, err := tester.RelayPayloadRetriever.GetPayload(ctx, blobCert)
 
@@ -226,7 +226,8 @@ func TestGetBlobReturnsError(t *testing.T) {
 	tester.MockRelayClient.AssertExpectations(t)
 }
 
-// TestGetBlobReturnsDifferentBlob tests what happens when the relay returns a blob that doesn't match the commitment.
+// TestGetBlobReturnsDifferentBlob tests that when the relay returns a blob that doesn't match the commitment,
+// an error is returned.
 func TestGetBlobReturnsDifferentBlob(t *testing.T) {
 	ctx := t.Context()
 
@@ -244,7 +245,7 @@ func TestGetBlobReturnsDifferentBlob(t *testing.T) {
 	tester.MockRelayClient.AssertExpectations(t)
 }
 
-// TestFailedDecoding verifies that a failed blob decode is handled gracefully
+// TestFailedDecoding verifies that decoding errors (caused by corrupted payload headers) are handled gracefully.
 func TestFailedDecoding(t *testing.T) {
 	ctx := t.Context()
 
@@ -252,15 +253,16 @@ func TestFailedDecoding(t *testing.T) {
 	blob, _ := buildBlobAndCert(t, tester)
 	blobBytes := blob.Serialize()
 
-	// intentionally cause the payload header claimed length to differ from the actual length
+	// Corrupt the blob bytes to have an invalid payload header length
 	binary.BigEndian.PutUint32(blobBytes[2:6], uint32(len(blobBytes)-1))
 
-	// Build a cert that matches the corrupted blob (so commitment verification passes)
+	// Build a cert that matches the corrupted blob so commitment verification passes
 	maliciousCert := buildCertFromBlobBytes(t, blobBytes, tester.Random.Uint32())
 	blobLengthSymbols := maliciousCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
 	maliciousBlob, err := coretypes.DeserializeBlob(blobBytes, blobLengthSymbols)
 	require.NoError(t, err)
 
+	// The mock returns this malicious blob, which passes commitment verification but fails decoding
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything).Return(maliciousBlob, nil).Once()
 
 	payload, err := tester.RelayPayloadRetriever.GetPayload(ctx, maliciousCert)

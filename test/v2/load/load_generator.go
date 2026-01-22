@@ -218,7 +218,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 	}
 
 	l.relayReadLimiter <- struct{}{}
-	l.amplifiedReadFromRelay(rand, payload, eigenDAV3Cert)
+	l.readFromRelayWithAmplification(rand, payload, eigenDAV3Cert)
 	<-l.relayReadLimiter
 
 	l.validatorReadLimiter <- struct{}{}
@@ -351,7 +351,7 @@ func (l *LoadGenerator) doReadsWithProxy(
 }
 
 // Reads a blob from the relay using the GRPC clients, amplified to the configured degree.
-func (l *LoadGenerator) amplifiedReadFromRelay(
+func (l *LoadGenerator) readFromRelayWithAmplification(
 	rand *random.TestRandom,
 	payload []byte,
 	eigenDACert *coretypes.EigenDACertV3,

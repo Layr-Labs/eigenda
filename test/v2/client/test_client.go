@@ -737,10 +737,10 @@ func (c *TestClient) ReadBlobFromRelay(
 	var err error
 
 	relayKeys := cert.RelayKeys()
-	var relayKey corev2.RelayKey
-	if len(relayKeys) > 0 {
-		relayKey = relayKeys[0]
+	if len(relayKeys) != 1 {
+		return fmt.Errorf("cert must contain exactly 1 relay key, got %d", len(relayKeys))
 	}
+	relayKey := relayKeys[0]
 
 	c.metrics.startOperation("relay_read")
 	start := time.Now()
