@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/stretchr/testify/mock"
@@ -18,12 +19,13 @@ func NewRelayClient() *MockRelayClient {
 	return &MockRelayClient{}
 }
 
-func (c *MockRelayClient) GetBlob(ctx context.Context, relayKey corev2.RelayKey, blobKey corev2.BlobKey) ([]byte, error) {
-	args := c.Called(ctx, relayKey, blobKey)
+//nolint:wrapcheck // mock code intentionally returns unwrapped errors
+func (c *MockRelayClient) GetBlob(ctx context.Context, cert coretypes.EigenDACert) (*coretypes.Blob, error) {
+	args := c.Called(ctx, cert)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]byte), args.Error(1)
+	return args.Get(0).(*coretypes.Blob), args.Error(1)
 }
 
 func (c *MockRelayClient) GetChunksByRange(ctx context.Context, relayKey corev2.RelayKey, requests []*relay.ChunkRequestByRange) ([][]byte, error) {
@@ -40,15 +42,6 @@ func (c *MockRelayClient) GetChunksByIndex(ctx context.Context, relayKey corev2.
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([][]byte), args.Error(1)
-}
-
-func (c *MockRelayClient) GetSockets() map[corev2.RelayKey]string {
-	args := c.Called()
-	if args.Get(0) == nil {
-		return nil
-	}
-
-	return args.Get(0).(map[corev2.RelayKey]string)
 }
 
 func (c *MockRelayClient) Close() error {

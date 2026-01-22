@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -282,7 +281,6 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 
 	testHarness.RelayRetrievalClientV2, err = payloadretrieval.NewRelayPayloadRetriever(
 		infraHarness.Logger,
-		rand.New(rand.NewSource(time.Now().UnixNano())),
 		relayPayloadRetrieverConfig,
 		relayClient,
 		kzgVerifier.G1SRS,

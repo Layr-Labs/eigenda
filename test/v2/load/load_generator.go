@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/pprof"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test/random"
@@ -205,7 +204,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 
 	l.submissionLimiter <- struct{}{}
 
-	blobKey, payload, eigenDACert, err := l.disperseBlob(rand)
+	payload, eigenDACert, err := l.disperseBlob(rand)
 	<-l.submissionLimiter
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to disperse blob: %w", err)
@@ -219,7 +218,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 	}
 
 	l.relayReadLimiter <- struct{}{}
-	l.readBlobFromRelays(rand, blobKey, payload, eigenDAV3Cert)
+	l.amplifiedReadFromRelay(rand, payload, eigenDAV3Cert)
 	<-l.relayReadLimiter
 
 	l.validatorReadLimiter <- struct{}{}
@@ -229,10 +228,10 @@ func (l *LoadGenerator) readAndWriteBlob() {
 
 // Submits a single blob to the network using the GRPC clients.
 func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
-	blobKey corev2.BlobKey,
 	payload []byte,
 	eigenDACert coretypes.EigenDACert,
-	err error) {
+	err error,
+) {
 
 	payload = rand.Bytes(int(l.payloadSize))
 
@@ -243,26 +242,20 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	eigenDACert, err = l.client.DispersePayload(ctx, payload)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
-		return corev2.BlobKey{}, nil, nil, fmt.Errorf("failed to disperse blob: %w", err)
+		return nil, nil, fmt.Errorf("failed to disperse blob: %w", err)
 	}
 
 	// Ensure the eigenDACert is of type EigenDACertV3
 	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
 	if !ok {
 		l.client.GetLogger().Errorf("expected EigenDACertV3, got %T", eigenDACert)
-		return corev2.BlobKey{}, nil, nil, fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
-	}
-
-	blobKey, err = eigenDAV3Cert.ComputeBlobKey()
-	if err != nil {
-		l.client.GetLogger().Errorf("failed to compute blob key: %v", err)
-		return corev2.BlobKey{}, nil, nil, fmt.Errorf("failed to compute blob key: %w", err)
+		return nil, nil, fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
 	}
 
 	// Estimate gas for CheckDACert call
 	go l.estimateAndReportGasCheckDACert(eigenDAV3Cert)
 
-	return blobKey, payload, eigenDACert, nil
+	return payload, eigenDACert, nil
 }
 
 // estimateAndReportGasCheckDACert performs gas estimation and reports it as a metric.
@@ -357,10 +350,9 @@ func (l *LoadGenerator) doReadsWithProxy(
 	return nil
 }
 
-// readBlobFromRelays reads a blob from the relays using the GRPC clients.
-func (l *LoadGenerator) readBlobFromRelays(
+// Reads a blob from the relay using the GRPC clients, amplified to the configured degree.
+func (l *LoadGenerator) amplifiedReadFromRelay(
 	rand *random.TestRandom,
-	blobKey corev2.BlobKey,
 	payload []byte,
 	eigenDACert *coretypes.EigenDACertV3,
 ) {
@@ -380,20 +372,10 @@ func (l *LoadGenerator) readBlobFromRelays(
 		relayReadCount = int(l.config.RelayReadAmplification)
 	}
 
-	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
-	relayKeys := eigenDACert.RelayKeys()
-	readStartIndex := rand.Int32Range(0, int32(len(relayKeys)))
-
-	for i := 0; i < relayReadCount; i++ {
-		err := l.client.ReadBlobFromRelay(
-			ctx,
-			blobKey,
-			relayKeys[(int(readStartIndex)+i)%len(relayKeys)],
-			payload,
-			blobLengthSymbols,
-			0)
+	for range relayReadCount {
+		err := l.client.ReadBlobFromRelay(ctx, eigenDACert, payload, 0)
 		if err != nil {
-			l.client.GetLogger().Errorf("failed to read blob from relays: %v", err)
+			l.client.GetLogger().Errorf("failed to read blob from relay: %v", err)
 		}
 	}
 }
