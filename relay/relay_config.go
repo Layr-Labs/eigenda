@@ -212,6 +212,65 @@ func (c *RelayConfig) GetPackagePaths() []string {
 }
 
 func (c *RelayConfig) Verify() error {
+	// Verify nested config structs
+	if err := c.AWS.Verify(); err != nil {
+		return fmt.Errorf("invalid AWS config: %w", err)
+	}
+	if err := c.EthClient.Verify(); err != nil {
+		return fmt.Errorf("invalid EthClient config: %w", err)
+	}
+	if err := c.Graph.Verify(); err != nil {
+		return fmt.Errorf("invalid Graph config: %w", err)
+	}
+
+	// Verify rate limits configuration
+	if c.RateLimits.MaxGetBlobOpsPerSecond <= 0 {
+		return fmt.Errorf("invalid MaxGetBlobOpsPerSecond: %f", c.RateLimits.MaxGetBlobOpsPerSecond)
+	}
+	if c.RateLimits.GetBlobOpsBurstiness <= 0 {
+		return fmt.Errorf("invalid GetBlobOpsBurstiness: %d", c.RateLimits.GetBlobOpsBurstiness)
+	}
+	if c.RateLimits.MaxGetBlobBytesPerSecond <= 0 {
+		return fmt.Errorf("invalid MaxGetBlobBytesPerSecond: %f", c.RateLimits.MaxGetBlobBytesPerSecond)
+	}
+	if c.RateLimits.GetBlobBytesBurstiness <= 0 {
+		return fmt.Errorf("invalid GetBlobBytesBurstiness: %d", c.RateLimits.GetBlobBytesBurstiness)
+	}
+	if c.RateLimits.MaxConcurrentGetBlobOps <= 0 {
+		return fmt.Errorf("invalid MaxConcurrentGetBlobOps: %d", c.RateLimits.MaxConcurrentGetBlobOps)
+	}
+	if c.RateLimits.MaxGetChunkOpsPerSecond <= 0 {
+		return fmt.Errorf("invalid MaxGetChunkOpsPerSecond: %f", c.RateLimits.MaxGetChunkOpsPerSecond)
+	}
+	if c.RateLimits.GetChunkOpsBurstiness <= 0 {
+		return fmt.Errorf("invalid GetChunkOpsBurstiness: %d", c.RateLimits.GetChunkOpsBurstiness)
+	}
+	if c.RateLimits.MaxGetChunkBytesPerSecond <= 0 {
+		return fmt.Errorf("invalid MaxGetChunkBytesPerSecond: %f", c.RateLimits.MaxGetChunkBytesPerSecond)
+	}
+	if c.RateLimits.GetChunkBytesBurstiness <= 0 {
+		return fmt.Errorf("invalid GetChunkBytesBurstiness: %d", c.RateLimits.GetChunkBytesBurstiness)
+	}
+	if c.RateLimits.MaxConcurrentGetChunkOps <= 0 {
+		return fmt.Errorf("invalid MaxConcurrentGetChunkOps: %d", c.RateLimits.MaxConcurrentGetChunkOps)
+	}
+	if c.RateLimits.MaxGetChunkOpsPerSecondClient <= 0 {
+		return fmt.Errorf("invalid MaxGetChunkOpsPerSecondClient: %f", c.RateLimits.MaxGetChunkOpsPerSecondClient)
+	}
+	if c.RateLimits.GetChunkOpsBurstinessClient <= 0 {
+		return fmt.Errorf("invalid GetChunkOpsBurstinessClient: %d", c.RateLimits.GetChunkOpsBurstinessClient)
+	}
+	if c.RateLimits.MaxGetChunkBytesPerSecondClient <= 0 {
+		return fmt.Errorf("invalid MaxGetChunkBytesPerSecondClient: %f", c.RateLimits.MaxGetChunkBytesPerSecondClient)
+	}
+	if c.RateLimits.GetChunkBytesBurstinessClient <= 0 {
+		return fmt.Errorf("invalid GetChunkBytesBurstinessClient: %d", c.RateLimits.GetChunkBytesBurstinessClient)
+	}
+	if c.RateLimits.MaxConcurrentGetChunkOpsClient <= 0 {
+		return fmt.Errorf("invalid MaxConcurrentGetChunkOpsClient: %d", c.RateLimits.MaxConcurrentGetChunkOpsClient)
+	}
+
+	// Verify storage configuration
 	if c.BucketName == "" {
 		return fmt.Errorf("invalid bucket name: %s", c.BucketName)
 	}
@@ -232,97 +291,120 @@ func (c *RelayConfig) Verify() error {
 			return fmt.Errorf("invalid OCI namespace: %s", c.OCINamespace)
 		}
 	}
+
+	// Verify contract addresses
 	if c.EigenDADirectory == "" {
 		return fmt.Errorf("invalid EigenDA directory address: %s", c.EigenDADirectory)
 	}
+	if c.OperatorStateRetrieverAddr == "" {
+		return fmt.Errorf("invalid OperatorStateRetriever address: %s", c.OperatorStateRetrieverAddr)
+	}
+	if c.EigenDAServiceManagerAddr == "" {
+		return fmt.Errorf("invalid EigenDAServiceManager address: %s", c.EigenDAServiceManagerAddr)
+	}
+
+	// Verify relay keys
 	if len(c.RelayKeys) == 0 {
 		return fmt.Errorf("invalid relay keys: %v", c.RelayKeys)
 	}
 
+	// Verify gRPC configuration
 	if c.GRPCPort <= 0 || c.GRPCPort > 65535 {
 		return fmt.Errorf("invalid gRPC port: %d", c.GRPCPort)
 	}
-
 	if c.MaxGRPCMessageSize <= 0 {
 		return fmt.Errorf("invalid max gRPC message size: %d", c.MaxGRPCMessageSize)
 	}
 
+	// Verify cache configuration
 	if c.MetadataCacheSize <= 0 {
 		return fmt.Errorf("invalid metadata cache size: %d", c.MetadataCacheSize)
 	}
-
-	if c.MetadataMaxConcurrency <= 0 {
-		return fmt.Errorf("invalid metadata max concurrency: %d", c.MetadataMaxConcurrency)
-	}
-
 	if c.BlobCacheBytes <= 0 {
 		return fmt.Errorf("invalid blob cache bytes: %d", c.BlobCacheBytes)
 	}
-
-	if c.BlobMaxConcurrency <= 0 {
-		return fmt.Errorf("invalid blob max concurrency: %d", c.BlobMaxConcurrency)
-	}
-
 	if c.ChunkCacheBytes <= 0 {
 		return fmt.Errorf("invalid chunk cache bytes: %d", c.ChunkCacheBytes)
 	}
+	if c.AuthenticationKeyCacheSize <= 0 {
+		return fmt.Errorf("invalid authentication key cache size: %d", c.AuthenticationKeyCacheSize)
+	}
 
+	// Verify concurrency configuration
+	if c.MetadataMaxConcurrency <= 0 {
+		return fmt.Errorf("invalid metadata max concurrency: %d", c.MetadataMaxConcurrency)
+	}
+	if c.BlobMaxConcurrency <= 0 {
+		return fmt.Errorf("invalid blob max concurrency: %d", c.BlobMaxConcurrency)
+	}
 	if c.ChunkMaxConcurrency <= 0 {
 		return fmt.Errorf("invalid chunk max concurrency: %d", c.ChunkMaxConcurrency)
 	}
 
+	// Verify request limits
 	if c.MaxKeysPerGetChunksRequest <= 0 {
 		return fmt.Errorf("invalid max keys per GetChunks request: %d", c.MaxKeysPerGetChunksRequest)
 	}
 
+	// Verify authentication configuration
+	if c.GetChunksRequestMaxPastAge <= 0 {
+		return fmt.Errorf("invalid GetChunks request max past age: %s", c.GetChunksRequestMaxPastAge)
+	}
+	if c.GetChunksRequestMaxFutureAge <= 0 {
+		return fmt.Errorf("invalid GetChunks request max future age: %s", c.GetChunksRequestMaxFutureAge)
+	}
+
+	// Verify timeout configuration
 	if c.Timeouts.GetChunksTimeout <= 0 {
 		return fmt.Errorf("invalid GetChunks timeout: %s", c.Timeouts.GetChunksTimeout)
 	}
-
 	if c.Timeouts.GetBlobTimeout <= 0 {
 		return fmt.Errorf("invalid GetBlob timeout: %s", c.Timeouts.GetBlobTimeout)
 	}
-
 	if c.Timeouts.InternalGetMetadataTimeout <= 0 {
 		return fmt.Errorf("invalid InternalGetMetadata timeout: %s", c.Timeouts.InternalGetMetadataTimeout)
 	}
-
 	if c.Timeouts.InternalGetBlobTimeout <= 0 {
 		return fmt.Errorf("invalid InternalGetBlob timeout: %s", c.Timeouts.InternalGetBlobTimeout)
 	}
-
 	if c.Timeouts.InternalGetProofsTimeout <= 0 {
 		return fmt.Errorf("invalid InternalGetProofs timeout: %s", c.Timeouts.InternalGetProofsTimeout)
 	}
-
 	if c.Timeouts.InternalGetCoefficientsTimeout <= 0 {
 		return fmt.Errorf("invalid InternalGetCoefficients timeout: %s", c.Timeouts.InternalGetCoefficientsTimeout)
 	}
 
+	// Verify refresh interval
 	if c.OnchainStateRefreshInterval <= 0 {
 		return fmt.Errorf("invalid onchain state refresh interval: %s", c.OnchainStateRefreshInterval)
 	}
 
+	// Verify metrics configuration
 	if c.MetricsPort <= 0 || c.MetricsPort > 65535 {
 		return fmt.Errorf("invalid metrics port: %d", c.MetricsPort)
 	}
 
+	// Verify pprof configuration
 	if c.EnablePprof {
 		if c.PprofHttpPort <= 0 || c.PprofHttpPort > 65535 {
 			return fmt.Errorf("invalid pprof HTTP port: %d", c.PprofHttpPort)
 		}
 	}
 
+	// Verify connection age configuration
 	if c.MaxConnectionAge < 0 {
 		return fmt.Errorf("invalid max connection age: %s", c.MaxConnectionAge)
 	}
-
 	if c.MaxConnectionAgeGrace < 0 {
 		return fmt.Errorf("invalid max connection age grace: %s", c.MaxConnectionAgeGrace)
 	}
-
 	if c.MaxIdleConnectionAge < 0 {
 		return fmt.Errorf("invalid max idle connection age: %s", c.MaxIdleConnectionAge)
+	}
+
+	// Verify logging configuration
+	if c.LogOutputType != string(common.JSONLogFormat) && c.LogOutputType != string(common.TextLogFormat) {
+		return fmt.Errorf("invalid log output type: %s (must be 'json' or 'text')", c.LogOutputType)
 	}
 
 	return nil
