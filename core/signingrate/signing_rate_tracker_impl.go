@@ -136,8 +136,7 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 		ValidatorId: validatorID[:],
 	}
 
-	iterator, err := s.buckets.IteratorFrom(startIndex)
-	enforce.NilError(err, "should be impossible with a valid index")
+	iterator := s.buckets.IteratorFrom(startIndex)
 	for _, bucket := range iterator {
 		if !bucket.startTimestamp.Before(endTime) {
 			break
@@ -205,13 +204,11 @@ func (s *signingRateTracker) UpdateLastBucket(bucket *validator.SigningRateBucke
 		return
 	}
 
-	previousBucket, err := s.buckets.PeekBack()
-	enforce.NilError(err, "should be impossible with a non-empty deque")
+	previousBucket := s.buckets.PeekBack()
 
 	if previousBucket.startTimestamp.Equal(convertedBucket.startTimestamp) {
 		// We have a bucket with the same start time, replace it.
-		_, err := s.buckets.SetFromBack(0, convertedBucket)
-		enforce.NilError(err, "should be impossible with a valid index")
+		s.buckets.SetFromBack(0, convertedBucket)
 		return
 	}
 
@@ -234,8 +231,7 @@ func (s *signingRateTracker) GetLastBucketStartTime() (time.Time, error) {
 	if s.buckets.Size() == 0 {
 		return time.Time{}, nil
 	}
-	bucket, err := s.buckets.PeekBack()
-	enforce.NilError(err, "should be impossible with a non-empty deque")
+	bucket := s.buckets.PeekBack()
 	return bucket.startTimestamp, nil
 }
 
@@ -254,12 +250,12 @@ func (s *signingRateTracker) getMutableBucket(now time.Time) *SigningRateBucket 
 		s.buckets.PushBack(newBucket)
 	}
 
-	bucket, err := s.buckets.PeekBack()
-	enforce.NilError(err, "should be impossible with a non-empty deque")
+	bucket := s.buckets.PeekBack()
 
 	if !bucket.Contains(now) {
 		// The current bucket's time span has elapsed, create a new bucket.
 
+		var err error
 		bucket, err = NewSigningRateBucket(now, s.bucketSpan)
 		enforce.NilError(err, "should be impossible with a valid bucket span")
 		s.buckets.PushBack(bucket)
@@ -277,8 +273,7 @@ func (s *signingRateTracker) garbageCollectBuckets(now time.Time) {
 	cutoff := now.Add(-s.timeSpan)
 
 	for s.buckets.Size() > 0 {
-		bucket, err := s.buckets.PeekFront()
-		enforce.NilError(err, "should be impossible with a non-empty deque")
+		bucket := s.buckets.PeekFront()
 
 		if cutoff.Before(bucket.EndTimestamp()) {
 			// This bucket is new enough, so all later buckets will also be new enough.
@@ -286,8 +281,7 @@ func (s *signingRateTracker) garbageCollectBuckets(now time.Time) {
 		}
 
 		// This bucket is too old, remove it.
-		_, err = s.buckets.PopFront()
-		enforce.NilError(err, "should be impossible with a non-empty deque")
+		s.buckets.PopFront()
 	}
 }
 

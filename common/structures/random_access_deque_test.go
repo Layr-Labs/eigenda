@@ -145,11 +145,9 @@ func TestRandomDequeOperations(t *testing.T) {
 			// Remove from the front
 
 			if expectedSize == 0 {
-				_, err := deque.PopFront()
-				require.Error(t, err)
+				require.Panics(t, func() { deque.PopFront() })
 			} else {
-				value, err := deque.PopFront()
-				require.NoError(t, err)
+				value := deque.PopFront()
 
 				expectedValue, ok := expectedData.PeekFront()
 				require.True(t, ok)
@@ -164,11 +162,9 @@ func TestRandomDequeOperations(t *testing.T) {
 			// remove from the back
 
 			if expectedSize == 0 {
-				_, err := deque.PopBack()
-				require.Error(t, err)
+				require.Panics(t, func() { deque.PopBack() })
 			} else {
-				value, err := deque.PopBack()
-				require.NoError(t, err)
+				value := deque.PopBack()
 
 				expectedValue, ok := expectedData.PeekBack()
 				require.True(t, ok)
@@ -183,10 +179,8 @@ func TestRandomDequeOperations(t *testing.T) {
 			// set a random index
 
 			if expectedSize == 0 {
-				_, err := deque.Set(0, rand.Int())
-				require.Error(t, err)
-				_, err = deque.Set(rand.Uint64(), rand.Int())
-				require.Error(t, err)
+				require.Panics(t, func() { deque.Set(0, rand.Int()) })
+				require.Panics(t, func() { deque.Set(rand.Uint64(), rand.Int()) })
 			} else {
 				index := 0
 				if expectedSize > 2 {
@@ -198,8 +192,7 @@ func TestRandomDequeOperations(t *testing.T) {
 				expectedOldValue := expectedData.Get(index)
 				expectedData.Set(index, newValue)
 
-				oldValue, err := deque.Set(uint64(index), newValue)
-				require.NoError(t, err)
+				oldValue := deque.Set(uint64(index), newValue)
 
 				require.Equal(t, expectedOldValue, oldValue)
 			}
@@ -208,10 +201,8 @@ func TestRandomDequeOperations(t *testing.T) {
 			// set a random index from the back
 
 			if expectedSize == 0 {
-				_, err := deque.SetFromBack(0, rand.Int())
-				require.Error(t, err)
-				_, err = deque.SetFromBack(rand.Uint64(), rand.Int())
-				require.Error(t, err)
+				require.Panics(t, func() { deque.SetFromBack(0, rand.Int()) })
+				require.Panics(t, func() { deque.SetFromBack(rand.Uint64(), rand.Int()) })
 			} else {
 				index := 0
 				if expectedSize > 2 {
@@ -223,8 +214,7 @@ func TestRandomDequeOperations(t *testing.T) {
 				expectedOldValue := expectedData.Get(index)
 				expectedData.Set(index, newValue)
 
-				oldValue, err := deque.SetFromBack(expectedSize-uint64(index)-1, newValue)
-				require.NoError(t, err)
+				oldValue := deque.SetFromBack(expectedSize-uint64(index)-1, newValue)
 
 				require.Equal(t, expectedOldValue, oldValue)
 			}
@@ -233,37 +223,25 @@ func TestRandomDequeOperations(t *testing.T) {
 		// Always check things that are fast to check.
 		require.Equal(t, expectedSize, deque.Size(), "size mismatch after %d operations", i)
 		if expectedSize == 0 {
-			_, err := deque.PeekFront()
-			require.Error(t, err)
-			_, err = deque.PeekBack()
-			require.Error(t, err)
-			_, err = deque.PopFront()
-			require.Error(t, err)
-			_, err = deque.PopBack()
-			require.Error(t, err)
-			_, err = deque.Get(0)
-			require.Error(t, err)
-			_, err = deque.Get(rand.Uint64())
-			require.Error(t, err)
-			_, err = deque.GetFromBack(0)
-			require.Error(t, err)
-			_, err = deque.GetFromBack(rand.Uint64())
-			require.Error(t, err)
-			_, err = deque.Set(0, rand.Int())
-			require.Error(t, err)
-			_, err = deque.Set(rand.Uint64(), rand.Int())
-			require.Error(t, err)
+			require.Panics(t, func() { deque.PeekFront() })
+			require.Panics(t, func() { deque.PeekBack() })
+			require.Panics(t, func() { deque.PopFront() })
+			require.Panics(t, func() { deque.PopBack() })
+			require.Panics(t, func() { deque.Get(0) })
+			require.Panics(t, func() { deque.Get(rand.Uint64()) })
+			require.Panics(t, func() { deque.GetFromBack(0) })
+			require.Panics(t, func() { deque.GetFromBack(rand.Uint64()) })
+			require.Panics(t, func() { deque.Set(0, rand.Int()) })
+			require.Panics(t, func() { deque.Set(rand.Uint64(), rand.Int()) })
 		} else {
 			expected, ok := expectedData.PeekFront()
 			require.True(t, ok)
-			actual, err := deque.PeekFront()
-			require.NoError(t, err)
+			actual := deque.PeekFront()
 			require.Equal(t, expected, actual)
 
 			expected, ok = expectedData.PeekBack()
 			require.True(t, ok)
-			actual, err = deque.PeekBack()
-			require.NoError(t, err)
+			actual = deque.PeekBack()
 			require.Equal(t, expected, actual)
 		}
 
@@ -277,13 +255,11 @@ func TestRandomDequeOperations(t *testing.T) {
 				if expectedData.Size() > 2 {
 					index = rand.Intn(int(expectedData.Size()) - 1)
 				}
-				value, err := deque.Get(uint64(index))
-				require.NoError(t, err)
+				value := deque.Get(uint64(index))
 				require.Equal(t, expectedData.Get(index), value)
 
 				// fetch the same value, but indexed from the back
-				valueFromBack, err := deque.GetFromBack(expectedSize - uint64(index) - 1)
-				require.NoError(t, err)
+				valueFromBack := deque.GetFromBack(expectedSize - uint64(index) - 1)
 				require.Equal(t, expectedData.Get(index), valueFromBack)
 			}
 
@@ -311,17 +287,14 @@ func TestRandomDequeOperations(t *testing.T) {
 
 			// Iterate forwards from a random index.
 			if expectedSize == 0 {
-				_, err := deque.IteratorFrom(0)
-				require.Error(t, err)
-				_, err = deque.IteratorFrom(1234)
-				require.Error(t, err)
+				require.Panics(t, func() { deque.IteratorFrom(0) })
+				require.Panics(t, func() { deque.IteratorFrom(1234) })
 			} else {
 				expectedIndex = 0
 				if expectedData.Size() > 1 {
 					expectedIndex = rand.Intn(int(expectedData.Size()) - 1)
 				}
-				iterator, err := deque.IteratorFrom(uint64(expectedIndex))
-				require.NoError(t, err)
+				iterator := deque.IteratorFrom(uint64(expectedIndex))
 				for index, value := range iterator {
 					require.Equal(t, uint64(expectedIndex), index)
 					expectedIndex++
@@ -334,17 +307,14 @@ func TestRandomDequeOperations(t *testing.T) {
 
 			// Iterate backwards from a random index.
 			if expectedSize == 0 {
-				_, err := deque.ReverseIteratorFrom(0)
-				require.Error(t, err)
-				_, err = deque.ReverseIteratorFrom(1234)
-				require.Error(t, err)
+				require.Panics(t, func() { deque.ReverseIteratorFrom(0) })
+				require.Panics(t, func() { deque.ReverseIteratorFrom(1234) })
 			} else {
 				expectedIndex = int(expectedData.Size()) - 1
 				if expectedData.Size() > 1 {
 					expectedIndex = rand.Intn(int(expectedData.Size()) - 1)
 				}
-				iterator, err := deque.ReverseIteratorFrom(uint64(expectedIndex))
-				require.NoError(t, err)
+				iterator := deque.ReverseIteratorFrom(uint64(expectedIndex))
 				for index, value := range iterator {
 					require.Equal(t, uint64(expectedIndex), index)
 					expectedIndex--
@@ -409,8 +379,7 @@ func TestBinarySearchInDeque(t *testing.T) {
 	// Large size
 
 	// Search for the left-most value
-	target, err := deque.PeekFront()
-	require.NoError(t, err)
+	target = deque.PeekFront()
 	index, exact = BinarySearchInOrderedDeque(deque, target, comparator)
 	require.True(t, exact)
 	require.Equal(t, uint64(0), index)
@@ -422,8 +391,7 @@ func TestBinarySearchInDeque(t *testing.T) {
 	require.Equal(t, uint64(0), index)
 
 	// Search for the right-most value
-	target, err = deque.PeekBack()
-	require.NoError(t, err)
+	target = deque.PeekBack()
 	index, exact = BinarySearchInOrderedDeque(deque, target, comparator)
 	require.True(t, exact)
 	require.Equal(t, deque.Size()-1, index)
@@ -436,8 +404,7 @@ func TestBinarySearchInDeque(t *testing.T) {
 
 	// Add a bunch of random values (in sorted order). To simplify this test, don't use contiguous values.
 	for i := 0; i < 1000; i++ {
-		previousValue, err := deque.PeekBack()
-		require.NoError(t, err)
+		previousValue := deque.PeekBack()
 
 		deque.PushBack(rand.IntRange(previousValue+5, previousValue+100))
 	}
@@ -445,8 +412,7 @@ func TestBinarySearchInDeque(t *testing.T) {
 	// Search for randomly chosen values
 	for i := 0; i < 10; i++ {
 		expectedIndex := rand.Uint64Range(0, deque.Size())
-		target, err := deque.Get(expectedIndex)
-		require.NoError(t, err)
+		target := deque.Get(expectedIndex)
 
 		foundIndex, exact := BinarySearchInOrderedDeque(deque, target, comparator)
 		require.True(t, exact)
@@ -456,10 +422,8 @@ func TestBinarySearchInDeque(t *testing.T) {
 	// Search for values that don't exist
 	for i := 0; i < 10; i++ {
 		expectedIndex := rand.Uint64Range(1, deque.Size())
-		leftBound, err := deque.Get(expectedIndex - 1)
-		require.NoError(t, err)
-		rightBound, err := deque.Get(expectedIndex)
-		require.NoError(t, err)
+		leftBound := deque.Get(expectedIndex - 1)
+		rightBound := deque.Get(expectedIndex)
 
 		// Pick a target value between leftBound and rightBound
 		target = rand.IntRange(leftBound+1, rightBound)
