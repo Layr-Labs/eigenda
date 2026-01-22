@@ -141,6 +141,7 @@ func TestReadWriteBlobs(t *testing.T) {
 
 	// This is the server used to read it back
 	config := DefaultRelayConfig()
+	config.GRPCPort = 50051
 
 	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
@@ -310,6 +311,7 @@ func TestReadWriteChunks(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+	config.GRPCPort = 50051
 
 	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
@@ -539,6 +541,11 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 	// This is the server used to read it back
 	config := DefaultRelayConfig()
+	config.GRPCPort = 50051
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 
 	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
