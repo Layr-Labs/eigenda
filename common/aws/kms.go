@@ -179,7 +179,6 @@ type MultiRegionKMSSigner struct {
 	clients   []RegionalKMSClient
 	keyID     string
 	publicKey *ecdsa.PublicKey
-	failFast  bool
 }
 
 // NewMultiRegionKMSSigner creates a new multi-region KMS signer.
@@ -188,19 +187,16 @@ func NewMultiRegionKMSSigner(
 	clients []RegionalKMSClient,
 	keyID string,
 	publicKey *ecdsa.PublicKey,
-	failFast bool,
 ) *MultiRegionKMSSigner {
 	return &MultiRegionKMSSigner{
 		clients:   clients,
 		keyID:     keyID,
 		publicKey: publicKey,
-		failFast:  failFast,
 	}
 }
 
 // Sign signs a hash using the configured KMS key across multiple regions with automatic failover.
-// If failFast is true, it returns immediately on first failure.
-// Otherwise, it tries all regions before returning an error.
+// It tries all regions before returning an error.
 func (m *MultiRegionKMSSigner) Sign(ctx context.Context, hash []byte) ([]byte, error) {
 	if len(m.clients) == 0 {
 		return nil, errors.New("no KMS clients configured")
@@ -214,11 +210,6 @@ func (m *MultiRegionKMSSigner) Sign(ctx context.Context, hash []byte) ([]byte, e
 		if err != nil {
 			log.Printf("KMS signing failed in region %s: %v", client.Region, err)
 			lastErr = err
-
-			// If fail-fast is enabled and this is not the last region, fail immediately
-			if m.failFast {
-				return nil, fmt.Errorf("KMS signing failed in primary region %s (fail-fast enabled): %w", client.Region, err)
-			}
 
 			// Try next region if available
 			if i < len(m.clients)-1 {

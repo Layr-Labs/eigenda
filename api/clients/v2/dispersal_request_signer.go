@@ -34,9 +34,6 @@ type DispersalRequestSignerConfig struct {
 	// FallbackRegions is a comma-separated list of fallback AWS regions for multi-regional KMS failover.
 	// Optional. If specified, signing will automatically retry in these regions if the primary region fails.
 	FallbackRegions string
-	// FailFast determines failover behavior. If true, signing fails immediately if the primary region fails.
-	// If false, signing will try all configured fallback regions before failing. Default is false.
-	FailFast bool
 	// Endpoint is an optional custom AWS KMS endpoint URL. If empty, the standard AWS KMS endpoint is used.
 	// This is primarily useful for testing with LocalStack or other custom KMS implementations. Default is empty.
 	Endpoint string
@@ -65,10 +62,8 @@ func (c *DispersalRequestSignerConfig) Verify() error {
 
 // kmsRequestSigner implements DispersalRequestSigner using AWS KMS.
 type kmsRequestSigner struct {
-	// For backward compatibility, we keep both single-region and multi-region fields
 	keyID             string
 	publicKey         *ecdsa.PublicKey
-	kmsClient         *kms.Client
 	multiRegionSigner *aws2.MultiRegionKMSSigner
 }
 
@@ -139,16 +134,7 @@ func NewKMSDispersalRequestSigner(
 		return nil, fmt.Errorf("failed to get ecdsa public key from primary region: %w", err)
 	}
 
-	// If no fallback regions configured, use single-region mode
-	if len(fallbackRegions) == 0 {
-		return &kmsRequestSigner{
-			keyID:     config.KeyID,
-			publicKey: key,
-			kmsClient: primaryClient,
-		}, nil
-	}
-
-	// Multi-region mode: create clients for all regions
+	// Create regional clients list, starting with primary region
 	var regionalClients []aws2.RegionalKMSClient
 
 	// Add primary region client
@@ -186,7 +172,6 @@ func NewKMSDispersalRequestSigner(
 		regionalClients,
 		config.KeyID,
 		key,
-		config.FailFast,
 	)
 
 	return &kmsRequestSigner{
@@ -220,14 +205,7 @@ func (s *kmsRequestSigner) SignStoreChunksRequest(
 		return nil, fmt.Errorf("failed to hash request: %w", err)
 	}
 
-	// Use multi-region signer if configured, otherwise use single-region client
-	var signature []byte
-	if s.multiRegionSigner != nil {
-		signature, err = s.multiRegionSigner.Sign(ctx, hash)
-	} else {
-		signature, err = aws2.SignKMS(ctx, s.kmsClient, s.keyID, s.publicKey, hash)
-	}
-
+	signature, err := s.multiRegionSigner.Sign(ctx, hash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}

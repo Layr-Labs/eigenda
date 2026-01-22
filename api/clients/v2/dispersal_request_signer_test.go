@@ -827,7 +827,7 @@ func TestMultiRegionKMSConfig(t *testing.T) {
 	require.NotEmpty(t, signature, "signature should not be empty")
 }
 
-func TestMultiRegionKMSFailFast(t *testing.T) {
+func TestMultiRegionKMSFailover(t *testing.T) {
 	ctx := t.Context()
 	_ = setupLocalStack(t)
 
@@ -838,15 +838,14 @@ func TestMultiRegionKMSFailFast(t *testing.T) {
 
 	keyID, _ := createTestKMSKey(t, ctx, keyManager)
 
-	// Test fail-fast mode with fallback regions
+	// Test multi-region mode with fallback regions
 	signer, err := NewKMSDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
 		Region:          region,
 		Endpoint:        localstackHost,
 		KeyID:           keyID,
 		FallbackRegions: "us-west-2",
-		FailFast:        true,
 	})
-	require.NoError(t, err, "should create multi-region KMS signer with fail-fast")
+	require.NoError(t, err, "should create multi-region KMS signer")
 
 	kmsSigner, ok := signer.(*kmsRequestSigner)
 	require.True(t, ok, "should be kmsRequestSigner type")
@@ -874,8 +873,7 @@ func TestSingleRegionBackwardCompatibility(t *testing.T) {
 
 	kmsSigner, ok := signer.(*kmsRequestSigner)
 	require.True(t, ok, "should be kmsRequestSigner type")
-	require.Nil(t, kmsSigner.multiRegionSigner, "multi-region signer should be nil for single-region mode")
-	require.NotNil(t, kmsSigner.kmsClient, "single-region KMS client should be set")
+	require.NotNil(t, kmsSigner.multiRegionSigner, "multi-region signer should be set even for single-region mode")
 
 	// Test signing with single-region setup
 	rand := random.NewTestRandom()
@@ -946,13 +944,9 @@ func TestMultiRegionFallbackRegionsParsing(t *testing.T) {
 				require.NoError(t, err, tt.errorMsg)
 				require.NotNil(t, signer, "signer should not be nil")
 
-				// Verify multi-region signer is set only when fallback regions are provided
+				// Verify multi-region signer is always set (even for single-region)
 				kmsSigner := signer.(*kmsRequestSigner)
-				if tt.fallbackRegions == "" {
-					require.Nil(t, kmsSigner.multiRegionSigner, "multi-region signer should be nil when no fallbacks")
-				} else {
-					require.NotNil(t, kmsSigner.multiRegionSigner, "multi-region signer should be set when fallbacks provided")
-				}
+				require.NotNil(t, kmsSigner.multiRegionSigner, "multi-region signer should always be set")
 			}
 		})
 	}
