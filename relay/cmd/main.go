@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	blobstorefactory "github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -45,7 +46,7 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("failed to bootstrap config: %w", err)
 	}
 
-	// handle nil config (help flag was provided)
+	// Handle nil config (help flag was provided)
 	if config == nil {
 		return nil
 	}
@@ -100,9 +101,24 @@ func run(ctx context.Context) error {
 	blobStore := blobstore.NewBlobStore(config.BucketName, objectStorageClient, logger)
 	chunkReader := chunkstore.NewChunkReader(objectStorageClient, config.BucketName)
 
+	// Use EigenDADirectory contract to fetch contract addresses
+	var eigenDAServiceManagerAddr, operatorStateRetrieverAddr gethcommon.Address
+	contractDirectory, err := directory.NewContractDirectory(ctx, logger, ethClient,
+		gethcommon.HexToAddress(config.EigenDADirectory))
+	if err != nil {
+		return fmt.Errorf("new contract directory: %w", err)
+	}
+	eigenDAServiceManagerAddr, err = contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
+	if err != nil {
+		return fmt.Errorf("get eigenDAServiceManagerAddr: %w", err)
+	}
+	operatorStateRetrieverAddr, err = contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
+	if err != nil {
+		return fmt.Errorf("get OperatorStateRetriever addr: %w", err)
+	}
+
 	// Create eth writer
-	// TODO(iquidus): use directory contract to fetch contract addresses
-	tx, err := eth.NewWriter(logger, ethClient, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, ethClient, operatorStateRetrieverAddr.String(), eigenDAServiceManagerAddr.String())
 	if err != nil {
 		return fmt.Errorf("failed to create eth writer: %w", err)
 	}

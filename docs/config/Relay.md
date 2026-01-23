@@ -8,6 +8,7 @@
 |--------|-------------|
 | $${\color{red}\texttt{AWS.Region}}$$<br>`RELAY_AWS_REGION`<br><br>type: `string` | Region is the region to use when interacting with S3. Default is "us-east-2". |
 | $${\color{red}\texttt{BucketName}}$$<br>`RELAY_BUCKET_NAME`<br><br>type: `string` | Name of the bucket to store blobs |
+| $${\color{red}\texttt{EigenDADirectory}}$$<br>`RELAY_EIGEN_DA_DIRECTORY`<br><br>type: `string` | Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain |
 | $${\color{red}\texttt{EnableMetrics}}$$<br>`RELAY_ENABLE_METRICS`<br><br>type: `bool` | Enable prometheus metrics collection |
 | $${\color{red}\texttt{EthClient.RPCURLs}}$$<br>`RELAY_ETH_CLIENT_RPCURLS`<br><br>type: `[]string` | A list of RPC URL endpoints to connect to the Ethereum chain. |
 | $${\color{red}\texttt{GRPCPort}}$$<br>`RELAY_GRPC_PORT`<br><br>type: `int` | Port to listen on for gRPC |
@@ -30,8 +31,6 @@
 | $${\color{red}\texttt{BlobMaxConcurrency}}$$<br>`RELAY_BLOB_MAX_CONCURRENCY`<br><br>type: `int`<br>default: `32` | Max number of concurrent blob fetches |
 | $${\color{red}\texttt{ChunkCacheBytes}}$$<br>`RELAY_CHUNK_CACHE_BYTES`<br><br>type: `uint64`<br>default: `1073741824` | Size of the chunk cache, in bytes |
 | $${\color{red}\texttt{ChunkMaxConcurrency}}$$<br>`RELAY_CHUNK_MAX_CONCURRENCY`<br><br>type: `int`<br>default: `32` | Max number of concurrent chunk fetches |
-| $${\color{red}\texttt{EigenDADirectory}}$$<br>`RELAY_EIGEN_DA_DIRECTORY`<br><br>type: `string`<br>default: `""` | Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain |
-| $${\color{red}\texttt{EigenDAServiceManagerAddr}}$$<br>`RELAY_EIGEN_DA_SERVICE_MANAGER_ADDR`<br><br>type: `string`<br>default: `""` | Address of the Eigen DA service manager contract. |
 | $${\color{red}\texttt{EnablePprof}}$$<br>`RELAY_ENABLE_PPROF`<br><br>type: `bool`<br>default: `false` | Enable pprof profiling |
 | $${\color{red}\texttt{EthClient.NumConfirmations}}$$<br>`RELAY_ETH_CLIENT_NUM_CONFIRMATIONS`<br><br>type: `int`<br>default: `0` | Number of block confirmations to wait for. |
 | $${\color{red}\texttt{EthClient.NumRetries}}$$<br>`RELAY_ETH_CLIENT_NUM_RETRIES`<br><br>type: `int`<br>default: `2` | Max number of retries for each RPC call after failure. |
@@ -56,7 +55,6 @@
 | $${\color{red}\texttt{OCIRegion}}$$<br>`RELAY_OCI_REGION`<br><br>type: `string`<br>default: `""` | OCI region (only used when object-storage-backend is oci) |
 | $${\color{red}\texttt{ObjectStorageBackend}}$$<br>`RELAY_OBJECT_STORAGE_BACKEND`<br><br>type: `string`<br>default: `"s3"` | Object storage backend to use (s3 or oci) |
 | $${\color{red}\texttt{OnchainStateRefreshInterval}}$$<br>`RELAY_ONCHAIN_STATE_REFRESH_INTERVAL`<br><br>type: `time.Duration`<br>default: `1h0m0s` | The interval at which to refresh the onchain state |
-| $${\color{red}\texttt{OperatorStateRetrieverAddr}}$$<br>`RELAY_OPERATOR_STATE_RETRIEVER_ADDR`<br><br>type: `string`<br>default: `""` | Address of the OperatorStateRetriever contract. |
 | $${\color{red}\texttt{PprofHttpPort}}$$<br>`RELAY_PPROF_HTTP_PORT`<br><br>type: `int`<br>default: `6060` | Port to listen on for pprof |
 | $${\color{red}\texttt{RateLimits.GetBlobBytesBurstiness}}$$<br>`RELAY_RATE_LIMITS_GET_BLOB_BYTES_BURSTINESS`<br><br>type: `int`<br>default: `20971520` | Burstiness of the GetBlob bandwidth rate limiter |
 | $${\color{red}\texttt{RateLimits.GetBlobOpsBurstiness}}$$<br>`RELAY_RATE_LIMITS_GET_BLOB_OPS_BURSTINESS`<br><br>type: `int`<br>default: `1024` | Burstiness of the GetBlob rate limiter |

@@ -46,7 +46,7 @@ type RelayConfig struct {
 
 	// Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the
 	// only contract entrypoint needed offchain
-	EigenDADirectory string
+	EigenDADirectory string `docs:"required"`
 
 	// Relay keys to use
 	RelayKeys []v2.RelayKey `docs:"required"`
@@ -126,12 +126,6 @@ type RelayConfig struct {
 
 	// Whether to enable color in log output (only applies to text output).
 	LogColor bool
-
-	// Address of the OperatorStateRetriever contract.
-	OperatorStateRetrieverAddr string
-
-	// Address of the Eigen DA service manager contract.
-	EigenDAServiceManagerAddr string
 }
 
 func DefaultRelayConfig() *RelayConfig {
@@ -221,6 +215,11 @@ func (c *RelayConfig) Verify() error {
 	}
 	if err := c.Graph.Verify(); err != nil {
 		return fmt.Errorf("invalid Graph config: %w", err)
+	}
+
+	// Verify EigenDADirectory
+	if c.EigenDADirectory == "" {
+		return fmt.Errorf("invalid EigenDADirectory: %s", c.EigenDADirectory)
 	}
 
 	// Verify rate limits configuration
