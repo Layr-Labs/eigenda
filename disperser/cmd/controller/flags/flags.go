@@ -240,6 +240,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_PRIVATE_KEY"),
 	}
+	DisperserKMSFallbackRegionsFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-kms-fallback-regions"),
+		Usage:    "Comma-separated list of fallback AWS regions for multi-regional KMS failover",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_FALLBACK_REGIONS"),
+	}
 	ControllerReadinessProbePathFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "controller-readiness-probe-path"),
 		Usage:    "File path for the readiness probe; created once the controller is fully started and ready to serve traffic",
@@ -430,6 +436,7 @@ var optionalFlags = []cli.Flag{
 	DisperserStoreChunksSigningDisabledFlag,
 	DisperserKMSKeyIDFlag,
 	DisperserPrivateKeyFlag,
+	DisperserKMSFallbackRegionsFlag,
 	ControllerReadinessProbePathFlag,
 	ControllerHealthProbePathFlag,
 	ControllerHeartbeatMaxStallDurationFlag,
