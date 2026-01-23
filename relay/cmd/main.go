@@ -29,15 +29,13 @@ var (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 
 	err := run(ctx)
 	if err != nil {
 		panic(err)
 	}
-
-	// Block forever, the relay runs in background goroutines.
-	<-ctx.Done()
 }
 
 // Run the relay. This method is split from main() so we only have to use panic() once.
@@ -47,10 +45,11 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("failed to bootstrap config: %w", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// handle nil config (help flag was provided)
+	if config == nil {
+		return nil
+	}
 
-	// TODO(iquidus): handle nil config (help flag was probably provided)
 	loggerConfig := common.DefaultLoggerConfig()
 	loggerConfig.Format = common.LogFormat(config.LogOutputType)
 	loggerConfig.HandlerOpts.NoColor = !config.LogColor
@@ -151,8 +150,8 @@ func run(ctx context.Context) error {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	select {
-	case sig := <-sigChan:
-		logger.Info("Received shutdown signal, stopping relay server", "signal", sig)
+	case <-ctx.Done():
+		logger.Info("Received shutdown signal, stopping relay server")
 	case err := <-errChan:
 		logger.Error("Relay server failed", "error", err)
 		return fmt.Errorf("relay server failed: %w", err)
