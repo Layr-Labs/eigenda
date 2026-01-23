@@ -292,17 +292,6 @@ func (c *RelayConfig) Verify() error {
 		}
 	}
 
-	// Verify contract addresses
-	if c.EigenDADirectory == "" {
-		return fmt.Errorf("invalid EigenDA directory address: %s", c.EigenDADirectory)
-	}
-	if c.OperatorStateRetrieverAddr == "" {
-		return fmt.Errorf("invalid OperatorStateRetriever address: %s", c.OperatorStateRetrieverAddr)
-	}
-	if c.EigenDAServiceManagerAddr == "" {
-		return fmt.Errorf("invalid EigenDAServiceManager address: %s", c.EigenDAServiceManagerAddr)
-	}
-
 	// Verify relay keys
 	if len(c.RelayKeys) == 0 {
 		return fmt.Errorf("invalid relay keys: %v", c.RelayKeys)
