@@ -148,13 +148,13 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 			continue
 		}
 
-	valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob, blobCommitments.Commitment)
-	if err != nil {
-		return nil, fmt.Errorf("blob %s: generate and compare blob commitment: %w", blobKey.Hex(), err)
-	}
-	if !valid {
-		return nil, fmt.Errorf("blob %s: commitment mismatch with cert", blobKey.Hex())
-	}
+		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob, blobCommitments.Commitment)
+		if err != nil {
+			return nil, fmt.Errorf("blob %s: generate and compare blob commitment: %w", blobKey.Hex(), err)
+		}
+		if !valid {
+			return nil, fmt.Errorf("blob %s: commitment mismatch with cert", blobKey.Hex())
+		}
 
 		return blob.ToEncodedPayloadUnchecked(pr.config.PayloadPolynomialForm), nil
 	}
