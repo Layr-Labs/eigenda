@@ -8,17 +8,16 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/ephemeraldb"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	cert_types_binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
-
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const (
@@ -104,7 +103,11 @@ func (e *MemStore) generateRandomV3Cert(blobContents []byte) (*coretypes.EigenDA
 	// READPREIMAGE functionality in the arbitrum x eigenda integration since
 	// preimage key is computed within the VM from hashing a recomputation of the data
 	// commitment
-	dataCommitment, err := verification.GenerateBlobCommitment(e.g1SRS, blobContents)
+	coefficients, err := rs.ToFrArray(blobContents)
+	if err != nil {
+		return nil, fmt.Errorf("convert bytes to field elements: %w", err)
+	}
+	dataCommitment, err := verification.GenerateBlobCommitment(e.g1SRS, coefficients)
 	if err != nil {
 		return nil, err
 	}

@@ -25,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/codec"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/test"
 	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -438,7 +439,9 @@ func TestFailedDecoding(t *testing.T) {
 	binary.BigEndian.PutUint32(blobBytes[2:6], uint32(len(blobBytes)-1))
 
 	// generate a malicious cert, which will verify for the invalid blob
-	maliciousCommitment, err := verification.GenerateBlobCommitment(tester.G1Srs, blobBytes)
+	coefficients, err := rs.ToFrArray(blobBytes)
+	require.NoError(t, err)
+	maliciousCommitment, err := verification.GenerateBlobCommitment(tester.G1Srs, coefficients)
 	require.NoError(t, err)
 	require.NotNil(t, maliciousCommitment)
 
