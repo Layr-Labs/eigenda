@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/config"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -81,6 +82,7 @@ var _ DispersalRequestSigner = &localRequestSigner{}
 func NewDispersalRequestSigner(
 	ctx context.Context,
 	config DispersalRequestSignerConfig,
+	logger logging.Logger,
 ) (DispersalRequestSigner, error) {
 	if err := config.Verify(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
@@ -88,7 +90,7 @@ func NewDispersalRequestSigner(
 
 	// Use KMS if KeyID is provided
 	if config.KeyID != "" {
-		return NewKMSDispersalRequestSigner(ctx, config)
+		return NewKMSDispersalRequestSigner(ctx, config, logger)
 	}
 
 	// Use local private key
@@ -99,6 +101,7 @@ func NewDispersalRequestSigner(
 func NewKMSDispersalRequestSigner(
 	ctx context.Context,
 	config DispersalRequestSignerConfig,
+	logger logging.Logger,
 ) (DispersalRequestSigner, error) {
 	// Parse fallback regions from comma-separated string
 	var fallbackRegions []string
@@ -172,6 +175,7 @@ func NewKMSDispersalRequestSigner(
 		regionalClients,
 		config.KeyID,
 		key,
+		logger,
 	)
 
 	return &kmsRequestSigner{

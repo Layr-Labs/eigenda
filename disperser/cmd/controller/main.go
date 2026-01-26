@@ -231,6 +231,7 @@ func RunController(cliCtx *cli.Context) error {
 		requestSigner, err = clients.NewDispersalRequestSigner(
 			ctx,
 			config.DispersalRequestSigner,
+			logger,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create request signer: %v", err)

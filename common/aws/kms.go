@@ -8,14 +8,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 
+	"math/big"
+
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"math/big"
 )
 
 // This file contains utility methods for working with AWS KMS using ecdsa on the KeySpecEccSecgP256k1 curve.
@@ -179,6 +180,7 @@ type MultiRegionKMSSigner struct {
 	clients   []RegionalKMSClient
 	keyID     string
 	publicKey *ecdsa.PublicKey
+	logger    logging.Logger
 }
 
 // NewMultiRegionKMSSigner creates a new multi-region KMS signer.
@@ -187,11 +189,13 @@ func NewMultiRegionKMSSigner(
 	clients []RegionalKMSClient,
 	keyID string,
 	publicKey *ecdsa.PublicKey,
+	logger logging.Logger,
 ) *MultiRegionKMSSigner {
 	return &MultiRegionKMSSigner{
 		clients:   clients,
 		keyID:     keyID,
 		publicKey: publicKey,
+		logger:    logger,
 	}
 }
 
@@ -204,16 +208,16 @@ func (m *MultiRegionKMSSigner) Sign(ctx context.Context, hash []byte) ([]byte, e
 
 	var lastErr error
 	for i, client := range m.clients {
-		log.Printf("Attempting to sign with KMS in region: %s", client.Region)
+		m.logger.Debug("Attempting to sign with KMS in region", "region", client.Region)
 
 		signature, err := SignKMS(ctx, client.Client, m.keyID, m.publicKey, hash)
 		if err != nil {
-			log.Printf("KMS signing failed in region %s: %v", client.Region, err)
+			m.logger.Warn("KMS signing failed in region", "region", client.Region, "error", err)
 			lastErr = err
 
 			// Try next region if available
 			if i < len(m.clients)-1 {
-				log.Printf("Failing over to next region")
+				m.logger.Warn("Failing over to next region")
 				continue
 			}
 
@@ -223,9 +227,9 @@ func (m *MultiRegionKMSSigner) Sign(ctx context.Context, hash []byte) ([]byte, e
 
 		// Success
 		if i > 0 {
-			log.Printf("Successfully signed with KMS after failing over to region: %s", client.Region)
+			m.logger.Info("Successfully signed with KMS after failing over to region", "region", client.Region)
 		} else {
-			log.Printf("Successfully signed with KMS in primary region: %s", client.Region)
+			m.logger.Debug("Successfully signed with KMS in primary region", "region", client.Region)
 		}
 		return signature, nil
 	}

@@ -788,7 +788,9 @@ func startController(
 			Region:   awsConfig.Region,
 			Endpoint: awsConfig.EndpointURL,
 			KeyID:    config.TestConfig.DisperserKMSKeyID,
-		})
+		},
+		controllerLogger,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dispersal request signer: %w", err)
 	}

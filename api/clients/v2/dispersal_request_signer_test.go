@@ -88,7 +88,7 @@ func TestKMSSignatureVerificationWithEmptyKeyID(t *testing.T) {
 		Region:   region,
 		Endpoint: localstackHost,
 		KeyID:    "",
-	})
+	}, logger)
 
 	require.Error(t, err, "should fail to create signer with empty KeyID")
 }
@@ -101,7 +101,7 @@ func TestKMSSignatureVerificationWithEmptyRegion(t *testing.T) {
 		Region:   "",
 		Endpoint: localstackHost,
 		KeyID:    "random_key_id",
-	})
+	}, logger)
 
 	require.Error(t, err, "should fail to create signer with empty Region")
 }
@@ -124,7 +124,7 @@ func TestKMSSignatureVerification(t *testing.T) {
 		Region:   region,
 		Endpoint: localstackHost,
 		KeyID:    keyID,
-	})
+	}, logger)
 	require.NoError(t, err, "failed to create dispersal request signer")
 
 	request := auth.RandomStoreChunksRequest(rand)
@@ -226,7 +226,7 @@ func TestKMSSignatureVerification(t *testing.T) {
 			Region:   region,
 			Endpoint: localstackHost,
 			KeyID:    keyID2,
-		})
+		}, logger)
 		require.NoError(t, err, "failed to create second dispersal request signer")
 
 		request2 := auth.RandomStoreChunksRequest(rand)
@@ -247,7 +247,7 @@ func TestLocalSignerWithEmptyPrivateKey(t *testing.T) {
 
 	_, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
 		PrivateKey: "",
-	})
+	}, logger)
 
 	require.Error(t, err, "should fail to create signer with empty private key")
 }
@@ -257,7 +257,7 @@ func TestLocalSignerWithInvalidPrivateKey(t *testing.T) {
 
 	_, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
 		PrivateKey: "invalid_hex",
-	})
+	}, logger)
 
 	require.Error(t, err, "should fail to create signer with invalid private key")
 }
@@ -268,13 +268,13 @@ func TestLocalSignerPrivateKeyFormats(t *testing.T) {
 	// Test with 0x prefix - should fail
 	_, err1 := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
 		PrivateKey: "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-	})
+	}, logger)
 	require.Error(t, err1, "should fail with 0x prefix")
 
 	// Test without 0x prefix - should succeed
 	_, err2 := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
 		PrivateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-	})
+	}, logger)
 	require.NoError(t, err2, "should succeed without 0x prefix")
 }
 
@@ -285,7 +285,7 @@ func TestLocalSignerWithBothKMSAndPrivateKey(t *testing.T) {
 		KeyID:      "some_key_id",
 		PrivateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		Region:     region,
-	})
+	}, logger)
 
 	require.Error(t, err, "should fail when both KeyID and PrivateKey are specified")
 }
@@ -307,7 +307,7 @@ func TestNewKMSDispersalRequestSignerDirect(t *testing.T) {
 		Region:   region,
 		Endpoint: localstackHost,
 		KeyID:    keyID,
-	})
+	}, logger)
 	require.NoError(t, err, "failed to create KMS signer directly")
 	require.NotNil(t, signer, "signer should not be nil")
 }
@@ -359,7 +359,7 @@ func TestNewKMSDispersalRequestSignerErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewKMSDispersalRequestSigner(ctx, tt.config)
+			_, err := NewKMSDispersalRequestSigner(ctx, tt.config, logger)
 			if tt.expectError {
 				require.Error(t, err, tt.errorMsg)
 			} else {
@@ -500,7 +500,7 @@ func TestLocalSignerSignatureVerification(t *testing.T) {
 	// Create signer with private key
 	signer, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
 		PrivateKey: privateKeyHex,
-	})
+	}, logger)
 	require.NoError(t, err, "failed to create local dispersal request signer")
 
 	request := auth.RandomStoreChunksRequest(rand)
@@ -600,7 +600,7 @@ func TestLocalSignerSignatureVerification(t *testing.T) {
 
 		signer2, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
 			PrivateKey: fmt.Sprintf("%x", crypto.FromECDSA(privateKey2)),
-		})
+		}, logger)
 		require.NoError(t, err, "failed to create second local dispersal request signer")
 
 		request2 := auth.RandomStoreChunksRequest(rand)
@@ -636,7 +636,7 @@ func TestKMSSignerEdgeCases(t *testing.T) {
 		Region:   region,
 		Endpoint: localstackHost,
 		KeyID:    keyID,
-	})
+	}, logger)
 	require.NoError(t, err, "failed to create KMS signer")
 
 	// Note: nil request test omitted as it would cause panic in hashing function,
@@ -705,7 +705,7 @@ func TestSignerTypeAssertion(t *testing.T) {
 			Region:   region,
 			Endpoint: localstackHost,
 			KeyID:    keyID,
-		})
+		}, logger)
 		require.NoError(t, err, "failed to create KMS signer")
 
 		// Verify it's the correct concrete type
@@ -746,7 +746,7 @@ func TestNewDispersalRequestSignerRouting(t *testing.T) {
 			Region:   region,
 			Endpoint: localstackHost,
 			KeyID:    keyID,
-		})
+		}, logger)
 		require.NoError(t, err, "should route to KMS signer")
 
 		// Verify it routed to the correct type
@@ -762,7 +762,7 @@ func TestNewDispersalRequestSignerRouting(t *testing.T) {
 
 		signer, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
 			PrivateKey: privateKeyHex,
-		})
+		}, logger)
 		require.NoError(t, err, "should route to local signer")
 
 		// Verify it routed to the correct type
@@ -787,7 +787,7 @@ func TestKMSSignerWithDefaultConfig(t *testing.T) {
 		Region: region,
 		KeyID:  keyID,
 		// No endpoint specified - should try to use default AWS config
-	})
+	}, logger)
 	// This will fail in test environment but we're testing the code path
 	require.Error(t, err, "should fail to load default AWS config in test environment")
 }
@@ -809,7 +809,7 @@ func TestMultiRegionKMSConfig(t *testing.T) {
 		Endpoint:        localstackHost,
 		KeyID:           keyID,
 		FallbackRegions: "us-west-2, eu-west-1",
-	})
+	}, logger)
 	require.NoError(t, err, "should create multi-region KMS signer")
 
 	kmsSigner, ok := signer.(*kmsRequestSigner)
@@ -844,7 +844,7 @@ func TestMultiRegionKMSFailover(t *testing.T) {
 		Endpoint:        localstackHost,
 		KeyID:           keyID,
 		FallbackRegions: "us-west-2",
-	})
+	}, logger)
 	require.NoError(t, err, "should create multi-region KMS signer")
 
 	kmsSigner, ok := signer.(*kmsRequestSigner)
@@ -868,7 +868,7 @@ func TestSingleRegionBackwardCompatibility(t *testing.T) {
 		Region:   region,
 		Endpoint: localstackHost,
 		KeyID:    keyID,
-	})
+	}, logger)
 	require.NoError(t, err, "should create single-region KMS signer")
 
 	kmsSigner, ok := signer.(*kmsRequestSigner)
@@ -936,7 +936,7 @@ func TestMultiRegionFallbackRegionsParsing(t *testing.T) {
 				Endpoint:        localstackHost,
 				KeyID:           keyID,
 				FallbackRegions: tt.fallbackRegions,
-			})
+			}, logger)
 
 			if tt.expectError {
 				require.Error(t, err, tt.errorMsg)
