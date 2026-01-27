@@ -792,7 +792,7 @@ func TestKMSSignerWithDefaultConfig(t *testing.T) {
 	require.Error(t, err, "should fail to load default AWS config in test environment")
 }
 
-func TestMultiRegionKMSConfig(t *testing.T) {
+func TestKMSRegionOverride(t *testing.T) {
 	ctx := t.Context()
 	_ = setupLocalStack(t)
 
@@ -803,53 +803,28 @@ func TestMultiRegionKMSConfig(t *testing.T) {
 
 	keyID, _ := createTestKMSKey(t, ctx, keyManager)
 
-	// Test multi-region configuration with fallback regions
+	// Test KMS region override - KMSRegion should be used instead of Region
 	signer, err := NewKMSDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
-		Region:          region,
-		Endpoint:        localstackHost,
-		KeyID:           keyID,
-		FallbackRegions: "us-west-2, eu-west-1",
+		Region:    "us-west-2", // This should be ignored
+		KMSRegion: region,      // This should be used
+		Endpoint:  localstackHost,
+		KeyID:     keyID,
 	}, logger)
-	require.NoError(t, err, "should create multi-region KMS signer")
+	require.NoError(t, err, "should create KMS signer with region override")
 
 	kmsSigner, ok := signer.(*kmsRequestSigner)
 	require.True(t, ok, "should be kmsRequestSigner type")
 	require.NotNil(t, kmsSigner.multiRegionSigner, "multi-region signer should be initialized")
 
-	// Test signing with multi-region setup
+	// Test signing with KMS region override
 	rand := random.NewTestRandom()
 	request := auth.RandomStoreChunksRequest(rand)
 	request.Signature = nil
 
 	signature, err := signer.SignStoreChunksRequest(ctx, request)
-	require.NoError(t, err, "should sign successfully with multi-region signer")
+	require.NoError(t, err, "should sign successfully with KMS region override")
 	require.NotNil(t, signature, "signature should not be nil")
 	require.NotEmpty(t, signature, "signature should not be empty")
-}
-
-func TestMultiRegionKMSFailover(t *testing.T) {
-	ctx := t.Context()
-	_ = setupLocalStack(t)
-
-	keyManager := kms.New(kms.Options{
-		Region:       region,
-		BaseEndpoint: aws.String(localstackHost),
-	})
-
-	keyID, _ := createTestKMSKey(t, ctx, keyManager)
-
-	// Test multi-region mode with fallback regions
-	signer, err := NewKMSDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
-		Region:          region,
-		Endpoint:        localstackHost,
-		KeyID:           keyID,
-		FallbackRegions: "us-west-2",
-	}, logger)
-	require.NoError(t, err, "should create multi-region KMS signer")
-
-	kmsSigner, ok := signer.(*kmsRequestSigner)
-	require.True(t, ok, "should be kmsRequestSigner type")
-	require.NotNil(t, kmsSigner.multiRegionSigner, "multi-region signer should be initialized")
 }
 
 func TestSingleRegionBackwardCompatibility(t *testing.T) {
@@ -886,68 +861,3 @@ func TestSingleRegionBackwardCompatibility(t *testing.T) {
 	require.NotEmpty(t, signature, "signature should not be empty")
 }
 
-func TestMultiRegionFallbackRegionsParsing(t *testing.T) {
-	ctx := t.Context()
-	_ = setupLocalStack(t)
-
-	keyManager := kms.New(kms.Options{
-		Region:       region,
-		BaseEndpoint: aws.String(localstackHost),
-	})
-
-	keyID, _ := createTestKMSKey(t, ctx, keyManager)
-
-	tests := []struct {
-		name            string
-		fallbackRegions string
-		expectError     bool
-		errorMsg        string
-	}{
-		{
-			name:            "single_fallback_region",
-			fallbackRegions: "us-west-2",
-			expectError:     false,
-			errorMsg:        "single fallback region should work",
-		},
-		{
-			name:            "multiple_fallback_regions",
-			fallbackRegions: "us-west-2,eu-west-1,ap-south-1",
-			expectError:     false,
-			errorMsg:        "multiple fallback regions should work",
-		},
-		{
-			name:            "fallback_regions_with_spaces",
-			fallbackRegions: " us-west-2 , eu-west-1 , ap-south-1 ",
-			expectError:     false,
-			errorMsg:        "fallback regions with spaces should be trimmed",
-		},
-		{
-			name:            "empty_fallback_regions",
-			fallbackRegions: "",
-			expectError:     false,
-			errorMsg:        "empty fallback regions should default to single-region mode",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			signer, err := NewKMSDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
-				Region:          region,
-				Endpoint:        localstackHost,
-				KeyID:           keyID,
-				FallbackRegions: tt.fallbackRegions,
-			}, logger)
-
-			if tt.expectError {
-				require.Error(t, err, tt.errorMsg)
-			} else {
-				require.NoError(t, err, tt.errorMsg)
-				require.NotNil(t, signer, "signer should not be nil")
-
-				// Verify multi-region signer is always set (even for single-region)
-				kmsSigner := signer.(*kmsRequestSigner)
-				require.NotNil(t, kmsSigner.multiRegionSigner, "multi-region signer should always be set")
-			}
-		})
-	}
-}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"strings"
 
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/api/hashing"
@@ -32,9 +31,9 @@ type DispersalRequestSignerConfig struct {
 	PrivateKey string `docs:"required"`
 	// Region is the AWS region where the KMS key is located (e.g., "us-east-1"). Required if using KMS.
 	Region string `docs:"required"`
-	// FallbackRegions is a comma-separated list of fallback AWS regions for multi-regional KMS failover.
-	// Optional. If specified, signing will automatically retry in these regions if the primary region fails.
-	FallbackRegions string
+	// KMSRegion is an optional AWS region override for KMS operations. When specified, this region is used
+	// instead of Region for KMS key operations. If empty, Region is used.
+	KMSRegion string
 	// Endpoint is an optional custom AWS KMS endpoint URL. If empty, the standard AWS KMS endpoint is used.
 	// This is primarily useful for testing with LocalStack or other custom KMS implementations. Default is empty.
 	Endpoint string
@@ -103,74 +102,44 @@ func NewKMSDispersalRequestSigner(
 	config DispersalRequestSignerConfig,
 	logger logging.Logger,
 ) (DispersalRequestSigner, error) {
-	// Parse fallback regions from comma-separated string
-	var fallbackRegions []string
-	if config.FallbackRegions != "" {
-		for _, region := range strings.Split(config.FallbackRegions, ",") {
-			trimmed := strings.TrimSpace(region)
-			if trimmed != "" {
-				fallbackRegions = append(fallbackRegions, trimmed)
-			}
-		}
+	// Determine which region to use for KMS operations
+	kmsRegion := config.Region
+	if config.KMSRegion != "" {
+		kmsRegion = config.KMSRegion
 	}
 
-	// Create KMS client for primary region to load public key
-	var primaryClient *kms.Client
+	// Create KMS client
+	var kmsClient *kms.Client
 	if config.Endpoint != "" {
-		primaryClient = kms.New(kms.Options{
-			Region:       config.Region,
+		kmsClient = kms.New(kms.Options{
+			Region:       kmsRegion,
 			BaseEndpoint: aws.String(config.Endpoint),
 		})
 	} else {
 		cfg, err := awsconfig.LoadDefaultConfig(ctx,
-			awsconfig.WithRegion(config.Region),
+			awsconfig.WithRegion(kmsRegion),
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load AWS config for primary region: %w", err)
+			return nil, fmt.Errorf("failed to load AWS config for region %s: %w", kmsRegion, err)
 		}
-		primaryClient = kms.NewFromConfig(cfg)
+		kmsClient = kms.NewFromConfig(cfg)
 	}
 
-	// Load public key from primary region
-	key, err := aws2.LoadPublicKeyKMS(ctx, primaryClient, config.KeyID)
+	// Load public key
+	key, err := aws2.LoadPublicKeyKMS(ctx, kmsClient, config.KeyID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ecdsa public key from primary region: %w", err)
+		return nil, fmt.Errorf("failed to get ecdsa public key from region %s: %w", kmsRegion, err)
 	}
 
-	// Create regional clients list, starting with primary region
-	var regionalClients []aws2.RegionalKMSClient
-
-	// Add primary region client
-	regionalClients = append(regionalClients, aws2.RegionalKMSClient{
-		Client: primaryClient,
-		Region: config.Region,
-	})
-
-	// Create clients for fallback regions
-	for _, region := range fallbackRegions {
-		var client *kms.Client
-		if config.Endpoint != "" {
-			client = kms.New(kms.Options{
-				Region:       region,
-				BaseEndpoint: aws.String(config.Endpoint),
-			})
-		} else {
-			cfg, err := awsconfig.LoadDefaultConfig(ctx,
-				awsconfig.WithRegion(region),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load AWS config for fallback region %s: %w", region, err)
-			}
-			client = kms.NewFromConfig(cfg)
-		}
-
-		regionalClients = append(regionalClients, aws2.RegionalKMSClient{
-			Client: client,
-			Region: region,
-		})
+	// Create regional client list with single region
+	regionalClients := []aws2.RegionalKMSClient{
+		{
+			Client: kmsClient,
+			Region: kmsRegion,
+		},
 	}
 
-	// Create multi-region signer
+	// Create multi-region signer (with single region for consistency)
 	multiRegionSigner := aws2.NewMultiRegionKMSSigner(
 		regionalClients,
 		config.KeyID,
