@@ -1,1 +1,1 @@
-@openzeppelin/=node_modules/@openzeppelin/
+@openzeppelin/=lib/openzeppelin-contracts/
