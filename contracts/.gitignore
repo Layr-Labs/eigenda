@@ -16,6 +16,11 @@ docs/
 
 data/
 
+# Deployment scripts config/input/output
+!script/deploy/router/config/example_config.json
+script/deploy/router/config/*.json
+!script/deploy/*/output/.gitkeep
+script/deploy/*/output/*.json
 script/output/*
 script/input/eigenda_deploy_config.json
 

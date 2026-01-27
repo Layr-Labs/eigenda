@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
+// Forge
+import {Test} from "forge-std/Test.sol";
+import {Script} from "forge-std/Script.sol";
+import {stdJson} from "forge-std/StdJson.sol";
+
+// OpenZeppelin
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+// EigenDA
 import {IEigenDACertVerifier} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
 import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "forge-std/Test.sol";
-import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
 
 struct ABNConfig {
     uint32 blockNumber;
@@ -44,33 +49,25 @@ contract CertVerifierRouterDeployer is Script, Test {
         string memory configPath = string.concat("./script/deploy/router/config/", inputJSONFile);
         string memory configData = vm.readFile(configPath);
 
-        // Parse configuration parameters
+        // 2. Parse configuration parameters
         initialOwner = stdJson.readAddress(configData, ".initialOwner");
         setABNConfigs(configData);
         proxyAdmin = stdJson.readAddress(configData, ".proxyAdmin");
 
-        // 2. Deploy the implementation and proxy contracts
+        // 3. Deploy the implementation and proxy contracts
         vm.startBroadcast();
-
         EigenDACertVerifierRouter implementation = new EigenDACertVerifierRouter();
-
-        // Deploy proxy and initialize in one step
         bytes memory initData =
             abi.encodeCall(EigenDACertVerifierRouter.initialize, (initialOwner, initABNs, initCertVerifiers));
-
         TransparentUpgradeableProxy proxy =
             new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
-
         vm.stopBroadcast();
 
         // 4. Output the deployed addresses to a JSON file
-
-        string memory outputPath =
-            string.concat("./script/deploy/router/output/", vm.toString(block.chainid), "/", outputJSONFile);
+        string memory outputPath = string.concat("./script/deploy/router/output/", outputJSONFile);
         string memory parent = "parent object";
         string memory finalJson = vm.serializeAddress(parent, "eigenDACertVerifierRouter", address(proxy));
         finalJson = vm.serializeAddress(parent, "eigenDACertVerifierRouterImplementation", address(implementation));
-
         vm.writeJson(finalJson, outputPath);
     }
 
@@ -82,7 +79,6 @@ contract CertVerifierRouterDeployer is Script, Test {
             address certVerifier = configs[i].certVerifier;
 
             // run user input safety checks
-            //
             // 1) the cert verifier's dependencies appear correctly initialized
             address thresholdRegistry = address(IEigenDACertVerifier(certVerifier).eigenDAThresholdRegistry());
             IEigenDAThresholdRegistry(thresholdRegistry).nextBlobVersion();
