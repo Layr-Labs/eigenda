@@ -345,7 +345,6 @@ func NewTestClient(
 
 	relayPayloadRetriever, err := payloadretrieval.NewRelayPayloadRetriever(
 		logger,
-		rand.Rand,
 		*relayPayloadRetrieverConfig,
 		relayClient,
 		blobVerifier.G1SRS,
@@ -604,12 +603,6 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		return fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
 	}
 
-	blobKey, err := eigenDAV3Cert.ComputeBlobKey()
-	if err != nil {
-		return fmt.Errorf("failed to compute blob key: %w", err)
-	}
-
-	// read blob from a single relay (assuming success, otherwise will retry)
 	payloadFromRelayRetriever, err := c.relayPayloadRetriever.GetPayload(ctx, eigenDAV3Cert)
 	if err != nil {
 		return fmt.Errorf("failed to get payload from relay: %w", err)
@@ -627,23 +620,9 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		return fmt.Errorf("payloads do not match")
 	}
 
-	commitment, err := eigenDAV3Cert.Commitments()
+	err = c.ReadBlobFromRelay(ctx, eigenDAV3Cert, payload, 0)
 	if err != nil {
-		return fmt.Errorf("failed to parse blob commitments: %w", err)
-	}
-
-	blobLengthSymbols := commitment.Length
-
-	// read blob from ALL relays
-	err = c.ReadBlobFromRelays(
-		ctx,
-		blobKey,
-		eigenDAV3Cert.RelayKeys(),
-		payload,
-		blobLengthSymbols,
-		0)
-	if err != nil {
-		return fmt.Errorf("failed to read blob from relays: %w", err)
+		return fmt.Errorf("failed to read blob from relay: %w", err)
 	}
 
 	blobHeader, err := eigenDAV3Cert.BlobHeader()
@@ -739,35 +718,11 @@ func (c *TestClient) DispersePayloadWithProxy(ctx context.Context, payloadBytes 
 	return cert, nil
 }
 
-// ReadBlobFromRelays reads a blob from the relays and compares it to the given payload.
-//
-// The timeout provided is a timeout for each individual relay read, not all reads as a whole.
-func (c *TestClient) ReadBlobFromRelays(
-	ctx context.Context,
-	key corev2.BlobKey,
-	relayKeys []corev2.RelayKey,
-	expectedPayload []byte,
-	blobLengthSymbols uint32,
-	timeout time.Duration) error {
-
-	for _, relayID := range relayKeys {
-		err := c.ReadBlobFromRelay(ctx, key, relayID, expectedPayload, blobLengthSymbols, timeout)
-
-		if err != nil {
-			return fmt.Errorf("failed to read blob from relay %d: %w", relayID, err)
-		}
-	}
-
-	return nil
-}
-
 // ReadBlobFromRelay reads a blob from the relay and compares it to the given payload.
 func (c *TestClient) ReadBlobFromRelay(
 	ctx context.Context,
-	key corev2.BlobKey,
-	relayKey corev2.RelayKey,
+	cert coretypes.EigenDACert,
 	expectedPayload []byte,
-	blobLengthSymbols uint32,
 	timeout time.Duration,
 ) error {
 
@@ -779,6 +734,12 @@ func (c *TestClient) ReadBlobFromRelay(
 
 	// Important: don't redefine err. It's used by the deferred function to report success or failure.
 	var err error
+
+	relayKeys := cert.RelayKeys()
+	if len(relayKeys) == 0 {
+		return errors.New("cert contains no relay keys")
+	}
+	relayKey := relayKeys[0]
 
 	c.metrics.startOperation("relay_read")
 	start := time.Now()
@@ -793,14 +754,9 @@ func (c *TestClient) ReadBlobFromRelay(
 		}
 	}()
 
-	blobBytesFromRelay, err := c.relayClient.GetBlob(ctx, relayKey, key)
+	blob, err := c.relayClient.GetBlob(ctx, cert)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relay: %w", err)
-	}
-
-	blob, err := coretypes.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
-	if err != nil {
-		return fmt.Errorf("failed to deserialize blob: %w", err)
 	}
 
 	payloadFromRelay, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
