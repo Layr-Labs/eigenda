@@ -4,7 +4,7 @@ pragma solidity ^0.8.12;
 // Forge
 import {Test} from "forge-std/Test.sol";
 import {Script} from "forge-std/Script.sol";
-import {stdJson} from"forge-std/StdJson.sol";
+import {stdJson} from "forge-std/StdJson.sol";
 
 // OpenZeppelin
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -14,7 +14,6 @@ import {IEigenDACertVerifier} from "src/integrations/cert/interfaces/IEigenDACer
 import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
 import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
-
 
 struct ABNConfig {
     uint32 blockNumber;
@@ -58,18 +57,14 @@ contract CertVerifierRouterDeployer is Script, Test {
         // 3. Deploy the implementation and proxy contracts
         vm.startBroadcast();
         EigenDACertVerifierRouter implementation = new EigenDACertVerifierRouter();
-        bytes memory initData = abi.encodeCall(
-            EigenDACertVerifierRouter.initialize, (initialOwner, initABNs, initCertVerifiers)
-        );
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(implementation), address(proxyAdmin), initData
-        );
+        bytes memory initData =
+            abi.encodeCall(EigenDACertVerifierRouter.initialize, (initialOwner, initABNs, initCertVerifiers));
+        TransparentUpgradeableProxy proxy =
+            new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
         vm.stopBroadcast();
 
         // 4. Output the deployed addresses to a JSON file
-        string memory outputPath = string.concat(
-            "./script/deploy/router/output/", outputJSONFile
-        );
+        string memory outputPath = string.concat("./script/deploy/router/output/", outputJSONFile);
         string memory parent = "parent object";
         string memory finalJson = vm.serializeAddress(parent, "eigenDACertVerifierRouter", address(proxy));
         finalJson = vm.serializeAddress(parent, "eigenDACertVerifierRouterImplementation", address(implementation));
