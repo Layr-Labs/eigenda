@@ -465,8 +465,6 @@ func buildRelayPayloadRetriever(
 
 	relayPayloadRetriever, err := payloadretrieval.NewRelayPayloadRetriever(
 		log,
-		//nolint:gosec // disable G404: this doesn't need to be cryptographically secure
-		rand.New(rand.NewSource(time.Now().UnixNano())),
 		clientConfigV2.RelayPayloadRetrieverCfg,
 		relayClient,
 		g1Srs,
