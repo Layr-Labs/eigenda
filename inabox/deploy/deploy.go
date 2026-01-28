@@ -102,7 +102,6 @@ func (env *Config) deployEigenDAContracts() error {
 		CertVerifier:           result.EigenDA.CertVerifier,
 		CertVerifierRouter:     result.EigenDA.CertVerifierRouter,
 	}
-	env.EigenDAV1CertVerifier = result.EigenDAV1CertVerifier
 
 	return nil
 }
