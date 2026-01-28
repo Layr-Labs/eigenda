@@ -11,3 +11,6 @@
 	path = contracts/lib/eigenlayer-middleware
 	url = https://github.com/Layr-Labs/eigenlayer-middleware
 	branch = m2-mainnet-fixes
+[submodule "contracts/lib/openzeppelin-contracts-upgradeable-v5.5.0"]
+	path = contracts/lib/openzeppelin-contracts-upgradeable-v5.5.0
+	url = https://github.com/openzeppelin/openzeppelin-contracts-upgradeable
