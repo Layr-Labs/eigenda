@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
@@ -21,12 +19,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -43,22 +38,17 @@ const (
 	host             = "127.0.0.1"
 	disperserPort    = "443"
 
-	// CertVerifier and SvcManager addresses are still specified by hand for V1.
-	// Probably not worth the effort to force use of EigenDADirectory for V1.
 	disperserSepoliaHostname   = "disperser-testnet-sepolia.eigenda.xyz"
 	sepoliaEigenDADirectory    = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 	sepoliaCertVerifierAddress = "0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429"
-	sepoliaSvcManagerAddress   = "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764"
 
 	disperserHoodiTestnetHostname   = "disperser-hoodi.eigenda.xyz"
 	hoodiTestnetEigenDADirectory    = "0x5a44e56e88abcf610c68340c6814ae7f5c4369fd"
 	hoodiTestnetCertVerifierAddress = "0xD82d14F1c6d1403E95Cd9EC40CBb6463E27C1c5F"
-	hoodiTestnetSvcManagerAddress   = "0x3FF2204A567C15dC3731140B95362ABb4b17d8ED"
 
 	disperserHoodiPreprodHostname   = "disperser-v2-preprod-hoodi.eigenda.xyz"
 	hoodiPreprodEigenDADirectory    = "0xbFa1b820bb302925a3eb98C8836a95361FB75b87"
 	hoodiPreprodCertVerifierAddress = "0xb64101890d15499790d665f9863ede1278ce553d"
-	hoodiPreprodSvcManagerAddress   = "0x9F3A67f1b56d0B21115A54356c02B2d77f39EA8a"
 )
 
 var (
@@ -234,13 +224,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		panic("ETHEREUM_RPC environment variable is not set")
 	}
 
-	var pollInterval time.Duration
-	if useMemory {
-		pollInterval = time.Second * 1
-	} else {
-		pollInterval = time.Minute * 1
-	}
-
 	maxBlobLength := testCfg.MaxBlobLength
 	if maxBlobLength == "" {
 		maxBlobLength = "1mib"
@@ -252,7 +235,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 
 	var disperserHostname string
 	var certVerifierAddress string
-	var svcManagerAddress string
 	var eigenDADirectory string
 	switch testCfg.Backend {
 	case MemstoreBackend:
@@ -260,19 +242,16 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	case SepoliaBackend:
 		disperserHostname = disperserSepoliaHostname
 		certVerifierAddress = sepoliaCertVerifierAddress
-		svcManagerAddress = sepoliaSvcManagerAddress
 		eigenDADirectory = sepoliaEigenDADirectory
 
 	case HoodiTestnetBackend:
 		disperserHostname = disperserHoodiTestnetHostname
 		certVerifierAddress = hoodiTestnetCertVerifierAddress
-		svcManagerAddress = hoodiTestnetSvcManagerAddress
 		eigenDADirectory = hoodiTestnetEigenDADirectory
 
 	case HoodiPreprodBackend:
 		disperserHostname = disperserHoodiPreprodHostname
 		certVerifierAddress = hoodiPreprodCertVerifierAddress
-		svcManagerAddress = hoodiPreprodSvcManagerAddress
 		eigenDADirectory = hoodiPreprodEigenDADirectory
 
 	default:
@@ -290,37 +269,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			DispersalBackend:              testCfg.DispersalBackend,
 			WriteOnCacheMiss:              testCfg.WriteOnCacheMiss,
 			ErrorOnSecondaryInsertFailure: testCfg.ErrorOnSecondaryInsertFailure,
-		},
-		ClientConfigV1: common.ClientConfigV1{
-			EdaClientCfg: clients.EigenDAClientConfig{
-				RPC:                      disperserHostname + ":" + disperserPort,
-				StatusQueryTimeout:       time.Minute * 45,
-				StatusQueryRetryInterval: pollInterval,
-				DisableTLS:               false,
-				SignerPrivateKeyHex:      pk,
-				EthRpcUrl:                ethRPC,
-				SvcManagerAddr:           svcManagerAddress,
-			},
-			MaxBlobSizeBytes: maxBlobLengthBytes,
-			PutTries:         3,
-		},
-		VerifierConfigV1: verify.Config{
-			VerifyCerts:          true,
-			RPCURL:               ethRPC,
-			SvcManagerAddr:       svcManagerAddress,
-			EthConfirmationDepth: 1,
-			WaitForFinalization:  false,
-			MaxBlobSizeBytes:     maxBlobLengthBytes,
-		},
-		KzgConfig: kzg.KzgConfig{
-			G1Path:          "../../resources/g1.point",
-			G2Path:          "../../resources/g2.point",
-			G2TrailingPath:  "../../resources/g2.trailing.point",
-			CacheDir:        "../../resources/SRSTables",
-			SRSOrder:        encoding.SRSOrder,
-			SRSNumberToLoad: maxBlobLengthBytes / 32,
-			NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
-			LoadG2Points:    true,
 		},
 		MemstoreConfig: memconfig.NewSafeConfig(
 			memconfig.Config{
@@ -354,13 +302,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			ClientLedgerMode:                   testCfg.ClientLedgerMode,
 			VaultMonitorInterval:               testCfg.VaultMonitorInterval,
 		},
-	}
-	if useMemory {
-		builderConfig.ClientConfigV1.EdaClientCfg.SignerPrivateKeyHex =
-			"0000000000000000000100000000000000000000000000000000000000000000"
-		builderConfig.ClientConfigV1.EdaClientCfg.SvcManagerAddr = "0x00000000069"
-		builderConfig.KzgConfig.LoadG2Points = false
-		builderConfig.VerifierConfigV1.VerifyCerts = false
 	}
 	switch {
 	case testCfg.UseKeccak256ModeS3:
