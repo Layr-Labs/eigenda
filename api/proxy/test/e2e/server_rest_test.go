@@ -18,7 +18,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
-	"github.com/Layr-Labs/eigenda/test/random"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,14 +64,6 @@ func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
 	require.Equal(t, testBlob, preimage)
 }
 
-func TestProxyClientWriteReadV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testProxyClientWriteRead(t, common.V1EigenDABackend)
-}
-
 func TestProxyClientWriteReadV2(t *testing.T) {
 	testProxyClientWriteRead(t, common.V2EigenDABackend)
 }
@@ -90,14 +81,6 @@ func testProxyClientWriteRead(t *testing.T, dispersalBackend common.EigenDABacke
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(100))
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
-}
-
-func TestOptimismClientWithKeccak256CommitmentV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testOptimismClientWithKeccak256Commitment(t, common.V1EigenDABackend)
 }
 
 func TestOptimismClientWithKeccak256CommitmentV2(t *testing.T) {
@@ -118,14 +101,6 @@ func testOptimismClientWithKeccak256Commitment(t *testing.T, dispersalBackend co
 	requireOPClientSetGet(t, ts, testutils.RandBytes(100), true)
 }
 
-func TestOptimismClientWithGenericCommitmentV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testOptimismClientWithGenericCommitment(t, common.V1EigenDABackend)
-}
-
 func TestOptimismClientWithGenericCommitmentV2(t *testing.T) {
 	testOptimismClientWithGenericCommitment(t, common.V2EigenDABackend)
 }
@@ -144,14 +119,6 @@ func testOptimismClientWithGenericCommitment(t *testing.T, dispersalBackend comm
 
 	requireOPClientSetGet(t, ts, testutils.RandBytes(100), false)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.OptimismGenericCommitmentMode)
-}
-
-func TestProxyClientServerIntegrationV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testProxyClientServerIntegration(t, common.V1EigenDABackend)
 }
 
 func TestProxyClientServerIntegrationV2(t *testing.T) {
@@ -234,14 +201,6 @@ func testProxyClientServerIntegration(t *testing.T, dispersalBackend common.Eige
 		})
 }
 
-func TestProxyCachingV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testProxyCaching(t, common.V1EigenDABackend)
-}
-
 func TestProxyCachingV2(t *testing.T) {
 	testProxyCaching(t, common.V2EigenDABackend)
 }
@@ -262,14 +221,6 @@ func testProxyCaching(t *testing.T, dispersalBackend common.EigenDABackend) {
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
 	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
-}
-
-func TestProxyReadFallbackV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testProxyReadFallback(t, common.V1EigenDABackend)
 }
 
 func TestProxyReadFallbackV2(t *testing.T) {
@@ -316,14 +267,6 @@ func testProxyReadFallback(t *testing.T, dispersalBackend common.EigenDABackend)
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
 	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
-}
-
-func TestProxyWriteCacheOnMissV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testProxyWriteCacheOnMiss(t, common.V1EigenDABackend)
 }
 
 func TestProxyWriteCacheOnMissV2(t *testing.T) {
@@ -375,16 +318,8 @@ func testProxyWriteCacheOnMiss(t *testing.T, dispersalBackend common.EigenDABack
 	require.True(t, exists)
 }
 
-// TestErrorOnSecondaryInsertFailureFlagOnV1 verifies that when the flag is ON,
+// TestErrorOnSecondaryInsertFailureFlagOnV2 verifies that when the flag is ON,
 // secondary storage write failures cause the PUT to return HTTP 500.
-func TestErrorOnSecondaryInsertFailureFlagOnV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testErrorOnSecondaryInsertFailureFlagOn(t, common.V1EigenDABackend)
-}
-
 func TestErrorOnSecondaryInsertFailureFlagOnV2(t *testing.T) {
 	testErrorOnSecondaryInsertFailureFlagOn(t, common.V2EigenDABackend)
 }
@@ -435,16 +370,8 @@ func testErrorOnSecondaryInsertFailureFlagOn(t *testing.T, dispersalBackend comm
 	require.Contains(t, err.Error(), "500", "Expected HTTP 500 error")
 }
 
-// TestErrorOnSecondaryInsertFailureFlagOffPartialFailureV1 verifies that when the flag is OFF (default),
+// TestErrorOnSecondaryInsertFailureFlagOffPartialFailureV2 verifies that when the flag is OFF (default),
 // partial secondary storage failures are tolerated - PUT succeeds if at least one backend succeeds.
-func TestErrorOnSecondaryInsertFailureFlagOffPartialFailureV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testErrorOnSecondaryInsertFailureFlagOffPartialFailure(t, common.V1EigenDABackend)
-}
-
 func TestErrorOnSecondaryInsertFailureFlagOffPartialFailureV2(t *testing.T) {
 	testErrorOnSecondaryInsertFailureFlagOffPartialFailure(t, common.V2EigenDABackend)
 }
@@ -495,16 +422,8 @@ func testErrorOnSecondaryInsertFailureFlagOffPartialFailure(t *testing.T, disper
 	require.Equal(t, testBlob, retrievedBlob)
 }
 
-// TestErrorOnSecondaryInsertFailureFlagOnSuccessV1 verifies that when the flag is ON
+// TestErrorOnSecondaryInsertFailureFlagOnSuccessV2 verifies that when the flag is ON
 // and all secondary writes succeed, PUT succeeds normally (happy path).
-func TestErrorOnSecondaryInsertFailureFlagOnSuccessV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testErrorOnSecondaryInsertFailureFlagOnSuccess(t, common.V1EigenDABackend)
-}
-
 func TestErrorOnSecondaryInsertFailureFlagOnSuccessV2(t *testing.T) {
 	testErrorOnSecondaryInsertFailureFlagOnSuccess(t, common.V2EigenDABackend)
 }
@@ -542,14 +461,6 @@ func testErrorOnSecondaryInsertFailureFlagOnSuccess(t *testing.T, dispersalBacke
 	retrievedBlob, err := daClient.GetData(ts.Ctx, blobInfo)
 	require.NoError(t, err)
 	require.Equal(t, testBlob, retrievedBlob)
-}
-
-func TestProxyMemConfigClientCanGetAndPatchV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testProxyMemConfigClientCanGetAndPatch(t, common.V1EigenDABackend)
 }
 
 func TestProxyMemConfigClientCanGetAndPatchV2(t *testing.T) {
@@ -593,78 +504,6 @@ func testProxyMemConfigClientCanGetAndPatch(t *testing.T, dispersalBackend commo
 
 	require.NoError(t, err)
 	require.Equal(t, cfg.PutLatency, expectedChange)
-}
-
-// TestInterleavedVersions alternately disperses payloads to v1 and v2, and then retrieves them.
-func TestInterleavedVersions(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	t.Parallel()
-	testRandom := random.NewTestRandom()
-
-	testCfg := testutils.NewTestConfig(
-		testutils.GetBackend(),
-		common.V1EigenDABackend,
-		[]common.EigenDABackend{common.V1EigenDABackend, common.V2EigenDABackend})
-	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	testSuite, kill := testutils.CreateTestSuite(tsConfig)
-	defer kill()
-
-	client := standard_client.New(
-		&standard_client.Config{
-			URL: testSuite.RestAddress(),
-		})
-
-	// disperse a payload to v1
-	payload1a := testRandom.Bytes(1000)
-	cert1a, err := client.SetData(testSuite.Ctx, payload1a)
-	require.NoError(t, err)
-
-	// disperse a payload to v2
-	testSuite.RestServer.SetDispersalBackend(common.V2EigenDABackend)
-	payload2a := testRandom.Bytes(1000)
-	cert2a, err := client.SetData(testSuite.Ctx, payload2a)
-	require.NoError(t, err)
-
-	// disperse another payload to v1
-	testSuite.RestServer.SetDispersalBackend(common.V1EigenDABackend)
-	payload1b := testRandom.Bytes(1000)
-	cert1b, err := client.SetData(testSuite.Ctx, payload1b)
-	require.NoError(t, err)
-
-	// disperse another payload to v2
-	testSuite.RestServer.SetDispersalBackend(common.V2EigenDABackend)
-	payload2b := testRandom.Bytes(1000)
-	cert2b, err := client.SetData(testSuite.Ctx, payload2b)
-	require.NoError(t, err)
-
-	// fetch in reverse order, because why not
-	fetchedPayload2b, err := client.GetData(testSuite.Ctx, cert2b)
-	require.NoError(t, err)
-	fetchedPayload1b, err := client.GetData(testSuite.Ctx, cert1b)
-	require.NoError(t, err)
-	fetchedPayload2a, err := client.GetData(testSuite.Ctx, cert2a)
-	require.NoError(t, err)
-	fetchedPayload1a, err := client.GetData(testSuite.Ctx, cert1a)
-	require.NoError(t, err)
-
-	require.Equal(t, payload1a, fetchedPayload1a)
-	require.Equal(t, payload2a, fetchedPayload2a)
-	require.Equal(t, payload1b, fetchedPayload1b)
-	require.Equal(t, payload2b, fetchedPayload2b)
-
-	requireStandardClientSetGet(t, testSuite, testRandom.Bytes(100))
-	requireDispersalRetrievalEigenDA(t, testSuite.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
-}
-
-func TestMaxBlobSizeV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testMaxBlobSize(t, common.V1EigenDABackend)
 }
 
 func TestMaxBlobSizeV2(t *testing.T) {
