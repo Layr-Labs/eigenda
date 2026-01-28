@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
@@ -18,9 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
-	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	paymentvaultbindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
-	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
@@ -85,13 +82,6 @@ func NewTestHarnessWithSetup(infra *InfrastructureHarness) (*TestHarness, error)
 	testCtx.DeployerTransactorOpts = newTransactOptsFromPrivateKey(pk, testCtx.ChainID)
 
 	// Create contract bindings
-	testCtx.EigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(
-		gethcommon.HexToAddress(infra.TestConfig.EigenDAV1CertVerifier),
-		testCtx.EthClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create EigenDA cert verifier V1: %w", err)
-	}
-
 	testCtx.EigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(
 		gethcommon.HexToAddress(infra.TestConfig.EigenDA.CertVerifierRouter),
 		testCtx.EthClient)
@@ -189,8 +179,6 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 	}
 
 	cs := coreeth.NewChainState(tx, testHarness.EthClient)
-	agn := &core.StdAssignmentCoordinator{}
-	nodeClient := clients.NewNodeClient(20 * time.Second)
 
 	srsOrder, err := strconv.Atoi(infraHarness.TestConfig.Retriever.RETRIEVER_SRS_ORDER)
 	if err != nil {
@@ -211,12 +199,6 @@ func setupRetrievalClientsForContext(testHarness *TestHarness, infraHarness *Inf
 	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create kzg verifier: %w", err)
-	}
-
-	testHarness.RetrievalClient, err = clients.NewRetrievalClient(
-		infraHarness.Logger, cs, agn, nodeClient, kzgVerifier, 10)
-	if err != nil {
-		return fmt.Errorf("failed to create retrieval client: %w", err)
 	}
 
 	testHarness.ChainReader, err = coreeth.NewReader(
