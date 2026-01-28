@@ -12,12 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// FuzzProxyClientServerV1 will fuzz the proxy client server integration
-// and op client keccak256 with malformed inputs. This is never meant to be fuzzed with EigenDA.
-func FuzzProxyClientServerV1(f *testing.F) {
-	fuzzProxyClientServer(f, common.V1EigenDABackend)
-}
-
 func FuzzProxyClientServerV2(f *testing.F) {
 	fuzzProxyClientServer(f, common.V2EigenDABackend)
 }

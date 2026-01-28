@@ -7,14 +7,11 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	eigendaflags_v2 "github.com/Layr-Labs/eigenda/api/proxy/config/v2/eigendaflags"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
-	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
 	"github.com/urfave/cli/v2"
 )
 
@@ -24,10 +21,7 @@ type Config struct {
 	StoreConfig store.Config
 
 	// main storage configs
-	ClientConfigV1   common.ClientConfigV1
-	VerifierConfigV1 verify.Config
-	KzgConfig        kzg.KzgConfig
-	ClientConfigV2   common.ClientConfigV2
+	ClientConfigV2 common.ClientConfigV2
 
 	MemstoreConfig  *memconfig.SafeConfig
 	MemstoreEnabled bool
@@ -47,15 +41,8 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("read storage config: %w", err)
 	}
 
-	var clientConfigV1 common.ClientConfigV1
-	var verifierConfigV1 verify.Config
 	if slices.Contains(storeConfig.BackendsToEnable, common.V1EigenDABackend) {
-		clientConfigV1, err = eigendaflags.ReadClientConfigV1(ctx)
-		if err != nil {
-			return Config{}, fmt.Errorf("read client config v1: %w", err)
-		}
-
-		verifierConfigV1 = verify.ReadConfig(ctx, clientConfigV1)
+		return Config{}, fmt.Errorf("V1 backend has been removed, please use V2")
 	}
 
 	var clientConfigV2 common.ClientConfigV2
@@ -69,7 +56,7 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 	var maxBlobSizeBytes uint64
 	switch storeConfig.DispersalBackend {
 	case common.V1EigenDABackend:
-		maxBlobSizeBytes = clientConfigV1.MaxBlobSizeBytes
+		return Config{}, fmt.Errorf("V1 dispersal backend has been removed, please use V2")
 	case common.V2EigenDABackend:
 		maxBlobSizeBytes = clientConfigV2.MaxBlobSizeBytes
 	default:
@@ -83,16 +70,13 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	cfg := Config{
-		StoreConfig:      storeConfig,
-		ClientConfigV1:   clientConfigV1,
-		VerifierConfigV1: verifierConfigV1,
-		KzgConfig:        verify.ReadKzgConfig(ctx, maxBlobSizeBytes),
-		ClientConfigV2:   clientConfigV2,
-		MemstoreConfig:   memstoreConfig,
-		MemstoreEnabled:  ctx.Bool(memstore.EnabledFlagName),
-		S3Config:         s3.ReadConfig(ctx),
-		RetryCount:       ctx.Int(eigendaflags_v2.EthRPCRetryCountFlagName),
-		RetryDelay:       ctx.Duration(eigendaflags_v2.EthRPCRetryDelayIncrementFlagName),
+		StoreConfig:     storeConfig,
+		ClientConfigV2:  clientConfigV2,
+		MemstoreConfig:  memstoreConfig,
+		MemstoreEnabled: ctx.Bool(memstore.EnabledFlagName),
+		S3Config:        s3.ReadConfig(ctx),
+		RetryCount:      ctx.Int(eigendaflags_v2.EthRPCRetryCountFlagName),
+		RetryDelay:      ctx.Duration(eigendaflags_v2.EthRPCRetryDelayIncrementFlagName),
 	}
 
 	return cfg, nil
@@ -102,10 +86,7 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 func (cfg *Config) Check() error {
 	v1Enabled := slices.Contains(cfg.StoreConfig.BackendsToEnable, common.V1EigenDABackend)
 	if v1Enabled {
-		err := cfg.checkV1Config()
-		if err != nil {
-			return fmt.Errorf("check v1 config: %w", err)
-		}
+		return fmt.Errorf("V1 backend has been removed, please use V2")
 	}
 
 	v2Enabled := slices.Contains(cfg.StoreConfig.BackendsToEnable, common.V2EigenDABackend)
@@ -128,56 +109,12 @@ func (cfg *Config) Check() error {
 	return cfg.StoreConfig.Check()
 }
 
-func (cfg *Config) checkV1Config() error {
-	if cfg.MemstoreEnabled {
-		// provide dummy values to eigenda client config. Since the client won't be called in this
-		// mode it doesn't matter.
-		cfg.VerifierConfigV1.SvcManagerAddr = "0x0000000000000000000000000000000000000000"
-		cfg.ClientConfigV1.EdaClientCfg.EthRpcUrl = "http://0.0.0.0:666"
-	} else {
-		if cfg.ClientConfigV1.EdaClientCfg.SvcManagerAddr == "" || cfg.VerifierConfigV1.SvcManagerAddr == "" {
-			return fmt.Errorf("service manager address is required for communication with EigenDA")
-		}
-		if cfg.ClientConfigV1.EdaClientCfg.EthRpcUrl == "" {
-			return fmt.Errorf("eth prc url is required for communication with EigenDA")
-		}
-		if cfg.ClientConfigV1.EdaClientCfg.RPC == "" {
-			return fmt.Errorf("using eigenda backend (memstore.enabled=false) but eigenda disperser rpc url is not set")
-		}
-	}
-
-	// cert verification is enabled
-	// TODO: move this verification logic to verify/cli.go
-	if cfg.VerifierConfigV1.VerifyCerts {
-		if cfg.MemstoreEnabled {
-			return fmt.Errorf(
-				"cannot enable cert verification when memstore is enabled. use --%s",
-				verify.CertVerificationDisabledFlagName)
-		}
-		if cfg.VerifierConfigV1.RPCURL == "" {
-			return fmt.Errorf("cert verification enabled but eth rpc is not set")
-		}
-		if cfg.ClientConfigV1.EdaClientCfg.SvcManagerAddr == "" || cfg.VerifierConfigV1.SvcManagerAddr == "" {
-			return fmt.Errorf("cert verification enabled but svc manager address is not set")
-		}
-	}
-
-	return nil
-}
-
 func (cfg *Config) ToString() (string, error) {
 	redacted := "******"
 
 	// create a copy, otherwise the original values being redacted will be lost
 	configCopy := *cfg
 
-	if configCopy.ClientConfigV1.EdaClientCfg.SignerPrivateKeyHex != "" {
-		configCopy.ClientConfigV1.EdaClientCfg.SignerPrivateKeyHex = redacted
-	}
-	if configCopy.ClientConfigV1.EdaClientCfg.EthRpcUrl != "" {
-		// hiding as RPC providers typically use sensitive API keys within
-		configCopy.ClientConfigV1.EdaClientCfg.EthRpcUrl = redacted
-	}
 	if configCopy.S3Config.AccessKeySecret != "" {
 		configCopy.S3Config.AccessKeySecret = redacted
 	}

@@ -473,7 +473,6 @@ func NewTestClient(
 						proxycommon.ValidatorRetrieverType,
 					},
 				},
-				KzgConfig: *kzgConfig,
 			},
 		})
 	if err != nil {

@@ -37,7 +37,6 @@ build: protoc contract-bindings
 	$(MAKE) -C disperser build
 	$(MAKE) -C node build
 	$(MAKE) -C retriever build
-	$(MAKE) -C tools/traffic build
 	$(MAKE) -C tools/kzgpad build
 	$(MAKE) -C relay build
 	$(MAKE) -C litt build
@@ -50,7 +49,6 @@ clean:
 	$(MAKE) -C disperser clean
 	$(MAKE) -C node clean
 	$(MAKE) -C retriever clean
-	$(MAKE) -C tools/traffic clean
 	$(MAKE) -C tools/kzgpad clean
 	$(MAKE) -C relay clean
 	$(MAKE) -C litt clean

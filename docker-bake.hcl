@@ -50,7 +50,6 @@ group "all" {
     "retriever",
     "churner",
     "dataapi",
-    "traffic-generator",
     "traffic-generator-v2",
     "controller",
     "ejector",
@@ -77,7 +76,6 @@ group "internal-release" {
     "retriever-internal",
     "churner-internal",
     "dataapi-internal",
-    "traffic-generator-internal",
     "traffic-generator-v2-internal",
     "controller-internal",
     "ejector-internal",
@@ -183,22 +181,6 @@ target "churner-internal" {
     "${REGISTRY}/eigenda-churner:${BUILD_TAG}",
     "${REGISTRY}/eigenda-churner:${GIT_SHA}",
     "${REGISTRY}/eigenda-churner:sha-${GIT_SHORT_SHA}"
-  ]
-}
-
-target "traffic-generator" {
-  context    = "."
-  dockerfile = "./Dockerfile"
-  target     = "generator"
-  tags       = ["${REGISTRY}/${REPO}/traffic-generator:${BUILD_TAG}"]
-}
-
-target "traffic-generator-internal" {
-  inherits = ["traffic-generator"]
-  tags     = [
-    "${REGISTRY}/eigenda-traffic-generator:${BUILD_TAG}",
-    "${REGISTRY}/eigenda-traffic-generator:${GIT_SHA}",
-    "${REGISTRY}/eigenda-traffic-generator:sha-${GIT_SHORT_SHA}"
   ]
 }
 

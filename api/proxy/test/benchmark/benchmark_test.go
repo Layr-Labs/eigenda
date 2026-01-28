@@ -11,16 +11,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
 )
 
-// BenchmarkPutsWithSecondaryV1  ... Takes in an async worker count and profiles blob insertions using
-// constant blob sizes in parallel. Exercises V1 code pathways
-func BenchmarkPutsWithSecondaryV1(b *testing.B) {
-	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, common.V1EigenDABackend, nil)
-	putsWithSecondary(b, testCfg)
-}
-
-// BenchmarkPutsWithSecondaryV2  ... Takes in an async worker count and profiles blob insertions using
-// constant blob sizes in parallel. Exercises V2 code pathways
-func BenchmarkPutsWithSecondaryV2(b *testing.B) {
+// BenchmarkPutsWithSecondary  ... Takes in an async worker count and profiles blob insertions using
+// constant blob sizes in parallel.
+func BenchmarkPutsWithSecondary(b *testing.B) {
 	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, common.V2EigenDABackend, nil)
 	putsWithSecondary(b, testCfg)
 }

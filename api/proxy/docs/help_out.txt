@@ -33,94 +33,6 @@ GLOBAL OPTIONS:
           cause the derivation pipeline to halt where the nitro software would enter an
           infinite loop on calls to daprovider_RecoverPayload
 
-   Cert Verifier (V1 only)
-
-   
-    --eigenda.cert-verification-disabled (default: false)                   ($EIGENDA_PROXY_EIGENDA_CERT_VERIFICATION_DISABLED)
-          Whether to verify certificates received from EigenDA disperser.
-   
-    --eigenda.cert-verifier-v1 value                                       ($EIGENDA_PROXY_EIGENDA_CERT_VERIFIER_V1)
-          Address of EigenDACertVerifierV1 contract. Only necessary if using custom
-          quorums/thresholds 
-                    for certificate verification. If no address is provided
-          then the default 
-                    EigenDAServiceManager parameters will be uesd.
-
-   EigenDA V1 Client
-
-   
-    --eigenda.confirmation-depth value  (default: "8")                     ($EIGENDA_PROXY_EIGENDA_CONFIRMATION_DEPTH)
-          Number of Ethereum blocks to wait after the blob's batch has been included
-          on-chain, before returning from PutBlob calls. Can either be a number or
-          'finalized'.
-   
-    --eigenda.confirmation-timeout value (default: 15m0s)                   ($EIGENDA_PROXY_EIGENDA_CONFIRMATION_TIMEOUT)
-          The total amount of time that the client will spend waiting for EigenDA
-                to
-          "confirm" (include onchain) a blob after it has been dispersed. Note that
-                we
-          stick to "confirm" here but this really means InclusionTimeout,
-                not
-          confirmation in the sense of confirmation depth.
-                
-                If ConfirmationTimeout
-          time passes and the blob is not yet confirmed,
-                the client will return an
-          api.ErrorFailover to let the caller failover to EthDA.
-   
-    --eigenda.custom-quorum-ids value                                      ($EIGENDA_PROXY_EIGENDA_CUSTOM_QUORUM_IDS)
-          Custom quorum IDs for writing blobs. Should not include default quorums 0 or 1.
-   
-    --eigenda.disable-point-verification-mode (default: false)                   ($EIGENDA_PROXY_EIGENDA_DISABLE_POINT_VERIFICATION_MODE)
-          Disable point verification mode. This mode performs IFFT on data before writing
-          and FFT on data after reading. Disabling requires supplying the entire blob for
-          verification against the KZG commitment.
-   
-    --eigenda.disable-tls               (default: false)                   ($EIGENDA_PROXY_EIGENDA_GRPC_DISABLE_TLS)
-          Disable TLS for gRPC communication with the EigenDA disperser. Default is false.
-   
-    --eigenda.disperser-rpc value                                          ($EIGENDA_PROXY_EIGENDA_DISPERSER_RPC)
-          RPC endpoint of the EigenDA disperser.
-   
-    --eigenda.eth-rpc value                                                ($EIGENDA_PROXY_EIGENDA_ETH_RPC)
-          URL of the Ethereum RPC endpoint. Needed to confirm blobs landed onchain.
-   
-    --eigenda.max-blob-length value     (default: "16MiB")                 ($EIGENDA_PROXY_EIGENDA_MAX_BLOB_LENGTH)
-          Maximum blob length (base 2) to be written or read from EigenDA. Determines the
-          number of SRS points
-                      loaded into memory for KZG commitments. Example
-          units: '15MiB', '4Kib'.
-   
-    --eigenda.put-blob-encoding-version value (default: 0)                       ($EIGENDA_PROXY_EIGENDA_PUT_BLOB_ENCODING_VERSION)
-          Blob encoding version to use when writing blobs from the high-level interface.
-   
-    --eigenda.put-retries value         (default: 3)                       ($EIGENDA_PROXY_EIGENDA_PUT_RETRIES)
-          Total number of times to try blob dispersals before serving an error response.>0
-          = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted
-          (causes startup error).
-   
-    --eigenda.response-timeout value    (default: 1m0s)                    ($EIGENDA_PROXY_EIGENDA_RESPONSE_TIMEOUT)
-          Flag used to configure the underlying disperser-client. Total time to wait for
-          the disperseBlob call to return or disperseAuthenticatedBlob stream to finish
-          and close.
-   
-    --eigenda.signer-private-key-hex value                                    ($EIGENDA_PROXY_EIGENDA_SIGNER_PRIVATE_KEY_HEX)
-          Hex-encoded signer private key. Used for authn/authz and rate limits on EigenDA
-          disperser. Should not be associated with an Ethereum address holding any funds.
-   
-    --eigenda.status-query-retry-interval value (default: 5s)                      ($EIGENDA_PROXY_EIGENDA_STATUS_QUERY_INTERVAL)
-          Interval between retries when awaiting network blob finalization. Default is 5
-          seconds.
-   
-    --eigenda.status-query-timeout value (default: 30m0s)                   ($EIGENDA_PROXY_EIGENDA_STATUS_QUERY_TIMEOUT)
-          Duration to wait for a blob to finalize after being sent for dispersal. Default
-          is 30 minutes.
-   
-    --eigenda.svc-manager-addr value                                       ($EIGENDA_PROXY_EIGENDA_SERVICE_MANAGER_ADDR)
-          Address of the EigenDAServiceManager contract. Required to confirm blobs landed
-          onchain. See
-          https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment
-
    EigenDA V2 Client
 
    
@@ -240,26 +152,6 @@ GLOBAL OPTIONS:
           Which proxy application APIs to enable. supported options are admin, standard,
           op-generic, op-keccak, arb, metrics
 
-   KZG
-
-   
-    --eigenda.cache-path value          (default: "resources/SRSTables/")  ($EIGENDA_PROXY_EIGENDA_TARGET_CACHE_PATH)
-          Path to SRS tables for caching. This resource is not currently used, but needed
-          because of the shared eigenda KZG library that we use. We will eventually fix
-          this.
-   
-    --eigenda.g1-path value             (default: "resources/g1.point")    ($EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH)
-          Path to g1.point file. Only needed for V1 backend. Points are embedded into the
-          binary for V2 backend.
-   
-    --eigenda.g2-path value             (default: "resources/g2.point")    ($EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH)
-          [Deprecated] SRS points are embedded in the binary, so this flag is no longer
-          needed.
-   
-    --eigenda.g2-path-trailing value    (default: "resources/g2.trailing.point") ($EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH)
-          [Deprecated] SRS points are embedded in the binary, so this flag is no longer
-          needed.
-
    Logging
 
    
@@ -349,8 +241,9 @@ GLOBAL OPTIONS:
    Storage
 
    
-    --storage.backends-to-enable value  (default: "V1")                    ($EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE)
-          Comma separated list of eigenDA backends to enable (e.g. V1,V2)
+    --storage.backends-to-enable value  (default: "V2")                    ($EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE)
+          Comma separated list of eigenDA backends to enable (currently only V2 is
+          supported)
    
     --storage.cache-targets value                                          ($EIGENDA_PROXY_STORAGE_CACHE_TARGETS)
           List of caching targets to use fast reads from EigenDA.
@@ -359,8 +252,9 @@ GLOBAL OPTIONS:
           Number of threads spun-up for async secondary storage insertions. (<=0) denotes
           single threaded insertions where (>0) indicates decoupled writes.
    
-    --storage.dispersal-backend value   (default: "V1")                    ($EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND)
-          Target EigenDA backend version for blob dispersal (e.g. V1 or V2).
+    --storage.dispersal-backend value   (default: "V2")                    ($EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND)
+          Target EigenDA backend version for blob dispersal (currently only V2 is
+          supported).
    
     --storage.error-on-secondary-insert-failure (default: false)                   ($EIGENDA_PROXY_STORAGE_ERROR_ON_SECONDARY_INSERT_FAILURE)
           Return HTTP 500 if any secondary storage write fails. Uses fail-fast behavior:

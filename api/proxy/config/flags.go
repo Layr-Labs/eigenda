@@ -1,13 +1,11 @@
 package config
 
 import (
-	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	eigenda_v2_flags "github.com/Layr-Labs/eigenda/api/proxy/config/v2/eigendaflags"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/logging"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
@@ -29,11 +27,7 @@ const (
 	MemstoreFlagsCategory = "Memstore (for testing purposes - replaces EigenDA backend)"
 	S3Category            = "S3 Cache/Fallback"
 
-	EigenDAClientCategory = "EigenDA V1 Client"
-	VerifierCategory      = "Cert Verifier (V1 only)"
-
 	EigenDAV2ClientCategory = "EigenDA V2 Client"
-	KZGCategory             = "KZG"
 
 	DeprecatedRedisCategory = "Redis Cache/Fallback"
 )
@@ -53,18 +47,13 @@ func init() {
 	Flags = append(Flags, metrics.CLIFlags(GlobalEnvVarPrefix, MetricsFlagCategory)...)
 
 	Flags = append(Flags, logging.CLIFlags(GlobalEnvVarPrefix, LoggingFlagsCategory)...)
-	Flags = append(Flags, eigendaflags.CLIFlags(GlobalEnvVarPrefix, EigenDAClientCategory)...)
 	Flags = append(Flags, eigenda_v2_flags.CLIFlags(GlobalEnvVarPrefix, EigenDAV2ClientCategory)...)
 	Flags = append(Flags, store.CLIFlags(GlobalEnvVarPrefix, StorageFlagsCategory)...)
 	Flags = append(Flags, s3.CLIFlags(GlobalEnvVarPrefix, S3Category)...)
 	Flags = append(Flags, memstore.CLIFlags(GlobalEnvVarPrefix, MemstoreFlagsCategory)...)
-	Flags = append(Flags, verify.VerifierCLIFlags(GlobalEnvVarPrefix, VerifierCategory)...)
-	Flags = append(Flags, verify.KZGCLIFlags(GlobalEnvVarPrefix, KZGCategory)...)
 
 	Flags = append(Flags, metrics.DeprecatedCLIFlags(GlobalEnvVarPrefix, MetricsFlagCategory)...)
-	Flags = append(Flags, eigendaflags.DeprecatedCLIFlags(GlobalEnvVarPrefix, EigenDAClientCategory)...)
 	Flags = append(Flags, eigenda_v2_flags.DeprecatedCLIFlags(GlobalEnvVarPrefix, EigenDAV2ClientCategory)...)
-	Flags = append(Flags, verify.DeprecatedCLIFlags(GlobalEnvVarPrefix, VerifierCategory)...)
 	Flags = append(Flags, store.DeprecatedCLIFlags(GlobalEnvVarPrefix, StorageFlagsCategory)...)
 	Flags = append(Flags, redis.DeprecatedCLIFlags(GlobalEnvVarPrefix, DeprecatedRedisCategory)...)
 }
