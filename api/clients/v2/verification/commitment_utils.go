@@ -3,32 +3,25 @@ package verification
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-
-	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-// GenerateBlobCommitment computes a kzg-bn254 commitment of blob data using SRS
-func GenerateBlobCommitment(
-	g1Srs []bn254.G1Affine,
-	blobBytes []byte) (*encoding.G1Commitment, error) {
+// GenerateBlobCommitment computes a kzg-bn254 commitment from field element coefficients using SRS
+func GenerateBlobCommitment(g1Srs []bn254.G1Affine, coefficients []fr.Element) (*encoding.G1Commitment, error) {
 
-	inputFr, err := rs.ToFrArray(blobBytes)
-	if err != nil {
-		return nil, fmt.Errorf("convert bytes to field elements, %w", err)
-	}
-
-	if len(g1Srs) < len(inputFr) {
+	if len(g1Srs) < len(coefficients) {
 		return nil, fmt.Errorf(
 			"insufficient SRS in memory: have %v, need %v",
 			len(g1Srs),
-			len(inputFr))
+			len(coefficients))
 	}
 
 	var commitment bn254.G1Affine
-	_, err = commitment.MultiExp(g1Srs[:len(inputFr)], inputFr, ecc.MultiExpConfig{})
+	_, err := commitment.MultiExp(g1Srs[:len(coefficients)], coefficients, ecc.MultiExpConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("MultiExp: %w", err)
 	}
@@ -41,10 +34,11 @@ func GenerateBlobCommitment(
 // is successfully generated, and is equal to the claimed commitment, otherwise false.
 func GenerateAndCompareBlobCommitment(
 	g1Srs []bn254.G1Affine,
-	blobBytes []byte,
-	claimedCommitment *encoding.G1Commitment) (bool, error) {
+	blob *coretypes.Blob,
+	claimedCommitment *encoding.G1Commitment,
+) (bool, error) {
 
-	computedCommitment, err := GenerateBlobCommitment(g1Srs, blobBytes)
+	computedCommitment, err := GenerateBlobCommitment(g1Srs, blob.GetCoefficients())
 	if err != nil {
 		return false, fmt.Errorf("compute commitment: %w", err)
 	}

@@ -250,16 +250,16 @@ func TestFailedDecoding(t *testing.T) {
 	ctx := t.Context()
 
 	tester := buildRelayPayloadRetrieverTester(t)
-	blob, _ := buildBlobAndCert(t, tester)
+	blob, originalCert := buildBlobAndCert(t, tester)
 	blobBytes := blob.Serialize()
 
 	// Corrupt the blob bytes to have an invalid payload header length
 	binary.BigEndian.PutUint32(blobBytes[2:6], uint32(len(blobBytes)-1))
 
-	// Build a cert that matches the corrupted blob so commitment verification passes
-	maliciousCert := buildCertFromBlobBytes(t, blobBytes, tester.Random.Uint32())
-	blobLengthSymbols := maliciousCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
-	maliciousBlob, err := coretypes.DeserializeBlob(blobBytes, blobLengthSymbols)
+	// generate a malicious cert, which will verify for the invalid blob
+	maliciousCert := buildCertFromBlobBytes(t, blobBytes, originalCert.RelayKeys()[0])
+	maliciousBlob, err := coretypes.DeserializeBlob(
+		blobBytes, originalCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length)
 	require.NoError(t, err)
 
 	// The mock returns this malicious blob, which passes commitment verification but fails decoding

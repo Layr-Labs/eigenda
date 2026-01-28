@@ -117,11 +117,7 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 		return nil, fmt.Errorf("blob %s: get blob from relay: %w", blobKey.Hex(), err)
 	}
 
-	// TODO (litt3): eventually, we should make GenerateAndCompareBlobCommitment accept a blob, instead of the
-	//  serialization of a blob. Commitment generation operates on field elements, which is how a blob is stored
-	//  under the hood, so it's actually duplicating work to serialize the blob here. I'm declining to make this
-	//  change now, to limit the size of the refactor PR.
-	valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob.Serialize(), blobCommitments.Commitment)
+	valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob, blobCommitments.Commitment)
 	if err != nil {
 		return nil, fmt.Errorf("blob %s: generate and compare blob commitment: %w", blobKey.Hex(), err)
 	}

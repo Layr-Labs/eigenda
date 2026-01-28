@@ -129,11 +129,8 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 			continue
 		}
 
-		// TODO (litt3): eventually, we should make GenerateAndCompareBlobCommitment accept a blob, instead of the
-		//  serialization of a blob. Commitment generation operates on field elements, which is how a blob is stored
-		//  under the hood, so it's actually duplicating work to serialize the blob here. I'm declining to make this
-		//  change now, to limit the size of the refactor PR.
-		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob.Serialize(), blobHeader.BlobCommitments.Commitment)
+		valid, err := verification.GenerateAndCompareBlobCommitment(
+			pr.g1Srs, blob, blobHeader.BlobCommitments.Commitment)
 		if err != nil {
 			pr.logger.Warn(
 				"generate and compare blob commitment",
