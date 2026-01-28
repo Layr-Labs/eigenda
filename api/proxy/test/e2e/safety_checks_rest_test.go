@@ -19,14 +19,6 @@ func isNilPtrDerefPanic(err string) bool {
 		strings.Contains(err, "nil pointer dereference")
 }
 
-func TestOpClientKeccak256MalformedInputsV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testOpClientKeccak256MalformedInputs(t, common.V1EigenDABackend)
-}
-
 func TestOpClientKeccak256MalformedInputsV2(t *testing.T) {
 	testOpClientKeccak256MalformedInputs(t, common.V2EigenDABackend)
 }
@@ -77,14 +69,6 @@ func testOpClientKeccak256MalformedInputs(t *testing.T, dispersalBackend common.
 			// Refer to issue: https://github.com/ethereum-optimism/optimism/issues/11987
 			// assert.False(t, strings.Contains(err.Error(), ": EOF") && !isPanic(err.Error()))
 		})
-}
-
-func TestProxyClientMalformedInputCasesV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testProxyClientMalformedInputCases(t, common.V1EigenDABackend)
 }
 
 func TestProxyClientMalformedInputCasesV2(t *testing.T) {
@@ -199,14 +183,6 @@ func testProxyClientMalformedInputCases(t *testing.T, dispersalBackend common.Ei
 		})
 }
 
-func TestKeccak256CommitmentRequestErrorsWhenS3NotSetV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testKeccak256CommitmentRequestErrorsWhenS3NotSet(t, common.V1EigenDABackend)
-}
-
 func TestKeccak256CommitmentRequestErrorsWhenS3NotSetV2(t *testing.T) {
 	testKeccak256CommitmentRequestErrorsWhenS3NotSet(t, common.V2EigenDABackend)
 }
@@ -232,14 +208,6 @@ func testKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T, dispersalBac
 	_, err := daClient.SetInput(ts.Ctx, testPreimage)
 	// TODO: the server currently returns an internal server error. Should it return a 400 instead?
 	require.Error(t, err)
-}
-
-func TestOversizedBlobRequestErrorsV1(t *testing.T) {
-	if !testutils.GetBackend().SupportsEigenDAV1() {
-		t.Skip("BACKEND value provided doesn't support EigenDAV1, skipping test execution")
-	}
-
-	testOversizedBlobRequestErrors(t, common.V1EigenDABackend)
 }
 
 func TestOversizedBlobRequestErrorsV2(t *testing.T) {
@@ -268,7 +236,6 @@ func testOversizedBlobRequestErrors(t *testing.T, dispersalBackend common.EigenD
 	require.Error(t, err)
 
 	var oversizedError bool
-	// error returned from EigenDA V1 disperser
 	if strings.Contains(err.Error(), "blob size cannot exceed") {
 		oversizedError = true
 	}
