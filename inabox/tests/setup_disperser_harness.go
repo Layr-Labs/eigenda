@@ -296,16 +296,12 @@ func SetupDisperserHarness(
 	harness.APIServer = apiServerComponents.Server
 	harness.APIServerAddress = apiServerComponents.Address
 
-	// Start remaining binaries (disperser, batcher, etc.)
+	// Generate environment variables needed by test harness (e.g., KZG config paths)
 	if config.TestConfig != nil {
-		logger.Info("Starting remaining binaries")
 		err := config.TestConfig.GenerateAllVariables()
 		if err != nil {
 			return nil, fmt.Errorf("could not generate environment variables: %w", err)
 		}
-
-		// Start binaries for tests, will skip churner, operators, encoder, controller, and relays
-		config.TestConfig.StartBinaries(true)
 	}
 
 	return harness, nil
