@@ -47,7 +47,6 @@ type IEigenDAManager interface {
 type EigenDAManager struct {
 	log logging.Logger
 
-	eigenda          common.EigenDAV1Store // v0 version byte
 	eigendaV2        common.EigenDAV2Store // >= v1 version bytes
 	dispersalBackend atomic.Value          // stores the EigenDABackend to write blobs to
 
@@ -59,7 +58,6 @@ var _ IEigenDAManager = &EigenDAManager{}
 
 // NewEigenDAManager creates a new EigenDAManager
 func NewEigenDAManager(
-	eigenda common.EigenDAV1Store,
 	eigenDAV2 common.EigenDAV2Store,
 	l logging.Logger,
 	secondary secondary.ISecondary,
@@ -70,13 +68,12 @@ func NewEigenDAManager(
 		return nil, fmt.Errorf("EigenDA V2 dispersal enabled but no v2 store provided")
 	}
 
-	if dispersalBackend == common.V1EigenDABackend && eigenda == nil {
-		return nil, fmt.Errorf("EigenDA dispersal enabled but no store provided")
+	if dispersalBackend == common.V1EigenDABackend {
+		return nil, fmt.Errorf("V1 backend has been removed, please use V2")
 	}
 
 	manager := &EigenDAManager{
 		log:       l,
-		eigenda:   eigenda,
 		eigendaV2: eigenDAV2,
 		secondary: secondary,
 	}
@@ -110,10 +107,7 @@ func (m *EigenDAManager) Get(ctx context.Context,
 ) ([]byte, error) {
 	switch versionedCert.Version {
 	case certs.V0VersionByte:
-		if m.eigenda == nil {
-			return nil, errors.New("received CertV0 but EigenDA V1 client is not initialized")
-		}
-		return m.getEigenDAV1(ctx, versionedCert)
+		return nil, errors.New("V1 backend has been removed, V0 certs are no longer supported")
 	case certs.V1VersionByte, certs.V2VersionByte, certs.V3VersionByte:
 		if m.eigendaV2 == nil {
 			return nil, errors.New("received EigenDAV2 cert but EigenDA V2 client is not initialized")
@@ -122,70 +116,6 @@ func (m *EigenDAManager) Get(ctx context.Context,
 	default:
 		return nil, fmt.Errorf("cert version unknown: %b", versionedCert.Version)
 	}
-}
-
-// getEigenDAV1 will attempt to retrieve a blob for the given versionedCert
-// from cache, EigenDA V1, and fallback storage.
-// TODO: we should also add the v1 RetrievalClient to retrieve from the validators directly
-// in case the v1 disperser is down, the same way we do for v2.
-func (m *EigenDAManager) getEigenDAV1(
-	ctx context.Context,
-	versionedCert *certs.VersionedCert,
-) ([]byte, error) {
-	verifyFnForSecondary := func(ctx context.Context, cert []byte, payload []byte) error {
-		// We don't add the cert version because EigenDA V1 only supports [certs.V0VersionByte] Certs.
-		// We also don't use the l1InclusionBlockNumber because Recency check is only supported by EigenDA V2.
-		// TODO: we should decouple the Verify function into a VerifyCert and VerifyBlob function,
-		// and only verify the cert once here, before retrievals, and then only verify the blob commitment
-		// after retrievals.
-		return m.eigenda.Verify(ctx, cert, payload)
-	}
-
-	var readErrors []error
-	// 1 - read payload from cache if enabled
-	// Secondary storages (cache and fallback) store payloads instead of blobs.
-	// TODO: would be nice to store blobs instead of payloads in secondary storages, such that we could standardize all
-	// storages and make them all implement the [clients.PayloadRetriever] interface.
-	// We could then get rid of the proxy notion of caches/fallbacks and only have storages.
-	if m.secondary.CachingEnabled() {
-		m.log.Debug("Retrieving payload from cached backends")
-		payload, err := m.secondary.MultiSourceRead(ctx,
-			versionedCert.SerializedCert, false, verifyFnForSecondary)
-		if err == nil {
-			return payload, nil
-		}
-		m.log.Warn("Failed to read payload from cache targets", "err", err)
-		readErrors = append(readErrors, fmt.Errorf("read from cache targets: %w", err))
-	}
-
-	// 2 - read payload from EigenDA
-	payload, err := m.eigenda.Get(ctx, versionedCert.SerializedCert)
-	if err == nil {
-		err = m.eigenda.Verify(ctx, versionedCert.SerializedCert, payload)
-		if err != nil {
-			return nil, fmt.Errorf("verify EigenDA V1 cert: %w", err)
-		}
-		if m.secondary.WriteOnCacheMissEnabled() {
-			err = m.backupToSecondary(ctx, versionedCert.SerializedCert, payload)
-			if err != nil {
-				return nil, fmt.Errorf("backup to secondary on cache miss: %w", err)
-			}
-		}
-		return payload, nil
-	}
-	readErrors = append(readErrors, fmt.Errorf("read from EigenDA backend: %w", err))
-
-	// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
-	if m.secondary.FallbackEnabled() {
-		payload, err = m.secondary.MultiSourceRead(ctx,
-			versionedCert.SerializedCert, true, verifyFnForSecondary)
-		if err == nil {
-			return payload, nil
-		}
-		readErrors = append(readErrors, fmt.Errorf("read from fallback targets: %w", err))
-	}
-
-	return nil, fmt.Errorf("failed to read from all storage backends: %w", errors.Join(readErrors...))
 }
 
 // getEigenDAV2 will attempt to retrieve a blob for the given versionedCert
@@ -295,15 +225,7 @@ func (m *EigenDAManager) putToCorrectEigenDABackend(
 	}
 
 	if backend == common.V1EigenDABackend {
-		if m.eigenda == nil {
-			return nil, errors.New("EigenDA V1 dispersal requested but not configured")
-		}
-		serializedCert, err := m.eigenda.Put(ctx, value)
-		if err != nil {
-			return nil, fmt.Errorf("could not disperse payload to v1 backend: %w", err)
-		}
-
-		return certs.NewVersionedCert(serializedCert, certs.V0VersionByte), nil
+		return nil, errors.New("V1 backend has been removed, please use V2")
 	}
 
 	if backend == common.V2EigenDABackend {

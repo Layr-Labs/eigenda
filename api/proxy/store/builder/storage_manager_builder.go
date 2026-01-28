@@ -62,7 +62,6 @@ func BuildManagers(
 ) (*store.EigenDAManager, *store.KeccakManager, error) {
 	var err error
 	var s3Store *s3.Store
-	var eigenDAV1Store common.EigenDAV1Store
 	var eigenDAV2Store common.EigenDAV2Store
 
 	if config.S3Config.Bucket != "" {
@@ -134,7 +133,6 @@ func BuildManagers(
 	)
 
 	certMgr, err := store.NewEigenDAManager(
-		eigenDAV1Store,
 		eigenDAV2Store,
 		log,
 		secondary,
