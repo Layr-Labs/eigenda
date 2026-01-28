@@ -94,16 +94,6 @@ stop-infra:
 	docker ps -q --filter "ancestor=ipfs/kubo:v0.24.0" | xargs -r docker stop 2>/dev/null || true
 	docker ps -q --filter "ancestor=postgres:13" | xargs -r docker stop 2>/dev/null || true
 
-# Starts all the services: disperser, validators, churner, etc.
-# These are run as local processes, not containerized. Their pids are stored inside the testdata dir
-# and they can be killed using `make stop-services`. Their configs and logs are also available
-# inside the testdata dir.
-start-services:
-	./bin.sh start-detached
-
-stop-services:
-	./bin.sh stop-detached
-
 ############################################################################
 #                               Tools                                      #
 ############################################################################
