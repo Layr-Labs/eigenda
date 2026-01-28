@@ -168,11 +168,8 @@ func NewTestConfig(
 	backendsToEnable []common.EigenDABackend,
 ) TestConfig {
 	if backendsToEnable == nil {
-		if dispersalBackend == common.V2EigenDABackend {
-			backendsToEnable = []common.EigenDABackend{common.V2EigenDABackend}
-		} else {
-			backendsToEnable = []common.EigenDABackend{common.V1EigenDABackend}
-		}
+		// V2 is the only supported backend
+		backendsToEnable = []common.EigenDABackend{common.V2EigenDABackend}
 	}
 
 	return TestConfig{
