@@ -270,12 +270,19 @@ func (s *DispersalServerV2) validateDispersalRequest(
 //
 // If DisableAnchorSignatureVerification is true, then this method will skip all validation and return nil.
 //
-// If TolerateMissingAnchorSignature is true, then this method will pass validation even if no anchor signature is
-// provided in the request.
+// Anchor signatures are required for blob version > 0. For blob version 0, missing anchor signatures are tolerated
+// for backward compatibility with legacy clients.
 //
-// If an anchor signature is provided, it will be validated whether or not TolerateMissingAnchorSignature is true.
+// If an anchor signature is provided, it will be validated regardless of blob version.
 // While validating the anchor signature, this method will also verify that the disperser ID and chain ID in the request
 // match the expected values.
+//
+// Version-based enforcement rationale:
+// We co-opt the BlobVersion field to signal client capability. Without this, an attacker could strip the anchor
+// signature from a request and replay it, since we can't reject unsigned requests outright (that would break legacy
+// clients). By requiring anchor signatures for version > 0, the blob key hash changes, making it impossible to forge
+// a valid version=0 signature from a version=1 request. This workaround is necessary since there isn't a "proper" blob
+// version field included in the hash, so there are limited options available to communicate version compatibility.
 func (s *DispersalServerV2) validateAnchorSignature(
 	req *pb.DisperseBlobRequest,
 	blobHeader *corev2.BlobHeader,
@@ -287,11 +294,13 @@ func (s *DispersalServerV2) validateAnchorSignature(
 	anchorSignature := req.GetAnchorSignature()
 
 	if len(anchorSignature) == 0 {
-		if s.serverConfig.TolerateMissingAnchorSignature {
-			return nil
+		if blobHeader.BlobVersion > 0 {
+			return fmt.Errorf("anchor signature is required for blob version > 0 (got version %d)",
+				blobHeader.BlobVersion)
 		}
 
-		return errors.New("anchor signature is required but not provided")
+		// Version 0: allow missing anchor signature for backward compatibility
+		return nil
 	}
 
 	if len(anchorSignature) != 65 {
