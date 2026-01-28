@@ -2,17 +2,14 @@ package payloadretrieval
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"math/rand"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/math"
-	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -21,11 +18,7 @@ import (
 //
 // This struct is goroutine safe.
 type RelayPayloadRetriever struct {
-	log logging.Logger
-	// random doesn't need to be cryptographically secure, as it's only used to distribute load across relays.
-	// Not all methods on Rand are guaranteed goroutine safe: if additional usages of random are added, they
-	// must be evaluated for thread safety.
-	random      *rand.Rand
+	log         logging.Logger
 	config      RelayPayloadRetrieverConfig
 	relayClient relay.RelayClient
 	g1Srs       []bn254.G1Affine
@@ -38,7 +31,6 @@ var _ clients.PayloadRetriever = &RelayPayloadRetriever{}
 // initialized.
 func NewRelayPayloadRetriever(
 	log logging.Logger,
-	random *rand.Rand,
 	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
 	relayClient relay.RelayClient,
 	g1Srs []bn254.G1Affine,
@@ -51,7 +43,6 @@ func NewRelayPayloadRetriever(
 
 	return &RelayPayloadRetriever{
 		log:         log,
-		random:      random,
 		config:      relayPayloadRetrieverConfig,
 		relayClient: relayClient,
 		g1Srs:       g1Srs,
@@ -59,8 +50,7 @@ func NewRelayPayloadRetriever(
 	}, nil
 }
 
-// GetPayload iteratively attempts to retrieve a given blob from the relays
-// listed in the EigenDACert. The relays are attempted in random order.
+// GetPayload retrieves a blob from the relay specified in the EigenDACert.
 //
 // If the blob is successfully retrieved, then the blob is verified against the certificate. If the verification
 // succeeds, the blob is decoded to yield the payload (the original user data, with no padding or any modification),
@@ -93,8 +83,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 	return payload, nil
 }
 
-// GetEncodedPayload iteratively attempts to retrieve a given blob from the relays
-// listed in the EigenDACert. The relays are attempted in random order.
+// GetEncodedPayload retrieves a blob from the relay specified in the EigenDACert.
 //
 // If the blob is successfully retrieved, then the blob is verified against the EigenDACert.
 // If the verification succeeds, the blob is converted to an encoded payload form and returned.
@@ -103,112 +92,44 @@ func (pr *RelayPayloadRetriever) GetPayload(
 // eigenDACert has already been verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetEncodedPayload(
 	ctx context.Context,
-	eigenDACert coretypes.EigenDACert) (*coretypes.EncodedPayload, error) {
-
-	relayKeys := eigenDACert.RelayKeys()
-	blobCommitments, err := eigenDACert.Commitments()
-	if err != nil {
-		return nil, fmt.Errorf("get commitments from eigenDACert: %w", err)
-	}
+	eigenDACert coretypes.EigenDACert,
+) (*coretypes.EncodedPayload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
 		return nil, fmt.Errorf("compute blob key: %w", err)
 	}
 
-	blobLengthSymbols := uint32(blobCommitments.Length)
+	blobCommitments, err := eigenDACert.Commitments()
+	if err != nil {
+		return nil, fmt.Errorf("blob %s: get commitments from eigenDACert: %w", blobKey.Hex(), err)
+	}
+
 	// TODO(samlaf): are there more properties of the Cert that should lead to [coretypes.MaliciousOperatorsError]s?
-	if !math.IsPowerOfTwo(blobLengthSymbols) {
+	if !math.IsPowerOfTwo(blobCommitments.Length) {
 		return nil, coretypes.ErrCertCommitmentBlobLengthNotPowerOf2MaliciousOperatorsError.WithBlobKey(blobKey.Hex())
 	}
-
-	relayKeyCount := len(relayKeys)
-	if relayKeyCount == 0 {
-		return nil, errors.New("relay key count is zero")
-	}
-
-	// create a randomized array of indices, so that it isn't always the first relay in the list which gets hit
-	indices := pr.random.Perm(relayKeyCount)
-
-	// TODO (litt3): consider creating a utility which deprioritizes relays that fail to respond (or respond maliciously),
-	//  and prioritizes relays with lower latencies.
-
-	// iterate over relays in random order, until we are able to get the blob from someone
-	for _, val := range indices {
-		relayKey := relayKeys[val]
-
-		blob, err := pr.retrieveBlobWithTimeout(ctx, relayKey, blobKey, blobLengthSymbols)
-		// if GetBlob returned an error, try calling a different relay
-		if err != nil {
-			pr.log.Warn(
-				"blob couldn't be retrieved from relay",
-				"blobKey", blobKey.Hex(),
-				"relayKey", relayKey,
-				"error", err)
-			continue
-		}
-
-		// TODO (litt3): eventually, we should make GenerateAndCompareBlobCommitment accept a blob, instead of the
-		//  serialization of a blob. Commitment generation operates on field elements, which is how a blob is stored
-		//  under the hood, so it's actually duplicating work to serialize the blob here. I'm declining to make this
-		//  change now, to limit the size of the refactor PR.
-		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob.Serialize(), blobCommitments.Commitment)
-		if err != nil {
-			pr.log.Warn(
-				"generate and compare blob commitment",
-				"blobKey", blobKey.Hex(), "relayKey", relayKey, "error", err)
-			continue
-		}
-		if !valid {
-			pr.log.Warn(
-				"discarding blob retrieved from relay due to commitment mismatch with cert.commitment",
-				"blobKey", blobKey.Hex(), "relayKey", relayKey)
-			continue
-		}
-
-		return blob.ToEncodedPayloadUnchecked(pr.config.PayloadPolynomialForm), nil
-	}
-
-	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
-}
-
-// retrieveBlobWithTimeout attempts to retrieve a blob from a given relay,
-// and times out based on [RelayPayloadRetrieverConfig.RelayTimeout].
-//
-// blobLengthSymbols MUST be taken from the eigenDACert for the blob being retrieved,
-// and MUST be a power of 2.
-func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
-	ctx context.Context,
-	relayKey core.RelayKey,
-	blobKey core.BlobKey,
-	// blobLengthSymbols should be taken from the eigenDACert for the blob being retrieved
-	blobLengthSymbols uint32,
-) (*coretypes.Blob, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RelayTimeout)
 	defer cancel()
-
-	// TODO (litt3): eventually, we should make GetBlob return an actual blob object, instead of the serialized bytes.
-	blobBytes, err := pr.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
+	blob, err := pr.relayClient.GetBlob(timeoutCtx, eigenDACert)
 	if err != nil {
-		return nil, fmt.Errorf("get blob from relay: %w", err)
+		return nil, fmt.Errorf("blob %s: get blob from relay: %w", blobKey.Hex(), err)
 	}
 
-	blob, err := coretypes.DeserializeBlob(blobBytes, blobLengthSymbols)
-	if errors.Is(err, coretypes.ErrBlobLengthSymbolsNotPowerOf2) {
-		// In a better language I would write this as a debug assert.
-		pr.log.Errorf("BROKEN INVARIANT: retrieveBlobWithTimeout: blobLengthSymbols=%d is not power of 2: "+
-			"this is a major broken invariant, that should have been checked by the validators, "+
-			"and the caller (GetEncodedPayload) should already have checked this invariant "+
-			"and returned a MaliciousOperatorsError. Returning the same MaliciousOperatorsError "+
-			"to be safe, but this code should be fixed.", blobLengthSymbols)
-		return nil, coretypes.ErrCertCommitmentBlobLengthNotPowerOf2MaliciousOperatorsError.WithBlobKey(blobKey.Hex())
-	}
+	// TODO (litt3): eventually, we should make GenerateAndCompareBlobCommitment accept a blob, instead of the
+	//  serialization of a blob. Commitment generation operates on field elements, which is how a blob is stored
+	//  under the hood, so it's actually duplicating work to serialize the blob here. I'm declining to make this
+	//  change now, to limit the size of the refactor PR.
+	valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob.Serialize(), blobCommitments.Commitment)
 	if err != nil {
-		return nil, fmt.Errorf("deserialize blob: %w", err)
+		return nil, fmt.Errorf("blob %s: generate and compare blob commitment: %w", blobKey.Hex(), err)
+	}
+	if !valid {
+		return nil, fmt.Errorf("blob %s: commitment mismatch with cert", blobKey.Hex())
 	}
 
-	return blob, nil
+	return blob.ToEncodedPayloadUnchecked(pr.config.PayloadPolynomialForm), nil
 }
 
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
