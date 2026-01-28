@@ -34,7 +34,7 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Name:     BackendsToEnableFlagName,
 			Usage:    "Comma separated list of eigenDA backends to enable (e.g. V1,V2)",
 			EnvVars:  withEnvPrefix(envPrefix, "BACKENDS_TO_ENABLE"),
-			Value:    cli.NewStringSlice("V1"),
+			Value:    cli.NewStringSlice("V2"),
 			Category: category,
 			Required: false,
 		},
@@ -44,7 +44,7 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "DISPERSAL_BACKEND"),
 			Category: category,
 			Required: false,
-			Value:    "V1",
+			Value:    "V2",
 		},
 		&cli.StringSliceFlag{
 			Name:     FallbackTargetsFlagName,
