@@ -48,6 +48,11 @@ test-e2e-hoodi-preprod:
 test-e2e-sepolia:
 	BACKEND=sepolia gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
+# E2E tests using inabox backend.
+# Note: inabox backend tests require an inabox testnet to be running and accessible.
+test-e2e-inabox:
+	BACKEND=inabox gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 8
+
 # To clean the cached corpus, run `go clean -fuzzcache` before running this.
 test-fuzz:
 	go test ./test/fuzz -fuzz=FuzzProxyClientServerV1 -fuzztime=1m
