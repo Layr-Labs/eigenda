@@ -5,6 +5,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/ejector"
+	"github.com/Layr-Labs/eigenda/relay"
 	"github.com/Layr-Labs/eigenda/test/v2/load"
 )
 
@@ -20,4 +21,7 @@ func main() {
 
 	err = config.DocumentConfig(controller.DefaultControllerConfig, configDocsDir, true)
 	enforce.NilError(err, "failed to generate docs for the disperser controller config")
+
+	err = config.DocumentConfig(relay.DefaultRelayConfig, configDocsDir, true)
+	enforce.NilError(err, "failed to generate docs for the relay config")
 }
