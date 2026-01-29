@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/urfave/cli/v2"
 )
@@ -41,20 +40,12 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Usage:    "Whether to use memstore for DA logic.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "ENABLED"), withDeprecatedEnvPrefix(envPrefix, "ENABLED")},
 			Category: category,
-			Action: func(ctx *cli.Context, enabled bool) error {
+			Action: func(_ *cli.Context, _ bool) error {
 				if _, ok := os.LookupEnv(withDeprecatedEnvPrefix(envPrefix, "ENABLED")); ok {
 					return fmt.Errorf("env var %s is deprecated for flag %s, use %s instead",
 						withDeprecatedEnvPrefix(envPrefix, "ENABLED"),
 						EnabledFlagName,
 						withEnvPrefix(envPrefix, "ENABLED"))
-				}
-				if enabled {
-					// If memstore is enabled, we disable cert verification,
-					// because memstore generates some meaningless certs.
-					err := ctx.Set(verify.CertVerificationDisabledFlagName, "true")
-					if err != nil {
-						return fmt.Errorf("failed to set %s: %w", verify.CertVerificationDisabledFlagName, err)
-					}
 				}
 				return nil
 			},
