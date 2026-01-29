@@ -34,28 +34,22 @@ const (
 
 // Config contains all of the configuration information for a DA node.
 type Config struct {
-	Hostname                        string
-	RetrievalPort                   string
-	DispersalPort                   string
-	InternalRetrievalPort           string
-	InternalDispersalPort           string
-	V2DispersalPort                 string
-	V2RetrievalPort                 string
-	InternalV2DispersalPort         string
-	InternalV2RetrievalPort         string
-	EnableNodeApi                   bool
-	NodeApiPort                     string
-	EnableMetrics                   bool
-	MetricsPort                     int
-	OnchainMetricsInterval          int64
-	Timeout                         time.Duration
-	RegisterNodeAtStart             bool
-	ExpirationPollIntervalSec       uint64
-	LevelDBDisableSeeksCompactionV1 bool
-	LevelDBSyncWritesV1             bool
-	EnableTestMode                  bool
-	OverrideBlockStaleMeasure       uint64
-	OverrideStoreDurationBlocks     uint64
+	Hostname                    string
+	V2DispersalPort             string
+	V2RetrievalPort             string
+	InternalV2DispersalPort     string
+	InternalV2RetrievalPort     string
+	EnableNodeApi               bool
+	NodeApiPort                 string
+	EnableMetrics               bool
+	MetricsPort                 int
+	OnchainMetricsInterval      int64
+	Timeout                     time.Duration
+	RegisterNodeAtStart         bool
+	ExpirationPollIntervalSec   uint64
+	EnableTestMode              bool
+	OverrideBlockStaleMeasure   uint64
+	OverrideStoreDurationBlocks uint64
 	// If set, overrides the default TTL for v2 chunks
 	OverrideV2Ttl                  time.Duration
 	QuorumIDList                   []core.QuorumID
@@ -90,12 +84,6 @@ type Config struct {
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    common.LoggerConfig
 	EncoderConfig   kzg.KzgConfig
-
-	EnableV1 bool
-	EnableV2 bool
-
-	// Prevents v1 mode and triggers deletion of v1 data
-	DeprecateV1 bool
 
 	// If true, reject batch dispersal requests containing more than one blob
 	EnforceSingleBlobBatches bool
@@ -342,55 +330,12 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		}
 	}
 
-	internalDispersalFlag := ctx.GlobalString(flags.InternalDispersalPortFlag.Name)
-	internalRetrievalFlag := ctx.GlobalString(flags.InternalRetrievalPortFlag.Name)
-	if internalDispersalFlag == "" {
-		internalDispersalFlag = ctx.GlobalString(flags.DispersalPortFlag.Name)
-	}
-	if internalRetrievalFlag == "" {
-		internalRetrievalFlag = ctx.GlobalString(flags.RetrievalPortFlag.Name)
-	}
-
 	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
 	if err != nil {
 		return nil, err
 	}
 
-	runtimeMode := ctx.GlobalString(flags.RuntimeModeFlag.Name)
-	switch runtimeMode {
-	case flags.ModeV1Only, flags.ModeV2Only, flags.ModeV1AndV2:
-		// Valid mode
-	default:
-		return nil, fmt.Errorf("invalid runtime mode %q: must be one of %s, %s, or %s", runtimeMode, flags.ModeV1Only, flags.ModeV2Only, flags.ModeV1AndV2)
-	}
-
-	// Convert mode to v1/v2 enabled flags
-	v1Enabled := runtimeMode == flags.ModeV1Only || runtimeMode == flags.ModeV1AndV2
-	v2Enabled := runtimeMode == flags.ModeV2Only || runtimeMode == flags.ModeV1AndV2
-
-	deprecateV1 := ctx.GlobalBool(flags.DeprecateV1Flag.Name)
-	if deprecateV1 {
-		if runtimeMode == flags.ModeV1Only {
-			return nil, fmt.Errorf("cannot run in %s mode when %s is enabled",
-				flags.ModeV1Only, flags.DeprecateV1Flag.Name)
-		}
-		// When deprecating v1, disable v1 functionality even if the runtime mode includes v1
-		v1Enabled = false
-		v2Enabled = true
-	}
-
-	// v1 ports must be defined and valid even if v1 is disabled
-	dispersalPort := ctx.GlobalString(flags.DispersalPortFlag.Name)
-	err = core.ValidatePort(dispersalPort)
-	if err != nil {
-		return nil, fmt.Errorf("invalid v1 dispersal port: %s", dispersalPort)
-	}
-	retrievalPort := ctx.GlobalString(flags.RetrievalPortFlag.Name)
-	err = core.ValidatePort(retrievalPort)
-	if err != nil {
-		return nil, fmt.Errorf("invalid v1 retrieval port: %s", retrievalPort)
-	}
-
+	// V2 ports are required
 	v2DispersalPort := ctx.GlobalString(flags.V2DispersalPortFlag.Name)
 	v2RetrievalPort := ctx.GlobalString(flags.V2RetrievalPortFlag.Name)
 	internalV2DispersalPort := ctx.GlobalString(flags.InternalV2DispersalPortFlag.Name)
@@ -402,17 +347,15 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		internalV2RetrievalPort = v2RetrievalPort
 	}
 
-	if v2Enabled {
-		if v2DispersalPort == "" {
-			return nil, errors.New("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be defined when v2 is enabled")
-		} else if err := core.ValidatePort(v2DispersalPort); err != nil {
-			return nil, fmt.Errorf("invalid v2 dispersal port: %s", v2DispersalPort)
-		}
-		if v2RetrievalPort == "" {
-			return nil, errors.New("v2 retrieval port (NODE_V2_RETRIEVAL_PORT) must be defined when v2 is enabled")
-		} else if err := core.ValidatePort(v2RetrievalPort); err != nil {
-			return nil, fmt.Errorf("invalid v2 retrieval port: %s", v2RetrievalPort)
-		}
+	if v2DispersalPort == "" {
+		return nil, errors.New("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be defined")
+	} else if err := core.ValidatePort(v2DispersalPort); err != nil {
+		return nil, fmt.Errorf("invalid v2 dispersal port: %s", v2DispersalPort)
+	}
+	if v2RetrievalPort == "" {
+		return nil, errors.New("v2 retrieval port (NODE_V2_RETRIEVAL_PORT) must be defined")
+	} else if err := core.ValidatePort(v2RetrievalPort); err != nil {
+		return nil, fmt.Errorf("invalid v2 retrieval port: %s", v2RetrievalPort)
 	}
 
 	reservationLedgerCacheConfig, err := reservationvalidation.NewReservationLedgerCacheConfig(
@@ -441,10 +384,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	return &Config{
 		Hostname:                            ctx.GlobalString(flags.HostnameFlag.Name),
-		DispersalPort:                       dispersalPort,
-		RetrievalPort:                       retrievalPort,
-		InternalDispersalPort:               internalDispersalFlag,
-		InternalRetrievalPort:               internalRetrievalFlag,
 		V2DispersalPort:                     v2DispersalPort,
 		V2RetrievalPort:                     v2RetrievalPort,
 		InternalV2DispersalPort:             internalV2DispersalPort,
@@ -460,8 +399,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ReachabilityPollIntervalSec:         reachabilityPollIntervalSec,
 		EnableTestMode:                      testMode,
 		OverrideBlockStaleMeasure:           ctx.GlobalUint64(flags.OverrideBlockStaleMeasureFlag.Name),
-		LevelDBDisableSeeksCompactionV1:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV1Flag.Name),
-		LevelDBSyncWritesV1:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV1Flag.Name),
 		OverrideStoreDurationBlocks:         ctx.GlobalUint64(flags.OverrideStoreDurationBlocksFlag.Name),
 		OverrideV2Ttl:                       ctx.GlobalDuration(flags.OverrideV2TtlFlag.Name),
 		QuorumIDList:                        ids,
@@ -484,9 +421,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		RelayConnectionPoolSize:             ctx.GlobalUint(flags.RelayConnectionPoolSizeFlag.Name),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
-		EnableV2:                            v2Enabled,
-		EnableV1:                            v1Enabled,
-		DeprecateV1:                         deprecateV1,
 		EnforceSingleBlobBatches:            ctx.GlobalBool(flags.EnforceSingleBlobBatchesFlag.Name),
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),

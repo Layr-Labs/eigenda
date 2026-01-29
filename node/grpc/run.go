@@ -3,7 +3,6 @@ package grpc
 import (
 	"errors"
 
-	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/node"
@@ -13,49 +12,13 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logger logging.Logger) error {
-	if config.EnableV1 && serverV1 == nil {
-		return errors.New("node v1 server is not configured")
-	}
-	if config.EnableV2 && serverV2 == nil {
+func RunServers(serverV2 *ServerV2, config *node.Config, logger logging.Logger) error {
+	if serverV2 == nil {
 		return errors.New("node v2 server is not configured")
 	}
-	if !config.EnableV1 && !config.EnableV2 {
-		return errors.New("node is not configured to run any servers")
-	}
-
-	// V1 dispersal service
-	go func() {
-		if !config.EnableV1 {
-			logger.Warn("v1 is not enabled, skipping v1 dispersal server startup")
-			return
-		}
-
-		listener := serverV1.dispersalListener
-
-		opt := grpc.MaxRecvMsgSize(60 * 1024 * 1024 * 1024) // 60 GiB
-		gs := grpc.NewServer(opt)
-
-		// Register reflection service on gRPC server
-		// This makes "grpcurl -plaintext localhost:9000 list" command work
-		reflection.Register(gs)
-
-		pb.RegisterDispersalServer(gs, serverV1)
-
-		healthcheck.RegisterHealthServer("node.Dispersal", gs)
-
-		logger.Info("v1 dispersal enabled on port", config.InternalDispersalPort, "address", listener.Addr().String(), "GRPC Listening")
-		if err := gs.Serve(listener); err != nil {
-			logger.Error("dispersal server failed", "err", err)
-		}
-	}()
 
 	// V2 dispersal service
 	go func() {
-		if !config.EnableV2 {
-			logger.Warn("v2 is not enabled, skipping v2 dispersal server startup")
-			return
-		}
 
 		listener := serverV2.dispersalListener
 
@@ -82,37 +45,8 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 		}
 	}()
 
-	// v1 Retrieval service
-	go func() {
-		if !config.EnableV1 {
-			logger.Warn("v1 is not enabled, skipping v1 retrieval server startup")
-			return
-		}
-
-		listener := serverV1.retrievalListener
-
-		opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-		gs := grpc.NewServer(opt)
-
-		// Register reflection service on gRPC server
-		// This makes "grpcurl -plaintext localhost:9000 list" command work
-		reflection.Register(gs)
-
-		pb.RegisterRetrievalServer(gs, serverV1)
-		healthcheck.RegisterHealthServer("node.Retrieval", gs)
-
-		logger.Info("v1 retrieval enabled on port", config.InternalRetrievalPort, "address", listener.Addr().String(), "GRPC Listening")
-		if err := gs.Serve(listener); err != nil {
-			logger.Error("retrieval server failed", "err", err)
-		}
-	}()
-
 	// v2 Retrieval service
 	go func() {
-		if !config.EnableV2 {
-			logger.Warn("v2 is not enabled, skipping v2 retrieval server startup")
-			return
-		}
 
 		listener := serverV2.retrievalListener
 

@@ -167,10 +167,6 @@ func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (
 }
 
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
-	if !s.config.EnableV2 {
-		return nil, api.NewErrorInvalidArg("v2 API is disabled")
-	}
-
 	if s.node.BLSSigner == nil {
 		return nil, api.NewErrorInternal("missing bls signer")
 	}
@@ -446,10 +442,6 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 
 func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
 	start := time.Now()
-
-	if !s.config.EnableV2 {
-		return nil, api.NewErrorInvalidArg("v2 API is disabled")
-	}
 
 	blobKey, err := corev2.BytesToBlobKey(in.GetBlobKey())
 	if err != nil {

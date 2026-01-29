@@ -231,8 +231,11 @@ func TestNewConfig_RateLimitConfigFromEnv(t *testing.T) {
 	t.Setenv("NODE_SRS_ORDER", "1")
 	t.Setenv("NODE_SRS_LOAD", "1")
 
-	// Avoid v2 port requirements in this config parsing test.
-	t.Setenv("NODE_RUNTIME_MODE", flags.ModeV1Only)
+	// Provide V2 ports for the node.
+	t.Setenv("NODE_V2_DISPERSAL_PORT", "32005")
+	t.Setenv("NODE_V2_RETRIEVAL_PORT", "32004")
+	t.Setenv("NODE_INTERNAL_V2_DISPERSAL_PORT", "32007")
+	t.Setenv("NODE_INTERNAL_V2_RETRIEVAL_PORT", "32006")
 
 	// Avoid BLS key file requirements by enabling test mode and providing a test private key.
 	t.Setenv("NODE_ENABLE_TEST_MODE", "true")
