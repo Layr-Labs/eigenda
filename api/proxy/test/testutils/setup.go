@@ -27,6 +27,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/v1/kzg"
+	integration "github.com/Layr-Labs/eigenda/inabox/tests"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -41,7 +42,6 @@ const (
 	EthRPCEnvVar     = "ETHEREUM_RPC"
 	transport        = "http"
 	host             = "127.0.0.1"
-	disperserPort    = "443"
 
 	// CertVerifier and SvcManager addresses are still specified by hand for V1.
 	// Probably not worth the effort to force use of EigenDADirectory for V1.
@@ -62,6 +62,7 @@ const (
 )
 
 var (
+	disperserPort = "443"
 	// set by startMinioContainer
 	minioEndpoint = ""
 )
@@ -109,12 +110,13 @@ const (
 	MemstoreBackend
 	HoodiTestnetBackend
 	HoodiPreprodBackend
+	InaboxBackend
 )
 
 func (b Backend) SupportsEigenDAV1() bool {
 	switch b {
 	// technically HoodiTestnet supports V1 but there's 0 rollup usage
-	case HoodiTestnetBackend, HoodiPreprodBackend:
+	case HoodiTestnetBackend, HoodiPreprodBackend, InaboxBackend:
 		return false
 
 	case SepoliaBackend, MemstoreBackend:
@@ -136,6 +138,8 @@ func ParseBackend(inputString string) (Backend, error) {
 		return HoodiTestnetBackend, nil
 	case "hoodi-preprod":
 		return HoodiPreprodBackend, nil
+	case "inabox":
+		return InaboxBackend, nil
 
 	default:
 		return 0, fmt.Errorf("invalid backend: %s", inputString)
@@ -145,7 +149,7 @@ func ParseBackend(inputString string) (Backend, error) {
 func GetBackend() Backend {
 	backend, err := ParseBackend(os.Getenv(backendEnvVar))
 	if err != nil {
-		panic(fmt.Sprintf("BACKEND must be = memstore|hoodi-testnet|hoodi-preprod|sepolia. parse backend error: %v", err))
+		panic(fmt.Sprintf("BACKEND must be = memstore|hoodi-testnet|hoodi-preprod|sepolia|inabox. parse backend error: %v", err))
 	}
 	return backend
 }
@@ -227,11 +231,27 @@ func createS3Config() s3.Config {
 // nolint: funlen
 func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	useMemory := testCfg.Backend == MemstoreBackend
+	useInabox := testCfg.Backend == InaboxBackend
 	pk := os.Getenv(privateKeyEnvVar)
+	ethRPC := ""
 
-	ethRPC := os.Getenv(EthRPCEnvVar)
-	if ethRPC == "" && !useMemory {
-		panic("ETHEREUM_RPC environment variable is not set")
+	if useInabox {
+		// inabox tests always use v2 backend
+		testCfg.DispersalBackend = common.V2EigenDABackend
+		testCfg.BackendsToEnable = []common.EigenDABackend{common.V2EigenDABackend}
+
+		// use inabox ethRPC
+		ethRPC = "http://localhost:8545"
+
+		// use inabox default private key
+		pk = integration.GetDefaultTestPayloadDisperserConfig().PrivateKey
+
+		// TODO(iquidus): initialize on-demand balance for on-demand test
+	} else {
+		ethRPC = os.Getenv(EthRPCEnvVar)
+		if ethRPC == "" && !useMemory {
+			panic("ETHEREUM_RPC environment variable is not set")
+		}
 	}
 
 	var pollInterval time.Duration
@@ -274,6 +294,13 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		certVerifierAddress = hoodiPreprodCertVerifierAddress
 		svcManagerAddress = hoodiPreprodSvcManagerAddress
 		eigenDADirectory = hoodiPreprodEigenDADirectory
+	case InaboxBackend:
+		// TODO(iquidus): set these values dynamically when inabox backend is ready
+		disperserHostname = "localhost"
+		disperserPort = "32005"
+		certVerifierAddress = "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+		svcManagerAddress = ""
+		eigenDADirectory = "0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8"
 
 	default:
 		panic("Unsupported backend")
@@ -331,7 +358,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		ClientConfigV2: common.ClientConfigV2{
 			DisperserClientCfg: dispersal.DisperserClientConfig{
 				GrpcUri:           fmt.Sprintf("%s:%s", disperserHostname, disperserPort),
-				UseSecureGrpcFlag: true,
+				UseSecureGrpcFlag: !useInabox,
 				DisperserID:       0,
 				ChainID:           nil, // Will be populated after eth client is created
 			},
