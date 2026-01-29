@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/urfave/cli/v2"
 )
@@ -253,7 +252,7 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 	}
 
 	maxBlobLengthFlagContents := ctx.String(MaxBlobLengthFlagName)
-	maxBlobLengthBytes, err := eigendaflags.ParseMaxBlobLength(maxBlobLengthFlagContents)
+	maxBlobLengthBytes, err := common.ParseBytesAmount(maxBlobLengthFlagContents)
 	if err != nil {
 		return common.ClientConfigV2{}, fmt.Errorf(
 			"parse max blob length flag \"%v\": %w", maxBlobLengthFlagContents, err)

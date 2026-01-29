@@ -89,17 +89,6 @@ type Store interface {
 	BackendType() BackendType
 }
 
-// EigenDAV1Store is the interface for an EigenDA V1 data store as well as V1 memstore.
-type EigenDAV1Store interface {
-	Store
-	// Put inserts the given value into the key-value (serializedCert-payload) data store.
-	Put(ctx context.Context, payload []byte) (serializedCert []byte, err error)
-	// Get retrieves the given key if it's present in the key-value (serializedCert-payload) data store.
-	Get(ctx context.Context, serializedCert []byte) (payload []byte, err error)
-	// Verify verifies the cert and that the payload (after encoding) matches the kzg commitment in the cert.
-	Verify(ctx context.Context, serializedCert []byte, payload []byte) error
-}
-
 // EigenDAV2Store is the interface for an EigenDA V2 data store as well as V2 memstore.
 type EigenDAV2Store interface {
 	Store

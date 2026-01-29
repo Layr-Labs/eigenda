@@ -11,7 +11,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	metrics_v2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
@@ -23,9 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	srs "github.com/Layr-Labs/eigenda/api/proxy/resources"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore"
 	memstore_v2 "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/v2"
 	eigenda_v2 "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
@@ -44,7 +40,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
-	kzgverifier "github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	rsv2 "github.com/Layr-Labs/eigenda/encoding/v2/rs"
@@ -67,7 +62,6 @@ func BuildManagers(
 ) (*store.EigenDAManager, *store.KeccakManager, error) {
 	var err error
 	var s3Store *s3.Store
-	var eigenDAV1Store common.EigenDAV1Store
 	var eigenDAV2Store common.EigenDAV2Store
 
 	if config.S3Config.Bucket != "" {
@@ -83,26 +77,12 @@ func BuildManagers(
 
 	if config.StoreConfig.DispersalBackend == common.V2EigenDABackend && !v2Enabled {
 		return nil, nil, fmt.Errorf("dispersal backend is set to V2, but V2 backend is not enabled")
-	} else if config.StoreConfig.DispersalBackend == common.V1EigenDABackend && !v1Enabled {
-		return nil, nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
+	} else if config.StoreConfig.DispersalBackend == common.V1EigenDABackend {
+		return nil, nil, fmt.Errorf("V1 backend has been removed, please use V2")
 	}
 
 	if v1Enabled {
-		log.Info("Building EigenDA v1 storage backend")
-		// The verifier doesn't support loading trailing g2 points from a separate file. If LoadG2Points is true, and
-		// the user is using a slimmed down g2 SRS file, the verifier will encounter an error while trying to load g2
-		// points. Since the verifier doesn't actually need g2 points, it's safe to force LoadG2Points to false, to
-		// sidestep the issue entirely.
-		kzgConfig := config.KzgConfig
-		kzgConfig.LoadG2Points = false
-		kzgVerifier, err := kzgverifier.NewVerifier(&kzgConfig, nil)
-		if err != nil {
-			return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
-		}
-		eigenDAV1Store, err = buildEigenDAV1Backend(ctx, log, config, kzgVerifier)
-		if err != nil {
-			return nil, nil, fmt.Errorf("build v1 backend: %w", err)
-		}
+		return nil, nil, fmt.Errorf("V1 backend has been removed, please use V2")
 	}
 
 	if v2Enabled {
@@ -144,18 +124,15 @@ func BuildManagers(
 
 	log.Info(
 		"Created storage backends",
-		"eigenda_v1", eigenDAV1Store != nil,
 		"eigenda_v2", eigenDAV2Store != nil,
 		"s3", s3Store != nil,
 		"read_fallback", len(fallbacks) > 0,
 		"caching", len(caches) > 0,
 		"async_secondary_writes", (secondary.Enabled() && config.StoreConfig.AsyncPutWorkers > 0),
 		"error_on_secondary_insert_failure", config.StoreConfig.ErrorOnSecondaryInsertFailure,
-		"verify_v1_certs", config.VerifierConfigV1.VerifyCerts,
 	)
 
 	certMgr, err := store.NewEigenDAManager(
-		eigenDAV1Store,
 		eigenDAV2Store,
 		log,
 		secondary,
@@ -400,54 +377,6 @@ func buildEigenDAV2Backend(
 	}
 
 	return eigenDAV2Store, nil
-}
-
-// buildEigenDAV1Backend ... Builds EigenDA V1 storage backend
-func buildEigenDAV1Backend(
-	ctx context.Context,
-	log logging.Logger,
-	config Config,
-	kzgVerifier *kzgverifier.Verifier,
-) (common.EigenDAV1Store, error) {
-	verifier, err := verify.NewVerifier(&config.VerifierConfigV1, kzgVerifier, log)
-	if err != nil {
-		return nil, fmt.Errorf("new verifier: %w", err)
-	}
-
-	if config.VerifierConfigV1.VerifyCerts {
-		log.Info("Certificate verification with Ethereum enabled")
-	} else {
-		log.Warn("Certificate verification disabled. This can result in invalid EigenDA certificates being accredited.")
-	}
-
-	if config.MemstoreEnabled {
-		log.Info("Using memstore backend for EigenDA V1")
-		return memstore.New(ctx, verifier, log, config.MemstoreConfig)
-	}
-	// EigenDAV1 backend dependency injection
-	var client *clients.EigenDAClient
-
-	client, err = clients.NewEigenDAClient(log, config.ClientConfigV1.EdaClientCfg)
-	if err != nil {
-		return nil, err
-	}
-
-	storeConfig, err := eigenda.NewStoreConfig(
-		config.ClientConfigV1.MaxBlobSizeBytes,
-		config.VerifierConfigV1.EthConfirmationDepth,
-		config.ClientConfigV1.EdaClientCfg.StatusQueryTimeout,
-		config.ClientConfigV1.PutTries,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create v1 store config: %w", err)
-	}
-
-	return eigenda.NewStore(
-		client,
-		verifier,
-		log,
-		storeConfig,
-	)
 }
 
 func buildRelayPayloadRetriever(
