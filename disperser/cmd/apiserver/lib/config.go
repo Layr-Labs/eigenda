@@ -19,7 +19,6 @@ import (
 type DisperserVersion uint
 
 const (
-	V1 DisperserVersion = 1
 	V2 DisperserVersion = 2
 )
 
@@ -61,8 +60,8 @@ type Config struct {
 
 func NewConfig(ctx *cli.Context) (Config, error) {
 	version := ctx.GlobalUint(flags.DisperserVersionFlag.Name)
-	if version != uint(V1) && version != uint(V2) {
-		return Config{}, fmt.Errorf("unknown disperser version %d", version)
+	if version != uint(V2) {
+		return Config{}, fmt.Errorf("disperser version %d is not supported (only v2 is supported)", version)
 	}
 
 	ratelimiterConfig, err := ratelimit.ReadCLIConfig(ctx, flags.FlagPrefix)

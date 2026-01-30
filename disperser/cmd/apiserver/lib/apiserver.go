@@ -12,19 +12,15 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/math"
-	"github.com/Layr-Labs/eigenda/common/ratelimit"
-	"github.com/Layr-Labs/eigenda/common/store"
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	mt "github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/signingrate"
-	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -57,14 +53,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 		logger, client, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
-	}
-	blockStaleMeasure, err := transactor.GetBlockStaleMeasure(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to get BLOCK_STALE_MEASURE: %w", err)
-	}
-	storeDurationBlocks, err := transactor.GetStoreDurationBlocks(context.Background())
-	if err != nil || storeDurationBlocks == 0 {
-		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
 
 	objectStorageClient, err := blobstore.CreateObjectStorageClient(
@@ -116,26 +104,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 		meterer.Start(context.Background())
 	}
 
-	var ratelimiter common.RateLimiter
-	if config.EnableRatelimiter {
-		globalParams := config.RatelimiterConfig.GlobalRateParams
-
-		var bucketStore common.KVStore[common.RateBucketParams]
-		if config.BucketTableName != "" {
-			dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
-			if err != nil {
-				return err
-			}
-			bucketStore = store.NewDynamoParamStore[common.RateBucketParams](dynamoClient, config.BucketTableName)
-		} else {
-			bucketStore, err = store.NewLocalParamStore[common.RateBucketParams](config.BucketStoreSize)
-			if err != nil {
-				return err
-			}
-		}
-		ratelimiter = ratelimit.NewRateLimiter(reg, globalParams, bucketStore, logger)
-	}
-
 	if config.MaxBlobSize <= 0 || config.MaxBlobSize > 32*1024*1024 {
 		return fmt.Errorf("configured max blob size is invalid %v", config.MaxBlobSize)
 	}
@@ -146,155 +114,125 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
-	if config.DisperserVersion == V2 {
-		committer, err := committer.NewFromConfig(config.KzgCommitterConfig)
-		if err != nil {
-			return fmt.Errorf("new committer: %w", err)
-		}
-		baseBlobMetadataStore := blobstorev2.NewBlobMetadataStore(
-			dynamoClient,
-			logger,
-			config.BlobstoreConfig.TableName)
-		blobMetadataStore := blobstorev2.NewInstrumentedMetadataStore(
-			baseBlobMetadataStore,
-			blobstorev2.InstrumentedMetadataStoreConfig{
-				ServiceName: "apiserver",
-				Registry:    reg,
-				Backend:     blobstorev2.BackendDynamoDB,
-			})
-		blobStore := blobstorev2.NewBlobStore(bucketName, objectStorageClient, logger)
 
-		if config.ControllerAddress == "" {
-			return fmt.Errorf("controller address is required")
-		}
-		controllerConnection, err := grpc.NewClient(
-			config.ControllerAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			return fmt.Errorf("create controller connection: %w", err)
-		}
-		controllerClient := controller.NewControllerServiceClient(controllerConnection)
-
-		// Create listener for the gRPC server
-		addr := fmt.Sprintf("%s:%s", "0.0.0.0", config.ServerConfig.GrpcPort)
-		listener, err := net.Listen("tcp", addr)
-		if err != nil {
-			return fmt.Errorf("failed to create listener: %w", err)
-		}
-
-		signingRateTracker, err := signingrate.NewSigningRateTracker(
-			logger,
-			config.ServerConfig.SigningRateRetentionPeriod,
-			time.Second, // bucket size is unimportant, since it is unused when mirroring from controller
-			time.Now,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create signing rate tracker: %w", err)
-		}
-		signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(context.Background(), signingRateTracker)
-
-		// A function that can fetch signing rate data from the controller.
-		scraper := func(ctx context.Context, startTime time.Time) ([]*validator.SigningRateBucket, error) {
-			data, err := controllerClient.GetValidatorSigningRateDump(
-				ctx,
-				&controller.GetValidatorSigningRateDumpRequest{
-					StartTimestamp: uint64(startTime.Unix()),
-				})
-			if err != nil {
-				return nil, fmt.Errorf("GetValidatorSigningRateDump RPC failed: %w", err)
-			}
-			return data.GetSigningRateBuckets(), nil
-		}
-
-		// Clone signing rate data from controller. This is blocking, so that when we start the server we have
-		// data to serve right away.
-		err = signingrate.DoInitialScrape(
-			context.Background(),
-			logger,
-			scraper,
-			signingRateTracker,
-			config.ServerConfig.SigningRateRetentionPeriod)
-		if err != nil {
-			return fmt.Errorf("do initial scrape: %w", err)
-		}
-
-		// In the background, periodically refresh signing rate data from controller.
-		go signingrate.MirrorSigningRate(
-			context.Background(),
-			logger,
-			scraper,
-			signingRateTracker,
-			config.ServerConfig.SigningRatePollInterval,
-			config.ServerConfig.SigningRateRetentionPeriod,
-		)
-
-		authenticator, err := authv2.NewPaymentStateAuthenticator(
-			config.AuthPmtStateRequestMaxPastAge,
-			config.AuthPmtStateRequestMaxFutureAge)
-		if err != nil {
-			return fmt.Errorf("failed to create payment state authenticator: %w", err)
-		}
-
-		server, err := apiserver.NewDispersalServerV2(
-			config.ServerConfig,
-			time.Now,
-			chainId,
-			blobStore,
-			blobMetadataStore,
-			transactor,
-			meterer,
-			authenticator,
-			committer,
-			config.MaxNumSymbolsPerBlob,
-			config.OnchainStateRefreshInterval,
-			config.MaxDispersalAge,
-			config.MaxFutureDispersalTime,
-			logger,
-			reg,
-			config.MetricsConfig,
-			config.ReservedOnly,
-			controllerConnection,
-			controllerClient,
-			listener,
-			signingRateTracker,
-		)
-		if err != nil {
-			return err
-		}
-		return server.Start(context.Background())
+	if config.DisperserVersion != V2 {
+		return fmt.Errorf("disperser version %d is not supported (only v2 is supported)", config.DisperserVersion)
 	}
 
-	blobMetadataStore := blobstore.NewBlobMetadataStore(
+	committer, err := committer.NewFromConfig(config.KzgCommitterConfig)
+	if err != nil {
+		return fmt.Errorf("new committer: %w", err)
+	}
+	baseBlobMetadataStore := blobstorev2.NewBlobMetadataStore(
 		dynamoClient,
 		logger,
-		config.BlobstoreConfig.TableName,
-		time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
-	blobStore := blobstore.NewSharedStorage(bucketName, objectStorageClient, blobMetadataStore, logger)
+		config.BlobstoreConfig.TableName)
+	blobMetadataStore := blobstorev2.NewInstrumentedMetadataStore(
+		baseBlobMetadataStore,
+		blobstorev2.InstrumentedMetadataStoreConfig{
+			ServiceName: "apiserver",
+			Registry:    reg,
+			Backend:     blobstorev2.BackendDynamoDB,
+		})
+	blobStore := blobstorev2.NewBlobStore(bucketName, objectStorageClient, logger)
 
-	grpcMetrics := grpcprom.NewServerMetrics()
-	metrics := disperser.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)
-	server := apiserver.NewDispersalServer(
-		config.ServerConfig,
-		blobStore,
-		transactor,
-		logger,
-		metrics,
-		grpcMetrics,
-		meterer,
-		ratelimiter,
-		config.RateConfig,
-		config.MaxBlobSize,
+	if config.ControllerAddress == "" {
+		return fmt.Errorf("controller address is required")
+	}
+	controllerConnection, err := grpc.NewClient(
+		config.ControllerAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
+	if err != nil {
+		return fmt.Errorf("create controller connection: %w", err)
+	}
+	controllerClient := controller.NewControllerServiceClient(controllerConnection)
 
-	reg.MustRegister(grpcMetrics)
-
-	// Enable Metrics Block
-	if config.MetricsConfig.EnableMetrics {
-		httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
-		metrics.Start(context.Background())
-		logger.Info("Enabled metrics for Disperser", "socket", httpSocket)
+	// Create listener for the gRPC server
+	addr := fmt.Sprintf("%s:%s", "0.0.0.0", config.ServerConfig.GrpcPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("failed to create listener: %w", err)
 	}
 
+	signingRateTracker, err := signingrate.NewSigningRateTracker(
+		logger,
+		config.ServerConfig.SigningRateRetentionPeriod,
+		time.Second, // bucket size is unimportant, since it is unused when mirroring from controller
+		time.Now,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create signing rate tracker: %w", err)
+	}
+	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(context.Background(), signingRateTracker)
+
+	// A function that can fetch signing rate data from the controller.
+	scraper := func(ctx context.Context, startTime time.Time) ([]*validator.SigningRateBucket, error) {
+		data, err := controllerClient.GetValidatorSigningRateDump(
+			ctx,
+			&controller.GetValidatorSigningRateDumpRequest{
+				StartTimestamp: uint64(startTime.Unix()),
+			})
+		if err != nil {
+			return nil, fmt.Errorf("GetValidatorSigningRateDump RPC failed: %w", err)
+		}
+		return data.GetSigningRateBuckets(), nil
+	}
+
+	// Clone signing rate data from controller. This is blocking, so that when we start the server we have
+	// data to serve right away.
+	err = signingrate.DoInitialScrape(
+		context.Background(),
+		logger,
+		scraper,
+		signingRateTracker,
+		config.ServerConfig.SigningRateRetentionPeriod)
+	if err != nil {
+		return fmt.Errorf("do initial scrape: %w", err)
+	}
+
+	// In the background, periodically refresh signing rate data from controller.
+	go signingrate.MirrorSigningRate(
+		context.Background(),
+		logger,
+		scraper,
+		signingRateTracker,
+		config.ServerConfig.SigningRatePollInterval,
+		config.ServerConfig.SigningRateRetentionPeriod,
+	)
+
+	authenticator, err := authv2.NewPaymentStateAuthenticator(
+		config.AuthPmtStateRequestMaxPastAge,
+		config.AuthPmtStateRequestMaxFutureAge)
+	if err != nil {
+		return fmt.Errorf("failed to create payment state authenticator: %w", err)
+	}
+
+	server, err := apiserver.NewDispersalServerV2(
+		config.ServerConfig,
+		time.Now,
+		chainId,
+		blobStore,
+		blobMetadataStore,
+		transactor,
+		meterer,
+		authenticator,
+		committer,
+		config.MaxNumSymbolsPerBlob,
+		config.OnchainStateRefreshInterval,
+		config.MaxDispersalAge,
+		config.MaxFutureDispersalTime,
+		logger,
+		reg,
+		config.MetricsConfig,
+		config.ReservedOnly,
+		controllerConnection,
+		controllerClient,
+		listener,
+		signingRateTracker,
+	)
+	if err != nil {
+		return fmt.Errorf("create dispersal server: %w", err)
+	}
 	return server.Start(context.Background())
 }

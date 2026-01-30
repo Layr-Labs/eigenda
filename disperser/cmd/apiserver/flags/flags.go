@@ -114,9 +114,9 @@ var (
 	/* Optional Flags*/
 	DisperserVersionFlag = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-version"),
-		Usage:    "Disperser version. Options are 1 and 2.",
+		Usage:    "Disperser version. Only version 2 is supported.",
 		Required: false,
-		Value:    1,
+		Value:    2,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_VERSION"),
 	}
 	MetricsHTTPPort = cli.StringFlag{
