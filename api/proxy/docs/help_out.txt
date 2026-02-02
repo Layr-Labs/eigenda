@@ -43,11 +43,11 @@ GLOBAL OPTIONS:
     --eigenda.v2.blob-status-poll-interval value (default: 1s)                      ($EIGENDA_PROXY_EIGENDA_V2_BLOB_STATUS_POLL_INTERVAL)
           Duration to query for blob status updates during dispersal.
    
-    --eigenda.v2.blob-version value     (default: 0)                       ($EIGENDA_PROXY_EIGENDA_V2_BLOB_PARAMS_VERSION)
+    --eigenda.v2.blob-version value     (default: 1)                       ($EIGENDA_PROXY_EIGENDA_V2_BLOB_PARAMS_VERSION)
           Blob params version used when dispersing. This refers to a global version
           maintained by EigenDA
           governance and is injected in the BlobHeader before
-          dispersing. Currently only supports (0).
+          dispersing.
    
     --eigenda.v2.cert-verifier-router-or-immutable-verifier-addr value                                    ($EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR)
           Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier
