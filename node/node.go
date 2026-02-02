@@ -837,11 +837,6 @@ func (n *Node) RefreshOnchainState() error {
 	}
 }
 
-// ProcessBatch validates the batch is correct, stores data into the node's Store, and then returns a
-// signature for the entire batch.
-//
-// The batch will be itemized into batch header, header and chunks of each blob in the batch. These items will
-// be stored atomically to the database.
 func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature, error) {
 	signature, err := n.BLSSigner.Sign(ctx, data[:])
 	if err != nil {
