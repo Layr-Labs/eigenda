@@ -109,12 +109,11 @@ func RunDataApi(ctx *cli.Context) error {
 	metrics := dataapi.NewMetrics(reg, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
 	server, err := serverv2.NewServerV2(
 		dataapi.Config{
-			ServerMode:         config.ServerMode,
-			SocketAddr:         config.SocketAddr,
-			AllowOrigins:       config.AllowOrigins,
-			DisperserHostname:  config.DisperserHostname,
-			ChurnerHostname:    config.ChurnerHostname,
-			BatcherHealthEndpt: config.BatcherHealthEndpt,
+			ServerMode:        config.ServerMode,
+			SocketAddr:        config.SocketAddr,
+			AllowOrigins:      config.AllowOrigins,
+			DisperserHostname: config.DisperserHostname,
+			ChurnerHostname:   config.ChurnerHostname,
 		},
 		blobMetadataStorev2,
 		promClient,
