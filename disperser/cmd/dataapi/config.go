@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -15,7 +13,6 @@ import (
 )
 
 type Config struct {
-	ServerVersion    uint
 	AwsClientConfig  aws.ClientConfig
 	BlobstoreConfig  blobstore.Config
 	EthClientConfig  geth.EthClientConfig
@@ -41,11 +38,6 @@ type Config struct {
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
-	version := ctx.GlobalUint(flags.DataApiServerVersionFlag.Name)
-	if version != 1 && version != 2 {
-		return Config{}, fmt.Errorf("unknown server version %d, must be in [1, 2]", version)
-	}
-
 	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
 	if err != nil {
 		return Config{}, err
@@ -68,7 +60,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:    ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		EigenDADirectory:             ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		ServerMode:                   ctx.GlobalString(flags.ServerModeFlag.Name),
-		ServerVersion:                version,
 		PrometheusConfig: prometheus.Config{
 			ServerURL: ctx.GlobalString(flags.PrometheusServerURLFlag.Name),
 			Username:  ctx.GlobalString(flags.PrometheusServerUsernameFlag.Name),

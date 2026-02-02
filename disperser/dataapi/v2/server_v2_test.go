@@ -73,7 +73,6 @@ var (
 
 	dynamoClient dynamodb.Client
 
-	serverVersion     = uint(2)
 	mockPrometheusApi = &prommock.MockPrometheusApi{}
 	prometheusClient  = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
 	mockSubgraphApi   = &subgraphmock.MockSubgraphApi{}

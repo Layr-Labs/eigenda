@@ -132,20 +132,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CHURNER_HOSTNAME"),
 	}
-/* Optional Flags*/
+	/* Optional Flags*/
 	MetricsHTTPPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
 		Usage:    "the http port which the metrics prometheus server is listening",
 		Required: false,
 		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_HTTP_PORT"),
-	}
-	DataApiServerVersionFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "dataapi-version"),
-		Usage:    "DataApi server version. Options are 1 and 2.",
-		Required: false,
-		Value:    1,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DATA_API_VERSION"),
 	}
 )
 
@@ -169,7 +162,6 @@ var requiredFlags = []cli.Flag{
 var optionalFlags = []cli.Flag{
 	ServerModeFlag,
 	MetricsHTTPPort,
-	DataApiServerVersionFlag,
 	EigenDADirectoryFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
