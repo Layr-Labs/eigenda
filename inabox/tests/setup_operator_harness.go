@@ -76,7 +76,6 @@ func SetupOperatorHarness(
 
 // operatorListeners holds the network listeners for a single operator
 type operatorListeners struct {
-	v1 grpc.Listeners
 	v2 grpc.Listeners
 }
 
@@ -118,19 +117,12 @@ func (oh *OperatorHarness) StartOperators(ctx context.Context, logger logging.Lo
 
 	// Create listeners and start each operator
 	for i := range operatorCount {
-		v1Listeners, err := grpc.CreateListeners("0", "0")
-		if err != nil {
-			return fmt.Errorf("failed to create v1 listeners for operator %d: %w", i, err)
-		}
-
 		v2Listeners, err := grpc.CreateListeners("0", "0")
 		if err != nil {
-			v1Listeners.Close()
-			return fmt.Errorf("failed to create v2 listeners for opersator %d: %w", i, err)
+			return fmt.Errorf("failed to create v2 listeners for operator %d: %w", i, err)
 		}
 
 		listeners := operatorListeners{
-			v1: v1Listeners,
 			v2: v2Listeners,
 		}
 
@@ -139,7 +131,6 @@ func (oh *OperatorHarness) StartOperators(ctx context.Context, logger logging.Lo
 		serverV2, err := oh.startOperator(ctx, logger, i, listeners)
 		if err != nil {
 			// Close the listeners we just created since startOperator failed
-			listeners.v1.Close()
 			listeners.v2.Close()
 
 			// Clean up any operators we've already started
