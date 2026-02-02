@@ -43,13 +43,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go build -o ./bin/dataapi ./cmd/dataapi
 
-# Batcher build stage
-FROM common-builder AS batcher-builder
-WORKDIR /app/disperser
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    go build -o ./bin/batcher ./cmd/batcher
-
 # Retriever build stage
 FROM common-builder AS retriever-builder
 WORKDIR /app/retriever
@@ -145,10 +138,6 @@ ENTRYPOINT ["apiserver"]
 FROM alpine:3.22 AS dataapi
 COPY --from=dataapi-builder /app/disperser/bin/dataapi /usr/local/bin
 ENTRYPOINT ["dataapi"]
-
-FROM alpine:3.22 AS batcher
-COPY --from=batcher-builder /app/disperser/bin/batcher /usr/local/bin
-ENTRYPOINT ["batcher"]
 
 FROM alpine:3.22 AS retriever
 COPY --from=retriever-builder /app/retriever/bin/retriever /usr/local/bin

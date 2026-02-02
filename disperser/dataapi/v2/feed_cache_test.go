@@ -96,7 +96,7 @@ func setupTestCache(maxItems int) (*v2.FeedCache[testItem], *testFetcher, time.T
 		maxItems,
 		fetcher.fetch,
 		timestampFn,
-		dataapi.NewMetrics(uint(2), prometheus.NewRegistry(), nil, "9001", test.GetLogger()).BatchFeedCacheMetrics,
+		dataapi.NewMetrics(prometheus.NewRegistry(), nil, "9001", test.GetLogger()).BatchFeedCacheMetrics,
 	)
 
 	return cache, fetcher, baseTime

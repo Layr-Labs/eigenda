@@ -11,11 +11,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	commonaws "github.com/Layr-Labs/eigenda/common/s3/aws"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
-	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	dataapiprometheus "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
@@ -67,20 +65,6 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	s3Client, err := commonaws.NewAwsS3Client(
-		context.Background(),
-		logger,
-		config.AwsClientConfig.EndpointURL,
-		config.AwsClientConfig.Region,
-		config.AwsClientConfig.FragmentParallelismFactor,
-		config.AwsClientConfig.FragmentParallelismConstant,
-		config.AwsClientConfig.AccessKey,
-		config.AwsClientConfig.SecretAccessKey,
-	)
-	if err != nil {
-		return err
-	}
-
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
 	if err != nil {
 		return err
@@ -110,56 +94,20 @@ func RunDataApi(ctx *cli.Context) error {
 		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 	)
 
-	if config.ServerVersion == 2 {
-		baseBlobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
-		blobMetadataStorev2 := blobstorev2.NewInstrumentedMetadataStore(baseBlobMetadataStorev2, blobstorev2.InstrumentedMetadataStoreConfig{
+	baseBlobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+	blobMetadataStorev2 := blobstorev2.NewInstrumentedMetadataStore(
+		baseBlobMetadataStorev2, blobstorev2.InstrumentedMetadataStoreConfig{
 			ServiceName: "dataapi",
 			Registry:    reg,
 			Backend:     blobstorev2.BackendDynamoDB,
 		})
 
-		// Register reservation collector
-		reservationCollector := serverv2.NewReservationExpirationCollector(subgraphClient, logger)
-		reg.MustRegister(reservationCollector)
+	// Register reservation collector
+	reservationCollector := serverv2.NewReservationExpirationCollector(subgraphClient, logger)
+	reg.MustRegister(reservationCollector)
 
-		metrics := dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
-		serverv2, err := serverv2.NewServerV2(
-			dataapi.Config{
-				ServerMode:         config.ServerMode,
-				SocketAddr:         config.SocketAddr,
-				AllowOrigins:       config.AllowOrigins,
-				DisperserHostname:  config.DisperserHostname,
-				ChurnerHostname:    config.ChurnerHostname,
-				BatcherHealthEndpt: config.BatcherHealthEndpt,
-			},
-			blobMetadataStorev2,
-			promClient,
-			subgraphClient,
-			tx,
-			chainState,
-			indexedChainState,
-			logger,
-			metrics,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create v2 server: %w", err)
-		}
-
-		// Enable Metrics Block
-		if config.MetricsConfig.EnableMetrics {
-			httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
-			metrics.Start(context.Background())
-			logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
-		}
-
-		return runServer(serverv2, logger)
-	}
-
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
-	sharedStorage := blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
-	metrics := dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
-
-	server, err := dataapi.NewServer(
+	metrics := dataapi.NewMetrics(reg, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
+	server, err := serverv2.NewServerV2(
 		dataapi.Config{
 			ServerMode:         config.ServerMode,
 			SocketAddr:         config.SocketAddr,
@@ -168,7 +116,7 @@ func RunDataApi(ctx *cli.Context) error {
 			ChurnerHostname:    config.ChurnerHostname,
 			BatcherHealthEndpt: config.BatcherHealthEndpt,
 		},
-		sharedStorage,
+		blobMetadataStorev2,
 		promClient,
 		subgraphClient,
 		tx,
@@ -176,12 +124,9 @@ func RunDataApi(ctx *cli.Context) error {
 		indexedChainState,
 		logger,
 		metrics,
-		nil,
-		nil,
-		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create v1 server: %w", err)
+		return fmt.Errorf("failed to create server: %w", err)
 	}
 
 	// Enable Metrics Block

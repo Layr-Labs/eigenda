@@ -116,7 +116,6 @@ type Config struct {
 
 	Churner    ChurnerVars
 	Dispersers []DisperserVars
-	Batcher    []BatcherVars
 	Encoder    []EncoderVars
 	Operators  []OperatorVars
 	Stakers    []Staker

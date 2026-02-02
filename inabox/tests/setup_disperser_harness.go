@@ -159,7 +159,6 @@ func setupLocalStackResources(
 	deployConfig := testbed.DeployResourcesConfig{
 		LocalStackEndpoint:  localstackContainer.Endpoint(),
 		BlobStoreBucketName: config.S3BucketName,
-		MetadataTableName:   config.MetadataTableName,
 		BucketTableName:     config.BucketTableName,
 		V2MetadataTableName: config.MetadataTableNameV2,
 		AWSConfig:           localstackContainer.GetAWSClientConfig(),
