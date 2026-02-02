@@ -16,24 +16,14 @@ import (
 	"github.com/urfave/cli"
 )
 
-type DisperserVersion uint
-
-const (
-	V1 DisperserVersion = 1
-	V2 DisperserVersion = 2
-)
-
 type Config struct {
-	DisperserVersion  DisperserVersion
-	AwsClientConfig   aws.ClientConfig
-	BlobstoreConfig   blobstore.Config
-	ServerConfig      disperser.ServerConfig
-	LoggerConfig      common.LoggerConfig
-	MetricsConfig     disperser.MetricsConfig
-	RatelimiterConfig ratelimit.Config
-	RateConfig        apiserver.RateConfig
-	// KzgCommitterConfig is only needed when DisperserVersion is V2.
-	// It's used by the grpc endpoint we expose to compute client commitments.
+	AwsClientConfig             aws.ClientConfig
+	BlobstoreConfig             blobstore.Config
+	ServerConfig                disperser.ServerConfig
+	LoggerConfig                common.LoggerConfig
+	MetricsConfig               disperser.MetricsConfig
+	RatelimiterConfig           ratelimit.Config
+	RateConfig                  apiserver.RateConfig
 	KzgCommitterConfig          committer.Config
 	EnableRatelimiter           bool
 	EnablePaymentMeterer        bool
@@ -60,11 +50,6 @@ type Config struct {
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
-	version := ctx.GlobalUint(flags.DisperserVersionFlag.Name)
-	if version != uint(V1) && version != uint(V2) {
-		return Config{}, fmt.Errorf("unknown disperser version %d", version)
-	}
-
 	ratelimiterConfig, err := ratelimit.ReadCLIConfig(ctx, flags.FlagPrefix)
 	if err != nil {
 		return Config{}, err
@@ -81,15 +66,12 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	kzgCommitterConfig := committer.ReadCLIConfig(ctx)
-	if version == uint(V2) {
-		if err := kzgCommitterConfig.Verify(); err != nil {
-			return Config{}, fmt.Errorf("disperser version 2: kzg committer config verify: %w", err)
-		}
+	if err := kzgCommitterConfig.Verify(); err != nil {
+		return Config{}, fmt.Errorf("kzg committer config verify: %w", err)
 	}
 
 	config := Config{
-		DisperserVersion: DisperserVersion(version),
-		AwsClientConfig:  aws.ReadClientConfig(ctx, flags.FlagPrefix),
+		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		ServerConfig: disperser.ServerConfig{
 			GrpcPort:                           ctx.GlobalString(flags.GrpcPortFlag.Name),
 			GrpcTimeout:                        ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
