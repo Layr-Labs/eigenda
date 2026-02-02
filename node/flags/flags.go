@@ -568,6 +568,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENFORCE_SINGLE_BLOB_BATCHES"),
 	}
+	DeleteV1DataFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "delete-v1-data"),
+		Usage:    "When enabled, deletes any existing v1 data on node startup",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DELETE_V1_DATA"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -722,6 +728,7 @@ var optionalFlags = []cli.Flag{
 	EnablePerAccountPaymentMetricsFlag,
 	OverrideV2TtlFlag,
 	EnforceSingleBlobBatchesFlag,
+	DeleteV1DataFlag,
 }
 
 func init() {

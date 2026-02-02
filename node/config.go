@@ -88,6 +88,9 @@ type Config struct {
 	// If true, reject batch dispersal requests containing more than one blob
 	EnforceSingleBlobBatches bool
 
+	// If true, triggers deletion of v1 data on node startup
+	DeleteV1Data bool
+
 	OnchainStateRefreshInterval time.Duration
 	ChunkDownloadTimeout        time.Duration
 	GRPCMsgSizeLimitV2          int
@@ -422,6 +425,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
 		EnforceSingleBlobBatches:            ctx.GlobalBool(flags.EnforceSingleBlobBatchesFlag.Name),
+		DeleteV1Data:                        ctx.GlobalBool(flags.DeleteV1DataFlag.Name),
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
 		GRPCMsgSizeLimitV2:                  ctx.GlobalInt(flags.GRPCMsgSizeLimitV2Flag.Name),

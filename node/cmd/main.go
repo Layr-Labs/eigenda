@@ -70,6 +70,13 @@ func NodeMain(ctx *cli.Context, softwareVersion *version.Semver) error {
 		return err
 	}
 
+	if config.DeleteV1Data {
+		err := node.DeleteV1Data(logger, config.DbPath)
+		if err != nil {
+			return fmt.Errorf("delete v1 data: %w", err)
+		}
+	}
+
 	pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProviders...)
 
 	// Rate limiter
