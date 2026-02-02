@@ -53,6 +53,12 @@ type ControllerMetrics struct {
 	enablePerAccountMetrics         bool
 	userAccountRemapping            map[string]string
 	validatorIdRemapping            map[string]string
+
+	// Dual disperser ID migration metrics
+	disperserIDRetryAttempts  prometheus.Counter
+	disperserIDRetrySuccesses prometheus.Counter
+	disperserIDRetryFailures  prometheus.Counter
+	validatorsByDisperserID   *prometheus.GaugeVec
 }
 
 // Sets up metrics for the controller.
@@ -317,6 +323,39 @@ func NewControllerMetrics(
 		[]string{"quorum"},
 	)
 
+	disperserIDRetryAttempts := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: controllerNamespace,
+			Name:      "disperser_id_retry_attempts_total",
+			Help:      "Total number of disperser ID retry attempts (primary ID rejected, trying fallback)",
+		},
+	)
+
+	disperserIDRetrySuccesses := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: controllerNamespace,
+			Name:      "disperser_id_retry_successes_total",
+			Help:      "Total number of successful disperser ID retries (fallback ID accepted after primary rejected)",
+		},
+	)
+
+	disperserIDRetryFailures := promauto.With(registry).NewCounter(
+		prometheus.CounterOpts{
+			Namespace: controllerNamespace,
+			Name:      "disperser_id_retry_failures_total",
+			Help:      "Total number of failed disperser ID retries (both primary and fallback rejected)",
+		},
+	)
+
+	validatorsByDisperserID := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: controllerNamespace,
+			Name:      "validators_by_disperser_id",
+			Help:      "Number of validators using each disperser ID type (primary or fallback)",
+		},
+		[]string{"disperser_id_type"},
+	)
+
 	return &ControllerMetrics{
 		processSigningMessageLatency:    processSigningMessageLatency,
 		attestationUpdateLatency:        attestationUpdateLatency,
@@ -348,6 +387,10 @@ func NewControllerMetrics(
 		globalSignedByteCount:           globalSignedByteCount,
 		globalUnsignedByteCount:         globalUnsignedByteCount,
 		globalSigningFractionHistogram:  globalSigningFractionHistogram,
+		disperserIDRetryAttempts:        disperserIDRetryAttempts,
+		disperserIDRetrySuccesses:       disperserIDRetrySuccesses,
+		disperserIDRetryFailures:        disperserIDRetryFailures,
+		validatorsByDisperserID:         validatorsByDisperserID,
 	}, nil
 }
 
@@ -570,4 +613,40 @@ func (m *ControllerMetrics) ReportValidatorSigningLatency(id core.OperatorID, la
 		m.validatorIdRemapping,
 		m.collectDetailedValidatorMetrics)
 	m.validatorSigningLatency.WithLabelValues(idLabel).Observe(common.ToMilliseconds(latency))
+}
+
+// IncrementDisperserIDRetryAttempts increments the counter for disperser ID retry attempts.
+func (m *ControllerMetrics) IncrementDisperserIDRetryAttempts() {
+	if m == nil {
+		return
+	}
+	m.disperserIDRetryAttempts.Inc()
+}
+
+// IncrementDisperserIDRetrySuccesses increments the counter for successful disperser ID retries.
+func (m *ControllerMetrics) IncrementDisperserIDRetrySuccesses() {
+	if m == nil {
+		return
+	}
+	m.disperserIDRetrySuccesses.Inc()
+}
+
+// IncrementDisperserIDRetryFailures increments the counter for failed disperser ID retries.
+func (m *ControllerMetrics) IncrementDisperserIDRetryFailures() {
+	if m == nil {
+		return
+	}
+	m.disperserIDRetryFailures.Inc()
+}
+
+// UpdateValidatorDisperserIDDistribution updates the gauge showing how many validators use each disperser ID.
+func (m *ControllerMetrics) UpdateValidatorDisperserIDDistribution(stats ValidatorDisperserIDStats) {
+	if m == nil {
+		return
+	}
+	// Set count for each disperser ID
+	for id, count := range stats.CountByID {
+		m.validatorsByDisperserID.WithLabelValues(fmt.Sprintf("id_%d", id)).Set(float64(count))
+	}
+	m.validatorsByDisperserID.WithLabelValues("unknown").Set(float64(stats.UnknownCount))
 }

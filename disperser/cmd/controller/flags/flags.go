@@ -341,9 +341,19 @@ var (
 	}
 	DisperserIDFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-id"),
-		Usage:    "Unique identifier for this disperser instance. The value specified must match the index of the associated pubkey in the disperser registry",
-		Required: true,
+		Usage:    "Unique identifier for this disperser instance. The value specified must match the index of the associated pubkey in the disperser registry. Deprecated: use --controller-disperser-ids instead for multi-ID support",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_ID"),
+	}
+	// Multi Disperser ID Support
+	DisperserIDsFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "disperser-ids"),
+		Usage: "Comma-separated list of disperser IDs to use, in priority order (e.g., '1,0'). " +
+			"Each ID requires corresponding credentials via environment variables: " +
+			"CONTROLLER_DISPERSER_ID_{N}_PRIVATE_KEY or CONTROLLER_DISPERSER_ID_{N}_KMS_KEY_ID. " +
+			"If not specified, falls back to --controller-disperser-id for backward compatibility",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_IDS"),
 	}
 	SigningRateRetentionPeriodFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-retention-period"),
@@ -404,7 +414,6 @@ var requiredFlags = []cli.Flag{
 	DispatcherPullIntervalFlag,
 	AttestationTimeoutFlag,
 	BatchAttestationTimeoutFlag,
-	DisperserIDFlag,
 	SigningRateDynamoDbTableNameFlag,
 }
 
@@ -454,6 +463,8 @@ var optionalFlags = []cli.Flag{
 	BlobDispersalRequestBatchSizeFlag,
 	BlobDispersalRequestBackoffPeriodFlag,
 	SigningRateFlushPeriodFlag,
+	DisperserIDFlag,
+	DisperserIDsFlag,
 }
 
 var Flags []cli.Flag
