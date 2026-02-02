@@ -115,10 +115,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
 
-	if config.DisperserVersion != V2 {
-		return fmt.Errorf("disperser version %d is not supported (only v2 is supported)", config.DisperserVersion)
-	}
-
 	committer, err := committer.NewFromConfig(config.KzgCommitterConfig)
 	if err != nil {
 		return fmt.Errorf("new committer: %w", err)
