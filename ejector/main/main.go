@@ -129,7 +129,7 @@ func run(ctx context.Context) error {
 
 	threadedEjectionManager := ejector.NewThreadedEjectionManager(ctx, logger, ejectionManager, ejectorConfig)
 
-	// Currently used for both v1 and v2 signing rate lookups. Eventually, v2 will poll the controller for this info.
+	// Currently used for v2 signing rate lookups. Eventually, v2 will poll the controller for this info.
 	dataApiSigningRateLookup := ejector.NewDataApiSigningRateLookup(
 		logger,
 		ejectorConfig.DataApiUrl,
@@ -184,7 +184,6 @@ func run(ctx context.Context) error {
 		logger,
 		ejectorConfig,
 		threadedEjectionManager,
-		dataApiSigningRateLookup,
 		dataApiSigningRateLookup,
 		validatorIDToAddressConverter,
 		referenceBlockProvider,
