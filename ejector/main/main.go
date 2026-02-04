@@ -99,7 +99,7 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("failed to create ejection manager caller: %w", err)
 	}
 
-	coolDownSeconds, err := caller.EjectionCooldown(&bind.CallOpts{Context: ctx})
+	cooldownSeconds, err := caller.EjectionCooldown(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return fmt.Errorf("failed to read `cooldown` value from ejection manager contract: %w", err)
 	}
@@ -117,7 +117,7 @@ func run(ctx context.Context) error {
 	//       plainly restarting the ejector in this event is a sufficient mitigation considering
 	//       the service is only currently ran by EigenCloud who also controls the
 	//       ownership role on the EjectionsManager contract responsible for updating onchain params.
-	err = ejectorConfig.HasSufficientOnChainMirror(coolDownSeconds, finalizationDelaySeconds)
+	err = ejectorConfig.HasSufficientOnChainMirror(cooldownSeconds, finalizationDelaySeconds)
 	if err != nil {
 		return fmt.Errorf("failed to comply with current EjectionManager contract params: %w", err)
 	}
