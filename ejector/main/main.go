@@ -9,9 +9,11 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	contractEigenDAEjectionManager "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDAEjectionManager"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/ejector"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -87,6 +89,37 @@ func run(ctx context.Context) error {
 	ejectionContractAddress, err := contractDirectory.GetContractAddress(ctx, directory.EigenDAEjectionManager)
 	if err != nil {
 		return fmt.Errorf("failed to get ejection manager address: %w", err)
+	}
+
+	// TODO(ethenotethan): Figure out tighter abstraction or alternative call sites
+
+	caller, err := contractEigenDAEjectionManager.NewContractIEigenDAEjectionManagerCaller(
+		ejectionContractAddress, gethClient)
+	if err != nil {
+		return fmt.Errorf("failed to create ejection manager caller: %w", err)
+	}
+
+	coolDownSeconds, err := caller.EjectionCooldown(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("failed to read `cooldown` value from ejection manager contract: %w", err)
+	}
+
+	finalizationDelaySeconds, err := caller.EjectionDelay(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("failed to read `delay` value from ejection manager contract: %w", err)
+	}
+
+	// NOTE: this check is only performed as a precursor invariant during
+	//       app bootstrap. the app main loop doesn't perform this check which can
+	//       result in the onchain (cooldown, delay) parameters changing and invalidating
+	//       the ejector's config.
+	//
+	//       plainly restarting the ejector in this event is a sufficient mitigation considering
+	//       the service is only currently ran by EigenCloud who also controls the
+	//       ownership role on the EjectionsManager contract responsible for updating onchain params.
+	err = ejectorConfig.HasSufficientOnChainMirror(coolDownSeconds, finalizationDelaySeconds)
+	if err != nil {
+		return fmt.Errorf("failed to comply with current EjectionManager contract params: %w", err)
 	}
 
 	registryCoordinatorAddress, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
