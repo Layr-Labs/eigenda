@@ -129,8 +129,8 @@ func (e *RootEjectorConfig) Verify() error {
 // HasSufficientOnChainMirror checks for cross-domain correctness between the ejector config and
 // the EjectionsManager contract's param values.
 //
-// If improperly set, there'd be performance degredations in the ejector's processing timeline
-// where retried ejections could be attempted pre-maturely as well as finanlization claim txs
+// If improperly set, there'd be performance degradations in the ejector's processing timeline
+// where retried ejections could be attempted prematurely as well as finalization claim txs
 func (e *EjectorConfig) HasSufficientOnChainMirror(cooldown, finalizationDelay uint64) error {
 
 	cooldownSeconds, delaySeconds := time.Duration(cooldown)*time.Second, time.Duration(finalizationDelay)*time.Second
