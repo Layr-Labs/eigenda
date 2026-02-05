@@ -92,7 +92,7 @@ func TestIndexerIntegration(t *testing.T) {
 	require.NoError(t, err, "failed to get indexed operator state")
 	require.Equal(
 		t,
-		len(infraHarness.OperatorHarness.Servers),
+		len(infraHarness.OperatorHarness.ServersV2),
 		len(state.IndexedOperators),
 		"operator count mismatch",
 	)

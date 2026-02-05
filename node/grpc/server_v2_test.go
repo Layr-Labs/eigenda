@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"math/big"
 	"net"
 	"os"
 	"strings"
@@ -54,7 +55,17 @@ var (
 	blobParamsMap = map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,
 	}
+	opID = [32]byte{0}
 )
+
+func makeConfig(t *testing.T) *node.Config {
+	return &node.Config{
+		DbPath:                              t.TempDir(),
+		StoreChunksRequestMaxPastAge:        5 * time.Minute,
+		StoreChunksRequestMaxFutureAge:      5 * time.Minute,
+		DispersalAuthenticationKeyCacheSize: 1024,
+	}
+}
 
 type testComponents struct {
 	server        *grpc.ServerV2
@@ -75,7 +86,6 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		PrivateKey: keyPair.PrivKey.String(),
 	})
 	require.NoError(t, err)
-	opID = [32]byte{0}
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
 	require.NoError(t, err)
@@ -97,6 +107,31 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	ratelimiter := &commonmock.NoopRatelimiter{}
 
 	val := coremockv2.NewMockShardValidator()
+
+	// Create fresh mock chain state for this test
+	chainState := &coremock.MockIndexedChainState{}
+
+	// Set up mock operator state with required quorums (0, 1, 2)
+	mockOperatorState := &core.OperatorState{
+		Operators:   make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo),
+		Totals:      make(map[core.QuorumID]*core.OperatorInfo),
+		BlockNumber: 100,
+	}
+	// Initialize quorums 0, 1, 2 with a mock operator in each
+	for _, quorumID := range []core.QuorumID{0, 1, 2} {
+		mockOperatorState.Operators[quorumID] = make(map[core.OperatorID]*core.OperatorInfo)
+		// Add a mock operator to each quorum so chunk location determination works
+		mockOperatorState.Operators[quorumID][opID] = &core.OperatorInfo{
+			Stake:  big.NewInt(100),
+			Index:  0,
+		}
+		mockOperatorState.Totals[quorumID] = &core.OperatorInfo{
+			Stake:  big.NewInt(100),
+			Index:  1,
+		}
+	}
+	chainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(mockOperatorState, nil)
+
 	metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", opID, -1, tx, chainState)
 
 	operatorStateCache := operatorstate.NewMockOperatorStateCache()
@@ -180,20 +215,8 @@ func TestV2NodeInfoRequest(t *testing.T) {
 	require.Equal(t, resp.GetSemver(), version.DefaultVersion().String())
 }
 
-func TestV2ServerWithoutV2(t *testing.T) {
-	config := makeConfig(t)
-	config.EnableV2 = false
-	c := newTestComponents(t, config)
-	_, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{})
-	requireErrorStatus(t, err, codes.InvalidArgument)
-
-	_, err = c.server.GetChunks(context.Background(), &validator.GetChunksRequest{})
-	requireErrorStatus(t, err, codes.InvalidArgument)
-}
-
 func TestV2StoreChunksInputValidation(t *testing.T) {
 	config := makeConfig(t)
-	config.EnableV2 = true
 	c := newTestComponents(t, config)
 	_, batch, _ := nodemock.MockBatch(t)
 	batchProto, err := batch.ToProtobuf()
@@ -238,7 +261,6 @@ func TestV2StoreChunksInputValidation(t *testing.T) {
 
 func TestV2StoreChunksSuccess(t *testing.T) {
 	config := makeConfig(t)
-	config.EnableV2 = true
 	c := newTestComponents(t, config)
 
 	blobKeys, batch, bundles := nodemock.MockBatch(t)
@@ -294,7 +316,6 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 
 func TestV2StoreChunksDownloadFailure(t *testing.T) {
 	config := makeConfig(t)
-	config.EnableV2 = true
 	c := newTestComponents(t, config)
 
 	_, batch, _ := nodemock.MockBatch(t)
@@ -317,7 +338,6 @@ func TestV2StoreChunksDownloadFailure(t *testing.T) {
 
 func TestV2StoreChunksStorageFailure(t *testing.T) {
 	config := makeConfig(t)
-	config.EnableV2 = true
 	c := newTestComponents(t, config)
 
 	blobKeys, batch, bundles := nodemock.MockBatch(t)
@@ -366,7 +386,6 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 
 func TestV2StoreChunksLevelDBValidationFailure(t *testing.T) {
 	config := makeConfig(t)
-	config.EnableV2 = true
 	c := newTestComponents(t, config)
 
 	blobKeys, batch, bundles := nodemock.MockBatch(t)
@@ -410,7 +429,6 @@ func TestV2StoreChunksLevelDBValidationFailure(t *testing.T) {
 
 func TestV2GetChunksInputValidation(t *testing.T) {
 	config := makeConfig(t)
-	config.EnableV2 = true
 	c := newTestComponents(t, config)
 	ctx := context.Background()
 	req := &validator.GetChunksRequest{

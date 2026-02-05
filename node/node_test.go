@@ -16,7 +16,6 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 var (
@@ -66,12 +65,9 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
-		panic("failed to create a directory for levelDB")
+		panic("failed to create a directory for DB")
 	}
 	tx := &coremock.MockWriter{}
-
-	mockVal := coremock.NewMockShardValidator()
-	mockVal.On("ValidateBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	chainState, _ := coremock.MakeChainDataMock(map[uint8]int{
 		0: 4,
@@ -79,17 +75,6 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 		2: 3,
 	})
 
-	store, err := node.NewLevelDBStore(
-		dbPath,
-		logger,
-		nil,
-		1e9,
-		true,
-		false,
-		1e9)
-	if err != nil {
-		panic("failed to create a new levelDB store")
-	}
 	t.Cleanup(func() {
 		if err := os.Remove(dbPath); err != nil {
 			t.Log("failed to remove dbPath:", dbPath, "error:", err)
@@ -101,9 +86,7 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 		Logger:         logger,
 		KeyPair:        keyPair,
 		Metrics:        nil,
-		Store:          store,
 		ChainState:     chainState,
-		Validator:      mockVal,
 		Transactor:     tx,
 		DownloadPool:   workerpool.New(1),
 		ValidationPool: workerpool.New(1),
