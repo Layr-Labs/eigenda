@@ -10,7 +10,6 @@ import (
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -27,9 +26,6 @@ type DeployResourcesConfig struct {
 
 	// Required: AWS client config
 	AWSConfig aws.ClientConfig
-
-	// Optional: Metadata table name, defaults to "test-eigenda-blobmetadata"
-	MetadataTableName string
 
 	// Optional: Bucket table name, defaults to "test-eigenda-bucket"
 	BucketTableName string
@@ -70,9 +66,6 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 	if config.V2PaymentPrefix == "" {
 		config.V2PaymentPrefix = "e2e_v2_"
 	}
-	if config.MetadataTableName == "" {
-		config.MetadataTableName = "test-eigenda-blobmetadata"
-	}
 	if config.BucketTableName == "" {
 		config.BucketTableName = "test-eigenda-bucket"
 	}
@@ -92,16 +85,6 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 	// Create S3 bucket
 	if err := createS3Bucket(ctx, cfg, config.BlobStoreBucketName, logger); err != nil {
 		return fmt.Errorf("failed to create S3 bucket: %w", err)
-	}
-
-	// Create metadata table
-	if config.MetadataTableName != "" {
-		_, err := test_utils.CreateTable(ctx, cfg, config.MetadataTableName,
-			blobstore.GenerateTableSchema(config.MetadataTableName, 10, 10))
-		if err != nil {
-			return fmt.Errorf("failed to create metadata table %s: %w", config.MetadataTableName, err)
-		}
-		logger.Info("Created metadata table", "table", config.MetadataTableName)
 	}
 
 	// Create bucket table

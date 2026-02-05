@@ -22,7 +22,6 @@ var (
 	rootPathFlagName       = "root-path"
 	localstackPortFlagName = "localstack-port"
 
-	metadataTableName   = "test-BlobMetadata"
 	bucketTableName     = "test-BucketStore"
 	metadataTableNameV2 = "test-BlobMetadata-v2"
 
@@ -216,7 +215,6 @@ func startLocalstack(ctx *cli.Context, config *deploy.Config) error {
 
 	deployConfig := testbed.DeployResourcesConfig{
 		LocalStackEndpoint:  localstackContainer.Endpoint(),
-		MetadataTableName:   metadataTableName,
 		BucketTableName:     bucketTableName,
 		V2MetadataTableName: metadataTableNameV2,
 		AWSConfig:           localstackContainer.GetAWSClientConfig(),
