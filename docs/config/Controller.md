@@ -6,9 +6,7 @@
 
 | Config | Description |
 |--------|-------------|
-| $${\color{red}\texttt{AwsClient.AccessKey}}$$<br>`CONTROLLER_AWS_CLIENT_ACCESS_KEY`<br><br>type: `string` | AccessKey to use when interacting with S3. |
 | $${\color{red}\texttt{AwsClient.Region}}$$<br>`CONTROLLER_AWS_CLIENT_REGION`<br><br>type: `string` | Region is the region to use when interacting with S3. Default is "us-east-2". |
-| $${\color{red}\texttt{AwsClient.SecretAccessKey}}$$<br>`CONTROLLER_AWS_CLIENT_SECRET_ACCESS_KEY`<br><br>type: `string` | SecretAccessKey to use when interacting with S3. |
 | $${\color{red}\texttt{ChainState.Endpoint}}$$<br>`CONTROLLER_CHAIN_STATE_ENDPOINT`<br><br>type: `string` | The Graph endpoint |
 | $${\color{red}\texttt{ContractDirectoryAddress}}$$<br>`CONTROLLER_CONTRACT_DIRECTORY_ADDRESS`<br><br>type: `string` | The contract directory contract address, which is used to derive other EigenDA contract addresses. |
 | $${\color{red}\texttt{DispersalRequestSigner.KeyID}}$$<br>`CONTROLLER_DISPERSAL_REQUEST_SIGNER_KEY_ID`<br><br>type: `string` | KeyID is the AWS KMS key identifier used for signing requests. Optional if PrivateKey is provided. |
@@ -20,6 +18,7 @@
 | $${\color{red}\texttt{Encoder.EncoderAddress}}$$<br>`CONTROLLER_ENCODER_ENCODER_ADDRESS`<br><br>type: `string` | EncoderAddress is the network address of the encoder service (e.g., "localhost:50051"). Must not be empty. |
 | $${\color{red}\texttt{EthClient.RPCURLs}}$$<br>`CONTROLLER_ETH_CLIENT_RPCURLS`<br><br>type: `[]string` | A list of RPC URL endpoints to connect to the Ethereum chain. |
 | $${\color{red}\texttt{Payment.OnDemand.OnDemandTableName}}$$<br>`CONTROLLER_PAYMENT_ON_DEMAND_ON_DEMAND_TABLE_NAME`<br><br>type: `string` | The name of the dynamo table where on-demand payment information is stored |
+| $${\color{red}\texttt{Server.GrpcPort}}$$<br>`CONTROLLER_SERVER_GRPC_PORT`<br><br>type: `uint16` | Port that the gRPC server listens on |
 | $${\color{red}\texttt{SigningRateDynamoDbTableName}}$$<br>`CONTROLLER_SIGNING_RATE_DYNAMO_DB_TABLE_NAME`<br><br>type: `string` | The name of the DynamoDB table used to store signing rate data. |
 
 ## Optional Fields
@@ -27,9 +26,11 @@
 | Config | Description |
 |--------|-------------|
 | $${\color{red}\texttt{AttestationTimeout}}$$<br>`CONTROLLER_ATTESTATION_TIMEOUT`<br><br>type: `time.Duration`<br>default: `45s` | AttestationTimeout is the maximum time to wait for a single node to provide a signature. Must be positive. |
-| $${\color{red}\texttt{AwsClient.EndpointURL}}$$<br>`CONTROLLER_AWS_CLIENT_ENDPOINT_URL`<br><br>type: `string`<br>default: `""` | EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used. |
+| $${\color{red}\texttt{AwsClient.AccessKey}}$$<br>`CONTROLLER_AWS_CLIENT_ACCESS_KEY`<br><br>type: `string`<br>default: `""` | AccessKey to use when interacting with S3. |
+| $${\color{red}\texttt{AwsClient.EndpointURL}}$$<br>`CONTROLLER_AWS_CLIENT_ENDPOINT_URL`<br><br>type: `string`<br>default: `""` | EndpointURL of the S3 endpoint to use. If set to "", the AWS library will use the default AWS S3 endpoint. |
 | $${\color{red}\texttt{AwsClient.FragmentParallelismConstant}}$$<br>`CONTROLLER_AWS_CLIENT_FRAGMENT_PARALLELISM_CONSTANT`<br><br>type: `int`<br>default: `0` | This is a deprecated setting and can be ignored. |
 | $${\color{red}\texttt{AwsClient.FragmentParallelismFactor}}$$<br>`CONTROLLER_AWS_CLIENT_FRAGMENT_PARALLELISM_FACTOR`<br><br>type: `int`<br>default: `8` | This is a deprecated setting and can be ignored. |
+| $${\color{red}\texttt{AwsClient.SecretAccessKey}}$$<br>`CONTROLLER_AWS_CLIENT_SECRET_ACCESS_KEY`<br><br>type: `string`<br>default: `""` | SecretAccessKey to use when interacting with S3. |
 | $${\color{red}\texttt{BatchAttestationTimeout}}$$<br>`CONTROLLER_BATCH_ATTESTATION_TIMEOUT`<br><br>type: `time.Duration`<br>default: `55s` | BatchAttestationTimeout is the maximum time to wait for all nodes to provide signatures for a batch. Must be positive and must be longer or equal to the AttestationTimeout. |
 | $${\color{red}\texttt{BatchMetadataUpdatePeriod}}$$<br>`CONTROLLER_BATCH_METADATA_UPDATE_PERIOD`<br><br>type: `time.Duration`<br>default: `1m0s` | BatchMetadataUpdatePeriod is the interval between attempts to refresh batch metadata (reference block number and operator state). Since this changes at most once per eth block, values shorter than 10 seconds are not useful. In practice, checking every several minutes is sufficient. Must be positive. |
 | $${\color{red}\texttt{BlobDispersalQueueSize}}$$<br>`CONTROLLER_BLOB_DISPERSAL_QUEUE_SIZE`<br><br>type: `uint32`<br>default: `1024` | BlobDispersalQueueSize is the maximum number of blobs that can be queued for dispersal. |
@@ -78,7 +79,6 @@
 | $${\color{red}\texttt{Payment.Reservation.OverfillBehavior}}$$<br>`CONTROLLER_PAYMENT_RESERVATION_OVERFILL_BEHAVIOR`<br><br>type: `ratelimit.OverfillBehavior`<br>default: `overfillOncePermitted` | How to handle requests that would overfill the bucket |
 | $${\color{red}\texttt{Payment.Reservation.UpdateInterval}}$$<br>`CONTROLLER_PAYMENT_RESERVATION_UPDATE_INTERVAL`<br><br>type: `time.Duration`<br>default: `30s` | Interval for checking for payment updates |
 | $${\color{red}\texttt{PullInterval}}$$<br>`CONTROLLER_PULL_INTERVAL`<br><br>type: `time.Duration`<br>default: `1s` | PullInterval is how frequently the Dispatcher polls for new encoded blobs to batch and dispatch. Must be positive. |
-| $${\color{red}\texttt{Server.GrpcPort}}$$<br>`CONTROLLER_SERVER_GRPC_PORT`<br><br>type: `uint16`<br>default: `32010` | Port that the gRPC server listens on |
 | $${\color{red}\texttt{Server.MaxGRPCMessageSize}}$$<br>`CONTROLLER_SERVER_MAX_GRPC_MESSAGE_SIZE`<br><br>type: `int`<br>default: `1048576` | Maximum size of a gRPC message that the server will accept (in bytes) |
 | $${\color{red}\texttt{Server.MaxIdleConnectionAge}}$$<br>`CONTROLLER_SERVER_MAX_IDLE_CONNECTION_AGE`<br><br>type: `time.Duration`<br>default: `5m0s` | Maximum time a connection can be idle before it is closed. |
 | $${\color{red}\texttt{Server.RequestMaxFutureAge}}$$<br>`CONTROLLER_SERVER_REQUEST_MAX_FUTURE_AGE`<br><br>type: `time.Duration`<br>default: `3m0s` | Maximum age of a request in the future that the server will accept. Requests with timestamps too far in the future will be rejected. |

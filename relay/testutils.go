@@ -7,11 +7,8 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 )
 
-// NewTestConfig creates a relay configuration suitable for testing.
-// The relayIndex determines the relay key and metrics port.
-// The grpcPort is set to 0 by default to let the OS assign a port (can be overridden).
-func NewTestConfig(relayIndex int) *Config {
-	return &Config{
+func NewTestRelayConfig(relayIndex int) *RelayConfig {
+	return &RelayConfig{
 		RelayKeys:                  []v2.RelayKey{v2.RelayKey(relayIndex)},
 		GRPCPort:                   0, // OS assigns port
 		MaxGRPCMessageSize:         1024 * 1024 * 300,
