@@ -160,7 +160,7 @@ func (i *indexer) Index(ctx context.Context) error {
 					newHeaders, err := i.HeaderStore.AddHeaders(headers)
 					if err != nil {
 						i.Logger.Error("Error adding headers", "err", err)
-						// TODO: Properly think through error handling
+						time.Sleep(i.PullInterval)
 						continue loop
 					}
 
