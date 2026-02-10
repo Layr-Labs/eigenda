@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/config"
-	"github.com/Layr-Labs/eigenda/common/geth"
 )
 
 var _ config.DocumentedConfig = (*RootIndexerConfig)(nil)
@@ -47,9 +46,6 @@ type IndexerConfig struct {
 
 	// The format of the log file. Accepted options are 'json' and 'text'
 	LogFormat string
-
-	// Ethereum client configuration for connecting to RPC endpoints.
-	EthClientConfig geth.EthClientConfig
 }
 
 var _ config.VerifiableConfig = (*IndexerSecretConfig)(nil)
@@ -70,7 +66,6 @@ func DefaultIndexerConfig() *IndexerConfig {
 		HTTPPort:         "8080",
 		LogLevel:         "info",
 		LogFormat:        "json",
-		EthClientConfig:  geth.DefaultEthClientConfig(),
 	}
 }
 
