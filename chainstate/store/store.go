@@ -66,8 +66,8 @@ type Store interface {
 	// Persistence operations
 
 	// Snapshot serializes the entire store state to bytes for persistence.
-	Snapshot() ([]byte, error)
+	Snapshot(ctx context.Context) ([]byte, error)
 
 	// Restore deserializes and loads store state from bytes.
-	Restore(data []byte) error
+	Restore(ctx context.Context, data []byte) error
 }
