@@ -34,7 +34,7 @@ type Store interface {
 	SaveQuorumAPK(ctx context.Context, apk *types.QuorumAPK) error
 
 	// GetQuorumAPK retrieves the aggregate public key for a quorum at a specific block.
-	GetQuorumAPK(ctx context.Context, quorumID uint8, blockNum uint64) (*types.QuorumAPK, error)
+	GetQuorumAPK(ctx context.Context, quorumID core.QuorumID, blockNum uint64) (*types.QuorumAPK, error)
 
 	// ListQuorumAPKs retrieves quorum APK snapshots matching the filter.
 	ListQuorumAPKs(ctx context.Context, filter types.QuorumAPKFilter) ([]*types.QuorumAPK, error)
