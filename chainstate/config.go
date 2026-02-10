@@ -2,6 +2,7 @@ package chainstate
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/config"
@@ -128,6 +129,9 @@ func (c *IndexerConfig) Verify() error {
 func (c *IndexerSecretConfig) Verify() error {
 	if len(c.EthRpcUrls) == 0 {
 		return fmt.Errorf("at least one Ethereum RPC URL is required")
+	}
+	if slices.Contains(c.EthRpcUrls, "") {
+		return fmt.Errorf("Ethereum RPC URL can not be an empty string")
 	}
 	return nil
 }
