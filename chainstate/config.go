@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/geth"
 )
@@ -43,8 +42,11 @@ type IndexerConfig struct {
 	// Port for the HTTP API server that serves indexed data queries.
 	HTTPPort string `docs:"required"`
 
-	// Logging configuration.
-	LoggerConfig common.LoggerConfig
+	// The lowest log level that will be output. Accepted options are "debug", "info", "warn", "error"
+	LogLevel string
+
+	// The format of the log file. Accepted options are 'json' and 'text'
+	LogFormat string
 
 	// Ethereum client configuration for connecting to RPC endpoints.
 	EthClientConfig geth.EthClientConfig
@@ -66,7 +68,8 @@ func DefaultIndexerConfig() *IndexerConfig {
 		PollInterval:     12 * time.Second,
 		PersistInterval:  30 * time.Second,
 		HTTPPort:         "8080",
-		LoggerConfig:     *common.DefaultLoggerConfig(),
+		LogLevel:         "info",
+		LogFormat:        "json",
 		EthClientConfig:  geth.DefaultEthClientConfig(),
 	}
 }
@@ -115,6 +118,12 @@ func (c *IndexerConfig) Verify() error {
 	}
 	if c.PersistInterval <= 0 {
 		return fmt.Errorf("persist interval must be greater than 0")
+	}
+	if c.LogLevel != "debug" && c.LogLevel != "info" && c.LogLevel != "warn" && c.LogLevel != "error" {
+		return fmt.Errorf("invalid log level")
+	}
+	if c.LogFormat != "json" && c.LogFormat != "text" {
+		return fmt.Errorf("invalid log format")
 	}
 	return nil
 }
