@@ -91,6 +91,7 @@ func (c *IndexerConfig) GetEnvVarPrefix() string {
 func (c *IndexerConfig) GetPackagePaths() []string {
 	return []string{
 		"github.com/Layr-Labs/eigenda/chainstate",
+		"github.com/Layr-Labs/eigenda/common/config",
 	}
 }
 
