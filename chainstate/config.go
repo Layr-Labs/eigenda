@@ -3,6 +3,7 @@ package chainstate
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/config"
@@ -107,7 +108,14 @@ func (c *IndexerConfig) Verify() error {
 	if c.HTTPPort == "" {
 		return fmt.Errorf("HTTP port is required")
 	}
-	if c.BlockBatchSize == 0 {
+	port, err := strconv.Atoi(c.HTTPPort)
+	if err != nil {
+		return fmt.Errorf("HTTP port must be a valid integer: %w", err)
+	}
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("HTTP port must be between 1 and 65535, got %d", port)
+	}
+	if c.BlockBatchSize <= 0 {
 		return fmt.Errorf("block batch size must be greater than 0")
 	}
 	if c.PollInterval <= 0 {
@@ -117,10 +125,10 @@ func (c *IndexerConfig) Verify() error {
 		return fmt.Errorf("persist interval must be greater than 0")
 	}
 	if c.LogLevel != "debug" && c.LogLevel != "info" && c.LogLevel != "warn" && c.LogLevel != "error" {
-		return fmt.Errorf("invalid log level")
+		return fmt.Errorf("invalid log level %q, accepted values: debug, info, warn, error", c.LogLevel)
 	}
 	if c.LogFormat != "json" && c.LogFormat != "text" {
-		return fmt.Errorf("invalid log format")
+		return fmt.Errorf("invalid log format %q, accepted values: json, text", c.LogFormat)
 	}
 	return nil
 }
