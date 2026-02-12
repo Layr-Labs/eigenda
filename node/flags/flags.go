@@ -1,7 +1,6 @@
 package flags
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/docker/go-units"
@@ -15,11 +14,6 @@ import (
 const (
 	FlagPrefix   = "node"
 	EnvVarPrefix = "NODE"
-
-	// Node mode values
-	ModeV1Only  = "v1-only"
-	ModeV2Only  = "v2-only"
-	ModeV1AndV2 = "v1-and-v2"
 )
 
 var (
@@ -30,30 +24,6 @@ var (
 		Usage:    "Hostname at which node is available",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "HOSTNAME"),
-	}
-	DispersalPortFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "dispersal-port"),
-		Usage:    "Port at which node registers to listen for dispersal calls",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_PORT"),
-	}
-	RetrievalPortFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "retrieval-port"),
-		Usage:    "Port at which node registers to listen for retrieval calls",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RETRIEVAL_PORT"),
-	}
-	InternalDispersalPortFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "internal-dispersal-port"),
-		Usage:    "Port at which node listens for dispersal calls (used when node is behind NGINX)",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_DISPERSAL_PORT"),
-	}
-	InternalRetrievalPortFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "internal-retrieval-port"),
-		Usage:    "Port at which node listens for retrieval calls (used when node is behind NGINX)",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_RETRIEVAL_PORT"),
 	}
 	V2DispersalPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "v2-dispersal-port"),
@@ -371,13 +341,6 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PPROF"),
 	}
 
-	RuntimeModeFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "runtime-mode"),
-		Usage:    fmt.Sprintf("Node runtime mode (%s (default), %s, or %s)", ModeV1AndV2, ModeV1Only, ModeV2Only),
-		Required: false,
-		Value:    ModeV1AndV2,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RUNTIME_MODE"),
-	}
 	StoreChunksRequestMaxPastAgeFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "store-chunks-request-max-past-age"),
 		Usage:    "The maximum age of a StoreChunks request in the past that the node will accept.",
@@ -405,18 +368,6 @@ var (
 		Required: false,
 		Value:    10000,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_RATE_LIMIT_BURST"),
-	}
-	LevelDBDisableSeeksCompactionV1Flag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "leveldb-disable-seeks-compaction-v1"),
-		Usage:    "Disable seeks compaction for LevelDB for v1",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_DISABLE_SEEKS_COMPACTION_V1"),
-	}
-	LevelDBEnableSyncWritesV1Flag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "leveldb-enable-sync-writes-v1"),
-		Usage:    "Enable sync writes for LevelDB for v1",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V1"),
 	}
 	LittDBWriteCacheSizeGBFlag = cli.Float64Flag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
@@ -617,11 +568,11 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENFORCE_SINGLE_BLOB_BATCHES"),
 	}
-	DeprecateV1Flag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "deprecate-v1"),
-		Usage:    "When enabled deletes any existing v1 data, and prevents any v1 logic from executing",
+	DeleteV1DataFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "delete-v1-data"),
+		Usage:    "When enabled, deletes any existing v1 data on node startup",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DEPRECATE_V1"),
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DELETE_V1_DATA"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -692,8 +643,6 @@ var (
 
 var requiredFlags = []cli.Flag{
 	HostnameFlag,
-	DispersalPortFlag,
-	RetrievalPortFlag,
 	EnableMetricsFlag,
 	MetricsPortFlag,
 	OnchainMetricsIntervalFlag,
@@ -719,8 +668,6 @@ var optionalFlags = []cli.Flag{
 	TestPrivateBlsFlag,
 	NumBatchValidatorsFlag,
 	NumBatchDeserializationWorkersFlag,
-	InternalDispersalPortFlag,
-	InternalRetrievalPortFlag,
 	InternalV2DispersalPortFlag,
 	InternalV2RetrievalPortFlag,
 	ClientIPHeaderFlag,
@@ -748,13 +695,10 @@ var optionalFlags = []cli.Flag{
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,
 	RelayConnectionPoolSizeFlag,
-	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
 	DisperserRateLimitPerSecondFlag,
 	DisperserRateLimitBurstFlag,
-	LevelDBDisableSeeksCompactionV1Flag,
-	LevelDBEnableSyncWritesV1Flag,
 	DownloadPoolSizeFlag,
 	LittDBWriteCacheSizeGBFlag,
 	LittDBReadCacheSizeGBFlag,
@@ -784,7 +728,7 @@ var optionalFlags = []cli.Flag{
 	EnablePerAccountPaymentMetricsFlag,
 	OverrideV2TtlFlag,
 	EnforceSingleBlobBatchesFlag,
-	DeprecateV1Flag,
+	DeleteV1DataFlag,
 }
 
 func init() {
