@@ -8,10 +8,24 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// OperatorStatus represents the registration status filter for operators.
+type OperatorStatus int
+
+const (
+	// OperatorStatusAll returns both registered and deregistered operators
+	OperatorStatusAll OperatorStatus = iota
+
+	// OperatorStatusRegistered returns only registered operators
+	OperatorStatusRegistered
+
+	// OperatorStatusDeregistered returns only deregistered operators
+	OperatorStatusDeregistered
+)
+
 // Operator represents an EigenDA operator with their registration information.
 type Operator struct {
 	// Unique operator identifier
-	ID core.OperatorID
+	OperatorID core.OperatorID
 
 	// Ethereum address of the operator
 	Address common.Address
@@ -96,17 +110,14 @@ type OperatorEjection struct {
 	// Transaction hash of the ejection
 	TxHash common.Hash
 
-	// Timestamp when this was recorded
+	// Timestamp when the ejection occurred
 	EjectedAt time.Time
 }
 
 // OperatorFilter is used to filter operators when querying.
 type OperatorFilter struct {
-	// Only return registered operators
-	RegisteredOnly bool
-
-	// Only return deregistered operators
-	DeregisteredOnly bool
+	// Filter by registration status (default: OperatorStatusAll)
+	Status OperatorStatus
 
 	// Filter by specific quorum ID (nil for all)
 	QuorumID *core.QuorumID
@@ -118,13 +129,19 @@ type OperatorFilter struct {
 	MaxBlock uint64
 }
 
-// QuorumAPKFilter is used to filter quorum APK snapshots when querying.
-type QuorumAPKFilter struct {
+// QuorumAPKQuery is used to get the APK for a specific block.
+type QuorumAPKQuery struct {
 	// Quorum identifier
 	QuorumID core.QuorumID
 
 	// Block number for the snapshot (0 for latest)
 	BlockNumber uint64
+}
+
+// QuorumAPKHistoryFilter is used to filter quorum APK snapshots over a range.
+type QuorumAPKHistoryFilter struct {
+	// Quorum identifier
+	QuorumID core.QuorumID
 
 	// Get all snapshots after this block (inclusive)
 	MinBlock uint64

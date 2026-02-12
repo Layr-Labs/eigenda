@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/Layr-Labs/eigenda/chainstate"
 	"github.com/Layr-Labs/eigenda/common/config"
 	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
@@ -20,4 +21,7 @@ func main() {
 
 	err = config.DocumentConfig(controller.DefaultControllerConfig, configDocsDir, true)
 	enforce.NilError(err, "failed to generate docs for the disperser controller config")
+
+	err = config.DocumentConfig(chainstate.DefaultRootIndexerConfig, configDocsDir, true)
+	enforce.NilError(err, "failed to generate docs for the chainstate indexer config")
 }

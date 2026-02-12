@@ -2,11 +2,11 @@ package chainstate
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
-	"github.com/Layr-Labs/eigenda/common/geth"
 )
 
 var _ config.DocumentedConfig = (*RootIndexerConfig)(nil)
@@ -43,11 +43,11 @@ type IndexerConfig struct {
 	// Port for the HTTP API server that serves indexed data queries.
 	HTTPPort string `docs:"required"`
 
-	// Logging configuration.
-	LoggerConfig common.LoggerConfig
+	// The lowest log level that will be output. Accepted options are "debug", "info", "warn", "error"
+	LogLevel string
 
-	// Ethereum client configuration for connecting to RPC endpoints.
-	EthClientConfig geth.EthClientConfig
+	// The format of the log file. Accepted options are 'json' and 'text'
+	LogFormat string
 }
 
 var _ config.VerifiableConfig = (*IndexerSecretConfig)(nil)
@@ -66,8 +66,8 @@ func DefaultIndexerConfig() *IndexerConfig {
 		PollInterval:     12 * time.Second,
 		PersistInterval:  30 * time.Second,
 		HTTPPort:         "8080",
-		LoggerConfig:     *common.DefaultLoggerConfig(),
-		EthClientConfig:  geth.DefaultEthClientConfig(),
+		LogLevel:         "info",
+		LogFormat:        "json",
 	}
 }
 
@@ -93,6 +93,7 @@ func (c *IndexerConfig) GetEnvVarPrefix() string {
 func (c *IndexerConfig) GetPackagePaths() []string {
 	return []string{
 		"github.com/Layr-Labs/eigenda/chainstate",
+		"github.com/Layr-Labs/eigenda/common/config",
 	}
 }
 
@@ -107,7 +108,14 @@ func (c *IndexerConfig) Verify() error {
 	if c.HTTPPort == "" {
 		return fmt.Errorf("HTTP port is required")
 	}
-	if c.BlockBatchSize == 0 {
+	port, err := strconv.Atoi(c.HTTPPort)
+	if err != nil {
+		return fmt.Errorf("HTTP port must be a valid integer: %w", err)
+	}
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("HTTP port must be between 1 and 65535, got %d", port)
+	}
+	if c.BlockBatchSize <= 0 {
 		return fmt.Errorf("block batch size must be greater than 0")
 	}
 	if c.PollInterval <= 0 {
@@ -116,6 +124,12 @@ func (c *IndexerConfig) Verify() error {
 	if c.PersistInterval <= 0 {
 		return fmt.Errorf("persist interval must be greater than 0")
 	}
+	if c.LogLevel != "debug" && c.LogLevel != "info" && c.LogLevel != "warn" && c.LogLevel != "error" {
+		return fmt.Errorf("invalid log level %q, accepted values: debug, info, warn, error", c.LogLevel)
+	}
+	if c.LogFormat != "json" && c.LogFormat != "text" {
+		return fmt.Errorf("invalid log format %q, accepted values: json, text", c.LogFormat)
+	}
 	return nil
 }
 
@@ -123,6 +137,9 @@ func (c *IndexerConfig) Verify() error {
 func (c *IndexerSecretConfig) Verify() error {
 	if len(c.EthRpcUrls) == 0 {
 		return fmt.Errorf("at least one Ethereum RPC URL is required")
+	}
+	if slices.Contains(c.EthRpcUrls, "") {
+		return fmt.Errorf("Ethereum RPC URL can not be an empty string")
 	}
 	return nil
 }
