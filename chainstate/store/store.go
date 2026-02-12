@@ -37,7 +37,7 @@ type Store interface {
 	GetQuorumAPK(ctx context.Context, quorumID core.QuorumID, blockNum uint64) (*types.QuorumAPK, error)
 
 	// ListQuorumAPKs retrieves quorum APK snapshots matching the filter.
-	ListQuorumAPKs(ctx context.Context, filter types.QuorumAPKFilter) ([]*types.QuorumAPK, error)
+	ListQuorumAPKs(ctx context.Context, filter types.QuorumAPKHistoryFilter) ([]*types.QuorumAPK, error)
 
 	// Ejection operations
 
@@ -53,7 +53,12 @@ type Store interface {
 	SaveSocketUpdate(ctx context.Context, update *types.OperatorSocketUpdate) error
 
 	// ListSocketUpdates retrieves socket update events for an operator.
-	ListSocketUpdates(ctx context.Context, operatorID core.OperatorID, limit, offset int) ([]*types.OperatorSocketUpdate, error)
+	ListSocketUpdates(
+		ctx context.Context,
+		operatorID core.OperatorID,
+		limit int,
+		offset int,
+	) ([]*types.OperatorSocketUpdate, error)
 
 	// Block tracking
 
