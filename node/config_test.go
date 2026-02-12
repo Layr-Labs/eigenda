@@ -207,7 +207,10 @@ func TestECDSAKeyValidationSuccess(t *testing.T) {
 	}
 }
 
-func TestNewConfig_RateLimitConfigFromEnv(t *testing.T) {
+// setBaselineConfigEnv sets the minimum environment variables needed for NewConfig to succeed.
+// Individual tests can override specific variables before calling runNewConfig.
+func setBaselineConfigEnv(t *testing.T) {
+	t.Helper()
 	t.Setenv("NODE_HOSTNAME", "localhost")
 	t.Setenv("NODE_DISPERSAL_PORT", "9000")
 	t.Setenv("NODE_RETRIEVAL_PORT", "9001")
@@ -220,50 +223,172 @@ func TestNewConfig_RateLimitConfigFromEnv(t *testing.T) {
 	t.Setenv("NODE_CHURNER_URL", "http://localhost:1234")
 	t.Setenv("NODE_PUBLIC_IP_PROVIDER", "ipify")
 	t.Setenv("NODE_PUBLIC_IP_CHECK_INTERVAL", "0s")
-
-	// Minimal eth config required by common/geth flags (still required in test mode).
 	t.Setenv("NODE_CHAIN_RPC", "http://localhost:8545")
 	t.Setenv("NODE_PRIVATE_KEY", "0x00")
-
-	// Required KZG flags (the config reader doesn't validate paths here, but the CLI marks them required).
 	t.Setenv("NODE_G1_PATH", "/tmp/g1.point")
 	t.Setenv("NODE_CACHE_PATH", "/tmp/eigenda-srs-cache")
 	t.Setenv("NODE_SRS_ORDER", "1")
 	t.Setenv("NODE_SRS_LOAD", "1")
-
-	// Provide V2 ports for the node.
 	t.Setenv("NODE_V2_DISPERSAL_PORT", "32005")
 	t.Setenv("NODE_V2_RETRIEVAL_PORT", "32004")
 	t.Setenv("NODE_INTERNAL_V2_DISPERSAL_PORT", "32007")
 	t.Setenv("NODE_INTERNAL_V2_RETRIEVAL_PORT", "32006")
-
-	// Avoid BLS key file requirements by enabling test mode and providing a test private key.
 	t.Setenv("NODE_ENABLE_TEST_MODE", "true")
 	t.Setenv("NODE_TEST_PRIVATE_BLS", "deadbeef")
+}
 
-	// The config under test.
-	t.Setenv("NODE_DISPERSER_RATE_LIMIT_PER_SECOND", "0.5")
-	t.Setenv("NODE_DISPERSER_RATE_LIMIT_BURST", "10")
-
+// runNewConfig runs a cli.App that calls NewConfig and returns the config and any error.
+func runNewConfig(t *testing.T) (*Config, error) {
+	t.Helper()
 	app := cli.NewApp()
 	app.Flags = flags.Flags
 
 	var cfg *Config
+	var configErr error
 	app.Action = func(ctx *cli.Context) error {
 		c, err := NewConfig(ctx)
 		if err != nil {
+			configErr = err
 			return err
 		}
 		cfg = c
 		return nil
 	}
+	// app.Run itself may return an error wrapping configErr.
+	_ = app.Run([]string{os.Args[0]})
+	return cfg, configErr
+}
 
-	// Ensure we don't inherit CLI args from the test runner.
-	err := app.Run([]string{os.Args[0]})
+func TestNewConfig_RateLimitConfigFromEnv(t *testing.T) {
+	setBaselineConfigEnv(t)
+	t.Setenv("NODE_DISPERSER_RATE_LIMIT_PER_SECOND", "0.5")
+	t.Setenv("NODE_DISPERSER_RATE_LIMIT_BURST", "10")
+
+	cfg, err := runNewConfig(t)
 	assert.NoError(t, err)
 	if !assert.NotNil(t, cfg) {
 		return
 	}
 	assert.InDelta(t, 0.5, cfg.DisperserRateLimitPerSecond, 1e-9)
 	assert.Equal(t, 10, cfg.DisperserRateLimitBurst)
+}
+
+func TestNewConfig_InvalidTimeout(t *testing.T) {
+	setBaselineConfigEnv(t)
+	t.Setenv("NODE_TIMEOUT", "not-a-duration")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+}
+
+func TestNewConfig_InvalidQuorumID(t *testing.T) {
+	setBaselineConfigEnv(t)
+	t.Setenv("NODE_QUORUM_ID_LIST", "abc")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+}
+
+func TestNewConfig_ExpirationPollIntervalTooLow(t *testing.T) {
+	setBaselineConfigEnv(t)
+	t.Setenv("NODE_EXPIRATION_POLL_INTERVAL", "1")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "expiration-poll-interval")
+}
+
+func TestNewConfig_ReachabilityPollIntervalTooLow(t *testing.T) {
+	setBaselineConfigEnv(t)
+	t.Setenv("NODE_REACHABILITY_POLL_INTERVAL", "5")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "reachability-poll-interval")
+}
+
+func TestNewConfig_MissingV2DispersalPort(t *testing.T) {
+	setBaselineConfigEnv(t)
+	t.Setenv("NODE_V2_DISPERSAL_PORT", "")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "v2 dispersal port")
+}
+
+func TestNewConfig_MissingV2RetrievalPort(t *testing.T) {
+	setBaselineConfigEnv(t)
+	t.Setenv("NODE_V2_RETRIEVAL_PORT", "")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "v2 retrieval port")
+}
+
+func TestNewConfig_InvalidV2DispersalPort(t *testing.T) {
+	setBaselineConfigEnv(t)
+	t.Setenv("NODE_V2_DISPERSAL_PORT", "99999")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid v2 dispersal port")
+}
+
+func TestNewConfig_InvalidV2RetrievalPort(t *testing.T) {
+	setBaselineConfigEnv(t)
+	t.Setenv("NODE_V2_RETRIEVAL_PORT", "99999")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid v2 retrieval port")
+}
+
+func TestNewConfig_OnDemandMeterFuzzFactorZero(t *testing.T) {
+	setBaselineConfigEnv(t)
+	t.Setenv("NODE_ON_DEMAND_METER_FUZZ_FACTOR", "0")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "on-demand-meter-fuzz-factor")
+}
+
+func TestNewConfig_InternalPortDefaults(t *testing.T) {
+	setBaselineConfigEnv(t)
+	// Clear internal ports so they default to v2 ports.
+	t.Setenv("NODE_INTERNAL_V2_DISPERSAL_PORT", "")
+	t.Setenv("NODE_INTERNAL_V2_RETRIEVAL_PORT", "")
+
+	cfg, err := runNewConfig(t)
+	assert.NoError(t, err)
+	if !assert.NotNil(t, cfg) {
+		return
+	}
+	assert.Equal(t, cfg.V2DispersalPort, cfg.InternalV2DispersalPort)
+	assert.Equal(t, cfg.V2RetrievalPort, cfg.InternalV2RetrievalPort)
+}
+
+func TestNewConfig_BLSRemoteSignerMissingURL(t *testing.T) {
+	setBaselineConfigEnv(t)
+	// Disable test mode to hit the BLS remote signer branch.
+	t.Setenv("NODE_ENABLE_TEST_MODE", "false")
+	t.Setenv("NODE_BLS_REMOTE_SIGNER_ENABLED", "true")
+	t.Setenv("NODE_BLS_REMOTE_SIGNER_URL", "")
+	t.Setenv("NODE_BLS_PUBLIC_KEY_HEX", "")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "BLS remote signer URL")
+}
+
+func TestNewConfig_BLSLocalSignerMissingKey(t *testing.T) {
+	setBaselineConfigEnv(t)
+	// Disable test mode and remote signer.
+	t.Setenv("NODE_ENABLE_TEST_MODE", "false")
+	t.Setenv("NODE_BLS_REMOTE_SIGNER_ENABLED", "false")
+	t.Setenv("NODE_BLS_KEY_FILE", "")
+	t.Setenv("NODE_BLS_KEY_PASSWORD", "")
+
+	_, err := runNewConfig(t)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "BLS key file and password")
 }
