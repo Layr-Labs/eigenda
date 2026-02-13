@@ -132,12 +132,6 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CHURNER_HOSTNAME"),
 	}
-	BatcherHealthEndptFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-batcher-health-endpoint"),
-		Usage:    "Endpt of EigenDA Batcher Health Sidecar",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_BATCHER_HEALTH_ENDPOINT"),
-	}
 	/* Optional Flags*/
 	MetricsHTTPPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
@@ -145,13 +139,6 @@ var (
 		Required: false,
 		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_HTTP_PORT"),
-	}
-	DataApiServerVersionFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "dataapi-version"),
-		Usage:    "DataApi server version. Options are 1 and 2.",
-		Required: false,
-		Value:    1,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DATA_API_VERSION"),
 	}
 )
 
@@ -170,13 +157,11 @@ var requiredFlags = []cli.Flag{
 	EnableMetricsFlag,
 	DisperserHostnameFlag,
 	ChurnerHostnameFlag,
-	BatcherHealthEndptFlag,
 }
 
 var optionalFlags = []cli.Flag{
 	ServerModeFlag,
 	MetricsHTTPPort,
-	DataApiServerVersionFlag,
 	EigenDADirectoryFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,

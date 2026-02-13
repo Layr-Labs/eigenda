@@ -44,7 +44,6 @@ group "default" {
 group "all" {
   targets = [
     "node-group",
-    "batcher",
     "disperser",
     "encoder",
     "retriever",
@@ -69,7 +68,6 @@ group "node-group" {
 group "internal-release" {
   targets = [
     "node-internal",
-    "batcher-internal",
     "disperser-internal",
     "encoder-internal",
     "encoder-icicle-internal",
@@ -86,22 +84,6 @@ group "internal-release" {
 }
 
 # DISPERSER TARGETS
-target "batcher" {
-  context    = "."
-  dockerfile = "./Dockerfile"
-  target     = "batcher"
-  tags       = ["${REGISTRY}/${REPO}/batcher:${BUILD_TAG}"]
-}
-
-target "batcher-internal" {
-  inherits = ["batcher"]
-  tags     = [
-    "${REGISTRY}/eigenda-batcher:${BUILD_TAG}",
-    "${REGISTRY}/eigenda-batcher:${GIT_SHA}",
-    "${REGISTRY}/eigenda-batcher:sha-${GIT_SHORT_SHA}"
-  ]
-}
-
 target "disperser" {
   context    = "."
   dockerfile = "./Dockerfile"

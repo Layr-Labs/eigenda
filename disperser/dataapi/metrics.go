@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -43,7 +41,12 @@ type Metrics struct {
 	logger   logging.Logger
 }
 
-func NewMetrics(serverVersion uint, reg *prometheus.Registry, blobMetadataStore interface{}, httpPort string, logger logging.Logger) *Metrics {
+func NewMetrics(
+	reg *prometheus.Registry,
+	blobMetadataStore blobstorev2.MetadataStore,
+	httpPort string,
+	logger logging.Logger,
+) *Metrics {
 	namespace := "eigenda_dataapi"
 	if reg == nil {
 		panic("registry must not be nil")
@@ -51,23 +54,8 @@ func NewMetrics(serverVersion uint, reg *prometheus.Registry, blobMetadataStore 
 
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
-	switch serverVersion {
-	case 1:
-		if store, ok := blobMetadataStore.(*blobstore.BlobMetadataStore); ok {
-			reg.MustRegister(NewDynamoDBCollector(store, logger))
-		} else {
-			// Skip registering metrics if the store is not a blobstore.BlobMetadataStore
-			logger.Warn("blobMetadataStore is not a blobstore.BlobMetadataStore")
-		}
-	case 2:
-		if store, ok := blobMetadataStore.(blobstorev2.MetadataStore); ok {
-			reg.MustRegister(NewBlobMetadataStoreV2Collector(store, reg, logger))
-		} else {
-			// Skip registering metrics if the store is not a blobstorev2.MetadataStore
-			logger.Warn("blobMetadataStore is not a blobstorev2.MetadataStore")
-		}
-	default:
-		panic(fmt.Sprintf("unsupported server version %d", serverVersion))
+	if blobMetadataStore != nil {
+		reg.MustRegister(NewBlobMetadataStoreV2Collector(blobMetadataStore, reg, logger))
 	}
 	metrics := &Metrics{
 		NumRequests: promauto.With(reg).NewCounterVec(
@@ -239,43 +227,6 @@ func (g *Metrics) Start(ctx context.Context) {
 		err := http.ListenAndServe(addr, mux)
 		log.Error("Prometheus server failed", "err", err)
 	}()
-}
-
-type DynamoDBCollector struct {
-	blobMetadataStore *blobstore.BlobMetadataStore
-	blobStatusMetric  *prometheus.Desc
-	logger            logging.Logger
-}
-
-func NewDynamoDBCollector(blobMetadataStore *blobstore.BlobMetadataStore, logger logging.Logger) *DynamoDBCollector {
-	return &DynamoDBCollector{
-		blobMetadataStore: blobMetadataStore,
-		blobStatusMetric: prometheus.NewDesc("dynamodb_blob_metadata_status_count",
-			"Number of blobs with specific status in DynamoDB",
-			[]string{"status"},
-			nil,
-		),
-		logger: logger,
-	}
-}
-
-func (collector *DynamoDBCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- collector.blobStatusMetric
-}
-
-func (collector *DynamoDBCollector) Collect(ch chan<- prometheus.Metric) {
-	count, err := collector.blobMetadataStore.GetBlobMetadataCountByStatus(context.Background(), disperser.Processing)
-	if err != nil {
-		collector.logger.Error("failed to get count of blob metadata by status", "err", err)
-		return
-	}
-
-	ch <- prometheus.MustNewConstMetric(
-		collector.blobStatusMetric,
-		prometheus.GaugeValue,
-		float64(count),
-		disperser.Processing.String(),
-	)
 }
 
 // BlobStatusMetrics holds the metrics for a specific blob status
