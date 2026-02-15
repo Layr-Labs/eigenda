@@ -733,6 +733,7 @@ var optionalFlags = []cli.Flag{
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
+	Flags = append(Flags, deprecatedFlags...)
 	Flags = append(Flags, kzgflags.CLIFlags(EnvVarPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(EnvVarPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(EnvVarPrefix, FlagPrefix)...)
