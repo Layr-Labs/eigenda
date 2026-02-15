@@ -42,7 +42,7 @@ var (
 		Usage:  deprecatedUsage,
 		EnvVar: common.PrefixEnvVar(EnvVarPrefix, "DISABLE_DISPERSAL_AUTHENTICATION"),
 	}
-	DeprecatedLevelDBDisableSeeksCompactionV1Flag = cli.BoolFlag{
+	DeprecatedLevelDBDisableSeeksCompactionV1Flag = cli.BoolTFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "leveldb-disable-seeks-compaction-v1"),
 		Usage:  deprecatedUsage,
 		EnvVar: common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_DISABLE_SEEKS_COMPACTION_V1"),
@@ -52,7 +52,7 @@ var (
 		Usage:  deprecatedUsage,
 		EnvVar: common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V1"),
 	}
-	DeprecatedEnablePaymentValidationFlag = cli.BoolFlag{
+	DeprecatedEnablePaymentValidationFlag = cli.BoolTFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "enable-payment-validation"),
 		Usage:  deprecatedUsage,
 		EnvVar: common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PAYMENT_VALIDATION"),

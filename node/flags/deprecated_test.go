@@ -100,6 +100,8 @@ func TestDeprecatedFlags_UsageText(t *testing.T) {
 			assert.Equal(t, deprecatedUsage, flag.Usage, "flag %s should have deprecated usage", flag.Name)
 		case cli.BoolFlag:
 			assert.Equal(t, deprecatedUsage, flag.Usage, "flag %s should have deprecated usage", flag.Name)
+		case cli.BoolTFlag:
+			assert.Equal(t, deprecatedUsage, flag.Usage, "flag %s should have deprecated usage", flag.Name)
 		default:
 			t.Errorf("unexpected flag type for %v", f)
 		}
