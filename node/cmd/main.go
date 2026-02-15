@@ -45,6 +45,7 @@ func main() {
 	app.Description = "Service for receiving and storing encoded blobs from disperser"
 
 	app.Action = func(ctx *cli.Context) error {
+		flags.CheckDeprecatedCLIFlags(ctx)
 		return NodeMain(ctx, softwareVersion)
 	}
 	err := app.Run(os.Args)
