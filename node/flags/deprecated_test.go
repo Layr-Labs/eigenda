@@ -86,9 +86,9 @@ func TestDeprecatedFlags_AllFlagsSetViaCLI(t *testing.T) {
 	}
 	runWithFlags(t, deprecatedFlags, args, func(ctx *cli.Context) {
 		set := getSetDeprecatedCLIFlags(ctx)
-		assert.Len(t, set, len(deprecatedFlagNames))
-		for _, name := range deprecatedFlagNames {
-			assert.Contains(t, set, name)
+		assert.Len(t, set, len(deprecatedFlags))
+		for _, f := range deprecatedFlags {
+			assert.Contains(t, set, f.GetName())
 		}
 	})
 }

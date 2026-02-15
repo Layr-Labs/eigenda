@@ -7,7 +7,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-const deprecatedUsage = "Deprecated v1 flag. This flag will be ignored"
+const deprecatedUsage = "Deprecated v1 flag. This flag will be ignored."
 
 // Deprecated v1 flags. These flags are no longer functional but are kept
 // to avoid breaking users who haven't yet removed them from their configurations.
@@ -71,19 +71,6 @@ var deprecatedFlags = []cli.Flag{
 	DeprecatedEnablePaymentValidationFlag,
 }
 
-// deprecatedFlagNames contains the CLI names of all deprecated flags for use in CheckDeprecatedCLIFlags.
-var deprecatedFlagNames = []string{
-	DeprecatedDispersalPortFlag.Name,
-	DeprecatedRetrievalPortFlag.Name,
-	DeprecatedInternalDispersalPortFlag.Name,
-	DeprecatedInternalRetrievalPortFlag.Name,
-	DeprecatedRuntimeModeFlag.Name,
-	DeprecatedDisableDispersalAuthenticationFlag.Name,
-	DeprecatedLevelDBDisableSeeksCompactionV1Flag.Name,
-	DeprecatedLevelDBEnableSyncWritesV1Flag.Name,
-	DeprecatedEnablePaymentValidationFlag.Name,
-}
-
 // CheckDeprecatedCLIFlags logs a warning for each deprecated flag that has been set.
 func CheckDeprecatedCLIFlags(ctx *cli.Context) {
 	for _, name := range getSetDeprecatedCLIFlags(ctx) {
@@ -95,7 +82,8 @@ func CheckDeprecatedCLIFlags(ctx *cli.Context) {
 // getSetDeprecatedCLIFlags returns the names of deprecated flags that have been explicitly set.
 func getSetDeprecatedCLIFlags(ctx *cli.Context) []string {
 	var set []string
-	for _, name := range deprecatedFlagNames {
+	for _, f := range deprecatedFlags {
+		name := f.GetName()
 		if ctx.GlobalIsSet(name) {
 			set = append(set, name)
 		}
