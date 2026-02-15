@@ -1,7 +1,6 @@
 package flags
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -155,9 +154,9 @@ func TestDeprecatedFlags_DoNotBreakApp(t *testing.T) {
 		t.Setenv(k, v)
 	}
 	// Clear any stale env vars for the deprecated flags being tested via CLI.
-	os.Unsetenv("NODE_DISPERSAL_PORT")
-	os.Unsetenv("NODE_RUNTIME_MODE")
-	os.Unsetenv("NODE_DISABLE_DISPERSAL_AUTHENTICATION")
+	t.Setenv("NODE_DISPERSAL_PORT", "")
+	t.Setenv("NODE_RUNTIME_MODE", "")
+	t.Setenv("NODE_DISABLE_DISPERSAL_AUTHENTICATION", "")
 
 	app := cli.NewApp()
 	app.Flags = allFlags
