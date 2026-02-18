@@ -13,6 +13,11 @@ library EigenDATypesV2 {
         address disperserAddress;
     }
 
+    struct DisperserInfoV2 {
+        address disperser;
+        string relayURL;
+    }
+
     struct BlobInclusionInfo {
         BlobCertificate blobCertificate;
         uint32 blobIndex;
