@@ -17,6 +17,12 @@ contract EigenDARelayRegistry is OwnableUpgradeable, EigenDARelayRegistryStorage
         _transferOwnership(_initialOwner);
     }
 
+    /// @notice Reinitializer to set a new owner during proxy upgrade, replacing the lost EOA owner.
+    /// @param _newOwner The address of the new owner.
+    function initializeV2(address _newOwner) external reinitializer(2) {
+        _transferOwnership(_newOwner);
+    }
+
     function addRelayInfo(EigenDATypesV2.RelayInfo memory relayInfo) external onlyOwner returns (uint32) {
         relayKeyToInfo[nextRelayKey] = relayInfo;
         emit RelayAdded(relayInfo.relayAddress, nextRelayKey, relayInfo.relayURL);

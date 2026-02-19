@@ -17,6 +17,12 @@ contract EigenDADisperserRegistry is OwnableUpgradeable, EigenDADisperserRegistr
         _transferOwnership(_initialOwner);
     }
 
+    /// @notice Reinitializer to set a new owner during proxy upgrade, replacing the lost EOA owner.
+    /// @param _newOwner The address of the new owner.
+    function initializeV2(address _newOwner) external reinitializer(2) {
+        _transferOwnership(_newOwner);
+    }
+
     function setDisperserInfo(uint32 _disperserKey, EigenDATypesV2.DisperserInfo memory _disperserInfo)
         external
         onlyOwner
