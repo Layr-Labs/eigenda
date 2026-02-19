@@ -13,6 +13,7 @@ Audit reports for EigenDA Proxy published in the `docs` folder: [https://github.
 ### EigenDA
 | Date | Report Link |
 | ------- | ----------- |
+| 202505 | [LittDB Audit](https://github.com/Layr-Labs/eigenda/blob/master/docs/audits/ChainLight_EigenDA_LittDB_Security_Audit_Report_Rev_1.1.pdf) 
 | 202503 | [pdf](https://github.com/Layr-Labs/eigenda/blob/master/docs/audits/Sigma_Prime_EigenDA_Blazar_Security_Assessment_Report.pdf) |
 | 202404 | [pdf](https://github.com/Layr-Labs/eigenda/blob/master/docs/audits/Sigma_Prime_EigenDA_Offchain_Security_Assessment_Report.pdf) |
 | 202404 | [pdf](https://github.com/Layr-Labs/eigenda/blob/master/docs/audits/spearbit-report-generator-eigenlayer-vciso-final.pdf) |
@@ -21,7 +22,6 @@ Audit reports for EigenDA Proxy published in the `docs` folder: [https://github.
 | Date | Release (Commit) Audited | Report Link | Findings Addressed in Release |
 | ------- | ----------- | ----------- | ----------- |
 | 202501 | v1.6.1 (9e1b746)	| [pdf](https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/docs/audits/Sigma_Prime_EigenDA_Proxy_Security_Assessment_Report.pdf) | v1.6.2 |
-
 
 ## Reporting a Vulnerability
 
