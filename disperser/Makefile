@@ -1,37 +1,13 @@
 build:
 # We build the apiserver individually to change its name to "server" instead of "apiserver"
 	go build -o ./bin/server ./cmd/apiserver
-# All the other binaries (dataapi, encoder, batcher, etc) are then built together.
+# All the other binaries (dataapi, encoder, etc) are then built together.
 	go build -o ./bin ./...
 
 clean:
 	rm -rf ./bin
 
 # Below are example run commands. They are not maintained so likely to be out of date.
-
-run_batcher: build
-	./bin/batcher \
-	--batcher.pull-interval 10s \
-	--batcher.bls-operator-state-retriever 0x9d4454B023096f34B160D6B654540c56A1F81688 \
-	--batcher.eigenda-service-manager 0x67d269191c92Caf3cD7723F116c85e6E9bf55933 \
-	--chain.rpc http://localhost:8545 \
-	--chain.private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-	--batcher.aws.region us-east-1 \
-	--batcher.aws.access-key-id xyz \
-	--batcher.aws.secret-access-key hello \
-	--batcher.aws.endpoint-url http://0.0.0.0:4566 \
-	--batcher.s3-bucket-name test-eigenda-blobstore \
-	--batcher.dynamodb-table-name test-BlobMetadata \
-	--encoder-socket 34000 \
-	--batcher.enable-metrics \
-	--batcher.graph-url false \
-	--batcher.batch-size-limit 10000 \
-	--batcher.use-graph false \
-	--batcher.srs-order 3000 \
-	--encoding-timeout 10s \
-	--attestation-timeout 11s \
-	--chain-read-timeout 12s \
-	--chain-write-timeout 13s
 
 run_server: build
 	./bin/server \

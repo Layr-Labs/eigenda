@@ -73,7 +73,6 @@ var (
 
 	dynamoClient dynamodb.Client
 
-	serverVersion     = uint(2)
 	mockPrometheusApi = &prommock.MockPrometheusApi{}
 	prometheusClient  = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
 	mockSubgraphApi   = &subgraphmock.MockSubgraphApi{}
@@ -198,7 +197,7 @@ func setup(_ *testing.M) {
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
-	metrics := dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), blobMetadataStore, "9001", logger)
+	metrics := dataapi.NewMetrics(prometheus.NewRegistry(), blobMetadataStore, "9001", logger)
 	testDataApiServerV2, err = serverv2.NewServerV2(
 		config, blobMetadataStore, prometheusClient, subgraphClient,
 		mockTx, mockChainState, mockIndexedChainState, logger, metrics)
@@ -1516,7 +1515,7 @@ func TestFetchBatchFeed(t *testing.T) {
 	testDataApiServerV2, err := serverv2.NewServerV2(
 		config, blobMetadataStore, prometheusClient, subgraphClient,
 		mockTx, mockChainState, mockIndexedChainState, logger,
-		dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
+		dataapi.NewMetrics(prometheus.NewRegistry(), nil, "9001", logger))
 	require.NoError(t, err)
 
 	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
@@ -1996,7 +1995,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	testDataApiServerV2, err := serverv2.NewServerV2(
 		config, blobMetadataStore, prometheusClient, subgraphClient,
 		mockTx, mockChainState, mockIndexedChainState, logger,
-		dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
+		dataapi.NewMetrics(prometheus.NewRegistry(), nil, "9001", logger))
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
@@ -2295,7 +2294,7 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	testDataApiServerV2, err := serverv2.NewServerV2(
 		config, blobMetadataStore, prometheusClient, subgraphClient,
 		mockTx, mockChainState, mockIcs, logger,
-		dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
+		dataapi.NewMetrics(prometheus.NewRegistry(), nil, "9001", logger))
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)

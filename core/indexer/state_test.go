@@ -128,7 +128,7 @@ func mustMakeChainState(
 	logger logging.Logger,
 ) *coreindexer.IndexedChainState {
 	t.Helper()
-	client, rpcClient := mustMakeTestClients(t, env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
+	client, rpcClient := mustMakeTestClients(t, env, env.Churner.CHURNER_PRIVATE_KEY, logger)
 
 	tx, err := eth.NewWriter(logger, client, env.EigenDA.OperatorStateRetriever, env.EigenDA.ServiceManager)
 	require.NoError(t, err, "failed to create writer")
