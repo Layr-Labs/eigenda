@@ -791,3 +791,73 @@ func TestKMSSignerWithDefaultConfig(t *testing.T) {
 	// This will fail in test environment but we're testing the code path
 	require.Error(t, err, "should fail to load default AWS config in test environment")
 }
+
+func TestKMSRegionOverride(t *testing.T) {
+	ctx := t.Context()
+	_ = setupLocalStack(t)
+
+	keyManager := kms.New(kms.Options{
+		Region:       region,
+		BaseEndpoint: aws.String(localstackHost),
+	})
+
+	keyID, _ := createTestKMSKey(t, ctx, keyManager)
+
+	// Test that KMSRegion overrides Region for KMS operations
+	signer, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:    "us-west-2", // This should be ignored for KMS
+		KMSRegion: region,      // This should be used for KMS
+		Endpoint:  localstackHost,
+		KeyID:     keyID,
+	})
+	require.NoError(t, err, "should create KMS signer with region override")
+
+	kmsSigner, ok := signer.(*kmsRequestSigner)
+	require.True(t, ok, "should be kmsRequestSigner type")
+	require.NotNil(t, kmsSigner.kmsClient, "KMS client should be initialized")
+
+	// Test signing with KMS region override
+	rand := random.NewTestRandom()
+	request := auth.RandomStoreChunksRequest(rand)
+	request.Signature = nil
+
+	signature, err := signer.SignStoreChunksRequest(ctx, request)
+	require.NoError(t, err, "should sign successfully with KMS region override")
+	require.NotNil(t, signature, "signature should not be nil")
+	require.NotEmpty(t, signature, "signature should not be empty")
+}
+
+func TestKMSRegionDefault(t *testing.T) {
+	ctx := t.Context()
+	_ = setupLocalStack(t)
+
+	keyManager := kms.New(kms.Options{
+		Region:       region,
+		BaseEndpoint: aws.String(localstackHost),
+	})
+
+	keyID, _ := createTestKMSKey(t, ctx, keyManager)
+
+	// Test that Region is used when KMSRegion is not specified
+	signer, err := NewDispersalRequestSigner(ctx, DispersalRequestSignerConfig{
+		Region:   region,
+		Endpoint: localstackHost,
+		KeyID:    keyID,
+		// KMSRegion not specified - should use Region
+	})
+	require.NoError(t, err, "should create KMS signer using default Region")
+
+	kmsSigner, ok := signer.(*kmsRequestSigner)
+	require.True(t, ok, "should be kmsRequestSigner type")
+	require.NotNil(t, kmsSigner.kmsClient, "KMS client should be initialized")
+
+	// Test signing when KMSRegion is not specified
+	rand := random.NewTestRandom()
+	request := auth.RandomStoreChunksRequest(rand)
+	request.Signature = nil
+
+	signature, err := signer.SignStoreChunksRequest(ctx, request)
+	require.NoError(t, err, "should sign successfully using default Region")
+	require.NotNil(t, signature, "signature should not be nil")
+	require.NotEmpty(t, signature, "signature should not be empty")
+}
