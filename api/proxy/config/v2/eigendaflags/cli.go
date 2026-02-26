@@ -186,10 +186,10 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		&cli.UintFlag{
 			Name: BlobParamsVersionFlagName,
 			Usage: `Blob params version used when dispersing. This refers to a global version maintained by EigenDA
-governance and is injected in the BlobHeader before dispersing. Currently only supports (0).`,
+governance and is injected in the BlobHeader before dispersing.`,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "BLOB_PARAMS_VERSION")},
 			Category: category,
-			Value:    uint(0),
+			Value:    uint(1),
 			Required: false,
 		},
 		&cli.StringFlag{

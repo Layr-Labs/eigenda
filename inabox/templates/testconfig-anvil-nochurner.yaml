@@ -18,7 +18,11 @@ eigenda:
 # NOTE: This uses a different blob version configuration than live deployments.
 # Live deployments typically use higher coding rates (e.g., 8) with more chunks and operators.
 # TODO: Investigate the revert that occurs when trying to use codingRate 2.
+# Two blob versions are registered: version 0 for backward compatibility, version 1 as the new default.
 blobVersions:
+  - codingRate: 8
+    numChunks: 16
+    maxNumOperators: 3
   - codingRate: 8
     numChunks: 16
     maxNumOperators: 3
