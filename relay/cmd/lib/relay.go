@@ -22,6 +22,9 @@ import (
 	"github.com/urfave/cli"
 )
 
+// This is the legacy entrypoint for the relay. It is retained for backwards compatibility with the blobapi.
+// Once the blobapi config is updated to the documented/verifiable config framework, this can be removed.
+// TODO(iquidus): remove this function once blobapi is updated to use the documented config framework.
 // RunRelay is the entrypoint for the relay.
 func RunRelay(cliCtx *cli.Context) error {
 	config, err := NewConfig(cliCtx)
@@ -96,12 +99,15 @@ func RunRelay(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to create listener on %s: %w", addr, err)
 	}
 
+	cfg := relay.DefaultRelayConfig()
+	cfg.PopulateFromLegacy(config.RelayConfig)
+
 	// Create server
 	server, err := relay.NewServer(
 		ctx,
 		metricsRegistry,
 		logger,
-		&config.RelayConfig,
+		cfg,
 		metadataStore,
 		blobStore,
 		chunkReader,

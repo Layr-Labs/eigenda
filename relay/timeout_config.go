@@ -5,22 +5,21 @@ import "time"
 // TimeoutConfig encapsulates the timeout configuration for the relay server.
 type TimeoutConfig struct {
 
-	// The maximum time permitted for a GetChunks GRPC to complete. If zero then no timeout is enforced.
+	// Timeout for GetChunks()
 	GetChunksTimeout time.Duration
 
-	// The maximum time permitted for a GetBlob GRPC to complete. If zero then no timeout is enforced.
+	// Timeout for GetBlob()
 	GetBlobTimeout time.Duration
 
-	// The maximum time permitted for a single request to the metadata store to fetch the metadata
-	// for an individual blob.
+	// Timeout for internal metadata fetch
 	InternalGetMetadataTimeout time.Duration
 
-	// The maximum time permitted for a single request to the blob store to fetch a blob.
+	// Timeout for internal blob fetch
 	InternalGetBlobTimeout time.Duration
 
-	// The maximum time permitted for a single request to the chunk store to fetch chunk proofs.
+	// Timeout for internal proofs fetch
 	InternalGetProofsTimeout time.Duration
 
-	// The maximum time permitted for a single request to the chunk store to fetch chunk coefficients.
+	// Timeout for internal coefficients fetch
 	InternalGetCoefficientsTimeout time.Duration
 }

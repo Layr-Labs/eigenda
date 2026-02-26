@@ -5,61 +5,52 @@ type Config struct {
 
 	// Blob rate limiting
 
-	// MaxGetBlobOpsPerSecond is the maximum permitted number of GetBlob operations per second. Default is
-	// 1024.
+	// Max number of GetBlob operations per second
 	MaxGetBlobOpsPerSecond float64
-	// The burstiness of the MaxGetBlobOpsPerSecond rate limiter. This is the maximum burst size that happen within
-	// a short time window. Default is 1024.
+
+	// Burstiness of the GetBlob rate limiter
 	GetBlobOpsBurstiness int
 
-	// MaxGetBlobBytesPerSecond is the maximum bandwidth, in bytes, that GetBlob operations are permitted
-	// to consume per second. Default is 20MiB/s.
+	// Max bandwidth for GetBlob operations in bytes per second
 	MaxGetBlobBytesPerSecond float64
-	// The burstiness of the MaxGetBlobBytesPerSecond rate limiter. This is the maximum burst size that happen within
-	// a short time window. Default is 20MiB.
+
+	// Burstiness of the GetBlob bandwidth rate limiter
 	GetBlobBytesBurstiness int
 
-	// MaxConcurrentGetBlobOps is the maximum number of concurrent GetBlob operations that are permitted.
-	// This is in addition to the rate limits. Default is 1024.
+	// Max number of concurrent GetBlob operations
 	MaxConcurrentGetBlobOps int
 
 	// Chunk rate limiting
 
-	// MaxGetChunkOpsPerSecond is the maximum permitted number of GetChunk operations per second. Default is
-	// 1024.
+	// Max number of GetChunk operations per second
 	MaxGetChunkOpsPerSecond float64
-	// The burstiness of the MaxGetChunkOpsPerSecond rate limiter. This is the maximum burst size that happen within
-	// a short time window. Default is 1024.
+
+	// Burstiness of the GetChunk rate limiter
 	GetChunkOpsBurstiness int
 
-	// MaxGetChunkBytesPerSecond is the maximum bandwidth, in bytes, that GetChunk operations are permitted
-	// to consume per second. Default is 20MiB/s.
+	// Max bandwidth for GetChunk operations in bytes per second
 	MaxGetChunkBytesPerSecond float64
-	// The burstiness of the MaxGetChunkBytesPerSecond rate limiter. This is the maximum burst size that happen within
-	// a short time window. Default is 20MiB.
+
+	// Burstiness of the GetChunk bandwidth rate limiter
 	GetChunkBytesBurstiness int
 
-	// MaxConcurrentGetChunkOps is the maximum number of concurrent GetChunk operations that are permitted.
-	// Default is 1024.
+	// Max number of concurrent GetChunk operations
 	MaxConcurrentGetChunkOps int
 
 	// Client rate limiting for GetChunk operations
 
-	// MaxGetChunkOpsPerSecondClient is the maximum permitted number of GetChunk operations per second for a single
-	// client. Default is 8.
+	// Max number of GetChunk operations per second per client
 	MaxGetChunkOpsPerSecondClient float64
-	// The burstiness of the MaxGetChunkOpsPerSecondClient rate limiter. This is the maximum burst size that happen
-	// within a short time window. Default is 8.
+
+	// Burstiness of the GetChunk rate limiter per client
 	GetChunkOpsBurstinessClient int
 
-	// MaxGetChunkBytesPerSecondClient is the maximum bandwidth, in bytes, that GetChunk operations are permitted
-	// to consume per second. Default is 2MiB/s.
+	// Max bandwidth for GetChunk operations in bytes per second per client
 	MaxGetChunkBytesPerSecondClient float64
-	// The burstiness of the MaxGetChunkBytesPerSecondClient rate limiter. This is the maximum burst size that happen
-	// within a short time window. Default is 2MiB.
+
+	// Burstiness of the GetChunk bandwidth rate limiter per client
 	GetChunkBytesBurstinessClient int
 
-	// MaxConcurrentGetChunkOpsClient is the maximum number of concurrent GetChunk operations that are permitted.
-	// Default is 1.
+	// Max number of concurrent GetChunk operations per client
 	MaxConcurrentGetChunkOpsClient int
 }
