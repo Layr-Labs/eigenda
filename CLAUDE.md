@@ -53,6 +53,7 @@ CLAUDE.md file *in the relevant subdirectory*.
 |--------------|-----------------------------------------------------|
 | ./core       | Core business logic and components of EigenDA       |
 | ./docs       | Documentation files describing the EigenDA system.  |
+| ./test       | Testing utilities and comprehensive testing guidelines. |
 
 ---
 
@@ -65,9 +66,11 @@ CLAUDE.md file *in the relevant subdirectory*.
 2. If any AI is used to assist with writing tests, its involvement must be limited to the following tasks:
    - Evaluating existing coverage
    - Generating small bits of test logic, which must be carefully scrutinized by a human before being accepted.
+   - Evaluating if tests follow the repository's testing guidelines and best practices.
    USE WITH CAUTION.
 3. Unit tests should be put in `*_test.go` files in same package.
 4. Use `testify` for assertions.
+5. **Follow idiomatic Go testing patterns**: See @test/CLAUDE.md for comprehensive testing guidelines and best practices.
 
 ---
 
