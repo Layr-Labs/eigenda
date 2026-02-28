@@ -654,8 +654,6 @@ func (e *EncodingStreamer) transitionBlobToDispersing(ctx context.Context, metad
 		e.logger.Error("error marking blob as dispersing", "err", err, "blobKey", blobKey.String())
 		return err
 	}
-	// remove encoded blob from storage so we don't disperse it again
-	e.RemoveEncodedBlob(metadata)
 	return nil
 }
 
