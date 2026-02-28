@@ -11,3 +11,6 @@
 	path = contracts/lib/eigenlayer-middleware
 	url = https://github.com/Layr-Labs/eigenlayer-middleware
 	branch = m2-mainnet-fixes
+[submodule "contracts/lib/zeus-templates"]
+	path = contracts/lib/zeus-templates
+	url = https://github.com/Layr-labs/zeus-templates

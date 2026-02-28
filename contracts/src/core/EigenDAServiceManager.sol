@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
+import {Pausable} from "src/mixins/Pausable.sol";
 import {
     IPauserRegistry
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
@@ -58,7 +58,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         address _initialOwner,
         address[] memory _batchConfirmers,
         address _rewardsInitiator
-    ) public initializer {
+    ) public reinitializer(2) {
         _initializePauser(_pauserRegistry, _initialPausedStatus);
         _transferOwnership(_initialOwner);
         _setRewardsInitiator(_rewardsInitiator);
