@@ -21,11 +21,12 @@ make compile
 
 ## Generate Golang Bindings
 
-To generate golang ABI bindings, run the following (which will compile the contracts as a dependency):
+To generate golang ABI bindings (both ABI V1 and V2), run the following (which will compile the contracts as a dependency):
 ```
 make bindings
-
 ```
+
+The `generate-bindings.sh` script specifies which contracts to build bindings for. It must be manually updated whenever contract targets are added or removed.
 
 ### Testing
 Tests are all written using foundry and can be ran via the following commands:
@@ -36,3 +37,7 @@ or
 ```
 forge test -v
 ```
+
+## (ERC-7201) Namespaced Storage Schemas
+
+Some EigenDA core contracts implement the [ERC-7201](https://eips.ethereum.org/EIPS/eip-7201) namespaced storage standard. Contracts using this standard follow the namespace pattern based on the storage library name, e.g a library named `ConfigRegistryStorage` would have a namespaced storage ID preimage of `config.registry.storage`.
