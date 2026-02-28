@@ -141,6 +141,9 @@ live-tests-v1:
 semver:
 	echo "${SEMVER}"
 
+release-build:
+	GORELEASER_PREVIOUS_TAG=v0.0.0 GORELEASER_CURRENT_TAG=latest goreleaser release --skip publish --clean --snapshot
+
 ##### Proxies to other local Makefiles #####
 mdbook-serve:
 	$(MAKE) -C docs/spec serve

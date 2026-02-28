@@ -158,8 +158,16 @@ FROM alpine:3.22 AS node
 COPY --from=node-builder /app/node/bin/node /usr/local/bin
 ENTRYPOINT ["node"]
 
+FROM alpine:3.22 AS node-goreleaser
+COPY node /usr/local/bin
+ENTRYPOINT ["node"]
+
 FROM alpine:3.22 AS nodeplugin
 COPY --from=node-plugin-builder /app/node/bin/nodeplugin /usr/local/bin
+ENTRYPOINT ["nodeplugin"]
+
+FROM alpine:3.22 AS nodeplugin-goreleaser
+COPY nodeplugin /usr/local/bin
 ENTRYPOINT ["nodeplugin"]
 
 FROM alpine:3.22 AS controller
@@ -190,6 +198,14 @@ COPY --from=proxy-builder /app/api/proxy/bin/eigenda-proxy .
 # All SRS points are now embedded into the binary, but we keep g1.point here
 # because it is needed for V1 codepaths that need to dynamically read single srs points from the file.
 COPY --from=proxy-builder /app/api/proxy/resources/g1.point /app/resources/g1.point
+# default ports for data and metrics
+EXPOSE 3100 7300
+ENTRYPOINT ["./eigenda-proxy"]
+
+FROM alpine:3.22 AS proxy-goreleaser
+WORKDIR /app
+COPY eigenda-proxy .
+COPY api/proxy/resources/*.point resources/
 # default ports for data and metrics
 EXPOSE 3100 7300
 ENTRYPOINT ["./eigenda-proxy"]
