@@ -40,7 +40,8 @@ type EigenDAContract struct {
 	OperatorStateRetriever string `json:"operatorStateRetriever"`
 	BlsApkRegistry         string `json:"blsApkRegistry"`
 	RegistryCoordinator    string `json:"registryCoordinator"`
-	CertVerifierLegacy     string `json:"eigenDALegacyCertVerifier"`
+	CertVerifierLegacyV2   string `json:"eigenDALegacyCertVerifierV2"`
+	CertVerifierLegacyV3   string `json:"eigenDALegacyCertVerifierV3"`
 	CertVerifier           string `json:"eigenDACertVerifier"`
 	CertVerifierRouter     string `json:"eigenDACertVerifierRouter"`
 }

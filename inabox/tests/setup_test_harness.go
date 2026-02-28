@@ -157,6 +157,17 @@ func setupVerifiersForContext(testCtx *TestHarness, infra *InfrastructureHarness
 		return fmt.Errorf("failed to create static cert verifier: %w", err)
 	}
 
+	staticAddressProviderV3 := verification.NewStaticCertVerifierAddressProvider(
+		gethcommon.HexToAddress(infra.TestConfig.EigenDA.CertVerifierLegacyV3))
+
+	testCtx.StaticCertVerifierV3, err = verification.NewCertVerifier(
+		infra.Logger,
+		testCtx.EthClient,
+		staticAddressProviderV3)
+	if err != nil {
+		return fmt.Errorf("failed to create legacy v3 cert verifier: %w", err)
+	}
+
 	testCtx.RouterCertVerifier, err = verification.NewCertVerifier(
 		infra.Logger,
 		testCtx.EthClient,

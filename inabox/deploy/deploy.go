@@ -98,7 +98,8 @@ func (env *Config) deployEigenDAContracts() error {
 		OperatorStateRetriever: result.EigenDA.OperatorStateRetriever,
 		BlsApkRegistry:         result.EigenDA.BlsApkRegistry,
 		RegistryCoordinator:    result.EigenDA.RegistryCoordinator,
-		CertVerifierLegacy:     result.EigenDA.CertVerifierLegacy,
+		CertVerifierLegacyV2:   result.EigenDA.CertVerifierLegacyV2,
+		CertVerifierLegacyV3:   result.EigenDA.CertVerifierLegacyV3,
 		CertVerifier:           result.EigenDA.CertVerifier,
 		CertVerifierRouter:     result.EigenDA.CertVerifierRouter,
 	}

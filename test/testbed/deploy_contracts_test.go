@@ -35,7 +35,8 @@ func TestDeployWithAnvilContainer(t *testing.T) {
 	require.NotEmpty(t, result.EigenDA.OperatorStateRetriever)
 	require.NotEmpty(t, result.EigenDA.BlsApkRegistry)
 	require.NotEmpty(t, result.EigenDA.RegistryCoordinator)
-	require.NotEmpty(t, result.EigenDA.CertVerifierLegacy)
+	require.NotEmpty(t, result.EigenDA.CertVerifierLegacyV2)
+	require.NotEmpty(t, result.EigenDA.CertVerifierLegacyV3)
 	require.NotEmpty(t, result.EigenDA.CertVerifier)
 	require.NotEmpty(t, result.EigenDA.CertVerifierRouter)
 
