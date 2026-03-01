@@ -168,7 +168,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 			ctx,
 			&controller.GetValidatorSigningRateDumpRequest{
 				StartTimestamp: uint64(startTime.Unix()),
-			})
+			},
+			grpc.MaxCallRecvMsgSize(32*1024*1024),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("GetValidatorSigningRateDump RPC failed: %w", err)
 		}
