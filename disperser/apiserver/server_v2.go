@@ -488,6 +488,10 @@ func (s *DispersalServerV2) GetValidatorSigningRate(
 	request *pb.GetValidatorSigningRateRequest,
 ) (*pb.GetValidatorSigningRateReply, error) {
 
+	if len(request.GetValidatorId()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "validator id must be non-empty")
+	}
+
 	validatorId := core.OperatorID(request.GetValidatorId())
 
 	signingRate, err := s.signingRateTracker.GetValidatorSigningRate(
