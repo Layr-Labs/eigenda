@@ -488,8 +488,8 @@ func (s *DispersalServerV2) GetValidatorSigningRate(
 	request *pb.GetValidatorSigningRateRequest,
 ) (*pb.GetValidatorSigningRateReply, error) {
 
-	if len(request.GetValidatorId()) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "validator id must be non-empty")
+	if len(request.GetValidatorId()) != 32 {
+		return nil, fmt.Errorf("validator id must be 32 bytes")
 	}
 
 	validatorId := core.OperatorID(request.GetValidatorId())
