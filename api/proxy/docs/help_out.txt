@@ -129,6 +129,11 @@ GLOBAL OPTIONS:
           = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted
           (causes startup error).
    
+    --eigenda.v2.put-retry-delay-increment value (default: 1s)                      ($EIGENDA_PROXY_EIGENDA_V2_PUT_RETRY_DELAY_INCREMENT)
+          Base time unit for linear retry backoff on blob dispersal retries. Applied only
+          to rate-limit related errors (ResourceExhausted, debit rejection). On the Nth
+          consecutive rate-limit retry, sleeps N * this value.
+   
     --eigenda.v2.relay-connection-pool-size value (default: 1)                       ($EIGENDA_PROXY_EIGENDA_V2_RELAY_CONNECTION_POOL_SIZE)
           Number of gRPC connections to maintain to each relay.
    

@@ -33,6 +33,9 @@ type Store struct {
 	// - If < 0: Retry indefinitely until success
 	// - If = 0: Not permitted
 	putTries int
+	// retryDelay is the base time unit for linear retry backoff on blob dispersals.
+	// On retry attempt n (1-indexed), the delay is n * retryDelay.
+	retryDelay time.Duration
 
 	// Verification related fields.
 	certVerifier *verification.CertVerifier
@@ -54,6 +57,7 @@ func NewStore(
 	log logging.Logger,
 	disperser *dispersal.PayloadDisperser,
 	putTries int,
+	retryDelay time.Duration,
 	certVerifier *verification.CertVerifier,
 	retrievers []clients.PayloadRetriever,
 	contractCallTimeout time.Duration,
@@ -72,6 +76,7 @@ func NewStore(
 	return &Store{
 		log:                   log,
 		putTries:              putTries,
+		retryDelay:            retryDelay,
 		disperser:             disperser,
 		retrievers:            retrievers,
 		certVerifier:          certVerifier,
@@ -149,9 +154,17 @@ func (e Store) Put(
 	// TODO: https://github.com/Layr-Labs/eigenda/issues/1271
 
 	// We attempt to disperse the blob to EigenDA up to PutRetries times, unless we get a 400 error on any attempt.
+	//
+	// Retry delays are applied per-case rather than globally: rate-limiting errors (ResourceExhausted, debit
+	// rejection) use linear backoff to allow capacity to recover, while transient errors (failover, other gRPC
+	// errors) retry immediately since the issue is likely resolved by switching endpoints or retrying right away.
 
 	payload := coretypes.Payload(value)
 
+	// rateLimitRetries tracks rate-limit related errors for linear backoff.
+	// Never reset between retries: even if a non-rate-limit error occurs in between,
+	// the backoff pressure must keep increasing to give the server time to recover capacity.
+	var rateLimitRetries int
 	cert, err := retry.DoWithData(
 		func() (coretypes.EigenDACert, error) {
 			return e.disperser.SendPayload(ctx, payload)
@@ -170,7 +183,13 @@ func (e Store) Put(
 				}
 				grpcStatus, isGRPCError := status.FromError(err)
 				if !isGRPCError {
-					e.log.Warn("Received non-grpc error, retrying", "err", err)
+					// the only change for non-grpc error is debit rejection.
+					// linear backoff can alleviate the issue allowing reservation to fill back
+					rateLimitRetries++
+					sleepDuration := time.Duration(rateLimitRetries) * e.retryDelay
+					e.log.Warn("Received non-grpc error, retrying",
+						"err", err, "sleep", sleepDuration)
+					time.Sleep(sleepDuration)
 					return true
 				}
 				//nolint:exhaustive // we only care about a few grpc error codes
@@ -180,12 +199,14 @@ func (e Store) Put(
 					e.log.Warn("Received InvalidArgument status code, not retrying", "err", err)
 					return false
 				case codes.ResourceExhausted:
-					// we retry on 429s because it *can* mean we are being rate limited
-					// we sleep 1 second... very arbitrarily, because we don't have more info.
-					// grpc error itself should return a backoff time,
-					// see https://github.com/Layr-Labs/eigenda/issues/845 for more details
-					e.log.Warn("Received ResourceExhausted status code, retrying after 1 second", "err", err)
-					time.Sleep(1 * time.Second)
+					// We retry on 429s because it *can* mean we are being rate limited.
+					// Linear backoff: sleep (n * retryDelay) where n increases on consecutive 429s.
+					// This matches the pattern used by MultiHomingClient.sleepBeforeRetry.
+					rateLimitRetries++
+					sleepDuration := time.Duration(rateLimitRetries) * e.retryDelay
+					e.log.Warn("Received ResourceExhausted status code, retrying",
+						"err", err, "sleep", sleepDuration)
+					time.Sleep(sleepDuration)
 					return true
 				default:
 					e.log.Warn("Received gRPC error, retrying", "err", err, "code", grpcStatus.Code())
