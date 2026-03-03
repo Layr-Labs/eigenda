@@ -20,6 +20,7 @@ var (
 	PointEvaluationDisabledFlagName = withFlagPrefix("disable-point-evaluation")
 
 	PutRetriesFlagName                                = withFlagPrefix("put-retries")
+	PutRetryDelayIncrementFlagName                    = withFlagPrefix("put-retry-delay-increment")
 	SignerPaymentKeyHexFlagName                       = withFlagPrefix("signer-payment-key-hex")
 	DisperseBlobTimeoutFlagName                       = withFlagPrefix("disperse-blob-timeout")
 	BlobCertifiedTimeoutFlagName                      = withFlagPrefix("blob-certified-timeout")
@@ -117,6 +118,16 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Value:    3,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "PUT_RETRIES")},
 			Category: category,
+		},
+		&cli.DurationFlag{
+			Name: PutRetryDelayIncrementFlagName,
+			Usage: "Base time unit for linear retry backoff on blob dispersal retries. " +
+				"Applied only to rate-limit related errors (ResourceExhausted, debit rejection). " +
+				"On the Nth consecutive rate-limit retry, sleeps N * this value.",
+			Value:    1 * time.Second,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "PUT_RETRY_DELAY_INCREMENT")},
+			Category: category,
+			Required: false,
 		},
 		&cli.DurationFlag{
 			Name:     DisperseBlobTimeoutFlagName,
