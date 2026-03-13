@@ -77,6 +77,7 @@ type TestHarness struct {
 	CertBuilder                     *clientsv2.CertBuilder
 	RouterCertVerifier              *verification.CertVerifier
 	StaticCertVerifier              *verification.CertVerifier
+	StaticCertVerifierV3            *verification.CertVerifier
 	EigenDACertVerifierRouter       *routerbindings.ContractEigenDACertVerifierRouterTransactor
 	EigenDACertVerifierRouterCaller *routerbindings.ContractEigenDACertVerifierRouterCaller
 
@@ -308,13 +309,20 @@ func (tc *TestHarness) CreatePayloadDisperser(
 		return nil, fmt.Errorf("build client ledger: %w", err)
 	}
 
+	var certVerifier *verification.CertVerifier
+	if config.CertVerifier != nil {
+		certVerifier = config.CertVerifier
+	} else {
+		certVerifier = tc.RouterCertVerifier
+	}
+
 	payloadDisperser, err := dispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClientMultiplexer,
 		blockMonitor,
 		tc.CertBuilder,
-		tc.RouterCertVerifier,
+		certVerifier,
 		clientLedger,
 		nil,
 	)
