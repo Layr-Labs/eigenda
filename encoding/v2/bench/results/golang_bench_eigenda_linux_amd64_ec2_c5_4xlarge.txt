@@ -1,0 +1,45 @@
+2026/05/04 18:23:30 maxprocs: Leaving GOMAXPROCS=16: CPU quota undefined
+goos: linux
+goarch: amd64
+pkg: github.com/Layr-Labs/eigenda/encoding/v2/bench
+cpu: Intel(R) Xeon(R) Platinum 8275CL CPU @ 3.00GHz
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^17_bytes-16                    325           3650768 ns/op         1720504 B/op         10 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^20_bytes-16                     30          34415608 ns/op        13648046 B/op         12 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^21_bytes-16                     14          79043715 ns/op        27279574 B/op         13 allocs/op
+BenchmarkPayloadToBlobConversion/PayloadToBlob_size_2^24_bytes-16                      2         859783524 ns/op        218120520 B/op        16 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^17_bytes-16                         44          26713743 ns/op          765574 B/op        255 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^20_bytes-16                          8         130979892 ns/op        42899822 B/op        361 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^21_bytes-16                          5         228989125 ns/op        82611593 B/op        359 allocs/op
+BenchmarkCommittmentGeneration/Commitments_size_2^24_bytes-16                          1        1352764227 ns/op        537950672 B/op       332 allocs/op
+BenchmarkRSBackendGnark/2^15_Frs-16                                                  538           2013649 ns/op         2097155 B/op          2 allocs/op
+BenchmarkRSBackendGnark/2^18_Frs-16                                                   58          21370504 ns/op        16777243 B/op          2 allocs/op
+BenchmarkRSBackendGnark/2^19_Frs-16                                                   24          49863073 ns/op        33554493 B/op          3 allocs/op
+BenchmarkRSBackendGnark/2^22_Frs-16                                                    1        4516783306 ns/op        268437024 B/op        40 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^17_bytes-16                               46          23857540 ns/op         5632209 B/op      16448 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^20_bytes-16                                6         195107963 ns/op        45085626 B/op      16448 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^21_bytes-16                                3         440205986 ns/op        95419960 B/op      16447 allocs/op
+BenchmarkBlobToChunksEncoding/Encode_size_2^24_bytes-16                                1        4778142731 ns/op        939884392 B/op     16457 allocs/op
+BenchmarkMultiproofGenerationGnark/Multiproof_size_2^17_bytes-16                       1        1284775775 ns/op        102470168 B/op    828168 allocs/op
+BenchmarkMultiproofGenerationGnark/Multiproof_size_2^20_bytes-16                       1        1376302954 ns/op        118935288 B/op    852199 allocs/op
+BenchmarkMultiproofGenerationGnark/Multiproof_size_2^21_bytes-16                       1        1470073944 ns/op        123149776 B/op    799074 allocs/op
+BenchmarkMultiproofGenerationGnark/Multiproof_size_2^24_bytes-16                       1        2708552730 ns/op        374774800 B/op    995934 allocs/op
+BenchmarkFrameGenerationGnark/Multiproof_size_2^17_bytes-16                            1        1268118600 ns/op        112802752 B/op    852105 allocs/op
+BenchmarkFrameGenerationGnark/Multiproof_size_2^20_bytes-16                            1        1394514883 ns/op        195643200 B/op    876819 allocs/op
+BenchmarkFrameGenerationGnark/Multiproof_size_2^21_bytes-16                            1        1512434334 ns/op        275371536 B/op    823731 allocs/op
+BenchmarkFrameGenerationGnark/Multiproof_size_2^24_bytes-16                            1        5352140988 ns/op        1583936960 B/op  1020583 allocs/op
+BenchmarkFFTFr/2^9_elements-16                                                      7852            148393 ns/op           32768 B/op          2 allocs/op
+BenchmarkFFTFr/2^14_elements-16                                                      172           6906530 ns/op         1048584 B/op          2 allocs/op
+BenchmarkFFTFr/2^19_elements-16                                                        3         380709640 ns/op        33554512 B/op          3 allocs/op
+BenchmarkFFTFr/2^22_elements-16                                                        1        3848733354 ns/op        268435648 B/op         4 allocs/op
+BenchmarkFFTG1/2^13_Points-16                                                          2         910345814 ns/op        34423296 B/op     430604 allocs/op
+BenchmarkFFTG1/2^14_Points-16                                                          1        1881422944 ns/op        72713184 B/op     909846 allocs/op
+BenchmarkGnarkParallelIFFTG1/2^13_G1Points-16                                          3         338470082 ns/op        23976997 B/op     276108 allocs/op
+BenchmarkGnarkParallelIFFTG1/2^14_G1Points-16                                          2         717322930 ns/op        51297028 B/op     592528 allocs/op
+BenchmarkMSMG1/2^12_Points-16                                                        280           4243207 ns/op          250339 B/op         80 allocs/op
+BenchmarkMSMG1/2^15_Points-16                                                         46          25133650 ns/op         6957692 B/op        106 allocs/op
+BenchmarkMSMG1/2^19_Points-16                                                          5         221835347 ns/op        114303164 B/op       106 allocs/op
+BenchmarkMSMG2/2^12_Points-16                                                        100          11356163 ns/op          254516 B/op         80 allocs/op
+BenchmarkMSMG2/2^15_Points-16                                                         21          55437974 ns/op        17970928 B/op        127 allocs/op
+BenchmarkMSMG2/2^19_Points-16                                                          2         556914658 ns/op        211823104 B/op       107 allocs/op
+PASS
+ok      github.com/Layr-Labs/eigenda/encoding/v2/bench  228.838s
