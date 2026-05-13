@@ -20,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
