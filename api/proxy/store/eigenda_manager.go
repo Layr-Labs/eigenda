@@ -150,12 +150,17 @@ func (m *EigenDAManager) getEigenDAV2(
 	// TODO: would be nice to store blobs instead of payloads in secondary storages, such that we could standardize all
 	// storages and make them all implement the [clients.PayloadRetriever] interface.
 	// We could then get rid of the proxy notion of caches/fallbacks and only have storages.
-	if m.secondary.CachingEnabled() && !opts.ReturnEncodedPayload {
+	if m.secondary.CachingEnabled() {
 		m.log.Debug("Retrieving payload from cached backends")
 		payload, err := m.secondary.MultiSourceRead(ctx,
 			versionedCert.SerializedCert, false, verifyFnForSecondary)
 		if err == nil {
-			return payload, nil
+			if !opts.ReturnEncodedPayload {
+				return payload, nil
+			} else {
+				encodedPayload := coretypes.Payload(payload).ToEncodedPayload()
+				return encodedPayload.Serialize(), nil
+			}
 		}
 		m.log.Warn("Failed to read payload from cache targets", "err", err)
 		readErrors = append(readErrors, fmt.Errorf("read from cache targets: %w", err))

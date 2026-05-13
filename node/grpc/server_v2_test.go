@@ -122,12 +122,12 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		mockOperatorState.Operators[quorumID] = make(map[core.OperatorID]*core.OperatorInfo)
 		// Add a mock operator to each quorum so chunk location determination works
 		mockOperatorState.Operators[quorumID][opID] = &core.OperatorInfo{
-			Stake:  big.NewInt(100),
-			Index:  0,
+			Stake: big.NewInt(100),
+			Index: 0,
 		}
 		mockOperatorState.Totals[quorumID] = &core.OperatorInfo{
-			Stake:  big.NewInt(100),
-			Index:  1,
+			Stake: big.NewInt(100),
+			Index: 1,
 		}
 	}
 	chainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(mockOperatorState, nil)
