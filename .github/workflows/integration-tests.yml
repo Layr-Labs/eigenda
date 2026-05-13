@@ -117,7 +117,7 @@ jobs:
     steps:
       - name: Send GitHub Action trigger data to Slack eigenda-pr channel
         id: slack
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@e28cf165c92ffef168d23c5c9000cffc8a25e117
         with:
           payload: |
             {
