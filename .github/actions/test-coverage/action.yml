@@ -28,7 +28,7 @@ runs:
         token: ${{ github.token }}
         path: ./.github/wiki/
 
-    - uses: jdx/mise-action@v2
+    - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151
       env:
         MISE_VERSION: 2024.12.14
       with:
