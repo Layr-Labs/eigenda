@@ -32,6 +32,9 @@ type Config struct {
 	// eth rpc retry count and delay
 	RetryCount int
 	RetryDelay time.Duration
+
+	// PutRetryDelay is the base time unit for linear backoff on blob dispersal retries.
+	PutRetryDelay time.Duration
 }
 
 // ReadConfig ... parses the Config from the provided flags or environment variables.
@@ -77,6 +80,7 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		S3Config:        s3.ReadConfig(ctx),
 		RetryCount:      ctx.Int(eigendaflags_v2.EthRPCRetryCountFlagName),
 		RetryDelay:      ctx.Duration(eigendaflags_v2.EthRPCRetryDelayIncrementFlagName),
+		PutRetryDelay:   ctx.Duration(eigendaflags_v2.PutRetryDelayIncrementFlagName),
 	}
 
 	return cfg, nil

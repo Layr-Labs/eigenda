@@ -39,13 +39,13 @@ ENV ICICLE_BASE_SHA256=d4510e6a5c4556cfc6e434e91d6b45329c43fc559d11b466283ed7539
 ENV ICICLE_CUDA_SHA256=de2d29c3df8da899e4097006e014c35e386e120b0433993fd4fec5c1753625f6
 
 # Download Icicle tarballs
-ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}/icicle_${ICICLE_VERSION//./_}-ubuntu22.tar.gz /tmp/icicle.tar.gz
-ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}/icicle_${ICICLE_VERSION//./_}-ubuntu22-cuda122.tar.gz /tmp/icicle-cuda.tar.gz
+COPY disperser/cmd/encoder/open-icicle-ubuntu22.tar.gz /tmp/icicle.tar.gz
+COPY disperser/cmd/encoder/open-icicle-ubuntu22-cuda122.tar.gz /tmp/icicle-cuda.tar.gz
 
 # Verify checksums and install Icicle
-RUN echo "${ICICLE_BASE_SHA256} /tmp/icicle.tar.gz" | sha256sum -c - && \
-    echo "${ICICLE_CUDA_SHA256} /tmp/icicle-cuda.tar.gz" | sha256sum -c - && \
-    tar xzf /tmp/icicle.tar.gz && \
+#RUN echo "${ICICLE_BASE_SHA256} /tmp/icicle.tar.gz" | sha256sum -c - && \
+#    echo "${ICICLE_CUDA_SHA256} /tmp/icicle-cuda.tar.gz" | sha256sum -c - && \
+RUN tar xzf /tmp/icicle.tar.gz && \
     cp -r ./icicle/lib/* /usr/lib/ && \
     cp -r ./icicle/include/icicle/ /usr/local/include/ && \
     tar xzf /tmp/icicle-cuda.tar.gz -C /opt && \

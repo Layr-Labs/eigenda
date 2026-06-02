@@ -15,8 +15,8 @@ jobs:
   flags:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -29,8 +29,8 @@ jobs:
   help-output-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -41,10 +41,10 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
         with:
           submodules: true
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -57,10 +57,10 @@ jobs:
   e2e-tests-local:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
         with:
           submodules: true
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -73,10 +73,10 @@ jobs:
   e2e-tests-sepolia:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
         with:
           submodules: true
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -92,10 +92,10 @@ jobs:
   e2e-tests-hoodi:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
         with:
           submodules: true
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -111,10 +111,10 @@ jobs:
   fuzz:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
         with:
           submodules: true
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -127,8 +127,8 @@ jobs:
   build-binary:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -139,7 +139,7 @@ jobs:
   build-docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
       - run: BUILD_TAG=dev make docker-build
         working-directory: api/proxy
       # We also test that the docker container starts up correctly.

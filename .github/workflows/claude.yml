@@ -55,13 +55,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #v4.2.2
         with:
           fetch-depth: 1
 
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@0c6a49f1fa56a1d472575da86a94dbc1edb78eda
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           max_turns: "10"
