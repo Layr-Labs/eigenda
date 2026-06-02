@@ -21,7 +21,7 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
-      - uses: bufbuild/buf-action@v1
+      - uses: bufbuild/buf-action@fd21066df7214747548607aaa45548ba2b9bc1ff
         with:
           setup_only: true #only install buf -- needed by `make protoc` command
       - name: Recompile Protobufs

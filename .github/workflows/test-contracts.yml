@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
         with:
           submodules: recursive
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -42,7 +42,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -69,7 +69,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true

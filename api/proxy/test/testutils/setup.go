@@ -273,6 +273,13 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 				MaxBlobSizeBytes: maxBlobLengthBytes,
 			}),
 		MemstoreEnabled: useMemory,
+		// The client reservation leaky bucket starts full (see storage_manager_builder.go), so a freshly
+		// started proxy cannot disperse until the bucket leaks. Since every blob is billed as at least
+		// minNumSymbols (4096 on testnets) and the reservation leaks at symbolsPerSecond, there is a ~1s
+		// startup dead-zone where dispersals are rejected with "reservation lacks capacity". A non-zero
+		// PutRetryDelay lets the existing linear backoff in the V2 store span that window, mirroring the
+		// production default (the prod flag defaults to 1s) instead of retrying instantly (sleep=0s).
+		PutRetryDelay: 1 * time.Second,
 		ClientConfigV2: common.ClientConfigV2{
 			DisperserClientCfg: dispersal.DisperserClientConfig{
 				GrpcUri:           fmt.Sprintf("%s:%s", disperserHostname, disperserPort),
