@@ -29,23 +29,23 @@ COPY . .
 
 # Define Icicle versions and checksums
 # If you ever change the ICICLE_VERSION, first find the new artifact links from
-# https://github.com/ingonyama-zk/icicle/releases, and then compute the new checksums by running:
-#  wget https://github.com/ingonyama-zk/icicle/releases/download/v3.9.2/icicle_3_9_2-ubuntu22.tar.gz
-#  sha256sum icicle_3_9_2-ubuntu22.tar.gz
-#  wget https://github.com/ingonyama-zk/icicle/releases/download/v3.9.2/icicle_3_9_2-ubuntu22-cuda122.tar.gz
-#  sha256sum icicle_3_9_2-ubuntu22-cuda122.tar.gz
-ENV ICICLE_VERSION=3.9.2
-ENV ICICLE_BASE_SHA256=d4510e6a5c4556cfc6e434e91d6b45329c43fc559d11b466283ed75391d5ff2e
-ENV ICICLE_CUDA_SHA256=de2d29c3df8da899e4097006e014c35e386e120b0433993fd4fec5c1753625f6
+# https://github.com/ingonyama-zk/open-icicle/releases, and then compute the new checksums by running:
+#  wget https://github.com/ingonyama-zk/open-icicle/releases/download/v3.9.2/open-icicle_3_9_2-ubuntu22.tar.gz
+#  sha256sum open-icicle_3_9_2-ubuntu22.tar.gz
+#  wget https://github.com/ingonyama-zk/open-icicle/releases/download/v3.9.2/open-icicle_3_9_2-ubuntu22-cuda122.tar.gz
+#  sha256sum open-icicle_3_9_2-ubuntu22-cuda122.tar.gz
+ENV ICICLE_VERSION=3_9_2
+ENV ICICLE_BASE_SHA256=d3576c2abff38a36a6129642a5617cf97a6bebf0a18f90e76d550c5c1660b50d
+ENV ICICLE_CUDA_SHA256=1f9c194bde786d178b5ac10f151d2864885a40f411ebe508bbe2a29fddfb030f
 
-# Download Icicle tarballs
-COPY disperser/cmd/encoder/open-icicle-ubuntu22.tar.gz /tmp/icicle.tar.gz
-COPY disperser/cmd/encoder/open-icicle-ubuntu22-cuda122.tar.gz /tmp/icicle-cuda.tar.gz
+# Download Icicle tarballs from the open-icicle release
+ADD https://github.com/ingonyama-zk/open-icicle/releases/download/v3.9.2/open-icicle_${ICICLE_VERSION}-ubuntu22.tar.gz /tmp/icicle.tar.gz
+ADD https://github.com/ingonyama-zk/open-icicle/releases/download/v3.9.2/open-icicle_${ICICLE_VERSION}-ubuntu22-cuda122.tar.gz /tmp/icicle-cuda.tar.gz
 
 # Verify checksums and install Icicle
-#RUN echo "${ICICLE_BASE_SHA256} /tmp/icicle.tar.gz" | sha256sum -c - && \
-#    echo "${ICICLE_CUDA_SHA256} /tmp/icicle-cuda.tar.gz" | sha256sum -c - && \
-RUN tar xzf /tmp/icicle.tar.gz && \
+RUN echo "${ICICLE_BASE_SHA256} /tmp/icicle.tar.gz" | sha256sum -c - && \
+    echo "${ICICLE_CUDA_SHA256} /tmp/icicle-cuda.tar.gz" | sha256sum -c - && \
+    tar xzf /tmp/icicle.tar.gz && \
     cp -r ./icicle/lib/* /usr/lib/ && \
     cp -r ./icicle/include/icicle/ /usr/local/include/ && \
     tar xzf /tmp/icicle-cuda.tar.gz -C /opt && \
