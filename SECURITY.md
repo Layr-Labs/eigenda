@@ -27,5 +27,5 @@ Audit reports for EigenDA Proxy published in the `docs` folder: [https://github.
 
 **Please do not file a public ticket** mentioning the vulnerability.
 
-Please report security vulnerabilities to security@eigenlabs.org with the all the relavent details included in the email.
+Please report security vulnerabilities to security@eigenlabs.org with the all the relevant details included in the email.
 
