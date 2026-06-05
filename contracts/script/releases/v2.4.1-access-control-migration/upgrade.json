@@ -1,0 +1,15 @@
+{
+    "name": "v2.4.1-access-control-migration",
+    "from": "0.0.0",
+    "to": "2.4.1",
+    "phases": [
+        {
+            "type": "eoa",
+            "filename": "1-DeployImplementations.s.sol"
+        },
+        {
+            "type": "eoa",
+            "filename": "2-ExecuteUpgrade.s.sol"
+        }
+    ]
+}

@@ -17,7 +17,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/Ownabl
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 
-import {Pausable} from "eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
+import {Pausable} from "src/mixins/Pausable.sol";
 import {EigenDARegistryCoordinatorStorage} from "src/core/EigenDARegistryCoordinatorStorage.sol";
 
 import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
@@ -76,7 +76,7 @@ contract EigenDARegistryCoordinator is
         OperatorSetParam[] memory _operatorSetParams,
         uint96[] memory _minimumStakes,
         IStakeRegistry.StrategyParams[][] memory _strategyParams
-    ) external initializer {
+    ) external reinitializer(2) {
         require(
             _operatorSetParams.length == _minimumStakes.length && _minimumStakes.length == _strategyParams.length,
             "RegCoord.initialize: input length mismatch"
