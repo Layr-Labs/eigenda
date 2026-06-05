@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 )
 
@@ -16,6 +17,9 @@ type TestPayloadDisperserConfig struct {
 	// Private key to use for the disperser account (hex string with or without 0x prefix).
 	// If empty string, a random private key will be generated.
 	PrivateKey string
+
+	// Optional custom cert verifier to use. If nil, the default cert verifier will be used.
+	CertVerifier *verification.CertVerifier
 }
 
 // Returns a PayloadDisperserConfig with default values for testing.
