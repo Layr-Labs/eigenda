@@ -1223,7 +1223,6 @@ func startAPIServer(
 		MaxConnectionAgeGrace:              30 * time.Second,
 		MaxIdleConnectionAge:               1 * time.Minute,
 		DisperserId:                        0,
-		TolerateMissingAnchorSignature:     false,
 		DisableAnchorSignatureVerification: false,
 	}
 
