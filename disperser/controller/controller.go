@@ -226,14 +226,99 @@ func (c *Controller) sendChunksToValidator(
 
 	defer validatorProbe.End()
 
-	validatorProbe.SetStage("get_client")
-
 	host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(validatorInfo.Socket)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to parse operator socket %s: %w", validatorInfo.Socket, err)
 	}
 
-	client, err := c.nodeClientManager.GetClient(host, v2DispersalPort)
+	// Try sending with the appropriate disperser ID
+	sig, latency, err := c.attemptStoreChunks(
+		ctx,
+		batchData,
+		validatorId,
+		validatorInfo,
+		host,
+		v2DispersalPort,
+		validatorProbe)
+
+	// If multi-signer mode is enabled and we got an invalid disperser ID error, retry with next ID
+	if c.MultiSignerConfig != nil && IsInvalidDisperserIDError(err) {
+		currentID := c.MultiSignerConfig.IDTracker.GetDisperserID(validatorId)
+		nextID := c.MultiSignerConfig.IDTracker.GetNextDisperserID(currentID)
+
+		// Keep retrying with remaining IDs in priority order
+		for nextID != 0 {
+			c.logger.Info("validator rejected disperser ID, retrying with next ID",
+				"validator", validatorId.Hex(),
+				"rejectedID", currentID,
+				"nextID", nextID,
+				"error", err)
+
+			c.metrics.IncrementDisperserIDRetryAttempts()
+
+			// Record failure for current ID
+			c.MultiSignerConfig.IDTracker.RecordFailure(validatorId, currentID)
+
+			// Retry with next ID
+			sig, latency, err = c.attemptStoreChunks(
+				ctx,
+				batchData,
+				validatorId,
+				validatorInfo,
+				host,
+				v2DispersalPort,
+				validatorProbe)
+
+			if err == nil {
+				c.metrics.IncrementDisperserIDRetrySuccesses()
+				// Record success for this ID
+				c.MultiSignerConfig.IDTracker.RecordSuccess(validatorId, nextID)
+				break
+			} else if !IsInvalidDisperserIDError(err) {
+				// Different error, stop retrying
+				c.metrics.IncrementDisperserIDRetryFailures()
+				break
+			}
+
+			// Try next ID
+			currentID = nextID
+			nextID = c.MultiSignerConfig.IDTracker.GetNextDisperserID(currentID)
+		}
+
+		if err != nil && IsInvalidDisperserIDError(err) {
+			c.metrics.IncrementDisperserIDRetryFailures()
+		}
+	} else if err == nil && c.MultiSignerConfig != nil {
+		// Record success for whichever ID was used
+		disperserID := c.MultiSignerConfig.IDTracker.GetDisperserID(validatorId)
+		c.MultiSignerConfig.IDTracker.RecordSuccess(validatorId, disperserID)
+	}
+
+	return sig, latency, err
+}
+
+// attemptStoreChunks attempts to send chunks to a validator once.
+// This is extracted from sendChunksToValidator to support retry logic.
+func (c *Controller) attemptStoreChunks(
+	ctx context.Context,
+	batchData *batchData,
+	validatorId core.OperatorID,
+	validatorInfo *core.IndexedOperatorInfo,
+	host string,
+	v2DispersalPort string,
+	validatorProbe *common.SequenceProbe,
+) (signature *core.Signature, latency time.Duration, err error) {
+
+	validatorProbe.SetStage("get_client")
+
+	var client clients.NodeClient
+	if c.MultiSignerConfig != nil {
+		// Use validator-specific client (with appropriate disperser ID)
+		client, err = c.nodeClientManager.GetClientForValidator(host, v2DispersalPort, validatorId)
+	} else {
+		// Use single-ID client
+		client, err = c.nodeClientManager.GetClient(host, v2DispersalPort)
+	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get node client for validator at host %s port %s: %w",
 			host, v2DispersalPort, err)

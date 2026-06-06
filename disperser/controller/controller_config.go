@@ -16,6 +16,44 @@ import (
 
 var _ config.DocumentedConfig = &ControllerConfig{}
 
+// DisperserIDConfig contains configuration for a single disperser ID and its signing credentials.
+type DisperserIDConfig struct {
+	// ID is the disperser ID
+	ID uint32
+	// PrivateKey is a hex-encoded private key (without 0x prefix). Optional if KMSKeyID is provided.
+	PrivateKey string
+	// KMSKeyID is the AWS KMS key identifier. Optional if PrivateKey is provided.
+	KMSKeyID string
+	// KMSRegion is the AWS region for KMS. Required if KMSKeyID is provided.
+	KMSRegion string
+	// KMSEndpoint is an optional custom KMS endpoint (e.g., for LocalStack). Optional.
+	KMSEndpoint string
+}
+
+// Verify checks that the configuration is valid.
+func (c *DisperserIDConfig) Verify() error {
+	if c.PrivateKey == "" && c.KMSKeyID == "" {
+		return fmt.Errorf("disperser ID %d: either PrivateKey or KMSKeyID is required", c.ID)
+	}
+	if c.PrivateKey != "" && c.KMSKeyID != "" {
+		return fmt.Errorf("disperser ID %d: PrivateKey and KMSKeyID cannot both be specified", c.ID)
+	}
+	if c.KMSKeyID != "" && c.KMSRegion == "" {
+		return fmt.Errorf("disperser ID %d: KMSRegion is required when using KMS", c.ID)
+	}
+	return nil
+}
+
+// MultiSignerConfig contains configuration for multiple disperser ID support.
+type MultiSignerConfig struct {
+	// DisperserIDs is the list of disperser ID configurations, in priority order
+	DisperserIDs []DisperserIDConfig
+	// MultiSigner wraps signers for all configured IDs
+	MultiSigner *clients.MultiDispersalRequestSigner
+	// IDTracker tracks which disperser ID each validator accepts
+	IDTracker *ValidatorDisperserIDTracker
+}
+
 // ControllerConfig contains configuration parameters for the controller.
 type ControllerConfig struct {
 	// Configuration for logging.
@@ -178,6 +216,10 @@ type ControllerConfig struct {
 
 	// Configures the payment authorization system.
 	Payment PaymentAuthorizationConfig
+
+	// MultiSignerConfig is optional configuration for multiple disperser ID support.
+	// If nil, single-signer mode is used (via DisperserID field). If set, enables multi-ID retry logic.
+	MultiSignerConfig *MultiSignerConfig
 }
 
 var _ config.VerifiableConfig = &ControllerConfig{}

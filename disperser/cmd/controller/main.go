@@ -7,10 +7,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
@@ -55,6 +57,62 @@ func main() {
 		log.Fatalf("application failed: %v", err)
 	}
 	select {}
+}
+
+// parseDisperserIDConfigs parses disperser IDs from a comma-separated string and loads their credentials
+// from environment variables.
+func parseDisperserIDConfigs(
+	ctx context.Context,
+	disperserIDsStr string,
+	awsConfig aws.ClientConfig,
+) ([]controller.DisperserIDConfig, error) {
+	idStrings := strings.Split(disperserIDsStr, ",")
+	configs := make([]controller.DisperserIDConfig, 0, len(idStrings))
+
+	for _, idStr := range idStrings {
+		idStr = strings.TrimSpace(idStr)
+		if idStr == "" {
+			continue
+		}
+
+		id, err := strconv.ParseUint(idStr, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid disperser ID '%s': %w", idStr, err)
+		}
+
+		disperserID := uint32(id)
+
+		// Load credentials from environment variables
+		envPrefix := fmt.Sprintf("CONTROLLER_DISPERSER_ID_%d", disperserID)
+		privateKey := os.Getenv(envPrefix + "_PRIVATE_KEY")
+		kmsKeyID := os.Getenv(envPrefix + "_KMS_KEY_ID")
+		kmsRegion := os.Getenv(envPrefix + "_KMS_REGION")
+		kmsEndpoint := os.Getenv(envPrefix + "_KMS_ENDPOINT")
+
+		// Use AWS config defaults if not specified
+		if kmsRegion == "" {
+			kmsRegion = awsConfig.Region
+		}
+		if kmsEndpoint == "" {
+			kmsEndpoint = awsConfig.EndpointURL
+		}
+
+		config := controller.DisperserIDConfig{
+			ID:          disperserID,
+			PrivateKey:  privateKey,
+			KMSKeyID:    kmsKeyID,
+			KMSRegion:   kmsRegion,
+			KMSEndpoint: kmsEndpoint,
+		}
+
+		if err := config.Verify(); err != nil {
+			return nil, fmt.Errorf("invalid config for disperser ID %d: %w", disperserID, err)
+		}
+
+		configs = append(configs, config)
+	}
+
+	return configs, nil
 }
 
 func RunController(cliCtx *cli.Context) error {
@@ -237,13 +295,95 @@ func RunController(cliCtx *cli.Context) error {
 		}
 	}
 
-	nodeClientManager, err := controller.NewNodeClientManager(
-		config.NodeClientCacheSize,
-		requestSigner,
-		config.DisperserID,
-		logger)
-	if err != nil {
-		return fmt.Errorf("failed to create node client manager: %v", err)
+	// Check if multi disperser ID mode is enabled
+	disperserIDsStr := cliCtx.GlobalString(flags.DisperserIDsFlag.Name)
+	var nodeClientManager controller.NodeClientManager
+
+	//nolint:nestif // Multi-ID initialization requires nested checks for validation
+	if disperserIDsStr != "" {
+		logger.Info("Multi disperser ID mode enabled", "disperserIDs", disperserIDsStr)
+
+		// Parse disperser IDs from comma-separated string
+		disperserIDConfigs, err := parseDisperserIDConfigs(ctx, disperserIDsStr, config.AwsClient)
+		if err != nil {
+			return fmt.Errorf("failed to parse disperser ID configs: %w", err)
+		}
+
+		if len(disperserIDConfigs) == 0 {
+			return fmt.Errorf("no valid disperser IDs configured")
+		}
+
+		// Create signers for each disperser ID
+		signers := make(map[uint32]clients.DispersalRequestSigner)
+		disperserIDs := make([]uint32, 0, len(disperserIDConfigs))
+
+		for _, idConfig := range disperserIDConfigs {
+			var signer clients.DispersalRequestSigner
+			if idConfig.PrivateKey != "" {
+				signer, err = clients.NewLocalDispersalRequestSigner(clients.DispersalRequestSignerConfig{
+					PrivateKey: idConfig.PrivateKey,
+				})
+			} else {
+				signer, err = clients.NewKMSDispersalRequestSigner(ctx, clients.DispersalRequestSignerConfig{
+					KeyID:    idConfig.KMSKeyID,
+					Region:   idConfig.KMSRegion,
+					Endpoint: idConfig.KMSEndpoint,
+				})
+			}
+			if err != nil {
+				return fmt.Errorf("failed to create signer for disperser ID %d: %w", idConfig.ID, err)
+			}
+
+			signers[idConfig.ID] = signer
+			disperserIDs = append(disperserIDs, idConfig.ID)
+			logger.Info("Configured disperser ID", "id", idConfig.ID,
+				"signerType", map[bool]string{true: "private_key", false: "kms"}[idConfig.PrivateKey != ""])
+		}
+
+		// Create multi signer
+		multiSigner, err := clients.NewMultiDispersalRequestSigner(clients.MultiDispersalRequestSignerConfig{
+			Signers:      signers,
+			DisperserIDs: disperserIDs,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create multi signer: %w", err)
+		}
+
+		// Create validator disperser ID tracker
+		idTracker := controller.NewValidatorDisperserIDTracker(disperserIDs)
+
+		// Create node client manager with multi-signer support
+		nodeClientManager, err = controller.NewNodeClientManagerWithMultiSigner(
+			config.NodeClientCacheSize,
+			multiSigner,
+			idTracker,
+			logger)
+		if err != nil {
+			return fmt.Errorf("failed to create node client manager with multi signer: %w", err)
+		}
+
+		// Set multi signer config in controller config
+		config.MultiSignerConfig = &controller.MultiSignerConfig{
+			DisperserIDs: disperserIDConfigs,
+			MultiSigner:  multiSigner,
+			IDTracker:    idTracker,
+		}
+
+		logger.Info("Multi disperser ID mode configured", "disperserIDs", disperserIDs)
+	} else {
+		// Single-signer mode (backward compatible)
+		if config.DisperserID == 0 && cliCtx.GlobalUint64(flags.DisperserIDFlag.Name) == 0 {
+			return fmt.Errorf("either --controller-disperser-id or --controller-disperser-ids is required")
+		}
+
+		nodeClientManager, err = controller.NewNodeClientManager(
+			config.NodeClientCacheSize,
+			requestSigner,
+			config.DisperserID,
+			logger)
+		if err != nil {
+			return fmt.Errorf("failed to create node client manager: %w", err)
+		}
 	}
 
 	batchMetadataManager, err := metadata.NewBatchMetadataManager(
