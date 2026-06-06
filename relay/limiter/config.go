@@ -53,10 +53,10 @@ type Config struct {
 	GetChunkOpsBurstinessClient int
 
 	// MaxGetChunkBytesPerSecondClient is the maximum bandwidth, in bytes, that GetChunk operations are permitted
-	// to consume per second. Default is 2MiB/s.
+	// to consume per second. Default is 40MiB/s.
 	MaxGetChunkBytesPerSecondClient float64
 	// The burstiness of the MaxGetChunkBytesPerSecondClient rate limiter. This is the maximum burst size that happen
-	// within a short time window. Default is 2MiB.
+	// within a short time window. Default is 400MiB.
 	GetChunkBytesBurstinessClient int
 
 	// MaxConcurrentGetChunkOpsClient is the maximum number of concurrent GetChunk operations that are permitted.
