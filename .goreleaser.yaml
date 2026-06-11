@@ -1,0 +1,168 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+git:
+  tag_sort: -version:refname
+
+builds:
+  - id: node
+    main: ./node/cmd/main.go
+    binary: node
+    ldflags:
+      - -X 'github.com/Layr-Labs/eigenda/node.SemVer={{ .Version }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.GitCommit={{ .ShortCommit }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.Arch={{ .Arch }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.Os={{ .Os }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.GitDate={{ .Timestamp }}'
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+  - id: nodeplugin
+    main: ./node/plugin/cmd/main.go
+    binary: nodeplugin
+    ldflags:
+      - -X 'github.com/Layr-Labs/eigenda/node.SemVer={{ .Version }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.GitCommit={{ .ShortCommit }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.Arch={{ .Arch }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.Os={{ .Os }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.GitDate={{ .Timestamp }}'
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+  - id: proxy
+    main: ./api/proxy/cmd/server
+    binary: eigenda-proxy
+    ldflags:
+      - -X 'main.version={{ .Version }}'
+      - -X 'main.gitcommit={{ .ShortCommit }}'
+      - -X 'main.gitDate={{ .Timestamp }}'
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+dockers:
+  - image_templates:
+      - "ghcr.io/layr-labs/eigenda/opr-node:{{ .Version }}-amd64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--target=node-goreleaser"
+      - "--platform=linux/amd64"
+      - "--provenance=false"
+      - "--sbom=false"
+    goarch: amd64
+    ids:
+      - node
+  - image_templates:
+      - "ghcr.io/layr-labs/eigenda/opr-node:{{ .Version }}-arm64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--target=node-goreleaser"
+      - "--platform=linux/arm64"
+      - "--provenance=false"
+      - "--sbom=false"
+    goarch: arm64
+    ids:
+      - node
+  - image_templates:
+      - "ghcr.io/layr-labs/eigenda/opr-nodeplugin:{{ .Version }}-amd64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--target=nodeplugin-goreleaser"
+      - "--platform=linux/amd64"
+      - "--provenance=false"
+      - "--sbom=false"
+    goarch: amd64
+    ids:
+      - nodeplugin
+  - image_templates:
+      - "ghcr.io/layr-labs/eigenda/opr-nodeplugin:{{ .Version }}-arm64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--target=nodeplugin-goreleaser"
+      - "--platform=linux/arm64"
+      - "--provenance=false"
+      - "--sbom=false"
+    goarch: arm64
+    ids:
+      - nodeplugin
+  - image_templates:
+      - "ghcr.io/layr-labs/eigenda-proxy:{{ .Version }}-amd64"
+    dockerfile: Dockerfile
+    use: buildx
+    extra_files:
+      - api/proxy/resources
+    build_flag_templates:
+      - "--target=proxy-goreleaser"
+      - "--platform=linux/amd64"
+      - "--provenance=false"
+      - "--sbom=false"
+    goarch: amd64
+    ids:
+      - proxy
+  - image_templates:
+      - "ghcr.io/layr-labs/eigenda-proxy:{{ .Version }}-arm64"
+    dockerfile: Dockerfile
+    use: buildx
+    extra_files:
+      - api/proxy/resources
+    build_flag_templates:
+      - "--target=proxy-goreleaser"
+      - "--platform=linux/arm64"
+      - "--provenance=false"
+      - "--sbom=false"
+    goarch: arm64
+    ids:
+      - proxy
+
+docker_manifests:
+  - name_template: "ghcr.io/layr-labs/eigenda/opr-node:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/layr-labs/eigenda/opr-node:{{ .Version }}-amd64"
+      - "ghcr.io/layr-labs/eigenda/opr-node:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/layr-labs/eigenda/opr-nodeplugin:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/layr-labs/eigenda/opr-nodeplugin:{{ .Version }}-amd64"
+      - "ghcr.io/layr-labs/eigenda/opr-nodeplugin:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/layr-labs/eigenda-proxy:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/layr-labs/eigenda-proxy:{{ .Version }}-amd64"
+      - "ghcr.io/layr-labs/eigenda-proxy:{{ .Version }}-arm64"
+
+checksum:
+  disable: true
+
+release:
+  github:
+    owner: layr-labs
+    name: eigenda
+
+  draft: true
+
+archives:
+  - formats: "tar.gz"
+    wrap_in_directory: true
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{- .Os }}_{{- .Arch }}"
+    files:
+      - LICENSE
+      - src: api/proxy/resources/*.point
+        dst: resources
