@@ -3,7 +3,9 @@ package dataapi
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -18,6 +20,25 @@ type GRPCConn interface {
 }
 
 type GRPCDialerSkipTLS struct{}
+
+// buildTLSConfig constructs a secure TLS client configuration for gRPC
+// that validates the server certificate and hostname. It uses the system's
+// root certificate pool and enforces TLS 1.2+.
+func buildTLSConfig(serverAddr string) *tls.Config {
+	host := serverAddr
+	if h, _, err := net.SplitHostPort(serverAddr); err == nil {
+		host = h
+	}
+	pool, _ := x509.SystemCertPool()
+	if pool == nil {
+		pool = x509.NewCertPool()
+	}
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    pool,
+		ServerName: host,
+	}
+}
 
 type EigenDAServiceAvailabilityCheck struct {
 	disperserConn *grpc.ClientConn
@@ -81,13 +102,16 @@ func NewEigenDAServiceHealthCheck(grpcConnection GRPCConn, disperserHostName, ch
 	// Create Pre-configured connections to the services
 	// Saves from having to create new connection on each request
 
-	disperserConn, err := grpcConnection.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})))
+	// Build secure TLS configs for each target
+	disperserTLS := buildTLSConfig(disperserHostName)
+	disperserConn, err := grpcConnection.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewTLS(disperserTLS)))
 
 	if err != nil {
 		return nil
 	}
 
-	churnerConn, err := grpcConnection.Dial(churnerHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})))
+	churnerTLS := buildTLSConfig(churnerHostName)
+	churnerConn, err := grpcConnection.Dial(churnerHostName, grpc.WithTransportCredentials(credentials.NewTLS(churnerTLS)))
 
 	if err != nil {
 		return nil
