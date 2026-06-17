@@ -29,7 +29,7 @@ pub const EIGENDA_DIRECTORY_SEPOLIA: Address =
 pub const EIGENDA_DIRECTORY_INABOX: Address =
     address!("0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8");
 
-/// EigenDA relevant contracts. Addresses are retrieved from the the EigenDADirectory contract for
+/// EigenDA relevant contracts. Addresses are retrieved from the EigenDADirectory contract for
 /// the respective network (i.e. Mainnet, Hoodi)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EigenDaContracts {

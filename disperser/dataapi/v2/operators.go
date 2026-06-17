@@ -518,7 +518,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 
 			operatorAddress, ok := operatorList.GetAddress(operatorId)
 			if !ok {
-				// This should never happen (becuase OperatorList ensures the 1:1 mapping
+				// This should never happen (because OperatorList ensures the 1:1 mapping
 				// between ID and address), but we don't fail the entire request, just
 				// mark internal error for the address field to signal the issue.
 				operatorAddress = "Unexpected internal error"
