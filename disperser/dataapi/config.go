@@ -7,6 +7,7 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
+	PoolSize           int
 }
 
 type DataApiVersion uint

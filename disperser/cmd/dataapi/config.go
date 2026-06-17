@@ -39,6 +39,7 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
+	PoolSize           int
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -85,6 +86,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		DisperserHostname:  ctx.GlobalString(flags.DisperserHostnameFlag.Name),
 		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
+		PoolSize:           ctx.GlobalInt(flags.PoolSizeFlag.Name),
 		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
 	}
 	return config, nil
