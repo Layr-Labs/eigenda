@@ -93,17 +93,20 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 
 func ReadConfig(ctx *cli.Context) (Config, error) {
 	backendStrings := ctx.StringSlice(BackendsToEnableFlagName)
-	if len(backendStrings) == 0 {
-		return Config{}, errors.New("backends must not be empty")
-	}
-
 	backends := make([]common.EigenDABackend, 0, len(backendStrings))
 	for _, backendString := range backendStrings {
+		if backendString == "" {
+			continue
+		}
+
 		backend, err := common.StringToEigenDABackend(backendString)
 		if err != nil {
 			return Config{}, fmt.Errorf("string to eigenDA backend: %w", err)
 		}
 		backends = append(backends, backend)
+	}
+	if len(backends) == 0 {
+		return Config{}, errors.New("backends must not be empty")
 	}
 
 	dispersalBackend, err := common.StringToEigenDABackend(ctx.String(DispersalBackendFlagName))
