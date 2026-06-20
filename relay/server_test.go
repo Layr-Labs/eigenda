@@ -140,7 +140,8 @@ func TestReadWriteBlobs(t *testing.T) {
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
-	config := defaultConfig()
+	config := DefaultRelayConfig()
+	config.GRPCPort = 50051
 
 	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
@@ -233,7 +234,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
-	config := defaultConfig()
+	config := DefaultRelayConfig()
 
 	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
@@ -305,11 +306,12 @@ func TestReadWriteChunks(t *testing.T) {
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
-	config := defaultConfig()
+	config := DefaultRelayConfig()
 	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+	config.GRPCPort = 50051
 
 	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
@@ -538,7 +540,12 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
-	config := defaultConfig()
+	config := DefaultRelayConfig()
+	config.GRPCPort = 50051
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 
 	addr := fmt.Sprintf("0.0.0.0:%d", config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)

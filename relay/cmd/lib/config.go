@@ -14,6 +14,10 @@ import (
 	"github.com/urfave/cli"
 )
 
+// This is the legacy config for the relay. It is retained for backwards compatibility with the blobapi.
+// Once the blobapi config is updated to the documented/verifiable config framework, this can be removed.
+// TODO(iquidus): remove this config once blobapi is updated to use the documented config framework.
+
 // Config is the configuration for the relay Server.
 type Config struct {
 

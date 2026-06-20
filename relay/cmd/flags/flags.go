@@ -11,6 +11,10 @@ import (
 	"github.com/urfave/cli"
 )
 
+// These flags are used by the legacy config. They are retained for backwards compatibility with the blobapi.
+// Once the blobapi config is updated to the documented/verifiable config framework, these can be removed.
+// TODO(iquidus): remove these flags once blobapi is updated to use the documented config framework.
+
 const (
 	FlagPrefix   = "relay"
 	envVarPrefix = "RELAY"
