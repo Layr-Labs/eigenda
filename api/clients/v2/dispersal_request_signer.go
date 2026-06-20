@@ -28,8 +28,12 @@ type DispersalRequestSignerConfig struct {
 	KeyID string `docs:"required"`
 	// PrivateKey is a hex-encoded private key for local signing (without 0x prefix). Optional if KeyID is provided.
 	PrivateKey string `docs:"required"`
-	// Region is the AWS region where the KMS key is located (e.g., "us-east-1"). Required if using KMS.
+	// Region is the default AWS region (e.g., "us-east-1"). Required if using KMS.
 	Region string `docs:"required"`
+	// KMSRegion is an optional AWS region override for KMS operations. When specified, this region is used
+	// for KMS operations instead of Region. If empty, Region is used. This allows KMS keys to be stored in
+	// a different region than other AWS resources.
+	KMSRegion string
 	// Endpoint is an optional custom AWS KMS endpoint URL. If empty, the standard AWS KMS endpoint is used.
 	// This is primarily useful for testing with LocalStack or other custom KMS implementations. Default is empty.
 	Endpoint string
@@ -96,27 +100,34 @@ func NewKMSDispersalRequestSigner(
 	ctx context.Context,
 	config DispersalRequestSignerConfig,
 ) (DispersalRequestSigner, error) {
+	// Determine which region to use for KMS operations.
+	// If KMSRegion is specified, use it; otherwise fall back to Region.
+	kmsRegion := config.Region
+	if config.KMSRegion != "" {
+		kmsRegion = config.KMSRegion
+	}
+
 	var kmsClient *kms.Client
 	if config.Endpoint != "" {
 		kmsClient = kms.New(kms.Options{
-			Region:       config.Region,
+			Region:       kmsRegion,
 			BaseEndpoint: aws.String(config.Endpoint),
 		})
 	} else {
 		// Load the AWS SDK configuration, which will automatically detect credentials
 		// from environment variables, IAM roles, or AWS config files
 		cfg, err := awsconfig.LoadDefaultConfig(ctx,
-			awsconfig.WithRegion(config.Region),
+			awsconfig.WithRegion(kmsRegion),
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load AWS config: %w", err)
+			return nil, fmt.Errorf("failed to load AWS config for region %s: %w", kmsRegion, err)
 		}
 		kmsClient = kms.NewFromConfig(cfg)
 	}
 
 	key, err := aws2.LoadPublicKeyKMS(ctx, kmsClient, config.KeyID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
+		return nil, fmt.Errorf("failed to get ecdsa public key from KMS in region %s: %w", kmsRegion, err)
 	}
 
 	return &kmsRequestSigner{

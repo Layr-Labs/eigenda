@@ -103,6 +103,7 @@ func NewConfig(ctx *cli.Context) (*controller.ControllerConfig, error) {
 			KeyID:      ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
 			PrivateKey: ctx.GlobalString(flags.DisperserPrivateKeyFlag.Name),
 			Region:     awsClientConfig.Region,
+			KMSRegion:  ctx.GlobalString(flags.DisperserKMSRegionFlag.Name),
 			Endpoint:   awsClientConfig.EndpointURL,
 		},
 		Encoder: controller.EncodingManagerConfig{
