@@ -107,7 +107,12 @@ func (m *EigenDAManager) Get(ctx context.Context,
 ) ([]byte, error) {
 	switch versionedCert.Version {
 	case certs.V0VersionByte:
-		return nil, errors.New("V1 backend has been removed, V0 certs are no longer supported")
+		if !m.secondary.CachingEnabled() && !m.secondary.FallbackEnabled() {
+			return nil, errors.New(
+				"V1 backend has been removed. V0 certs can only be read from secondary storage (S3/Redis), " +
+					"but no secondary storage is configured")
+		}
+		return m.getV0FromSecondary(ctx, versionedCert)
 	case certs.V1VersionByte, certs.V2VersionByte, certs.V3VersionByte:
 		if m.eigendaV2 == nil {
 			return nil, errors.New("received EigenDAV2 cert but EigenDA V2 client is not initialized")
@@ -116,6 +121,48 @@ func (m *EigenDAManager) Get(ctx context.Context,
 	default:
 		return nil, fmt.Errorf("cert version unknown: %b", versionedCert.Version)
 	}
+}
+
+// getV0FromSecondary retrieves V0 (EigenDA V1) cert data from secondary storage only.
+// The V1 dispersal backend has been removed, but data previously cached in S3/Redis
+// can still be read via the secondary storage layer.
+func (m *EigenDAManager) getV0FromSecondary(
+	ctx context.Context,
+	versionedCert *certs.VersionedCert,
+) ([]byte, error) {
+	// V1 verification logic has been removed. Data in secondary storage was already verified
+	// at write time, so we use a no-op verify function.
+	noopVerify := func(_ context.Context, _ []byte, _ []byte) error {
+		return nil
+	}
+
+	var readErrors []error
+
+	if m.secondary.CachingEnabled() {
+		m.log.Debug("Retrieving V0 cert payload from cached backends")
+		payload, err := m.secondary.MultiSourceRead(ctx,
+			versionedCert.SerializedCert, false, noopVerify)
+		if err == nil {
+			return payload, nil
+		}
+		m.log.Warn("Failed to read V0 cert payload from cache targets", "err", err)
+		readErrors = append(readErrors, fmt.Errorf("read from cache targets: %w", err))
+	}
+
+	if m.secondary.FallbackEnabled() {
+		m.log.Debug("Retrieving V0 cert payload from fallback backends")
+		payload, err := m.secondary.MultiSourceRead(ctx,
+			versionedCert.SerializedCert, true, noopVerify)
+		if err == nil {
+			return payload, nil
+		}
+		m.log.Warn("Failed to read V0 cert payload from fallback targets", "err", err)
+		readErrors = append(readErrors, fmt.Errorf("read from fallback targets: %w", err))
+	}
+
+	return nil, fmt.Errorf(
+		"V1 backend has been removed; failed to read V0 cert from secondary storage: %w",
+		errors.Join(readErrors...))
 }
 
 // getEigenDAV2 will attempt to retrieve a blob for the given versionedCert
