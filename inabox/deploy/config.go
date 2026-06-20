@@ -219,7 +219,6 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
 		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		DISPERSER_SERVER_DISPERSER_VERSION:           "2",
 
 		DISPERSER_SERVER_ENABLE_PAYMENT_METERER:  "true",
 		DISPERSER_SERVER_RESERVED_ONLY:           "false",
@@ -235,43 +234,6 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
-
-	return v
-}
-
-// Generates batcher .env
-func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) BatcherVars {
-	v := BatcherVars{
-		BATCHER_LOG_FORMAT:                    "text",
-		BATCHER_S3_BUCKET_NAME:                "test-eigenda-blobstore",
-		BATCHER_DYNAMODB_TABLE_NAME:           "test-BlobMetadata",
-		BATCHER_OBJECT_STORAGE_BACKEND:        "s3",
-		BATCHER_ENABLE_METRICS:                "true",
-		BATCHER_METRICS_HTTP_PORT:             "9094",
-		BATCHER_PULL_INTERVAL:                 "5s",
-		BATCHER_EIGENDA_DIRECTORY:             env.EigenDA.EigenDADirectory,
-		BATCHER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetriever,
-		BATCHER_EIGENDA_SERVICE_MANAGER:       env.EigenDA.ServiceManager,
-		BATCHER_SRS_ORDER:                     "300000",
-		BATCHER_CHAIN_RPC:                     "",
-		BATCHER_PRIVATE_KEY:                   key[2:],
-		BATCHER_GRAPH_URL:                     graphUrl,
-		BATCHER_USE_GRAPH:                     "true",
-		BATCHER_BATCH_SIZE_LIMIT:              "10240", // 10 GiB
-		BATCHER_INDEXER_PULL_INTERVAL:         "1s",
-		BATCHER_AWS_REGION:                    "",
-		BATCHER_AWS_ACCESS_KEY_ID:             "",
-		BATCHER_AWS_SECRET_ACCESS_KEY:         "",
-		BATCHER_AWS_ENDPOINT_URL:              "",
-		BATCHER_FINALIZER_INTERVAL:            "6m",
-		BATCHER_ENCODING_REQUEST_QUEUE_SIZE:   "500",
-		BATCHER_NUM_CONFIRMATIONS:             "0",
-		BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE: "100",
-		BATCHER_FINALIZATION_BLOCK_DELAY:      "0",
-		BATCHER_KMS_KEY_DISABLE:               "true",
-	}
-
-	env.applyDefaults(&v, "BATCHER", "batcher", ind)
 
 	return v
 }
@@ -388,10 +350,6 @@ func (env *Config) generateProxyVars(ind int) ProxyVars {
 		EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC:     "localhost:32005",
 		EIGENDA_PROXY_EIGENDA_V2_EIGENDA_DIRECTORY: env.EigenDA.EigenDADirectory,
 		EIGENDA_PROXY_EIGENDA_V2_GRPC_DISABLE_TLS:  "true",
-		// SRS paths
-		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH:          "../resources/srs/g1.point",
-		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH:          "../resources/srs/g2.point",
-		EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH: "../resources/srs/g2.trailing.point",
 	}
 	env.applyDefaults(&v, "EIGENDA_PROXY", "proxy", ind)
 	return v
@@ -641,20 +599,6 @@ func (env *Config) GenerateAllVariables() error {
 		env.Operators = append(env.Operators, operatorConfig)
 	}
 
-	// Batcher
-	name = "batcher0"
-	logPath, _, _, envFile = env.getPaths(name)
-	key, _, err := env.getKey(name)
-	if err != nil {
-		return fmt.Errorf("failed to get key for %s: %w", name, err)
-	}
-
-	batcherConfig := env.generateBatcherVars(0, key, graphUrl, logPath)
-	if err := writeEnv(batcherConfig.getEnvMap(), envFile); err != nil {
-		return fmt.Errorf("failed to write env file: %w", err)
-	}
-	env.Batcher = append(env.Batcher, batcherConfig)
-
 	// Encoders
 	// TODO: Add more encoders
 	name = "enc0"
@@ -705,7 +649,7 @@ func (env *Config) GenerateAllVariables() error {
 	}
 
 	name = "retriever0"
-	key, _, err = env.getKey(name)
+	key, _, err := env.getKey(name)
 	if err != nil {
 		return fmt.Errorf("failed to get key for %s: %w", name, err)
 	}

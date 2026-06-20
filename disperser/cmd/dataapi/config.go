@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -15,7 +13,6 @@ import (
 )
 
 type Config struct {
-	ServerVersion    uint
 	AwsClientConfig  aws.ClientConfig
 	BlobstoreConfig  blobstore.Config
 	EthClientConfig  geth.EthClientConfig
@@ -36,17 +33,11 @@ type Config struct {
 	OperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr  string
 
-	DisperserHostname  string
-	ChurnerHostname    string
-	BatcherHealthEndpt string
+	DisperserHostname string
+	ChurnerHostname   string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
-	version := ctx.GlobalUint(flags.DataApiServerVersionFlag.Name)
-	if version != 1 && version != 2 {
-		return Config{}, fmt.Errorf("unknown server version %d, must be in [1, 2]", version)
-	}
-
 	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
 	if err != nil {
 		return Config{}, err
@@ -69,7 +60,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:    ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		EigenDADirectory:             ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		ServerMode:                   ctx.GlobalString(flags.ServerModeFlag.Name),
-		ServerVersion:                version,
 		PrometheusConfig: prometheus.Config{
 			ServerURL: ctx.GlobalString(flags.PrometheusServerURLFlag.Name),
 			Username:  ctx.GlobalString(flags.PrometheusServerUsernameFlag.Name),
@@ -82,10 +72,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetricsFlag.Name),
 		},
-		DisperserHostname:  ctx.GlobalString(flags.DisperserHostnameFlag.Name),
-		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
-		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
-		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
+		DisperserHostname: ctx.GlobalString(flags.DisperserHostnameFlag.Name),
+		ChurnerHostname:   ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
+		ChainStateConfig:  thegraph.ReadCLIConfig(ctx),
 	}
 	return config, nil
 }

@@ -189,7 +189,7 @@ func NewServerV2(
 		indexedChainState:                indexedChainState,
 		metrics:                          metrics,
 		operatorHandler:                  operatorHandler,
-		metricsHandler:                   dataapi.NewMetricsHandler(promClient, dataapi.V2),
+		metricsHandler:                   dataapi.NewMetricsHandler(promClient),
 		batchFeedCache:                   batchFeedCache,
 		blobMetadataCache:                blobMetadataCache,
 		blobAttestationInfoCache:         blobAttestationInfoCache,
