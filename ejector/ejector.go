@@ -20,10 +20,6 @@ type Ejector struct {
 	// Responsible for executing ejections and managing the ejection lifecycle.
 	ejectionManager *ThreadedEjectionManager
 
-	// Used for looking up signing rates for V1.
-	// TODO(cody.littley): remove this after V1 sunset
-	signingRateLookupV1 SigningRateLookup
-
 	// Used for looking up signing rates for V2.
 	signingRateLookupV2 SigningRateLookup
 
@@ -52,7 +48,6 @@ func NewEjector(
 	logger logging.Logger,
 	config *EjectorConfig,
 	ejectionManager *ThreadedEjectionManager,
-	signingRateLookupV1 SigningRateLookup,
 	signingRateLookupV2 SigningRateLookup,
 	validatorIDToAddressCache eth.ValidatorIDToAddressConverter,
 	referenceBlockProvider eth.ReferenceBlockProvider,
@@ -63,7 +58,6 @@ func NewEjector(
 		ctx:                        ctx,
 		logger:                     logger,
 		ejectionManager:            ejectionManager,
-		signingRateLookupV1:        signingRateLookupV1,
 		signingRateLookupV2:        signingRateLookupV2,
 		period:                     config.EjectionPeriod,
 		ejectionCriteriaTimeWindow: config.EjectionCriteriaTimeWindow,
@@ -104,17 +98,7 @@ func (e *Ejector) evaluateValidators() error {
 
 	e.logger.Debug("evaluating validators for ejection")
 
-	v1SigningRates, err := e.signingRateLookupV1.GetSigningRates(
-		e.ejectionCriteriaTimeWindow,
-		nil, // all quorums
-		ProtocolVersionV1,
-		true, // omit perfect signers if possible (data API has inconsistent behavior across v1 and v2)
-	)
-	if err != nil {
-		return fmt.Errorf("error looking up v1 signing rates: %w", err)
-	}
-
-	v2SigningRates, err := e.signingRateLookupV2.GetSigningRates(
+	signingRates, err := e.signingRateLookupV2.GetSigningRates(
 		e.ejectionCriteriaTimeWindow,
 		nil, // all quorums
 		ProtocolVersionV2,
@@ -124,11 +108,6 @@ func (e *Ejector) evaluateValidators() error {
 		return fmt.Errorf("error looking up v2 signing rates: %w", err)
 	}
 
-	// Combine data from v1 and v2 lookups, since the validator is likely to cancel ejection if it is active in either.
-	signingRates, err := combineSigningRateSlices(v1SigningRates, v2SigningRates)
-	if err != nil {
-		return fmt.Errorf("error combining signing rates: %w", err)
-	}
 	sortByUnsignedBytesDescending(signingRates)
 
 	for _, signingRate := range signingRates {
