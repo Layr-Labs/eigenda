@@ -387,10 +387,10 @@ func TestGetReachabilityURL_InvalidBase(t *testing.T) {
 func TestConfigureMemoryLimits_ConstantSizes(t *testing.T) {
 	logger := testLogger(t)
 	config := &Config{
-		GCSafetyBufferSizeBytes:      1024,
-		LittDBReadCacheSizeBytes:     2048,
-		LittDBWriteCacheSizeBytes:    2048,
-		StoreChunksBufferSizeBytes:   4096,
+		GCSafetyBufferSizeBytes:    1024,
+		LittDBReadCacheSizeBytes:   2048,
+		LittDBWriteCacheSizeBytes:  2048,
+		StoreChunksBufferSizeBytes: 4096,
 	}
 	err := configureMemoryLimits(logger, config)
 	require.NoError(t, err)
@@ -404,10 +404,10 @@ func TestConfigureMemoryLimits_FractionSizes(t *testing.T) {
 	logger := testLogger(t)
 	// Use small fractions that should not exceed system memory.
 	config := &Config{
-		GCSafetyBufferSizeFraction:      0.01,
-		LittDBReadCacheSizeFraction:     0.01,
-		LittDBWriteCacheSizeFraction:    0.01,
-		StoreChunksBufferSizeFraction:   0.01,
+		GCSafetyBufferSizeFraction:    0.01,
+		LittDBReadCacheSizeFraction:   0.01,
+		LittDBWriteCacheSizeFraction:  0.01,
+		StoreChunksBufferSizeFraction: 0.01,
 	}
 	err := configureMemoryLimits(logger, config)
 	require.NoError(t, err)

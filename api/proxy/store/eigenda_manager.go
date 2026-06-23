@@ -145,17 +145,22 @@ func (m *EigenDAManager) getEigenDAV2(
 	var readErrors []error
 	// 1 - read payload from cache if enabled
 	// Secondary storages (cache and fallback) store payloads instead of blobs.
-	// For simplicity, we bypass secondary storages when requesting encoded payloads,
-	// since those requests are only for secure integrations and run by provers/challengers.
+	// When ReturnEncodedPayload is requested, we re-encode the stored payload. This is only safe
+	// because there is a single [PayloadEncodingVersion] in use; adding a new encoding version
+	// will require the stored payload to carry (or the cert to identify) its original encoding version.
 	// TODO: would be nice to store blobs instead of payloads in secondary storages, such that we could standardize all
 	// storages and make them all implement the [clients.PayloadRetriever] interface.
 	// We could then get rid of the proxy notion of caches/fallbacks and only have storages.
-	if m.secondary.CachingEnabled() && !opts.ReturnEncodedPayload {
-		m.log.Debug("Retrieving payload from cached backends")
+	if m.secondary.CachingEnabled() {
+		m.log.Debug("Retrieving payload from cached backends", "returnEncodedPayload", opts.ReturnEncodedPayload)
 		payload, err := m.secondary.MultiSourceRead(ctx,
 			versionedCert.SerializedCert, false, verifyFnForSecondary)
 		if err == nil {
-			return payload, nil
+			if !opts.ReturnEncodedPayload {
+				return payload, nil
+			}
+			encodedPayload := coretypes.Payload(payload).ToEncodedPayload()
+			return encodedPayload.Serialize(), nil
 		}
 		m.log.Warn("Failed to read payload from cache targets", "err", err)
 		readErrors = append(readErrors, fmt.Errorf("read from cache targets: %w", err))
@@ -178,13 +183,20 @@ func (m *EigenDAManager) getEigenDAV2(
 	}
 	readErrors = append(readErrors, fmt.Errorf("read from EigenDA backend: %w", err))
 
-	// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
-	// Only use fallbacks if we're not requesting encoded payload
-	if m.secondary.FallbackEnabled() && !opts.ReturnEncodedPayload {
-		payloadOrEncodedPayload, err = m.secondary.MultiSourceRead(ctx,
+	// 3 - read payload from fallbacks if enabled and data is non-retrievable from EigenDA.
+	// When ReturnEncodedPayload is requested, we re-encode the stored payload (see cache branch above
+	// for the single-encoding-version caveat). This path is critical for secure integrations after
+	// EigenDA's retention window expires, when the relays/validators no longer serve the encoded payload.
+	if m.secondary.FallbackEnabled() {
+		m.log.Debug("Retrieving payload from fallback backends", "returnEncodedPayload", opts.ReturnEncodedPayload)
+		payload, err := m.secondary.MultiSourceRead(ctx,
 			versionedCert.SerializedCert, true, verifyFnForSecondary)
 		if err == nil {
-			return payloadOrEncodedPayload, nil
+			if !opts.ReturnEncodedPayload {
+				return payload, nil
+			}
+			encodedPayload := coretypes.Payload(payload).ToEncodedPayload()
+			return encodedPayload.Serialize(), nil
 		}
 		readErrors = append(readErrors, fmt.Errorf("read from fallback targets: %w", err))
 	}
