@@ -17,7 +17,7 @@ which will start a local server at `http://localhost:3000` and open your browser
 ## Github Pages
 
 The book is automatically built and deployed to Github Pages on every push to the `main` branch.
-This is done by the Github Actions workflow defined in [../../.github/workflows/mdbook.yaml](../../.github/workflows/mdbook.yaml)
+This is done by the Github Actions workflow defined in [../../.github/workflows/mdbook-publish.yaml](../../.github/workflows/mdbook-publish.yaml)
 
 ## Mermaid Diagrams
 

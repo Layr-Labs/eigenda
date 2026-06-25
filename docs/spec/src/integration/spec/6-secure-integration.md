@@ -56,7 +56,7 @@ When validation fails, the DA Cert is discarded and nothing is forwarded downstr
 - Host provides false recency window size that leads to failure
 
 #### Cert Validity Check Failed
-- DA Cert doesn't satisfy [quorum-attestation constraint](../spec/6-secure-integration.md#2-cert-validation) or the `offchain derivation version` in the DA Cert differs from the immutable one stored in the `EigenDACertVerifier`'s bytecode. For more information, see [upgrade](./7-upgrade.md).
+- DA Cert doesn't satisfy [quorum-attestation constraint](../spec/6-secure-integration.md#2-cert-validation) or the `offchain derivation version` in the DA Cert differs from the immutable one stored in the `EigenDACertVerifier`'s bytecode. For more information, see [upgrade](./7-secure-upgrade.md).
 - Host provides false validity information via preimage oracle
 
 #### Decode Blob Failed
