@@ -3,6 +3,7 @@ package chainstate
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	blsapkregistry "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
 	ejectionmanager "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
+	stakeregistry "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -32,6 +34,7 @@ type Indexer struct {
 	registryCoordinator *regcoordinator.ContractEigenDARegistryCoordinator
 	blsApkRegistry      *blsapkregistry.ContractBLSApkRegistry
 	ejectionManager     *ejectionmanager.ContractEjectionManager
+	stakeRegistry       *stakeregistry.ContractStakeRegistry
 
 	// wg tracks the background goroutines (index loop and periodic persister)
 	// so that Wait can block until the final state save completes on shutdown.
@@ -102,6 +105,17 @@ func NewIndexer(
 		return nil, fmt.Errorf("failed to create ejection manager binding: %w", err)
 	}
 
+	// Stake Registry (used to record total quorum stake alongside APK snapshots)
+	stakeRegistryAddr, err := contractDirectory.GetContractAddress(ctx, directory.StakeRegistry)
+	if err != nil {
+		return nil, fmt.Errorf("get stake registry addr: %w", err)
+	}
+
+	stakeRegistry, err := stakeregistry.NewContractStakeRegistry(stakeRegistryAddr, ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stake registry binding: %w", err)
+	}
+
 	// Create store and persister
 	memStore := store.NewMemoryStore()
 	persister := store.NewJSONPersister(memStore, config.PersistencePath, logger)
@@ -114,6 +128,7 @@ func NewIndexer(
 		registryCoordinator: registryCoordinator,
 		blsApkRegistry:      blsApkRegistry,
 		ejectionManager:     ejectionManager,
+		stakeRegistry:       stakeRegistry,
 		logger:              logger.With("component", "ChainStateIndexer"),
 	}, nil
 }
@@ -408,6 +423,11 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 		}
 
 		i.logger.Debug("Indexed operator added to quorums", "operator_id", fmt.Sprintf("%x", event.OperatorId), "quorums", event.QuorumNumbers, "block", event.Raw.BlockNumber)
+
+		// The aggregate public key of each affected quorum changed; snapshot it.
+		if err := i.snapshotQuorumAPKs(ctx, event.QuorumNumbers, event.Raw.BlockNumber); err != nil {
+			return fmt.Errorf("failed to snapshot quorum APKs: %w", err)
+		}
 	}
 
 	if err := addedIter.Error(); err != nil {
@@ -452,10 +472,74 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 		}
 
 		i.logger.Debug("Indexed operator removed from quorums", "operator_id", fmt.Sprintf("%x", event.OperatorId), "quorums", event.QuorumNumbers, "block", event.Raw.BlockNumber)
+
+		// The aggregate public key of each affected quorum changed; snapshot it.
+		if err := i.snapshotQuorumAPKs(ctx, event.QuorumNumbers, event.Raw.BlockNumber); err != nil {
+			return fmt.Errorf("failed to snapshot quorum APKs: %w", err)
+		}
 	}
 
 	if err := removedIter.Error(); err != nil {
 		return fmt.Errorf("error iterating OperatorRemovedFromQuorums events: %w", err)
+	}
+
+	return nil
+}
+
+// snapshotQuorumAPKs records an aggregate-public-key snapshot for each of the
+// given quorums as of blockNum. The aggregate key is maintained on-chain by the
+// BLSApkRegistry, so we read it directly rather than summing operator keys
+// ourselves; total quorum stake is read from the StakeRegistry.
+//
+// To match the operator-state subgraph this indexer replaces, the contract reads
+// are made at blockNum (the block of the membership-change event), not at the
+// chain head. Reading historical state this way requires the configured RPC to
+// be an archive node. The snapshot timestamp is the block's timestamp, again to
+// match the subgraph rather than recording wall-clock indexing time.
+//
+// Any read or save failure is returned so the caller can retry the block range,
+// rather than silently leaving a quorum without a snapshot at this block.
+func (i *Indexer) snapshotQuorumAPKs(ctx context.Context, quorumNumbers []byte, blockNum uint64) error {
+	if len(quorumNumbers) == 0 {
+		return nil
+	}
+
+	blockBig := new(big.Int).SetUint64(blockNum)
+	callOpts := &bind.CallOpts{Context: ctx, BlockNumber: blockBig}
+
+	// Fetch the block header once to stamp every snapshot with the block time.
+	header, err := i.ethClient.HeaderByNumber(ctx, blockBig)
+	if err != nil {
+		return fmt.Errorf("failed to get header for block %d: %w", blockNum, err)
+	}
+	blockTime := time.Unix(int64(header.Time), 0).UTC()
+
+	for _, quorumID := range quorumNumbers {
+		apk, err := i.blsApkRegistry.GetApk(callOpts, quorumID)
+		if err != nil {
+			return fmt.Errorf("failed to read APK for quorum %d at block %d: %w", quorumID, blockNum, err)
+		}
+
+		// callOpts.BlockNumber pins this view call to blockNum, so "current"
+		// total stake here means the total stake as of that block.
+		totalStake, err := i.stakeRegistry.GetCurrentTotalStake(callOpts, quorumID)
+		if err != nil {
+			return fmt.Errorf("failed to read total stake for quorum %d at block %d: %w", quorumID, blockNum, err)
+		}
+
+		snapshot := &types.QuorumAPK{
+			QuorumID:    quorumID,
+			BlockNumber: blockNum,
+			APK:         core.NewG1Point(apk.X, apk.Y),
+			TotalStake:  totalStake,
+			UpdatedAt:   blockTime,
+		}
+
+		if err := i.store.SaveQuorumAPK(ctx, snapshot); err != nil {
+			return fmt.Errorf("failed to save APK snapshot for quorum %d at block %d: %w", quorumID, blockNum, err)
+		}
+
+		i.logger.Debug("Indexed quorum APK snapshot", "quorum", quorumID, "block", blockNum)
 	}
 
 	return nil
