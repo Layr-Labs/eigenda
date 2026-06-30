@@ -7,10 +7,9 @@ import (
 	"syscall"
 
 	"github.com/Layr-Labs/eigenda/chainstate"
-	"github.com/Layr-Labs/eigenda/chainstate/api"
+	"github.com/Layr-Labs/eigenda/chainstate/service"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/config"
-	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 var (
@@ -63,52 +62,25 @@ func run(ctx context.Context) error {
 		"gitCommit", GitCommit,
 		"gitDate", GitDate)
 
-	// Create Ethereum client
-	if len(secretConfig.EthRpcUrls) == 0 {
-		return fmt.Errorf("no Ethereum RPC URLs configured")
-	}
-
-	ethClient, err := ethclient.Dial(secretConfig.EthRpcUrls[0])
+	// Create the service (dials RPC, builds the indexer and API server).
+	svc, err := service.New(ctx, indexerConfig, secretConfig, logger)
 	if err != nil {
-		return fmt.Errorf("failed to connect to Ethereum RPC: %w", err)
-	}
-	defer ethClient.Close()
-
-	// TODO(iquidus): dont leak api key in logs
-	logger.Info("Connected to Ethereum RPC", "url", secretConfig.EthRpcUrls[0])
-
-	// Create indexer
-	indexer, err := chainstate.NewIndexer(ctx, indexerConfig, ethClient, logger)
-	if err != nil {
-		return fmt.Errorf("failed to create indexer: %w", err)
+		return fmt.Errorf("failed to create service: %w", err)
 	}
 
-	// Start indexer
-	if err := indexer.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start indexer: %w", err)
+	// Start indexing and the API server.
+	if err := svc.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start service: %w", err)
 	}
 
-	logger.Info("Indexer started successfully")
-
-	// Create and start API server
-	apiServer := api.NewServer(indexerConfig, indexer.GetStore(), logger)
-
-	// Start API server in a goroutine
-	errChan := make(chan error, 1)
-	go func() {
-		if err := apiServer.Start(ctx); err != nil {
-			errChan <- err
-		}
-	}()
-
-	logger.Info("API server started", "port", indexerConfig.HTTPPort)
+	logger.Info("Indexer and API server started", "port", indexerConfig.HTTPPort)
 
 	// Wait for either a shutdown signal (via ctx) or a fatal API server error.
 	var runErr error
 	select {
 	case <-ctx.Done():
 		logger.Info("Received shutdown signal, stopping indexer")
-	case err := <-errChan:
+	case err := <-svc.Errors():
 		logger.Error("API server failed", "error", err)
 		runErr = fmt.Errorf("API server failed: %w", err)
 	}
@@ -117,7 +89,7 @@ func run(ctx context.Context) error {
 	// block until its background goroutines stop, ensuring the persister's final
 	// state save completes before we exit on every shutdown path.
 	cancelIndexer()
-	indexer.Wait()
+	svc.Wait()
 	logger.Info("Shutdown complete")
 
 	return runErr
