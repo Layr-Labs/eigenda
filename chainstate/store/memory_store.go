@@ -55,6 +55,20 @@ func NewMemoryStore() *MemoryStore {
 	}
 }
 
+// paginate returns the slice of items for the given limit and offset, clamping
+// both to valid ranges. A negative or out-of-range offset yields an empty slice,
+// and a non-positive limit means "no limit" (return everything from offset on).
+func paginate[T any](items []T, limit, offset int) []T {
+	if offset < 0 || offset >= len(items) {
+		return []T{}
+	}
+	items = items[offset:]
+	if limit > 0 && limit < len(items) {
+		items = items[:limit]
+	}
+	return items
+}
+
 // SaveOperator implements Store.SaveOperator.
 func (s *MemoryStore) SaveOperator(ctx context.Context, op *types.Operator) error {
 	s.mu.Lock()
@@ -124,16 +138,7 @@ func (s *MemoryStore) ListOperators(ctx context.Context, filter types.OperatorFi
 		return result[i].RegisteredAtBlockNumber < result[j].RegisteredAtBlockNumber
 	})
 
-	// Apply pagination
-	if offset >= len(result) {
-		return []*types.Operator{}, nil
-	}
-	result = result[offset:]
-	if limit > 0 && limit < len(result) {
-		result = result[:limit]
-	}
-
-	return result, nil
+	return paginate(result, limit, offset), nil
 }
 
 // UpdateOperatorSocket implements Store.UpdateOperatorSocket.
@@ -259,16 +264,7 @@ func (s *MemoryStore) ListEjections(ctx context.Context, operatorID *core.Operat
 		return result[i].BlockNumber > result[j].BlockNumber
 	})
 
-	// Apply pagination
-	if offset >= len(result) {
-		return []*types.OperatorEjection{}, nil
-	}
-	result = result[offset:]
-	if limit > 0 && limit < len(result) {
-		result = result[:limit]
-	}
-
-	return result, nil
+	return paginate(result, limit, offset), nil
 }
 
 // SaveSocketUpdate implements Store.SaveSocketUpdate.
@@ -300,16 +296,7 @@ func (s *MemoryStore) ListSocketUpdates(ctx context.Context, operatorID core.Ope
 		return result[i].BlockNumber > result[j].BlockNumber
 	})
 
-	// Apply pagination
-	if offset >= len(result) {
-		return []*types.OperatorSocketUpdate{}, nil
-	}
-	result = result[offset:]
-	if limit > 0 && limit < len(result) {
-		result = result[:limit]
-	}
-
-	return result, nil
+	return paginate(result, limit, offset), nil
 }
 
 // GetLastIndexedBlock implements Store.GetLastIndexedBlock.
