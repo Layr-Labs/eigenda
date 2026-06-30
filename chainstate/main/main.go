@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/signal"
 	"syscall"
 
@@ -46,6 +45,12 @@ func run(ctx context.Context) error {
 	secretConfig := cfg.Secret
 	indexerConfig := cfg.Config
 	cfg = nil // Safety: discard root config to prevent accidental secret logging
+
+	// Derive a cancellable context for the indexer so that, even if shutdown is
+	// triggered by an API server error rather than a signal, we can stop the
+	// indexer and let its persister flush a final state save before exiting.
+	ctx, cancelIndexer := context.WithCancel(ctx)
+	defer cancelIndexer()
 
 	// Create logger
 	logger, err := common.NewLogger(&indexerConfig.LoggerConfig)
@@ -98,20 +103,22 @@ func run(ctx context.Context) error {
 
 	logger.Info("API server started", "port", indexerConfig.HTTPPort)
 
-	// Wait for interrupt signal for graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
+	// Wait for either a shutdown signal (via ctx) or a fatal API server error.
+	var runErr error
 	select {
 	case <-ctx.Done():
-		logger.Info("Received shutdown signal, stopping relay server")
+		logger.Info("Received shutdown signal, stopping indexer")
 	case err := <-errChan:
-		logger.Error("Relay server failed", "error", err)
-		return fmt.Errorf("relay server failed: %w", err)
+		logger.Error("API server failed", "error", err)
+		runErr = fmt.Errorf("API server failed: %w", err)
 	}
 
-	// Give some time for graceful shutdown
+	// Cancel the indexer context (a no-op if a signal already cancelled it) and
+	// block until its background goroutines stop, ensuring the persister's final
+	// state save completes before we exit on every shutdown path.
+	cancelIndexer()
+	indexer.Wait()
 	logger.Info("Shutdown complete")
 
-	return nil
+	return runErr
 }

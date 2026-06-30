@@ -3,6 +3,7 @@ package chainstate
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/chainstate/store"
@@ -31,6 +32,10 @@ type Indexer struct {
 	registryCoordinator *regcoordinator.ContractEigenDARegistryCoordinator
 	blsApkRegistry      *blsapkregistry.ContractBLSApkRegistry
 	ejectionManager     *ejectionmanager.ContractEjectionManager
+
+	// wg tracks the background goroutines (index loop and periodic persister)
+	// so that Wait can block until the final state save completes on shutdown.
+	wg sync.WaitGroup
 
 	logger logging.Logger
 }
@@ -121,13 +126,28 @@ func (i *Indexer) Start(ctx context.Context) error {
 	}
 
 	// Start periodic persistence
-	go i.persister.StartPeriodicSave(ctx, i.config.PersistInterval)
+	i.wg.Add(1)
+	go func() {
+		defer i.wg.Done()
+		i.persister.StartPeriodicSave(ctx, i.config.PersistInterval)
+	}()
 
 	// Start indexing loop
-	go i.indexLoop(ctx)
+	i.wg.Add(1)
+	go func() {
+		defer i.wg.Done()
+		i.indexLoop(ctx)
+	}()
 
 	i.logger.Info("Indexer started successfully")
 	return nil
+}
+
+// Wait blocks until the indexer's background goroutines have stopped. This
+// should be called after the context passed to Start has been cancelled, to
+// ensure the persister's final state save completes before the process exits.
+func (i *Indexer) Wait() {
+	i.wg.Wait()
 }
 
 // indexLoop continuously polls for new blocks and indexes them.
