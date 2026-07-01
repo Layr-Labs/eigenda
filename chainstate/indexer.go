@@ -252,7 +252,7 @@ func (i *Indexer) indexRegistryCoordinatorEvents(ctx context.Context, from, to u
 	if err != nil {
 		return fmt.Errorf("failed to filter OperatorRegistered events: %w", err)
 	}
-	defer regIter.Close()
+	defer func() { _ = regIter.Close() }()
 
 	for regIter.Next() {
 		event := regIter.Event
@@ -267,7 +267,13 @@ func (i *Indexer) indexRegistryCoordinatorEvents(ctx context.Context, from, to u
 			return fmt.Errorf("failed to save operator: %w", err)
 		}
 
-		i.logger.Debug("Indexed operator registration", "operator_id", fmt.Sprintf("%x", event.OperatorId), "block", event.Raw.BlockNumber)
+		i.logger.Debug(
+			"Indexed operator registration",
+			"operator_id",
+			fmt.Sprintf("%x", event.OperatorId),
+			"block",
+			event.Raw.BlockNumber,
+		)
 	}
 
 	if err := regIter.Error(); err != nil {
@@ -279,16 +285,28 @@ func (i *Indexer) indexRegistryCoordinatorEvents(ctx context.Context, from, to u
 	if err != nil {
 		return fmt.Errorf("failed to filter OperatorDeregistered events: %w", err)
 	}
-	defer deregIter.Close()
+	defer func() { _ = deregIter.Close() }()
 
 	for deregIter.Next() {
 		event := deregIter.Event
 		if err := i.store.DeregisterOperator(ctx, event.OperatorId, event.Raw.BlockNumber, event.Raw.TxHash); err != nil {
-			i.logger.Warn("Failed to deregister operator (may not exist yet)", "operator_id", fmt.Sprintf("%x", event.OperatorId), "error", err)
+			i.logger.Warn(
+				"Failed to deregister operator (may not exist yet)",
+				"operator_id",
+				fmt.Sprintf("%x", event.OperatorId),
+				"error",
+				err,
+			)
 			continue
 		}
 
-		i.logger.Debug("Indexed operator deregistration", "operator_id", fmt.Sprintf("%x", event.OperatorId), "block", event.Raw.BlockNumber)
+		i.logger.Debug(
+			"Indexed operator deregistration",
+			"operator_id",
+			fmt.Sprintf("%x", event.OperatorId),
+			"block",
+			event.Raw.BlockNumber,
+		)
 	}
 
 	if err := deregIter.Error(); err != nil {
@@ -300,7 +318,7 @@ func (i *Indexer) indexRegistryCoordinatorEvents(ctx context.Context, from, to u
 	if err != nil {
 		return fmt.Errorf("failed to filter OperatorSocketUpdate events: %w", err)
 	}
-	defer socketIter.Close()
+	defer func() { _ = socketIter.Close() }()
 
 	for socketIter.Next() {
 		event := socketIter.Event
@@ -318,10 +336,24 @@ func (i *Indexer) indexRegistryCoordinatorEvents(ctx context.Context, from, to u
 
 		// Also update the operator's socket
 		if err := i.store.UpdateOperatorSocket(ctx, event.OperatorId, event.Socket, event.Raw.BlockNumber); err != nil {
-			i.logger.Warn("Failed to update operator socket (may not exist yet)", "operator_id", fmt.Sprintf("%x", event.OperatorId), "error", err)
+			i.logger.Warn(
+				"Failed to update operator socket (may not exist yet)",
+				"operator_id",
+				fmt.Sprintf("%x", event.OperatorId),
+				"error",
+				err,
+			)
 		}
 
-		i.logger.Debug("Indexed socket update", "operator_id", fmt.Sprintf("%x", event.OperatorId), "socket", event.Socket, "block", event.Raw.BlockNumber)
+		i.logger.Debug(
+			"Indexed socket update",
+			"operator_id",
+			fmt.Sprintf("%x", event.OperatorId),
+			"socket",
+			event.Socket,
+			"block",
+			event.Raw.BlockNumber,
+		)
 	}
 
 	if err := socketIter.Error(); err != nil {
@@ -344,7 +376,7 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 	if err != nil {
 		return fmt.Errorf("failed to filter NewPubkeyRegistration events: %w", err)
 	}
-	defer pubkeyIter.Close()
+	defer func() { _ = pubkeyIter.Close() }()
 
 	for pubkeyIter.Next() {
 		event := pubkeyIter.Event
@@ -374,7 +406,13 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 		// Get the operator and update their BLS keys
 		op, err := i.store.GetOperator(ctx, operatorID)
 		if err != nil {
-			i.logger.Warn("Operator not found when registering pubkey", "operator_id", fmt.Sprintf("%x", operatorID), "error", err)
+			i.logger.Warn(
+				"Operator not found when registering pubkey",
+				"operator_id",
+				fmt.Sprintf("%x", operatorID),
+				"error",
+				err,
+			)
 			continue
 		}
 
@@ -385,7 +423,13 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 			return fmt.Errorf("failed to update operator pubkey: %w", err)
 		}
 
-		i.logger.Debug("Indexed BLS pubkey registration", "operator_id", fmt.Sprintf("%x", event.Operator), "block", event.Raw.BlockNumber)
+		i.logger.Debug(
+			"Indexed BLS pubkey registration",
+			"operator_id",
+			fmt.Sprintf("%x", event.Operator),
+			"block",
+			event.Raw.BlockNumber,
+		)
 	}
 
 	if err := pubkeyIter.Error(); err != nil {
@@ -397,7 +441,7 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 	if err != nil {
 		return fmt.Errorf("failed to filter OperatorAddedToQuorums events: %w", err)
 	}
-	defer addedIter.Close()
+	defer func() { _ = addedIter.Close() }()
 
 	for addedIter.Next() {
 		event := addedIter.Event
@@ -405,7 +449,13 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 		// Get the operator and update their quorum memberships
 		op, err := i.store.GetOperator(ctx, event.OperatorId)
 		if err != nil {
-			i.logger.Warn("Operator not found when adding to quorums", "operator_id", fmt.Sprintf("%x", event.OperatorId), "error", err)
+			i.logger.Warn(
+				"Operator not found when adding to quorums",
+				"operator_id",
+				fmt.Sprintf("%x", event.OperatorId),
+				"error",
+				err,
+			)
 			continue
 		}
 
@@ -413,13 +463,13 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 		for _, newQuorum := range event.QuorumNumbers {
 			found := false
 			for _, existingQuorum := range op.QuorumIDs {
-				if existingQuorum == core.QuorumID(newQuorum) {
+				if existingQuorum == newQuorum {
 					found = true
 					break
 				}
 			}
 			if !found {
-				op.QuorumIDs = append(op.QuorumIDs, core.QuorumID(newQuorum))
+				op.QuorumIDs = append(op.QuorumIDs, newQuorum)
 			}
 		}
 
@@ -427,7 +477,15 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 			return fmt.Errorf("failed to update operator quorums: %w", err)
 		}
 
-		i.logger.Debug("Indexed operator added to quorums", "operator_id", fmt.Sprintf("%x", event.OperatorId), "quorums", event.QuorumNumbers, "block", event.Raw.BlockNumber)
+		i.logger.Debug(
+			"Indexed operator added to quorums",
+			"operator_id",
+			fmt.Sprintf("%x", event.OperatorId),
+			"quorums",
+			event.QuorumNumbers,
+			"block",
+			event.Raw.BlockNumber,
+		)
 
 		// The aggregate public key of each affected quorum changed; snapshot it.
 		if err := i.snapshotQuorumAPKs(ctx, event.QuorumNumbers, event.Raw.BlockNumber); err != nil {
@@ -444,7 +502,7 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 	if err != nil {
 		return fmt.Errorf("failed to filter OperatorRemovedFromQuorums events: %w", err)
 	}
-	defer removedIter.Close()
+	defer func() { _ = removedIter.Close() }()
 
 	for removedIter.Next() {
 		event := removedIter.Event
@@ -452,7 +510,13 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 		// Get the operator and update their quorum memberships
 		op, err := i.store.GetOperator(ctx, event.OperatorId)
 		if err != nil {
-			i.logger.Warn("Operator not found when removing from quorums", "operator_id", fmt.Sprintf("%x", event.OperatorId), "error", err)
+			i.logger.Warn(
+				"Operator not found when removing from quorums",
+				"operator_id",
+				fmt.Sprintf("%x", event.OperatorId),
+				"error",
+				err,
+			)
 			continue
 		}
 
@@ -461,7 +525,7 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 		for _, existingQuorum := range op.QuorumIDs {
 			shouldRemove := false
 			for _, removedQuorum := range event.QuorumNumbers {
-				if existingQuorum == core.QuorumID(removedQuorum) {
+				if existingQuorum == removedQuorum {
 					shouldRemove = true
 					break
 				}
@@ -476,7 +540,15 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 			return fmt.Errorf("failed to update operator quorums: %w", err)
 		}
 
-		i.logger.Debug("Indexed operator removed from quorums", "operator_id", fmt.Sprintf("%x", event.OperatorId), "quorums", event.QuorumNumbers, "block", event.Raw.BlockNumber)
+		i.logger.Debug(
+			"Indexed operator removed from quorums",
+			"operator_id",
+			fmt.Sprintf("%x", event.OperatorId),
+			"quorums",
+			event.QuorumNumbers,
+			"block",
+			event.Raw.BlockNumber,
+		)
 
 		// The aggregate public key of each affected quorum changed; snapshot it.
 		if err := i.snapshotQuorumAPKs(ctx, event.QuorumNumbers, event.Raw.BlockNumber); err != nil {
@@ -563,13 +635,13 @@ func (i *Indexer) indexEjectionManagerEvents(ctx context.Context, from, to uint6
 	if err != nil {
 		return fmt.Errorf("failed to filter OperatorEjected events: %w", err)
 	}
-	defer ejectedIter.Close()
+	defer func() { _ = ejectedIter.Close() }()
 
 	for ejectedIter.Next() {
 		event := ejectedIter.Event
 
 		// OperatorEjected event has a single QuorumNumber, not QuorumNumbers array
-		quorumIDs := []core.QuorumID{core.QuorumID(event.QuorumNumber)}
+		quorumIDs := []core.QuorumID{event.QuorumNumber}
 
 		ejection := &types.OperatorEjection{
 			OperatorID:  event.OperatorId,
@@ -583,7 +655,15 @@ func (i *Indexer) indexEjectionManagerEvents(ctx context.Context, from, to uint6
 			return fmt.Errorf("failed to save ejection: %w", err)
 		}
 
-		i.logger.Debug("Indexed operator ejection", "operator_id", fmt.Sprintf("%x", event.OperatorId), "quorum", event.QuorumNumber, "block", event.Raw.BlockNumber)
+		i.logger.Debug(
+			"Indexed operator ejection",
+			"operator_id",
+			fmt.Sprintf("%x", event.OperatorId),
+			"quorum",
+			event.QuorumNumber,
+			"block",
+			event.Raw.BlockNumber,
+		)
 	}
 
 	if err := ejectedIter.Error(); err != nil {

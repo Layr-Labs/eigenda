@@ -208,7 +208,7 @@ func (s *Server) handleListQuorumAPKs(c *gin.Context) {
 	maxBlock := parseUint64Or(c.Query("max_block"), 0)
 
 	filter := types.QuorumAPKFilter{
-		QuorumID:    core.QuorumID(quorumID),
+		QuorumID:    quorumID,
 		BlockNumber: blockNumber,
 		MinBlock:    minBlock,
 		MaxBlock:    maxBlock,

@@ -53,7 +53,11 @@ type Store interface {
 	SaveSocketUpdate(ctx context.Context, update *types.OperatorSocketUpdate) error
 
 	// ListSocketUpdates retrieves socket update events for an operator.
-	ListSocketUpdates(ctx context.Context, operatorID core.OperatorID, limit, offset int) ([]*types.OperatorSocketUpdate, error)
+	ListSocketUpdates(
+		ctx context.Context,
+		operatorID core.OperatorID,
+		limit, offset int,
+	) ([]*types.OperatorSocketUpdate, error)
 
 	// Block tracking
 
