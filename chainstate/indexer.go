@@ -352,11 +352,16 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 		// Convert BN254 points to core.G1Point and core.G2Point
 		g1Point := core.NewG1Point(event.PubkeyG1.X, event.PubkeyG1.Y)
 
-		// For G2Point, we need to manually construct the bn254.G2Affine
-		// G2 X and Y are E2 extension field elements with two components each
+		// For G2Point, we need to manually construct the bn254.G2Affine.
+		// G2 X and Y are E2 extension field elements with two components each.
+		//
+		// The contract orders the components as [A1, A0] (see core/eth/utils.go),
+		// whereas E2.SetString takes (A0, A1). The indices must therefore be
+		// swapped: component [1] is A0 and component [0] is A1. Getting this wrong
+		// yields a valid-looking but incorrect G2 key.
 		var g2Affine bn254.G2Affine
-		g2Affine.X.SetString(event.PubkeyG2.X[0].String(), event.PubkeyG2.X[1].String())
-		g2Affine.Y.SetString(event.PubkeyG2.Y[0].String(), event.PubkeyG2.Y[1].String())
+		g2Affine.X.SetString(event.PubkeyG2.X[1].String(), event.PubkeyG2.X[0].String())
+		g2Affine.Y.SetString(event.PubkeyG2.Y[1].String(), event.PubkeyG2.Y[0].String())
 		g2Point := &core.G2Point{G2Affine: &g2Affine}
 
 		// Convert operator address to operator ID using the contract
