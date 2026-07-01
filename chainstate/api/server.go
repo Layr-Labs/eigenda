@@ -152,24 +152,9 @@ func (s *Server) handleListOperators(c *gin.Context) {
 
 // handleGetOperator returns a single operator by ID.
 func (s *Server) handleGetOperator(c *gin.Context) {
-	idStr := c.Param("id")
-	if len(idStr) != 64 && len(idStr) != 66 { // 32 bytes hex = 64 chars, or 66 with "0x" prefix
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid operator ID format (expected 32-byte hex)"})
+	operatorID, ok := parseOperatorIDParam(c, "id")
+	if !ok {
 		return
-	}
-
-	// Remove "0x" prefix if present
-	if len(idStr) == 66 && idStr[:2] == "0x" {
-		idStr = idStr[2:]
-	}
-
-	var operatorID core.OperatorID
-	for i := 0; i < 32; i++ {
-		_, err := fmt.Sscanf(idStr[i*2:i*2+2], "%02x", &operatorID[i])
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid operator ID format"})
-			return
-		}
 	}
 
 	operator, err := s.store.GetOperator(c.Request.Context(), operatorID)
@@ -249,24 +234,9 @@ func (s *Server) handleListEjections(c *gin.Context) {
 
 // handleListOperatorEjections returns ejections for a specific operator.
 func (s *Server) handleListOperatorEjections(c *gin.Context) {
-	idStr := c.Param("operator_id")
-	if len(idStr) != 64 && len(idStr) != 66 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid operator ID format"})
+	operatorID, ok := parseOperatorIDParam(c, "operator_id")
+	if !ok {
 		return
-	}
-
-	// Remove "0x" prefix if present
-	if len(idStr) == 66 && idStr[:2] == "0x" {
-		idStr = idStr[2:]
-	}
-
-	var operatorID core.OperatorID
-	for i := 0; i < 32; i++ {
-		_, err := fmt.Sscanf(idStr[i*2:i*2+2], "%02x", &operatorID[i])
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid operator ID format"})
-			return
-		}
 	}
 
 	limit := parseIntOr(c.Query("limit"), 100)
@@ -289,24 +259,9 @@ func (s *Server) handleListOperatorEjections(c *gin.Context) {
 
 // handleListSocketUpdates returns socket updates for a specific operator.
 func (s *Server) handleListSocketUpdates(c *gin.Context) {
-	idStr := c.Param("operator_id")
-	if len(idStr) != 64 && len(idStr) != 66 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid operator ID format"})
+	operatorID, ok := parseOperatorIDParam(c, "operator_id")
+	if !ok {
 		return
-	}
-
-	// Remove "0x" prefix if present
-	if len(idStr) == 66 && idStr[:2] == "0x" {
-		idStr = idStr[2:]
-	}
-
-	var operatorID core.OperatorID
-	for i := 0; i < 32; i++ {
-		_, err := fmt.Sscanf(idStr[i*2:i*2+2], "%02x", &operatorID[i])
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid operator ID format"})
-			return
-		}
 	}
 
 	limit := parseIntOr(c.Query("limit"), 100)
@@ -353,6 +308,18 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// parseOperatorIDParam parses the named path parameter as a 32-byte operator ID
+// (hex, with or without a "0x" prefix). On failure it writes a 400 response and
+// returns ok=false, so callers can simply `return` when ok is false.
+func parseOperatorIDParam(c *gin.Context, param string) (core.OperatorID, bool) {
+	operatorID, err := core.OperatorIDFromHex(c.Param(param))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid operator ID format (expected 32-byte hex)"})
+		return core.OperatorID{}, false
+	}
+	return operatorID, true
 }
 
 // Helper functions for parsing query parameters

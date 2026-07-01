@@ -67,6 +67,10 @@ func New(
 // A fatal API server error is delivered on the channel returned by Errors.
 func (s *Service) Start(ctx context.Context) error {
 	if err := s.indexer.Start(ctx); err != nil {
+		// The indexer never started, so its goroutines will never run and Wait
+		// would return immediately without closing the client. Release it here so
+		// a Start failure does not leak the connection.
+		s.ethClient.Close()
 		return fmt.Errorf("failed to start indexer: %w", err)
 	}
 
