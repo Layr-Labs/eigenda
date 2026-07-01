@@ -61,10 +61,9 @@ func (ics *IndexedChainState) Start(ctx context.Context) error {
 // and quorums: the on-chain operator state, plus each quorum's aggregate public
 // key and each operator's indexed info (BLS keys and socket) from the store.
 //
-// The assembly mirrors core/thegraph's implementation, including its handling of
-// operators that are present on-chain but missing from the index (an error) and
-// indexed operators that are not part of any requested quorum at the reference
-// block (filtered out).
+// The three pieces are combined by core.AssembleIndexedOperatorState, which is
+// shared with core/thegraph so both implementations apply identical
+// missing/extra-operator rules.
 func (ics *IndexedChainState) GetIndexedOperatorState(
 	ctx context.Context,
 	blockNumber uint,
@@ -96,46 +95,26 @@ func (ics *IndexedChainState) GetIndexedOperatorState(
 		return nil, err
 	}
 
-	// Every operator present in the on-chain state must be present in the index.
-	operatorSeen := make(map[core.OperatorID]struct{})
-	for _, quorumOperators := range operatorState.Operators {
-		for operatorID := range quorumOperators {
-			if indexedOperators[operatorID] == nil {
-				return nil, fmt.Errorf("operator %s not found in indexed state", operatorID.Hex())
-			}
-			operatorSeen[operatorID] = struct{}{}
-		}
+	state, err := core.AssembleIndexedOperatorState(operatorState, indexedOperators, aggKeys)
+	if err != nil {
+		return nil, fmt.Errorf("failed to assemble indexed operator state: %w", err)
 	}
-
-	// Drop indexed operators that are not part of any requested quorum at the
-	// reference block (e.g. operators that registered after blockNumber).
-	for operatorID := range indexedOperators {
-		if _, ok := operatorSeen[operatorID]; !ok {
-			delete(indexedOperators, operatorID)
-		}
-	}
-
-	return &core.IndexedOperatorState{
-		OperatorState:    operatorState,
-		IndexedOperators: indexedOperators,
-		AggKeys:          aggKeys,
-	}, nil
+	return state, nil
 }
 
-// GetIndexedOperators returns the indexed info (BLS keys and socket) for all
-// operators known to the store that are registered as of blockNumber, keyed by
-// operator ID.
-//
-// Like core/thegraph, this may over-fetch (an operator that registered after
-// blockNumber but is still registered is included); callers that need results
-// scoped to a reference block filter against the on-chain operator state, as
-// GetIndexedOperatorState does.
+// GetIndexedOperators returns the indexed info (BLS keys and socket) for every
+// operator that was registered as of blockNumber, keyed by operator ID. An
+// operator deregistered after blockNumber is included, since it was registered
+// at the reference block.
 func (ics *IndexedChainState) GetIndexedOperators(
 	ctx context.Context,
 	blockNumber uint,
 ) (map[core.OperatorID]*core.IndexedOperatorInfo, error) {
-	// A zero/empty filter returns all operators; we filter by registration below.
-	operators, err := ics.store.ListOperators(ctx, types.OperatorFilter{}, 0, 0)
+	// Push the registration-block bound into the store so it doesn't copy
+	// operators that registered after blockNumber. The store filter can't
+	// express "not yet deregistered as of blockNumber" (its RegisteredOnly is
+	// not block-scoped), so that half of the check stays in registeredAt below.
+	operators, err := ics.store.ListOperators(ctx, types.OperatorFilter{MaxBlock: uint64(blockNumber)}, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list operators: %w", err)
 	}
