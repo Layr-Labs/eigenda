@@ -289,15 +289,14 @@ func (i *Indexer) indexRegistryCoordinatorEvents(ctx context.Context, from, to u
 
 	for deregIter.Next() {
 		event := deregIter.Event
+		// All OperatorRegistered events in this range are indexed before the
+		// deregistrations, and on-chain a deregistration always follows the
+		// operator's registration, so the operator must already exist. A
+		// not-found here means a genuine gap (a missed earlier range or a reorg),
+		// so fail the batch to retry rather than silently dropping the event.
 		if err := i.store.DeregisterOperator(ctx, event.OperatorId, event.Raw.BlockNumber, event.Raw.TxHash); err != nil {
-			i.logger.Warn(
-				"Failed to deregister operator (may not exist yet)",
-				"operator_id",
-				fmt.Sprintf("%x", event.OperatorId),
-				"error",
-				err,
-			)
-			continue
+			return fmt.Errorf("failed to deregister operator %x at block %d: %w",
+				event.OperatorId, event.Raw.BlockNumber, err)
 		}
 
 		i.logger.Debug(
@@ -436,6 +435,22 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 		return fmt.Errorf("error iterating NewPubkeyRegistration events: %w", err)
 	}
 
+	// affectedQuorums tracks, per block, the set of quorums whose aggregate
+	// public key changed in this range. Collecting these and snapshotting once
+	// per (block, quorum) at the end avoids repeating the header and contract
+	// reads for events that share a block.
+	affectedQuorums := make(map[uint64]map[core.QuorumID]struct{})
+	markAffected := func(blockNum uint64, quorums []byte) {
+		byQuorum, ok := affectedQuorums[blockNum]
+		if !ok {
+			byQuorum = make(map[core.QuorumID]struct{})
+			affectedQuorums[blockNum] = byQuorum
+		}
+		for _, quorum := range quorums {
+			byQuorum[quorum] = struct{}{}
+		}
+	}
+
 	// Index OperatorAddedToQuorums events
 	addedIter, err := i.blsApkRegistry.FilterOperatorAddedToQuorums(filterOpts)
 	if err != nil {
@@ -487,10 +502,8 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 			event.Raw.BlockNumber,
 		)
 
-		// The aggregate public key of each affected quorum changed; snapshot it.
-		if err := i.snapshotQuorumAPKs(ctx, event.QuorumNumbers, event.Raw.BlockNumber); err != nil {
-			return fmt.Errorf("failed to snapshot quorum APKs: %w", err)
-		}
+		// The aggregate public key of each affected quorum changed at this block.
+		markAffected(event.Raw.BlockNumber, event.QuorumNumbers)
 	}
 
 	if err := addedIter.Error(); err != nil {
@@ -550,14 +563,24 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 			event.Raw.BlockNumber,
 		)
 
-		// The aggregate public key of each affected quorum changed; snapshot it.
-		if err := i.snapshotQuorumAPKs(ctx, event.QuorumNumbers, event.Raw.BlockNumber); err != nil {
-			return fmt.Errorf("failed to snapshot quorum APKs: %w", err)
-		}
+		// The aggregate public key of each affected quorum changed at this block.
+		markAffected(event.Raw.BlockNumber, event.QuorumNumbers)
 	}
 
 	if err := removedIter.Error(); err != nil {
 		return fmt.Errorf("error iterating OperatorRemovedFromQuorums events: %w", err)
+	}
+
+	// Snapshot each affected quorum's APK once per block, after all membership
+	// changes for the range have been applied.
+	for blockNum, byQuorum := range affectedQuorums {
+		quorums := make([]core.QuorumID, 0, len(byQuorum))
+		for quorum := range byQuorum {
+			quorums = append(quorums, quorum)
+		}
+		if err := i.snapshotQuorumAPKs(ctx, quorums, blockNum); err != nil {
+			return fmt.Errorf("failed to snapshot quorum APKs: %w", err)
+		}
 	}
 
 	return nil
@@ -576,7 +599,7 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 //
 // Any read or save failure is returned so the caller can retry the block range,
 // rather than silently leaving a quorum without a snapshot at this block.
-func (i *Indexer) snapshotQuorumAPKs(ctx context.Context, quorumNumbers []byte, blockNum uint64) error {
+func (i *Indexer) snapshotQuorumAPKs(ctx context.Context, quorumNumbers []core.QuorumID, blockNum uint64) error {
 	if len(quorumNumbers) == 0 {
 		return nil
 	}
