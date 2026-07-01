@@ -81,13 +81,14 @@ func (ics *IndexedChainState) GetIndexedOperatorState(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get aggregate public key for quorum %d: %w", quorum, err)
 		}
-		if apk != nil {
-			aggKeys[quorum] = apk
+		// A requested quorum with no APK snapshot is an error, not a silent
+		// omission: returning a partial AggKeys map would let a consumer verify
+		// signatures against an incomplete key set. This matches core/thegraph,
+		// which surfaces a missing APK as an error.
+		if apk == nil {
+			return nil, fmt.Errorf("no aggregate public key found for quorum %d at block %d", quorum, blockNumber)
 		}
-	}
-	if len(aggKeys) == 0 {
-		ics.logger.Warn("no aggregate public keys found for any of the specified quorums",
-			"blockNumber", blockNumber)
+		aggKeys[quorum] = apk
 	}
 
 	indexedOperators, err := ics.GetIndexedOperators(ctx, blockNumber)

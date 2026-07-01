@@ -96,7 +96,11 @@ func (s *MemoryStore) GetOperator(ctx context.Context, id core.OperatorID) (*typ
 }
 
 // ListOperators implements Store.ListOperators.
-func (s *MemoryStore) ListOperators(ctx context.Context, filter types.OperatorFilter, limit, offset int) ([]*types.Operator, error) {
+func (s *MemoryStore) ListOperators(
+	ctx context.Context,
+	filter types.OperatorFilter,
+	limit, offset int,
+) ([]*types.Operator, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -142,7 +146,12 @@ func (s *MemoryStore) ListOperators(ctx context.Context, filter types.OperatorFi
 }
 
 // UpdateOperatorSocket implements Store.UpdateOperatorSocket.
-func (s *MemoryStore) UpdateOperatorSocket(ctx context.Context, id core.OperatorID, socket string, blockNum uint64) error {
+func (s *MemoryStore) UpdateOperatorSocket(
+	ctx context.Context,
+	id core.OperatorID,
+	socket string,
+	blockNum uint64,
+) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -157,7 +166,12 @@ func (s *MemoryStore) UpdateOperatorSocket(ctx context.Context, id core.Operator
 }
 
 // DeregisterOperator implements Store.DeregisterOperator.
-func (s *MemoryStore) DeregisterOperator(ctx context.Context, id core.OperatorID, blockNum uint64, txHash common.Hash) error {
+func (s *MemoryStore) DeregisterOperator(
+	ctx context.Context,
+	id core.OperatorID,
+	blockNum uint64,
+	txHash common.Hash,
+) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -207,7 +221,7 @@ func (s *MemoryStore) ListQuorumAPKs(ctx context.Context, filter types.QuorumAPK
 
 	for _, apk := range s.quorumAPKs {
 		// Apply filters
-		if apk.QuorumID != core.QuorumID(filter.QuorumID) {
+		if apk.QuorumID != filter.QuorumID {
 			continue
 		}
 		if filter.BlockNumber > 0 && apk.BlockNumber != filter.BlockNumber {
@@ -237,13 +251,28 @@ func (s *MemoryStore) SaveEjection(ctx context.Context, ejection *types.Operator
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Dedup on the event's on-chain identity so that re-indexing a block range
+	// (e.g. after a failed batch) does not append duplicate ejections. Full-value
+	// equality can't be used because the recorded timestamp is wall-clock time.
+	for _, ej := range s.ejections {
+		if ej.OperatorID == ejection.OperatorID &&
+			ej.BlockNumber == ejection.BlockNumber &&
+			ej.TxHash == ejection.TxHash {
+			return nil
+		}
+	}
+
 	ejectionCopy := *ejection
 	s.ejections = append(s.ejections, &ejectionCopy)
 	return nil
 }
 
 // ListEjections implements Store.ListEjections.
-func (s *MemoryStore) ListEjections(ctx context.Context, operatorID *core.OperatorID, limit, offset int) ([]*types.OperatorEjection, error) {
+func (s *MemoryStore) ListEjections(
+	ctx context.Context,
+	operatorID *core.OperatorID,
+	limit, offset int,
+) ([]*types.OperatorEjection, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -272,13 +301,29 @@ func (s *MemoryStore) SaveSocketUpdate(ctx context.Context, update *types.Operat
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Dedup on the event's on-chain identity so that re-indexing a block range
+	// (e.g. after a failed batch) does not append duplicate socket updates.
+	// Full-value equality can't be used because the recorded timestamp is
+	// wall-clock time.
+	for _, upd := range s.socketUpdates {
+		if upd.OperatorID == update.OperatorID &&
+			upd.BlockNumber == update.BlockNumber &&
+			upd.TxHash == update.TxHash {
+			return nil
+		}
+	}
+
 	updateCopy := *update
 	s.socketUpdates = append(s.socketUpdates, &updateCopy)
 	return nil
 }
 
 // ListSocketUpdates implements Store.ListSocketUpdates.
-func (s *MemoryStore) ListSocketUpdates(ctx context.Context, operatorID core.OperatorID, limit, offset int) ([]*types.OperatorSocketUpdate, error) {
+func (s *MemoryStore) ListSocketUpdates(
+	ctx context.Context,
+	operatorID core.OperatorID,
+	limit, offset int,
+) ([]*types.OperatorSocketUpdate, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -351,7 +396,11 @@ func (s *MemoryStore) Snapshot() ([]byte, error) {
 		LastIndexedBlock: s.lastIndexedBlock,
 	}
 
-	return json.Marshal(snapshot)
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal snapshot: %w", err)
+	}
+	return data, nil
 }
 
 // Restore implements Store.Restore.
