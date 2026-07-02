@@ -3,11 +3,15 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/chainstate"
+	"github.com/Layr-Labs/eigenda/chainstate/store"
+	"github.com/Layr-Labs/eigenda/chainstate/types"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	integration "github.com/Layr-Labs/eigenda/inabox/tests"
@@ -118,35 +122,98 @@ func TestChainStateSubgraphParity(t *testing.T) {
 		return err == nil && len(state.AggKeys) == len(quorums)
 	}, 60*time.Second, time.Second, "subgraph did not index APKs for all quorums at block %d", referenceBlock)
 
-	subgraphState, err := subgraphICS.GetIndexedOperatorState(ctx, referenceBlock, quorums)
-	require.NoError(t, err, "subgraph GetIndexedOperatorState failed")
+	// Compare at the head AND at every membership-change block (the blocks with
+	// APK snapshots, which include operator registrations and the churn-driven
+	// deregistration). Comparing only at the head would miss divergence in
+	// historical-block semantics, e.g. how each side treats an operator that was
+	// deregistered by (or registered after) the reference block.
+	//
+	// NOTE: inabox's default scenario deregisters one operator (churn) but never
+	// RE-registers one, so re-registration semantics are still not exercised
+	// here; covering that requires a scenario change.
+	sampleBlocks := membershipChangeBlocks(t, ctx, indexer.GetStore(), quorums)
+	sampleBlocks = append(sampleBlocks, uint64(referenceBlock))
+	for _, block := range sampleBlocks {
+		requireParityAt(t, ctx, subgraphICS, chainstateICS, onchainChainState, uint(block))
+	}
+}
 
-	chainstateState, err := chainstateICS.GetIndexedOperatorState(ctx, referenceBlock, quorums)
-	require.NoError(t, err, "chainstate GetIndexedOperatorState failed")
+// requireParityAt asserts that the subgraph-backed and chainstate-backed
+// IndexedChainState implementations return identical indexed operator state at
+// the given reference block, for the quorums active at that block.
+func requireParityAt(
+	t *testing.T,
+	ctx context.Context,
+	subgraphICS core.IndexedChainState,
+	chainstateICS core.IndexedChainState,
+	onchain *coreeth.ChainState,
+	block uint,
+) {
+	t.Helper()
+
+	quorums := activeQuorums(t, ctx, onchain, block)
+	if len(quorums) == 0 {
+		return
+	}
+
+	subgraphState, err := subgraphICS.GetIndexedOperatorState(ctx, block, quorums)
+	require.NoError(t, err, "subgraph GetIndexedOperatorState failed at block %d", block)
+
+	chainstateState, err := chainstateICS.GetIndexedOperatorState(ctx, block, quorums)
+	require.NoError(t, err, "chainstate GetIndexedOperatorState failed at block %d", block)
 
 	// Compare aggregate public keys per quorum.
 	require.Equal(t, len(subgraphState.AggKeys), len(chainstateState.AggKeys),
-		"different number of quorum aggregate public keys")
+		"different number of quorum aggregate public keys at block %d", block)
 	for quorum, subgraphAPK := range subgraphState.AggKeys {
 		chainstateAPK, ok := chainstateState.AggKeys[quorum]
-		require.True(t, ok, "chainstate missing aggregate public key for quorum %d", quorum)
+		require.True(t, ok, "chainstate missing aggregate public key for quorum %d at block %d", quorum, block)
 		require.True(t, subgraphAPK.G1Affine.Equal(chainstateAPK.G1Affine),
-			"aggregate public key mismatch for quorum %d", quorum)
+			"aggregate public key mismatch for quorum %d at block %d", quorum, block)
 	}
 
 	// Compare the indexed operator sets (BLS keys and socket) keyed by ID.
 	require.Equal(t, len(subgraphState.IndexedOperators), len(chainstateState.IndexedOperators),
-		"different number of indexed operators")
+		"different number of indexed operators at block %d", block)
 	for operatorID, subgraphOp := range subgraphState.IndexedOperators {
 		chainstateOp, ok := chainstateState.IndexedOperators[operatorID]
-		require.True(t, ok, "chainstate missing indexed operator %s", operatorID.Hex())
+		require.True(t, ok, "chainstate missing indexed operator %s at block %d", operatorID.Hex(), block)
 		require.Equal(t, subgraphOp.Socket, chainstateOp.Socket,
-			"socket mismatch for operator %s", operatorID.Hex())
+			"socket mismatch for operator %s at block %d", operatorID.Hex(), block)
 		require.True(t, subgraphOp.PubkeyG1.G1Affine.Equal(chainstateOp.PubkeyG1.G1Affine),
-			"pubkey G1 mismatch for operator %s", operatorID.Hex())
+			"pubkey G1 mismatch for operator %s at block %d", operatorID.Hex(), block)
 		require.True(t, subgraphOp.PubkeyG2.G2Affine.Equal(chainstateOp.PubkeyG2.G2Affine),
-			"pubkey G2 mismatch for operator %s", operatorID.Hex())
+			"pubkey G2 mismatch for operator %s at block %d", operatorID.Hex(), block)
 	}
+}
+
+// membershipChangeBlocks returns the ascending distinct block numbers at which
+// any of the given quorums' membership changed, read from the chainstate
+// store's APK snapshot history (a snapshot is written per membership-change
+// block).
+func membershipChangeBlocks(
+	t *testing.T,
+	ctx context.Context,
+	st store.Store,
+	quorums []uint8,
+) []uint64 {
+	t.Helper()
+
+	blockSet := map[uint64]struct{}{}
+	for _, q := range quorums {
+		apks, err := st.ListQuorumAPKs(ctx, types.QuorumAPKFilter{QuorumID: q})
+		require.NoError(t, err, "failed to list APK snapshots for quorum %d", q)
+		for _, apk := range apks {
+			blockSet[apk.BlockNumber] = struct{}{}
+		}
+	}
+
+	blocks := make([]uint64, 0, len(blockSet))
+	for b := range blockSet {
+		blocks = append(blocks, b)
+	}
+	slices.Sort(blocks)
+	return blocks
 }
 
 // activeQuorums returns the quorum IDs that have at least one operator in the
