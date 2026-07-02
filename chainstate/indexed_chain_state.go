@@ -103,25 +103,29 @@ func (ics *IndexedChainState) GetIndexedOperatorState(
 }
 
 // GetIndexedOperators returns the indexed info (BLS keys and socket) for every
-// operator that was registered as of blockNumber, keyed by operator ID. An
-// operator deregistered after blockNumber is included, since it was registered
-// at the reference block.
+// operator not deregistered as of blockNumber, keyed by operator ID.
+//
+// Deliberately mirroring the operator-state subgraph, this filters ONLY on the
+// deregistration block (the subgraph's deregistrationBlockNumber_gt condition)
+// and not on the registration block. That means it over-fetches: an operator
+// that registered after blockNumber, or re-registered after an earlier stint
+// that covered blockNumber, is still included. Over-fetching is safe because
+// GetIndexedOperatorState filters the result against the on-chain operator
+// state; filtering on the stored registration block would instead UNDER-fetch
+// after a re-registration (the stored block is the latest registration, hiding
+// earlier registration windows) and make assembly fail with a missing operator.
 func (ics *IndexedChainState) GetIndexedOperators(
 	ctx context.Context,
 	blockNumber uint,
 ) (map[core.OperatorID]*core.IndexedOperatorInfo, error) {
-	// Push the registration-block bound into the store so it doesn't copy
-	// operators that registered after blockNumber. The store filter can't
-	// express "not yet deregistered as of blockNumber" (its RegisteredOnly is
-	// not block-scoped), so that half of the check stays in registeredAt below.
-	operators, err := ics.store.ListOperators(ctx, types.OperatorFilter{MaxBlock: uint64(blockNumber)}, 0, 0)
+	operators, err := ics.store.ListOperators(ctx, types.OperatorFilter{}, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list operators: %w", err)
 	}
 
 	result := make(map[core.OperatorID]*core.IndexedOperatorInfo, len(operators))
 	for _, op := range operators {
-		if !registeredAt(op, uint64(blockNumber)) {
+		if deregisteredAsOf(op, uint64(blockNumber)) {
 			continue
 		}
 		info, err := toIndexedOperatorInfo(op)
@@ -168,15 +172,12 @@ func (ics *IndexedChainState) getQuorumAPK(
 	return apk.APK, nil
 }
 
-// registeredAt reports whether the operator was registered as of blockNumber.
-func registeredAt(op *types.Operator, blockNumber uint64) bool {
-	if op.RegisteredAtBlockNumber > blockNumber {
-		return false
-	}
-	if op.DeregisteredAtBlockNumber != nil && *op.DeregisteredAtBlockNumber <= blockNumber {
-		return false
-	}
-	return true
+// deregisteredAsOf reports whether the operator had deregistered at or before
+// blockNumber (and has not re-registered since; a re-registration clears the
+// deregistration marker). This is the inverse of the subgraph's
+// deregistrationBlockNumber_gt filter.
+func deregisteredAsOf(op *types.Operator, blockNumber uint64) bool {
+	return op.DeregisteredAtBlockNumber != nil && *op.DeregisteredAtBlockNumber <= blockNumber
 }
 
 // toIndexedOperatorInfo projects a stored operator onto the core indexed-info

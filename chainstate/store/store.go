@@ -2,11 +2,18 @@ package store
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Layr-Labs/eigenda/chainstate/types"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/common"
 )
+
+// ErrOperatorNotFound is returned by Store implementations when a requested
+// operator does not exist. Callers that need to distinguish "not yet indexed"
+// from other failures (e.g. the registration handler deciding between creating
+// a fresh record and updating an existing one) should test with errors.Is.
+var ErrOperatorNotFound = errors.New("operator not found")
 
 // Store is the interface for persisting and querying indexed chain state.
 // This abstraction allows for different storage backends (memory, database, etc.).

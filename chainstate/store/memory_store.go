@@ -119,7 +119,7 @@ func (s *MemoryStore) GetOperator(ctx context.Context, id core.OperatorID) (*typ
 
 	op, exists := s.operators[id]
 	if !exists {
-		return nil, fmt.Errorf("operator not found: %x", id)
+		return nil, fmt.Errorf("%w: %x", ErrOperatorNotFound, id)
 	}
 
 	// Return a clone (including the QuorumIDs slice) to prevent external mutations
@@ -188,7 +188,7 @@ func (s *MemoryStore) UpdateOperatorSocket(
 
 	op, exists := s.operators[id]
 	if !exists {
-		return fmt.Errorf("operator not found: %x", id)
+		return fmt.Errorf("%w: %x", ErrOperatorNotFound, id)
 	}
 
 	// Since op is a pointer, we can modify it directly
@@ -208,7 +208,7 @@ func (s *MemoryStore) DeregisterOperator(
 
 	op, exists := s.operators[id]
 	if !exists {
-		return fmt.Errorf("operator not found: %x", id)
+		return fmt.Errorf("%w: %x", ErrOperatorNotFound, id)
 	}
 
 	// Since op is a pointer, we can modify it directly

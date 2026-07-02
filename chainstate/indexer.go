@@ -2,6 +2,7 @@ package chainstate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -256,12 +257,28 @@ func (i *Indexer) indexRegistryCoordinatorEvents(ctx context.Context, from, to u
 
 	for regIter.Next() {
 		event := regIter.Event
-		operator := &types.Operator{
-			ID:                      event.OperatorId,
-			Address:                 event.Operator,
-			RegisteredAtBlockNumber: event.Raw.BlockNumber,
-			RegisteredTxHash:        event.Raw.TxHash,
+
+		// A registration may be a RE-registration of an operator that previously
+		// deregistered. The operator's BLS keys were recorded by the
+		// NewPubkeyRegistration event, which the BLSApkRegistry contract emits at
+		// most once per operator ever, so overwriting the record with a fresh
+		// struct would wipe the keys irrecoverably. Load any existing record and
+		// update it in place (mirroring the operator-state subgraph, which only
+		// resets the deregistration marker on re-registration).
+		operator, err := i.store.GetOperator(ctx, event.OperatorId)
+		if errors.Is(err, store.ErrOperatorNotFound) {
+			operator = &types.Operator{
+				ID:      event.OperatorId,
+				Address: event.Operator,
+			}
+		} else if err != nil {
+			return fmt.Errorf("failed to get operator %x: %w", event.OperatorId, err)
 		}
+
+		operator.RegisteredAtBlockNumber = event.Raw.BlockNumber
+		operator.RegisteredTxHash = event.Raw.TxHash
+		operator.DeregisteredAtBlockNumber = nil
+		operator.DeregisteredTxHash = nil
 
 		if err := i.store.SaveOperator(ctx, operator); err != nil {
 			return fmt.Errorf("failed to save operator: %w", err)
@@ -395,24 +412,24 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 		g2Affine.Y.SetString(event.PubkeyG2.Y[1].String(), event.PubkeyG2.Y[0].String())
 		g2Point := &core.G2Point{G2Affine: &g2Affine}
 
-		// Convert operator address to operator ID using the contract
-		operatorID, err := i.registryCoordinator.GetOperatorId(nil, event.Operator)
+		// Convert operator address to operator ID using the contract. The
+		// NewPubkeyRegistration event is emitted at most once per operator ever
+		// (the contract forbids re-registering a pubkey), so dropping it here
+		// would lose the operator's BLS keys irrecoverably. Fail the batch so a
+		// transient RPC error is retried rather than swallowed.
+		operatorID, err := i.registryCoordinator.GetOperatorId(&bind.CallOpts{Context: ctx}, event.Operator)
 		if err != nil {
-			i.logger.Warn("Failed to get operator ID for pubkey registration", "operator", event.Operator, "error", err)
-			continue
+			return fmt.Errorf("failed to get operator ID for pubkey registration of %s: %w",
+				event.Operator.Hex(), err)
 		}
 
-		// Get the operator and update their BLS keys
+		// The operator must already exist: registrations in this range are indexed
+		// before BLS registry events, and on-chain the pubkey registration happens
+		// in the operator's registration transaction. A not-found is a genuine gap
+		// (missed range or reorg), so fail the batch to retry.
 		op, err := i.store.GetOperator(ctx, operatorID)
 		if err != nil {
-			i.logger.Warn(
-				"Operator not found when registering pubkey",
-				"operator_id",
-				fmt.Sprintf("%x", operatorID),
-				"error",
-				err,
-			)
-			continue
+			return fmt.Errorf("failed to get operator %x for pubkey registration: %w", operatorID, err)
 		}
 
 		op.BLSPubKeyG1 = g1Point
