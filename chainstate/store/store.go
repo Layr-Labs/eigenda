@@ -36,6 +36,10 @@ type Store interface {
 	// GetQuorumAPK retrieves the aggregate public key for a quorum at a specific block.
 	GetQuorumAPK(ctx context.Context, quorumID uint8, blockNum uint64) (*types.QuorumAPK, error)
 
+	// GetLatestQuorumAPK retrieves the most recent APK snapshot for a quorum at or
+	// before blockNum, or (nil, nil) if none exists in that range.
+	GetLatestQuorumAPK(ctx context.Context, quorumID core.QuorumID, blockNum uint64) (*types.QuorumAPK, error)
+
 	// ListQuorumAPKs retrieves quorum APK snapshots matching the filter.
 	ListQuorumAPKs(ctx context.Context, filter types.QuorumAPKFilter) ([]*types.QuorumAPK, error)
 

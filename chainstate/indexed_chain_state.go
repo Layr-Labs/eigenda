@@ -158,19 +158,14 @@ func (ics *IndexedChainState) getQuorumAPK(
 	quorumID core.QuorumID,
 	blockNumber uint64,
 ) (*core.G1Point, error) {
-	apks, err := ics.store.ListQuorumAPKs(ctx, types.QuorumAPKFilter{
-		QuorumID: quorumID,
-		MaxBlock: blockNumber,
-	})
+	apk, err := ics.store.GetLatestQuorumAPK(ctx, quorumID, blockNumber)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list quorum APKs: %w", err)
+		return nil, fmt.Errorf("failed to get latest quorum APK: %w", err)
 	}
-	if len(apks) == 0 {
+	if apk == nil {
 		return nil, nil
 	}
-	// ListQuorumAPKs returns snapshots sorted ascending by block number, so the
-	// last entry is the latest snapshot at or before blockNumber.
-	return apks[len(apks)-1].APK, nil
+	return apk.APK, nil
 }
 
 // registeredAt reports whether the operator was registered as of blockNumber.
