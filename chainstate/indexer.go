@@ -461,17 +461,16 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 	for addedIter.Next() {
 		event := addedIter.Event
 
-		// Get the operator and update their quorum memberships
+		// The operator must already exist: registrations in this range are indexed
+		// before quorum-membership events, and on-chain an operator is registered
+		// before being added to a quorum. A not-found here means a genuine gap (a
+		// missed earlier range or a reorg), so fail the batch to retry rather than
+		// silently dropping the membership change (which would also skip its APK
+		// snapshot). This matches the OperatorDeregistered handling above.
 		op, err := i.store.GetOperator(ctx, event.OperatorId)
 		if err != nil {
-			i.logger.Warn(
-				"Operator not found when adding to quorums",
-				"operator_id",
-				fmt.Sprintf("%x", event.OperatorId),
-				"error",
-				err,
-			)
-			continue
+			return fmt.Errorf("failed to add operator %x to quorums at block %d: %w",
+				event.OperatorId, event.Raw.BlockNumber, err)
 		}
 
 		// Add new quorums (avoiding duplicates)
@@ -520,17 +519,12 @@ func (i *Indexer) indexBLSApkRegistryEvents(ctx context.Context, from, to uint64
 	for removedIter.Next() {
 		event := removedIter.Event
 
-		// Get the operator and update their quorum memberships
+		// As with adding to quorums, a not-found operator here signals a genuine
+		// indexing gap rather than a benign condition, so fail the batch to retry.
 		op, err := i.store.GetOperator(ctx, event.OperatorId)
 		if err != nil {
-			i.logger.Warn(
-				"Operator not found when removing from quorums",
-				"operator_id",
-				fmt.Sprintf("%x", event.OperatorId),
-				"error",
-				err,
-			)
-			continue
+			return fmt.Errorf("failed to remove operator %x from quorums at block %d: %w",
+				event.OperatorId, event.Raw.BlockNumber, err)
 		}
 
 		// Remove quorums
