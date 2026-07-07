@@ -1,9 +1,9 @@
 {
   "network": "hoodi",
-  "RegistryCoordinator_address": "0xec03e7038Ca95cB7706a8b129CDE36635CBAF9df",
-  "RegistryCoordinator_startBlock": 1274216,
-  "BLSApkRegistry_address": "0xf2b91361f20040a0f1c2663B49bCAE6CD5ED5B98",
-  "BLSApkRegistry_startBlock": 1274205,
-  "EjectionManager_address": "0xe397F202D271d73EAB6444d634F68278B6274830",
-  "EjectionManager_startBlock": 1274229
+  "RegistryCoordinator_address": "0x51C4476565B982442Afd702Ea6aaa095F5169EFe",
+  "RegistryCoordinator_startBlock": 3162015,
+  "BLSApkRegistry_address": "0xF9A852526c98DeEa3021a1E1362698818e7E236a",
+  "BLSApkRegistry_startBlock": 3162017,
+  "EjectionManager_address": "0xE36e1079b78A6aa69179A773608a5981624fA129",
+  "EjectionManager_startBlock": 3162043
 }
