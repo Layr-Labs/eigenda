@@ -37,7 +37,7 @@ func (n EigenDANetwork) GetEigenDADirectory() string {
 	case HoodiTestnetEigenDANetwork:
 		return "0x5a44e56e88abcf610c68340c6814ae7f5c4369fd"
 	case HoodiPreprodEigenDANetwork:
-		return "0xbFa1b820bb302925a3eb98C8836a95361FB75b87"
+		return "0xc0357dd474A70910f5A48fddD5Dff4fD8764eE4E"
 	default:
 		panic(fmt.Sprintf("unknown EigenDA network: %s", n))
 	}
