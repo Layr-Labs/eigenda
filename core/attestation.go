@@ -32,6 +32,26 @@ func NewG1Point(x, y *big.Int) *G1Point {
 	}
 }
 
+// NewG2Point creates a G2Point from coordinates in the contracts' BN254.G2Point
+// layout, where each E2 extension-field coordinate is ordered [A1, A0]
+// (imaginary component first), the reverse of gnark-crypto's (A0, A1). Getting
+// the swap wrong yields a valid-looking but incorrect key, so all conversions
+// from contract data should go through this helper.
+func NewG2Point(x, y [2]*big.Int) *G2Point {
+	return &G2Point{
+		&bn254.G2Affine{
+			X: struct{ A0, A1 fp.Element }{
+				A0: newFpElement(x[1]),
+				A1: newFpElement(x[0]),
+			},
+			Y: struct{ A0, A1 fp.Element }{
+				A0: newFpElement(y[1]),
+				A1: newFpElement(y[0]),
+			},
+		},
+	}
+}
+
 // Add another G1 point to this one
 func (p *G1Point) Add(p2 *G1Point) {
 	p.G1Affine.Add(p.G1Affine, p2.G1Affine)

@@ -130,7 +130,16 @@ func (ics *IndexedChainState) GetIndexedOperators(
 		}
 		info, err := toIndexedOperatorInfo(op)
 		if err != nil {
-			return nil, fmt.Errorf("operator %s: %w", op.ID.Hex(), err)
+			// An incomplete record (missing keys or socket) can exist when the
+			// operator's one-time pubkey registration predates the configured
+			// start block, or transiently while the indexer is mid-way through
+			// the events of a registration transaction. Skip it rather than
+			// failing the whole call: if the operator matters for the requested
+			// quorums, AssembleIndexedOperatorState reports it as missing; if it
+			// doesn't, one bad record must not poison every query.
+			ics.logger.Warn("Skipping operator with incomplete indexed record",
+				"operator_id", op.ID.Hex(), "error", err)
+			continue
 		}
 		result[op.ID] = info
 	}

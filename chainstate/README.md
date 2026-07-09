@@ -43,12 +43,10 @@ The indexer uses the EigenDA documented config framework. Configuration can be p
 
 | Field | Description | Environment Variable |
 |-------|-------------|---------------------|
-| `RegistryCoordinatorAddr` | Address of the RegistryCoordinator contract | `CHAINSTATE_INDEXER_REGISTRY_COORDINATOR_ADDR` |
-| `BLSApkRegistryAddr` | Address of the BLSApkRegistry contract | `CHAINSTATE_INDEXER_BLS_APK_REGISTRY_ADDR` |
-| `EjectionManagerAddr` | Address of the EjectionManager contract | `CHAINSTATE_INDEXER_EJECTION_MANAGER_ADDR` |
-| `PersistencePath` | Path to JSON file for state persistence | `CHAINSTATE_INDEXER_PERSISTENCE_PATH` |
-| `HTTPPort` | Port for the HTTP API server | `CHAINSTATE_INDEXER_HTTP_PORT` |
-| `EthRpcUrls` | Ethereum RPC endpoint URLs (must be archive nodes, see note) | `CHAINSTATE_INDEXER_ETH_RPC_URLS` |
+| `Config.EigenDADirectory` | Address of the EigenDADirectory contract, from which all other contract addresses (RegistryCoordinator, BLSApkRegistry, EjectionManager, StakeRegistry) are resolved | `CHAINSTATE_INDEXER_CONFIG_EIGEN_DA_DIRECTORY` |
+| `Config.PersistencePath` | Path to JSON file for state persistence | `CHAINSTATE_INDEXER_CONFIG_PERSISTENCE_PATH` |
+| `Config.HTTPPort` | Port for the HTTP API server | `CHAINSTATE_INDEXER_CONFIG_HTTP_PORT` |
+| `Secret.EthRpcUrls` | Ethereum RPC endpoint URLs (must be archive nodes, see note); extra URLs act as failover fallbacks | `CHAINSTATE_INDEXER_SECRET_ETH_RPC_URLS` |
 
 > **Archive node required.** When recording quorum APK snapshots, the indexer
 > reads each quorum's aggregate public key and total stake *as of the block of
@@ -61,48 +59,40 @@ The indexer uses the EigenDA documented config framework. Configuration can be p
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `StartBlockNumber` | 0 | Starting block for indexing (0 = current block) |
-| `BlockBatchSize` | 1000 | Number of blocks to process per batch |
-| `PollInterval` | 12s | Interval between polling for new blocks |
-| `PersistInterval` | 30s | Interval for persisting state snapshots |
-| `MetricsHTTPPort` | 9090 | Port for Prometheus metrics endpoint |
-| `EnableMetrics` | true | Enable metrics collection |
+| `Config.StartBlockNumber` | 0 | First block to index, inclusive. **0 means the current chain head**, which skips all historical events — including the one-time BLS pubkey registrations. Set it to the contract deployment block to index full history. |
+| `Config.BlockBatchSize` | 1000 | Number of blocks to process per batch |
+| `Config.PollInterval` | 12s | Interval between polling for new blocks |
+| `Config.PersistInterval` | 30s | Interval for persisting state snapshots |
+| `Config.EthClientConfig` | see `geth.DefaultEthClientConfig` | Ethereum client settings (retries, confirmations); the RPC URLs come from `Secret.EthRpcUrls` |
+| `Config.LoggerConfig` | see `common.DefaultLoggerConfig` | Logging configuration |
 
 ### Example Configuration File
 
 ```yaml
 # config.yaml
-registry_coordinator_addr: "0x1234..."
-bls_apk_registry_addr: "0x5678..."
-ejection_manager_addr: "0x9abc..."
-persistence_path: "/data/chainstate.json"
-http_port: "8080"
-start_block_number: 0
-block_batch_size: 1000
-poll_interval: 12s
-persist_interval: 30s
-enable_metrics: true
-metrics_http_port: "9090"
+Config:
+  EigenDADirectory: "0x1234..."
+  PersistencePath: "/data/chainstate.json"
+  HTTPPort: "8080"
+  StartBlockNumber: 0
+  BlockBatchSize: 1000
+  PollInterval: 12s
+  PersistInterval: 30s
+  LoggerConfig:
+    Format: json
 
-# eth_client_config is nested
-eth_client_config:
-  rpc_url: "http://localhost:8545"
-
-# logger_config is nested
-logger_config:
-  log_level: "info"
-  format: "json"
+Secret:
+  EthRpcUrls:
+    - "http://localhost:8545"
 ```
 
 ### Example Using Environment Variables
 
 ```bash
-export CHAINSTATE_INDEXER_REGISTRY_COORDINATOR_ADDR="0x1234..."
-export CHAINSTATE_INDEXER_BLS_APK_REGISTRY_ADDR="0x5678..."
-export CHAINSTATE_INDEXER_EJECTION_MANAGER_ADDR="0x9abc..."
-export CHAINSTATE_INDEXER_PERSISTENCE_PATH="/data/chainstate.json"
-export CHAINSTATE_INDEXER_HTTP_PORT="8080"
-export CHAINSTATE_INDEXER_ETH_RPC_URLS="http://localhost:8545"
+export CHAINSTATE_INDEXER_CONFIG_EIGEN_DA_DIRECTORY="0x1234..."
+export CHAINSTATE_INDEXER_CONFIG_PERSISTENCE_PATH="/data/chainstate.json"
+export CHAINSTATE_INDEXER_CONFIG_HTTP_PORT="8080"
+export CHAINSTATE_INDEXER_SECRET_ETH_RPC_URLS="http://localhost:8545"
 
 ./bin/chainstate-indexer
 ```
@@ -180,8 +170,8 @@ Returns a paginated list of operators.
     {
       "id": "0x1234...",
       "address": "0x5678...",
-      "bls_pub_key_g1": {...},
-      "bls_pub_key_g2": {...},
+      "bls_pubkey_g1": {...},
+      "bls_pubkey_g2": {...},
       "socket": "example.com:32004",
       "registered_at_block_number": 12345000,
       "deregistered_at_block_number": null,
@@ -238,7 +228,7 @@ GET /api/v1/quorum-apk/history?quorum_id=0&min_block=12340000&max_block=12350000
 Returns a list of quorum APK snapshots.
 
 **Query Parameters:**
-- `quorum_id` (uint8): Filter by quorum ID
+- `quorum_id` (uint8, required): The quorum whose snapshots to list
 - `block_number` (uint64): Get APK for specific block
 - `min_block` (uint64): Minimum block number
 - `max_block` (uint64): Maximum block number
@@ -273,27 +263,9 @@ Returns socket update events for a specific operator.
 
 ## Metrics
 
-Prometheus metrics are exposed at `/metrics` on the configured metrics port (default: 9090).
-
-### Available Metrics
-
-**Indexer Metrics:**
-- `eigenda_chainstate_indexer_last_indexed_block`: Last block number indexed
-- `eigenda_chainstate_indexer_blocks_indexed_total`: Total blocks indexed
-- `eigenda_chainstate_indexer_index_errors_total`: Total indexing errors
-- `eigenda_chainstate_indexer_operators_registered_total`: Total operator registrations
-- `eigenda_chainstate_indexer_operators_deregistered_total`: Total operator deregistrations
-- `eigenda_chainstate_indexer_socket_updates_total`: Total socket updates
-- `eigenda_chainstate_indexer_ejections_recorded_total`: Total ejections recorded
-
-**API Metrics:**
-- `eigenda_chainstate_indexer_api_requests_total`: Total API requests by method, endpoint, and status
-- `eigenda_chainstate_indexer_api_latency_seconds`: API request latency histogram
-- `eigenda_chainstate_indexer_api_errors_total`: Total API errors by endpoint and type
-
-**Standard Metrics:**
-- Process metrics (CPU, memory, file descriptors, etc.)
-- Go runtime metrics (goroutines, GC stats, etc.)
+Prometheus metrics are not yet implemented (see Future Enhancements). The
+`/api/v1/status` endpoint exposes the last indexed block for basic progress
+monitoring in the meantime.
 
 ## Architecture
 
@@ -302,7 +274,6 @@ Prometheus metrics are exposed at `/metrics` on the configured metrics port (def
 1. **Indexer**: Core component that polls Ethereum for new blocks and indexes events
 2. **Store**: In-memory storage with JSON persistence (interface-based for future database support)
 3. **API Server**: HTTP server providing REST endpoints for querying indexed data
-4. **Metrics**: Prometheus metrics for observability
 
 ### Data Flow
 
@@ -391,6 +362,7 @@ make clean
 
 - **Database backend**: PostgreSQL store implementation for larger datasets
 - **GraphQL API**: Add GraphQL endpoint for backward compatibility
+- **Metrics**: Prometheus metrics for indexing progress and API usage
 - **Reorg handling**: Detect and handle chain reorganizations
 - **WebSocket support**: Real-time updates via WebSocket subscriptions
 - **Multi-chain support**: Index from multiple chains simultaneously
@@ -416,7 +388,7 @@ make clean
 The in-memory store will grow over time as more data is indexed. For large datasets:
 1. Consider implementing a database backend
 2. Add TTL or archival logic for old data
-3. Monitor memory usage via Prometheus metrics
+3. Monitor process memory usage externally (Prometheus metrics are not yet implemented)
 
 ## Support
 

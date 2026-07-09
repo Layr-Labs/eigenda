@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -158,8 +159,12 @@ func (s *Server) handleGetOperator(c *gin.Context) {
 	}
 
 	operator, err := s.store.GetOperator(c.Request.Context(), operatorID)
-	if err != nil {
+	if errors.Is(err, store.ErrOperatorNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "operator not found"})
+		return
+	} else if err != nil {
+		s.logger.Error("Failed to get operator", "operator_id", operatorID.Hex(), "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get operator"})
 		return
 	}
 
@@ -168,7 +173,10 @@ func (s *Server) handleGetOperator(c *gin.Context) {
 
 // handleGetQuorumAPK returns the aggregate public key for a quorum at a specific block.
 func (s *Server) handleGetQuorumAPK(c *gin.Context) {
-	quorumID := parseUint8Or(c.Query("quorum_id"), 0)
+	quorumID, ok := parseQuorumIDQuery(c)
+	if !ok {
+		return
+	}
 	blockNumber := parseUint64Or(c.Query("block_number"), 0)
 
 	if blockNumber == 0 {
@@ -187,7 +195,10 @@ func (s *Server) handleGetQuorumAPK(c *gin.Context) {
 
 // handleListQuorumAPKs returns a list of quorum APK snapshots.
 func (s *Server) handleListQuorumAPKs(c *gin.Context) {
-	quorumID := parseUint8Or(c.Query("quorum_id"), 0)
+	quorumID, ok := parseQuorumIDQuery(c)
+	if !ok {
+		return
+	}
 	blockNumber := parseUint64Or(c.Query("block_number"), 0)
 	minBlock := parseUint64Or(c.Query("min_block"), 0)
 	maxBlock := parseUint64Or(c.Query("max_block"), 0)
@@ -322,6 +333,24 @@ func parseOperatorIDParam(c *gin.Context, param string) (core.OperatorID, bool) 
 	return operatorID, true
 }
 
+// parseQuorumIDQuery parses the required "quorum_id" query parameter as a
+// uint8. On a missing or invalid value it writes a 400 response and returns
+// ok=false; silently defaulting instead would serve quorum 0's data for a
+// mistyped or out-of-range quorum ID.
+func parseQuorumIDQuery(c *gin.Context) (core.QuorumID, bool) {
+	qidStr := c.Query("quorum_id")
+	if qidStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "quorum_id is required"})
+		return 0, false
+	}
+	qid, err := strconv.ParseUint(qidStr, 10, 8)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid quorum_id"})
+		return 0, false
+	}
+	return core.QuorumID(qid), true
+}
+
 // Helper functions for parsing query parameters
 
 func parseIntOr(s string, defaultVal int) int {
@@ -344,15 +373,4 @@ func parseUint64Or(s string, defaultVal uint64) uint64 {
 		return defaultVal
 	}
 	return val
-}
-
-func parseUint8Or(s string, defaultVal uint8) uint8 {
-	if s == "" {
-		return defaultVal
-	}
-	val, err := strconv.ParseUint(s, 10, 8)
-	if err != nil {
-		return defaultVal
-	}
-	return uint8(val)
 }

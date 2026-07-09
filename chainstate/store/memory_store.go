@@ -47,9 +47,12 @@ type MemoryStore struct {
 }
 
 // eventKey builds the on-chain identity used to dedup append-only events
-// (ejections, socket updates) when a block range is re-indexed.
-func eventKey(operatorID core.OperatorID, blockNumber uint64, txHash common.Hash) string {
-	return fmt.Sprintf("%x:%d:%x", operatorID, blockNumber, txHash)
+// (ejections, socket updates) when a block range is re-indexed. The log index
+// is part of the identity because one transaction can emit several events for
+// the same operator — e.g. EjectionManager.ejectOperators emits one
+// OperatorEjected per quorum — and those must not collapse into one record.
+func eventKey(operatorID core.OperatorID, blockNumber uint64, logIndex uint, txHash common.Hash) string {
+	return fmt.Sprintf("%x:%d:%d:%x", operatorID, blockNumber, logIndex, txHash)
 }
 
 // memoryStoreSnapshot is the serializable representation of the memory store.
@@ -325,7 +328,7 @@ func (s *MemoryStore) SaveEjection(ctx context.Context, ejection *types.Operator
 	// Dedup on the event's on-chain identity so that re-indexing a block range
 	// (e.g. after a failed batch) does not append duplicate ejections. Full-value
 	// equality can't be used because the recorded timestamp is wall-clock time.
-	key := eventKey(ejection.OperatorID, ejection.BlockNumber, ejection.TxHash)
+	key := eventKey(ejection.OperatorID, ejection.BlockNumber, ejection.LogIndex, ejection.TxHash)
 	if _, seen := s.ejectionKeys[key]; seen {
 		return nil
 	}
@@ -374,7 +377,7 @@ func (s *MemoryStore) SaveSocketUpdate(ctx context.Context, update *types.Operat
 	// (e.g. after a failed batch) does not append duplicate socket updates.
 	// Full-value equality can't be used because the recorded timestamp is
 	// wall-clock time.
-	key := eventKey(update.OperatorID, update.BlockNumber, update.TxHash)
+	key := eventKey(update.OperatorID, update.BlockNumber, update.LogIndex, update.TxHash)
 	if _, seen := s.socketUpdateKeys[key]; seen {
 		return nil
 	}
@@ -430,6 +433,21 @@ func (s *MemoryStore) SetLastIndexedBlock(ctx context.Context, blockNum uint64) 
 
 // Snapshot implements Store.Snapshot.
 func (s *MemoryStore) Snapshot() ([]byte, error) {
+	snapshot := s.copyForSnapshot()
+
+	// Marshal outside the lock: serialization time grows with store size, and
+	// holding the lock across it would stall every indexer write for the
+	// duration on each periodic save.
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal snapshot: %w", err)
+	}
+	return data, nil
+}
+
+// copyForSnapshot builds the serializable value-type copy of the store under
+// the read lock.
+func (s *MemoryStore) copyForSnapshot() memoryStoreSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -437,7 +455,9 @@ func (s *MemoryStore) Snapshot() ([]byte, error) {
 	// Convert OperatorID keys to hex strings since byte arrays can't be JSON keys
 	operators := make(map[string]types.Operator, len(s.operators))
 	for id, op := range s.operators {
-		operators[id.Hex()] = *op
+		opCopy := *op
+		opCopy.QuorumIDs = slices.Clone(op.QuorumIDs)
+		operators[id.Hex()] = opCopy
 	}
 
 	quorumAPKs := make(map[string]types.QuorumAPK, len(s.quorumAPKs))
@@ -455,19 +475,13 @@ func (s *MemoryStore) Snapshot() ([]byte, error) {
 		socketUpdates[i] = *upd
 	}
 
-	snapshot := memoryStoreSnapshot{
+	return memoryStoreSnapshot{
 		Operators:        operators,
 		QuorumAPKs:       quorumAPKs,
 		Ejections:        ejections,
 		SocketUpdates:    socketUpdates,
 		LastIndexedBlock: s.lastIndexedBlock,
 	}
-
-	data, err := json.Marshal(snapshot)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal snapshot: %w", err)
-	}
-	return data, nil
 }
 
 // Restore implements Store.Restore.
@@ -514,7 +528,7 @@ func (s *MemoryStore) Restore(data []byte) error {
 	for i, ej := range snapshot.Ejections {
 		ejCopy := ej
 		s.ejections[i] = &ejCopy
-		s.ejectionKeys[eventKey(ej.OperatorID, ej.BlockNumber, ej.TxHash)] = struct{}{}
+		s.ejectionKeys[eventKey(ej.OperatorID, ej.BlockNumber, ej.LogIndex, ej.TxHash)] = struct{}{}
 	}
 
 	s.socketUpdates = make([]*types.OperatorSocketUpdate, len(snapshot.SocketUpdates))
@@ -522,7 +536,7 @@ func (s *MemoryStore) Restore(data []byte) error {
 	for i, upd := range snapshot.SocketUpdates {
 		updCopy := upd
 		s.socketUpdates[i] = &updCopy
-		s.socketUpdateKeys[eventKey(upd.OperatorID, upd.BlockNumber, upd.TxHash)] = struct{}{}
+		s.socketUpdateKeys[eventKey(upd.OperatorID, upd.BlockNumber, upd.LogIndex, upd.TxHash)] = struct{}{}
 	}
 
 	s.lastIndexedBlock = snapshot.LastIndexedBlock

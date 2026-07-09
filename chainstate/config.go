@@ -25,7 +25,10 @@ type IndexerConfig struct {
 	// EigenDADirectory contract address
 	EigenDADirectory string `docs:"required"`
 
-	// Starting block number for indexing. If 0, starts from contract deployment block.
+	// First block to index (inclusive). If 0, indexing starts from the current
+	// chain head, skipping all historical events — including the one-time BLS
+	// pubkey registrations, without which operators cannot be served. Set this
+	// to the contract deployment block to index full history.
 	StartBlockNumber uint64
 
 	// Number of blocks to process in each batch during indexing.
@@ -46,7 +49,9 @@ type IndexerConfig struct {
 	// Logging configuration.
 	LoggerConfig common.LoggerConfig
 
-	// Ethereum client configuration for connecting to RPC endpoints.
+	// Ethereum client configuration (retries, confirmations). The RPC URLs
+	// themselves come from IndexerSecretConfig.EthRpcUrls, since they may embed
+	// API keys.
 	EthClientConfig geth.EthClientConfig
 }
 

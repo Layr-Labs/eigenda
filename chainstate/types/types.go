@@ -75,6 +75,10 @@ type OperatorSocketUpdate struct {
 	// Block number of the update
 	BlockNumber uint64
 
+	// Index of the event's log within its block, disambiguating multiple
+	// updates for the same operator in one transaction
+	LogIndex uint
+
 	// Transaction hash of the update
 	TxHash common.Hash
 
@@ -92,6 +96,10 @@ type OperatorEjection struct {
 
 	// Block number of the ejection
 	BlockNumber uint64
+
+	// Index of the event's log within its block, disambiguating multiple
+	// ejections of the same operator (one per quorum) in one transaction
+	LogIndex uint
 
 	// Transaction hash of the ejection
 	TxHash common.Hash

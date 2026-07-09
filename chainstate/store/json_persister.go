@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -26,20 +27,17 @@ func NewJSONPersister(store Store, path string, logger logging.Logger) *JSONPers
 }
 
 // Save persists the current store state to the configured JSON file.
-// It uses atomic file operations (write to temp, then rename) to ensure consistency.
+// It uses util.AtomicWrite (write to a swap file, fsync, rename, fsync the
+// directory) so a crash mid-save can never leave a truncated or torn state
+// file behind.
 func (p *JSONPersister) Save(ctx context.Context) error {
 	data, err := p.store.Snapshot()
 	if err != nil {
 		return fmt.Errorf("failed to create snapshot: %w", err)
 	}
 
-	tmpPath := p.path + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
-	}
-
-	if err := os.Rename(tmpPath, p.path); err != nil {
-		return fmt.Errorf("failed to rename temp file: %w", err)
+	if err := util.AtomicWrite(p.path, data, true); err != nil {
+		return fmt.Errorf("failed to write state file: %w", err)
 	}
 
 	p.logger.Info("State persisted", "path", p.path, "size_bytes", len(data))

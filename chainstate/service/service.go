@@ -13,24 +13,25 @@ import (
 	"github.com/Layr-Labs/eigenda/chainstate"
 	"github.com/Layr-Labs/eigenda/chainstate/api"
 	"github.com/Layr-Labs/eigenda/chainstate/store"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/ethereum/go-ethereum/ethclient"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Service bundles a running indexer with its API server.
 type Service struct {
 	indexer   *chainstate.Indexer
 	apiServer *api.Server
-	ethClient *ethclient.Client
 	logger    logging.Logger
 
 	// errChan receives a fatal error from the API server goroutine, if any.
 	errChan chan error
 }
 
-// New constructs a Service: it dials the configured Ethereum RPC, builds the
-// indexer (resolving contract addresses from the EigenDADirectory), and creates
-// the API server. It does not start any background work; call Start for that.
+// New constructs a Service: it connects to the configured Ethereum RPCs,
+// builds the indexer (resolving contract addresses from the EigenDADirectory),
+// and creates the API server. It does not start any background work; call
+// Start for that.
 func New(
 	ctx context.Context,
 	config *chainstate.IndexerConfig,
@@ -41,14 +42,20 @@ func New(
 		return nil, fmt.Errorf("no Ethereum RPC URLs configured")
 	}
 
-	ethClient, err := ethclient.Dial(secret.EthRpcUrls[0])
+	// The RPC URLs live in the secret config (they may embed API keys); the
+	// rest of the client settings (retries, confirmations) come from the public
+	// EthClientConfig. The multi-homing client fails over across all configured
+	// URLs, so extra endpoints act as fallbacks. The indexer only reads, so no
+	// sender address is needed.
+	ethClientConfig := config.EthClientConfig
+	ethClientConfig.RPCURLs = secret.EthRpcUrls
+	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Ethereum RPC: %w", err)
 	}
 
 	indexer, err := chainstate.NewIndexer(ctx, config, ethClient, logger)
 	if err != nil {
-		ethClient.Close()
 		return nil, fmt.Errorf("failed to create indexer: %w", err)
 	}
 
@@ -57,7 +64,6 @@ func New(
 	return &Service{
 		indexer:   indexer,
 		apiServer: apiServer,
-		ethClient: ethClient,
 		logger:    logger,
 		errChan:   make(chan error, 1),
 	}, nil
@@ -67,10 +73,6 @@ func New(
 // A fatal API server error is delivered on the channel returned by Errors.
 func (s *Service) Start(ctx context.Context) error {
 	if err := s.indexer.Start(ctx); err != nil {
-		// The indexer never started, so its goroutines will never run and Wait
-		// would return immediately without closing the client. Release it here so
-		// a Start failure does not leak the connection.
-		s.ethClient.Close()
 		return fmt.Errorf("failed to start indexer: %w", err)
 	}
 
@@ -95,10 +97,9 @@ func (s *Service) Store() store.Store {
 }
 
 // Wait blocks until the indexer's background goroutines have stopped (which
-// happens after the context passed to Start is cancelled), then releases the
-// Ethereum client. Waiting on the indexer ensures the persister's final state
-// save completes before this returns.
+// happens after the context passed to Start is cancelled). Waiting on the
+// indexer ensures the persister's final state save completes before this
+// returns.
 func (s *Service) Wait() {
 	s.indexer.Wait()
-	s.ethClient.Close()
 }

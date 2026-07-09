@@ -178,6 +178,7 @@ type operatorSocketUpdateJSON struct {
 	OperatorID  string      `json:"operator_id"`
 	Socket      string      `json:"socket"`
 	BlockNumber uint64      `json:"block_number"`
+	LogIndex    uint        `json:"log_index"`
 	TxHash      common.Hash `json:"tx_hash"`
 	UpdatedAt   time.Time   `json:"updated_at"`
 }
@@ -188,6 +189,7 @@ func (u OperatorSocketUpdate) MarshalJSON() ([]byte, error) {
 		OperatorID:  "0x" + u.OperatorID.Hex(),
 		Socket:      u.Socket,
 		BlockNumber: u.BlockNumber,
+		LogIndex:    u.LogIndex,
 		TxHash:      u.TxHash,
 		UpdatedAt:   u.UpdatedAt,
 	})
@@ -211,6 +213,7 @@ func (u *OperatorSocketUpdate) UnmarshalJSON(data []byte) error {
 		OperatorID:  id,
 		Socket:      aux.Socket,
 		BlockNumber: aux.BlockNumber,
+		LogIndex:    aux.LogIndex,
 		TxHash:      aux.TxHash,
 		UpdatedAt:   aux.UpdatedAt,
 	}
@@ -221,6 +224,7 @@ type operatorEjectionJSON struct {
 	OperatorID  string      `json:"operator_id"`
 	QuorumIDs   []uint16    `json:"quorum_ids"`
 	BlockNumber uint64      `json:"block_number"`
+	LogIndex    uint        `json:"log_index"`
 	TxHash      common.Hash `json:"tx_hash"`
 	EjectedAt   time.Time   `json:"ejected_at"`
 }
@@ -231,6 +235,7 @@ func (e OperatorEjection) MarshalJSON() ([]byte, error) {
 		OperatorID:  "0x" + e.OperatorID.Hex(),
 		QuorumIDs:   quorumIDsToInts(e.QuorumIDs),
 		BlockNumber: e.BlockNumber,
+		LogIndex:    e.LogIndex,
 		TxHash:      e.TxHash,
 		EjectedAt:   e.EjectedAt,
 	})
@@ -258,6 +263,7 @@ func (e *OperatorEjection) UnmarshalJSON(data []byte) error {
 		OperatorID:  id,
 		QuorumIDs:   quorumIDs,
 		BlockNumber: aux.BlockNumber,
+		LogIndex:    aux.LogIndex,
 		TxHash:      aux.TxHash,
 		EjectedAt:   aux.EjectedAt,
 	}
