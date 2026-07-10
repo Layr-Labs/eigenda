@@ -28,26 +28,32 @@ endpoint-by-endpoint mapping to the REST API.
 
 ## 2. Phase 0 — Merge Readiness (this PR)
 
-1. **Human review of AI-drafted tests.** Both
-   `inabox/tests/chainstate_indexer_test.go` and
-   `inabox/tests/chainstate_subgraph_parity_test.go` self-flag as AI-drafted
-   (CLAUDE.md §3). A human must validate that the parity assertions encode
-   *intended* subgraph semantics — especially the "latest APK snapshot <=
-   block" lookup — before relying on them.
-2. **Unit tests for the fixed bugs** (human-written per CLAUDE.md §3).
-   `chainstate/` currently has no `*_test.go` files. Regression cases worth
-   covering, from the confirmed review findings:
-   - Deregistration at block N followed by re-registration at block N+k
-     within one batch ends registered (chronological event replay).
-   - Quorum remove-then-re-add within one batch keeps membership.
-   - First-registration event order: `NewPubkeyRegistration` /
-     `OperatorSocketUpdate` precede `OperatorRegistered` in one transaction
-     (skeleton-record path).
-   - Multi-quorum ejection in one transaction produces one record per quorum
-     (dedup key includes log index).
-   - Fresh store indexes the configured `StartBlockNumber` block itself.
-   - Persistence round-trip through `Snapshot`/`Restore`, including
-     `LogIndex` fields.
+1. **Human review of AI-drafted tests** (CLAUDE.md §3). This applies to the
+   e2e tests (`inabox/tests/chainstate_indexer_test.go`,
+   `inabox/tests/chainstate_subgraph_parity_test.go`) and to the unit tests
+   added in commit `961952eb` (`chainstate/indexer_test.go`,
+   `indexer_startblock_test.go`, `indexed_chain_state_test.go`,
+   `api/server_test.go`, `store/memory_store_test.go`,
+   `store/json_persister_test.go`, `core/attestation_test.go`). A human must
+   validate that the assertions encode *intended* behavior. Highest-scrutiny
+   items:
+   - The parity test's "latest APK snapshot <= block" lookup semantics.
+   - The `deregisteredAsOf` boundary (`<=`, mirroring the subgraph's
+     `deregistrationBlockNumber_gt` filter) in
+     `indexed_chain_state_test.go`.
+   - The intra-transaction event emission order
+     (`NewPubkeyRegistration` / `OperatorSocketUpdate` before
+     `OperatorRegistered`) encoded in `TestFirstRegistrationIntraTxOrder`,
+     derived from reading `RegistryCoordinator._registerOperator` rather
+     than from a spec.
+2. **Unit test status**: regression tests for the review-round fixes exist
+   and pass under `-race` — chronological event replay (dereg→rereg,
+   quorum remove→re-add), skeleton-record merging, multi-quorum ejection
+   dedup, start-block inclusivity and catch-up batching, snapshot/restore
+   round-trip, API status codes, and golden JSON field names. Not unit
+   tested (deliberately): `collectEvents` filterer plumbing,
+   `snapshotQuorumAPKs` historical eth_calls, and service/main wiring —
+   these are covered by the inabox e2e tests.
 3. **Run the inabox suite** (`cd inabox && make run-e2e-tests`, requires
    Docker). The parity test compares at every membership-change block and is
    the strongest end-to-end signal in this PR. It has not been executed since
