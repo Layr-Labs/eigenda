@@ -17,7 +17,7 @@ It stores all indexed data in memory and periodically persists snapshots to disk
 - **Persistent storage**: Automatic periodic snapshots to JSON files
 - **REST API**: Query indexed data via HTTP endpoints
 - **Graceful shutdown**: Ensures final state snapshot on shutdown
-- **Configurable**: Flexible configuration via files, environment variables, or CLI flags
+- **Configurable**: Flexible configuration via files and environment variables
 
 ## Building
 
@@ -25,19 +25,18 @@ It stores all indexed data in memory and periodically persists snapshots to disk
 # Build from the chainstate directory
 cd chainstate
 make build
-
-# Or build from the root directory
-make build
 ```
 
 The binary will be created at `chainstate/bin/chainstate-indexer`.
 
+Note: the repository root's `make build` does not currently include this
+service.
+
 ## Configuration
 
 The indexer uses the EigenDA documented config framework. Configuration can be provided via:
-1. Configuration files (YAML, TOML, or JSON)
+1. Configuration files (YAML, TOML, or JSON; pass one or more with `--config`)
 2. Environment variables (prefixed with `CHAINSTATE_INDEXER_`)
-3. CLI flags
 
 ### Required Configuration
 
@@ -298,16 +297,21 @@ The indexer uses an in-memory store with periodic JSON snapshots for persistence
 > reads from it yet. Components that need indexed operator state (churner,
 > disperser/controller, etc.) still query the subgraph via the `core/thegraph`
 > client. The inabox test suite reflects this: running it exercises the subgraph,
-> not this indexer, except for the standalone `TestChainStateIndexerE2E` which
-> runs the indexer as an observer against the same chain. Migrating consumers off
-> `thegraph.IndexedChainState` onto the REST API is separate, future work.
+> not this indexer, except for the standalone `TestChainStateIndexerE2E` and
+> `TestChainStateSubgraphParity` tests, which run the indexer as an observer
+> against the same chain. Migrating consumers off `thegraph.IndexedChainState`
+> is separate, future work.
 
 If you're migrating from the operator state subgraph:
 
-1. Deploy the chainstate indexer with the same contract addresses
+1. Deploy the chainstate indexer pointed at the network's EigenDADirectory
+   contract (the individual contract addresses are resolved from it)
 2. Let it index from the desired start block (or current block)
 3. Update clients to use the new REST API instead of GraphQL
 4. The API response format differs from GraphQL, so client code will need updates
+
+See [TESTING_AND_MIGRATION.md](./TESTING_AND_MIGRATION.md) for the full
+validation and phased-migration plan.
 
 ### Key Differences from Subgraph
 
@@ -316,7 +320,7 @@ If you're migrating from the operator state subgraph:
 | Query Language | GraphQL | REST |
 | Storage | PostgreSQL | In-memory + JSON |
 | Deployment | Requires graph-node infrastructure | Single binary |
-| Real-time updates | WebSocket subscriptions | Polling (WebSocket planned) |
+| Real-time updates | WebSocket subscriptions | Polling |
 | Query flexibility | High (GraphQL) | Medium (REST endpoints) |
 | Performance | Depends on graph-node | Very fast (in-memory) |
 
@@ -330,20 +334,24 @@ make test
 
 ### Running End-to-End Tests
 
-An end-to-end test (`TestChainStateIndexerE2E`) runs the indexer against a live
+Two end-to-end tests run the indexer against a live
 [inabox](../inabox/README.md) devnet (a local chain with the EigenDA contracts
-deployed and operators registered on-chain) and asserts on the results through
-the REST API. It lives in `inabox/tests` and runs as part of the inabox suite:
+deployed and operators registered on-chain): `TestChainStateIndexerE2E`
+asserts on the results through the REST API, and
+`TestChainStateSubgraphParity` compares the `core.IndexedChainState`
+implementation against the operator-state subgraph at every
+membership-change block. Both live in `inabox/tests` and run as part of the
+inabox suite:
 
 ```bash
 cd inabox && make run-e2e-tests
 ```
 
-To run only this test (the suite still brings up the full devnet, which requires
-Docker):
+To run only these tests (the suite still brings up the full devnet, which
+requires Docker):
 
 ```bash
-cd inabox && go test ./tests -v -config=../templates/testconfig-anvil.yaml -run TestChainStateIndexerE2E
+cd inabox && go test ./tests -v -config=../templates/testconfig-anvil.yaml -run 'TestChainStateIndexerE2E|TestChainStateSubgraphParity'
 ```
 
 ### Building
@@ -364,7 +372,6 @@ make clean
 - **GraphQL API**: Add GraphQL endpoint for backward compatibility
 - **Metrics**: Prometheus metrics for indexing progress and API usage
 - **Reorg handling**: Detect and handle chain reorganizations
-- **WebSocket support**: Real-time updates via WebSocket subscriptions
 - **Multi-chain support**: Index from multiple chains simultaneously
 - **Historical import**: Tool to backfill from existing subgraph data
 
