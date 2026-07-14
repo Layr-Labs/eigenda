@@ -172,6 +172,48 @@ type IndexedOperatorState struct {
 	AggKeys map[QuorumID]*G1Point
 }
 
+// AssembleIndexedOperatorState combines an on-chain operator state with indexed
+// data (per-operator info and per-quorum aggregate public keys) into an
+// IndexedOperatorState. It is shared by the IndexedChainState implementations
+// (the subgraph-backed one in core/thegraph and the chainstate indexer) so they
+// apply identical consistency rules:
+//
+//   - Every operator present in operatorState must have indexed info, otherwise
+//     an error is returned (the index is behind the chain).
+//   - indexedOperators may contain operators not in operatorState (e.g. ones
+//     that registered after the reference block); these are dropped so the
+//     result only describes operators actually in the requested quorums.
+//
+// indexedOperators is mutated (extra entries are deleted) and then embedded in
+// the returned state; callers should pass a map they own.
+func AssembleIndexedOperatorState(
+	operatorState *OperatorState,
+	indexedOperators map[OperatorID]*IndexedOperatorInfo,
+	aggKeys map[QuorumID]*G1Point,
+) (*IndexedOperatorState, error) {
+	operatorSeen := make(map[OperatorID]struct{})
+	for _, quorumOperators := range operatorState.Operators {
+		for operatorID := range quorumOperators {
+			if indexedOperators[operatorID] == nil {
+				return nil, fmt.Errorf("operator %s not found in indexed state", operatorID.Hex())
+			}
+			operatorSeen[operatorID] = struct{}{}
+		}
+	}
+
+	for operatorID := range indexedOperators {
+		if _, ok := operatorSeen[operatorID]; !ok {
+			delete(indexedOperators, operatorID)
+		}
+	}
+
+	return &IndexedOperatorState{
+		OperatorState:    operatorState,
+		IndexedOperators: indexedOperators,
+		AggKeys:          aggKeys,
+	}, nil
+}
+
 // ChainState is an interface for getting information about the current chain state.
 type ChainState interface {
 	GetCurrentBlockNumber(ctx context.Context) (uint, error)

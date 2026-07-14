@@ -149,29 +149,9 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		return nil, err
 	}
 
-	// Detect missing operators
-	operatorSeen := make(map[core.OperatorID]struct{})
-	for _, quorumOperators := range operatorState.Operators {
-		for operatorID := range quorumOperators {
-			if indexedOperators[operatorID] == nil {
-				return nil, fmt.Errorf("operator %s not found in indexed state", operatorID.Hex())
-			}
-			operatorSeen[operatorID] = struct{}{}
-		}
-	}
-
-	// Filter out the operators who are not part of any quorum. This can happen if the operator registers or re-registers
-	// after the reference block number.
-	for operatorID := range indexedOperators {
-		if _, ok := operatorSeen[operatorID]; !ok {
-			delete(indexedOperators, operatorID)
-		}
-	}
-
-	state := &core.IndexedOperatorState{
-		OperatorState:    operatorState,
-		IndexedOperators: indexedOperators,
-		AggKeys:          aggKeys,
+	state, err := core.AssembleIndexedOperatorState(operatorState, indexedOperators, aggKeys)
+	if err != nil {
+		return nil, fmt.Errorf("failed to assemble indexed operator state: %w", err)
 	}
 	return state, nil
 }

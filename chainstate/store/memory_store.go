@@ -1,0 +1,545 @@
+package store
+
+import (
+	"context"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"slices"
+	"sort"
+	"sync"
+
+	"github.com/Layr-Labs/eigenda/chainstate/types"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/ethereum/go-ethereum/common"
+)
+
+// MemoryStore is an in-memory implementation of the Store interface.
+// It stores all data in memory and can be persisted to disk via snapshots.
+type MemoryStore struct {
+	mu sync.RWMutex
+
+	// Map of operator ID to operator
+	operators map[core.OperatorID]*types.Operator
+
+	// Map of "quorumID:blockNumber" to quorum APK
+	quorumAPKs map[string]*types.QuorumAPK
+
+	// Per-quorum ascending list of block numbers that have an APK snapshot, kept
+	// sorted so "latest snapshot <= block" is a binary search rather than a scan
+	// and sort of all snapshots.
+	apkBlocksByQuorum map[core.QuorumID][]uint64
+
+	// List of all ejections
+	ejections []*types.OperatorEjection
+
+	// Set of ejection identities (see eventKey) already stored, for O(1) dedup.
+	ejectionKeys map[string]struct{}
+
+	// List of all socket updates
+	socketUpdates []*types.OperatorSocketUpdate
+
+	// Set of socket-update identities (see eventKey) already stored, for O(1) dedup.
+	socketUpdateKeys map[string]struct{}
+
+	// Last block number that was indexed
+	lastIndexedBlock uint64
+}
+
+// eventKey builds the on-chain identity used to dedup append-only events
+// (ejections, socket updates) when a block range is re-indexed. The log index
+// is part of the identity because one transaction can emit several events for
+// the same operator — e.g. EjectionManager.ejectOperators emits one
+// OperatorEjected per quorum — and those must not collapse into one record.
+func eventKey(operatorID core.OperatorID, blockNumber uint64, logIndex uint, txHash common.Hash) string {
+	return fmt.Sprintf("%x:%d:%d:%x", operatorID, blockNumber, logIndex, txHash)
+}
+
+// memoryStoreSnapshot is the serializable representation of the memory store.
+// Uses value types instead of pointers for JSON serialization.
+// Uses string keys for operators map since OperatorID ([32]byte) can't be a JSON key.
+type memoryStoreSnapshot struct {
+	Operators        map[string]types.Operator    `json:"operators"`
+	QuorumAPKs       map[string]types.QuorumAPK   `json:"quorum_apks"`
+	Ejections        []types.OperatorEjection     `json:"ejections"`
+	SocketUpdates    []types.OperatorSocketUpdate `json:"socket_updates"`
+	LastIndexedBlock uint64                       `json:"last_indexed_block"`
+}
+
+// NewMemoryStore creates a new in-memory store.
+func NewMemoryStore() *MemoryStore {
+	return &MemoryStore{
+		operators:         make(map[core.OperatorID]*types.Operator),
+		quorumAPKs:        make(map[string]*types.QuorumAPK),
+		apkBlocksByQuorum: make(map[core.QuorumID][]uint64),
+		ejections:         make([]*types.OperatorEjection, 0),
+		ejectionKeys:      make(map[string]struct{}),
+		socketUpdates:     make([]*types.OperatorSocketUpdate, 0),
+		socketUpdateKeys:  make(map[string]struct{}),
+	}
+}
+
+// paginate returns the slice of items for the given limit and offset, clamping
+// both to valid ranges. A negative or out-of-range offset yields an empty slice,
+// and a non-positive limit means "no limit" (return everything from offset on).
+func paginate[T any](items []T, limit, offset int) []T {
+	if offset < 0 || offset >= len(items) {
+		return []T{}
+	}
+	items = items[offset:]
+	if limit > 0 && limit < len(items) {
+		items = items[:limit]
+	}
+	return items
+}
+
+// cloneOperator returns a copy of op that shares no mutable backing storage with
+// it. A plain `*op` copies the struct but leaves the QuorumIDs slice header
+// pointing at the same backing array; since the indexer appends to QuorumIDs in
+// place, a shared array would be a data race between the index loop and API
+// readers. Cloning the slice makes stored and returned operators independent.
+func cloneOperator(op *types.Operator) *types.Operator {
+	opCopy := *op
+	opCopy.QuorumIDs = slices.Clone(op.QuorumIDs)
+	return &opCopy
+}
+
+// SaveOperator implements Store.SaveOperator.
+func (s *MemoryStore) SaveOperator(ctx context.Context, op *types.Operator) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Clone (including the QuorumIDs slice) so later mutations to the caller's
+	// operator or its slice cannot reach the stored copy, and vice versa.
+	s.operators[op.ID] = cloneOperator(op)
+	return nil
+}
+
+// GetOperator implements Store.GetOperator.
+func (s *MemoryStore) GetOperator(ctx context.Context, id core.OperatorID) (*types.Operator, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	op, exists := s.operators[id]
+	if !exists {
+		return nil, fmt.Errorf("%w: %x", ErrOperatorNotFound, id)
+	}
+
+	// Return a clone (including the QuorumIDs slice) to prevent external mutations
+	// and slice aliasing with the stored operator.
+	return cloneOperator(op), nil
+}
+
+// ListOperators implements Store.ListOperators.
+func (s *MemoryStore) ListOperators(
+	ctx context.Context,
+	filter types.OperatorFilter,
+	limit, offset int,
+) ([]*types.Operator, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []*types.Operator
+
+	for _, op := range s.operators {
+		// Apply filters
+		if filter.RegisteredOnly && !op.IsRegistered() {
+			continue
+		}
+		if filter.DeregisteredOnly && op.IsRegistered() {
+			continue
+		}
+		if filter.QuorumID != nil {
+			found := false
+			for _, qid := range op.QuorumIDs {
+				if qid == *filter.QuorumID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+		if filter.MinBlock > 0 && op.RegisteredAtBlockNumber < filter.MinBlock {
+			continue
+		}
+		if filter.MaxBlock > 0 && op.RegisteredAtBlockNumber > filter.MaxBlock {
+			continue
+		}
+
+		result = append(result, cloneOperator(op))
+	}
+
+	// Sort by registration block number for consistent ordering
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].RegisteredAtBlockNumber < result[j].RegisteredAtBlockNumber
+	})
+
+	return paginate(result, limit, offset), nil
+}
+
+// UpdateOperatorSocket implements Store.UpdateOperatorSocket.
+func (s *MemoryStore) UpdateOperatorSocket(
+	ctx context.Context,
+	id core.OperatorID,
+	socket string,
+	blockNum uint64,
+) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	op, exists := s.operators[id]
+	if !exists {
+		return fmt.Errorf("%w: %x", ErrOperatorNotFound, id)
+	}
+
+	// Since op is a pointer, we can modify it directly
+	op.Socket = socket
+	return nil
+}
+
+// DeregisterOperator implements Store.DeregisterOperator.
+func (s *MemoryStore) DeregisterOperator(
+	ctx context.Context,
+	id core.OperatorID,
+	blockNum uint64,
+	txHash common.Hash,
+) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	op, exists := s.operators[id]
+	if !exists {
+		return fmt.Errorf("%w: %x", ErrOperatorNotFound, id)
+	}
+
+	// Since op is a pointer, we can modify it directly
+	op.DeregisteredAtBlockNumber = &blockNum
+	op.DeregisteredTxHash = &txHash
+	return nil
+}
+
+// SaveQuorumAPK implements Store.SaveQuorumAPK.
+func (s *MemoryStore) SaveQuorumAPK(ctx context.Context, apk *types.QuorumAPK) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := fmt.Sprintf("%d:%d", apk.QuorumID, apk.BlockNumber)
+	_, existed := s.quorumAPKs[key]
+	apkCopy := *apk
+	s.quorumAPKs[key] = &apkCopy
+
+	// Maintain the per-quorum sorted block index. Only insert when this is a new
+	// (quorum, block) so re-indexing the same block doesn't create duplicates.
+	if !existed {
+		blocks := s.apkBlocksByQuorum[apk.QuorumID]
+		pos, _ := slices.BinarySearch(blocks, apk.BlockNumber)
+		s.apkBlocksByQuorum[apk.QuorumID] = slices.Insert(blocks, pos, apk.BlockNumber)
+	}
+	return nil
+}
+
+// GetLatestQuorumAPK returns the most recent APK snapshot for quorumID at or
+// before blockNum, or (nil, nil) if the quorum has no snapshot in that range.
+// The lookup is a binary search over the per-quorum block index.
+func (s *MemoryStore) GetLatestQuorumAPK(
+	ctx context.Context,
+	quorumID core.QuorumID,
+	blockNum uint64,
+) (*types.QuorumAPK, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	blocks := s.apkBlocksByQuorum[quorumID]
+	// Largest indexed block <= blockNum: find the first block > blockNum and step
+	// back one.
+	pos, found := slices.BinarySearch(blocks, blockNum)
+	if !found {
+		pos-- // BinarySearch returns the insertion point; the candidate is before it.
+	}
+	if pos < 0 {
+		return nil, nil
+	}
+
+	key := fmt.Sprintf("%d:%d", quorumID, blocks[pos])
+	apk, exists := s.quorumAPKs[key]
+	if !exists {
+		return nil, nil
+	}
+	apkCopy := *apk
+	return &apkCopy, nil
+}
+
+// GetQuorumAPK implements Store.GetQuorumAPK.
+func (s *MemoryStore) GetQuorumAPK(ctx context.Context, quorumID uint8, blockNum uint64) (*types.QuorumAPK, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	key := fmt.Sprintf("%d:%d", quorumID, blockNum)
+	apk, exists := s.quorumAPKs[key]
+	if !exists {
+		return nil, fmt.Errorf("quorum APK not found for quorum %d at block %d", quorumID, blockNum)
+	}
+
+	apkCopy := *apk
+	return &apkCopy, nil
+}
+
+// ListQuorumAPKs implements Store.ListQuorumAPKs.
+func (s *MemoryStore) ListQuorumAPKs(ctx context.Context, filter types.QuorumAPKFilter) ([]*types.QuorumAPK, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []*types.QuorumAPK
+
+	for _, apk := range s.quorumAPKs {
+		// Apply filters
+		if apk.QuorumID != filter.QuorumID {
+			continue
+		}
+		if filter.BlockNumber > 0 && apk.BlockNumber != filter.BlockNumber {
+			continue
+		}
+		if filter.MinBlock > 0 && apk.BlockNumber < filter.MinBlock {
+			continue
+		}
+		if filter.MaxBlock > 0 && apk.BlockNumber > filter.MaxBlock {
+			continue
+		}
+
+		apkCopy := *apk
+		result = append(result, &apkCopy)
+	}
+
+	// Sort by block number
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].BlockNumber < result[j].BlockNumber
+	})
+
+	return result, nil
+}
+
+// SaveEjection implements Store.SaveEjection.
+func (s *MemoryStore) SaveEjection(ctx context.Context, ejection *types.OperatorEjection) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Dedup on the event's on-chain identity so that re-indexing a block range
+	// (e.g. after a failed batch) does not append duplicate ejections. Full-value
+	// equality can't be used because the recorded timestamp is wall-clock time.
+	key := eventKey(ejection.OperatorID, ejection.BlockNumber, ejection.LogIndex, ejection.TxHash)
+	if _, seen := s.ejectionKeys[key]; seen {
+		return nil
+	}
+
+	ejectionCopy := *ejection
+	s.ejections = append(s.ejections, &ejectionCopy)
+	s.ejectionKeys[key] = struct{}{}
+	return nil
+}
+
+// ListEjections implements Store.ListEjections.
+func (s *MemoryStore) ListEjections(
+	ctx context.Context,
+	operatorID *core.OperatorID,
+	limit, offset int,
+) ([]*types.OperatorEjection, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []*types.OperatorEjection
+
+	for _, ej := range s.ejections {
+		// Filter by operator ID if specified
+		if operatorID != nil && ej.OperatorID != *operatorID {
+			continue
+		}
+
+		ejCopy := *ej
+		result = append(result, &ejCopy)
+	}
+
+	// Sort by block number (descending - most recent first)
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].BlockNumber > result[j].BlockNumber
+	})
+
+	return paginate(result, limit, offset), nil
+}
+
+// SaveSocketUpdate implements Store.SaveSocketUpdate.
+func (s *MemoryStore) SaveSocketUpdate(ctx context.Context, update *types.OperatorSocketUpdate) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Dedup on the event's on-chain identity so that re-indexing a block range
+	// (e.g. after a failed batch) does not append duplicate socket updates.
+	// Full-value equality can't be used because the recorded timestamp is
+	// wall-clock time.
+	key := eventKey(update.OperatorID, update.BlockNumber, update.LogIndex, update.TxHash)
+	if _, seen := s.socketUpdateKeys[key]; seen {
+		return nil
+	}
+
+	updateCopy := *update
+	s.socketUpdates = append(s.socketUpdates, &updateCopy)
+	s.socketUpdateKeys[key] = struct{}{}
+	return nil
+}
+
+// ListSocketUpdates implements Store.ListSocketUpdates.
+func (s *MemoryStore) ListSocketUpdates(
+	ctx context.Context,
+	operatorID core.OperatorID,
+	limit, offset int,
+) ([]*types.OperatorSocketUpdate, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []*types.OperatorSocketUpdate
+
+	for _, update := range s.socketUpdates {
+		if update.OperatorID == operatorID {
+			updateCopy := *update
+			result = append(result, &updateCopy)
+		}
+	}
+
+	// Sort by block number (descending - most recent first)
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].BlockNumber > result[j].BlockNumber
+	})
+
+	return paginate(result, limit, offset), nil
+}
+
+// GetLastIndexedBlock implements Store.GetLastIndexedBlock.
+func (s *MemoryStore) GetLastIndexedBlock(ctx context.Context) (uint64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.lastIndexedBlock, nil
+}
+
+// SetLastIndexedBlock implements Store.SetLastIndexedBlock.
+func (s *MemoryStore) SetLastIndexedBlock(ctx context.Context, blockNum uint64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.lastIndexedBlock = blockNum
+	return nil
+}
+
+// Snapshot implements Store.Snapshot.
+func (s *MemoryStore) Snapshot() ([]byte, error) {
+	snapshot := s.copyForSnapshot()
+
+	// Marshal outside the lock: serialization time grows with store size, and
+	// holding the lock across it would stall every indexer write for the
+	// duration on each periodic save.
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal snapshot: %w", err)
+	}
+	return data, nil
+}
+
+// copyForSnapshot builds the serializable value-type copy of the store under
+// the read lock.
+func (s *MemoryStore) copyForSnapshot() memoryStoreSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Convert pointer maps/slices to value types for JSON serialization
+	// Convert OperatorID keys to hex strings since byte arrays can't be JSON keys
+	operators := make(map[string]types.Operator, len(s.operators))
+	for id, op := range s.operators {
+		opCopy := *op
+		opCopy.QuorumIDs = slices.Clone(op.QuorumIDs)
+		operators[id.Hex()] = opCopy
+	}
+
+	quorumAPKs := make(map[string]types.QuorumAPK, len(s.quorumAPKs))
+	for key, apk := range s.quorumAPKs {
+		quorumAPKs[key] = *apk
+	}
+
+	ejections := make([]types.OperatorEjection, len(s.ejections))
+	for i, ej := range s.ejections {
+		ejections[i] = *ej
+	}
+
+	socketUpdates := make([]types.OperatorSocketUpdate, len(s.socketUpdates))
+	for i, upd := range s.socketUpdates {
+		socketUpdates[i] = *upd
+	}
+
+	return memoryStoreSnapshot{
+		Operators:        operators,
+		QuorumAPKs:       quorumAPKs,
+		Ejections:        ejections,
+		SocketUpdates:    socketUpdates,
+		LastIndexedBlock: s.lastIndexedBlock,
+	}
+}
+
+// Restore implements Store.Restore.
+func (s *MemoryStore) Restore(data []byte) error {
+	var snapshot memoryStoreSnapshot
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		return fmt.Errorf("failed to unmarshal snapshot: %w", err)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Convert value types to pointer maps/slices
+	// Convert hex string keys back to OperatorID
+	s.operators = make(map[core.OperatorID]*types.Operator, len(snapshot.Operators))
+	for idStr, op := range snapshot.Operators {
+		idBytes, err := hex.DecodeString(idStr)
+		if err != nil {
+			return fmt.Errorf("failed to decode operator ID %q: %w", idStr, err)
+		}
+		if len(idBytes) != 32 {
+			return fmt.Errorf("invalid operator ID length %q: expected 32 bytes, got %d", idStr, len(idBytes))
+		}
+		var id core.OperatorID
+		copy(id[:], idBytes)
+		opCopy := op
+		s.operators[id] = &opCopy
+	}
+
+	s.quorumAPKs = make(map[string]*types.QuorumAPK, len(snapshot.QuorumAPKs))
+	s.apkBlocksByQuorum = make(map[core.QuorumID][]uint64)
+	for key, apk := range snapshot.QuorumAPKs {
+		apkCopy := apk
+		s.quorumAPKs[key] = &apkCopy
+		s.apkBlocksByQuorum[apk.QuorumID] = append(s.apkBlocksByQuorum[apk.QuorumID], apk.BlockNumber)
+	}
+	// The map iteration above is unordered, so sort each quorum's block index.
+	for quorumID := range s.apkBlocksByQuorum {
+		slices.Sort(s.apkBlocksByQuorum[quorumID])
+	}
+
+	s.ejections = make([]*types.OperatorEjection, len(snapshot.Ejections))
+	s.ejectionKeys = make(map[string]struct{}, len(snapshot.Ejections))
+	for i, ej := range snapshot.Ejections {
+		ejCopy := ej
+		s.ejections[i] = &ejCopy
+		s.ejectionKeys[eventKey(ej.OperatorID, ej.BlockNumber, ej.LogIndex, ej.TxHash)] = struct{}{}
+	}
+
+	s.socketUpdates = make([]*types.OperatorSocketUpdate, len(snapshot.SocketUpdates))
+	s.socketUpdateKeys = make(map[string]struct{}, len(snapshot.SocketUpdates))
+	for i, upd := range snapshot.SocketUpdates {
+		updCopy := upd
+		s.socketUpdates[i] = &updCopy
+		s.socketUpdateKeys[eventKey(upd.OperatorID, upd.BlockNumber, upd.LogIndex, upd.TxHash)] = struct{}{}
+	}
+
+	s.lastIndexedBlock = snapshot.LastIndexedBlock
+
+	return nil
+}
