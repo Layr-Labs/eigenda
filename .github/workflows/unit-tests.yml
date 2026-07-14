@@ -31,7 +31,7 @@ jobs:
       - name: Checkout EigenDA
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -62,7 +62,7 @@ jobs:
           echo "coverage: $COVERAGE% of statements"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe #v5.5.4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           name: main-unit-tests-coverage
@@ -92,7 +92,7 @@ jobs:
       - name: Checkout EigenDA
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac #v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
@@ -123,7 +123,7 @@ jobs:
           echo "coverage: $COVERAGE% of statements"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe #v5.5.4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           name: litt-unit-tests-coverage

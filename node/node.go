@@ -3,12 +3,9 @@ package node
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"math"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -26,7 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
-	"github.com/Layr-Labs/eigenda/encoding/v1/kzg/verifier"
 	verifierv2 "github.com/Layr-Labs/eigenda/encoding/v2/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node/ejection"
 	"github.com/prometheus/client_golang/prometheus"
@@ -35,7 +31,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -57,7 +52,6 @@ const (
 	// The percentage of time in garbage collection in a GC cycle.
 	gcPercentageTime = 0.1
 
-	v1CheckPath = "api/v1/operators-info/port-check"
 	v2CheckPath = "api/v2/operators/liveness"
 )
 
@@ -79,10 +73,8 @@ type Node struct {
 	KeyPair                 *core.KeyPair
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
-	Store                   *Store
 	ValidatorStore          ValidatorStore
 	ChainState              core.ChainState
-	Validator               core.ShardValidator
 	ValidatorV2             corev2.ShardValidator
 	Transactor              core.Writer
 	PubIPProvider           pubip.Provider
@@ -205,13 +197,6 @@ func NewNode(
 
 	// Make validator
 	config.EncoderConfig.LoadG2Points = false
-	v, err := verifier.NewVerifier(&config.EncoderConfig, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create verifier: %w", err)
-	}
-	asgn := &core.StdAssignmentCoordinator{}
-	validator := core.NewShardValidator(v, asgn, cst, config.ID)
-
 	verifierV2Config := verifierv2.ConfigFromV1KzgConfig(&config.EncoderConfig)
 	verifierV2, err := verifierv2.NewVerifier(verifierV2Config)
 	if err != nil {
@@ -241,22 +226,6 @@ func NewNode(
 		}
 		storeDurationBlocks = storeDuration
 	}
-	// Create v1 chunk store only if v1 is enabled
-	var store *Store
-	if config.EnableV1 {
-		store, err = NewLevelDBStore(
-			config.DbPath+"/chunk",
-			logger,
-			metrics,
-			blockStaleMeasure,
-			config.LevelDBDisableSeeksCompactionV1,
-			config.LevelDBSyncWritesV1,
-			storeDurationBlocks)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create new store: %w", err)
-		}
-	}
-
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(serviceManagerAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
@@ -265,12 +234,8 @@ func NewNode(
 	nodeLogger.Info("Creating node",
 		"chainID", chainID.String(),
 		"operatorID", config.ID.Hex(),
-		"dispersalPort", config.DispersalPort,
-		"internalDispersalPort", config.InternalDispersalPort,
 		"v2DispersalPort", config.V2DispersalPort,
 		"internalV2DispersalPort", config.InternalV2DispersalPort,
-		"retrievalPort", config.RetrievalPort,
-		"internalRetrievalPort", config.InternalRetrievalPort,
 		"v2RetrievalPort", config.V2RetrievalPort,
 		"internalV2RetrievalPort", config.InternalV2RetrievalPort,
 		"churnerUrl", config.ChurnerUrl,
@@ -359,10 +324,8 @@ func NewNode(
 		Logger:                      nodeLogger,
 		Metrics:                     metrics,
 		NodeApi:                     nodeApi,
-		Store:                       store,
 		ChainState:                  cst,
 		Transactor:                  tx,
-		Validator:                   validator,
 		ValidatorV2:                 validatorV2,
 		PubIPProvider:               pubIPProvider,
 		OperatorSocketsFilterer:     socketsFilterer,
@@ -380,65 +343,62 @@ func NewNode(
 
 	n.startOnDemandMeterer(ctx)
 
-	if config.EnableV2 {
-		var blobVersionParams *corev2.BlobVersionParameterMap
+	var blobVersionParams *corev2.BlobVersionParameterMap
 
-		var ttl time.Duration
-		if config.OverrideV2Ttl == 0 {
-			// 12s per block
-			ttl = time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
-		} else {
-			ttl = config.OverrideV2Ttl
-		}
-
-		n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create new store v2: %w", err)
-		}
-
-		blobParams, err := tx.GetAllVersionedBlobParams(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get versioned blob parameters: %w", err)
-		}
-		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
-
-		relayClientConfig := &relay.RelayClientConfig{
-			UseSecureGrpcFlag:  config.RelayUseSecureGrpc,
-			OperatorID:         &config.ID,
-			MessageSigner:      n.SignMessage,
-			MaxGRPCMessageSize: config.RelayMaxMessageSize,
-			ConnectionPoolSize: config.RelayConnectionPoolSize,
-		}
-
-		relayUrlProvider, err := relay.NewRelayUrlProvider(client, tx.GetRelayRegistryAddress())
-		if err != nil {
-			return nil, fmt.Errorf("create relay url provider: %w", err)
-		}
-
-		relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create new relay client: %w", err)
-		}
-
-		n.RelayClient.Store(relayClient)
-
-		blockNumber, err := tx.GetCurrentBlockNumber(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get block number: %w", err)
-		}
-		quorumCount, err := tx.GetQuorumCount(ctx, blockNumber)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get quorum count: %w", err)
-		}
-		n.QuorumCount.Store(uint32(quorumCount))
-
-		n.BlobVersionParams.Store(blobVersionParams)
+	var ttl time.Duration
+	if config.OverrideV2Ttl == 0 {
+		// 12s per block
+		ttl = time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
+	} else {
+		ttl = config.OverrideV2Ttl
 	}
+
+	n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new store v2: %w", err)
+	}
+
+	blobParams, err := tx.GetAllVersionedBlobParams(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get versioned blob parameters: %w", err)
+	}
+	blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
+
+	relayClientConfig := &relay.RelayClientConfig{
+		UseSecureGrpcFlag:  config.RelayUseSecureGrpc,
+		OperatorID:         &config.ID,
+		MessageSigner:      n.SignMessage,
+		MaxGRPCMessageSize: config.RelayMaxMessageSize,
+		ConnectionPoolSize: config.RelayConnectionPoolSize,
+	}
+
+	relayUrlProvider, err := relay.NewRelayUrlProvider(client, tx.GetRelayRegistryAddress())
+	if err != nil {
+		return nil, fmt.Errorf("create relay url provider: %w", err)
+	}
+
+	relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new relay client: %w", err)
+	}
+
+	n.RelayClient.Store(relayClient)
+
+	blockNumber, err := tx.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block number: %w", err)
+	}
+	quorumCount, err := tx.GetQuorumCount(ctx, blockNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quorum count: %w", err)
+	}
+	n.QuorumCount.Store(uint32(quorumCount))
+
+	n.BlobVersionParams.Store(blobVersionParams)
 
 	n.startPprof()
 	n.startMetrics()
 	n.startNodeAPI()
-	n.startV1()
 	n.startV2()
 
 	n.CurrentSocket = n.buildSocket()
@@ -617,28 +577,18 @@ func (n *Node) startEjectionSentinel() error {
 // Start goroutines that periodically check and update the node's public IP address on-chain.
 func (n *Node) startNodeIPUpdater() {
 	// Start the Node IP updater only if the PUBLIC_IP_PROVIDER is greater than 0.
-	if n.Config.PubIPCheckInterval > 0 && n.Config.EnableV1 && n.Config.EnableV2 {
+	if n.Config.PubIPCheckInterval > 0 {
 		go n.checkRegisteredNodeIpOnChain(n.CTX)
 		go n.checkCurrentNodeIp(n.CTX)
 	}
 }
 
-// start goroutines that need to run for the v1 API.
-func (n *Node) startV1() {
-	if n.Config.EnableV1 {
-		go n.expireLoop()
-		go n.checkNodeReachability(v1CheckPath)
-	}
-}
-
 // start goroutines that need to run for the v2 API.
 func (n *Node) startV2() {
-	if n.Config.EnableV2 {
-		go func() {
-			_ = n.RefreshOnchainState()
-		}()
-		go n.checkNodeReachability(v2CheckPath)
-	}
+	go func() {
+		_ = n.RefreshOnchainState()
+	}()
+	go n.checkNodeReachability(v2CheckPath)
 }
 
 // Start the Node API if enabled.
@@ -658,11 +608,12 @@ func (n *Node) startMetrics() {
 }
 
 // buildSocket builds the socket string based on the current config.
+// Maps V2 ports to V1 port positions for backward compatibility with node plugin.
 func (n *Node) buildSocket() string {
 	return string(core.MakeOperatorSocket(
 		n.Config.Hostname,
-		n.Config.DispersalPort,
-		n.Config.RetrievalPort,
+		n.Config.V2DispersalPort, // V2 dispersal port mapped to V1 dispersal position
+		n.Config.V2RetrievalPort, // V2 retrieval port mapped to V1 retrieval position
 		n.Config.V2DispersalPort,
 		n.Config.V2RetrievalPort))
 }
@@ -681,9 +632,7 @@ func (n *Node) registerValidator(socket string) error {
 	n.Logger.Info("Registering node on chain with the following parameters:",
 		"operatorId", n.Config.ID.Hex(),
 		"hostname", n.Config.Hostname,
-		"dispersalPort", n.Config.DispersalPort,
 		"v2DispersalPort", n.Config.V2DispersalPort,
-		"retrievalPort", n.Config.RetrievalPort,
 		"v2RetrievalPort", n.Config.V2RetrievalPort,
 		"churnerUrl", n.Config.ChurnerUrl,
 		"quorumIds", fmt.Sprintf("%v", n.Config.QuorumIDList))
@@ -777,40 +726,38 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 	}
 	totalAllocated += config.GCSafetyBufferSizeBytes
 
-	if config.EnableV2 {
-		config.LittDBReadCacheSizeBytes, err = computeMemoryPoolSize(
-			logger,
-			"LittDB read cache",
-			config.LittDBReadCacheSizeBytes,
-			config.LittDBReadCacheSizeFraction,
-			maxMemory)
-		if err != nil {
-			return fmt.Errorf("failed to compute size: %w", err)
-		}
-		totalAllocated += config.LittDBReadCacheSizeBytes
-
-		config.LittDBWriteCacheSizeBytes, err = computeMemoryPoolSize(
-			logger,
-			"LittDB write cache",
-			config.LittDBWriteCacheSizeBytes,
-			config.LittDBWriteCacheSizeFraction,
-			maxMemory)
-		if err != nil {
-			return fmt.Errorf("failed to compute size: %w", err)
-		}
-		totalAllocated += config.LittDBWriteCacheSizeBytes
-
-		config.StoreChunksBufferSizeBytes, err = computeMemoryPoolSize(
-			logger,
-			"StoreChunks Buffer",
-			config.StoreChunksBufferSizeBytes,
-			config.StoreChunksBufferSizeFraction,
-			maxMemory)
-		if err != nil {
-			return fmt.Errorf("failed to compute size: %w", err)
-		}
-		totalAllocated += config.StoreChunksBufferSizeBytes
+	config.LittDBReadCacheSizeBytes, err = computeMemoryPoolSize(
+		logger,
+		"LittDB read cache",
+		config.LittDBReadCacheSizeBytes,
+		config.LittDBReadCacheSizeFraction,
+		maxMemory)
+	if err != nil {
+		return fmt.Errorf("failed to compute size: %w", err)
 	}
+	totalAllocated += config.LittDBReadCacheSizeBytes
+
+	config.LittDBWriteCacheSizeBytes, err = computeMemoryPoolSize(
+		logger,
+		"LittDB write cache",
+		config.LittDBWriteCacheSizeBytes,
+		config.LittDBWriteCacheSizeFraction,
+		maxMemory)
+	if err != nil {
+		return fmt.Errorf("failed to compute size: %w", err)
+	}
+	totalAllocated += config.LittDBWriteCacheSizeBytes
+
+	config.StoreChunksBufferSizeBytes, err = computeMemoryPoolSize(
+		logger,
+		"StoreChunks Buffer",
+		config.StoreChunksBufferSizeBytes,
+		config.StoreChunksBufferSizeFraction,
+		maxMemory)
+	if err != nil {
+		return fmt.Errorf("failed to compute size: %w", err)
+	}
+	totalAllocated += config.StoreChunksBufferSizeBytes
 
 	if totalAllocated > maxMemory {
 		return fmt.Errorf("total memory allocated (%d bytes) "+
@@ -849,46 +796,12 @@ func computeMemoryPoolSize(
 	return poolSize, nil
 }
 
-// The expireLoop is a loop that is run once per configured second(s) while the node
-// is running. It scans for expired batches and removes them from the local database.
-func (n *Node) expireLoop() {
-	n.Logger.Info("Start expireLoop goroutine in background to periodically remove expired batches on the node")
-	ticker := time.NewTicker(time.Duration(n.Config.ExpirationPollIntervalSec) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		<-ticker.C
-
-		// We cap the time the deletion function can run, to make sure there is no overlapping
-		// between loops and the garbage collection doesn't take too much resource.
-		// The heuristic is to cap the GC time to a percentage of the poll interval, but at
-		// least have 1 second.
-		timeLimitSec := uint64(math.Max(float64(n.Config.ExpirationPollIntervalSec)*gcPercentageTime, 1.0))
-		numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err := n.Store.DeleteExpiredEntries(
-			time.Now().Unix(), timeLimitSec)
-		n.Logger.Info("Complete an expiration cycle to remove expired batches",
-			"num expired batches found and removed", numBatchesDeleted,
-			"num expired mappings found and removed", numMappingsDeleted,
-			"num expired blobs found and removed", numBlobsDeleted)
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				n.Logger.Error("Expiration cycle exited with ContextDeadlineExceed, meaning more expired "+
-					"batches need to be removed, which will continue in next cycle", "time limit (sec)",
-					timeLimitSec)
-			} else {
-				n.Logger.Error("Expiration cycle encountered error when removing expired batches, "+
-					"which will be retried in next cycle", "err", err)
-			}
-		}
-	}
-}
-
 // RefreshOnchainState refreshes the onchain state of the node.
 // It fetches the latest blob parameters from the chain and updates the BlobVersionParams.
 // It runs periodically based on the OnchainStateRefreshInterval.
 // WARNING: this method is not thread-safe and should not be called concurrently.
 func (n *Node) RefreshOnchainState() error {
-	if !n.Config.EnableV2 || n.Config.OnchainStateRefreshInterval <= 0 {
+	if n.Config.OnchainStateRefreshInterval <= 0 {
 		return nil
 	}
 	ticker := time.NewTicker(n.Config.OnchainStateRefreshInterval)
@@ -924,148 +837,6 @@ func (n *Node) RefreshOnchainState() error {
 	}
 }
 
-// ProcessBatch validates the batch is correct, stores data into the node's Store, and then returns a
-// signature for the entire batch.
-//
-// The batch will be itemized into batch header, header and chunks of each blob in the batch. These items will
-// be stored atomically to the database.
-//
-// Notes:
-//   - If the batch is stored already, it's no-op to store it more than once
-//   - If the batch is stored, but the processing fails after that, these data items will not be rollback
-//   - These data items will be garbage collected eventually when they become stale.
-func (n *Node) ProcessBatch(
-	ctx context.Context,
-	header *core.BatchHeader,
-	blobs []*core.BlobMessage,
-	rawBlobs []*node.Blob,
-) (*core.Signature, error) {
-
-	start := time.Now()
-	log := n.Logger
-
-	batchHeaderHash, err := header.GetBatchHeaderHash()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(blobs) == 0 {
-		return nil, errors.New("number of blobs must be greater than zero")
-	}
-
-	if len(blobs) != len(rawBlobs) {
-		return nil, errors.New("number of parsed blobs must be the same as number of blobs from protobuf request")
-	}
-
-	// Measure num batches received and its size in bytes
-	batchSize := uint64(0)
-	for _, blob := range blobs {
-		for quorumID, bundle := range blob.Bundles {
-			n.Metrics.AcceptBlobs(quorumID, bundle.Size())
-		}
-		batchSize += blob.Bundles.Size()
-	}
-	n.Metrics.AcceptBatches("received", batchSize)
-
-	batchHeaderHashHex := hex.EncodeToString(batchHeaderHash[:])
-	log.Debug("Start processing a batch",
-		"batchHeaderHash", batchHeaderHashHex,
-		"batchSize (in bytes)", batchSize,
-		"num of blobs", len(blobs),
-		"referenceBlockNumber", header.ReferenceBlockNumber)
-
-	// Store the batch.
-	// Run this in a goroutine so we can parallelize the batch storing and batch
-	// verifaction work.
-	// This should be able to improve latency without needing more CPUs, because batch
-	// storing is an IO operation.
-	type storeResult struct {
-		// Whether StoreBatch failed.
-		err error
-
-		// The keys that are stored to database for a single batch.
-		// Defined only if the batch not already exists and gets stored to database successfully.
-		keys *[][]byte
-
-		// Latency to store the batch.
-		// Defined only if the batch not already exists and gets stored to database successfully.
-		latency time.Duration
-	}
-	storeChan := make(chan storeResult)
-	go func(n *Node) {
-		start := time.Now()
-		keys, err := n.Store.StoreBatch(ctx, header, blobs, rawBlobs)
-		if err != nil {
-			// If batch already exists, we don't store it again, but we should not
-			// error out in such case.
-			if errors.Is(err, ErrBatchAlreadyExist) {
-				storeChan <- storeResult{err: nil, keys: nil, latency: 0}
-			} else {
-				storeChan <- storeResult{
-					err:     fmt.Errorf("failed to store batch: %w", err),
-					keys:    nil,
-					latency: 0,
-				}
-			}
-			return
-		}
-		storeChan <- storeResult{err: nil, keys: keys, latency: time.Since(start)}
-	}(n)
-
-	// Validate batch.
-	stageTimer := time.Now()
-	err = n.ValidateBatch(ctx, header, blobs)
-	if err != nil {
-		// If we have already stored the batch into database, but it's not valid, we
-		// revert all the keys for that batch.
-		result := <-storeChan
-		if result.keys != nil {
-			log.Debug("Batch validation failed, rolling back the key/value entries stored in database",
-				"number of entries", len(*result.keys),
-				"batchHeaderHash", batchHeaderHashHex)
-			if deleteKeysErr := n.Store.DeleteKeys(ctx, result.keys); deleteKeysErr != nil {
-				log.Error("Failed to delete the invalid batch that should be rolled back",
-					"batchHeaderHash", batchHeaderHashHex,
-					"err", deleteKeysErr)
-			}
-		}
-		return nil, err
-	}
-	n.Metrics.RecordStoreChunksStage("validated", batchSize, time.Since(stageTimer))
-	log.Debug("Validate batch took", "duration:", time.Since(stageTimer))
-
-	// Before we sign the batch, we should first complete the batch storing successfully.
-	result := <-storeChan
-	if result.err != nil {
-		log.Error("Store batch failed", "batchHeaderHash", batchHeaderHashHex, "err", result.err)
-		return nil, err
-	}
-	if result.keys != nil {
-		n.Metrics.RecordStoreChunksStage("stored", batchSize, result.latency)
-		n.Logger.Debug("Store batch succeeded",
-			"batchHeaderHash", batchHeaderHashHex,
-			"duration:", result.latency)
-	} else {
-		n.Logger.Warn("Store batch skipped because the batch already exists in the store",
-			"batchHeaderHash", batchHeaderHashHex)
-	}
-
-	// Sign batch header hash if all validation checks pass and data items are written to database.
-	stageTimer = time.Now()
-	signature, err := n.SignMessage(ctx, batchHeaderHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign batch: %w", err)
-	}
-
-	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
-	log.Debug("Sign batch succeeded",
-		"pubkey", n.BLSSigner.GetPublicKeyG1(),
-		"duration", time.Since(stageTimer))
-
-	log.Debug("Exiting process batch", "duration", time.Since(start))
-	return signature, nil
-}
-
 func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature, error) {
 	signature, err := n.BLSSigner.Sign(ctx, data[:])
 	if err != nil {
@@ -1079,34 +850,6 @@ func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature,
 	return &core.Signature{
 		G1Point: g,
 	}, nil
-}
-
-func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage) error {
-	start := time.Now()
-	operatorState, err := n.ChainState.GetOperatorStateByOperator(ctx, header.ReferenceBlockNumber, n.Config.ID)
-	if err != nil {
-		return err
-	}
-	getStateDuration := time.Since(start)
-
-	err = n.Validator.ValidateBatch(header, blobs, operatorState, n.ValidationPool)
-	if err != nil {
-		h, hashErr := operatorState.Hash()
-		if hashErr != nil {
-			n.Logger.Error("failed to get operator state hash", "err", hashErr)
-		}
-
-		hStr := make([]string, 0, len(h))
-		for q, hash := range h {
-			hStr = append(hStr, fmt.Sprintf("%d: %x", q, hash))
-		}
-		return fmt.Errorf("failed to validate batch with operator state %x: %w",
-			strings.Join(hStr, ","), err)
-	}
-	n.Logger.Debug("ValidateBatch completed",
-		"get operator state duration", getStateDuration,
-		"total duration", time.Since(start))
-	return nil
 }
 
 func (n *Node) updateSocketAddress(ctx context.Context, newSocketAddr string) {
@@ -1167,8 +910,8 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 			newSocketAddr, err := SocketAddress(
 				ctx,
 				n.PubIPProvider,
-				n.Config.DispersalPort,
-				n.Config.RetrievalPort,
+				n.Config.V2DispersalPort,
+				n.Config.V2RetrievalPort,
 				n.Config.V2DispersalPort,
 				n.Config.V2RetrievalPort)
 			if err != nil {

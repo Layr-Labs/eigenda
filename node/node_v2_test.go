@@ -120,7 +120,6 @@ func TestDownloadBundlesOnlyParticipatingQuorums(t *testing.T) {
 
 func TestRefreshOnchainStateFailure(t *testing.T) {
 	c := newComponents(t, op0)
-	c.node.Config.EnableV2 = true
 	c.node.RelayClient.Store(c.relayClient)
 	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
 	bp, ok := c.node.BlobVersionParams.Load().Get(0)
@@ -180,7 +179,6 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 
 func TestRefreshOnchainStateSuccess(t *testing.T) {
 	c := newComponents(t, op0)
-	c.node.Config.EnableV2 = true
 	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
 
 	relayUrlProvider := test.NewTestRelayUrlProvider()

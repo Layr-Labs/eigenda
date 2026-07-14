@@ -149,7 +149,8 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKe
 	if s.config.PreventReencoding && s.chunkWriter.ProofExists(ctx, blobKey) {
 		coefExist := s.chunkWriter.CoefficientsExists(ctx, blobKey)
 		if coefExist {
-			return nil, fmt.Errorf("blob %s has already been encoded", blobKey.Hex())
+			// nolint:wrapcheck
+			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("blob %s has already been encoded", blobKey.Hex()))
 		}
 	}
 

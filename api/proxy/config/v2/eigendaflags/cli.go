@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/urfave/cli/v2"
 )
@@ -21,6 +20,7 @@ var (
 	PointEvaluationDisabledFlagName = withFlagPrefix("disable-point-evaluation")
 
 	PutRetriesFlagName                                = withFlagPrefix("put-retries")
+	PutRetryDelayIncrementFlagName                    = withFlagPrefix("put-retry-delay-increment")
 	SignerPaymentKeyHexFlagName                       = withFlagPrefix("signer-payment-key-hex")
 	DisperseBlobTimeoutFlagName                       = withFlagPrefix("disperse-blob-timeout")
 	BlobCertifiedTimeoutFlagName                      = withFlagPrefix("blob-certified-timeout")
@@ -118,6 +118,16 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Value:    3,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "PUT_RETRIES")},
 			Category: category,
+		},
+		&cli.DurationFlag{
+			Name: PutRetryDelayIncrementFlagName,
+			Usage: "Base time unit for linear retry backoff on blob dispersal retries. " +
+				"Applied only to rate-limit related errors (ResourceExhausted, debit rejection). " +
+				"On the Nth consecutive rate-limit retry, sleeps N * this value.",
+			Value:    1 * time.Second,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "PUT_RETRY_DELAY_INCREMENT")},
+			Category: category,
+			Required: false,
 		},
 		&cli.DurationFlag{
 			Name:     DisperseBlobTimeoutFlagName,
@@ -253,7 +263,7 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 	}
 
 	maxBlobLengthFlagContents := ctx.String(MaxBlobLengthFlagName)
-	maxBlobLengthBytes, err := eigendaflags.ParseMaxBlobLength(maxBlobLengthFlagContents)
+	maxBlobLengthBytes, err := common.ParseBytesAmount(maxBlobLengthFlagContents)
 	if err != nil {
 		return common.ClientConfigV2{}, fmt.Errorf(
 			"parse max blob length flag \"%v\": %w", maxBlobLengthFlagContents, err)

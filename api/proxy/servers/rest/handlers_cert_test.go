@@ -154,7 +154,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 	defer ctrl.Finish()
 	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
-	mockEigenDAManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
+	mockEigenDAManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V2EigenDABackend)
 
 	tests := []struct {
 		name         string
@@ -251,7 +251,7 @@ func TestHandlerPutErrors(t *testing.T) {
 	defer ctrl.Finish()
 	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
-	mockEigenDAManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
+	mockEigenDAManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V2EigenDABackend)
 
 	tests := []struct {
 		name                             string
@@ -324,7 +324,7 @@ func TestHandlerPutKeccakErrors(t *testing.T) {
 
 	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
-	mockEigenDAManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
+	mockEigenDAManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V2EigenDABackend)
 
 	tests := []struct {
 		name                            string

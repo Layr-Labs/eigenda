@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/dispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
@@ -19,7 +18,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/disperser"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
-	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	paymentvaultbindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -81,10 +79,8 @@ type TestHarness struct {
 	StaticCertVerifier              *verification.CertVerifier
 	EigenDACertVerifierRouter       *routerbindings.ContractEigenDACertVerifierRouterTransactor
 	EigenDACertVerifierRouterCaller *routerbindings.ContractEigenDACertVerifierRouterCaller
-	EigenDACertVerifierV1           *verifierv1bindings.ContractEigenDACertVerifierV1
 
 	// Retrieval clients
-	RetrievalClient            clients.RetrievalClient
 	RelayRetrievalClientV2     *payloadretrieval.RelayPayloadRetriever
 	ValidatorRetrievalClientV2 *payloadretrieval.ValidatorPayloadRetriever
 	// Tests can use this default payload disperser directly, or create custom payload dispersers via

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	relaygrpc "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common"
@@ -44,8 +45,8 @@ type ChunkRequestByIndex struct {
 }
 
 type RelayClient interface {
-	// GetBlob retrieves a blob from a relay
-	GetBlob(ctx context.Context, relayKey corev2.RelayKey, blobKey corev2.BlobKey) ([]byte, error)
+	// GetBlob retrieves a blob from a relay using the information in the EigenDACert.
+	GetBlob(ctx context.Context, cert coretypes.EigenDACert) (*coretypes.Blob, error)
 	// GetChunksByRange retrieves blob chunks from a relay by chunk index range
 	// The returned slice has the same length and ordering as the input slice, and the i-th element is the bundle for the i-th request.
 	// Each bundle is a sequence of frames in raw form (i.e., serialized core.Bundle bytearray).
@@ -114,7 +115,29 @@ func NewRelayClient(
 	}, nil
 }
 
-func (c *relayClient) GetBlob(ctx context.Context, relayKey corev2.RelayKey, blobKey corev2.BlobKey) ([]byte, error) {
+func (c *relayClient) GetBlob(
+	ctx context.Context,
+	cert coretypes.EigenDACert,
+) (*coretypes.Blob, error) {
+	// In practice, there will only be one relay key in each certificate, but we don't want to
+	// assert that here in case something changes in the future. We just ensure there is at least one.
+	relayKeys := cert.RelayKeys()
+	if len(relayKeys) == 0 {
+		return nil, errors.New("cert contains no relay keys")
+	}
+	relayKey := relayKeys[0]
+
+	blobKey, err := cert.ComputeBlobKey()
+	if err != nil {
+		return nil, fmt.Errorf("compute blob key from cert: %w", err)
+	}
+
+	blobCommitments, err := cert.Commitments()
+	if err != nil {
+		return nil, fmt.Errorf("get commitments from cert: %w", err)
+	}
+	blobLengthSymbols := blobCommitments.Length
+
 	client, err := c.getClient(ctx, relayKey)
 	if err != nil {
 		return nil, fmt.Errorf("get grpc client for key %d: %w", relayKey, err)
@@ -127,7 +150,12 @@ func (c *relayClient) GetBlob(ctx context.Context, relayKey corev2.RelayKey, blo
 		return nil, err
 	}
 
-	return res.GetBlob(), nil
+	blob, err := coretypes.DeserializeBlob(res.GetBlob(), blobLengthSymbols)
+	if err != nil {
+		return nil, fmt.Errorf("deserialize blob: %w", err)
+	}
+
+	return blob, nil
 }
 
 // signGetChunksRequest signs the GetChunksRequest with the operator's private key

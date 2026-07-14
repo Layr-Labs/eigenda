@@ -1,10 +1,12 @@
 package apiserver_test
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
 	"net"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -31,16 +33,30 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/codec"
+	kzgcommitter "github.com/Layr-Labs/eigenda/encoding/v2/kzg/committer"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/random"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	tmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/peer"
 )
+
+const (
+	privateKeyHex = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	s3BucketName  = "test-eigenda-blobstore"
+)
+
+var testInfrastructure struct {
+	localstackContainer *testbed.LocalStackContainer
+	localstackPort      string
+	v2MetadataTableName string
+}
 
 var invalidSignature = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
 	26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
@@ -53,6 +69,67 @@ type testComponents struct {
 	ChainReader       *mock.MockWriter
 	Signer            *auth.LocalBlobRequestSigner
 	Peer              *peer.Peer
+	Committer         *kzgcommitter.Committer
+}
+
+func TestMain(m *testing.M) {
+	setup()
+	code := m.Run()
+	teardown()
+	os.Exit(code)
+}
+
+func setup() {
+	logger := test.GetLogger()
+	deployLocalStack := os.Getenv("DEPLOY_LOCALSTACK") != "false"
+
+	testInfrastructure.localstackPort = "4576"
+	if port := os.Getenv("LOCALSTACK_PORT"); port != "" {
+		testInfrastructure.localstackPort = port
+	}
+	testInfrastructure.v2MetadataTableName = fmt.Sprintf("test-BlobMetadata-%v-v2", uuid.New())
+
+	if deployLocalStack {
+		ctx := context.Background()
+		var err error
+		testInfrastructure.localstackContainer, err = testbed.NewLocalStackContainerWithOptions(
+			ctx,
+			testbed.LocalStackOptions{
+				ExposeHostPort: true,
+				HostPort:       testInfrastructure.localstackPort,
+				Services:       []string{"s3", "dynamodb"},
+				Logger:         logger,
+			},
+		)
+		if err != nil {
+			teardown()
+			logger.Fatal("Failed to start localstack container:", err)
+		}
+
+		deployConfig := testbed.DeployResourcesConfig{
+			LocalStackEndpoint:  testInfrastructure.localstackContainer.Endpoint(),
+			BlobStoreBucketName: s3BucketName,
+			V2MetadataTableName: testInfrastructure.v2MetadataTableName,
+			AWSConfig:           testInfrastructure.localstackContainer.GetAWSClientConfig(),
+			Logger:              logger,
+		}
+
+		err = testbed.DeployResources(ctx, deployConfig)
+		if err != nil {
+			teardown()
+			logger.Fatal("Failed to deploy AWS resources:", err)
+		}
+	}
+}
+
+func teardown() {
+	if testInfrastructure.localstackContainer != nil {
+		ctx := context.Background()
+		if err := testInfrastructure.localstackContainer.Terminate(ctx); err != nil {
+			logger := test.GetLogger()
+			logger.Error("Failed to terminate localstack container", "error", err)
+		}
+	}
 }
 
 // buildDisperseBlobRequest creates a properly signed DisperseBlobRequest with both blob key and anchor signatures.
@@ -98,7 +175,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := committer.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.Committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	require.NoError(t, err)
@@ -155,7 +232,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	data2 = codec.ConvertByPaddingEmptyByte(data2)
-	commitments, err = committer.GetCommitmentsForPaddedLength(data2)
+	commitments, err = c.Committer.GetCommitmentsForPaddedLength(data2)
 	require.NoError(t, err)
 	commitmentProto, err = commitments.ToProtobuf()
 	require.NoError(t, err)
@@ -170,7 +247,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	require.NoError(t, err)
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := committer.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.Committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	require.NoError(t, err)
@@ -301,7 +378,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	_, err = rand.Read(data)
 	require.NoError(t, err)
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err = committer.GetCommitmentsForPaddedLength(data)
+	commitments, err = c.Committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	commitmentProto, err = commitments.ToProtobuf()
 	require.NoError(t, err)
@@ -326,9 +403,13 @@ func TestV2GetBlobStatus(t *testing.T) {
 	c := newTestServerV2(t)
 	ctx = peer.NewContext(ctx, c.Peer)
 
+	testData := codec.ConvertByPaddingEmptyByte([]byte("test data for blob status"))
+	commitments, err := c.Committer.GetCommitmentsForPaddedLength(testData)
+	require.NoError(t, err)
+
 	blobHeader := &corev2.BlobHeader{
 		BlobVersion:     0,
-		BlobCommitments: mockCommitment,
+		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         gethcommon.HexToAddress("0x1234"),
@@ -399,8 +480,8 @@ func TestV2GetBlobStatus(t *testing.T) {
 		},
 		APKG2: &core.G2Point{
 			G2Affine: &bn254.G2Affine{
-				X: mockCommitment.LengthCommitment.X,
-				Y: mockCommitment.LengthCommitment.Y,
+				X: commitments.LengthCommitment.X,
+				Y: commitments.LengthCommitment.Y,
 			},
 		},
 		Sigma: &core.Signature{
@@ -438,7 +519,7 @@ func TestV2GetBlobCommitment(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commit, err := committer.GetCommitmentsForPaddedLength(data)
+	commit, err := c.Committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	reply, err := c.DispersalServerV2.GetBlobCommitment(ctx, &pbv2.BlobCommitmentRequest{
 		Blob: data,
@@ -482,11 +563,20 @@ func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment b
 
 	ctx := t.Context()
 	logger := test.GetLogger()
+
+	committer, err := kzgcommitter.NewFromConfig(kzgcommitter.Config{
+		SRSNumberToLoad:   8192,
+		G1SRSPath:         "../../resources/srs/g1.point",
+		G2SRSPath:         "../../resources/srs/g2.point",
+		G2TrailingSRSPath: "../../resources/srs/g2.trailing.point",
+	})
+	require.NoError(t, err)
+
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", testInfrastructure.localstackPort),
 	}
 	s3Client, err := awss3.NewAwsS3Client(
 		ctx,
@@ -501,7 +591,7 @@ func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment b
 	require.NoError(t, err)
 	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
 	require.NoError(t, err)
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, v2MetadataTableName)
+	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, testInfrastructure.v2MetadataTableName)
 	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)
 	chainReader := &mock.MockWriter{}
 
@@ -525,17 +615,14 @@ func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment b
 	table_names := []string{"reservations_server_" + t.Name(), "ondemand_server_" + t.Name(), "global_server_" + t.Name()}
 	err = meterer.CreateReservationTable(awsConfig, table_names[0])
 	if err != nil {
-		teardown()
 		panic("failed to create reservation table")
 	}
 	err = meterer.CreateOnDemandTable(awsConfig, table_names[1])
 	if err != nil {
-		teardown()
 		panic("failed to create ondemand table")
 	}
 	err = meterer.CreateGlobalReservationTable(awsConfig, table_names[2])
 	if err != nil {
-		teardown()
 		panic("failed to create global reservation table")
 	}
 
@@ -547,7 +634,6 @@ func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment b
 		logger,
 	)
 	if err != nil {
-		teardown()
 		panic("failed to create metering store")
 	}
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
@@ -631,6 +717,7 @@ func newTestServerV2WithDeprecationFlag(t *testing.T, disableGetBlobCommitment b
 		ChainReader:       chainReader,
 		Signer:            signer,
 		Peer:              p,
+		Committer:         committer,
 	}
 }
 
@@ -644,7 +731,7 @@ func TestTimestampValidation(t *testing.T) {
 	require.NoError(t, err)
 	data = codec.ConvertByPaddingEmptyByte(data)
 
-	commitments, err := committer.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.Committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	require.NoError(t, err)
@@ -732,7 +819,7 @@ func TestInvalidLength(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := committer.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.Committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 
 	// Length we are committing to should be a power of 2.
@@ -776,7 +863,7 @@ func TestTooShortCommitment(t *testing.T) {
 	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := committer.GetCommitmentsForPaddedLength(data)
+	commitments, err := c.Committer.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 
 	// Length we are commiting to should be a power of 2.

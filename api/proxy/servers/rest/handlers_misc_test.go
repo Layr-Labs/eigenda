@@ -115,7 +115,7 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 	// Test with admin endpoints enabled
 	t.Run("Admin Endpoints Enabled", func(t *testing.T) {
 		// Initial state is false
-		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
+		mockEigenDAManager.EXPECT().GetDispersalBackend().Return(common.V2EigenDABackend)
 
 		// Test GET endpoint first to verify initial state
 		t.Run("Get EigenDA Dispersal Backend", func(t *testing.T) {
@@ -134,7 +134,7 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 			}
 			err := json.Unmarshal(rec.Body.Bytes(), &response)
 			require.NoError(t, err)
-			require.Equal(t, common.EigenDABackendToString(common.V1EigenDABackend), response.EigenDADispersalBackend)
+			require.Equal(t, common.EigenDABackendToString(common.V2EigenDABackend), response.EigenDADispersalBackend)
 		})
 
 		// Test PUT endpoint with invalid input

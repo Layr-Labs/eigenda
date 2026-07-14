@@ -1,12 +1,13 @@
 package verification
 
 import (
-	"math"
 	"runtime"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/encoding/codec"
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/encoding/v2/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/v2/rs"
 	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
@@ -15,96 +16,76 @@ const (
 	g1Path = "../../../../resources/srs/g1.point"
 )
 
-// computeSrsNumber computes the number of SRS elements that need to be loaded for a message of given byte count
-func computeSrsNumber(byteCount int) uint64 {
-	return uint64(math.Ceil(float64(byteCount) / 32))
-}
-
-// randomlyModifyBytes picks a random byte from the input array, and increments it
-func randomlyModifyBytes(testRandom *random.TestRandom, inputBytes []byte) {
-	indexToModify := testRandom.Intn(len(inputBytes))
-	inputBytes[indexToModify] = inputBytes[indexToModify] + 1
-}
-
-func getRandomPaddedBytes(testRandom *random.TestRandom, count int) []byte {
-	return codec.ConvertByPaddingEmptyByte(testRandom.Bytes(count))
+func randomBlob(t *testing.T, r *random.TestRandom, payloadSize int) *coretypes.Blob {
+	blob, err := coretypes.Payload(r.Bytes(payloadSize)).ToBlob(codecs.PolynomialFormCoeff)
+	require.NoError(t, err)
+	return blob
 }
 
 func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
 	testRandom := random.NewTestRandom()
-	randomBytes := getRandomPaddedBytes(testRandom, 100+testRandom.Intn(1000))
+	blob := randomBlob(t, testRandom, 100+testRandom.Intn(1000))
 
-	srsNumberToLoad := computeSrsNumber(len(randomBytes))
-
-	g1Srs, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	g1Srs, err := kzg.ReadG1Points(g1Path, uint64(blob.LenSymbols()), uint64(runtime.GOMAXPROCS(0)))
 	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
-	commitment, err := GenerateBlobCommitment(g1Srs, randomBytes)
+	commitment, err := GenerateBlobCommitment(g1Srs, blob.GetCoefficients())
 	require.NotNil(t, commitment)
 	require.NoError(t, err)
 
 	// make sure the commitment verifies correctly
-	result, err := GenerateAndCompareBlobCommitment(
-		g1Srs,
-		randomBytes,
-		commitment)
+	result, err := GenerateAndCompareBlobCommitment(g1Srs, blob, commitment)
 	require.True(t, result)
 	require.NoError(t, err)
 }
 
 func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
 	testRandom := random.NewTestRandom()
-	randomBytes := getRandomPaddedBytes(testRandom, 100+testRandom.Intn(1000))
+	blob1 := randomBlob(t, testRandom, 100+testRandom.Intn(1000))
 
-	srsNumberToLoad := computeSrsNumber(len(randomBytes))
-
-	g1Srs, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	g1Srs, err := kzg.ReadG1Points(g1Path, 1024, uint64(runtime.GOMAXPROCS(0)))
 	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
-	commitment, err := GenerateBlobCommitment(g1Srs, randomBytes)
+	commitment, err := GenerateBlobCommitment(g1Srs, blob1.GetCoefficients())
 	require.NotNil(t, commitment)
 	require.NoError(t, err)
 
-	// randomly modify the bytes, and make sure the commitment verification fails
-	randomlyModifyBytes(testRandom, randomBytes)
-	result, err := GenerateAndCompareBlobCommitment(
-		g1Srs,
-		randomBytes,
-		commitment)
+	// create a different blob and verify the commitment doesn't match
+	blob2 := randomBlob(t, testRandom, 100+testRandom.Intn(1000))
+	result, err := GenerateAndCompareBlobCommitment(g1Srs, blob2, commitment)
 	require.False(t, result)
 	require.NoError(t, err)
 }
 
 func TestGenerateBlobCommitmentEquality(t *testing.T) {
 	testRandom := random.NewTestRandom()
-	randomBytes := getRandomPaddedBytes(testRandom, 100+testRandom.Intn(1000))
+	blob := randomBlob(t, testRandom, 100+testRandom.Intn(1000))
+	coefficients := blob.GetCoefficients()
 
-	srsNumberToLoad := computeSrsNumber(len(randomBytes))
-
-	g1Srs, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	g1Srs, err := kzg.ReadG1Points(g1Path, 1024, uint64(runtime.GOMAXPROCS(0)))
 	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
 	// generate two identical commitments
-	commitment1, err := GenerateBlobCommitment(g1Srs, randomBytes)
+	commitment1, err := GenerateBlobCommitment(g1Srs, coefficients)
 	require.NotNil(t, commitment1)
 	require.NoError(t, err)
-	commitment2, err := GenerateBlobCommitment(g1Srs, randomBytes)
+	commitment2, err := GenerateBlobCommitment(g1Srs, coefficients)
 	require.NotNil(t, commitment2)
 	require.NoError(t, err)
 
-	// commitments to identical bytes should be equal
+	// commitments to identical coefficients should be equal
 	require.Equal(t, commitment1, commitment2)
 
-	// randomly modify a byte
-	randomlyModifyBytes(testRandom, randomBytes)
-	commitmentA, err := GenerateBlobCommitment(g1Srs, randomBytes)
+	// create a different blob
+	blob2 := randomBlob(t, testRandom, 100+testRandom.Intn(1000))
+	commitmentA, err := GenerateBlobCommitment(g1Srs, blob2.GetCoefficients())
 	require.NotNil(t, commitmentA)
 	require.NoError(t, err)
 
-	// commitments to non-identical bytes should not be equal
+	// commitments to different coefficients should not be equal
 	require.NotEqual(t, commitment1, commitmentA)
 }
 
@@ -120,13 +101,17 @@ func TestGenerateBlobCommitmentTooLong(t *testing.T) {
 
 	// an array of exactly this size should be fine
 	almostTooLongBytes := make([]byte, almostTooLongByteCount)
-	commitment1, err := GenerateBlobCommitment(g1Srs, almostTooLongBytes)
+	almostTooLongCoeffs, err := rs.ToFrArray(almostTooLongBytes)
+	require.NoError(t, err)
+	commitment1, err := GenerateBlobCommitment(g1Srs, almostTooLongCoeffs)
 	require.NotNil(t, commitment1)
 	require.NoError(t, err)
 
 	// but 1 more byte is more than we can handle
 	tooLongBytes := make([]byte, almostTooLongByteCount+1)
-	commitment2, err := GenerateBlobCommitment(g1Srs, tooLongBytes)
+	tooLongCoeffs, err := rs.ToFrArray(tooLongBytes)
+	require.NoError(t, err)
+	commitment2, err := GenerateBlobCommitment(g1Srs, tooLongCoeffs)
 	require.Nil(t, commitment2)
 	require.NotNil(t, err)
 }
