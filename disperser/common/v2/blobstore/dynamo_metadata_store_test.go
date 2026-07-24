@@ -1869,6 +1869,11 @@ func TestBlobMetadataStoreBatch(t *testing.T) {
 	b, err := blobMetadataStore.GetBatch(ctx, bhh)
 	require.NoError(t, err)
 	assert.Equal(t, batch, b)
+
+	batches, err := blobMetadataStore.GetBatches(ctx, [][32]byte{bhh})
+	require.NoError(t, err)
+	require.Len(t, batches, 1)
+	assert.Equal(t, batch, batches[0])
 }
 
 func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {

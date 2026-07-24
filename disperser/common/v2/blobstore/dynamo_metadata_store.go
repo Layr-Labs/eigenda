@@ -1112,6 +1112,38 @@ func (s *BlobMetadataStore) GetBatch(ctx context.Context, batchHeaderHash [32]by
 	return batch, nil
 }
 
+// GetBatches returns the batches for the given batch header hashes.
+// Note: the returned batches are not necessarily ordered by the input hashes.
+func (s *BlobMetadataStore) GetBatches(ctx context.Context, batchHeaderHashes [][32]byte) ([]*corev2.Batch, error) {
+	keys := make([]map[string]types.AttributeValue, len(batchHeaderHashes))
+	for i, batchHeaderHash := range batchHeaderHashes {
+		keys[i] = map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{
+				Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+			},
+			"SK": &types.AttributeValueMemberS{
+				Value: batchSK,
+			},
+		}
+	}
+
+	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys, true)
+	if err != nil {
+		return nil, fmt.Errorf("get batch items: %w", err)
+	}
+
+	batches := make([]*corev2.Batch, len(items))
+	for i, item := range items {
+		batch, err := UnmarshalBatch(item)
+		if err != nil {
+			return nil, err
+		}
+		batches[i] = batch
+	}
+
+	return batches, nil
+}
+
 func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {
 	item, err := MarshalBatchHeader(batchHeader)
 	if err != nil {

@@ -3,6 +3,7 @@ package blobstore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -322,6 +323,20 @@ func (m *InstrumentedMetadataStore) GetBatch(ctx context.Context, batchHeaderHas
 	batch, err := m.metadataStore.GetBatch(ctx, batchHeaderHash)
 	m.recordMetrics("GetBatch", start, err)
 	return batch, err
+}
+
+func (m *InstrumentedMetadataStore) GetBatches(
+	ctx context.Context,
+	batchHeaderHashes [][32]byte,
+) ([]*corev2.Batch, error) {
+	defer m.trackInFlight("GetBatches")()
+	start := time.Now()
+	batches, err := m.metadataStore.GetBatches(ctx, batchHeaderHashes)
+	if err != nil {
+		err = fmt.Errorf("get batches: %w", err)
+	}
+	m.recordMetrics("GetBatches", start, err)
+	return batches, err
 }
 
 func (m *InstrumentedMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {

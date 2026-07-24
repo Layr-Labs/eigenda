@@ -1715,7 +1715,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		- Batch:            Batch number
 		- AttestedAt:       Timestamp of attestation (sortkey of this table)
 		- RefBlockNum:      Reference block number
-		- Quorums:          Quorum numbers used by the batch
+		- Quorums:          Quorum numbers materialized in the attestation
 		- Nonsigners:       Operators that didn't sign for the batch
 		- Active operators: Mapping of operator ID to their quorum assignments at the block
 
@@ -1926,9 +1926,8 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
 	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
 
-	// Create a timeline of test batches
-	// See the above table for the choices of reference block number, quorums and nonsigners
-	// for each batch
+	// Create a timeline of test batches. Batch 5 contains only a quorum 1 blob while
+	// its attestation also contains quorum 0, reproducing a phantom attestation quorum.
 	numBatches := 6
 	now := uint64(time.Now().UnixNano())
 	firstBatchTime := now - uint64(32*time.Minute.Nanoseconds())
@@ -1939,6 +1938,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	}
 	referenceBlockNum := []uint64{1, 3, 2, 2, 4, 5}
 	quorums := [][]uint8{{0, 1}, {1}, {0}, {0, 1}, {0, 1}, {0}}
+	blobQuorums := [][][]uint8{{{0, 1}}, {{1}}, {{0}}, {{0, 1}}, {{1}}, {{0}}}
 	nonsigners := [][]*core.G1Point{
 		{operatorG1s[2]},
 		{operatorG1s[3]},
@@ -1947,17 +1947,35 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		{operatorG1s[2], operatorG1s[4]},
 		{operatorG1s[4]},
 	}
-	dynamoKeys := make([]dynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, 0, numBatches*2)
 	for i := 0; i < numBatches; i++ {
 		attestation := createAttestation(t, referenceBlockNum[i], attestedAt[i], nonsigners[i], quorums[i])
 		err := blobMetadataStore.PutAttestation(ctx, attestation)
 		require.NoError(t, err)
+
+		certificates := make([]*corev2.BlobCertificate, len(blobQuorums[i]))
+		for j, blobQuorumNumbers := range blobQuorums[i] {
+			blobHeader := makeBlobHeaderV2(t)
+			blobHeader.QuorumNumbers = blobQuorumNumbers
+			certificates[j] = &corev2.BlobCertificate{
+				BlobHeader: blobHeader,
+			}
+		}
+		err = blobMetadataStore.PutBatch(ctx, &corev2.Batch{
+			BatchHeader:      attestation.BatchHeader,
+			BlobCertificates: certificates,
+		})
+		require.NoError(t, err)
+
 		bhh, err := attestation.BatchHeader.Hash() // go:nolint QF1008
 		require.NoError(t, err)
-		dynamoKeys[i] = dynamodb.Key{
+		dynamoKeys = append(dynamoKeys, dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
-		}
+		}, dynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "BatchInfo"},
+		})
 	}
 	defer deleteItems(t, dynamoKeys)
 
@@ -2013,6 +2031,8 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 			"/v2/operators/signing-info?quorums=-1",
 			"/v2/operators/signing-info?nonsigner_only=-1",
 			"/v2/operators/signing-info?nonsigner_only=deadbeef",
+			"/v2/operators/signing-info?accounting=unknown",
+			"/v2/operators/signing-info?accounting=blob_quorums&interval=3601",
 		}
 		for _, url := range reqUrls {
 			w := httptest.NewRecorder()
@@ -2082,6 +2102,69 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 			TotalUnsignedBatches:    2,
 			TotalResponsibleBatches: 2,
 			TotalBatches:            5,
+		})
+	})
+
+	t.Run("blob quorum accounting", func(t *testing.T) {
+		w := executeRequest(t, r, http.MethodGet, "/v2/operators/signing-info?accounting=blob_quorums")
+		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
+		osi := response.OperatorSigningInfo
+		require.Equal(t, 7, len(osi))
+		checkOperatorSigningInfoEqual(t, osi[0], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[3].Hex(),
+			OperatorAddress:         operatorAddresses[3].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[3], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[3].Hex(),
+			OperatorAddress:         operatorAddresses[3].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[4], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[5], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[6], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[4].Hex(),
+			OperatorAddress:         operatorAddresses[4].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 1,
+			TotalBatches:            4,
 		})
 	})
 

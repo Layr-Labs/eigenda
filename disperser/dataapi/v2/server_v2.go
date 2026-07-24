@@ -108,7 +108,8 @@ type ServerV2 struct {
 	blobAttestationInfoResponseCache *lru.Cache[string, *BlobAttestationInfoResponse]
 
 	// KV caches for batches, keyed by batch header hash
-	batchResponseCache *lru.Cache[string, *BatchResponse]
+	batchResponseCache      *lru.Cache[string, *BatchResponse]
+	batchQuorumProfileCache *lru.Cache[string, *batchQuorumProfile]
 
 	// Account cache with TTL
 	accountCache *expirable.LRU[string, *AccountFeedResponse]
@@ -168,6 +169,10 @@ func NewServerV2(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create batchResponseCache: %w", err)
 	}
+	batchQuorumProfileCache, err := lru.New[string, *batchQuorumProfile](maxNumKVBatchesToCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create batchQuorumProfileCache: %w", err)
+	}
 
 	accountCache := expirable.NewLRU[string, *AccountFeedResponse](100, nil, accountCacheTTL)
 
@@ -196,6 +201,7 @@ func NewServerV2(
 		blobCertificateCache:             blobCertificateCache,
 		blobAttestationInfoResponseCache: blobAttestationInfoResponseCache,
 		batchResponseCache:               batchResponseCache,
+		batchQuorumProfileCache:          batchQuorumProfileCache,
 		accountCache:                     accountCache,
 	}, nil
 }

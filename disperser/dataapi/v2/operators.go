@@ -126,6 +126,7 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 //	@Param		interval		query		int		false	"Fetch operators signing info starting from an interval (in seconds) before the end time [default: 3600]"
 //	@Param		quorums			query		string	false	"Comma separated list of quorum IDs to fetch signing info for [default: 0,1]"
 //	@Param		nonsigner_only	query		boolean	false	"Whether to only return operators with signing rate less than 100% [default: false]"
+//	@Param		accounting		query		string	false	"Responsibility accounting mode; blob_quorums supports intervals up to 3600 seconds [default: legacy]"
 //	@Success	200				{object}	OperatorsSigningInfoResponse
 //	@Failure	400				{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404				{object}	ErrorResponse	"error: Not found"
@@ -207,6 +208,28 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		}
 	}
 
+	accountingMode := legacySigningInfoAccountingMode
+	if c.Query("accounting") != "" {
+		accountingMode = signingInfoAccountingMode(c.Query("accounting"))
+		if accountingMode != legacySigningInfoAccountingMode && accountingMode != blobQuorumSigningInfoAccountingMode {
+			s.metrics.IncrementInvalidArgRequestNum("FetchOperatorSigningInfo")
+			invalidParamsErrorResponse(c, errors.New("the accounting param must be \"legacy\" or \"blob_quorums\""))
+			return
+		}
+	}
+	if accountingMode == blobQuorumSigningInfoAccountingMode && interval > maxBlobQuorumSigningInfoIntervalSeconds {
+		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorSigningInfo")
+		invalidParamsErrorResponse(
+			c,
+			fmt.Errorf(
+				"the blob_quorums accounting mode supports intervals up to %d seconds, found: %d",
+				maxBlobQuorumSigningInfoIntervalSeconds,
+				interval,
+			),
+		)
+		return
+	}
+
 	startTime := endTime.Add(-time.Duration(interval) * time.Second)
 	if startTime.Before(oldestTime) {
 		startTime = oldestTime
@@ -220,8 +243,18 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		errorResponse(c, fmt.Errorf("failed to fetch attestation feed from blob metadata store: %w", err))
 		return
 	}
+	if accountingMode == blobQuorumSigningInfoAccountingMode {
+		attestations, err = deduplicateAttestations(attestations)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchOperatorSigningInfo")
+			errorResponse(c, fmt.Errorf("failed to deduplicate attestations: %w", err))
+			return
+		}
+	}
 
-	signingInfo, err := s.computeOperatorsSigningInfo(c.Request.Context(), attestations, quorumIds, nonsignerOnly)
+	signingInfo, err := s.computeOperatorsSigningInfo(
+		c.Request.Context(), attestations, quorumIds, nonsignerOnly, accountingMode,
+	)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorSigningInfo")
 		errorResponse(c, fmt.Errorf("failed to compute the operators signing info: %w", err))
@@ -442,6 +475,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 	attestations []*corev2.Attestation,
 	quorumIDs []uint8,
 	nonsignerOnly bool,
+	accountingMode signingInfoAccountingMode,
 ) ([]*OperatorSigningInfo, error) {
 	if len(attestations) == 0 {
 		return nil, errors.New("no attestations to compute signing info")
@@ -479,15 +513,33 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 		return nil, err
 	}
 
-	// Compute num batches failed, where numFailed[op][q] is the number of batches
-	// failed to sign for quorum "q" by operator "op".
-	numFailed := computeNumFailed(attestations, operatorQuorumIntervals)
+	var numFailed map[string]map[uint8]int
+	var numResponsible map[string]map[uint8]int
+	var totalNumBatchesPerQuorum map[uint8]int
+	if accountingMode == blobQuorumSigningInfoAccountingMode {
+		profiles, err := s.getBatchQuorumProfiles(ctx, attestations)
+		if err != nil {
+			return nil, fmt.Errorf("get batch quorum profiles: %w", err)
+		}
+		numFailed, numResponsible, totalNumBatchesPerQuorum, err = computeBlobQuorumSigningStats(
+			attestations,
+			profiles,
+			operatorQuorumIntervals,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("compute blob quorum signing stats: %w", err)
+		}
+	} else {
+		// Compute num batches failed, where numFailed[op][q] is the number of batches
+		// failed to sign for quorum "q" by operator "op".
+		numFailed = computeNumFailed(attestations, operatorQuorumIntervals)
 
-	// Compute num batches responsible, where numResponsible[op][q] is the number of batches
-	// that operator "op" are responsible for in quorum "q".
-	numResponsible := computeNumResponsible(attestations, operatorQuorumIntervals)
+		// Compute num batches responsible, where numResponsible[op][q] is the number of batches
+		// that operator "op" are responsible for in quorum "q".
+		numResponsible = computeNumResponsible(attestations, operatorQuorumIntervals)
 
-	totalNumBatchesPerQuorum := computeTotalNumBatchesPerQuorum(attestations)
+		totalNumBatchesPerQuorum = computeTotalNumBatchesPerQuorum(attestations)
+	}
 
 	state, err := s.chainState.GetOperatorState(ctx, uint(endBlock), quorumIDs)
 	if err != nil {

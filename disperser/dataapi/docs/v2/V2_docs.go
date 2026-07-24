@@ -705,6 +705,12 @@ const docTemplateV2 = `{
                         "description": "Whether to only return operators with signing rate less than 100% [default: false]",
                         "name": "nonsigner_only",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Responsibility accounting mode; blob_quorums supports intervals up to 3600 seconds [default: legacy]",
+                        "name": "accounting",
+                        "in": "query"
                     }
                 ],
                 "responses": {
