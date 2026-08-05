@@ -46,9 +46,12 @@ jobs:
         with:
           useConfigFile: true
 
-      - run: |
-          echo "SemVer ${{ env.fullSemVer }} Forced ${{ github.event.inputs.force }}"
-        name: Display SemVer
+      - name: Display SemVer
+        env:
+          FULL_SEMVER: ${{ env.fullSemVer }}
+          FORCE_RELEASE: ${{ github.event.inputs.force }}
+        run: |
+          echo "SemVer $FULL_SEMVER Forced $FORCE_RELEASE"
 
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v1
