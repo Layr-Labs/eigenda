@@ -51,6 +51,8 @@ runs:
 
     - name: Push to wiki
       shell: bash
+      env:
+        INPUT_AMEND: ${{ inputs.amend }}
       run: |
         cd ./.github/wiki/
         git add --all
@@ -58,6 +60,6 @@ runs:
         git config --local user.name  "GitHub Action"
         git config --local user.email "action@github.com"
         git remote set-url --push origin https://${{ github.token }}@github.com/Layr-Labs/eigenda.wiki.git
-        test ${{inputs.amend}} == "true" && \
+        test "$INPUT_AMEND" == "true" && \
           git commit --amend --no-edit   && git push --force-with-lease || \
           git commit -m "Update coverage" && git push https://${{ github.token }}@github.com/Layr-Labs/eigenda.wiki.git

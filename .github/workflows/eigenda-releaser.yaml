@@ -43,26 +43,29 @@ jobs:
           echo "Branch validation passed: running on $branch"
 
       - name: Validate version format
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          version="${{ github.event.inputs.version }}"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Error: Version must be in format x.y.z (e.g., 1.2.3)"
             exit 1
           fi
-          echo "Version format is valid: $version"
+          echo "Version format is valid: $VERSION"
 
       - name: Check if release branch already exists
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          version="${{ github.event.inputs.version }}"
-          if git branch -r | grep -q "origin/release/$version$"; then
-            echo "Error: Release branch release/$version already exists"
+          if git branch -r | grep -q "origin/release/$VERSION$"; then
+            echo "Error: Release branch release/$VERSION already exists"
             exit 1
           fi
-          echo "Release branch for version $version is available"
+          echo "Release branch for version $VERSION is available"
 
       - name: Create and push release branch
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          version="${{ github.event.inputs.version }}"
           git config --global user.name "releaser-bot"
-          git checkout -b "release/$version"
-          git push origin "release/$version"
+          git checkout -b "release/$VERSION"
+          git push origin "release/$VERSION"
