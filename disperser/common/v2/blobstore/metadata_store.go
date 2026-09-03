@@ -85,6 +85,7 @@ type MetadataStore interface {
 	// These methods manage batches of blobs that are processed together
 	PutBatch(ctx context.Context, batch *corev2.Batch) error
 	GetBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Batch, error)
+	GetBatches(ctx context.Context, batchHeaderHashes [][32]byte) ([]*corev2.Batch, error)
 	PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error
 	DeleteBatchHeader(ctx context.Context, batchHeaderHash [32]byte) error
 	GetBatchHeader(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, error)

@@ -118,7 +118,7 @@ func (e *Ejector) evaluateValidators() error {
 		e.ejectionCriteriaTimeWindow,
 		nil, // all quorums
 		ProtocolVersionV2,
-		true, // omit perfect signers if possible (data API has inconsistent behavior across v1 and v2)
+		false, // perfect V2 signers must be retained so they can cancel a V1 ejection
 	)
 	if err != nil {
 		return fmt.Errorf("error looking up v2 signing rates: %w", err)

@@ -324,6 +324,17 @@ func (m *InstrumentedMetadataStore) GetBatch(ctx context.Context, batchHeaderHas
 	return batch, err
 }
 
+func (m *InstrumentedMetadataStore) GetBatches(
+	ctx context.Context,
+	batchHeaderHashes [][32]byte,
+) ([]*corev2.Batch, error) {
+	defer m.trackInFlight("GetBatches")()
+	start := time.Now()
+	batches, err := m.metadataStore.GetBatches(ctx, batchHeaderHashes)
+	m.recordMetrics("GetBatches", start, err)
+	return batches, err //nolint:wrapcheck // Preserve underlying errors consistently with the other instrumented methods.
+}
+
 func (m *InstrumentedMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {
 	defer m.trackInFlight("PutBatchHeader")()
 	start := time.Now()

@@ -1130,6 +1130,11 @@ paths:
         in: query
         name: nonsigner_only
         type: boolean
+      - description: Responsibility accounting mode; blob_quorums supports intervals
+          up to 43200 seconds [default: blob_quorums]
+        in: query
+        name: accounting
+        type: string
       produces:
       - application/json
       responses:
