@@ -37,7 +37,7 @@ func newBatchQuorumProfile(batch *corev2.Batch) (*batchQuorumProfile, error) {
 
 	blobQuorums, err := batch.GetBlobQuorumNumbers()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get blob quorum numbers: %w", err)
 	}
 
 	return newBatchQuorumProfileFromBlobQuorums(blobQuorums)
@@ -201,7 +201,7 @@ func (s *ServerV2) getBatchQuorumProfiles(
 		}
 
 		if err := group.Wait(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("load historical batch quorum profiles: %w", err)
 		}
 	}
 
