@@ -67,6 +67,38 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 	assert.Equal(t, batch, newBatch)
 }
 
+func TestGetBlobQuorumNumbers(t *testing.T) {
+	batch := &v2.Batch{
+		BlobCertificates: []*v2.BlobCertificate{
+			{BlobHeader: &v2.BlobHeader{QuorumNumbers: []core.QuorumID{0, 1}}},
+			{BlobHeader: &v2.BlobHeader{QuorumNumbers: []core.QuorumID{1}}},
+		},
+	}
+
+	blobQuorumNumbers, err := batch.GetBlobQuorumNumbers()
+	require.NoError(t, err)
+	require.Equal(t, [][]core.QuorumID{{0, 1}, {1}}, blobQuorumNumbers)
+
+	batch.BlobCertificates[0].BlobHeader.QuorumNumbers[0] = 2
+	require.Equal(t, [][]core.QuorumID{{0, 1}, {1}}, blobQuorumNumbers)
+
+	testCases := map[string]*v2.Batch{
+		"nil batch":           nil,
+		"no certificates":     {},
+		"nil certificate":     {BlobCertificates: []*v2.BlobCertificate{nil}},
+		"missing blob header": {BlobCertificates: []*v2.BlobCertificate{{}}},
+		"missing quorums": {
+			BlobCertificates: []*v2.BlobCertificate{{BlobHeader: &v2.BlobHeader{}}},
+		},
+	}
+	for name, invalidBatch := range testCases {
+		t.Run(name, func(t *testing.T) {
+			_, err := invalidBatch.GetBlobQuorumNumbers()
+			require.Error(t, err)
+		})
+	}
+}
+
 func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
 	commitments, err := c.GetCommitmentsForPaddedLength(data)

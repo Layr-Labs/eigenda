@@ -169,7 +169,10 @@ func NewServerV2(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create batchResponseCache: %w", err)
 	}
-	batchQuorumProfileCache, err := lru.New[string, *batchQuorumProfile](maxNumKVBatchesToCache)
+	// Historical attestations do not contain inline quorum profiles. Keep enough
+	// compact fallback profiles for the full attestation cache window so rollout
+	// queries do not repeatedly reload full batches.
+	batchQuorumProfileCache, err := lru.New[string, *batchQuorumProfile](maxNumBatchesToCache)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create batchQuorumProfileCache: %w", err)
 	}

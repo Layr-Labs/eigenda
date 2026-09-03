@@ -147,6 +147,10 @@ func TestControllerInsufficientSignatures(t *testing.T) {
 	require.NotNil(t, att.Sigma)
 	require.ElementsMatch(t, att.QuorumNumbers, []core.QuorumID{1})
 	require.InDeltaMapValues(t, map[core.QuorumID]uint8{1: 20}, att.QuorumResults, 0)
+	require.NotEmpty(t, att.BlobQuorumNumbers)
+	for _, quorumNumbers := range att.BlobQuorumNumbers {
+		require.NotEmpty(t, quorumNumbers)
+	}
 
 	// give the signals a moment to be sent
 	time.Sleep(10 * time.Millisecond)
@@ -251,6 +255,7 @@ func TestControllerInsufficientSignatures2(t *testing.T) {
 	require.Len(t, att.QuorumNumbers, 0)
 	require.Len(t, att.QuorumResults, 0)
 	require.Len(t, att.NonSignerPubKeys, 0)
+	require.NotEmpty(t, att.BlobQuorumNumbers)
 
 	// give the signals a moment to be sent
 	time.Sleep(10 * time.Millisecond)

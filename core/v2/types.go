@@ -257,6 +257,29 @@ type Batch struct {
 	BlobCertificates []*BlobCertificate
 }
 
+// GetBlobQuorumNumbers returns the quorum set requested by each blob in the batch.
+func (b *Batch) GetBlobQuorumNumbers() ([][]core.QuorumID, error) {
+	if b == nil {
+		return nil, errors.New("batch is nil")
+	}
+	if len(b.BlobCertificates) == 0 {
+		return nil, errors.New("batch must contain at least one blob certificate")
+	}
+
+	blobQuorumNumbers := make([][]core.QuorumID, len(b.BlobCertificates))
+	for i, certificate := range b.BlobCertificates {
+		if certificate == nil || certificate.BlobHeader == nil {
+			return nil, fmt.Errorf("blob certificate %d is missing its header", i)
+		}
+		if len(certificate.BlobHeader.QuorumNumbers) == 0 {
+			return nil, fmt.Errorf("blob certificate %d has no quorums", i)
+		}
+		blobQuorumNumbers[i] = append([]core.QuorumID(nil), certificate.BlobHeader.QuorumNumbers...)
+	}
+
+	return blobQuorumNumbers, nil
+}
+
 func (b *Batch) ToProtobuf() (*commonpb.Batch, error) {
 	if b.BatchHeader == nil {
 		return nil, errors.New("batch header is nil")
@@ -350,6 +373,10 @@ type Attestation struct {
 	QuorumNumbers []core.QuorumID
 	// QuorumResults contains the operators' total signing percentage of the quorum
 	QuorumResults map[core.QuorumID]uint8
+	// BlobQuorumNumbers contains the quorum set requested by each blob in the batch.
+	// It is persisted for signing-accounting queries but is not part of the public
+	// attestation response.
+	BlobQuorumNumbers [][]core.QuorumID `json:"-" dynamodbav:"BlobQuorumNumbers"`
 }
 
 func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {

@@ -126,7 +126,7 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 //	@Param		interval		query		int		false	"Fetch operators signing info starting from an interval (in seconds) before the end time [default: 3600]"
 //	@Param		quorums			query		string	false	"Comma separated list of quorum IDs to fetch signing info for [default: 0,1]"
 //	@Param		nonsigner_only	query		boolean	false	"Whether to only return operators with signing rate less than 100% [default: false]"
-//	@Param		accounting		query		string	false	"Responsibility accounting mode; blob_quorums supports intervals up to 3600 seconds [default: legacy]"
+//	@Param		accounting		query		string	false	"Responsibility accounting mode; blob_quorums supports intervals up to 43200 seconds [default: blob_quorums]"
 //	@Success	200				{object}	OperatorsSigningInfoResponse
 //	@Failure	400				{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404				{object}	ErrorResponse	"error: Not found"
@@ -208,7 +208,7 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		}
 	}
 
-	accountingMode := legacySigningInfoAccountingMode
+	accountingMode := blobQuorumSigningInfoAccountingMode
 	if c.Query("accounting") != "" {
 		accountingMode = signingInfoAccountingMode(c.Query("accounting"))
 		if accountingMode != legacySigningInfoAccountingMode && accountingMode != blobQuorumSigningInfoAccountingMode {

@@ -1925,6 +1925,7 @@ func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
 			0: 100,
 			1: 80,
 		},
+		BlobQuorumNumbers: [][]core.QuorumID{{0, 1}, {1}},
 	}
 	err = blobMetadataStore.PutAttestation(ctx, attestation)
 	assert.NoError(t, err)
@@ -2102,6 +2103,7 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 			0: 100,
 			1: 90,
 		},
+		BlobQuorumNumbers: [][]core.QuorumID{{0, 1}, {1}},
 	}
 
 	err = blobMetadataStore.PutAttestation(ctx, updatedAttestation)

@@ -708,7 +708,7 @@ const docTemplateV2 = `{
                     },
                     {
                         "type": "string",
-                        "description": "Responsibility accounting mode; blob_quorums supports intervals up to 3600 seconds [default: legacy]",
+                        "description": "Responsibility accounting mode; blob_quorums supports intervals up to 43200 seconds [default: blob_quorums]",
                         "name": "accounting",
                         "in": "query"
                     }

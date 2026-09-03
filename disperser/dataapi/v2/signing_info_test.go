@@ -65,6 +65,14 @@ func TestComputeBlobQuorumSigningStats(t *testing.T) {
 	require.NotContains(t, numFailed, dualQuorumID)
 }
 
+func TestNewBatchQuorumProfileFromBlobQuorumsValidation(t *testing.T) {
+	_, err := newBatchQuorumProfileFromBlobQuorums(nil)
+	require.ErrorContains(t, err, "at least one blob quorum set")
+
+	_, err = newBatchQuorumProfileFromBlobQuorums([][]core.QuorumID{{}})
+	require.ErrorContains(t, err, "has no quorums")
+}
+
 func TestDeduplicateAttestationsKeepsLatestUpdate(t *testing.T) {
 	header := &corev2.BatchHeader{BatchRoot: [32]byte{1}, ReferenceBlockNumber: 1}
 	attestations := []*corev2.Attestation{

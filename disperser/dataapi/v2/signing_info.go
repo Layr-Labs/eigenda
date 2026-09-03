@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
+	"golang.org/x/sync/errgroup"
 )
 
 type signingInfoAccountingMode string
@@ -16,7 +18,9 @@ const (
 	legacySigningInfoAccountingMode     signingInfoAccountingMode = "legacy"
 	blobQuorumSigningInfoAccountingMode signingInfoAccountingMode = "blob_quorums"
 
-	maxBlobQuorumSigningInfoIntervalSeconds = 3600
+	maxBlobQuorumSigningInfoIntervalSeconds = 12 * 60 * 60
+	batchQuorumProfileLoadChunkSize         = 100
+	batchQuorumProfileLoadConcurrency       = 8
 )
 
 // batchQuorumProfile contains the minimum batch data needed to determine which
@@ -30,24 +34,30 @@ func newBatchQuorumProfile(batch *corev2.Batch) (*batchQuorumProfile, error) {
 	if batch == nil || batch.BatchHeader == nil {
 		return nil, fmt.Errorf("batch header is required")
 	}
-	if len(batch.BlobCertificates) == 0 {
-		return nil, fmt.Errorf("batch must contain at least one blob certificate")
+
+	blobQuorums, err := batch.GetBlobQuorumNumbers()
+	if err != nil {
+		return nil, err
 	}
 
+	return newBatchQuorumProfileFromBlobQuorums(blobQuorums)
+}
+
+func newBatchQuorumProfileFromBlobQuorums(blobQuorums [][]core.QuorumID) (*batchQuorumProfile, error) {
+	if len(blobQuorums) == 0 {
+		return nil, fmt.Errorf("batch must contain at least one blob quorum set")
+	}
 	profile := &batchQuorumProfile{
-		blobQuorums: make([][]core.QuorumID, len(batch.BlobCertificates)),
+		blobQuorums: make([][]core.QuorumID, len(blobQuorums)),
 		quorums:     make(map[core.QuorumID]struct{}),
 	}
-	for i, certificate := range batch.BlobCertificates {
-		if certificate == nil || certificate.BlobHeader == nil {
-			return nil, fmt.Errorf("blob certificate %d is missing its header", i)
-		}
-		if len(certificate.BlobHeader.QuorumNumbers) == 0 {
-			return nil, fmt.Errorf("blob certificate %d has no quorums", i)
+	for i, quorumNumbers := range blobQuorums {
+		if len(quorumNumbers) == 0 {
+			return nil, fmt.Errorf("blob quorum set %d has no quorums", i)
 		}
 
-		profile.blobQuorums[i] = append([]core.QuorumID(nil), certificate.BlobHeader.QuorumNumbers...)
-		for _, quorum := range certificate.BlobHeader.QuorumNumbers {
+		profile.blobQuorums[i] = append([]core.QuorumID(nil), quorumNumbers...)
+		for _, quorum := range quorumNumbers {
 			profile.quorums[quorum] = struct{}{}
 		}
 	}
@@ -130,6 +140,14 @@ func (s *ServerV2) getBatchQuorumProfiles(
 			return nil, fmt.Errorf("hash batch header: %w", err)
 		}
 		key := hex.EncodeToString(batchHeaderHash[:])
+		if len(attestation.BlobQuorumNumbers) > 0 {
+			profile, err := newBatchQuorumProfileFromBlobQuorums(attestation.BlobQuorumNumbers)
+			if err != nil {
+				return nil, fmt.Errorf("create persisted batch quorum profile for batch %s: %w", key, err)
+			}
+			profiles[key] = profile
+			continue
+		}
 		if profile, ok := s.batchQuorumProfileCache.Get(key); ok {
 			profiles[key] = profile
 			continue
@@ -142,26 +160,48 @@ func (s *ServerV2) getBatchQuorumProfiles(
 	}
 
 	if len(missingHashes) > 0 {
-		batches, err := s.blobMetadataStore.GetBatches(ctx, missingHashes)
-		if err != nil {
-			return nil, fmt.Errorf("get batches: %w", err)
+		var profilesMu sync.Mutex
+		group, groupCtx := errgroup.WithContext(ctx)
+		group.SetLimit(batchQuorumProfileLoadConcurrency)
+
+		for start := 0; start < len(missingHashes); start += batchQuorumProfileLoadChunkSize {
+			end := min(start+batchQuorumProfileLoadChunkSize, len(missingHashes))
+			hashes := append([][32]byte(nil), missingHashes[start:end]...)
+			group.Go(func() error {
+				batches, err := s.blobMetadataStore.GetBatches(groupCtx, hashes)
+				if err != nil {
+					return fmt.Errorf("get batches: %w", err)
+				}
+
+				loadedProfiles := make(map[string]*batchQuorumProfile, len(batches))
+				for _, batch := range batches {
+					profile, err := newBatchQuorumProfile(batch)
+					if err != nil {
+						return fmt.Errorf("create batch quorum profile: %w", err)
+					}
+					batchHeaderHash, err := batch.BatchHeader.Hash()
+					if err != nil {
+						return fmt.Errorf("hash batch header: %w", err)
+					}
+					key := hex.EncodeToString(batchHeaderHash[:])
+					if _, ok := missingKeys[key]; !ok {
+						return fmt.Errorf("received unexpected batch %s", key)
+					}
+					loadedProfiles[key] = profile
+				}
+
+				profilesMu.Lock()
+				defer profilesMu.Unlock()
+				for key, profile := range loadedProfiles {
+					profiles[key] = profile
+					s.batchQuorumProfileCache.Add(key, profile)
+				}
+				return nil
+			})
 		}
 
-		for _, batch := range batches {
-			profile, err := newBatchQuorumProfile(batch)
-			if err != nil {
-				return nil, fmt.Errorf("create batch quorum profile: %w", err)
-			}
-			batchHeaderHash, err := batch.BatchHeader.Hash()
-			if err != nil {
-				return nil, fmt.Errorf("hash batch header: %w", err)
-			}
-			key := hex.EncodeToString(batchHeaderHash[:])
-			if _, ok := missingKeys[key]; !ok {
-				return nil, fmt.Errorf("received unexpected batch %s", key)
-			}
-			profiles[key] = profile
-			s.batchQuorumProfileCache.Add(key, profile)
+		if err := group.Wait(); err != nil {
+			return nil, err
 		}
 	}
 

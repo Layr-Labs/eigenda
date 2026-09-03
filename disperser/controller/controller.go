@@ -301,6 +301,11 @@ func (c *Controller) HandleSignatures(
 		return errors.New("batchData is required")
 	}
 
+	blobQuorumNumbers, err := batchData.Batch.GetBlobQuorumNumbers()
+	if err != nil {
+		return fmt.Errorf("get blob quorum numbers: %w", err)
+	}
+
 	batchHeaderHash := hex.EncodeToString(batchData.BatchHeaderHash[:])
 	for _, key := range batchData.BlobKeys {
 		err := c.updateBlobStatus(ctx, key, v2.GatheringSignatures)
@@ -315,16 +320,17 @@ func (c *Controller) HandleSignatures(
 	// write an empty attestation before starting to gather signatures, so that it can be queried right away.
 	// the attestation will be periodically updated as signatures are gathered.
 	attestation := &corev2.Attestation{
-		BatchHeader:      batchData.Batch.BatchHeader,
-		AttestedAt:       uint64(time.Now().UnixNano()),
-		NonSignerPubKeys: nil,
-		APKG2:            nil,
-		QuorumAPKs:       nil,
-		Sigma:            nil,
-		QuorumNumbers:    nil,
-		QuorumResults:    nil,
+		BatchHeader:       batchData.Batch.BatchHeader,
+		AttestedAt:        uint64(time.Now().UnixNano()),
+		NonSignerPubKeys:  nil,
+		APKG2:             nil,
+		QuorumAPKs:        nil,
+		Sigma:             nil,
+		QuorumNumbers:     nil,
+		QuorumResults:     nil,
+		BlobQuorumNumbers: blobQuorumNumbers,
 	}
-	err := c.blobMetadataStore.PutAttestation(ctx, attestation)
+	err = c.blobMetadataStore.PutAttestation(ctx, attestation)
 	if err != nil {
 		// this error isn't fatal: a subsequent PutAttestation attempt might succeed
 		c.logger.Error("error calling PutAttestation",
@@ -363,7 +369,7 @@ func (c *Controller) HandleSignatures(
 	finalAttestation := &core.QuorumAttestation{}
 	// continue receiving attestations from the channel until it's closed
 	for receivedQuorumAttestation := range attestationChan {
-		err := c.updateAttestation(ctx, batchData, receivedQuorumAttestation)
+		err := c.updateAttestation(ctx, batchData, blobQuorumNumbers, receivedQuorumAttestation)
 		if err != nil {
 			c.logger.Warnf("error updating attestation for batch %s: %v", batchHeaderHash, err)
 			continue
@@ -387,6 +393,7 @@ func (c *Controller) HandleSignatures(
 func (c *Controller) updateAttestation(
 	ctx context.Context,
 	batchData *batchData,
+	blobQuorumNumbers [][]core.QuorumID,
 	quorumAttestation *core.QuorumAttestation,
 ) error {
 	sortedNonZeroQuorums, quorumPercentages := c.parseQuorumPercentages(quorumAttestation.QuorumResults)
@@ -405,14 +412,15 @@ func (c *Controller) updateAttestation(
 	}
 
 	attestation := &corev2.Attestation{
-		BatchHeader:      batchData.Batch.BatchHeader,
-		AttestedAt:       uint64(time.Now().UnixNano()),
-		NonSignerPubKeys: signatureAggregation.NonSigners,
-		APKG2:            signatureAggregation.AggPubKey,
-		QuorumAPKs:       signatureAggregation.QuorumAggPubKeys,
-		Sigma:            signatureAggregation.AggSignature,
-		QuorumNumbers:    sortedNonZeroQuorums,
-		QuorumResults:    quorumPercentages,
+		BatchHeader:       batchData.Batch.BatchHeader,
+		AttestedAt:        uint64(time.Now().UnixNano()),
+		NonSignerPubKeys:  signatureAggregation.NonSigners,
+		APKG2:             signatureAggregation.AggPubKey,
+		QuorumAPKs:        signatureAggregation.QuorumAggPubKeys,
+		Sigma:             signatureAggregation.AggSignature,
+		QuorumNumbers:     sortedNonZeroQuorums,
+		QuorumResults:     quorumPercentages,
+		BlobQuorumNumbers: blobQuorumNumbers,
 	}
 
 	putAttestationStartTime := time.Now()

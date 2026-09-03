@@ -16,6 +16,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
+const blobQuorumSigningInfoAccountingMode = "blob_quorums"
+
 var _ = (*dataApiSigningRateLookup)(nil)
 
 // Uses batch information in dynamoDB to determine signing rates.
@@ -195,9 +197,7 @@ func (srl *dataApiSigningRateLookup) getV2SigningRates(
 	q.Set("end", now.UTC().Format(time.RFC3339))
 	// interval: lookback window in seconds
 	q.Set("interval", strconv.Itoa(int(timeSpan.Seconds())))
-	if omitPerfectSigners {
-		q.Set("nonsigner_only", "true")
-	}
+	q.Set("accounting", blobQuorumSigningInfoAccountingMode)
 	url.RawQuery = q.Encode()
 	// Very verbose, enable for debugging if needed.
 	// srl.logger.Debug("making request to DataAPI", "url", url.String())
@@ -268,6 +268,9 @@ func (srl *dataApiSigningRateLookup) getV2SigningRates(
 
 	signingRates := make([]*validator.ValidatorSigningRate, 0, len(signingRateMap))
 	for _, rate := range signingRateMap {
+		if omitPerfectSigners && rate.GetUnsignedBatches() == 0 {
+			continue
+		}
 		signingRates = append(signingRates, rate)
 	}
 
@@ -303,7 +306,18 @@ func translateV2ToProto(data *dataapiv2.OperatorSigningInfo) (*validator.Validat
 		return nil, fmt.Errorf("error parsing operator ID %s: %w", data.OperatorId, err)
 	}
 
-	signedBatches := data.TotalBatches - data.TotalUnsignedBatches
+	if data.TotalResponsibleBatches < 0 ||
+		data.TotalUnsignedBatches < 0 ||
+		data.TotalUnsignedBatches > data.TotalResponsibleBatches {
+		return nil, fmt.Errorf(
+			"invalid batch counts for operator %s: responsible=%d, unsigned=%d",
+			data.OperatorId,
+			data.TotalResponsibleBatches,
+			data.TotalUnsignedBatches,
+		)
+	}
+
+	signedBatches := data.TotalResponsibleBatches - data.TotalUnsignedBatches
 	unsignedBatches := data.TotalUnsignedBatches
 
 	signingRate := &validator.ValidatorSigningRate{
