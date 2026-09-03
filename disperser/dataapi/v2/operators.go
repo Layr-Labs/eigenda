@@ -611,7 +611,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 		}
 	}
 
-	// Sort by descending order of signing rate and then ascending order of <quorumId, operatorId>.
+	// Sort by descending signing rate, then ascending operator ID and quorum ID.
 	sort.Slice(signingInfo, func(i, j int) bool {
 		if signingInfo[i].SigningPercentage == signingInfo[j].SigningPercentage {
 			if signingInfo[i].OperatorId == signingInfo[j].OperatorId {

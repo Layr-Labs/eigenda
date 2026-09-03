@@ -2315,8 +2315,8 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		osi := response.OperatorSigningInfo
 		require.Equal(t, 5, len(osi))
 		checkOperatorSigningInfoEqual(t, osi[0], &serverv2.OperatorSigningInfo{
-			OperatorId:              operatorIds[1].Hex(),
-			OperatorAddress:         operatorAddresses[1].Hex(),
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
 			QuorumId:                0,
 			TotalUnsignedBatches:    0,
 			TotalResponsibleBatches: 1,
@@ -2325,15 +2325,15 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
 			OperatorId:              operatorIds[1].Hex(),
 			OperatorAddress:         operatorAddresses[1].Hex(),
-			QuorumId:                1,
+			QuorumId:                0,
 			TotalUnsignedBatches:    0,
 			TotalResponsibleBatches: 1,
 			TotalBatches:            1,
 		})
 		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
-			OperatorId:              operatorIds[2].Hex(),
-			OperatorAddress:         operatorAddresses[2].Hex(),
-			QuorumId:                0,
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                1,
 			TotalUnsignedBatches:    0,
 			TotalResponsibleBatches: 1,
 			TotalBatches:            1,

@@ -34,16 +34,17 @@ const (
 	AccountBlobIndexName       = "AccountBlobIndex"
 	AccountUpdatedAtIndexName  = "AccountUpdatedAtIndex"
 
-	blobKeyPrefix             = "BlobKey#"
-	dispersalKeyPrefix        = "Dispersal#"
-	batchHeaderKeyPrefix      = "BatchHeader#"
-	blobMetadataSK            = "BlobMetadata"
-	blobCertSK                = "BlobCertificate"
-	dispersalRequestSKPrefix  = "DispersalRequest#"
-	dispersalResponseSKPrefix = "DispersalResponse#"
-	batchHeaderSK             = "BatchHeader"
-	batchSK                   = "BatchInfo"
-	attestationSK             = "Attestation"
+	blobKeyPrefix              = "BlobKey#"
+	dispersalKeyPrefix         = "Dispersal#"
+	batchHeaderKeyPrefix       = "BatchHeader#"
+	blobMetadataSK             = "BlobMetadata"
+	blobCertSK                 = "BlobCertificate"
+	dispersalRequestSKPrefix   = "DispersalRequest#"
+	dispersalResponseSKPrefix  = "DispersalResponse#"
+	batchHeaderSK              = "BatchHeader"
+	batchSK                    = "BatchInfo"
+	attestationSK              = "Attestation"
+	blobQuorumNumbersAttribute = "BlobQuorumNumbers"
 
 	accountPK      = "Account"
 	accountIndexPK = "AccountIndex"
@@ -1965,6 +1966,18 @@ func MarshalAttestation(attestation *corev2.Attestation) (commondynamodb.Item, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal attestation: %w", err)
 	}
+	if len(attestation.BlobQuorumNumbers) > 0 {
+		// [][]QuorumID is otherwise encoded as a DynamoDB binary set, which
+		// rejects duplicate quorum profiles for different blobs. Persist it as
+		// a list of binary values so identical per-blob quorum sets are valid.
+		blobQuorumNumbers := make([]types.AttributeValue, len(attestation.BlobQuorumNumbers))
+		for i, quorumNumbers := range attestation.BlobQuorumNumbers {
+			blobQuorumNumbers[i] = &types.AttributeValueMemberB{
+				Value: append([]byte(nil), quorumNumbers...),
+			}
+		}
+		fields[blobQuorumNumbersAttribute] = &types.AttributeValueMemberL{Value: blobQuorumNumbers}
+	}
 
 	hash, err := attestation.BatchHeader.Hash()
 	if err != nil {
@@ -1983,6 +1996,43 @@ func UnmarshalAttestation(item commondynamodb.Item) (*corev2.Attestation, error)
 	err := attributevalue.UnmarshalMap(item, &attestation)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal attestation: %w", err)
+	}
+
+	if value, ok := item[blobQuorumNumbersAttribute]; ok {
+		switch value := value.(type) {
+		case *types.AttributeValueMemberL:
+			attestation.BlobQuorumNumbers = make([][]core.QuorumID, len(value.Value))
+			for i, quorumNumbers := range value.Value {
+				binaryQuorums, ok := quorumNumbers.(*types.AttributeValueMemberB)
+				if !ok {
+					return nil, fmt.Errorf(
+						"failed to unmarshal attestation: %s[%d] is not binary",
+						blobQuorumNumbersAttribute,
+						i,
+					)
+				}
+				attestation.BlobQuorumNumbers[i] = append(
+					[]core.QuorumID(nil),
+					binaryQuorums.Value...,
+				)
+			}
+		case *types.AttributeValueMemberBS:
+			// Accept the representation written by early versions of this
+			// change when every blob quorum set happened to be unique.
+			attestation.BlobQuorumNumbers = make([][]core.QuorumID, len(value.Value))
+			for i, quorumNumbers := range value.Value {
+				attestation.BlobQuorumNumbers[i] = append(
+					[]core.QuorumID(nil),
+					quorumNumbers...,
+				)
+			}
+		default:
+			return nil, fmt.Errorf(
+				"failed to unmarshal attestation: %s has unexpected type %T",
+				blobQuorumNumbersAttribute,
+				value,
+			)
+		}
 	}
 
 	return &attestation, nil

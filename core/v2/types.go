@@ -376,7 +376,7 @@ type Attestation struct {
 	// BlobQuorumNumbers contains the quorum set requested by each blob in the batch.
 	// It is persisted for signing-accounting queries but is not part of the public
 	// attestation response.
-	BlobQuorumNumbers [][]core.QuorumID `json:"-" dynamodbav:"BlobQuorumNumbers"`
+	BlobQuorumNumbers [][]core.QuorumID `json:"-" dynamodbav:"-"`
 }
 
 func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
